@@ -8,6 +8,35 @@ In progress. Currently not implemented.
 
 Hopefully, supporting Java in the future.
 
+## Goal
+
+To act as a lightweight open-source replacement for MassTransit and MediatR, both of which are planning to go commercial.
+
+Hopefully, driven by the community. 
+
+And with support for other languages, like Java.
+
+Perhaps building native support for formats that aren't MassTransit. Compatibility with NServiceBus.
+
+Eventually, this will diverge and become its own thing.
+
+## Planned features
+
+Will try to be as faithful to the MassTransit API as possible. To enable further development.
+
+* Fire and forget (Send)
+* Pub-Sub pattern (Publish)
+* Request-Response pattern (`RequestClient`)
+* RabbitMQ
+* Mediator and In-memory
+* MassTransit message envelopes
+* Raw JSON messages
+* Retries
+* Error handling
+* Pipeline behaviors
+* OpenTelemetry support
+* Java client (and server)
+
 ## Sample
 
 The messages and consumers:
