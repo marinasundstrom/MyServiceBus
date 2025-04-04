@@ -1,41 +1,57 @@
-using System;
-using System.Collections.Generic;
 using System.Text.Json.Serialization;
 
 namespace MyServiceBus;
 
-public class MassTransitEnvelope<TMessage>
+public class Envelope<TMessage>
     where TMessage : class
 {
     [JsonPropertyName("messageId")]
     public Guid MessageId { get; set; }
 
-    [JsonPropertyName("conversationId")]
-    public Guid? ConversationId { get; set; }
+    [JsonPropertyName("requestId")]
+    public Guid? RequestId { get; set; }
 
     [JsonPropertyName("correlationId")]
     public Guid? CorrelationId { get; set; }
 
+    [JsonPropertyName("conversationId")]
+    public Guid? ConversationId { get; set; }
+
+    [JsonPropertyName("initiatorId")]
+    public Guid? InitiatorId { get; set; }
+
     [JsonPropertyName("sourceAddress")]
-    public string SourceAddress { get; set; }
+    public Uri? SourceAddress { get; set; }
 
     [JsonPropertyName("destinationAddress")]
-    public string DestinationAddress { get; set; }
+    public Uri? DestinationAddress { get; set; }
+
+    [JsonPropertyName("responseAddress")]
+    public Uri? ResponseAddress { get; set; }
+
+    [JsonPropertyName("faultAddress")]
+    public Uri? FaultAddress { get; set; }
+
+    [JsonPropertyName("expirationTime")]
+    public DateTimeOffset? ExpirationTime { get; set; }
+
+    [JsonPropertyName("sentTime")]
+    public DateTimeOffset? SentTime { get; set; }
 
     [JsonPropertyName("messageType")]
-    public List<string> MessageType { get; set; }
+    public List<string> MessageType { get; set; } = new();
 
     [JsonPropertyName("message")]
     public TMessage Message { get; set; }
 
     [JsonPropertyName("headers")]
-    public Dictionary<string, object> Headers { get; set; }
+    public Dictionary<string, object> Headers { get; set; } = new();
 
     [JsonPropertyName("host")]
-    public HostInfo Host { get; set; }
+    public HostInfo? Host { get; set; }
 
     [JsonPropertyName("contentType")]
-    public string ContentType { get; set; }
+    public string? ContentType { get; set; }
 }
 
 public class HostInfo
