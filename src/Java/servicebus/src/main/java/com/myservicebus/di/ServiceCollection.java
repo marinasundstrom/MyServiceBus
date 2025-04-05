@@ -2,6 +2,7 @@ package com.myservicebus.di;
 
 import com.google.inject.*;
 import com.google.inject.Module;
+import com.google.inject.multibindings.Multibinder;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -15,6 +16,7 @@ public class ServiceCollection {
         if (built) {
             throw new IllegalStateException("Cannot add service to container that has been built.");
         }
+
         modules.add(new AbstractModule() {
             @Override
             protected void configure() {
@@ -27,6 +29,7 @@ public class ServiceCollection {
         if (built) {
             throw new IllegalStateException("Cannot add service to container that has been built.");
         }
+
         modules.add(new AbstractModule() {
             @Override
             protected void configure() {
@@ -39,6 +42,7 @@ public class ServiceCollection {
         if (built) {
             throw new IllegalStateException("Cannot add service to container that has been built.");
         }
+
         modules.add(new AbstractModule() {
             @Override
             protected void configure() {
@@ -51,6 +55,7 @@ public class ServiceCollection {
         if (built) {
             throw new IllegalStateException("Cannot add service to container that has been built.");
         }
+
         modules.add(new AbstractModule() {
             @Override
             protected void configure() {
@@ -63,10 +68,39 @@ public class ServiceCollection {
         if (built) {
             throw new IllegalStateException("Cannot add service to container that has been built.");
         }
+
         modules.add(new AbstractModule() {
             @Override
             protected void configure() {
                 bind(iface).to(impl).in(Scoped.class);
+            }
+        });
+    }
+
+    public <T, U extends T> void addMultiBinding(Class<T> iface, Class<U> impl) {
+        if (built) {
+            throw new IllegalStateException("Cannot add service to container that has been built.");
+        }
+
+        modules.add(new AbstractModule() {
+            @Override
+            protected void configure() {
+                Multibinder<T> binder = Multibinder.newSetBinder(binder(), iface);
+                binder.addBinding().to(impl);
+            }
+        });
+    }
+
+    public <T, U extends T> void addScopedMultiBinding(Class<T> iface, Class<U> impl) {
+        if (built) {
+            throw new IllegalStateException("Cannot add service to container that has been built.");
+        }
+
+        modules.add(new AbstractModule() {
+            @Override
+            protected void configure() {
+                Multibinder<T> binder = Multibinder.newSetBinder(binder(), iface);
+                binder.addBinding().to(impl).in(Scoped.class);
             }
         });
     }
