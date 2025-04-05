@@ -5,7 +5,7 @@ import com.rabbitmq.client.Connection;
 import com.rabbitmq.client.ConnectionFactory;
 
 public class SimplePublisher {
-    public static void main(String[] args) throws Exception {
+    public static void main2(String[] args) throws Exception {
         ConnectionFactory factory = new ConnectionFactory();
         factory.setHost("localhost"); // or RabbitMQ server hostname
         try (Connection connection = factory.newConnection();

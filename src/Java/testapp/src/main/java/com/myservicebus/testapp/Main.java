@@ -10,15 +10,37 @@ import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.myservicebus.ConsumeContext;
 import com.myservicebus.Envelope;
 import com.myservicebus.Fault;
 import com.myservicebus.HostInfo;
+import com.myservicebus.MyScopedService;
+import com.myservicebus.MySecondService;
+import com.myservicebus.MyService;
+import com.myservicebus.MyServiceImpl;
+import com.myservicebus.di.ServiceCollection;
+import com.myservicebus.di.ServiceProvider;
+import com.myservicebus.di.ServiceScope;
 
 public class Main {
-    public static void main(String[] args) throws JsonProcessingException {
+    public static void main(String[] args) throws Exception {
         System.out.println("Hello world!");
 
-        test();
+        ServiceCollection services = new ServiceCollection();
+        services.addScoped(SubmitOrderConsumer.class);
+
+        ServiceProvider provider = services.build();
+
+        try (ServiceScope scope = provider.createScope()) {
+            SubmitOrderConsumer consumer = scope.getService(SubmitOrderConsumer.class);
+            var consumeContext = new ConsumeContext<SubmitOrder>(SubmitOrder.class);
+            var future = consumer.consume(consumeContext);
+            future.thenAccept(x -> {
+                System.out.println("completed");
+            });
+        }
+
+        // test();
     }
 
     private static void test() throws JsonProcessingException {

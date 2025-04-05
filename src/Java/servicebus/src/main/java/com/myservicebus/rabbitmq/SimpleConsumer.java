@@ -6,7 +6,7 @@ import com.rabbitmq.client.*;
 import java.nio.charset.StandardCharsets;
 
 public class SimpleConsumer {
-    public static void main(String[] args) throws Exception {
+    public static void main2(String[] args) throws Exception {
         ConnectionFactory factory = new ConnectionFactory();
         factory.setHost("localhost");
 
