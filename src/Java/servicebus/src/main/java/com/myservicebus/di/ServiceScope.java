@@ -6,6 +6,7 @@ import java.io.Closeable;
 public class ServiceScope implements Closeable {
     private final Injector injector;
     private final PerMessageScope scope;
+    private boolean closed;
 
     public ServiceScope(Injector injector, PerMessageScope scope) {
         this.injector = injector;
@@ -19,6 +20,9 @@ public class ServiceScope implements Closeable {
 
     @Override
     public void close() {
-        scope.exit();
+        if (!closed) {
+            scope.exit();
+            closed = true;
+        }
     }
 }

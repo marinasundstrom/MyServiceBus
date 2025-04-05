@@ -15,7 +15,6 @@ import com.myservicebus.Envelope;
 import com.myservicebus.Fault;
 import com.myservicebus.HostInfo;
 import com.myservicebus.MyScopedService;
-import com.myservicebus.MySecondService;
 import com.myservicebus.MyService;
 import com.myservicebus.MyServiceImpl;
 import com.myservicebus.di.ServiceCollection;
@@ -27,17 +26,19 @@ public class Main {
         System.out.println("Hello world!");
 
         ServiceCollection services = new ServiceCollection();
+        services.addScoped(MyService.class, MyServiceImpl.class);
         services.addScoped(SubmitOrderConsumer.class);
 
         ServiceProvider provider = services.build();
 
         try (ServiceScope scope = provider.createScope()) {
             SubmitOrderConsumer consumer = scope.getService(SubmitOrderConsumer.class);
+
             var consumeContext = new ConsumeContext<SubmitOrder>(SubmitOrder.class);
-            var future = consumer.consume(consumeContext);
-            future.thenAccept(x -> {
-                System.out.println("completed");
-            });
+
+            consumer.consume(consumeContext)
+                    .thenRun(() -> System.out.println("completed"))
+                    .join();
         }
 
         // test();
