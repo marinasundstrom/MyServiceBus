@@ -1,0 +1,12 @@
+<Project>
+    <PropertyGroup>
+        <UseArtifactsOutput>true</UseArtifactsOutput>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Sundstrom.CheckedExceptions">
+            <PrivateAssets>all</PrivateAssets>
+            <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
+        </PackageReference>
+    </ItemGroup>
+</Project>
