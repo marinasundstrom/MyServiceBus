@@ -19,7 +19,23 @@ public class Main {
             RabbitMqBusRegistrationConfiguratorExtensions.usingRabbitMq(x, (context, cfg) -> {
                 cfg.host("rabbitmq://localhost");
 
-                cfg.receiveEndpoint("submit-order-queue", e -> {
+                /*
+                 * cfg.Host("localhost", "/", h =>
+                 * {
+                 * h.Username("guest");
+                 * h.Password("guest");
+                 * });
+                 */
+
+                cfg.message(SubmitOrder.class, m -> {
+                    m.setEntityName("TestApp.SubmitOrder");
+                });
+
+                cfg.message(OrderSubmitted.class, m -> {
+                    m.setEntityName("TestApp.OrderSubmitted");
+                });
+
+                cfg.receiveEndpoint("submit-order-consumer", e -> {
                     e.configureConsumer(context, SubmitOrderConsumer.class);
                 });
             });
