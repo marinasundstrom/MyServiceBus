@@ -1,22 +1,49 @@
+using Microsoft.Extensions.DependencyInjection;
+using RabbitMQ.Client;
+
 namespace MyServiceBus;
 
 public static class RabbitMqServiceBusConfigurationBuilderExt
 {
-    public static IBusRegistrationConfigurator UsingRabbitMq(this IBusRegistrationConfigurator builder, Action<IBusRegistrationContext, IRabbiqMqFactoryConfigurator> c)
+    public static IBusRegistrationConfigurator UsingRabbitMq(
+        this IBusRegistrationConfigurator builder,
+        Action<IBusRegistrationContext, IRabbitMqFactoryConfigurator> configure)
     {
-        var busRegistrationContext = new BusRegistrationContext();
+        var rabbitConfigurator = new RabbitMqFactoryConfigurator();
 
-        //builder.Services.AddSingleton<IBus>();
-        //builder.Services.AddSingleton<IBusControl>();
+        // Save configuration for later, after the container is built
+        builder.Services.AddSingleton<IRabbitMqFactoryConfigurator>(rabbitConfigurator);
+        builder.Services.AddSingleton<IPostBuildAction>(new PostBuildConfigureAction(configure, rabbitConfigurator));
 
-        //builder.Services.AddSingleton<IReceiveEndpointConnector>();
-        //builder.Services.AddScoped<ISendEndpointProvider>();
-        //builder.Services.AddScoped<IPublishEndpoint>();
-        //builder.Services.AddScoped(typeof(IRequestClient<>));
+        // Register connection provider
+        builder.Services.AddSingleton<ConnectionProvider>(sp =>
+        {
+            var factory = new ConnectionFactory
+            {
+                HostName = rabbitConfigurator.Host,
+                //DispatchConsumersAsync = true
+            };
 
-        var configuration = new RabbiqMqFactoryConfigurator();
-        c?.Invoke(busRegistrationContext, configuration);
+            return new ConnectionProvider(factory);
+        });
+
+        builder.Services.AddSingleton<ITransportFactory, RabbitMqTransportFactory>();
+        builder.Services.AddSingleton<IMessageBus, MyMessageBus>();
 
         return builder;
     }
+}
+
+public sealed class ConnectionProvider
+{
+    private readonly IConnectionFactory connectionFactory;
+    private IConnection connection;
+
+    public ConnectionProvider(IConnectionFactory connectionFactory)
+    {
+        this.connectionFactory = connectionFactory;
+    }
+
+    public async Task<IConnection> GetOrCreateConnectionAsync(CancellationToken cancellationToken = default)
+        => connection ??= await connectionFactory.CreateConnectionAsync(cancellationToken);
 }

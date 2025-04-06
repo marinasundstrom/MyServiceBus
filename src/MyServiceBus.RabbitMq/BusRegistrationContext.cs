@@ -1,9 +1,14 @@
+
+
+
 namespace MyServiceBus;
 
-internal class BusRegistrationContext : IBusRegistrationContext
+internal sealed class BusRegistrationContext : IBusRegistrationContext
 {
-    public object? GetService(Type serviceType)
+    public BusRegistrationContext(IServiceProvider serviceProvider)
     {
-        throw new NotImplementedException();
+        this.ServiceProvider = serviceProvider;
     }
+
+    public IServiceProvider ServiceProvider { get; }
 }

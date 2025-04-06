@@ -7,11 +7,9 @@ public static class ServiceExtensions
     public static IServiceCollection AddServiceBus(this IServiceCollection services, Action<IBusRegistrationConfigurator> configure)
     {
         var configurator = new BusRegistrationConfigurator(services);
-        configure(configurator); // <-- you call AddConsumer, AddSaga, etc.
-        //configurator.SetBusFactory(...); // set up transport like RabbitMQ
+        configure(configurator); ;
 
-        // Registers bus and hosted service
-        //configurator.CompleteRegistration();
+        services.AddSingleton<IConsumerRegistry>(configurator.ConsumerRegistry);
 
         services.AddHostedService<ServiceBusHostedService>();
 

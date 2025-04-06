@@ -7,15 +7,17 @@ builder.Services.AddServiceBus(x =>
 {
     x.AddConsumer<SubmitOrderConsumer>();
 
-    x.UsingMediator();
+    //x.UsingMediator();
 
-    /*
     x.UsingRabbitMq((context, cfg) =>
     {
+        cfg.SetHost("localhost");
+
         cfg.ConfigureEndpoints(context);
     });
-    */
 });
+
+builder.Services.AddHostedService<HostedService>();
 
 // Add services to the container.
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
@@ -69,4 +71,27 @@ app.Run();
 record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
 {
     public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
+}
+
+
+public class HostedService : IHostedService
+{
+    private readonly IMessageBus messageBus;
+
+    public HostedService(IMessageBus messageBus)
+    {
+        this.messageBus = messageBus;
+    }
+
+    public async Task StartAsync(CancellationToken cancellationToken)
+    {
+        var message = new SubmitOrder() { OrderId = Guid.NewGuid() };
+        var exchangeName = NamingHelpers.GetExchangeName(message.GetType());
+        await messageBus.Publish(message, exchangeName, cancellationToken);
+    }
+
+    public Task StopAsync(CancellationToken cancellationToken)
+    {
+        return Task.CompletedTask;
+    }
 }
