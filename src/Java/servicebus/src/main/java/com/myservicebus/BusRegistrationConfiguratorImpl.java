@@ -1,5 +1,7 @@
 package com.myservicebus;
 
+import java.lang.reflect.Array;
+import java.lang.reflect.GenericArrayType;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.util.logging.Handler;
@@ -26,11 +28,29 @@ class BusRegistrationConfiguratorImpl implements BusRegistrationConfigurator {
                 if (pt.getRawType() == Consumer.class) {
                     Type actualType = pt.getActualTypeArguments()[0];
                     System.out.println("Generic type: " + actualType);
-
-                    registry.register(consumerClass, actualType.getClass());
+                    Class<?> messageType = getClassFromType(actualType);
+                    registry.register(consumerClass, messageType);
                 }
             }
         }
+    }
+
+    public static Class<?> getClassFromType(Type type) {
+        if (type instanceof Class<?>) {
+            return (Class<?>) type;
+        } else if (type instanceof ParameterizedType) {
+            Type rawType = ((ParameterizedType) type).getRawType();
+            if (rawType instanceof Class<?>) {
+                return (Class<?>) rawType;
+            }
+        } else if (type instanceof GenericArrayType) {
+            Type componentType = ((GenericArrayType) type).getGenericComponentType();
+            Class<?> componentClass = getClassFromType(componentType);
+            if (componentClass != null) {
+                return Array.newInstance(componentClass, 0).getClass();
+            }
+        }
+        throw new IllegalArgumentException("Cannot convert Type to Class: " + type);
     }
 
     public void complete() {

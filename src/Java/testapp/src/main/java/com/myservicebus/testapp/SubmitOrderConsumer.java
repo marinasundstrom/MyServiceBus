@@ -24,6 +24,8 @@ class SubmitOrderConsumer implements Consumer<SubmitOrder> {
 
         service.doWork();
 
+        System.out.println("Hello, World!");
+
         return context.publish(new OrderSubmitted(orderId), CancellationToken.none);
     }
 }

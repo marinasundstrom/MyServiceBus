@@ -1,7 +1,6 @@
 package com.myservicebus;
 
 import java.io.IOException;
-import java.lang.reflect.InvocationTargetException;
 import java.nio.charset.StandardCharsets;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -16,16 +15,26 @@ import com.myservicebus.di.ServiceCollection;
 import com.myservicebus.di.ServiceProvider;
 import com.myservicebus.di.ServiceScope;
 import com.myservicebus.util.EnvelopeDeserializer;
+import com.rabbitmq.client.BuiltinExchangeType;
 import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.Connection;
 import com.rabbitmq.client.ConnectionFactory;
 import com.rabbitmq.client.DeliverCallback;
+import com.rabbitmq.client.impl.AMQImpl.Basic.Consume;
 
 public class ServiceBus {
     private final ServiceProvider serviceProvider;
+    private Channel channel;
+    private ObjectMapper mapper;
 
     public ServiceBus(ServiceProvider serviceProvider) {
         this.serviceProvider = serviceProvider;
+
+        mapper = new ObjectMapper();
+        mapper.findAndRegisterModules();
+        mapper.enable(SerializationFeature.INDENT_OUTPUT);
+        mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+        mapper.registerModule(new JavaTimeModule());
     }
 
     public static ServiceBus configure(ServiceCollection services,
@@ -37,36 +46,37 @@ public class ServiceBus {
     }
 
     public void start() throws IOException, TimeoutException {
-        ObjectMapper mapper = new ObjectMapper();
-        mapper.findAndRegisterModules();
-        mapper.enable(SerializationFeature.INDENT_OUTPUT);
-        mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
-        mapper.registerModule(new JavaTimeModule());
-
         ConnectionFactory factory = new ConnectionFactory();
         factory.setHost("localhost");
 
         Connection connection = factory.newConnection();
-        Channel channel = connection.createChannel();
+        channel = connection.createChannel();
 
         ConsumerRegistry registry = serviceProvider.getService(ConsumerRegistry.class);
 
         for (ConsumerDefinition<?, ?> def : registry.getAll()) {
-            String exchange = def.getExchangeName();
+            // String exchange = def.getExchangeName();
             String queue = def.getQueueName();
 
-            channel.exchangeDeclare(exchange, "fanout", true);
+            String exchangeName = def.getMessageType().getSimpleName();
+
+            channel.exchangeDeclare(exchangeName, BuiltinExchangeType.FANOUT, true);
             channel.queueDeclare(queue, true, false, false, null);
-            channel.queueBind(queue, exchange, "");
+            channel.queueBind(queue, exchangeName, "");
 
             channel.basicConsume(queue, true, (tag, delivery) -> {
                 try (ServiceScope scope = serviceProvider.createScope()) {
-                    Object consumer = scope.getService(def.getConsumerType());
-                    Object message = EnvelopeDeserializer.deserialize(delivery.getBody(), def.getMessageType());
+                    Consumer<Object> consumer = (Consumer<Object>) scope.getService(def.getConsumerType());
 
-                    ConsumeContext<?> ctx = new ConsumeContext<>(message, null);
+                    var type = mapper
+                            .getTypeFactory()
+                            .constructParametricType(Envelope.class, def.getMessageType());
+
+                    var envelope = (Envelope<?>) mapper.readValue(delivery.getBody(), type);
+
+                    ConsumeContext<Object> ctx = new ConsumeContext<>(envelope.getMessage(), null);
                     try {
-                        consumer.getClass().getMethod("consume", ConsumeContext.class).invoke(consumer, ctx);
+                        consumer.consume(ctx);
                     } catch (Exception e) {
                         // TODO Auto-generated catch block
                         e.printStackTrace();
@@ -79,24 +89,33 @@ public class ServiceBus {
         }
     }
 
-    public void sendTestMessage(Channel channel, ObjectMapper mapper) throws IOException {
-        /*
-         * SubmitOrder message = new SubmitOrder(UUID.randomUUID());
-         * 
-         * Envelope<SubmitOrder> envelope = new Envelope<>();
-         * envelope.setMessageId(UUID.randomUUID());
-         * envelope.setSentTime(OffsetDateTime.now());
-         * envelope.setSourceAddress("rabbitmq://localhost/source");
-         * envelope.setDestinationAddress("rabbitmq://localhost/destination");
-         * envelope.setMessageType(List.of("urn:message:com.myservicebus:SubmitOrder"));
-         * envelope.setMessage(message);
-         * envelope.setHeaders(Map.of("Application-Header", "SomeValue"));
-         * envelope.setContentType("application/json");
-         * 
-         * String json = mapper.writeValueAsString(envelope);
-         * channel.basicPublish("", "my-service-queue", null,
-         * json.getBytes(StandardCharsets.UTF_8));
-         * System.out.println("📤 Sent test message");
-         */
+    public void publish(Object message) throws IOException {
+        if (message == null)
+            throw new IllegalArgumentException("Message cannot be null");
+
+        Class<?> messageType = message.getClass();
+
+        Envelope<Object> envelope = new Envelope<>();
+        envelope.setMessageId(UUID.randomUUID());
+        envelope.setSentTime(OffsetDateTime.now());
+        envelope.setSourceAddress("rabbitmq://localhost/source");
+        envelope.setDestinationAddress("rabbitmq://localhost/" + messageType.getSimpleName());
+        envelope.setMessageType(List.of("urn:message:" + messageType.getName()));
+        envelope.setMessage(message);
+        envelope.setHeaders(Map.of());
+        envelope.setContentType("application/json");
+
+        String json = mapper.writeValueAsString(envelope);
+        byte[] body = json.getBytes(StandardCharsets.UTF_8);
+
+        String exchangeName = messageType.getSimpleName();
+
+        // Ensure the exchange exists (fanout-type)
+        channel.exchangeDeclare(exchangeName, BuiltinExchangeType.FANOUT, true);
+
+        // Publish to the exchange (fanout -> routingKey is ignored)
+        channel.basicPublish(exchangeName, "", null, body);
+
+        System.out.println("📤 Published message of type " + messageType.getSimpleName());
     }
 }

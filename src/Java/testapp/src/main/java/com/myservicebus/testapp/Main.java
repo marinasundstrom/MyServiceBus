@@ -1,5 +1,7 @@
 package com.myservicebus.testapp;
 
+import java.util.UUID;
+
 import com.myservicebus.MyService;
 import com.myservicebus.MyServiceImpl;
 import com.myservicebus.ServiceBus;
@@ -8,26 +10,6 @@ import com.myservicebus.rabbitmq.RabbitMqBusRegistrationConfiguratorExtensions;
 
 public class Main {
     public static void main(String[] args) throws Exception {
-        System.out.println("Hello world!");
-
-        /*
-         * ServiceCollection services = new ServiceCollection();
-         * services.addScoped(MyService.class, MyServiceImpl.class);
-         * services.addScoped(SubmitOrderConsumer.class);
-         * 
-         * ServiceProvider provider = services.build();
-         * 
-         * try (ServiceScope scope = provider.createScope()) {
-         * SubmitOrderConsumer consumer = scope.getService(SubmitOrderConsumer.class);
-         * 
-         * var consumeContext = new ConsumeContext<SubmitOrder>(SubmitOrder.class);
-         * 
-         * consumer.consume(consumeContext)
-         * .thenRun(() -> System.out.println("completed"))
-         * .join();
-         * }
-         */
-
         ServiceCollection services = new ServiceCollection();
         services.addScoped(MyService.class, MyServiceImpl.class);
 
@@ -44,5 +26,15 @@ public class Main {
         });
 
         serviceBus.start();
+
+        System.out.println("Up and running");
+
+        SubmitOrder message = new SubmitOrder(UUID.randomUUID());
+
+        serviceBus.publish(message);
+
+        System.out.println("Waiting");
+
+        System.in.read();
     }
 }
