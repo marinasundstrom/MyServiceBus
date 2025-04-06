@@ -13,11 +13,15 @@ public record OrderSubmitted { }
 class SubmitOrderConsumer :
     IConsumer<SubmitOrder>
 {
-    public async Task Consume(ConsumeContext<SubmitOrder> context)
+    public Task Consume(ConsumeContext<SubmitOrder> context)
     {
-        await context.Publish<OrderSubmitted>(new
+        Console.WriteLine("Foo bar");
+
+        /* await context.Publish<OrderSubmitted>(new
         {
             context.Message.OrderId
-        });
+        }); */
+
+        return Task.CompletedTask;
     }
 }

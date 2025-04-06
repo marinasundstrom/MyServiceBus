@@ -1,3 +1,4 @@
+using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace MyServiceBus;
@@ -38,7 +39,7 @@ public static class RabbitMqConfiguratorExtensions
             var bus = context.ServiceProvider.GetRequiredService<IMessageBus>();
             var queueName = NamingHelpers.GetQueueName(consumerType);
 
-            method.Invoke(bus, new object[] { queueName, CancellationToken.None });
+            ((Task)method.Invoke(bus, [queueName, CancellationToken.None])).GetAwaiter().GetResult();
         }
     }
 }

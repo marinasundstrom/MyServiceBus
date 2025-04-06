@@ -1,3 +1,4 @@
+using System.Text;
 using System.Threading.Tasks;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
@@ -29,16 +30,18 @@ public sealed class RabbitMqReceiveTransport : IReceiveTransport
                 var body = ea.Body.ToArray();
                 var props = ea.BasicProperties;
 
-                var context = new ReceiveContext(body, props.Headers.ToDictionary(x => x.Key, x => x.Value!));
+                var context = new ReceiveContext(body, props.Headers.ToDictionary(x => x.Key, x => (object)Encoding.UTF8.GetString((byte[])x.Value!)));
 
                 await _messageHandler.Handle(context);
 
                 await _channel.BasicAckAsync(ea.DeliveryTag, multiple: false);
             }
-            catch (Exception)
+            catch (Exception exc)
             {
                 // Optionally nack
                 await _channel.BasicNackAsync(ea.DeliveryTag, false, requeue: true);
+
+                // Error handling & Retries
             }
         };
 

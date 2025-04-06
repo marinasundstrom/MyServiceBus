@@ -17,7 +17,7 @@ builder.Services.AddServiceBus(x =>
     });
 });
 
-builder.Services.AddHostedService<HostedService>();
+//builder.Services.AddHostedService<HostedService>();
 
 // Add services to the container.
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
@@ -59,6 +59,15 @@ app.MapPost("/publish", async (IPublishEndpoint publishEndpoint, CancellationTok
 .WithName("Test_Publish")
 .WithTags("Test");
 
+app.MapGet("/publish2", async (IMessageBus messageBus, CancellationToken cancellationToken = default) =>
+{
+    var message = new SubmitOrder() { OrderId = Guid.NewGuid() };
+    var exchangeName = NamingHelpers.GetExchangeName(message.GetType());
+    await messageBus.Publish(message, exchangeName, cancellationToken);
+})
+.WithName("Test_Publish2")
+.WithTags("Test");
+
 app.MapPost("/send", async (ISendEndpoint sendEndpoint, CancellationToken cancellationToken = default) =>
 {
     await sendEndpoint.Send(new SubmitOrder { OrderId = Guid.NewGuid() }, cancellationToken);
@@ -85,6 +94,8 @@ public class HostedService : IHostedService
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
+        await Task.Delay(200);
+
         var message = new SubmitOrder() { OrderId = Guid.NewGuid() };
         var exchangeName = NamingHelpers.GetExchangeName(message.GetType());
         await messageBus.Publish(message, exchangeName, cancellationToken);

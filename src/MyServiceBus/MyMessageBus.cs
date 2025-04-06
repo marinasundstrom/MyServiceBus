@@ -42,8 +42,6 @@ public class MyMessageBus : IMessageBus
         var messageType = typeof(TMessage);
         var consumerType = typeof(TConsumer);
 
-        _registeredConsumers[messageType.FullName!] = consumerType;
-
         var topology = new ReceiveEndpointTopology
         {
             QueueName = queue,
@@ -58,23 +56,18 @@ public class MyMessageBus : IMessageBus
 
         var receiveTransport = await _transportFactory.CreateReceiveTransport(topology, handler, cancellationToken);
 
+        _registeredConsumers.Add(messageType.FullName, consumerType);
         _activeTransports.Add(receiveTransport);
     }
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
-        foreach (var transport in _activeTransports)
-        {
-            await transport.Start(cancellationToken);
-        }
+        await Task.WhenAll(_activeTransports.Select(async transport => await transport.Start(cancellationToken)));
     }
 
     public async Task StopAsync(CancellationToken cancellationToken)
     {
-        foreach (var transport in _activeTransports)
-        {
-            await transport.Stop(cancellationToken);
-        }
+        await Task.WhenAll(_activeTransports.Select(async transport => await transport.Stop(cancellationToken)));
     }
 
     private async Task HandleMessageAsync(ReceiveContext context)
@@ -83,8 +76,10 @@ public class MyMessageBus : IMessageBus
         if (messageTypeName == null || !_registeredConsumers.TryGetValue(messageTypeName, out var consumerType))
             throw new InvalidOperationException($"No consumer registered for message type: {messageTypeName}");
 
-        var messageType = Type.GetType(messageTypeName)
-                          ?? throw new InvalidOperationException($"Cannot resolve message type: {messageTypeName}");
+        var messageType = consumerType.GetInterfaces().First().GetGenericArguments()[0];
+
+        /* var messageType = Type.GetType(messageTypeName, false)
+                          ?? throw new InvalidOperationException($"Cannot resolve message type: {messageTypeName}"); */
 
         var message = context.Deserialize(messageType);
 
@@ -100,6 +95,6 @@ public class MyMessageBus : IMessageBus
         var consumeMethod = consumerType.GetMethod("Consume", new[] { consumeContextType })
                           ?? throw new InvalidOperationException($"Consumer does not implement Consume({consumeContextType.Name})");
 
-        await (Task)consumeMethod.Invoke(consumer, new[] { consumeContext })!;
+        await (Task)consumeMethod.Invoke(consumer, [consumeContext])!;
     }
 }

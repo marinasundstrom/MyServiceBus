@@ -17,26 +17,22 @@ public sealed class ServiceBusHostedService : IHostedService
         this.logger = logger;
     }
 
-    public Task StartAsync(CancellationToken cancellationToken)
+    public async Task StartAsync(CancellationToken cancellationToken)
     {
         foreach (var action in serviceProvider.GetServices<IPostBuildAction>())
         {
             action.Execute(serviceProvider);
         }
 
-        messageBus.StartAsync(cancellationToken);
+        await messageBus.StartAsync(cancellationToken);
 
         logger.LogInformation("Hosted service started");
-
-        return Task.CompletedTask;
     }
 
-    public Task StopAsync(CancellationToken cancellationToken)
+    public async Task StopAsync(CancellationToken cancellationToken)
     {
-        messageBus.StopAsync(cancellationToken);
+        await messageBus.StopAsync(cancellationToken);
 
         logger.LogInformation("Hosted service stopped");
-
-        return Task.CompletedTask;
     }
 }
