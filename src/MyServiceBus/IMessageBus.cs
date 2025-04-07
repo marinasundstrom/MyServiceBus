@@ -1,3 +1,5 @@
+using MyServiceBus.Topology;
+
 namespace MyServiceBus;
 
 public interface IMessageBus
@@ -8,7 +10,7 @@ public interface IMessageBus
 
        Task Publish<T>(T message, string topic, CancellationToken cancellationToken = default)
               where T : class;
-       Task AddConsumer<TMessage, TConsumer>(string queue, CancellationToken cancellationToken = default)
+       Task AddConsumer<TMessage, TConsumer>(ConsumerTopology consumer, CancellationToken cancellationToken = default)
               where TConsumer : IConsumer<TMessage>
               where TMessage : class;
 }

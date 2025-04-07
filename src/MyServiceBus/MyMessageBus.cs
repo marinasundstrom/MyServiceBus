@@ -36,16 +36,16 @@ public class MyMessageBus : IMessageBus
         await transport.Send(message, context, cancellationToken);
     }
 
-    public async Task AddConsumer<TMessage, TConsumer>(string queue, CancellationToken cancellationToken = default)
+    public async Task AddConsumer<TMessage, TConsumer>(ConsumerTopology consumer, CancellationToken cancellationToken = default)
         where TConsumer : IConsumer<TMessage>
         where TMessage : class
     {
-        var messageType = typeof(TMessage);
-        var consumerType = typeof(TConsumer);
+        var messageType = consumer.Bindings.First().MessageType;
+        var consumerType = consumer.ConsumerType;
 
         var topology = new ReceiveEndpointTopology
         {
-            QueueName = queue,
+            QueueName = consumer.QueueName,
             ExchangeName = NamingHelpers.GetExchangeName(messageType)!, // standard MT routing
             RoutingKey = messageType.FullName!,
             ExchangeType = "fanout",

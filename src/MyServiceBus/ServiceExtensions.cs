@@ -7,7 +7,7 @@ public static class ServiceExtensions
     public static IServiceCollection AddServiceBus(this IServiceCollection services, Action<IBusRegistrationConfigurator> configure)
     {
         var configurator = new BusRegistrationConfigurator(services);
-        configure(configurator); ;
+        configure(configurator);
 
         configurator.Build();
 

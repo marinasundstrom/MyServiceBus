@@ -20,7 +20,7 @@ public class BusRegistrationConfigurator : IBusRegistrationConfigurator
         Services.AddScoped<IConsumer, TConsumer>();
 
         _topology.RegisterConsumer<TConsumer>(
-          queueName: typeof(TConsumer).Name.Replace("Consumer", "") + "-queue",
+          queueName: NamingHelpers.GetQueueName(typeof(TConsumer)),
           messageTypes: GetHandledMessageTypes(typeof(TConsumer))
       );
     }
@@ -37,5 +37,15 @@ public class BusRegistrationConfigurator : IBusRegistrationConfigurator
     public void Build()
     {
         Services.AddSingleton<TopologyRegistry>(_topology);
+
+        /*
+        Services.AddSingleton(provider =>
+        {
+            var bus = new MyMessageBus(_topology); // swap with actual bus later
+            var cfg = new RabbitMQ (bus); // replace with real one
+            _rabbitConfig?.Invoke(provider, cfg);
+            return bus;
+        });
+        */
     }
 }
