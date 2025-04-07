@@ -4,9 +4,7 @@ Asynchronous messaging library based on MassTransit.
 
 Meant to be minimal, for sending and publishing messages, but compatible with the MT message envelope format.
 
-In progress. Currently not implemented.
-
-Hopefully, supporting Java in the future.
+Prototypes for Java and .NET. Able to consume their own messages.
 
 ## Goal
 
