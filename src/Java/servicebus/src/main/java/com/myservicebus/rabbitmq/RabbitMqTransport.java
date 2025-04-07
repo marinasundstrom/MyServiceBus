@@ -2,9 +2,10 @@ package com.myservicebus.rabbitmq;
 
 import com.myservicebus.BusRegistrationConfigurator;
 
-public class RabbitMqBusRegistrationConfiguratorExtensions {
+public class RabbitMqTransport {
 
-    public static void usingRabbitMq(BusRegistrationConfigurator x,
+    // Equivalent to "UsingRabbitMq" in .NET impl
+    public static void configure(BusRegistrationConfigurator x,
             java.util.function.BiConsumer<BusRegistrationContext, RabbiqMqFactoryConfigurator> configure) {
 
         // factoryConfigurator

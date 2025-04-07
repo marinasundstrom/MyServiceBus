@@ -1,10 +1,12 @@
 package com.myservicebus.rabbitmq;
 
-import com.myservicebus.BusRegistrationConfigurator;
-
 public class RabbiqMqFactoryConfigurator {
 
     public void host(String string) {
+    }
+
+    public void host(String string, java.util.function.Consumer<RabbitMqHostConfigurator> configure) {
+        // configure.accept(null, null);
     }
 
     public void receiveEndpoint(String queueName,

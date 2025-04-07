@@ -22,8 +22,11 @@ internal sealed class RabbitMqFactoryConfigurator : IRabbitMqFactoryConfigurator
         configure(configurator);
     }
 
-    public void Host(string host)
+    public void Host(string host, Action<IRabbitMqHostConfigurator>? configure = null)
     {
         ClientHost = host;
+
+        IRabbitMqHostConfigurator? configurator = null;
+        configure?.Invoke(configurator!);
     }
 }

@@ -7,11 +7,13 @@ builder.Services.AddServiceBus(x =>
 {
     x.AddConsumer<SubmitOrderConsumer>();
 
-    //x.UsingMediator();
-
     x.UsingRabbitMq((context, cfg) =>
     {
-        cfg.Host("localhost");
+        cfg.Host("localhost", h =>
+        {
+            h.Username("guest");
+            h.Password("guest");
+        });
 
         cfg.Message<SubmitOrder>(m =>
         {
