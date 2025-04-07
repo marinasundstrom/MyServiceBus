@@ -11,7 +11,22 @@ builder.Services.AddServiceBus(x =>
 
     x.UsingRabbitMq((context, cfg) =>
     {
-        cfg.SetHost("localhost");
+        cfg.Host("localhost");
+
+        cfg.Message<SubmitOrder>(m =>
+        {
+            m.SetEntityName("TestApp.SubmitOrder");
+        });
+
+        cfg.Message<OrderSubmitted>(m =>
+        {
+            m.SetEntityName("TestApp.OrderSubmitted");
+        });
+
+        cfg.ReceiveEndpoint("submit-order-consumer", e =>
+        {
+            e.ConfigureConsumer<SubmitOrderConsumer>(context);
+        });
 
         cfg.ConfigureEndpoints(context);
     });

@@ -1,4 +1,4 @@
-namespace MyServiceBus;
+namespace MyServiceBus.Topology;
 
 public class ReceiveEndpointTopology
 {

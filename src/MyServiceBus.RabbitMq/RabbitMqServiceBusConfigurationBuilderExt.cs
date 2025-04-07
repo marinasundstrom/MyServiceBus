@@ -20,7 +20,7 @@ public static class RabbitMqServiceBusConfigurationBuilderExt
         {
             var factory = new ConnectionFactory
             {
-                HostName = rabbitConfigurator.Host,
+                HostName = rabbitConfigurator.ClientHost,
                 //DispatchConsumersAsync = true
             };
 

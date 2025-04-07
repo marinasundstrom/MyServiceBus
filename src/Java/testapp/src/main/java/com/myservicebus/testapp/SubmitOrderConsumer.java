@@ -6,7 +6,6 @@ import com.google.inject.Inject;
 import com.myservicebus.ConsumeContext;
 import com.myservicebus.Consumer;
 import com.myservicebus.MyService;
-import com.myservicebus.tasks.CancellationToken;
 
 class SubmitOrderConsumer implements Consumer<SubmitOrder> {
     private MyService service;
@@ -26,6 +25,6 @@ class SubmitOrderConsumer implements Consumer<SubmitOrder> {
 
         System.out.println("Hello, World!");
 
-        return context.publish(new OrderSubmitted(orderId), CancellationToken.none);
+        return context.publish(new OrderSubmitted(orderId), context.cancellationToken());
     }
 }

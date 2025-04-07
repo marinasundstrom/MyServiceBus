@@ -49,4 +49,9 @@ public class ConsumeContext<T>
         // TODO Auto-generated method stub
         throw new UnsupportedOperationException("Unimplemented method 'Respond'");
     }
+
+    public CancellationToken cancellationToken() {
+        // TODO Auto-generated method stub
+        throw new UnsupportedOperationException("Unimplemented method 'getCancellationToken'");
+    }
 }

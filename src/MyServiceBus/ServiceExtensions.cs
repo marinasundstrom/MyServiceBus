@@ -9,7 +9,7 @@ public static class ServiceExtensions
         var configurator = new BusRegistrationConfigurator(services);
         configure(configurator); ;
 
-        services.AddSingleton<IConsumerRegistry>(configurator.ConsumerRegistry);
+        configurator.Build();
 
         services.AddHostedService<ServiceBusHostedService>();
 

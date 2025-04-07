@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using MyServiceBus.Topology;
 
 namespace MyServiceBus;
 

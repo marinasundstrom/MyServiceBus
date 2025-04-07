@@ -1,3 +1,5 @@
+using MyServiceBus.Topology;
+
 namespace MyServiceBus;
 
 public interface ITransportFactory

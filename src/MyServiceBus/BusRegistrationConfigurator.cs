@@ -1,10 +1,11 @@
 using Microsoft.Extensions.DependencyInjection;
+using MyServiceBus.Topology;
 
 namespace MyServiceBus;
 
 public class BusRegistrationConfigurator : IBusRegistrationConfigurator
 {
-    public IConsumerRegistry ConsumerRegistry { get; } = new ConsumerRegistry();
+    private TopologyRegistry _topology = new TopologyRegistry();
 
     public IServiceCollection Services { get; }
 
@@ -13,12 +14,28 @@ public class BusRegistrationConfigurator : IBusRegistrationConfigurator
         Services = services;
     }
 
-    public void AddConsumer<T>() where T : class, IConsumer
+    public void AddConsumer<TConsumer>() where TConsumer : class, IConsumer
     {
-        Services.AddScoped<T>();
-        Services.AddScoped<IConsumer, T>();
+        Services.AddScoped<TConsumer>();
+        Services.AddScoped<IConsumer, TConsumer>();
 
-        // Also tracks metadata internally for endpoint setup
-        ConsumerRegistry.Register(typeof(T));
+        _topology.RegisterConsumer<TConsumer>(
+          queueName: typeof(TConsumer).Name.Replace("Consumer", "") + "-queue",
+          messageTypes: GetHandledMessageTypes(typeof(TConsumer))
+      );
+    }
+
+    private static Type[] GetHandledMessageTypes(Type consumerType)
+    {
+        return consumerType
+            .GetInterfaces()
+            .Where(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IConsumer<>))
+            .Select(i => i.GetGenericArguments()[0])
+            .ToArray();
+    }
+
+    public void Build()
+    {
+        Services.AddSingleton<TopologyRegistry>(_topology);
     }
 }

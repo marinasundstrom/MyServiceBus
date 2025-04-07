@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Threading.Tasks;
+using MyServiceBus.Topology;
 using RabbitMQ.Client;
 
 namespace MyServiceBus;

@@ -1,5 +1,4 @@
 using System.Threading.Tasks;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace MyServiceBus;
 
@@ -9,37 +8,22 @@ internal sealed class RabbitMqFactoryConfigurator : IRabbitMqFactoryConfigurator
     {
     }
 
-    public string Host { get; private set; } = "localhost";
+    public string ClientHost { get; private set; } = "localhost";
 
-    public void SetHost(string host)
+    public void Message<T>(Action<MessageConfigurator> configure)
     {
-        Host = host;
+        var configurator = new MessageConfigurator();
+        configure(configurator);
     }
-}
 
-public static class RabbitMqConfiguratorExtensions
-{
-    public static void ConfigureEndpoints(this IRabbitMqFactoryConfigurator configurator, IBusRegistrationContext context)
+    public void ReceiveEndpoint(string queueName, Action<ReceiveEndpointConfigurator> configure)
     {
-        var registry = context.ServiceProvider.GetRequiredService<IConsumerRegistry>();
+        var configurator = new ReceiveEndpointConfigurator();
+        configure(configurator);
+    }
 
-        foreach (var consumerType in registry.GetAll())
-        {
-            var messageType = consumerType
-                .GetInterfaces()
-                .FirstOrDefault(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IConsumer<>))
-                ?.GetGenericArguments().First();
-
-            if (messageType == null)
-                continue;
-
-            var method = typeof(IMessageBus).GetMethod("AddConsumer")!
-                .MakeGenericMethod(messageType, consumerType);
-
-            var bus = context.ServiceProvider.GetRequiredService<IMessageBus>();
-            var queueName = NamingHelpers.GetQueueName(consumerType);
-
-            ((Task)method.Invoke(bus, [queueName, CancellationToken.None])).GetAwaiter().GetResult();
-        }
+    public void Host(string host)
+    {
+        ClientHost = host;
     }
 }
