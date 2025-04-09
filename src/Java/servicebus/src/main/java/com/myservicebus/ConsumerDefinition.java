@@ -9,16 +9,8 @@ public class ConsumerDefinition<TConsumer, TMessage> {
     public ConsumerDefinition(Class<TConsumer> consumerType, Class<TMessage> messageType) {
         this.consumerType = consumerType;
         this.messageType = messageType;
-        this.queueName = defaultQueueName(consumerType);
-        this.exchangeName = defaultExchangeName(messageType);
-    }
-
-    private String defaultQueueName(Class<?> consumerType) {
-        return consumerType.getName().toLowerCase().replace(".", "-");
-    }
-
-    private String defaultExchangeName(Class<?> messageType) {
-        return messageType.getName().toLowerCase().replace(".", "-");
+        this.queueName = NamingConventions.getQueueName(consumerType);
+        this.exchangeName = NamingConventions.getExchangeName(messageType);
     }
 
     public Class getMessageType() {

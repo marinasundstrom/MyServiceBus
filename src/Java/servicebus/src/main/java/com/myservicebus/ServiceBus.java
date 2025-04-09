@@ -58,7 +58,7 @@ public class ServiceBus {
             // String exchange = def.getExchangeName();
             String queue = def.getQueueName();
 
-            String exchangeName = def.getMessageType().getSimpleName();
+            String exchangeName = def.getExchangeName();
 
             channel.exchangeDeclare(exchangeName, BuiltinExchangeType.FANOUT, true);
             channel.queueDeclare(queue, true, false, false, null);
@@ -100,8 +100,8 @@ public class ServiceBus {
         envelope.setConversationId(UUID.randomUUID());
         envelope.setSentTime(OffsetDateTime.now());
         envelope.setSourceAddress("rabbitmq://localhost/source");
-        envelope.setDestinationAddress("rabbitmq://localhost/" + messageType.getSimpleName());
-        envelope.setMessageType(List.of("urn:message:" + "TestApp" + ":" + messageType.getSimpleName()));
+        envelope.setDestinationAddress("rabbitmq://localhost/" + NamingConventions.getMessageName(messageType));
+        envelope.setMessageType(List.of(NamingConventions.getMessageUrn(messageType)));
         envelope.setMessage(message);
         envelope.setHeaders(Map.of());
         envelope.setContentType("application/json");
@@ -115,7 +115,7 @@ public class ServiceBus {
 
         // messageType.getPackageName()
 
-        String exchangeName = "TestApp" + ":" + messageType.getSimpleName();
+        String exchangeName = NamingConventions.getExchangeName(messageType);
 
         // Ensure the exchange exists (fanout-type)
         channel.exchangeDeclare(exchangeName, BuiltinExchangeType.FANOUT, true);
