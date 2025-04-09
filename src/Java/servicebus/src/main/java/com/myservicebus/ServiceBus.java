@@ -1,6 +1,7 @@
 package com.myservicebus;
 
 import java.io.IOException;
+import java.net.InetAddress;
 import java.nio.charset.StandardCharsets;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -106,9 +107,26 @@ public class ServiceBus {
         envelope.setHeaders(Map.of());
         envelope.setContentType("application/json");
 
-        var hostInfo = new HostInfo();
+        String machineName = InetAddress.getLocalHost().getHostName();
+        String processName = "java";
+        long processId = ProcessHandle.current().pid(); // Java 9+
+        String serviceName = "my-app";
+        String serviceVersion = "1.0.0";
+        String frameworkVersion = System.getProperty("java.version");
+        String platform = "8.0.10.0"; // define or detect if needed
+        String operatingSystemVersion = System.getProperty("os.name") + " " + System.getProperty("os.version");
 
-        envelope.setHost(hostInfo);
+        HostInfo host = new HostInfo(
+                machineName,
+                processName,
+                (int) processId,
+                serviceName,
+                serviceVersion,
+                frameworkVersion,
+                platform,
+                operatingSystemVersion);
+
+        envelope.setHost(host);
 
         String json = mapper.writeValueAsString(envelope);
         byte[] body = json.getBytes(StandardCharsets.UTF_8);
