@@ -5,7 +5,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddServiceBus(x =>
 {
-    x.AddConsumer<SubmitOrderConsumer>();
+    //x.AddConsumer<SubmitOrderConsumer>();
 
     x.UsingRabbitMq((context, cfg) =>
     {
@@ -15,6 +15,7 @@ builder.Services.AddServiceBus(x =>
             h.Password("guest");
         });
 
+        /*
         cfg.Message<SubmitOrder>(m =>
         {
             m.SetEntityName("TestApp.SubmitOrder");
@@ -28,7 +29,7 @@ builder.Services.AddServiceBus(x =>
         cfg.ReceiveEndpoint("submit-order-consumer", e =>
         {
             e.ConfigureConsumer<SubmitOrderConsumer>(context);
-        });
+        }); */
 
         cfg.ConfigureEndpoints(context);
     });
@@ -69,20 +70,22 @@ app.MapGet("/weatherforecast", () =>
 })
 .WithName("GetWeatherForecast");
 
+/*
 app.MapPost("/publish", async (IPublishEndpoint publishEndpoint, CancellationToken cancellationToken = default) =>
 {
     await publishEndpoint.Publish(new OrderSubmitted(), cancellationToken);
 })
 .WithName("Test_Publish")
 .WithTags("Test");
+*/
 
-app.MapGet("/publish2", async (IMessageBus messageBus, CancellationToken cancellationToken = default) =>
+app.MapGet("/publish", async (IMessageBus messageBus, CancellationToken cancellationToken = default) =>
 {
     var message = new SubmitOrder() { OrderId = Guid.NewGuid() };
     var exchangeName = NamingHelpers.GetExchangeName(message.GetType());
     await messageBus.Publish(message, exchangeName, cancellationToken);
 })
-.WithName("Test_Publish2")
+.WithName("Test_Publish")
 .WithTags("Test");
 
 app.MapPost("/send", async (ISendEndpoint sendEndpoint, CancellationToken cancellationToken = default) =>

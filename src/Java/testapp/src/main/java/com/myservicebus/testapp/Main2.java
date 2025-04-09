@@ -1,5 +1,7 @@
 package com.myservicebus.testapp;
 
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
@@ -16,7 +18,7 @@ import com.myservicebus.HostInfo;
 
 public class Main2 {
 
-    private static void test() throws JsonProcessingException {
+    private static void test() throws JsonProcessingException, UnknownHostException {
         ObjectMapper mapper = new ObjectMapper();
         mapper.findAndRegisterModules(); // For Java time serialization
         mapper.enable(SerializationFeature.INDENT_OUTPUT); // Pretty print
@@ -28,7 +30,8 @@ public class Main2 {
         // testMessageDeserialization(mapper);
     }
 
-    private static void testMessageDeserializationWithFaultWrapper(ObjectMapper mapper) throws JsonProcessingException {
+    private static void testMessageDeserializationWithFaultWrapper(ObjectMapper mapper)
+            throws JsonProcessingException, UnknownHostException {
         // 📨 Step 1: Build original message
         SubmitOrder message = new SubmitOrder(UUID.randomUUID());
 
@@ -51,12 +54,24 @@ public class Main2 {
         envelope.setSourceAddress("rabbitmq://localhost/source");
         envelope.setDestinationAddress("rabbitmq://localhost/destination");
 
+        String machineName = InetAddress.getLocalHost().getHostName();
+        String processName = "java";
+        long processId = ProcessHandle.current().pid(); // Java 9+
+        String serviceName = "my-app";
+        String serviceVersion = "1.0.0";
+        String frameworkVersion = System.getProperty("java.version");
+        String platform = "8.0.10.0"; // define or detect if needed
+        String operatingSystemVersion = System.getProperty("os.name") + " " + System.getProperty("os.version");
+
         HostInfo host = new HostInfo(
-                "MyMachine", "java", 1234,
-                "my-app", "1.0.0",
-                System.getProperty("java.version"),
-                "8.0.10.0",
-                System.getProperty("os.name") + " " + System.getProperty("os.version"));
+                machineName,
+                processName,
+                (int) processId,
+                serviceName,
+                serviceVersion,
+                frameworkVersion,
+                platform,
+                operatingSystemVersion);
         envelope.setHost(host);
 
         // 📝 Step 4: Serialize

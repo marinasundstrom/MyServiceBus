@@ -14,6 +14,7 @@ public sealed class RabbitMqSendTransport : ISendTransport
     }
 
     public async Task Send<T>(T message, SendContext context, CancellationToken cancellationToken = default)
+        where T : class
     {
         var props = new BasicProperties();
 

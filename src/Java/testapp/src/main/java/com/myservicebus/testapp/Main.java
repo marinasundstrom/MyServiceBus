@@ -14,25 +14,28 @@ public class Main {
         services.addScoped(MyService.class, MyServiceImpl.class);
 
         var serviceBus = ServiceBus.configure(services, x -> {
-            x.addConsumer(SubmitOrderConsumer.class);
+            // x.addConsumer(SubmitOrderConsumer.class);
 
             RabbitMqTransport.configure(x, (context, cfg) -> {
+
                 cfg.host("rabbitmq://localhost", h -> {
                     h.username("guest");
                     h.password("guest");
                 });
 
-                cfg.message(SubmitOrder.class, m -> {
-                    m.setEntityName("TestApp.SubmitOrder");
-                });
-
-                cfg.message(OrderSubmitted.class, m -> {
-                    m.setEntityName("TestApp.OrderSubmitted");
-                });
-
-                cfg.receiveEndpoint("submit-order-consumer", e -> {
-                    e.configureConsumer(context, SubmitOrderConsumer.class);
-                });
+                /*
+                 * cfg.message(SubmitOrder.class, m -> {
+                 * m.setEntityName("TestApp.SubmitOrder");
+                 * });
+                 * 
+                 * cfg.message(OrderSubmitted.class, m -> {
+                 * m.setEntityName("TestApp.OrderSubmitted");
+                 * });
+                 * 
+                 * cfg.receiveEndpoint("submit-order-consumer", e -> {
+                 * e.configureConsumer(context, SubmitOrderConsumer.class);
+                 * });
+                 */
             });
         });
 

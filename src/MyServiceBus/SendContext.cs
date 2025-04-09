@@ -12,6 +12,7 @@ public class SendContext
     public IMessageSerializer Serializer { get; set; } = new JsonMessageSerializer();
 
     public ReadOnlyMemory<byte> Serialize<T>(T message)
+        where T : class
     {
         return Serializer.Serialize(message);
     }

@@ -9,12 +9,12 @@ public static class NamingHelpers
         if (name.EndsWith("Consumer"))
             name = name[..^"Consumer".Length];
 
-        return name.ToKebabCase() + "-consumer";
+        return consumerType.GetInterfaces().First().GetGenericArguments().First().Name; //name.ToKebabCase() + "-consumer";
     }
 
     public static string GetExchangeName(Type messageType)
     {
-        return messageType.FullName!; // e.g. Contracts.Messages.SubmitOrder
+        return $"{messageType.Namespace}:{messageType.Name!}"; // e.g. Contracts.Messages.SubmitOrder
     }
 
     public static string GetRoutingKey(Type messageType)

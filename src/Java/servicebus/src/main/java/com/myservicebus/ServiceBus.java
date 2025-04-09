@@ -97,18 +97,25 @@ public class ServiceBus {
 
         Envelope<Object> envelope = new Envelope<>();
         envelope.setMessageId(UUID.randomUUID());
+        envelope.setConversationId(UUID.randomUUID());
         envelope.setSentTime(OffsetDateTime.now());
         envelope.setSourceAddress("rabbitmq://localhost/source");
         envelope.setDestinationAddress("rabbitmq://localhost/" + messageType.getSimpleName());
-        envelope.setMessageType(List.of("urn:message:" + messageType.getName()));
+        envelope.setMessageType(List.of("urn:message:" + "TestApp" + ":" + messageType.getSimpleName()));
         envelope.setMessage(message);
         envelope.setHeaders(Map.of());
         envelope.setContentType("application/json");
 
+        var hostInfo = new HostInfo();
+
+        envelope.setHost(hostInfo);
+
         String json = mapper.writeValueAsString(envelope);
         byte[] body = json.getBytes(StandardCharsets.UTF_8);
 
-        String exchangeName = messageType.getSimpleName();
+        // messageType.getPackageName()
+
+        String exchangeName = "TestApp" + ":" + messageType.getSimpleName();
 
         // Ensure the exchange exists (fanout-type)
         channel.exchangeDeclare(exchangeName, BuiltinExchangeType.FANOUT, true);

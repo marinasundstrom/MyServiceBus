@@ -1,0 +1,30 @@
+{
+    "messageId": "5e820000-6917-127c-9098-08dd779e0d00",
+    "requestId": null,
+    "correlationId": null,
+    "conversationId": "5e820000-6917-127c-cd5a-08dd779e0d01",
+    "initiatorId": null,
+    "sourceAddress": "",
+    "destinationAddress": "rabbitmq://localhost/TestApp:SubmitOrder",
+    "responseAddress": null,
+    "faultAddress": null,
+    "messageType": [
+        "urn:message:TestApp:SubmitOrder"
+    ],
+    "message": {
+        "orderId": "e7c2357a-69a5-4e51-9ad6-3d2efa55780c"
+    },
+    "expirationTime": null,
+    "sentTime": "2025-04-09T19:38:06.31574Z",
+    "headers": {},
+    "host": {
+        "machineName": "",
+        "processName": "TestApp_MassTransit",
+        "processId": 33374,
+        "assembly": "TestApp_MassTransit",
+        "assemblyVersion": "1.0.0.0",
+        "frameworkVersion": "9.0.1",
+        "massTransitVersion": "8.4.0.0",
+        "operatingSystemVersion": "Unix 15.4.0"
+    }
+}

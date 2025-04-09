@@ -19,6 +19,7 @@ public class ReceiveContext
     }
 
     public T Deserialize<T>()
+        where T : class
     {
         return Serializer.Deserialize<T>(Body);
     }
@@ -38,18 +39,48 @@ internal class JsonMessageSerializer : IMessageSerializer
     };
 
     public T Deserialize<T>(byte[] body)
+        where T : class
     {
         return JsonSerializer.Deserialize<T>(body, _options);
     }
 
     public object Deserialize(Type type, byte[] body)
     {
-        return JsonSerializer.Deserialize(body, type, _options)!;
+        var type2 = typeof(Envelope<>).MakeGenericType(type);
+        dynamic message = JsonSerializer.Deserialize(body, type2, _options)!;
+        return message.Message;
     }
 
     public byte[] Serialize<T>(T? message)
+        where T : class
     {
-        return JsonSerializer.SerializeToUtf8Bytes(message, _options);
+        var messageType = typeof(T);
+
+        var envelope = new Envelope<T>()
+        {
+            MessageId = Guid.NewGuid(),
+            CorrelationId = null,
+            ConversationId = Guid.NewGuid(),
+            SourceAddress = new Uri("rabbitmq://localhost/source"),
+            DestinationAddress = new Uri("rabbitmq://localhost/source" + messageType.Name),
+            MessageType = [$"urn:message:{messageType.Namespace}:{messageType.Name}"],
+            Message = message!,
+            SentTime = DateTimeOffset.UtcNow,
+            Headers = [],
+            Host = new HostInfo
+            {
+                MachineName = Environment.MachineName,
+                ProcessName = Environment.ProcessPath ?? "unknown",
+                ProcessId = Environment.ProcessId,
+                Assembly = typeof(T).Assembly.GetName().Name ?? "unknown",
+                AssemblyVersion = typeof(T).Assembly.GetName().Version?.ToString() ?? "unknown",
+                FrameworkVersion = System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription,
+                MassTransitVersion = "your-custom-version", // replace as needed
+                OperatingSystemVersion = Environment.OSVersion.VersionString
+            },
+            ContentType = "application/json"
+        };
+        return JsonSerializer.SerializeToUtf8Bytes(envelope, _options);
     }
 
     /*
@@ -78,7 +109,10 @@ internal class JsonMessageSerializer : IMessageSerializer
 
 public interface IMessageSerializer
 {
-    T Deserialize<T>(byte[] body);
+    T Deserialize<T>(byte[] body)
+        where T : class;
     object Deserialize(Type type, byte[] body);
-    byte[] Serialize<T>(T? message);
+
+    byte[] Serialize<T>(T? message)
+        where T : class;
 }

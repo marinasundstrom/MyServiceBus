@@ -1,0 +1,31 @@
+{
+    "messageId": "04df3b8f-b4ef-47a4-909c-ea81f4e80b97",
+    "requestId": null,
+    "correlationId": null,
+    "conversationId": "c28157cc-6dea-4c4e-a02f-58813cd67f92",
+    "initiatorId": null,
+    "sourceAddress": "",
+    "destinationAddress": "rabbitmq://localhost/TestApp:SubmitOrder",
+    "responseAddress": null,
+    "faultAddress": null,
+    "expirationTime": null,
+    "sentTime": "2025-04-09T19:50:43.801603+00:00",
+    "messageType": [
+        "urn:TestApp:SubmitOrder"
+    ],
+    "message": {
+        "orderId": "2cb6ce3d-1966-4aa0-a32c-a0cdc4096812"
+    },
+    "headers": {},
+    "host": {
+        "machineName": "",
+        "processName": "",
+        "processId": 37645,
+        "assembly": "TestApp.Contracts",
+        "assemblyVersion": "1.0.0.0",
+        "frameworkVersion": ".NET 9.0.1",
+        "massTransitVersion": "your-custom-version",
+        "operatingSystemVersion": "Unix 15.4.0"
+    },
+    "contentType": "application/json"
+}

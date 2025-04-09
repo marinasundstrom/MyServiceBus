@@ -15,6 +15,7 @@ builder.Services.AddMassTransit(x =>
             h.Password("guest");
         });
 
+        /*
         cfg.Message<SubmitOrder>(m =>
         {
             m.SetEntityName("TestApp.SubmitOrder");
@@ -28,7 +29,7 @@ builder.Services.AddMassTransit(x =>
         cfg.ReceiveEndpoint("submit-order-consumer", e =>
         {
             e.ConfigureConsumer<SubmitOrderConsumer>(context);
-        });
+        }); */
 
         cfg.ConfigureEndpoints(context);
     });
@@ -67,6 +68,14 @@ app.MapGet("/weatherforecast", () =>
     return forecast;
 })
 .WithName("GetWeatherForecast");
+
+app.MapGet("/publish", async (IPublishEndpoint publishEndpoint, CancellationToken cancellationToken = default) =>
+{
+    var message = new SubmitOrder() { OrderId = Guid.NewGuid() };
+    await publishEndpoint.Publish(message, cancellationToken);
+})
+.WithName("Test_Publish")
+.WithTags("Test");
 
 app.Run();
 

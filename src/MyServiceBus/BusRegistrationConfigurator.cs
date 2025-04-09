@@ -17,7 +17,7 @@ public class BusRegistrationConfigurator : IBusRegistrationConfigurator
     public void AddConsumer<TConsumer>() where TConsumer : class, IConsumer
     {
         Services.AddScoped<TConsumer>();
-        Services.AddScoped<IConsumer, TConsumer>();
+        Services.AddScoped<IConsumer, TConsumer>(sp => sp.GetRequiredService<TConsumer>());
 
         _topology.RegisterConsumer<TConsumer>(
           queueName: NamingHelpers.GetQueueName(typeof(TConsumer)),

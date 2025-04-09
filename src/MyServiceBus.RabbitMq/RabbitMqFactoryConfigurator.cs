@@ -9,6 +9,8 @@ internal sealed class RabbitMqFactoryConfigurator : IRabbitMqFactoryConfigurator
     }
 
     public string ClientHost { get; private set; } = "localhost";
+    public string Password { get; internal set; }
+    public string Username { get; internal set; }
 
     public void Message<T>(Action<MessageConfigurator> configure)
     {
@@ -26,7 +28,27 @@ internal sealed class RabbitMqFactoryConfigurator : IRabbitMqFactoryConfigurator
     {
         ClientHost = host;
 
-        IRabbitMqHostConfigurator? configurator = null;
+        IRabbitMqHostConfigurator? configurator = new RabbitMqHostConfigurator(this);
         configure?.Invoke(configurator!);
+    }
+}
+
+internal class RabbitMqHostConfigurator : IRabbitMqHostConfigurator
+{
+    private RabbitMqFactoryConfigurator rabbitMqFactoryConfigurator;
+
+    public RabbitMqHostConfigurator(RabbitMqFactoryConfigurator rabbitMqFactoryConfigurator)
+    {
+        this.rabbitMqFactoryConfigurator = rabbitMqFactoryConfigurator;
+    }
+
+    public void Password(string password)
+    {
+        rabbitMqFactoryConfigurator.Password = password;
+    }
+
+    public void Username(string username)
+    {
+        rabbitMqFactoryConfigurator.Username = username;
     }
 }

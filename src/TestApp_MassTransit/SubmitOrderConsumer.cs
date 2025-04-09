@@ -7,12 +7,14 @@ class SubmitOrderConsumer :
 {
     public Task Consume(ConsumeContext<SubmitOrder> context)
     {
-        Console.WriteLine("Foo bar");
+        Console.WriteLine($"Order Id: {context.Message.OrderId}");
 
         /* await context.Publish<OrderSubmitted>(new
         {
             context.Message.OrderId
         }); */
+
+        //throw new Exception();
 
         return Task.CompletedTask;
     }
