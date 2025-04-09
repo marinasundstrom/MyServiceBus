@@ -82,7 +82,7 @@ app.MapPost("/publish", async (IPublishEndpoint publishEndpoint, CancellationTok
 app.MapGet("/publish", async (IMessageBus messageBus, CancellationToken cancellationToken = default) =>
 {
     var message = new SubmitOrder() { OrderId = Guid.NewGuid() };
-    var exchangeName = NamingHelpers.GetExchangeName(message.GetType());
+    var exchangeName = NamingConventions.GetExchangeName(message.GetType());
     await messageBus.Publish(message, exchangeName, cancellationToken);
 })
 .WithName("Test_Publish")
@@ -117,7 +117,7 @@ public class HostedService : IHostedService
         await Task.Delay(200);
 
         var message = new SubmitOrder() { OrderId = Guid.NewGuid() };
-        var exchangeName = NamingHelpers.GetExchangeName(message.GetType());
+        var exchangeName = NamingConventions.GetExchangeName(message.GetType());
         await messageBus.Publish(message, exchangeName, cancellationToken);
     }
 

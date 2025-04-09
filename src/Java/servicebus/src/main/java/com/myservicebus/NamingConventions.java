@@ -14,7 +14,7 @@ public class NamingConventions {
         return String.format("TestApp:%s", messageType.getSimpleName());
     }
 
-    public static String getQueueName(Class<?> consumerType) {
-        return consumerType.getName().toLowerCase().replace(".", "-") + "-consumer";
+    public static String getQueueName(Class<?> messageType) {
+        return messageType.getName().toLowerCase().replace(".", "-") + "-consumer";
     }
 }

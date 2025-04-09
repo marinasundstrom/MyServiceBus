@@ -9,7 +9,7 @@ public class ConsumerDefinition<TConsumer, TMessage> {
     public ConsumerDefinition(Class<TConsumer> consumerType, Class<TMessage> messageType) {
         this.consumerType = consumerType;
         this.messageType = messageType;
-        this.queueName = NamingConventions.getQueueName(consumerType);
+        this.queueName = NamingConventions.getQueueName(messageType);
         this.exchangeName = NamingConventions.getExchangeName(messageType);
     }
 

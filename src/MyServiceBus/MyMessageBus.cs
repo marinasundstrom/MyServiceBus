@@ -46,7 +46,7 @@ public class MyMessageBus : IMessageBus
         var topology = new ReceiveEndpointTopology
         {
             QueueName = consumer.QueueName,
-            ExchangeName = NamingHelpers.GetExchangeName(messageType)!, // standard MT routing
+            ExchangeName = NamingConventions.GetExchangeName(messageType)!, // standard MT routing
             RoutingKey = messageType.FullName!,
             ExchangeType = "fanout",
             Durable = true,

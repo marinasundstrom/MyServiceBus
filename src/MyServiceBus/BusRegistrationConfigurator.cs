@@ -19,9 +19,11 @@ public class BusRegistrationConfigurator : IBusRegistrationConfigurator
         Services.AddScoped<TConsumer>();
         Services.AddScoped<IConsumer, TConsumer>(sp => sp.GetRequiredService<TConsumer>());
 
+        var messageType = GetHandledMessageTypes(typeof(TConsumer)).First();
+
         _topology.RegisterConsumer<TConsumer>(
-          queueName: NamingHelpers.GetQueueName(typeof(TConsumer)),
-          messageTypes: GetHandledMessageTypes(typeof(TConsumer))
+          queueName: NamingConventions.GetQueueName(messageType),
+          messageTypes: messageType
       );
     }
 

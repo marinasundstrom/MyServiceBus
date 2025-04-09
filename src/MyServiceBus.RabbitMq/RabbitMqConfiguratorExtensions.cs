@@ -41,7 +41,8 @@ public static class RabbitMqConfiguratorExtensions
                 .MakeGenericMethod(messageType, consumerType);
 
             var bus = context.ServiceProvider.GetRequiredService<IMessageBus>();
-            var queueName = NamingHelpers.GetQueueName(consumerType);
+
+            var queueName = NamingConventions.GetQueueName(consumerType);
 
             ((Task)method.Invoke(bus, [consumer, CancellationToken.None])).GetAwaiter().GetResult();
         }
