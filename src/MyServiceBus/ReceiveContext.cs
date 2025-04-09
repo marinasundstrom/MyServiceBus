@@ -2,17 +2,35 @@ using System.Text.Json;
 
 namespace MyServiceBus;
 
-public class ReceiveContext
+public interface ReceiveContext
+{
+    public Guid MessageId { get; }
+    public string ContentType { get; }
+    public byte[] Body { get; }
+
+    T Deserialize<T>()
+        where T : class;
+    object Deserialize(Type type);
+
+    public string MessageType { get; }
+}
+
+public class ReceiveContextImpl : ReceiveContext
 {
     public byte[] Body { get; }
+
     public IDictionary<string, object>? Headers { get; }
+
+    public Guid MessageId => Headers.TryGetValue("message-id", out var value) ? Guid.Parse(value.ToString()) : Guid.Empty;
+    public string ContentType => Headers.TryGetValue("content_type", out var value) ? value?.ToString() : null;
+
 
     public string? MessageType => Headers.TryGetValue("message-type", out var value) ? value?.ToString() : null;
     public string? CorrelationId => Headers.TryGetValue("correlation-id", out var value) ? value?.ToString() : null;
 
     public IMessageSerializer Serializer { get; set; } = new JsonMessageSerializer();
 
-    public ReceiveContext(byte[] body, IDictionary<string, object>? headers = null)
+    public ReceiveContextImpl(byte[] body, IDictionary<string, object>? headers = null)
     {
         Body = body;
         Headers = headers;
@@ -66,7 +84,10 @@ internal class JsonMessageSerializer : IMessageSerializer
             MessageType = [$"urn:message:{messageType.Namespace}:{messageType.Name}"],
             Message = message!,
             SentTime = DateTimeOffset.UtcNow,
-            Headers = [],
+            Headers = {
+                //{ "correlation-id", "" },
+                { "message-type", NamingConventions.GetMessageName(messageType)}
+            },
             Host = new HostInfo
             {
                 MachineName = Environment.MachineName,

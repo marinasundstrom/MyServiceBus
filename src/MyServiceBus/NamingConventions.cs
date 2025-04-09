@@ -19,6 +19,6 @@ public static class NamingConventions
 
     public static string GetQueueName(Type messageType)
     {
-        return $"{messageType.Name.ToLower().Replace('.', '-')}-consumer";
+        return $"{messageType.Name.ToLower().Replace('.', '-')}2-consumer";
     }
 }

@@ -14,7 +14,7 @@ public class Main {
         services.addScoped(MyService.class, MyServiceImpl.class);
 
         var serviceBus = ServiceBus.configure(services, x -> {
-            // x.addConsumer(SubmitOrderConsumer.class);
+            x.addConsumer(SubmitOrderConsumer.class);
 
             RabbitMqTransport.configure(x, (context, cfg) -> {
 

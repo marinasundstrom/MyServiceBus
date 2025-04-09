@@ -30,7 +30,7 @@ public sealed class RabbitMqReceiveTransport : IReceiveTransport
                 var body = ea.Body.ToArray();
                 var props = ea.BasicProperties;
 
-                var context = new ReceiveContext(body, props.Headers.ToDictionary(x => x.Key, x => (object)Encoding.UTF8.GetString((byte[])x.Value!)));
+                var context = new ReceiveContextImpl(body, props.Headers?.ToDictionary(x => x.Key, x => (object)Encoding.UTF8.GetString((byte[])x.Value!)) ?? []);
 
                 await _messageHandler.Handle(context);
 

@@ -47,7 +47,7 @@ public class MyMessageBus : IMessageBus
         {
             QueueName = consumer.QueueName,
             ExchangeName = NamingConventions.GetExchangeName(messageType)!, // standard MT routing
-            RoutingKey = messageType.FullName!,
+            RoutingKey = "", // messageType.FullName!,
             ExchangeType = "fanout",
             Durable = true,
             AutoDelete = false
