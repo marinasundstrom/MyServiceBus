@@ -13,8 +13,6 @@ public class Main {
         services.addScoped(MyScopedService.class);
         services.addScoped(MySecondService.class);
 
-        // services.addServiceBus();
-
         ServiceProvider provider = services.build();
 
         try (ServiceScope scope = provider.createScope()) {

@@ -17,13 +17,11 @@ class SubmitOrderConsumer implements Consumer<SubmitOrder> {
 
     @Override
     public CompletableFuture<Void> consume(ConsumeContext<SubmitOrder> context) throws Exception {
-        var orderId = context
-                .getMessage()
-                .getOrderId();
-
-        var message = context
-                .getMessage()
+        var m = context
                 .getMessage();
+
+        var orderId = m.getOrderId();
+        var message = m.getMessage();
 
         service.doWork();
 
