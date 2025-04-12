@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using MyServiceBus.Serialization;
 using MyServiceBus.Topology;
 
 namespace MyServiceBus;
@@ -25,7 +26,7 @@ public class MyMessageBus : IMessageBus
         var uri = new Uri($"rabbitmq://localhost/{topic}");
         var transport = await _transportFactory.GetSendTransport(uri, cancellationToken);
 
-        var context = new SendContext
+        var context = new SendContext(new EnvelopeMessageSerializer())
         {
             RoutingKey = topic,
             MessageId = Guid.NewGuid().ToString()
@@ -57,7 +58,7 @@ public class MyMessageBus : IMessageBus
 
         var receiveTransport = await _transportFactory.CreateReceiveTransport(topology, handler, cancellationToken);
 
-        _registeredConsumers.Add(messageType.FullName, consumerType);
+        _registeredConsumers.Add(NamingConventions.GetMessageUrn(messageType), consumerType);
         _activeTransports.Add(receiveTransport);
     }
 
@@ -73,7 +74,7 @@ public class MyMessageBus : IMessageBus
 
     private async Task HandleMessageAsync(ReceiveContext context)
     {
-        var messageTypeName = context.MessageType;
+        var messageTypeName = context.MessageType.First();
         if (messageTypeName == null || !_registeredConsumers.TryGetValue(messageTypeName, out var consumerType))
             throw new InvalidOperationException($"No consumer registered for message type: {messageTypeName}");
 
@@ -82,14 +83,12 @@ public class MyMessageBus : IMessageBus
         /* var messageType = Type.GetType(messageTypeName, false)
                           ?? throw new InvalidOperationException($"Cannot resolve message type: {messageTypeName}"); */
 
-        var message = context.Deserialize(messageType);
-
         using var scope = _serviceProvider.CreateScope();
         var consumer = (IConsumer)scope.ServiceProvider.GetRequiredService(consumerType);
 
         // Create ConsumeContext<T> dynamically and assign the message
         var consumeContextType = typeof(ConsumeContextImpl<>).MakeGenericType(messageType);
-        var consumeContext = Activator.CreateInstance(consumeContextType, message)
+        var consumeContext = Activator.CreateInstance(consumeContextType, context)
                             ?? throw new InvalidOperationException("Failed to create ConsumeContext");
 
         // Find the Consume method on IConsumer<T>

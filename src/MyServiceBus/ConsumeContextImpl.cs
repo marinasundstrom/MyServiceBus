@@ -4,14 +4,17 @@ namespace MyServiceBus;
 internal class ConsumeContextImpl<TMessage> : ConsumeContext<TMessage>
     where TMessage : class
 {
-    public ConsumeContextImpl(TMessage message)
+    private readonly ReceiveContext receiveContext;
+    private TMessage? message;
+
+    public ConsumeContextImpl(ReceiveContext receiveContext)
     {
-        Message = message;
+        this.receiveContext = receiveContext;
     }
 
-    public CancellationToken CancellationToken => throw new NotImplementedException();
+    public CancellationToken CancellationToken => CancellationToken.None;
 
-    public TMessage Message { get; }
+    public TMessage Message => message is null ? (receiveContext.TryGetMessage(out message) ? message : default) : message;
 
     public ISendEndpoint GetSendEndpoint(Uri uri)
     {

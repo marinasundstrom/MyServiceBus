@@ -1,6 +1,7 @@
 <Project>
     <PropertyGroup>
         <UseArtifactsOutput>true</UseArtifactsOutput>
+        <WarningsAsErrors>THROW003,THROW005,THROW006,THROW007</WarningsAsErrors>
     </PropertyGroup>
 
     <ItemGroup>

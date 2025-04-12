@@ -1,5 +1,6 @@
 using System.Text;
 using System.Threading.Tasks;
+using MyServiceBus.Serialization;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 
@@ -27,10 +28,12 @@ public sealed class RabbitMqReceiveTransport : IReceiveTransport
         {
             try
             {
-                var body = ea.Body.ToArray();
+                var payload = ea.Body.ToArray();
                 var props = ea.BasicProperties;
 
-                var context = new ReceiveContextImpl(body, props.Headers?.ToDictionary(x => x.Key, x => (object)Encoding.UTF8.GetString((byte[])x.Value!)) ?? []);
+                var messageContext = new EnvelopeMessageContext(payload, props.Headers?.ToDictionary(x => x.Key, x => (object)x.Value!) ?? []);
+
+                var context = new ReceiveContextImpl(messageContext);
 
                 await _messageHandler.Handle(context);
 

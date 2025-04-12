@@ -26,7 +26,7 @@ public sealed class RabbitMqSendTransport : ISendTransport
             props.Headers = context.Headers.ToDictionary(kv => kv.Key, kv => (object?)kv.Value);
         }
 
-        var body = context.Serializer.Serialize(message); // assume JSON or similar
+        var body = await context.Serialize(message); // assume JSON or similar
 
         await _channel.BasicPublishAsync(
             exchange: _exchange,
