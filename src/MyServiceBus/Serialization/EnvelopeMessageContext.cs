@@ -13,6 +13,8 @@ public class EnvelopeMessageContext : IMessageContext
     private List<string>? _messageType;
     private Dictionary<string, object>? _headers;
     private DateTimeOffset? _sentTime;
+    private Uri? _responseAddress;
+    private Uri? _faultAddress;
 
     public EnvelopeMessageContext(byte[] jsonBytes, IDictionary<string, object> transportHeaders)
     {
@@ -27,6 +29,40 @@ public class EnvelopeMessageContext : IMessageContext
 
     public IList<string> MessageType =>
         _messageType ??= TryGetProperty("messageType")?.Deserialize<List<string>>() ?? new();
+
+    public Uri? ResponseAddress
+    {
+        get
+        {
+            if (_responseAddress is not null)
+            {
+                return _responseAddress;
+            }
+            var s = TryGetProperty("responseAddress")?.GetString();
+            if (s is not null)
+            {
+                _responseAddress = new Uri(s);
+            }
+            return _responseAddress;
+        }
+    }
+
+    public Uri? FaultAddress
+    {
+        get
+        {
+            if (_faultAddress is not null)
+            {
+                return _faultAddress;
+            }
+            var s = TryGetProperty("faultAddress")?.GetString();
+            if (s is not null)
+            {
+                _faultAddress = new Uri(s);
+            }
+            return _faultAddress;
+        }
+    }
 
     public IDictionary<string, object> Headers =>
         _headers ??= TryGetProperty("headers")?.Deserialize<Dictionary<string, object>>() ?? new();

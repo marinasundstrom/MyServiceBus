@@ -5,6 +5,8 @@ public interface IMessageContext
     Guid MessageId { get; }
     Guid? CorrelationId { get; }
     IList<string> MessageType { get; }
+    Uri? ResponseAddress { get; }
+    Uri? FaultAddress { get; }
     IDictionary<string, object> Headers { get; }
     public DateTimeOffset SentTime { get; }
 

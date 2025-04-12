@@ -6,6 +6,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddServiceBus(x =>
 {
     x.AddConsumer<SubmitOrderConsumer>();
+    x.AddConsumer<TestRequestConsumer>();
 
     x.UsingRabbitMq((context, cfg) =>
     {
@@ -92,6 +93,16 @@ app.MapPost("/send", async (ISendEndpoint sendEndpoint, CancellationToken cancel
     await sendEndpoint.Send(new SubmitOrder { OrderId = Guid.NewGuid() }, cancellationToken);
 })
 .WithName("Test_Send")
+.WithTags("Test");
+
+app.MapGet("/request", async (IRequestClient<TestRequest> client, CancellationToken cancellationToken = default) =>
+{
+    var message = new TestRequest() { Message = "Foo" };
+    var x = await client.GetResponseAsync<TestResponse>(message, cancellationToken);
+
+    Console.WriteLine(x.Message);
+})
+.WithName("Test_Request")
 .WithTags("Test");
 
 app.Run();

@@ -21,6 +21,8 @@ public class EnvelopeMessageSerializer : IMessageSerializer
             ConversationId = null,
             //SourceAddress = new Uri("rabbitmq://localhost/source"),
             //DestinationAddress = new Uri("rabbitmq://localhost/source" + messageType.Name),
+            ResponseAddress = context.ResponseAddress,
+            FaultAddress = context.FaultAddress,
             MessageType = (List<string>)context.MessageType,
             Message = context.Message!,
             SentTime = context.SentTime,

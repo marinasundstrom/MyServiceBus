@@ -34,7 +34,7 @@ public sealed class RabbitMqTransportFactory : ITransportFactory
 
     public async Task<IReceiveTransport> CreateReceiveTransport(
         ReceiveEndpointTopology topology,
-        IMessageHandler handler,
+        Func<ReceiveContext, Task> handler,
         CancellationToken cancellationToken = default)
     {
         var connection = await _connectionProvider.GetOrCreateConnectionAsync(cancellationToken);

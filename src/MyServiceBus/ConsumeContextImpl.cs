@@ -1,15 +1,19 @@
 
+using MyServiceBus.Serialization;
+
 namespace MyServiceBus;
 
 internal class ConsumeContextImpl<TMessage> : ConsumeContext<TMessage>
     where TMessage : class
 {
     private readonly ReceiveContext receiveContext;
+    private readonly ITransportFactory _transportFactory;
     private TMessage? message;
 
-    public ConsumeContextImpl(ReceiveContext receiveContext)
+    public ConsumeContextImpl(ReceiveContext receiveContext, ITransportFactory transportFactory)
     {
         this.receiveContext = receiveContext;
+        this._transportFactory = transportFactory;
     }
 
     public CancellationToken CancellationToken => CancellationToken.None;
@@ -23,21 +27,36 @@ internal class ConsumeContextImpl<TMessage> : ConsumeContext<TMessage>
 
     public Task Publish<T>(object message, CancellationToken cancellationToken = default)
     {
-        throw new NotImplementedException();
+        return Task.CompletedTask;
     }
 
     public Task Publish<T>(T message, CancellationToken cancellationToken = default)
     {
-        throw new NotImplementedException();
+        return Task.CompletedTask;
     }
 
-    public Task Respond<T>(T message, CancellationToken cancellationToken = default)
+    public async Task Respond<T>(T message, CancellationToken cancellationToken = default)
     {
-        throw new NotImplementedException();
+        await Respond((object)message, cancellationToken);
     }
 
-    public Task Respond<T>(object message, CancellationToken cancellationToken = default)
+    public async Task Respond<T>(object message, CancellationToken cancellationToken = default)
     {
-        throw new NotImplementedException();
+        var responseAddress = receiveContext.ResponseAddress;
+
+        var exchangeName = NamingConventions.GetExchangeName(typeof(T));
+
+        var uri = new Uri($"rabbitmq://localhost/{exchangeName}");
+        var transport = await _transportFactory.GetSendTransport(uri, cancellationToken);
+
+        var context = new SendContext([typeof(T)], new EnvelopeMessageSerializer())
+        {
+            //RoutingKey = exchangeName,
+            MessageId = Guid.NewGuid().ToString()
+        };
+
+        //context.Headers["message-type"] = typeof(T).FullName!;
+
+        await transport.Send(message, context, cancellationToken);
     }
 }

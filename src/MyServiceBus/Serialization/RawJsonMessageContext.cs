@@ -25,6 +25,8 @@ public class RawJsonMessageContext : IMessageContext
     public Guid? CorrelationId { get; }
     public IDictionary<string, object> Headers { get; }
     public IList<string> MessageType { get; }
+    public Uri? ResponseAddress { get; }
+    public Uri? FaultAddress { get; }
     public DateTimeOffset SentTime { get; }
 
     public bool TryGetMessage<T>(out T? message) where T : class

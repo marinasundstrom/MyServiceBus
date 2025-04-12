@@ -10,10 +10,10 @@ public sealed class RabbitMqReceiveTransport : IReceiveTransport
 {
     private readonly IChannel _channel;
     private readonly string _queueName;
-    private readonly IMessageHandler _messageHandler;
+    private readonly Func<ReceiveContext, Task> _messageHandler;
     private string _consumerTag;
 
-    public RabbitMqReceiveTransport(IChannel channel, string queueName, IMessageHandler handler)
+    public RabbitMqReceiveTransport(IChannel channel, string queueName, Func<ReceiveContext, Task> handler)
     {
         _channel = channel;
         _queueName = queueName;
@@ -35,14 +35,14 @@ public sealed class RabbitMqReceiveTransport : IReceiveTransport
 
                 var context = new ReceiveContextImpl(messageContext);
 
-                await _messageHandler.Handle(context);
+                await _messageHandler.Invoke(context);
 
                 await _channel.BasicAckAsync(ea.DeliveryTag, multiple: false);
             }
             catch (Exception exc)
             {
                 // Optionally nack
-                await _channel.BasicNackAsync(ea.DeliveryTag, false, requeue: true);
+                await _channel.BasicNackAsync(ea.DeliveryTag, false, requeue: false);
 
                 // Error handling & Retries
             }

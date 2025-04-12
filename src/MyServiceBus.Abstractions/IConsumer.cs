@@ -1,3 +1,5 @@
+using System.Net;
+
 namespace MyServiceBus;
 
 public interface IConsumer

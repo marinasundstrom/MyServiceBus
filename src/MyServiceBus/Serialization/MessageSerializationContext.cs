@@ -14,6 +14,10 @@ public class MessageSerializationContext<T>
 
     public IList<string> MessageType { get; set; }
 
+    public Uri? ResponseAddress { get; set; }
+
+    public Uri? FaultAddress { get; set; }
+
     public IDictionary<string, object> Headers { get; set; }
 
     public DateTimeOffset SentTime { get; set; }

@@ -1,6 +1,19 @@
 namespace MyServiceBus;
 
 public interface IRequestClient<TRequest>
+    where TRequest : class
 {
-    Task<TResponse> GetResponse<TResponse>(TRequest request, CancellationToken cancellationToken = default);
+    Task<Response<T>> GetResponseAsync<T>(TRequest request, CancellationToken cancellationToken = default)
+        where T : class;
+}
+
+public class Response<T>
+    where T : class
+{
+    public Response(T message)
+    {
+        Message = message;
+    }
+
+    public T Message { get; set; } = default!;
 }

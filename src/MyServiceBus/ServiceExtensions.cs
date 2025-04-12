@@ -13,6 +13,8 @@ public static class ServiceExtensions
 
         services.AddHostedService<ServiceBusHostedService>();
 
+        services.AddScoped(typeof(IRequestClient<>), typeof(GenericRequestClient<>));
+
         return services;
     }
 }

@@ -28,13 +28,13 @@ public class MyMessageBus : IMessageBus
         var uri = new Uri($"rabbitmq://localhost/{exchangeName}");
         var transport = await _transportFactory.GetSendTransport(uri, cancellationToken);
 
-        var context = new SendContext(new EnvelopeMessageSerializer())
+        var context = new SendContext([typeof(T)], new EnvelopeMessageSerializer())
         {
             RoutingKey = exchangeName,
             MessageId = Guid.NewGuid().ToString()
         };
 
-        context.Headers["message-type"] = typeof(T).FullName!;
+        //context.Headers["message-type"] = typeof(T).FullName!;
 
         await transport.Send(message, context, cancellationToken);
     }
@@ -56,9 +56,7 @@ public class MyMessageBus : IMessageBus
             AutoDelete = false
         };
 
-        var handler = new DelegatingConsumer(HandleMessageAsync);
-
-        var receiveTransport = await _transportFactory.CreateReceiveTransport(topology, handler, cancellationToken);
+        var receiveTransport = await _transportFactory.CreateReceiveTransport(topology, HandleMessageAsync, cancellationToken);
 
         _registeredConsumers.Add(NamingConventions.GetMessageUrn(messageType), consumerType);
         _activeTransports.Add(receiveTransport);
@@ -78,7 +76,9 @@ public class MyMessageBus : IMessageBus
     {
         var messageTypeName = context.MessageType.First();
         if (messageTypeName == null || !_registeredConsumers.TryGetValue(messageTypeName, out var consumerType))
-            throw new InvalidOperationException($"No consumer registered for message type: {messageTypeName}");
+            return;
+
+        //throw new InvalidOperationException($"No consumer registered for message type: {messageTypeName}");
 
         var messageType = consumerType.GetInterfaces().First().GetGenericArguments()[0];
 
@@ -90,7 +90,7 @@ public class MyMessageBus : IMessageBus
 
         // Create ConsumeContext<T> dynamically and assign the message
         var consumeContextType = typeof(ConsumeContextImpl<>).MakeGenericType(messageType);
-        var consumeContext = Activator.CreateInstance(consumeContextType, context)
+        var consumeContext = Activator.CreateInstance(consumeContextType, context, _transportFactory)
                             ?? throw new InvalidOperationException("Failed to create ConsumeContext");
 
         // Find the Consume method on IConsumer<T>

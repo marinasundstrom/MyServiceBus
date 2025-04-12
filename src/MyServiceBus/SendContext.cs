@@ -5,10 +5,12 @@ namespace MyServiceBus;
 
 public class SendContext
 {
+    private readonly Type[] messageTypes;
     private readonly IMessageSerializer messageSerializer;
 
-    public SendContext(IMessageSerializer messageSerializer)
+    public SendContext(Type[] messageTypes, IMessageSerializer messageSerializer)
     {
+        this.messageTypes = messageTypes;
         this.messageSerializer = messageSerializer;
     }
 
@@ -16,6 +18,8 @@ public class SendContext
     public string RoutingKey { get; set; } = ""; // Defaults to empty
     public IDictionary<string, object> Headers { get; } = new Dictionary<string, object>();
     public string? CorrelationId { get; set; }
+    public Uri? ResponseAddress { get; set; }
+    public Uri? FaultAddress { get; set; }
 
     public async Task<ReadOnlyMemory<byte>> Serialize<T>(T message)
         where T : class
@@ -24,7 +28,8 @@ public class SendContext
         {
             MessageId = Guid.NewGuid(),
             CorrelationId = null,
-            MessageType = [NamingConventions.GetMessageUrn(typeof(T))],
+            MessageType = [.. messageTypes.Select(x => NamingConventions.GetMessageUrn(x))],
+            ResponseAddress = ResponseAddress,
             Headers = Headers,
             SentTime = DateTimeOffset.Now,
             HostInfo = GetHostInfo<T>(),
