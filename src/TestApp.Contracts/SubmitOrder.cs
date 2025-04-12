@@ -2,5 +2,7 @@ namespace TestApp;
 
 public record SubmitOrder
 {
-    public Guid OrderId { get; init; }
+    public required Guid OrderId { get; init; }
+
+    public string Message { get; init; }
 }

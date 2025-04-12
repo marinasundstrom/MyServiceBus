@@ -71,7 +71,7 @@ app.MapGet("/weatherforecast", () =>
 
 app.MapGet("/publish", async (IPublishEndpoint publishEndpoint, CancellationToken cancellationToken = default) =>
 {
-    var message = new SubmitOrder() { OrderId = Guid.NewGuid() };
+    var message = new SubmitOrder() { OrderId = Guid.NewGuid(), Message = "MT" };
     await publishEndpoint.Publish(message, cancellationToken);
 })
 .WithName("Test_Publish")
