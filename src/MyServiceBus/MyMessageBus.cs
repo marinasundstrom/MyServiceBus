@@ -20,15 +20,17 @@ public class MyMessageBus : IMessageBus
         _serviceProvider = serviceProvider;
     }
 
-    public async Task Publish<T>(T message, string topic, CancellationToken cancellationToken = default)
+    public async Task Publish<T>(T message, CancellationToken cancellationToken = default)
        where T : class
     {
-        var uri = new Uri($"rabbitmq://localhost/{topic}");
+        var exchangeName = NamingConventions.GetExchangeName(message.GetType());
+
+        var uri = new Uri($"rabbitmq://localhost/{exchangeName}");
         var transport = await _transportFactory.GetSendTransport(uri, cancellationToken);
 
         var context = new SendContext(new EnvelopeMessageSerializer())
         {
-            RoutingKey = topic,
+            RoutingKey = exchangeName,
             MessageId = Guid.NewGuid().ToString()
         };
 

@@ -14,7 +14,7 @@ public class SendContext
 
     public string MessageId { get; set; }
     public string RoutingKey { get; set; } = ""; // Defaults to empty
-    public IDictionary<string, string> Headers { get; } = new Dictionary<string, string>();
+    public IDictionary<string, object> Headers { get; } = new Dictionary<string, object>();
     public string? CorrelationId { get; set; }
 
     public async Task<ReadOnlyMemory<byte>> Serialize<T>(T message)
@@ -25,21 +25,23 @@ public class SendContext
             MessageId = Guid.NewGuid(),
             CorrelationId = null,
             MessageType = [NamingConventions.GetMessageUrn(typeof(T))],
-            Headers = { },
+            Headers = Headers,
             SentTime = DateTimeOffset.Now,
-            HostInfo = new HostInfo
-            {
-                MachineName = Environment.MachineName,
-                ProcessName = Environment.ProcessPath ?? "unknown",
-                ProcessId = Environment.ProcessId,
-                Assembly = typeof(T).Assembly.GetName().Name ?? "unknown",
-                AssemblyVersion = typeof(T).Assembly.GetName().Version?.ToString() ?? "unknown",
-                FrameworkVersion = System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription,
-                MassTransitVersion = "your-custom-version", // replace as needed
-                OperatingSystemVersion = Environment.OSVersion.VersionString
-            },
-        }
-        ;
+            HostInfo = GetHostInfo<T>(),
+        };
+
         return await messageSerializer.SerializeAsync(context);
     }
+
+    private static HostInfo GetHostInfo<T>() where T : class => new HostInfo
+    {
+        MachineName = Environment.MachineName,
+        ProcessName = Environment.ProcessPath ?? "unknown",
+        ProcessId = Environment.ProcessId,
+        Assembly = typeof(T).Assembly.GetName().Name ?? "unknown",
+        AssemblyVersion = typeof(T).Assembly.GetName().Version?.ToString() ?? "unknown",
+        FrameworkVersion = System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription,
+        MassTransitVersion = "your-custom-version", // replace as needed
+        OperatingSystemVersion = Environment.OSVersion.VersionString
+    };
 }
