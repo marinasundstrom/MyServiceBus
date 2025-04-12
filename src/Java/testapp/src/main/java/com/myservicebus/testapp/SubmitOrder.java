@@ -11,4 +11,5 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class SubmitOrder {
     private UUID orderId;
+    private String message;
 }

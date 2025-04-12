@@ -43,7 +43,7 @@ public class Main {
 
         System.out.println("Up and running");
 
-        SubmitOrder message = new SubmitOrder(UUID.randomUUID());
+        SubmitOrder message = new SubmitOrder(UUID.randomUUID(), "MT Clone Java");
 
         serviceBus.publish(message);
 

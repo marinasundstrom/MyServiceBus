@@ -4,11 +4,17 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.nio.charset.StandardCharsets;
 import java.time.OffsetDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeFormatterBuilder;
+import java.time.temporal.ChronoField;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.databind.DeserializationContext;
+import com.fasterxml.jackson.databind.JsonDeserializer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
@@ -35,7 +41,24 @@ public class ServiceBus {
         mapper.findAndRegisterModules();
         mapper.enable(SerializationFeature.INDENT_OUTPUT);
         mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
-        mapper.registerModule(new JavaTimeModule());
+
+        JavaTimeModule module = new JavaTimeModule();
+
+        DateTimeFormatter formatter = new DateTimeFormatterBuilder()
+                .appendPattern("yyyy-MM-dd'T'HH:mm:ss")
+                .appendFraction(ChronoField.NANO_OF_SECOND, 0, 6, true)
+                .appendOffset("+HH:MM", "Z")
+                .toFormatter();
+
+        module.addDeserializer(OffsetDateTime.class,
+                new JsonDeserializer<>() {
+                    @Override
+                    public OffsetDateTime deserialize(JsonParser p, DeserializationContext ctxt) throws IOException {
+                        return OffsetDateTime.parse(p.getText(), formatter);
+                    }
+                });
+
+        mapper.registerModule(module);
     }
 
     public static ServiceBus configure(ServiceCollection services,
@@ -65,20 +88,24 @@ public class ServiceBus {
             channel.queueDeclare(queue, true, false, false, null);
             channel.queueBind(queue, exchangeName, "");
 
-            channel.basicConsume(queue, true, (tag, delivery) -> {
+            channel.basicConsume(queue, false, (tag, delivery) -> {
                 try (ServiceScope scope = serviceProvider.createScope()) {
                     Consumer<Object> consumer = (Consumer<Object>) scope.getService(def.getConsumerType());
-
-                    var type = mapper
-                            .getTypeFactory()
-                            .constructParametricType(Envelope.class, def.getMessageType());
-
-                    var envelope = (Envelope<?>) mapper.readValue(delivery.getBody(), type);
-
-                    ConsumeContext<Object> ctx = new ConsumeContext<>(envelope.getMessage(), null);
                     try {
+                        var type = mapper
+                                .getTypeFactory()
+                                .constructParametricType(Envelope.class, def.getMessageType());
+
+                        var envelope = (Envelope<?>) mapper.readValue(delivery.getBody(), type);
+
+                        ConsumeContext<Object> ctx = new ConsumeContext<>(envelope.getMessage(), null);
+
                         consumer.consume(ctx);
+
+                        channel.basicAck(delivery.getEnvelope().getDeliveryTag(), false);
                     } catch (Exception e) {
+                        channel.basicNack(delivery.getEnvelope().getDeliveryTag(), false, false);
+
                         // TODO Auto-generated catch block
                         e.printStackTrace();
                     }

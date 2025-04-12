@@ -33,7 +33,7 @@ public class Main2 {
     private static void testMessageDeserializationWithFaultWrapper(ObjectMapper mapper)
             throws JsonProcessingException, UnknownHostException {
         // 📨 Step 1: Build original message
-        SubmitOrder message = new SubmitOrder(UUID.randomUUID());
+        SubmitOrder message = new SubmitOrder(UUID.randomUUID(), "");
 
         // 🚨 Step 2: Wrap in Fault<T>
         Fault<SubmitOrder> fault = new Fault<>();
@@ -93,7 +93,7 @@ public class Main2 {
 
     private static void testWrap(ObjectMapper mapper) throws JsonProcessingException {
         // Create a message
-        SubmitOrder message = new SubmitOrder(UUID.randomUUID());
+        SubmitOrder message = new SubmitOrder(UUID.randomUUID(), "");
 
         // Create envelope
         Envelope<SubmitOrder> envelope = new Envelope<>();

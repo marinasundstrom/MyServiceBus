@@ -21,9 +21,13 @@ class SubmitOrderConsumer implements Consumer<SubmitOrder> {
                 .getMessage()
                 .getOrderId();
 
+        var message = context
+                .getMessage()
+                .getMessage();
+
         service.doWork();
 
-        System.out.println("Order id: " + orderId);
+        System.out.println("Order id: " + orderId + " (from " + message + ")");
 
         return context.publish(new OrderSubmitted(orderId), context.cancellationToken());
     }

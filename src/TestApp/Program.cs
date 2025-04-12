@@ -81,7 +81,7 @@ app.MapPost("/publish", async (IPublishEndpoint publishEndpoint, CancellationTok
 
 app.MapGet("/publish", async (IMessageBus messageBus, CancellationToken cancellationToken = default) =>
 {
-    var message = new SubmitOrder() { OrderId = Guid.NewGuid(), Message = "MT Clone" };
+    var message = new SubmitOrder() { OrderId = Guid.NewGuid(), Message = "MT Clone C#" };
     await messageBus.Publish(message, cancellationToken);
 })
 .WithName("Test_Publish")
