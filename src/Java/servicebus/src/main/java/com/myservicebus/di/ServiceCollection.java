@@ -6,22 +6,27 @@ import com.google.inject.multibindings.Multibinder;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Consumer;
 
 public class ServiceCollection {
     private final List<Module> modules = new ArrayList<>();
+    private final List<Module> deferredModules = new ArrayList<>();
+    private final List<Consumer<ServiceProvider>> deferredScopedProviders = new ArrayList<>();
     private final PerMessageScope perMessageScope = new PerMessageScope();
     private boolean built;
 
-    public <T> void addSingleton(Class<T> type, Provider<T> provider) {
+    public <T> void addSingleton(Class<T> type, ServiceProviderBasedProvider<T> providerFactory) {
         if (built) {
             throw new IllegalStateException("Cannot add service to container that has been built.");
         }
 
-        modules.add(new AbstractModule() {
-            @Override
-            protected void configure() {
-                bind(type).toProvider(provider).in(Scopes.SINGLETON);
-            }
+        deferredScopedProviders.add(sp -> {
+            deferredModules.add(new AbstractModule() {
+                @Override
+                protected void configure() {
+                    bind(type).toProvider(providerFactory.create(sp)).in(Scopes.SINGLETON);
+                }
+            });
         });
     }
 
@@ -51,16 +56,18 @@ public class ServiceCollection {
         });
     }
 
-    public <T> void addScoped(Class<T> type, Provider<T> provider) {
+    public <T> void addScoped(Class<T> type, ServiceProviderBasedProvider<T> providerFactory) {
         if (built) {
             throw new IllegalStateException("Cannot add service to container that has been built.");
         }
 
-        modules.add(new AbstractModule() {
-            @Override
-            protected void configure() {
-                bind(type).toProvider(provider).in(Scoped.class);
-            }
+        deferredScopedProviders.add(sp -> {
+            deferredModules.add(new AbstractModule() {
+                @Override
+                protected void configure() {
+                    bind(type).toProvider(providerFactory.create(sp)).in(Scoped.class);
+                }
+            });
         });
     }
 
@@ -132,8 +139,16 @@ public class ServiceCollection {
         Injector injector = Guice.createInjector(new ArrayList<>(modules));
 
         // Now create the ServiceProvider and set it
-        ServiceProvider provider = new ServiceProviderImpl(injector, perMessageScope);
+        ServiceProviderImpl provider = new ServiceProviderImpl(injector, perMessageScope);
         holder.set(provider);
+
+        // Apply the deferred bindings
+        deferredScopedProviders.forEach(p -> p.accept(holder.get()));
+
+        // Add the new modules with bindings
+        injector = injector.createChildInjector(deferredModules); // or re-create the final injector
+
+        provider.setInjector(injector);
 
         return provider;
     }

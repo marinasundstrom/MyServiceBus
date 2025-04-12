@@ -54,6 +54,6 @@ class BusRegistrationConfiguratorImpl implements BusRegistrationConfigurator {
     }
 
     public void complete() {
-        serviceCollection.addSingleton(ConsumerRegistry.class, () -> registry);
+        serviceCollection.addSingleton(ConsumerRegistry.class, sp -> () -> registry);
     }
 }

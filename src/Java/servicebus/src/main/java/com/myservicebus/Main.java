@@ -9,7 +9,7 @@ public class Main {
         System.out.println("test");
 
         ServiceCollection services = new ServiceCollection();
-        services.addSingleton(MyService.class, MyServiceImpl.class);
+        services.addSingleton(MyService.class, (sp) -> () -> new MyServiceImpl(sp));
         services.addScoped(MyScopedService.class);
         services.addScoped(MySecondService.class);
 
@@ -17,8 +17,8 @@ public class Main {
 
         ServiceProvider provider = services.build();
 
-        try (var scope = provider.createScope()) {
-            var scopedServiceProvider = scope.getServiceProvider();
+        try (ServiceScope scope = provider.createScope()) {
+            ServiceProvider scopedServiceProvider = scope.getServiceProvider();
 
             MyService singleton = scopedServiceProvider.getService(MyService.class);
             MyScopedService scoped = scopedServiceProvider.getService(MyScopedService.class);
