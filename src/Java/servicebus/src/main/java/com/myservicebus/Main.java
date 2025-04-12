@@ -17,9 +17,11 @@ public class Main {
 
         ServiceProvider provider = services.build();
 
-        try (ServiceScope scope = provider.createScope()) {
-            MyService singleton = scope.getService(MyService.class);
-            MyScopedService scoped = scope.getService(MyScopedService.class);
+        try (var scope = provider.createScope()) {
+            var scopedServiceProvider = scope.getServiceProvider();
+
+            MyService singleton = scopedServiceProvider.getService(MyService.class);
+            MyScopedService scoped = scopedServiceProvider.getService(MyScopedService.class);
 
             singleton.doWork();
             scoped.doSomething();

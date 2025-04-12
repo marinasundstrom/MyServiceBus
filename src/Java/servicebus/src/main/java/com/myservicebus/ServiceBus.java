@@ -89,8 +89,11 @@ public class ServiceBus {
             channel.queueBind(queue, exchangeName, "");
 
             channel.basicConsume(queue, false, (tag, delivery) -> {
-                try (ServiceScope scope = serviceProvider.createScope()) {
-                    Consumer<Object> consumer = (Consumer<Object>) scope.getService(def.getConsumerType());
+                try (var scope = serviceProvider.createScope()) {
+                    var scopedServiceProvider = scope.getServiceProvider();
+
+                    Consumer<Object> consumer = (Consumer<Object>) scopedServiceProvider
+                            .getService(def.getConsumerType());
                     try {
                         var type = mapper
                                 .getTypeFactory()

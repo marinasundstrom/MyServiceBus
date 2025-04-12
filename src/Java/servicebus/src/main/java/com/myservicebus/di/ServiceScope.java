@@ -14,8 +14,8 @@ public class ServiceScope implements Closeable {
         this.scope.enter();
     }
 
-    public <T> T getService(Class<T> type) {
-        return injector.getInstance(type);
+    public ServiceProvider getServiceProvider() {
+        return new ServiceProviderImpl(injector, scope);
     }
 
     @Override
