@@ -40,7 +40,7 @@ public sealed class GenericRequestClient<TRequest> : IRequestClient<TRequest>, I
             {
                 taskCompletionSource.SetResult(new Response<T>(message));
 
-                await requestReceiveTransport.Stop();
+                await requestReceiveTransport.Stop(cancellationToken);
             }
         };
 
