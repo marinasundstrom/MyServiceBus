@@ -6,6 +6,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddServiceBus(x =>
 {
     x.AddConsumer<SubmitOrderConsumer>();
+    x.AddConsumer<OrderSubmittedConsumer>();
     x.AddConsumer<TestRequestConsumer>();
 
     x.UsingRabbitMq((context, cfg) =>

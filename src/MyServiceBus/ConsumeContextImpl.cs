@@ -25,14 +25,24 @@ internal class ConsumeContextImpl<TMessage> : ConsumeContext<TMessage>
         throw new NotImplementedException();
     }
 
-    public Task Publish<T>(object message, CancellationToken cancellationToken = default)
+    public async Task Publish<T>(T message, CancellationToken cancellationToken = default)
     {
-        return Task.CompletedTask;
+        await Publish((object)message, cancellationToken);
     }
 
-    public Task Publish<T>(T message, CancellationToken cancellationToken = default)
+    public async Task Publish<T>(object message, CancellationToken cancellationToken = default)
     {
-        return Task.CompletedTask;
+        var exchangeName = NamingConventions.GetExchangeName(typeof(T));
+
+        var uri = new Uri($"rabbitmq://localhost/{exchangeName}");
+        var transport = await _transportFactory.GetSendTransport(uri, cancellationToken);
+
+        var context = new SendContext([typeof(T)], new EnvelopeMessageSerializer())
+        {
+            MessageId = Guid.NewGuid().ToString()
+        };
+
+        await transport.Send(message, context, cancellationToken);
     }
 
     public async Task Respond<T>(T message, CancellationToken cancellationToken = default)
@@ -51,11 +61,8 @@ internal class ConsumeContextImpl<TMessage> : ConsumeContext<TMessage>
 
         var context = new SendContext([typeof(T)], new EnvelopeMessageSerializer())
         {
-            //RoutingKey = exchangeName,
             MessageId = Guid.NewGuid().ToString()
         };
-
-        //context.Headers["message-type"] = typeof(T).FullName!;
 
         await transport.Send(message, context, cancellationToken);
     }
