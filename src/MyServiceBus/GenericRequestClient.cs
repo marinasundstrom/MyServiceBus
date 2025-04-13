@@ -18,7 +18,7 @@ public sealed class GenericRequestClient<TRequest> : IRequestClient<TRequest>, I
 
     }
 
-    public async Task<Response<T>> GetResponseAsync<T>(TRequest request, CancellationToken cancellationToken = default) where T : class
+    public async Task<Response<T>> GetResponseAsync<T>(TRequest request, CancellationToken cancellationToken = default, RequestTimeout timeout = default) where T : class
     {
         var taskCompletionSource = new TaskCompletionSource<Response<T>>();
 
@@ -69,7 +69,7 @@ public sealed class GenericRequestClient<TRequest> : IRequestClient<TRequest>, I
         await requestSendTransport.Send(request, context, cancellationToken);
 
         using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        timeoutCts.CancelAfter(TimeSpan.FromSeconds(30)); // eller konfigurerbart
+        timeoutCts.CancelAfter(timeout.TimeSpan); // eller konfigurerbart
 
         await using var registration = timeoutCts.Token.Register(() =>
         {
