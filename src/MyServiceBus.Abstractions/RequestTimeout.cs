@@ -9,7 +9,7 @@ public struct RequestTimeout
         this.TimeSpan = timeSpan;
     }
 
-    public TimeSpan TimeSpan { get; } = defaultTimeout;
+    public TimeSpan TimeSpan { get; }
 
     public static RequestTimeout None { get; } = new RequestTimeout(TimeSpan.Zero);
 
