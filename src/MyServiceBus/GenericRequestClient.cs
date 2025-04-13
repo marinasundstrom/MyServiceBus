@@ -36,11 +36,17 @@ public sealed class GenericRequestClient<TRequest> : IRequestClient<TRequest>, I
 
         var handler = async (ReceiveContext context) =>
         {
-            if (context.TryGetMessage<T>(out var message))
+            try
             {
-                taskCompletionSource.SetResult(new Response<T>(message));
-
-                await requestReceiveTransport.Stop(cancellationToken);
+                if (context.TryGetMessage<T>(out var message))
+                {
+                    var response = new Response<T>(message);
+                    taskCompletionSource.TrySetResult(response);
+                }
+            }
+            catch (Exception ex)
+            {
+                taskCompletionSource.TrySetException(ex);
             }
         };
 
@@ -62,6 +68,21 @@ public sealed class GenericRequestClient<TRequest> : IRequestClient<TRequest>, I
 
         await requestSendTransport.Send(request, context, cancellationToken);
 
-        return await taskCompletionSource.Task;
+        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeoutCts.CancelAfter(TimeSpan.FromSeconds(30)); // eller konfigurerbart
+
+        await using var registration = timeoutCts.Token.Register(() =>
+        {
+            taskCompletionSource.TrySetException(new TimeoutException("Request timed out."));
+        });
+
+        try
+        {
+            return await taskCompletionSource.Task;
+        }
+        finally
+        {
+            await requestReceiveTransport.Stop(cancellationToken);
+        }
     }
 }
