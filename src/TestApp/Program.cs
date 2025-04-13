@@ -7,7 +7,7 @@ builder.Services.AddServiceBus(x =>
 {
     x.AddConsumer<SubmitOrderConsumer>();
     x.AddConsumer<OrderSubmittedConsumer>();
-    x.AddConsumer<TestRequestConsumer>();
+    // x.AddConsumer<TestRequestConsumer>();
 
     x.UsingRabbitMq((context, cfg) =>
     {

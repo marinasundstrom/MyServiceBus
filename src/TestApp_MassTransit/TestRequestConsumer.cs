@@ -1,5 +1,4 @@
-
-using MyServiceBus;
+using MassTransit;
 
 namespace TestApp;
 

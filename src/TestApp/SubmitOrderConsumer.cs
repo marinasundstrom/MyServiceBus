@@ -10,7 +10,7 @@ class SubmitOrderConsumer :
     {
         Console.WriteLine($"Order Id: {context.Message.OrderId} (from {context.Message.Message})");
 
-        await context.Publish<OrderSubmitted>(new
+        await context.PublishAsync<OrderSubmitted>(new
         {
             context.Message.OrderId
         });

@@ -25,12 +25,12 @@ internal class ConsumeContextImpl<TMessage> : ConsumeContext<TMessage>
         throw new NotImplementedException();
     }
 
-    public async Task Publish<T>(T message, CancellationToken cancellationToken = default)
+    public async Task PublishAsync<T>(T message, CancellationToken cancellationToken = default)
     {
-        await Publish((object)message, cancellationToken);
+        await PublishAsync((object)message, cancellationToken);
     }
 
-    public async Task Publish<T>(object message, CancellationToken cancellationToken = default)
+    public async Task PublishAsync<T>(object message, CancellationToken cancellationToken = default)
     {
         var exchangeName = NamingConventions.GetExchangeName(typeof(T));
 
@@ -45,12 +45,12 @@ internal class ConsumeContextImpl<TMessage> : ConsumeContext<TMessage>
         await transport.Send(message, context, cancellationToken);
     }
 
-    public async Task Respond<T>(T message, CancellationToken cancellationToken = default)
+    public async Task RespondAsync<T>(T message, CancellationToken cancellationToken = default)
     {
-        await Respond((object)message, cancellationToken);
+        await RespondAsync((object)message, cancellationToken);
     }
 
-    public async Task Respond<T>(object message, CancellationToken cancellationToken = default)
+    private async Task RespondAsync<T>(object obj, CancellationToken cancellationToken = default)
     {
         var responseAddress = receiveContext.ResponseAddress;
 
