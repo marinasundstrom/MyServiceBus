@@ -13,6 +13,10 @@
 
     <modules>
         <module>servicebus</module>
+        <module>servicebus-abstractions</module>
+        <module>servicebus-di</module>
+        <module>servicebus-tasks</module>
+        <module>servicebus-rabbitmq</module>
         <module>testapp</module>
     </modules>
 
