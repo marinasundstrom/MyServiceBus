@@ -1,0 +1,4 @@
+
+interface Processor {
+    String process();
+}

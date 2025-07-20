@@ -30,6 +30,19 @@ public class ServiceCollection {
         });
     }
 
+    public <T, U extends T> void addSingleton(Class<T> type) {
+        if (built) {
+            throw new IllegalStateException("Cannot add service to container that has been built.");
+        }
+
+        modules.add(new AbstractModule() {
+            @Override
+            protected void configure() {
+                bind(type).in(Scopes.SINGLETON);
+            }
+        });
+    }
+
     public <T, U extends T> void addSingleton(Class<T> iface, Class<U> impl) {
         if (built) {
             throw new IllegalStateException("Cannot add service to container that has been built.");

@@ -1,6 +1,11 @@
 package com.myservicebus.di;
 
+import java.util.Set;
+
 import com.google.inject.Injector;
+import com.google.inject.Key;
+import com.google.inject.TypeLiteral;
+import com.google.inject.util.Types;
 
 public class ServiceProviderImpl implements ServiceProvider {
     private Injector root;
@@ -13,6 +18,12 @@ public class ServiceProviderImpl implements ServiceProvider {
 
     public <T> T getService(Class<T> type) {
         return root.getInstance(type); // for singletons
+    }
+
+    @SuppressWarnings("unchecked")
+    public <T> Set<T> getServices(Class<T> iface) {
+        TypeLiteral<Set<T>> setType = (TypeLiteral<Set<T>>) TypeLiteral.get(Types.setOf(iface));
+        return root.getInstance(Key.get(setType));
     }
 
     public ServiceScope createScope() {
