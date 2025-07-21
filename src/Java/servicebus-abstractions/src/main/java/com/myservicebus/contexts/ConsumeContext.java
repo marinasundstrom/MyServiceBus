@@ -7,7 +7,9 @@ import transports.PublishEndpoint;
 import transports.SendEndpoint;
 
 public interface ConsumeContext<T>
-        extends PipeContext, MessageConsumeContext, PublishEndpoint, SendEndpoint, SendEndpointProvider {
+        extends PipeContext,
+        ConsumeContextBase, MessageConsumeContext, PublishEndpoint, SendEndpoint,
+        SendEndpointProvider {
 
     T getMessage();
 

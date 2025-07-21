@@ -53,4 +53,16 @@ public class ConsumeContextImpl<T> implements ConsumeContext<T> {
     public CancellationToken cancellationToken() {
         return null;
     }
+
+    @Override
+    public ReceiveContext getReceiveContext() {
+        // TODO Auto-generated method stub
+        throw new UnsupportedOperationException("Unimplemented method 'getReceiveContext'");
+    }
+
+    @Override
+    public boolean hasMessageType(Class<?> messageType) {
+        // TODO Auto-generated method stub
+        throw new UnsupportedOperationException("Unimplemented method 'hasMessageType'");
+    }
 }
