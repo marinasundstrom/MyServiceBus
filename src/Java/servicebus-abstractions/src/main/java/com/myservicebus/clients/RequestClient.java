@@ -1,4 +1,4 @@
-package com.myservicebus;
+package com.myservicebus.clients;
 
 import java.util.concurrent.CompletableFuture;
 

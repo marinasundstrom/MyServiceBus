@@ -18,6 +18,8 @@ import com.fasterxml.jackson.databind.JsonDeserializer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.myservicebus.contexts.ConsumeContext;
+import com.myservicebus.contexts.ConsumeContextImpl;
 import com.myservicebus.di.ServiceCollection;
 import com.myservicebus.di.ServiceProvider;
 import com.myservicebus.di.ServiceScope;
@@ -70,28 +72,29 @@ public class ServiceBus {
     }
 
     public void start() throws IOException, TimeoutException {
-        ConnectionFactory factory = new ConnectionFactory();
-        factory.setHost("localhost");
-
-        Connection connection = factory.newConnection();
-        channel = connection.createChannel();
+        RabbitMqTransport transport = new RabbitMqTransport("localhost");
+        channel = transport.connect();
+        TopologyBuilder topology = new RabbitMqTopologyBuilder(channel);
 
         ConsumerRegistry registry = serviceProvider.getService(ConsumerRegistry.class);
 
         for (ConsumerDefinition<?, ?> def : registry.getAll()) {
-            // String exchange = def.getExchangeName();
             String queue = def.getQueueName();
 
             String exchangeName = def.getExchangeName();
+            var exchangeType = def.getExchangeType();
 
-            channel.exchangeDeclare(exchangeName, BuiltinExchangeType.FANOUT, true);
-            channel.queueDeclare(queue, true, false, false, null);
-            channel.queueBind(queue, exchangeName, "");
+            var routingKey = def.getRoutingKey();
+
+            topology.declareExchange(exchangeName, exchangeType, true);
+            topology.declareQueue(queue, true, false);
+            topology.bindQueue(queue, exchangeName, routingKey);
 
             channel.basicConsume(queue, false, (tag, delivery) -> {
                 try (var scope = serviceProvider.createScope()) {
                     var scopedServiceProvider = scope.getServiceProvider();
 
+                    @SuppressWarnings("unchecked")
                     Consumer<Object> consumer = (Consumer<Object>) scopedServiceProvider
                             .getService(def.getConsumerType());
                     try {
@@ -101,7 +104,7 @@ public class ServiceBus {
 
                         var envelope = (Envelope<?>) mapper.readValue(delivery.getBody(), type);
 
-                        ConsumeContext<Object> ctx = new ConsumeContext<>(envelope.getMessage(), null);
+                        ConsumeContext<Object> ctx = new ConsumeContextImpl<>(envelope.getMessage(), null);
 
                         consumer.consume(ctx);
 

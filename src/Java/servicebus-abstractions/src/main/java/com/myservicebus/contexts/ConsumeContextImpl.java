@@ -1,18 +1,18 @@
-package com.myservicebus;
+package com.myservicebus.contexts;
 
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
 import com.myservicebus.tasks.CancellationToken;
 
-public class ConsumeContext<T>
-        implements PipeContext,
-        MessageConsumeContext, PublishEndpoint, SendEndpoint, SendEndpointProvider {
+import transports.SendEndpoint;
+
+public class ConsumeContextImpl<T> implements ConsumeContext<T> {
 
     private final T message;
     private final Map<String, Object> headers;
 
-    public ConsumeContext(T message, Map<String, Object> headers) {
+    public ConsumeContextImpl(T message, Map<String, Object> headers) {
         this.message = message;
         this.headers = headers;
     }
