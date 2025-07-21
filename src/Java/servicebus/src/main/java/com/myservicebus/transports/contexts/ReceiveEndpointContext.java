@@ -1,5 +1,6 @@
-package com.myservicebus.contexts;
+package com.myservicebus.transports.contexts;
 
+import com.myservicebus.contexts.PipeContext;
 import com.myservicebus.middleware.ReceivePipe;
 
 public interface ReceiveEndpointContext extends PipeContext {

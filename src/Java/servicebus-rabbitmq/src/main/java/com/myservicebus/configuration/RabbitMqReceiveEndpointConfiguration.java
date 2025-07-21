@@ -3,9 +3,9 @@ package com.myservicebus.configuration;
 import java.net.URI;
 import java.util.Optional;
 
-import com.myservicebus.contexts.ReceiveEndpointContext;
 import com.myservicebus.middleware.ConsumePipe;
 import com.myservicebus.middleware.ReceivePipe;
+import com.myservicebus.transports.contexts.ReceiveEndpointContext;
 
 public class RabbitMqReceiveEndpointConfiguration implements ReceiveEndpointConfiguration {
     @Override
