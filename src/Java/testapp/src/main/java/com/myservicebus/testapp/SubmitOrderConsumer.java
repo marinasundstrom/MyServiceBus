@@ -3,9 +3,9 @@ package com.myservicebus.testapp;
 import java.util.concurrent.CompletableFuture;
 
 import com.google.inject.Inject;
-import com.myservicebus.ConsumeContext;
 import com.myservicebus.Consumer;
 import com.myservicebus.MyService;
+import com.myservicebus.contexts.ConsumeContext;
 
 class SubmitOrderConsumer implements Consumer<SubmitOrder> {
     private MyService service;

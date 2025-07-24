@@ -1,4 +1,4 @@
-package com.myservicebus;
+package transports;
 
 import java.util.concurrent.CompletableFuture;
 
