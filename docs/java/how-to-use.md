@@ -49,6 +49,15 @@ public class Main {
 }
 ```
 
+## Request/Response
+
+```java
+RequestClient<SubmitOrder> client = serviceProvider.getService(RequestClient.class);
+OrderSubmitted response = client
+        .getResponse(new SubmitOrder(UUID.randomUUID(), "demo"), OrderSubmitted.class, CancellationToken.none)
+        .get();
+```
+
 ## Defining messages
 
 We are using `lombok` to generate property getters and setters, as well as default constructors, for messages.
