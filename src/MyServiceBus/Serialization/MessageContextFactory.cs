@@ -1,5 +1,4 @@
 using System;
-using System.Text.Json;
 using MyServiceBus.Transports;
 
 namespace MyServiceBus.Serialization;
@@ -27,7 +26,7 @@ public class MessageContextFactory
             throw new InvalidOperationException($"Invalid Content Type: {contentType}");
         }
 
-        throw new InvalidOperationException("Header Content-Type was not found");
+        return new EnvelopeMessageContext(transportMessage.Payload, transportMessage.Headers);
     }
 }
 
