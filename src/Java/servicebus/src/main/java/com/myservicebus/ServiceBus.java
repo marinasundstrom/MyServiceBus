@@ -1,15 +1,10 @@
 package com.myservicebus;
 
 import java.io.IOException;
-import java.net.InetAddress;
-import java.nio.charset.StandardCharsets;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeFormatterBuilder;
 import java.time.temporal.ChronoField;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 
 import com.fasterxml.jackson.core.JsonParser;
@@ -22,19 +17,26 @@ import com.myservicebus.di.ServiceCollection;
 import com.myservicebus.di.ServiceProvider;
 import com.myservicebus.di.ServiceScope;
 import com.myservicebus.util.EnvelopeDeserializer;
+import com.myservicebus.tasks.CancellationToken;
+import com.myservicebus.SendEndpointProvider;
+import com.myservicebus.rabbitmq.ConnectionProvider;
+import com.myservicebus.NamingConventions;
 import com.rabbitmq.client.BuiltinExchangeType;
 import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.Connection;
-import com.rabbitmq.client.ConnectionFactory;
 
 public class ServiceBus {
     private final ServiceProvider serviceProvider;
+    private final ConnectionProvider connectionProvider;
+    private final SendEndpointProvider sendEndpointProvider;
     private Connection connection;
     private Channel channel;
     private ObjectMapper mapper;
 
     public ServiceBus(ServiceProvider serviceProvider) {
         this.serviceProvider = serviceProvider;
+        this.connectionProvider = serviceProvider.getService(ConnectionProvider.class);
+        this.sendEndpointProvider = serviceProvider.getService(SendEndpointProvider.class);
 
         mapper = new ObjectMapper();
         mapper.findAndRegisterModules();
@@ -69,11 +71,12 @@ public class ServiceBus {
     }
 
     public void start() throws IOException, TimeoutException {
-        ConnectionFactory factory = new ConnectionFactory();
-        factory.setHost("localhost");
-
-        connection = factory.newConnection();
-        channel = connection.createChannel();
+        try {
+            connection = connectionProvider.getOrCreateConnection();
+            channel = connection.createChannel();
+        } catch (Exception ex) {
+            throw new IOException("Failed to start RabbitMQ connection", ex);
+        }
 
         ConsumerRegistry registry = serviceProvider.getService(ConsumerRegistry.class);
 
@@ -100,7 +103,13 @@ public class ServiceBus {
 
                         var envelope = (Envelope<?>) mapper.readValue(delivery.getBody(), type);
 
-                        ConsumeContext<Object> ctx = new ConsumeContext<>(envelope.getMessage(), null);
+                        ConsumeContext<Object> ctx = new ConsumeContext<>(
+                                envelope.getMessage(),
+                                envelope.getHeaders(),
+                                envelope.getResponseAddress(),
+                                envelope.getFaultAddress(),
+                                CancellationToken.none,
+                                sendEndpointProvider);
 
                         consumer.consume(ctx).get();
 
@@ -126,54 +135,14 @@ public class ServiceBus {
         if (message == null)
             throw new IllegalArgumentException("Message cannot be null");
 
-        Class<?> messageType = message.getClass();
-
-        Envelope<Object> envelope = new Envelope<>();
-        envelope.setMessageId(UUID.randomUUID());
-        envelope.setConversationId(UUID.randomUUID());
-        envelope.setSentTime(OffsetDateTime.now());
-        envelope.setSourceAddress("rabbitmq://localhost/source");
-        envelope.setDestinationAddress("rabbitmq://localhost/" + NamingConventions.getMessageName(messageType));
-        envelope.setMessageType(List.of(NamingConventions.getMessageUrn(messageType)));
-        envelope.setMessage(message);
-        envelope.setHeaders(Map.of());
-        envelope.setContentType("application/json");
-
-        String machineName = InetAddress.getLocalHost().getHostName();
-        String processName = "java";
-        long processId = ProcessHandle.current().pid(); // Java 9+
-        String serviceName = "my-app";
-        String serviceVersion = "1.0.0";
-        String frameworkVersion = System.getProperty("java.version");
-        String platform = "8.0.10.0"; // define or detect if needed
-        String operatingSystemVersion = System.getProperty("os.name") + " " + System.getProperty("os.version");
-
-        HostInfo host = new HostInfo(
-                machineName,
-                processName,
-                (int) processId,
-                serviceName,
-                serviceVersion,
-                frameworkVersion,
-                platform,
-                operatingSystemVersion);
-
-        envelope.setHost(host);
-
-        String json = mapper.writeValueAsString(envelope);
-        byte[] body = json.getBytes(StandardCharsets.UTF_8);
-
-        // messageType.getPackageName()
-
-        String exchangeName = NamingConventions.getExchangeName(messageType);
-
-        // Ensure the exchange exists (fanout-type)
-        channel.exchangeDeclare(exchangeName, BuiltinExchangeType.FANOUT, true);
-
-        // Publish to the exchange (fanout -> routingKey is ignored)
-        channel.basicPublish(exchangeName, "", null, body);
-
-        System.out.println("📤 Published message of type " + messageType.getSimpleName());
+        String exchange = NamingConventions.getExchangeName(message.getClass());
+        var endpoint = sendEndpointProvider.getSendEndpoint("rabbitmq://localhost/" + exchange);
+        try {
+            endpoint.send(message, CancellationToken.none).join();
+            System.out.println("📤 Published message of type " + message.getClass().getSimpleName());
+        } catch (Exception ex) {
+            throw new IOException("Failed to publish message", ex);
+        }
     }
 
     public void stop() throws IOException, TimeoutException {

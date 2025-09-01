@@ -4,8 +4,8 @@ import java.lang.reflect.Array;
 import java.lang.reflect.GenericArrayType;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
-import java.util.logging.Handler;
 
+import com.myservicebus.Consumer;
 import com.myservicebus.di.ServiceCollection;
 
 class BusRegistrationConfiguratorImpl implements BusRegistrationConfigurator {
@@ -55,5 +55,10 @@ class BusRegistrationConfiguratorImpl implements BusRegistrationConfigurator {
 
     public void complete() {
         serviceCollection.addSingleton(ConsumerRegistry.class, sp -> () -> registry);
+    }
+
+    @Override
+    public ServiceCollection getServiceCollection() {
+        return serviceCollection;
     }
 }
