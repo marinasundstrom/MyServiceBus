@@ -30,7 +30,7 @@ public class MessageConfigurator
     }
 }
 
-public class ReceiveEndpointConfigurator
+public class ReceiveEndpointConfigurator : IReceiveEndpointConfigurator
 {
     [Throws(typeof(InvalidOperationException))]
     public void ConfigureConsumer<T>(IBusRegistrationContext context)
