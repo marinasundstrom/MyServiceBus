@@ -48,6 +48,11 @@ public class ConsumerMessageFilter<TConsumer, TMessage> : IFilter<ConsumeContext
         }
         catch (Exception ex)
         {
+            if (context is ConsumeContextImpl<TMessage> ctx)
+            {
+                await ctx.RespondFaultAsync(ex);
+            }
+
             throw new InvalidOperationException($"Consumer {typeof(TConsumer).Name} failed", ex);
         }
     }

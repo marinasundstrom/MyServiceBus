@@ -25,11 +25,14 @@ public class RetryFilter<TContext> : IFilter<TContext>
             try
             {
                 await next.Send(context);
-                return;
+                break;
             }
-            catch when (attempt < retryCount)
+            catch
             {
-                if (delay.HasValue && delay.Value > TimeSpan.Zero)
+                if (attempt >= retryCount)
+                    throw;
+
+                if (delay.HasValue)
                     await Task.Delay(delay.Value, context.CancellationToken);
             }
         }
