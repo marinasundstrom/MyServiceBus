@@ -5,6 +5,12 @@ This repository contains a .NET solution for MyServiceBus and a Java project. Fo
 ## Code style
 - Use standard C# conventions (PascalCase for types and methods, camelCase for locals and parameters).
 - Prefer `dotnet format` to automatically format files.
+ 
+## Exception handling
+- The CheckedExceptions analyzer is enabled; treat THROWS diagnostics as warnings and avoid auto-fixes that clutter code.
+- Catch exceptions locally when possible. If an exception flows out of a method, declare it with `[Throws(typeof(ExceptionType))]`.
+- When overriding members, ensure your `Throws` declarations remain compatible with the base member.
+- Declare and use domain-specific exceptions when no built-in type clearly conveys the problem, wrapping the original exception as the `InnerException` for context.
 
 ## Testing
 - From the repository root, run `dotnet test` and ensure all tests pass before committing.

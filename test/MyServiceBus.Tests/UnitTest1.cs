@@ -6,6 +6,7 @@ using System.Text;
 using System.Text.Json;
 using MyServiceBus.Serialization;
 using Xunit;
+using Xunit.Sdk;
 
 public class EnvelopeMessageContextTests
 {
@@ -15,6 +16,7 @@ public class EnvelopeMessageContextTests
     }
 
     [Fact]
+    [Throws(typeof(NotSupportedException))]
     public void Can_Parse_Metadata_And_Deserialize_Message()
     {
         // Arrange: skapa test-envelope som JSON

@@ -1,9 +1,11 @@
-
+using System;
+using System.Threading;
+using System.Threading.Tasks;
 using MyServiceBus.Serialization;
 
 namespace MyServiceBus;
 
-internal class ConsumeContextImpl<TMessage> : ConsumeContext<TMessage>
+public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMessage>
     where TMessage : class
 {
     private readonly ReceiveContext receiveContext;
@@ -11,12 +13,11 @@ internal class ConsumeContextImpl<TMessage> : ConsumeContext<TMessage>
     private TMessage? message;
 
     public ConsumeContextImpl(ReceiveContext receiveContext, ITransportFactory transportFactory)
+        : base(receiveContext.CancellationToken)
     {
         this.receiveContext = receiveContext;
         this._transportFactory = transportFactory;
     }
-
-    public CancellationToken CancellationToken => CancellationToken.None;
 
     public TMessage Message => message is null ? (receiveContext.TryGetMessage(out message) ? message : default) : message;
 
@@ -37,7 +38,7 @@ internal class ConsumeContextImpl<TMessage> : ConsumeContext<TMessage>
         var uri = new Uri($"rabbitmq://localhost/{exchangeName}");
         var transport = await _transportFactory.GetSendTransport(uri, cancellationToken);
 
-        var context = new SendContext([typeof(T)], new EnvelopeMessageSerializer())
+        var context = new SendContext([typeof(T)], new EnvelopeMessageSerializer(), cancellationToken)
         {
             MessageId = Guid.NewGuid().ToString()
         };
@@ -59,11 +60,11 @@ internal class ConsumeContextImpl<TMessage> : ConsumeContext<TMessage>
         var uri = new Uri($"rabbitmq://localhost/{exchangeName}");
         var transport = await _transportFactory.GetSendTransport(uri, cancellationToken);
 
-        var context = new SendContext([typeof(T)], new EnvelopeMessageSerializer())
+        var context = new SendContext([typeof(T)], new EnvelopeMessageSerializer(), cancellationToken)
         {
             MessageId = Guid.NewGuid().ToString()
         };
 
-        await transport.Send(message, context, cancellationToken);
+        await transport.Send(obj, context, cancellationToken);
     }
 }

@@ -1,14 +1,19 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using MyServiceBus.Serialization;
 
 namespace MyServiceBus;
 
-public class SendContext
+public class SendContext : BasePipeContext
 {
     private readonly Type[] messageTypes;
     private readonly IMessageSerializer messageSerializer;
 
-    public SendContext(Type[] messageTypes, IMessageSerializer messageSerializer)
+    public SendContext(Type[] messageTypes, IMessageSerializer messageSerializer, CancellationToken cancellationToken = default)
+        : base(cancellationToken)
     {
         this.messageTypes = messageTypes;
         this.messageSerializer = messageSerializer;
