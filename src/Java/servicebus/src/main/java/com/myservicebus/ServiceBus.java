@@ -26,11 +26,10 @@ import com.rabbitmq.client.BuiltinExchangeType;
 import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.Connection;
 import com.rabbitmq.client.ConnectionFactory;
-import com.rabbitmq.client.DeliverCallback;
-import com.rabbitmq.client.impl.AMQImpl.Basic.Consume;
 
 public class ServiceBus {
     private final ServiceProvider serviceProvider;
+    private Connection connection;
     private Channel channel;
     private ObjectMapper mapper;
 
@@ -73,7 +72,7 @@ public class ServiceBus {
         ConnectionFactory factory = new ConnectionFactory();
         factory.setHost("localhost");
 
-        Connection connection = factory.newConnection();
+        connection = factory.newConnection();
         channel = connection.createChannel();
 
         ConsumerRegistry registry = serviceProvider.getService(ConsumerRegistry.class);
@@ -103,13 +102,16 @@ public class ServiceBus {
 
                         ConsumeContext<Object> ctx = new ConsumeContext<>(envelope.getMessage(), null);
 
-                        consumer.consume(ctx);
+                        consumer.consume(ctx).get();
 
                         channel.basicAck(delivery.getEnvelope().getDeliveryTag(), false);
                     } catch (Exception e) {
-                        channel.basicNack(delivery.getEnvelope().getDeliveryTag(), false, false);
+                        try {
+                            channel.basicNack(delivery.getEnvelope().getDeliveryTag(), false, false);
+                        } catch (IOException ioEx) {
+                            ioEx.printStackTrace();
+                        }
 
-                        // TODO Auto-generated catch block
                         e.printStackTrace();
                     }
                 }
@@ -172,5 +174,12 @@ public class ServiceBus {
         channel.basicPublish(exchangeName, "", null, body);
 
         System.out.println("📤 Published message of type " + messageType.getSimpleName());
+    }
+
+    public void stop() throws IOException, TimeoutException {
+        if (channel != null && channel.isOpen())
+            channel.close();
+        if (connection != null && connection.isOpen())
+            connection.close();
     }
 }
