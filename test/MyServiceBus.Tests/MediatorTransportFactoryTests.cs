@@ -34,7 +34,8 @@ public class MediatorTransportFactoryTests
 
         await receive.Start();
 
-        var send = await factory.GetSendTransport(new Uri("loopback://test"));
+        // Use a URI with a path segment so the exchange can be extracted
+        var send = await factory.GetSendTransport(new Uri("loopback://localhost/test"));
 
         var serializer = new EnvelopeMessageSerializer();
         var sendContext = new SendContext(new[] { typeof(SampleMessage) }, serializer)
