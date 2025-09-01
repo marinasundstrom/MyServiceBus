@@ -18,7 +18,7 @@ public class Main {
 
             RabbitMqTransport.configure(x, (context, cfg) -> {
 
-                cfg.host("rabbitmq://localhost", h -> {
+                cfg.host("localhost", h -> {
                     h.username("guest");
                     h.password("guest");
                 });
