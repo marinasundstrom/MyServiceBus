@@ -34,7 +34,7 @@ public class SendContext : BasePipeContext
         {
             MessageId = Guid.NewGuid(),
             CorrelationId = null,
-            MessageType = [..messageTypes.Select(x => NamingConventions.GetMessageUrn(x))],
+            MessageType = [.. messageTypes.Select(x => NamingConventions.GetMessageUrn(x))],
             ResponseAddress = ResponseAddress,
             Headers = Headers,
             SentTime = DateTimeOffset.Now,
@@ -52,7 +52,7 @@ public class SendContext : BasePipeContext
         Assembly = typeof(T).Assembly.GetName().Name ?? "unknown",
         AssemblyVersion = typeof(T).Assembly.GetName().Version?.ToString() ?? "unknown",
         FrameworkVersion = System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription,
-        MassTransitVersion = "your-custom-version", // replace as needed
+        MassTransitVersion = typeof(MyMessageBus).Assembly.GetName().Version?.ToString() ?? "unknown",
         OperatingSystemVersion = Environment.OSVersion.VersionString
     };
 }
