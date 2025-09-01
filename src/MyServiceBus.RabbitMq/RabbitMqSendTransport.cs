@@ -23,7 +23,15 @@ public sealed class RabbitMqSendTransport : ISendTransport
         // Headers
         if (context.Headers != null)
         {
-            props.Headers = context.Headers.ToDictionary(kv => kv.Key, kv => (object?)kv.Value);
+            try
+            {
+                props.Headers = context.Headers.ToDictionary(kv => kv.Key, kv => (object?)kv.Value);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Failed to map message headers: {ex}");
+                props.Headers = new Dictionary<string, object?>();
+            }
         }
 
         var body = await context.Serialize(message); // assume JSON or similar

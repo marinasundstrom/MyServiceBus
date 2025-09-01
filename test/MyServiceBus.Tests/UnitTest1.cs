@@ -16,7 +16,6 @@ public class EnvelopeMessageContextTests
     }
 
     [Fact]
-    [Throws(typeof(NotSupportedException))]
     public void Can_Parse_Metadata_And_Deserialize_Message()
     {
         // Arrange: skapa test-envelope som JSON

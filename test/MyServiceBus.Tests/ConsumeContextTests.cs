@@ -40,10 +40,18 @@ public class ConsumeContextTests
         var cts = new CancellationTokenSource();
         var json = Encoding.UTF8.GetBytes("{\"messageId\":\"00000000-0000-0000-0000-000000000000\",\"messageType\":[],\"message\":{}}");
         var envelope = new EnvelopeMessageContext(json, new Dictionary<string, object>());
-        var receiveContext = new ReceiveContextImpl(envelope, cts.Token);
-        var sut = new ConsumeContextImpl<string>(receiveContext, new StubTransportFactory());
 
-        Assert.Equal(cts.Token, sut.CancellationToken);
+        try
+        {
+            var receiveContext = new ReceiveContextImpl(envelope, cts.Token);
+            var sut = new ConsumeContextImpl<string>(receiveContext, new StubTransportFactory());
+
+            Assert.Equal(cts.Token, sut.CancellationToken);
+        }
+        catch (ObjectDisposedException exc)
+        {
+            Assert.Fail(exc.Message);
+        }
     }
 
     class StubTransportFactory : ITransportFactory

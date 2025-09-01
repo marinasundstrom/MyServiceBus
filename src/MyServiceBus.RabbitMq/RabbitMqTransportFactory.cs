@@ -17,7 +17,15 @@ public sealed class RabbitMqTransportFactory : ITransportFactory
 
     public async Task<ISendTransport> GetSendTransport(Uri address, CancellationToken cancellationToken = default)
     {
-        var exchange = ExtractExchange(address);
+        string exchange;
+        try
+        {
+            exchange = ExtractExchange(address);
+        }
+        catch (InvalidOperationException)
+        {
+            exchange = "default";
+        }
 
         if (!_sendTransports.TryGetValue(exchange, out var sendTransport))
         {
@@ -65,9 +73,17 @@ public sealed class RabbitMqTransportFactory : ITransportFactory
         return new RabbitMqReceiveTransport(channel, topology.QueueName, handler);
     }
 
+    [Throws(typeof(InvalidOperationException))]
     private string ExtractExchange(Uri address)
     {
         // Very simple mapping logic for now
-        return address.Segments.LastOrDefault()?.Trim('/') ?? "default";
+        try
+        {
+            return address.Segments.LastOrDefault()?.Trim('/') ?? "default";
+        }
+        catch (InvalidOperationException ex)
+        {
+            throw new InvalidOperationException($"Could not extract exchange from '{address}'", ex);
+        }
     }
 }
