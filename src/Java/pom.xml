@@ -18,6 +18,7 @@
         <module>myservicebus-tasks</module>
         <module>myservicebus-rabbitmq</module>
         <module>testapp</module>
+        <module>myservicebus-testing</module>
     </modules>
 
     <properties>
