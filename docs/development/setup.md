@@ -11,7 +11,7 @@ This is the development setup.
 * `TestApp` - our test project for the .NET client
 
 Java client
-* `servicebus` - the actual service bus. At the moment, containing the RabbitMQ transport.
+* `myservicebus` - the actual service bus. At the moment, containing the RabbitMQ transport.
 * `testapp` - our test project for the Java client
 
 Reference - for compatibility with MassTransit
