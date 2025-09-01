@@ -27,6 +27,6 @@ class SubmitOrderConsumer implements Consumer<SubmitOrder> {
 
         System.out.println("Order id: " + orderId + " (from " + message + ")");
 
-        return context.publish(new OrderSubmitted(orderId), context.cancellationToken());
+        return context.publish(new OrderSubmitted(orderId), context.getCancellationToken());
     }
 }
