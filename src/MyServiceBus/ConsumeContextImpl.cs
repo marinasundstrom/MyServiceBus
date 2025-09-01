@@ -50,21 +50,4 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
     {
         await RespondAsync((object)message, cancellationToken);
     }
-
-    private async Task RespondAsync<T>(object obj, CancellationToken cancellationToken = default)
-    {
-        var responseAddress = receiveContext.ResponseAddress;
-
-        var exchangeName = NamingConventions.GetExchangeName(typeof(T));
-
-        var uri = new Uri($"rabbitmq://localhost/{exchangeName}");
-        var transport = await _transportFactory.GetSendTransport(uri, cancellationToken);
-
-        var context = new SendContext([typeof(T)], new EnvelopeMessageSerializer(), cancellationToken)
-        {
-            MessageId = Guid.NewGuid().ToString()
-        };
-
-        await transport.Send(obj, context, cancellationToken);
-    }
 }
