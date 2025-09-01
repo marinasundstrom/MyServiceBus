@@ -2,7 +2,7 @@ using System.Threading.Tasks;
 
 namespace MyServiceBus;
 
-internal sealed class RabbitMqFactoryConfigurator : IRabbitMqFactoryConfigurator
+internal sealed class RabbitMqFactoryConfigurator : IRabbitMqFactoryConfigurator, IReceiveConfigurator<ReceiveEndpointConfigurator>
 {
     public RabbitMqFactoryConfigurator()
     {
