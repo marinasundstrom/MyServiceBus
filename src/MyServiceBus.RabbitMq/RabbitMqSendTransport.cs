@@ -16,9 +16,12 @@ public sealed class RabbitMqSendTransport : ISendTransport
     public async Task Send<T>(T message, SendContext context, CancellationToken cancellationToken = default)
         where T : class
     {
-        var props = new BasicProperties();
+        var props = new BasicProperties
+        {
+            Persistent = true
+        };
 
-        props.Persistent = true;
+        var body = await context.Serialize(message); // assume JSON or similar
 
         // Headers
         if (context.Headers != null)
@@ -26,6 +29,10 @@ public sealed class RabbitMqSendTransport : ISendTransport
             try
             {
                 props.Headers = context.Headers.ToDictionary(kv => kv.Key, kv => (object?)kv.Value);
+                if (context.Headers.TryGetValue("content_type", out var ct))
+                {
+                    props.ContentType = ct.ToString();
+                }
             }
             catch (Exception ex)
             {
@@ -33,8 +40,6 @@ public sealed class RabbitMqSendTransport : ISendTransport
                 props.Headers = new Dictionary<string, object?>();
             }
         }
-
-        var body = await context.Serialize(message); // assume JSON or similar
 
         await _channel.BasicPublishAsync(
             exchange: _exchange,
