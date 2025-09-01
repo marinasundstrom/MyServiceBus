@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using MyServiceBus.Topology;
+using System.Reflection;
 
 namespace MyServiceBus;
 
@@ -14,10 +15,11 @@ public class BusRegistrationConfigurator : IBusRegistrationConfigurator
         Services = services;
     }
 
+    [Throws(typeof(InvalidOperationException))]
     public void AddConsumer<TConsumer>() where TConsumer : class, IConsumer
     {
         Services.AddScoped<TConsumer>();
-        Services.AddScoped<IConsumer, TConsumer>(sp => sp.GetRequiredService<TConsumer>());
+        Services.AddScoped<IConsumer, TConsumer>([Throws(typeof(InvalidOperationException))] (sp) => sp.GetRequiredService<TConsumer>());
 
         var messageType = GetHandledMessageTypes(typeof(TConsumer)).First();
 
@@ -27,6 +29,7 @@ public class BusRegistrationConfigurator : IBusRegistrationConfigurator
       );
     }
 
+    [Throws(typeof(TargetInvocationException))]
     private static Type[] GetHandledMessageTypes(Type consumerType)
     {
         return consumerType

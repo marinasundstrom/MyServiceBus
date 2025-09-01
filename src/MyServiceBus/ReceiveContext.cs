@@ -1,24 +1,27 @@
-using System.Text.Json;
+using System;
+using System.Collections.Generic;
+using System.Threading;
 using MyServiceBus.Serialization;
 
 namespace MyServiceBus;
 
-public interface ReceiveContext
+public interface ReceiveContext : PipeContext
 {
-    public Guid MessageId { get; }
-    public IList<string> MessageType { get; }
-    public Uri? ResponseAddress { get; }
-    public Uri? FaultAddress { get; }
+    Guid MessageId { get; }
+    IList<string> MessageType { get; }
+    Uri? ResponseAddress { get; }
+    Uri? FaultAddress { get; }
 
     bool TryGetMessage<T>(out T? message)
         where T : class;
 }
 
-public class ReceiveContextImpl : ReceiveContext
+public class ReceiveContextImpl : BasePipeContext, ReceiveContext
 {
-    private IMessageContext messageContext;
+    private readonly IMessageContext messageContext;
 
-    public ReceiveContextImpl(IMessageContext messageContext)
+    public ReceiveContextImpl(IMessageContext messageContext, CancellationToken cancellationToken = default)
+        : base(cancellationToken)
     {
         this.messageContext = messageContext ?? throw new ArgumentNullException(nameof(messageContext));
     }
@@ -39,3 +42,4 @@ public class ReceiveContextImpl : ReceiveContext
         return messageContext.TryGetMessage(out message);
     }
 }
+
