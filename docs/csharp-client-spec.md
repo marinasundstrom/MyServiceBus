@@ -1,0 +1,33 @@
+# ServiceBus C# Client Specification
+
+## Overview
+The ServiceBus C# client provides a lightweight messaging abstraction for building distributed applications. It exposes asynchronous APIs for producing and consuming messages while delegating transport concerns to pluggable factories.
+
+## Features
+
+### Message Sending
+- `ConsumeContext` supplies `GetSendEndpoint` to send messages to arbitrary addresses.
+- `SendContext` captures headers, correlation and response addresses, and serializes messages into the ServiceBus envelope format.
+
+### Publishing
+- `PublishAsync` uses message type conventions to determine the exchange and send published messages through the configured transport.
+
+### Request–Response
+- `GenericRequestClient` sends requests and awaits responses or faults using temporary receive endpoints.
+- Consumers can reply with `RespondAsync` or signal failures with `RespondFaultAsync`.
+
+### Cancellation Propagation
+- All pipe contexts carry a `CancellationToken`, allowing operations to observe shutdown or timeout signals.
+
+### Transport Abstraction
+- An `ITransportFactory` resolves `ISendTransport` and `IReceiveTransport` implementations; the RabbitMQ factory ensures exchanges and queues exist before use.
+
+### Error Handling and Faults
+- When consumers encounter exceptions, `Fault<T>` messages describe the failure and are dispatched to the configured fault address.
+
+### Telemetry and Host Metadata
+- Outgoing messages include host information such as machine name, process details, and framework version to aid in diagnostics and tracing.
+
+## Behavior
+- Message serialization uses `EnvelopeMessageSerializer` and embeds metadata in headers consistent with `message-envelope.md`.
+- Send, publish, and respond operations are asynchronous and honor cancellation tokens.
