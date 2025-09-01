@@ -12,6 +12,8 @@ public interface ReceiveContext : PipeContext
     Uri? ResponseAddress { get; }
     Uri? FaultAddress { get; }
 
+    IDictionary<string, object> Headers { get; }
+
     bool TryGetMessage<T>(out T? message)
         where T : class;
 }
@@ -26,7 +28,7 @@ public class ReceiveContextImpl : BasePipeContext, ReceiveContext
         this.messageContext = messageContext ?? throw new ArgumentNullException(nameof(messageContext));
     }
 
-    public IDictionary<string, object>? Headers { get; }
+    public IDictionary<string, object> Headers => messageContext.Headers;
 
     public Guid MessageId => messageContext.MessageId;
 

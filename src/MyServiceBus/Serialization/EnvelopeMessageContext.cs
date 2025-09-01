@@ -7,6 +7,7 @@ public class EnvelopeMessageContext : IMessageContext
     private readonly JsonDocument _jsonDocument;
     private readonly JsonSerializerOptions _jsonSerializerOptions = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
     private readonly Dictionary<Type, object> _messageCache = new();
+    private readonly IDictionary<string, object> _transportHeaders;
 
     private Guid? _messageId;
     private Guid? _correlationId;
@@ -19,6 +20,7 @@ public class EnvelopeMessageContext : IMessageContext
     public EnvelopeMessageContext(byte[] jsonBytes, IDictionary<string, object> transportHeaders)
     {
         _jsonDocument = JsonDocument.Parse(jsonBytes);
+        _transportHeaders = transportHeaders;
     }
 
     public Guid MessageId =>
@@ -64,8 +66,7 @@ public class EnvelopeMessageContext : IMessageContext
         }
     }
 
-    public IDictionary<string, object> Headers =>
-        _headers ??= TryGetProperty("headers")?.Deserialize<Dictionary<string, object>>() ?? new();
+    public IDictionary<string, object> Headers => _headers ??= MergeHeaders();
 
     public DateTimeOffset SentTime =>
         _sentTime ??= TryGetProperty("sentTime")?.GetDateTimeOffset() ?? default;
@@ -103,5 +104,15 @@ public class EnvelopeMessageContext : IMessageContext
     private JsonElement? TryGetProperty(string propertyName)
     {
         return _jsonDocument.RootElement.TryGetProperty(propertyName, out var value) ? value : null;
+    }
+
+    private Dictionary<string, object> MergeHeaders()
+    {
+        var envelopeHeaders = TryGetProperty("headers")?.Deserialize<Dictionary<string, object>>() ?? new();
+        foreach (var kv in _transportHeaders)
+        {
+            envelopeHeaders[kv.Key] = kv.Value;
+        }
+        return envelopeHeaders;
     }
 }

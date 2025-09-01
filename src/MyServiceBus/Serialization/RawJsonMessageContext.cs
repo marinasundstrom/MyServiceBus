@@ -8,15 +8,17 @@ public class RawJsonMessageContext : IMessageContext
     private readonly JsonDocument _jsonDocument;
     private readonly JsonSerializerOptions _jsonSerializerOptions = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
     private readonly Dictionary<Type, object> _messageCache = new();
+    private readonly IDictionary<string, object> _transportHeaders;
 
     public RawJsonMessageContext(byte[] jsonBytes, IDictionary<string, object> transportHeaders)
     {
         _jsonDocument = JsonDocument.Parse(jsonBytes);
+        _transportHeaders = transportHeaders;
 
         // These will just be "empty" in raw mode
         MessageId = Guid.Empty;
         CorrelationId = null;
-        Headers = new Dictionary<string, object>();
+        Headers = new Dictionary<string, object>(transportHeaders);
         MessageType = new List<string>();
         SentTime = DateTime.UtcNow;
     }
