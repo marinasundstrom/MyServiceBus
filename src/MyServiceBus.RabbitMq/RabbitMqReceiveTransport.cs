@@ -1,3 +1,4 @@
+using System;
 using System.Text;
 using System.Threading.Tasks;
 using MyServiceBus.Serialization;
@@ -39,12 +40,20 @@ public sealed class RabbitMqReceiveTransport : IReceiveTransport
 
                 await _channel.BasicAckAsync(ea.DeliveryTag, multiple: false);
             }
-            catch (Exception exc)
+            catch (ObjectDisposedException exc)
             {
-                // Optionally nack
                 await _channel.BasicNackAsync(ea.DeliveryTag, false, requeue: false);
-
-                // Error handling & Retries
+                Console.WriteLine($"Message handling failed: {exc}");
+            }
+            catch (ArgumentException exc)
+            {
+                await _channel.BasicNackAsync(ea.DeliveryTag, false, requeue: false);
+                Console.WriteLine($"Message handling failed: {exc}");
+            }
+            catch (InvalidOperationException exc)
+            {
+                await _channel.BasicNackAsync(ea.DeliveryTag, false, requeue: false);
+                Console.WriteLine($"Message handling failed: {exc}");
             }
         };
 
