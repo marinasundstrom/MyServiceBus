@@ -29,6 +29,7 @@ public class RawJsonMessageContext : IMessageContext
     public Uri? FaultAddress { get; }
     public DateTimeOffset SentTime { get; }
 
+    [Throws(typeof(InvalidOperationException), typeof(ObjectDisposedException))]
     public bool TryGetMessage<T>(out T? message) where T : class
     {
         if (_messageCache.TryGetValue(typeof(T), out var cached))
