@@ -1,6 +1,6 @@
 # AGENTS Instructions
 
-This repository contains a .NET solution for MyServiceBus. Follow these guidelines when contributing:
+This repository contains a .NET solution for MyServiceBus and a Java project. Follow these guidelines when contributing:
 
 ## Code style
 - Use standard C# conventions (PascalCase for types and methods, camelCase for locals and parameters).
@@ -11,4 +11,7 @@ This repository contains a .NET solution for MyServiceBus. Follow these guidelin
 
 ## Documentation
 - Write documentation in Markdown and place files in the `docs/` folder when appropriate.
+
+## Java project
+- The Java project resides in `src/Java`. See `src/Java/AGENTS.md` for instructions specific to that codebase.
 
