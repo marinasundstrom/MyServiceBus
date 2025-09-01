@@ -1,11 +1,42 @@
 package com.myservicebus;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
-import lombok.Data;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 
-@Data
-public class Batch<T> {
+/**
+ * Represents a collection of messages that should be delivered together as a
+ * single message payload. The batch itself is serialized as a JSON array so
+ * that the envelope {@code message} property contains the grouped messages
+ * directly, matching MassTransit batch semantics.
+ *
+ * @param <T> the message type contained in the batch
+ */
+public class Batch<T> extends ArrayList<T> {
 
-    @JsonProperty("message")
-    private T[] message;
+    /**
+     * Creates an empty batch.
+     */
+    public Batch() {
+        super();
+    }
+
+    /**
+     * Creates a batch containing the specified messages.
+     *
+     * @param messages the messages to include in the batch
+     */
+    public Batch(Collection<? extends T> messages) {
+        super(messages);
+    }
+
+    /**
+     * Creates a batch containing the specified messages.
+     *
+     * @param messages the messages to include in the batch
+     */
+    @SafeVarargs
+    public Batch(T... messages) {
+        Collections.addAll(this, messages);
+    }
 }
