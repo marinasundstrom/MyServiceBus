@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 using MyServiceBus;
 using MyServiceBus.Topology;
 using Xunit;
+using Xunit.Sdk;
 
 public class FaultHandlingTests
 {
@@ -20,6 +21,7 @@ public class FaultHandlingTests
     }
 
     [Fact]
+    [Throws(typeof(EqualException), typeof(Exception))]
     public async Task Sends_fault_when_consumer_throws()
     {
         var services = new ServiceCollection();

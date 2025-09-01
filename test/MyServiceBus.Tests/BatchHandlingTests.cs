@@ -3,6 +3,7 @@ using System.Linq;
 using MyServiceBus;
 using MyServiceBus.Serialization;
 using Xunit;
+using Xunit.Sdk;
 
 namespace MyServiceBus.Tests;
 
@@ -14,7 +15,7 @@ public class BatchHandlingTests
     }
 
     [Fact]
-    [Throws(typeof(InvalidOperationException))]
+    [Throws(typeof(ContainsException), typeof(TrueException), typeof(NotNullException), typeof(EqualException), typeof(Exception))]
     public async Task Envelope_serializer_handles_batch_message()
     {
         var batch = new Batch<SampleMessage>(

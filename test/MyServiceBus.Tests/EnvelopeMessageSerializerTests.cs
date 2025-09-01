@@ -11,6 +11,7 @@ public class EnvelopeMessageSerializerTests
     }
 
     [Fact]
+    [Throws(typeof(Exception))]
     public async Task Foo2()
     {
         var foo = new SampleMessage
