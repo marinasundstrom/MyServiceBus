@@ -1,6 +1,6 @@
 package com.myservicebus.rabbitmq;
 
-import com.myservicebus.abstractions.SendTransport;
+import com.myservicebus.SendTransport;
 import com.rabbitmq.client.AMQP;
 import com.rabbitmq.client.Channel;
 

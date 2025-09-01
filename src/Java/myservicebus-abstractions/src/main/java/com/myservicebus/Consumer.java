@@ -1,4 +1,4 @@
-package com.myservicebus.abstractions;
+package com.myservicebus;
 
 import java.util.concurrent.CompletableFuture;
 

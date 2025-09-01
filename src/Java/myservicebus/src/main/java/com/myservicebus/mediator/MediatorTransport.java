@@ -1,7 +1,7 @@
 package com.myservicebus.mediator;
 
 import com.myservicebus.BusRegistrationConfigurator;
-import com.myservicebus.abstractions.SendEndpointProvider;
+import com.myservicebus.SendEndpointProvider;
 import com.myservicebus.di.ServiceCollection;
 
 public class MediatorTransport {

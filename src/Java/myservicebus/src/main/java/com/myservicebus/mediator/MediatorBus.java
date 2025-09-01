@@ -2,8 +2,8 @@ package com.myservicebus.mediator;
 
 import com.myservicebus.BusRegistrationConfigurator;
 import com.myservicebus.BusRegistrationConfiguratorImpl;
-import com.myservicebus.abstractions.NamingConventions;
-import com.myservicebus.abstractions.SendEndpointProvider;
+import com.myservicebus.NamingConventions;
+import com.myservicebus.SendEndpointProvider;
 import com.myservicebus.di.ServiceCollection;
 import com.myservicebus.di.ServiceProvider;
 import com.myservicebus.tasks.CancellationToken;

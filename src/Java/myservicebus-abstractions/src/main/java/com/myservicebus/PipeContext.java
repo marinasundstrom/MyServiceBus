@@ -1,4 +1,4 @@
-package com.myservicebus.abstractions;
+package com.myservicebus;
 
 import com.myservicebus.tasks.CancellationToken;
 

@@ -1,8 +1,8 @@
 package com.myservicebus.rabbitmq;
 
-import com.myservicebus.abstractions.SendEndpoint;
-import com.myservicebus.abstractions.SendEndpointProvider;
-import com.myservicebus.abstractions.SendTransport;
+import com.myservicebus.SendEndpoint;
+import com.myservicebus.SendEndpointProvider;
+import com.myservicebus.SendTransport;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 

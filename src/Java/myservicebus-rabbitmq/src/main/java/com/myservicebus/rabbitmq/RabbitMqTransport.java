@@ -1,7 +1,7 @@
 package com.myservicebus.rabbitmq;
 
 import com.myservicebus.BusRegistrationConfigurator;
-import com.myservicebus.abstractions.SendEndpointProvider;
+import com.myservicebus.SendEndpointProvider;
 import com.myservicebus.di.ServiceCollection;
 import com.rabbitmq.client.ConnectionFactory;
 import java.util.function.BiConsumer;

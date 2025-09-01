@@ -2,9 +2,9 @@ package com.myservicebus.mediator;
 
 import com.myservicebus.ConsumerDefinition;
 import com.myservicebus.ConsumerRegistry;
-import com.myservicebus.abstractions.ConsumeContext;
-import com.myservicebus.abstractions.Consumer;
-import com.myservicebus.abstractions.SendEndpoint;
+import com.myservicebus.ConsumeContext;
+import com.myservicebus.Consumer;
+import com.myservicebus.SendEndpoint;
 import com.myservicebus.di.ServiceProvider;
 import com.myservicebus.di.ServiceScope;
 import com.myservicebus.tasks.CancellationToken;

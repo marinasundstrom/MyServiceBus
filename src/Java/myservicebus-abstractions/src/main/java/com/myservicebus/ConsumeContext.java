@@ -1,11 +1,11 @@
-package com.myservicebus.abstractions;
+package com.myservicebus;
 
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
 import com.myservicebus.tasks.CancellationToken;
-import com.myservicebus.abstractions.NamingConventions;
-import com.myservicebus.abstractions.SendEndpoint;
+import com.myservicebus.NamingConventions;
+import com.myservicebus.SendEndpoint;
 
 /**
  * Context passed to consumers when a message is received.

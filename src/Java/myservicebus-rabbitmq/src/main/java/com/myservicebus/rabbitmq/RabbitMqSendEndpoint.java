@@ -10,9 +10,9 @@ import java.util.concurrent.CompletableFuture;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.myservicebus.Envelope;
 import com.myservicebus.HostInfo;
-import com.myservicebus.abstractions.NamingConventions;
-import com.myservicebus.abstractions.SendEndpoint;
-import com.myservicebus.abstractions.SendTransport;
+import com.myservicebus.NamingConventions;
+import com.myservicebus.SendEndpoint;
+import com.myservicebus.SendTransport;
 import com.myservicebus.tasks.CancellationToken;
 
 /**

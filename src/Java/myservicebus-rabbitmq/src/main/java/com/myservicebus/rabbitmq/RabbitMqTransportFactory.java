@@ -2,7 +2,7 @@ package com.myservicebus.rabbitmq;
 
 import java.util.concurrent.ConcurrentHashMap;
 
-import com.myservicebus.abstractions.SendTransport;
+import com.myservicebus.SendTransport;
 import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.Connection;
 

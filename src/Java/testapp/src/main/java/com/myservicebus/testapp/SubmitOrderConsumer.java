@@ -3,8 +3,8 @@ package com.myservicebus.testapp;
 import java.util.concurrent.CompletableFuture;
 
 import com.google.inject.Inject;
-import com.myservicebus.abstractions.ConsumeContext;
-import com.myservicebus.abstractions.Consumer;
+import com.myservicebus.ConsumeContext;
+import com.myservicebus.Consumer;
 import com.myservicebus.MyService;
 
 class SubmitOrderConsumer implements Consumer<SubmitOrder> {

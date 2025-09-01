@@ -1,6 +1,6 @@
 package com.myservicebus;
 
-import com.myservicebus.abstractions.NamingConventions;
+import com.myservicebus.NamingConventions;
 
 public class ConsumerDefinition<TConsumer, TMessage> {
     private final Class<TConsumer> consumerType;

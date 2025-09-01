@@ -1,4 +1,4 @@
-package com.myservicebus.abstractions;
+package com.myservicebus;
 
 public interface SendEndpointProvider {
     SendEndpoint getSendEndpoint(String uri);
