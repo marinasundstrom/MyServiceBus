@@ -32,7 +32,7 @@ public class MediatorTransportFactoryTests
     }
 
     [Fact]
-    [Throws(typeof(TrueException), typeof(Exception))]
+    [Throws(typeof(EqualException), typeof(Exception))]
     public async Task Send_Invokes_RegisteredHandler()
     {
         var factory = new MediatorTransportFactory();
@@ -71,7 +71,7 @@ public class MediatorTransportFactoryTests
     }
 
     [Fact]
-    [Throws(typeof(TrueException), typeof(InvalidOperationException))]
+    [Throws(typeof(EqualException), typeof(Exception))]
     public async Task Publish_delivers_message_to_registered_consumer()
     {
         var services = new ServiceCollection();
