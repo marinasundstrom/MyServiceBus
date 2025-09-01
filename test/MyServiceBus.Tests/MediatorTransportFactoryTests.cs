@@ -1,3 +1,5 @@
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using MyServiceBus.Serialization;
 using MyServiceBus.Topology;
 using Xunit;
@@ -10,6 +12,23 @@ public class MediatorTransportFactoryTests
     class SampleMessage
     {
         public string Value { get; set; } = string.Empty;
+    }
+
+    class ConsumerMessage
+    {
+        public string Value { get; set; } = string.Empty;
+    }
+
+    class SampleConsumer : IConsumer<ConsumerMessage>
+    {
+        public static TaskCompletionSource<ConsumerMessage> Received = new();
+
+        [Throws(typeof(ObjectDisposedException))]
+        public Task Consume(ConsumeContext<ConsumerMessage> context)
+        {
+            Received.TrySetResult(context.Message);
+            return Task.CompletedTask;
+        }
     }
 
     [Fact]
@@ -25,7 +44,7 @@ public class MediatorTransportFactoryTests
             RoutingKey = ""
         };
 
-        var receive = await factory.CreateReceiveTransport(topology, ctx =>
+        var receive = await factory.CreateReceiveTransport(topology, [Throws(typeof(ObjectDisposedException))] (ctx) =>
         {
             ctx.TryGetMessage<SampleMessage>(out var msg);
             tcs.SetResult(msg!);
@@ -49,5 +68,33 @@ public class MediatorTransportFactoryTests
         Assert.Equal("hi", message.Value);
 
         await receive.Stop();
+    }
+
+    [Fact]
+    [Throws(typeof(TrueException), typeof(InvalidOperationException))]
+    public async Task Publish_delivers_message_to_registered_consumer()
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddServiceBus(cfg =>
+        {
+            cfg.UsingMediator();
+            cfg.AddConsumer<SampleConsumer>();
+        });
+
+        using var provider = services.BuildServiceProvider();
+
+        var hosted = provider.GetRequiredService<IHostedService>();
+        await hosted.StartAsync(CancellationToken.None);
+
+        SampleConsumer.Received = new TaskCompletionSource<ConsumerMessage>();
+
+        var bus = provider.GetRequiredService<IMessageBus>();
+        await bus.Publish(new ConsumerMessage { Value = "hello" });
+
+        var message = await SampleConsumer.Received.Task;
+        Assert.Equal("hello", message.Value);
+
+        await hosted.StopAsync(CancellationToken.None);
     }
 }
