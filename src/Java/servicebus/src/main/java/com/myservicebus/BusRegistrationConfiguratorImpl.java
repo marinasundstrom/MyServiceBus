@@ -8,7 +8,7 @@ import java.lang.reflect.Type;
 import com.myservicebus.Consumer;
 import com.myservicebus.di.ServiceCollection;
 
-class BusRegistrationConfiguratorImpl implements BusRegistrationConfigurator {
+public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigurator {
 
     private ServiceCollection serviceCollection;
     private ConsumerRegistry registry = new ConsumerRegistry();

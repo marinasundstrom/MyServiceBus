@@ -1,3 +1,5 @@
+using Microsoft.Extensions.DependencyInjection;
+
 namespace MyServiceBus;
 
 public static class MediatorServiceBusConfigurationBuilderExt
@@ -6,7 +8,9 @@ public static class MediatorServiceBusConfigurationBuilderExt
     {
         var configuration = new MediatorFactoryConfigurator();
         c?.Invoke(configuration);
-
+        builder.Services.AddSingleton<IMediatorFactoryConfigurator>(configuration);
+        builder.Services.AddSingleton<ITransportFactory, MediatorTransportFactory>();
+        builder.Services.AddSingleton<IMessageBus, MyMessageBus>();
         return builder;
     }
 }
