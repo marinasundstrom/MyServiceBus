@@ -20,6 +20,11 @@ public class PipeConfigurator<TContext>
         UseFilter(new DelegateFilter(callback));
     }
 
+    public void UseRetry(int retryCount, TimeSpan? delay = null)
+    {
+        UseFilter(new RetryFilter<TContext>(retryCount, delay));
+    }
+
     public IPipe<TContext> Build()
     {
         IPipe<TContext> next = Pipe.Empty<TContext>();
