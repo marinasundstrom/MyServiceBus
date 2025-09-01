@@ -41,7 +41,7 @@ public class MyMessageBus : IMessageBus
         await transport.Send(message, context, cancellationToken);
     }
 
-    [Throws(typeof(InvalidOperationException))]
+    [Throws(typeof(InvalidOperationException), typeof(ArgumentException))]
     public async Task AddConsumer<TMessage, TConsumer>(ConsumerTopology consumer, CancellationToken cancellationToken = default)
         where TConsumer : class, IConsumer<TMessage>
         where TMessage : class
@@ -65,7 +65,12 @@ public class MyMessageBus : IMessageBus
         configurator.UseFilter(new ConsumerMessageFilter<TConsumer, TMessage>(_serviceProvider));
         var pipe = new ConsumePipe<TMessage>(configurator.Build());
 
-        _consumers.Add(NamingConventions.GetMessageUrn(messageType), (messageType, pipe));
+        var messageUrn = NamingConventions.GetMessageUrn(messageType);
+
+        if (_consumers.ContainsKey(messageUrn))
+            return;
+
+        _consumers.Add(messageUrn, (messageType, pipe));
         _activeTransports.Add(receiveTransport);
     }
 
@@ -81,7 +86,7 @@ public class MyMessageBus : IMessageBus
         await Task.WhenAll(_activeTransports.Select(async transport => await transport.Stop(cancellationToken)));
     }
 
-    [Throws(typeof(InvalidOperationException))]
+    [Throws(typeof(InvalidOperationException), typeof(ArgumentException), typeof(NotSupportedException))]
     private async Task HandleMessageAsync(ReceiveContext context)
     {
         var messageTypeName = context.MessageType.First();
