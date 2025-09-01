@@ -11,6 +11,6 @@ public interface IMessageBus
        Task Publish<T>(T message, CancellationToken cancellationToken = default)
               where T : class;
        Task AddConsumer<TMessage, TConsumer>(ConsumerTopology consumer, CancellationToken cancellationToken = default)
-              where TConsumer : IConsumer<TMessage>
+              where TConsumer : class, IConsumer<TMessage>
               where TMessage : class;
 }

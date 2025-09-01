@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using MyServiceBus.Serialization;
 using MyServiceBus.Topology;
+using System.Reflection;
 
 namespace MyServiceBus;
 
@@ -11,8 +12,8 @@ public class MyMessageBus : IMessageBus
 
     private readonly List<IReceiveTransport> _activeTransports = new();
 
-    // Key = message type full name, Value = consumer type (e.g. UserRegistered => UserRegisteredConsumer)
-    private readonly Dictionary<string, Type> _registeredConsumers = new();
+    // Key = message type URN, Value = registration containing message type and pipeline
+    private readonly Dictionary<string, (Type MessageType, IConsumePipe Pipe)> _consumers = new();
 
     public MyMessageBus(ITransportFactory transportFactory, IServiceProvider serviceProvider)
     {
@@ -20,6 +21,7 @@ public class MyMessageBus : IMessageBus
         _serviceProvider = serviceProvider;
     }
 
+    [Throws(typeof(UriFormatException))]
     public async Task Publish<T>(T message, CancellationToken cancellationToken = default)
        where T : class
     {
@@ -28,7 +30,7 @@ public class MyMessageBus : IMessageBus
         var uri = new Uri($"rabbitmq://localhost/{exchangeName}");
         var transport = await _transportFactory.GetSendTransport(uri, cancellationToken);
 
-        var context = new SendContext([typeof(T)], new EnvelopeMessageSerializer())
+        var context = new SendContext([typeof(T)], new EnvelopeMessageSerializer(), cancellationToken)
         {
             RoutingKey = exchangeName,
             MessageId = Guid.NewGuid().ToString()
@@ -39,12 +41,12 @@ public class MyMessageBus : IMessageBus
         await transport.Send(message, context, cancellationToken);
     }
 
+    [Throws(typeof(InvalidOperationException))]
     public async Task AddConsumer<TMessage, TConsumer>(ConsumerTopology consumer, CancellationToken cancellationToken = default)
-        where TConsumer : IConsumer<TMessage>
+        where TConsumer : class, IConsumer<TMessage>
         where TMessage : class
     {
         var messageType = consumer.Bindings.First().MessageType;
-        var consumerType = consumer.ConsumerType;
 
         var topology = new ReceiveEndpointTopology
         {
@@ -58,45 +60,37 @@ public class MyMessageBus : IMessageBus
 
         var receiveTransport = await _transportFactory.CreateReceiveTransport(topology, HandleMessageAsync, cancellationToken);
 
-        _registeredConsumers.Add(NamingConventions.GetMessageUrn(messageType), consumerType);
+        var configurator = new PipeConfigurator<ConsumeContext<TMessage>>();
+        configurator.UseFilter(new ConsumerMessageFilter<TConsumer, TMessage>(_serviceProvider));
+        var pipe = new ConsumePipe<TMessage>(configurator.Build());
+
+        _consumers.Add(NamingConventions.GetMessageUrn(messageType), (messageType, pipe));
         _activeTransports.Add(receiveTransport);
     }
 
+    [Throws(typeof(ArgumentException))]
     public async Task StartAsync(CancellationToken cancellationToken)
     {
         await Task.WhenAll(_activeTransports.Select(async transport => await transport.Start(cancellationToken)));
     }
 
+    [Throws(typeof(ArgumentException))]
     public async Task StopAsync(CancellationToken cancellationToken)
     {
         await Task.WhenAll(_activeTransports.Select(async transport => await transport.Stop(cancellationToken)));
     }
 
+    [Throws(typeof(InvalidOperationException))]
     private async Task HandleMessageAsync(ReceiveContext context)
     {
         var messageTypeName = context.MessageType.First();
-        if (messageTypeName == null || !_registeredConsumers.TryGetValue(messageTypeName, out var consumerType))
+        if (messageTypeName == null || !_consumers.TryGetValue(messageTypeName, out var registration))
             return;
 
-        //throw new InvalidOperationException($"No consumer registered for message type: {messageTypeName}");
+        var consumeContextType = typeof(ConsumeContextImpl<>).MakeGenericType(registration.MessageType);
+        var consumeContext = (ConsumeContext)Activator.CreateInstance(consumeContextType, context, _transportFactory)
+            ?? throw new InvalidOperationException("Failed to create ConsumeContext");
 
-        var messageType = consumerType.GetInterfaces().First().GetGenericArguments()[0];
-
-        /* var messageType = Type.GetType(messageTypeName, false)
-                          ?? throw new InvalidOperationException($"Cannot resolve message type: {messageTypeName}"); */
-
-        using var scope = _serviceProvider.CreateScope();
-        var consumer = (IConsumer)scope.ServiceProvider.GetRequiredService(consumerType);
-
-        // Create ConsumeContext<T> dynamically and assign the message
-        var consumeContextType = typeof(ConsumeContextImpl<>).MakeGenericType(messageType);
-        var consumeContext = Activator.CreateInstance(consumeContextType, context, _transportFactory)
-                            ?? throw new InvalidOperationException("Failed to create ConsumeContext");
-
-        // Find the Consume method on IConsumer<T>
-        var consumeMethod = consumerType.GetMethod("Consume", new[] { consumeContextType })
-                          ?? throw new InvalidOperationException($"Consumer does not implement Consume({consumeContextType.Name})");
-
-        await (Task)consumeMethod.Invoke(consumer, [consumeContext])!;
+        await registration.Pipe.Send(consumeContext);
     }
 }
