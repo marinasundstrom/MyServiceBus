@@ -1,6 +1,7 @@
 {
     "disableXmlDocInterop": false,
     "ignoredExceptions": [],
+    "treatThrowsExceptionAsCatchRest": true,
     "informationalExceptions": {
         "System.IO.NotImplementedException": "Always",
         "System.IO.IOException": "Propagation",

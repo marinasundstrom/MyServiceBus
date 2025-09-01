@@ -40,17 +40,7 @@ public sealed class RabbitMqReceiveTransport : IReceiveTransport
 
                 await _channel.BasicAckAsync(ea.DeliveryTag, multiple: false);
             }
-            catch (ObjectDisposedException exc)
-            {
-                await _channel.BasicNackAsync(ea.DeliveryTag, false, requeue: false);
-                Console.WriteLine($"Message handling failed: {exc}");
-            }
-            catch (ArgumentException exc)
-            {
-                await _channel.BasicNackAsync(ea.DeliveryTag, false, requeue: false);
-                Console.WriteLine($"Message handling failed: {exc}");
-            }
-            catch (InvalidOperationException exc)
+            catch (Exception exc)
             {
                 await _channel.BasicNackAsync(ea.DeliveryTag, false, requeue: false);
                 Console.WriteLine($"Message handling failed: {exc}");

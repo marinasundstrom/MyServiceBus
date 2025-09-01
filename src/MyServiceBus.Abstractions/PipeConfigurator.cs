@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Threading.Tasks;
 
 namespace MyServiceBus;
@@ -7,7 +8,7 @@ namespace MyServiceBus;
 public class PipeConfigurator<TContext>
     where TContext : class, PipeContext
 {
-    readonly IList<IFilter<TContext>> filters = new List<IFilter<TContext>>();
+    readonly List<IFilter<TContext>> filters = new List<IFilter<TContext>>();
 
     public void UseFilter(IFilter<TContext> filter)
     {

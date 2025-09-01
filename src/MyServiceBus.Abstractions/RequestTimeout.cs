@@ -2,7 +2,9 @@ namespace MyServiceBus;
 
 public struct RequestTimeout
 {
+#pragma warning disable THROW001 // Unhandled exception
     static TimeSpan defaultTimeout = TimeSpan.FromSeconds(30);
+#pragma warning restore THROW001 // Unhandled exception
 
     public RequestTimeout(TimeSpan timeSpan)
     {
