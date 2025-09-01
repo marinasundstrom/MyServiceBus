@@ -23,7 +23,7 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
 
     public ISendEndpoint GetSendEndpoint(Uri uri)
     {
-        throw new NotImplementedException();
+        return new TransportSendEndpoint(_transportFactory, uri);
     }
 
     public async Task PublishAsync<T>(T message, CancellationToken cancellationToken = default)
@@ -48,6 +48,84 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
 
     public async Task RespondAsync<T>(T message, CancellationToken cancellationToken = default)
     {
-        await RespondAsync((object)message, cancellationToken);
+        await RespondAsync<T>((object)message, cancellationToken);
+    }
+
+    public async Task RespondAsync<T>(object message, CancellationToken cancellationToken = default)
+    {
+        var address = receiveContext.ResponseAddress ??
+                      throw new InvalidOperationException("ResponseAddress not specified");
+
+        var transport = await _transportFactory.GetSendTransport(address, cancellationToken);
+
+        var context = new SendContext([typeof(T)], new EnvelopeMessageSerializer(), cancellationToken)
+        {
+            MessageId = Guid.NewGuid().ToString()
+        };
+
+        await transport.Send(message, context, cancellationToken);
+    }
+
+    internal async Task RespondFaultAsync(Exception exception, CancellationToken cancellationToken = default)
+    {
+        var address = receiveContext.FaultAddress ?? receiveContext.ResponseAddress;
+        if (address == null)
+            return;
+
+        var fault = new Fault<TMessage>
+        {
+            Message = Message,
+            FaultId = Guid.NewGuid(),
+            MessageId = receiveContext.MessageId,
+            SentTime = DateTimeOffset.UtcNow,
+            Host = GetHostInfo<TMessage>(),
+            Exceptions = [ExceptionInfo.FromException(exception)]
+        };
+
+        var transport = await _transportFactory.GetSendTransport(address, cancellationToken);
+        var context = new SendContext([typeof(Fault<TMessage>)], new EnvelopeMessageSerializer(), cancellationToken)
+        {
+            MessageId = Guid.NewGuid().ToString()
+        };
+
+        await transport.Send(fault, context, cancellationToken);
+    }
+
+    private static HostInfo GetHostInfo<T>() where T : class => new HostInfo
+    {
+        MachineName = Environment.MachineName,
+        ProcessName = Environment.ProcessPath ?? "unknown",
+        ProcessId = Environment.ProcessId,
+        Assembly = typeof(T).Assembly.GetName().Name ?? "unknown",
+        AssemblyVersion = typeof(T).Assembly.GetName().Version?.ToString() ?? "unknown",
+        FrameworkVersion = System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription,
+        MassTransitVersion = "your-custom-version",
+        OperatingSystemVersion = Environment.OSVersion.VersionString
+    };
+
+    class TransportSendEndpoint : ISendEndpoint
+    {
+        readonly ITransportFactory _transportFactory;
+        readonly Uri _address;
+
+        public TransportSendEndpoint(ITransportFactory transportFactory, Uri address)
+        {
+            _transportFactory = transportFactory;
+            _address = address;
+        }
+
+        public Task Send<T>(T message, CancellationToken cancellationToken = default)
+            => Send<T>((object)message, cancellationToken);
+
+        public async Task Send<T>(object message, CancellationToken cancellationToken = default)
+        {
+            var transport = await _transportFactory.GetSendTransport(_address, cancellationToken);
+            var context = new SendContext([typeof(T)], new EnvelopeMessageSerializer(), cancellationToken)
+            {
+                MessageId = Guid.NewGuid().ToString()
+            };
+
+            await transport.Send(message, context, cancellationToken);
+        }
     }
 }

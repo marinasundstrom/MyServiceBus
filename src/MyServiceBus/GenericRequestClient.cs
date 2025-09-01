@@ -42,6 +42,13 @@ public sealed class GenericRequestClient<TRequest> : IRequestClient<TRequest>, I
                 {
                     var response = new Response<T>(responeMessage);
                     taskCompletionSource.TrySetResult(response);
+                    return;
+                }
+
+                if (context.TryGetMessage<Fault<TRequest>>(out var fault))
+                {
+                    var exceptionMessage = fault.Exceptions.FirstOrDefault()?.Message ?? "Request faulted";
+                    taskCompletionSource.TrySetException(new InvalidOperationException(exceptionMessage));
                 }
             }
             catch (Exception ex)
