@@ -1,6 +1,7 @@
 package com.myservicebus.rabbitmq;
 
 import com.myservicebus.SendTransport;
+import com.rabbitmq.client.AMQP;
 import com.rabbitmq.client.Channel;
 
 public class RabbitMqSendTransport implements SendTransport {
@@ -15,9 +16,13 @@ public class RabbitMqSendTransport implements SendTransport {
     @Override
     public void send(byte[] data) {
         try {
-            channel.basicPublish(exchange, "", null, data);
+            AMQP.BasicProperties props = new AMQP.BasicProperties.Builder()
+                    .contentType("application/vnd.mybus.envelope+json")
+                    .build();
+            channel.basicPublish(exchange, "", props, data);
         } catch (Exception e) {
             throw new RuntimeException("Failed to send message", e);
         }
     }
 }
+

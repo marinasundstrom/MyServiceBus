@@ -40,6 +40,10 @@ public sealed class RabbitMqReceiveTransport : IReceiveTransport
                 {
                     headers["content_type"] = props.ContentType!;
                 }
+                else if (!headers.ContainsKey("content_type"))
+                {
+                    headers["content_type"] = "application/vnd.mybus.envelope+json";
+                }
 
                 var transportMessage = new RabbitMqTransportMessage(headers, props.Persistent, payload);
                 var messageContext = _contextFactory.CreateMessageContext(transportMessage);
