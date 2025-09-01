@@ -29,6 +29,20 @@ public class TransportMessageFactoryTests
     }
 
     [Fact]
+    public void CreateMessageContext_MassTransitContentType_ReturnsEnvelopeContext()
+    {
+        var payload = Encoding.UTF8.GetBytes("{\"messageId\":\"00000000-0000-0000-0000-000000000000\",\"messageType\":[],\"message\":{}}");
+        var headers = new Dictionary<string, object>
+        {
+            {"content_type", "application/vnd.masstransit+json"}
+        };
+        ITransportMessage transport = new StubTransportMessage { Headers = headers, Payload = payload };
+        var factory = new MessageContextFactory();
+        var ctx = factory.CreateMessageContext(transport);
+        Assert.IsType<EnvelopeMessageContext>(ctx);
+    }
+
+    [Fact]
     public void EnvelopeMessageContext_MergesTransportHeaders()
     {
         var payload = Encoding.UTF8.GetBytes("{\"messageId\":\"00000000-0000-0000-0000-000000000000\",\"messageType\":[],\"headers\":{\"Custom\":\"123\"},\"message\":{}}");

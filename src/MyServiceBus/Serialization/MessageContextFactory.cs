@@ -1,30 +1,33 @@
-using MyServiceBus.Transports;
+using System;
 using System.Text.Json;
+using MyServiceBus.Transports;
 
 namespace MyServiceBus.Serialization;
-
-// TODO: Message formatter
 
 public class MessageContextFactory
 {
     [Throws(typeof(InvalidOperationException))]
     public IMessageContext CreateMessageContext(ITransportMessage transportMessage)
     {
-        if (transportMessage.Headers.TryGetValue("content_type", out var contentType))
+        if (transportMessage.Headers.TryGetValue("content_type", out var contentTypeObj))
         {
-            switch (contentType.ToString())
+            var contentType = contentTypeObj.ToString();
+
+            if (string.Equals(contentType, "application/vnd.mybus.envelope+json", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(contentType, "application/vnd.masstransit+json", StringComparison.OrdinalIgnoreCase))
             {
-                case "application/vnd.mybus.envelope+json":
-                    return new EnvelopeMessageContext(transportMessage.Payload, transportMessage.Headers);
-                case "application/json":
-                    return new RawJsonMessageContext(transportMessage.Payload, transportMessage.Headers);
-                default:
-                    throw new InvalidOperationException("Invalid Content Type");
+                return new EnvelopeMessageContext(transportMessage.Payload, transportMessage.Headers);
             }
+
+            if (string.Equals(contentType, "application/json", StringComparison.OrdinalIgnoreCase))
+            {
+                return new RawJsonMessageContext(transportMessage.Payload, transportMessage.Headers);
+            }
+
+            throw new InvalidOperationException($"Invalid Content Type: {contentType}");
         }
-        else
-        {
-            throw new InvalidOperationException("Header Content-Type was not found");
-        }
+
+        throw new InvalidOperationException("Header Content-Type was not found");
     }
 }
+
