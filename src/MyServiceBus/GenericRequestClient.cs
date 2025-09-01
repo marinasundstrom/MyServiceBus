@@ -66,7 +66,7 @@ public sealed class GenericRequestClient<TRequest> : IRequestClient<TRequest>, I
         var uri = new Uri($"rabbitmq://localhost/{exchangeName}");
         var requestSendTransport = await _transportFactory.GetSendTransport(uri, cancellationToken);
 
-        var sendContext = new SendContext([typeof(TRequest)], new EnvelopeMessageSerializer(), cancellationToken)
+        var sendContext = new SendContext(MessageTypeCache.GetMessageTypes(typeof(TRequest)), new EnvelopeMessageSerializer(), cancellationToken)
         {
             //RoutingKey = exchangeName,
             ResponseAddress = new Uri($"queue:{NamingConventions.GetQueueName(typeof(T))}"),

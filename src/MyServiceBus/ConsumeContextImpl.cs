@@ -38,7 +38,7 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
         var uri = new Uri($"rabbitmq://localhost/{exchangeName}");
         var transport = await _transportFactory.GetSendTransport(uri, cancellationToken);
 
-        var context = new SendContext([typeof(T)], new EnvelopeMessageSerializer(), cancellationToken)
+        var context = new SendContext(MessageTypeCache.GetMessageTypes(typeof(T)), new EnvelopeMessageSerializer(), cancellationToken)
         {
             MessageId = Guid.NewGuid().ToString()
         };
@@ -58,7 +58,7 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
 
         var transport = await _transportFactory.GetSendTransport(address, cancellationToken);
 
-        var context = new SendContext([typeof(T)], new EnvelopeMessageSerializer(), cancellationToken)
+        var context = new SendContext(MessageTypeCache.GetMessageTypes(typeof(T)), new EnvelopeMessageSerializer(), cancellationToken)
         {
             MessageId = Guid.NewGuid().ToString()
         };
@@ -83,7 +83,7 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
         };
 
         var transport = await _transportFactory.GetSendTransport(address, cancellationToken);
-        var context = new SendContext([typeof(Fault<TMessage>)], new EnvelopeMessageSerializer(), cancellationToken)
+        var context = new SendContext(MessageTypeCache.GetMessageTypes(typeof(Fault<TMessage>)), new EnvelopeMessageSerializer(), cancellationToken)
         {
             MessageId = Guid.NewGuid().ToString()
         };
@@ -120,7 +120,7 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
         public async Task Send<T>(object message, CancellationToken cancellationToken = default)
         {
             var transport = await _transportFactory.GetSendTransport(_address, cancellationToken);
-            var context = new SendContext([typeof(T)], new EnvelopeMessageSerializer(), cancellationToken)
+            var context = new SendContext(MessageTypeCache.GetMessageTypes(typeof(T)), new EnvelopeMessageSerializer(), cancellationToken)
             {
                 MessageId = Guid.NewGuid().ToString()
             };

@@ -30,7 +30,7 @@ public class MyMessageBus : IMessageBus
         var uri = new Uri($"rabbitmq://localhost/{exchangeName}");
         var transport = await _transportFactory.GetSendTransport(uri, cancellationToken);
 
-        var context = new SendContext([typeof(T)], new EnvelopeMessageSerializer(), cancellationToken)
+        var context = new SendContext(MessageTypeCache.GetMessageTypes(typeof(T)), new EnvelopeMessageSerializer(), cancellationToken)
         {
             RoutingKey = exchangeName,
             MessageId = Guid.NewGuid().ToString()

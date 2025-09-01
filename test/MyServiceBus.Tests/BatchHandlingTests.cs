@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Linq;
 using MyServiceBus;
 using MyServiceBus.Serialization;
 using Xunit;
@@ -26,7 +27,10 @@ public class BatchHandlingTests
         {
             MessageId = Guid.NewGuid(),
             CorrelationId = null,
-            MessageType = [NamingConventions.GetMessageUrn(typeof(Batch<SampleMessage>))],
+            MessageType = [
+                NamingConventions.GetMessageUrn(typeof(Batch<SampleMessage>)),
+                NamingConventions.GetMessageUrn(typeof(SampleMessage))
+            ],
             Headers = new Dictionary<string, object>(),
             SentTime = DateTimeOffset.UtcNow,
             HostInfo = new HostInfo
@@ -47,6 +51,12 @@ public class BatchHandlingTests
         var messageElement = doc.RootElement.GetProperty("message");
         Assert.Equal(JsonValueKind.Array, messageElement.ValueKind);
         Assert.Equal(2, messageElement.GetArrayLength());
+
+        var typeElement = doc.RootElement.GetProperty("messageType");
+        Assert.Equal(2, typeElement.GetArrayLength());
+        var types = typeElement.EnumerateArray().Select(x => x.GetString()).ToArray();
+        Assert.Contains(NamingConventions.GetMessageUrn(typeof(Batch<SampleMessage>)), types);
+        Assert.Contains(NamingConventions.GetMessageUrn(typeof(SampleMessage)), types);
 
         var envelopeContext = new EnvelopeMessageContext(bytes, new Dictionary<string, object>());
 
