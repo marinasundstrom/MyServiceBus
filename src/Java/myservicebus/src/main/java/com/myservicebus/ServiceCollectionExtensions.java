@@ -1,6 +1,7 @@
 package com.myservicebus;
 
 import com.myservicebus.di.ServiceCollection;
+import java.util.function.Consumer;
 
 public class ServiceCollectionExtensions {
     public static ServiceCollection addServiceBus(ServiceCollection thiz,

@@ -1,5 +1,7 @@
 package com.myservicebus;
 
+import com.myservicebus.NamingConventions;
+
 public class ConsumerDefinition<TConsumer, TMessage> {
     private final Class<TConsumer> consumerType;
     private final Class<TMessage> messageType;

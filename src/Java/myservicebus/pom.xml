@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>com.myservicebus</groupId>
-    <artifactId>servicebus</artifactId>
+    <artifactId>myservicebus</artifactId>
     <version>1.0-SNAPSHOT</version>
 
     <properties>
@@ -16,19 +16,19 @@
     <dependencies>
         <dependency>
             <groupId>com.myservicebus</groupId>
-            <artifactId>servicebus-abstractions</artifactId>
+            <artifactId>myservicebus-abstractions</artifactId>
             <version>1.0-SNAPSHOT</version>
         </dependency>
 
         <dependency>
             <groupId>com.myservicebus</groupId>
-            <artifactId>servicebus-di</artifactId>
+            <artifactId>myservicebus-di</artifactId>
             <version>1.0-SNAPSHOT</version>
         </dependency>
 
         <dependency>
             <groupId>com.myservicebus</groupId>
-            <artifactId>servicebus-tasks</artifactId>
+            <artifactId>myservicebus-tasks</artifactId>
             <version>1.0-SNAPSHOT</version>
         </dependency>
 
