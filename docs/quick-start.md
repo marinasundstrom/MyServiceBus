@@ -54,6 +54,40 @@ bus.start();
 
 Built-in endpoint name formatters include `DefaultEndpointNameFormatter`, `KebabCaseEndpointNameFormatter`, and `SnakeCaseEndpointNameFormatter`.
 
+## Dependency Injection
+
+MyServiceBus registers common messaging abstractions in each client's
+dependency injection container so application code can depend on
+interfaces rather than concrete implementations.
+
+### C#
+
+`AddServiceBus` wires up several services with the following scopes:
+
+- `IMessageBus` – **singleton** that starts, stops, and routes messages.
+- `IPublishEndpoint` – **scoped** facade for publishing events.
+- `ISendEndpoint` – **scoped** handle to the default send queue.
+  Use `ISendEndpointProvider` (also scoped) to resolve endpoints by URI.
+- `IRequestClient<T>` – **scoped** helper for request/response exchanges.
+
+Consumers are registered as scoped dependencies and created per message.
+
+### Java
+
+`RabbitMqBus.configure` populates a `ServiceCollection` with analogous
+types:
+
+- `ServiceBus` – **singleton** providing `start`, `publish`, and
+  transport management.
+- `SendEndpointProvider` – **singleton**; call `getSendEndpoint(uri)` to
+  obtain a `SendEndpoint` when sending.
+- `RequestClientFactory` – **singleton** used to create transient
+  `RequestClient<T>` instances for request/response.
+
+Consumers are registered as scoped services. Because Java's container
+cannot infer generic types, endpoints and request clients are typically
+obtained from providers or factories rather than injected directly.
+
 ## Publishing
 
 ### C#
