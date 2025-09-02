@@ -13,6 +13,7 @@ import com.myservicebus.ServiceBus;
 import com.myservicebus.PublishEndpoint;
 import com.myservicebus.di.ServiceCollection;
 import com.myservicebus.di.ServiceProvider;
+import com.myservicebus.di.ServiceScope;
 import com.myservicebus.rabbitmq.RabbitMqBusFactory;
 import com.myservicebus.tasks.CancellationToken;
 
@@ -45,13 +46,16 @@ public class Main {
         var app = Javalin.create().start(5301);
 
         app.get("/publish", ctx -> {
-            var publishEndpoint = provider.getService(PublishEndpoint.class);
-            SubmitOrder message = new SubmitOrder(UUID.randomUUID(), "MT Clone Java");
-            try {
-                publishEndpoint.publish(message, CancellationToken.none).join();
-                ctx.result("Published SubmitOrder");
-            } catch (Exception e) {
-                ctx.status(500).result("Failed to publish message");
+            try (ServiceScope scope = provider.createScope()) {
+
+                var publishEndpoint = scope.getServiceProvider().getService(PublishEndpoint.class);
+                SubmitOrder message = new SubmitOrder(UUID.randomUUID(), "MT Clone Java");
+                try {
+                    publishEndpoint.publish(message, CancellationToken.none).join();
+                    ctx.result("Published SubmitOrder");
+                } catch (Exception e) {
+                    ctx.status(500).result("Failed to publish message");
+                }
             }
         });
 
@@ -60,9 +64,9 @@ public class Main {
             SubmitOrder message = new SubmitOrder(UUID.randomUUID(), "MT Clone Java");
             try {
                 sendEndpoint.send(message, CancellationToken.none).join();
-                ctx.result("Published SubmitOrder");
+                ctx.result("Sent SubmitOrder");
             } catch (Exception e) {
-                ctx.status(500).result("Failed to publish message");
+                ctx.status(500).result("Failed to send message");
             }
         });
 
@@ -74,7 +78,7 @@ public class Main {
                         .getResponse(new TestRequest("Foo"), TestResponse.class, CancellationToken.none).get();
                 ctx.result(response.getMessage());
             } catch (Exception e) {
-                ctx.status(500).result("Failed to publish message");
+                ctx.status(500).result("Failed to send request");
             }
         });
 
