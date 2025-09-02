@@ -2,6 +2,7 @@ package com.myservicebus;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Consumer;
 
 public class TopologyRegistry {
     private final List<MessageTopology> messages = new ArrayList<>();
@@ -30,7 +31,7 @@ public class TopologyRegistry {
         return topology;
     }
 
-    public <TConsumer> void registerConsumer(Class<TConsumer> consumerType, String queueName, Class<?>... messageTypes) {
+    public <TConsumer> void registerConsumer(Class<TConsumer> consumerType, String queueName, Consumer<PipeConfigurator<ConsumeContext<Object>>> configure, Class<?>... messageTypes) {
         List<MessageBinding> bindings = new ArrayList<>();
         for (Class<?> mt : messageTypes) {
             MessageTopology msg = messages.stream()
@@ -46,6 +47,7 @@ public class TopologyRegistry {
         consumer.setConsumerType(consumerType);
         consumer.setQueueName(queueName);
         consumer.setBindings(bindings);
+        consumer.setConfigure(configure);
         consumers.add(consumer);
     }
 }

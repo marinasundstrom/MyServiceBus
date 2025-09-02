@@ -170,6 +170,93 @@ bus.publish(new SubmitOrder(UUID.randomUUID()));
 
 The mediator dispatches messages in-memory, making it useful for lightweight scenarios and testing without a broker.
 
+## Filters
+
+Filters let you insert cross-cutting behavior into the consume pipeline.
+
+### Defining a Filter
+
+Filters are regular classes that implement `IFilter`/`Filter`.
+
+#### C#
+
+```csharp
+class LoggingFilter<TMessage> : IFilter<ConsumeContext<TMessage>> where TMessage : class
+{
+    public async Task Send(ConsumeContext<TMessage> context, IPipe<ConsumeContext<TMessage>> next)
+    {
+        Console.WriteLine($"Received {typeof(TMessage).Name}");
+        await next.Send(context);
+    }
+}
+```
+
+#### Java
+
+```java
+class LoggingFilter<T> implements Filter<ConsumeContext<T>> {
+    @Override
+    public CompletableFuture<Void> send(ConsumeContext<T> context, Pipe<ConsumeContext<T>> next) {
+        System.out.println("Received " + context.getMessage().getClass().getSimpleName());
+        return next.send(context);
+    }
+}
+```
+
+### Adding Filters to the Bus
+
+Use the consumer registration to configure the pipe and attach filters.
+
+#### C#
+
+```csharp
+builder.Services.AddServiceBus(x =>
+{
+    x.AddConsumer<SubmitOrderConsumer, SubmitOrder>(cfg =>
+    {
+        cfg.UseRetry(3);
+        cfg.UseFilter(new LoggingFilter<SubmitOrder>());
+        cfg.UseExecute(ctx =>
+        {
+            Console.WriteLine($"Processing {ctx.Message}");
+            return Task.CompletedTask;
+        });
+    });
+    x.ConfigureSend(cfg => cfg.UseExecute(ctx => { ctx.Headers["source"] = "api"; return Task.CompletedTask; }));
+    x.ConfigurePublish(cfg => cfg.UseExecute(ctx => { ctx.Headers["published"] = true; return Task.CompletedTask; }));
+    x.UsingRabbitMq((_, cfg) => { /* transport config */ });
+});
+```
+
+#### Java
+
+```java
+ServiceCollection services = new ServiceCollection();
+
+RabbitMqBus bus = RabbitMqBus.configure(services, x -> {
+    x.addConsumer(SubmitOrderConsumer.class, SubmitOrder.class, cfg -> {
+        cfg.useRetry(3);
+        cfg.useFilter(new LoggingFilter<>());
+        cfg.useExecute(ctx -> {
+            System.out.println("Processing " + ctx.getMessage());
+            return CompletableFuture.completedFuture(null);
+        });
+    });
+    x.configureSend(cfg -> cfg.useExecute(ctx -> {
+        ctx.getHeaders().put("source", "api");
+        return CompletableFuture.completedFuture(null);
+    }));
+    x.configurePublish(cfg -> cfg.useExecute(ctx -> {
+        ctx.getHeaders().put("published", true);
+        return CompletableFuture.completedFuture(null);
+    }));
+}, (context, cfg) -> {
+    cfg.host("rabbitmq://localhost");
+});
+
+bus.start();
+```
+
 ## Unit Testing with the In-Memory Test Harness
 
 ### C#

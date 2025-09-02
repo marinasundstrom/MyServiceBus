@@ -28,7 +28,7 @@ internal sealed class ConsumerRegistrationAction : IPostBuildAction
                 ?? throw new InvalidOperationException("AddConsumer method not found");
 
             var generic = method.MakeGenericMethod(messageType, consumer.ConsumerType);
-            var task = (Task)generic.Invoke(bus, new object[] { consumer, CancellationToken.None })!;
+            var task = (Task)generic.Invoke(bus, new object[] { consumer, consumer.ConfigurePipe, CancellationToken.None })!;
             task.GetAwaiter().GetResult();
         }
     }

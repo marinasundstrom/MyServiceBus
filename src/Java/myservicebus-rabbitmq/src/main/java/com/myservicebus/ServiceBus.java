@@ -25,6 +25,8 @@ public class ServiceBus {
     private final ServiceProvider serviceProvider;
     private final ConnectionProvider connectionProvider;
     private final SendEndpointProvider sendEndpointProvider;
+    private final PublishPipe publishPipe;
+    private final SendPipe sendPipe;
     private Connection connection;
     private Channel channel;
     private ObjectMapper mapper;
@@ -33,6 +35,8 @@ public class ServiceBus {
         this.serviceProvider = serviceProvider;
         this.connectionProvider = serviceProvider.getService(ConnectionProvider.class);
         this.sendEndpointProvider = serviceProvider.getService(SendEndpointProvider.class);
+        this.publishPipe = serviceProvider.getService(PublishPipe.class);
+        this.sendPipe = serviceProvider.getService(SendPipe.class);
 
         mapper = new ObjectMapper();
         mapper.findAndRegisterModules();
@@ -79,6 +83,16 @@ public class ServiceBus {
         for (ConsumerTopology consumerDef : topology.getConsumers()) {
             String queue = consumerDef.getQueueName();
 
+            PipeConfigurator<ConsumeContext<Object>> configurator = new PipeConfigurator<>();
+            configurator.useRetry(3);
+            @SuppressWarnings({"unchecked", "rawtypes"})
+            Filter<ConsumeContext<Object>> consumerFilter =
+                    new ConsumerMessageFilter(serviceProvider, consumerDef.getConsumerType());
+            configurator.useFilter(consumerFilter);
+            if (consumerDef.getConfigure() != null)
+                consumerDef.getConfigure().accept(configurator);
+            Pipe<ConsumeContext<Object>> pipe = configurator.build();
+
             for (MessageBinding binding : consumerDef.getBindings()) {
                 String exchangeName = binding.getEntityName();
                 channel.exchangeDeclare(exchangeName, BuiltinExchangeType.FANOUT, true);
@@ -88,38 +102,32 @@ public class ServiceBus {
 
             MessageBinding binding = consumerDef.getBindings().get(0);
             channel.basicConsume(queue, false, (tag, delivery) -> {
-                try (var scope = serviceProvider.createScope()) {
-                    var scopedServiceProvider = scope.getServiceProvider();
+                try {
+                    var type = mapper
+                            .getTypeFactory()
+                            .constructParametricType(Envelope.class, binding.getMessageType());
 
-                    Consumer<Object> consumer = (Consumer<Object>) scopedServiceProvider
-                            .getService(consumerDef.getConsumerType());
+                    var envelope = (Envelope<?>) mapper.readValue(delivery.getBody(), type);
+
+                    ConsumeContext<Object> ctx = new ConsumeContext<>(
+                            envelope.getMessage(),
+                            envelope.getHeaders(),
+                            envelope.getResponseAddress(),
+                            envelope.getFaultAddress(),
+                            CancellationToken.none,
+                            sendEndpointProvider);
+
+                    pipe.send(ctx).join();
+
+                    channel.basicAck(delivery.getEnvelope().getDeliveryTag(), false);
+                } catch (Exception e) {
                     try {
-                        var type = mapper
-                                .getTypeFactory()
-                                .constructParametricType(Envelope.class, binding.getMessageType());
-
-                        var envelope = (Envelope<?>) mapper.readValue(delivery.getBody(), type);
-
-                        ConsumeContext<Object> ctx = new ConsumeContext<>(
-                                envelope.getMessage(),
-                                envelope.getHeaders(),
-                                envelope.getResponseAddress(),
-                                envelope.getFaultAddress(),
-                                CancellationToken.none,
-                                sendEndpointProvider);
-
-                        consumer.consume(ctx).get();
-
-                        channel.basicAck(delivery.getEnvelope().getDeliveryTag(), false);
-                    } catch (Exception e) {
-                        try {
-                            channel.basicNack(delivery.getEnvelope().getDeliveryTag(), false, false);
-                        } catch (IOException ioEx) {
-                            ioEx.printStackTrace();
-                        }
-
-                        e.printStackTrace();
+                        channel.basicNack(delivery.getEnvelope().getDeliveryTag(), false, false);
+                    } catch (IOException ioEx) {
+                        ioEx.printStackTrace();
                     }
+
+                    e.printStackTrace();
                 }
             }, tag -> {
             });
@@ -133,9 +141,12 @@ public class ServiceBus {
             throw new IllegalArgumentException("Message cannot be null");
 
         String exchange = NamingConventions.getExchangeName(message.getClass());
+        SendContext ctx = new SendContext(message, CancellationToken.none);
+        publishPipe.send(ctx).join();
+        sendPipe.send(ctx).join();
         var endpoint = sendEndpointProvider.getSendEndpoint("rabbitmq://localhost/" + exchange);
         try {
-            endpoint.send(message, CancellationToken.none).join();
+            endpoint.send(ctx.getMessage(), CancellationToken.none).join();
             System.out.println("📤 Published message of type " + message.getClass().getSimpleName());
         } catch (Exception ex) {
             throw new IOException("Failed to publish message", ex);

@@ -1,3 +1,7 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+
 namespace MyServiceBus.Topology;
 
 public class TopologyRegistry
@@ -25,7 +29,7 @@ public class TopologyRegistry
         return messageTopology;
     }
 
-    public void RegisterConsumer<TConsumer>(string queueName, params Type[] messageTypes)
+    public void RegisterConsumer<TConsumer>(string queueName, Delegate? configurePipe, params Type[] messageTypes)
     {
         var bindings = messageTypes.Select(mt =>
         {
@@ -37,7 +41,8 @@ public class TopologyRegistry
         {
             ConsumerType = typeof(TConsumer),
             QueueName = queueName,
-            Bindings = bindings
+            Bindings = bindings,
+            ConfigurePipe = configurePipe
         });
     }
 }

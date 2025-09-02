@@ -25,7 +25,7 @@ public class RabbitMqFactoryConfiguratorTests
         public Task StartAsync(CancellationToken cancellationToken) => Task.CompletedTask;
         public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
         public Task Publish<T>(T message, CancellationToken cancellationToken = default) where T : class => Task.CompletedTask;
-        public Task AddConsumer<TMessage, TConsumer>(ConsumerTopology consumer, CancellationToken cancellationToken = default)
+        public Task AddConsumer<TMessage, TConsumer>(ConsumerTopology consumer, Delegate configure = null, CancellationToken cancellationToken = default)
             where TConsumer : class, IConsumer<TMessage>
             where TMessage : class => Task.CompletedTask;
     }
@@ -66,7 +66,7 @@ public class RabbitMqFactoryConfiguratorTests
     public void ReceiveEndpoint_overrides_queue_and_exchange()
     {
         var registry = new TopologyRegistry();
-        registry.RegisterConsumer<MyConsumer>("original-queue", typeof(MyMessage));
+        registry.RegisterConsumer<MyConsumer>("original-queue", null, typeof(MyMessage));
 
         var services = new ServiceCollection();
         services.AddSingleton(registry);
@@ -93,7 +93,7 @@ public class RabbitMqFactoryConfiguratorTests
     public void ConfigureEndpoints_uses_formatter()
     {
         var registry = new TopologyRegistry();
-        registry.RegisterConsumer<MyConsumer>("original-queue", typeof(MyMessage));
+        registry.RegisterConsumer<MyConsumer>("original-queue", null, typeof(MyMessage));
 
         var services = new ServiceCollection();
         services.AddSingleton(registry);

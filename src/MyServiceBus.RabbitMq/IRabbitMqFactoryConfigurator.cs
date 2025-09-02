@@ -84,7 +84,7 @@ public class ReceiveEndpointConfigurator
             var method = typeof(IMessageBus).GetMethod("AddConsumer")!
                 .MakeGenericMethod(messageType, consumerType);
 
-            ((Task)method.Invoke(bus, new object[] { consumer, CancellationToken.None }))
+            ((Task)method.Invoke(bus, new object[] { consumer, consumer.ConfigurePipe, CancellationToken.None }))
                 .GetAwaiter().GetResult();
         }
         catch (TargetInvocationException ex) when (ex.InnerException != null)
