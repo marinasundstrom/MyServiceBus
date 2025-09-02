@@ -14,6 +14,7 @@ The ServiceBus Java client mirrors the C# design by providing an asynchronous me
 
 ### Responding
 - `respond` forwards messages to the `responseAddress` when available; otherwise it completes immediately.
+- `respondFault` packages the original message and exception details into a `Fault<T>` and sends it to the `faultAddress` or `responseAddress`.
 
 ### RabbitMQ Transport
 - `RabbitMqSendEndpointProvider` creates `RabbitMqSendEndpoint` instances that serialize envelopes with host metadata and forward them through cached `RabbitMqSendTransport` objects.
@@ -25,4 +26,4 @@ The ServiceBus Java client mirrors the C# design by providing an asynchronous me
 
 ## Behavior
 - Send and publish operations serialize messages into an envelope, encoding headers, host information, and message type.
-- The current Java client lacks implementations for advanced behaviors such as retries, fault handling, and request‑response helpers, which remain future work.
+- The current Java client lacks implementations for advanced behaviors such as retries and request‑response helpers, which remain future work.
