@@ -1,4 +1,4 @@
-# MyServiceBus
+# ✉️ MyServiceBus
 
 MyServiceBus is a lightweight asynchronous messaging library inspired by MassTransit. It is designed to be minimal yet compatible with the MassTransit message envelope format, enabling services to send, publish, and consume messages across .NET and Java implementations.
 
