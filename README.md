@@ -1,46 +1,45 @@
-# Service Bus
+# MyServiceBus
 
-Asynchronous messaging library based on MassTransit. 
+MyServiceBus is a lightweight asynchronous messaging library inspired by MassTransit. It is designed to be minimal yet compatible with the MassTransit message envelope format, enabling services to send, publish, and consume messages across .NET and Java implementations.
 
-Meant to be minimal, for sending and publishing messages, but compatible with the MT message envelope format.
+## Goals
+- Provide a community-driven, open-source alternative to MassTransit and MediatR as they move toward commercial licensing.
+- Offer a familiar API for developers coming from MassTransit.
+- Maintain feature parity between the C# and Java clients with consistent behavior across languages.
 
-Prototypes for Java and .NET. Able to consume their own messages.
+## Features
+- Fire-and-forget message sending
+- Publish/subscribe pattern
+- Request/response pattern (`RequestClient`)
+- RabbitMQ transport
+- In-memory mediator
+- Compatibility with MassTransit message envelopes
+- Raw JSON messages
+- Retries and error handling
+- Pipeline behaviors
+- OpenTelemetry support
+- Java client and server prototypes
 
-## Goal
+## Getting Started
+### Prerequisites
+- [.NET SDK](https://dotnet.microsoft.com/download)
+- Java Development Kit (for the Java prototype)
 
-To act as a lightweight open-source replacement for MassTransit and MediatR, both of which are planning to go commercial.
+### Building
+```bash
+dotnet restore
+dotnet build
+```
 
-Hopefully, driven by the community. 
+### Running tests
+```bash
+dotnet test
+```
 
-And with support for other languages, like Java.
-
-Perhaps building native support for formats that aren't MassTransit. Compatibility with NServiceBus.
-
-Eventually, this will diverge and become its own thing.
-
-## Planned features
-
-Will try to be as faithful to the MassTransit API as possible. To enable further development.
-
-* Fire and forget (Send)
-* Pub-Sub pattern (Publish)
-* Request-Response pattern (`RequestClient`)
-* RabbitMQ
-* Mediator and In-memory
-* MassTransit message envelopes
-* Raw JSON messages
-* Retries
-* Error handling
-* Pipeline behaviors
-* OpenTelemetry support
-* Java client (and server)
-
-## Sample
-
-The messages and consumers:
+### Sample usage
+The following example publishes a `SubmitOrder` message that is handled by a consumer which then publishes an `OrderSubmitted` event:
 
 ```csharp
-
 public record SubmitOrder
 {
     public Guid OrderId { get; init; }
@@ -61,7 +60,7 @@ class SubmitOrderConsumer :
 }
 ```
 
-Add service bus to DI:
+Register the bus in the dependency injection container:
 
 ```csharp
 builder.Services.AddServiceBus(x =>
@@ -75,11 +74,27 @@ builder.Services.AddServiceBus(x =>
 });
 ```
 
-Publish `SubmitOrder` message:
+Publish the `SubmitOrder` message:
 
 ```csharp
 using IServiceScope scope = serviceScopeFactory.CreateScope();
 
 var publishEndpoint = scope.GetService<IPublishEndpoint>();
-await publishEndpoint.Publish(new OrderSubmitted());
+await publishEndpoint.Publish(new SubmitOrder
+{
+    OrderId = Guid.NewGuid()
+});
 ```
+
+## Repository structure
+- `src/` – C# and Java source code
+- `test/` – Test projects
+- `docs/` – Additional documentation and design goals
+- `docker-compose.yml` – Docker configuration for local infrastructure
+
+## Contributing
+Contributions are welcome! Please run `dotnet test` before submitting a pull request and follow the coding conventions described in `AGENTS.md`.
+
+## License
+This project is licensed under the [MIT License](LICENSE).
+
