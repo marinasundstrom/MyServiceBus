@@ -8,9 +8,6 @@ import java.lang.reflect.Type;
 import com.myservicebus.Consumer;
 import com.myservicebus.NamingConventions;
 import com.myservicebus.di.ServiceCollection;
-import com.myservicebus.GenericRequestClient;
-import com.myservicebus.RequestClient;
-import com.myservicebus.rabbitmq.ConnectionProvider;
 
 public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigurator {
 
@@ -61,8 +58,6 @@ public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigura
 
     public void complete() {
         serviceCollection.addSingleton(TopologyRegistry.class, sp -> () -> topology);
-        serviceCollection.addScoped(RequestClient.class,
-                sp -> () -> new GenericRequestClient<>(sp.getService(ConnectionProvider.class)));
     }
 
     @Override
