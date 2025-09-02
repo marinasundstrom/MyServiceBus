@@ -4,6 +4,7 @@ import com.myservicebus.BusRegistrationConfigurator;
 import com.myservicebus.BusRegistrationConfiguratorImpl;
 import com.myservicebus.ServiceBus;
 import com.myservicebus.di.ServiceCollection;
+import com.myservicebus.di.ServiceProvider;
 import java.io.IOException;
 import java.util.concurrent.TimeoutException;
 import java.util.function.BiConsumer;
@@ -23,10 +24,21 @@ public class RabbitMqBus {
         if (configureBus != null) {
             configureBus.accept(cfg);
         }
-        RabbitMqTransport.configure(cfg, configure);
+        RabbitMqTransport.configure(cfg);
         cfg.complete();
-        ServiceBus serviceBus = new ServiceBus(services.build());
+        ServiceProvider provider = services.build();
+        if (configure != null) {
+            BusRegistrationContext context = new BusRegistrationContext(provider);
+            RabbitMqFactoryConfigurator factoryConfigurator = provider.getService(RabbitMqFactoryConfigurator.class);
+            configure.accept(context, factoryConfigurator);
+        }
+        ServiceBus serviceBus = new ServiceBus(provider);
         return new RabbitMqBus(serviceBus);
+    }
+
+    public static RabbitMqBus configure(ServiceCollection services,
+            Consumer<BusRegistrationConfigurator> configureBus) {
+        return configure(services, configureBus, null);
     }
 
     public void start() throws IOException, TimeoutException {

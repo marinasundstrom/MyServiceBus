@@ -4,18 +4,13 @@ import com.myservicebus.BusRegistrationConfigurator;
 import com.myservicebus.SendEndpointProvider;
 import com.myservicebus.di.ServiceCollection;
 import com.rabbitmq.client.ConnectionFactory;
-import java.util.function.BiConsumer;
 
 public class RabbitMqTransport {
 
     // Equivalent to "UsingRabbitMq" in .NET impl
-    public static void configure(BusRegistrationConfigurator x,
-            BiConsumer<BusRegistrationContext, RabbitMqFactoryConfigurator> configure) {
+    public static void configure(BusRegistrationConfigurator x) {
 
         RabbitMqFactoryConfigurator factoryConfigurator = new RabbitMqFactoryConfigurator();
-        if (configure != null) {
-            configure.accept(null, factoryConfigurator);
-        }
 
         ServiceCollection services = x.getServiceCollection();
         services.addSingleton(RabbitMqFactoryConfigurator.class, sp -> () -> factoryConfigurator);
