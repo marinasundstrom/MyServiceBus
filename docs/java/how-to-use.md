@@ -13,15 +13,17 @@ import java.util.UUID;
 
 import com.myservicebus.MyService;
 import com.myservicebus.MyServiceImpl;
+import com.myservicebus.ServiceBus;
 import com.myservicebus.di.ServiceCollection;
-import com.myservicebus.rabbitmq.RabbitMqBus;
+import com.myservicebus.di.ServiceProvider;
+import com.myservicebus.rabbitmq.RabbitMqBusFactory;
 
 public class Main {
     public static void main(String[] args) throws Exception {
         ServiceCollection services = new ServiceCollection();
         services.addScoped(MyService.class, MyServiceImpl.class);
 
-        var bus = RabbitMqBus.configure(services, x -> {
+        RabbitMqBusFactory.configure(services, x -> {
             x.addConsumer(SubmitOrderConsumer.class);
         }, (context, cfg) -> {
             cfg.host("rabbitmq://localhost");
@@ -30,6 +32,9 @@ public class Main {
                 e.configureConsumer(context, SubmitOrderConsumer.class);
             });
         });
+
+        ServiceProvider provider = services.build();
+        ServiceBus bus = provider.getService(ServiceBus.class);
 
         bus.start();
 
