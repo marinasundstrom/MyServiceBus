@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using MyServiceBus.Serialization;
 
 namespace MyServiceBus;
 
@@ -14,7 +15,8 @@ public static class MediatorServiceBusConfigurationBuilderExt
             sp.GetRequiredService<ITransportFactory>(),
             sp,
             sp.GetRequiredService<ISendPipe>(),
-            sp.GetRequiredService<IPublishPipe>()));
+            sp.GetRequiredService<IPublishPipe>(),
+            sp.GetRequiredService<IMessageSerializer>()));
         return builder;
     }
 }

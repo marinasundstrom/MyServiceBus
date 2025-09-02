@@ -14,6 +14,7 @@ public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigura
     private TopologyRegistry topology = new TopologyRegistry();
     private PipeConfigurator<SendContext> sendConfigurator = new PipeConfigurator<>();
     private PipeConfigurator<SendContext> publishConfigurator = new PipeConfigurator<>();
+    private Class<? extends com.myservicebus.serialization.MessageSerializer> serializerClass = com.myservicebus.serialization.EnvelopeMessageSerializer.class;
 
     public BusRegistrationConfiguratorImpl(ServiceCollection serviceCollection) {
         this.serviceCollection = serviceCollection;
@@ -56,6 +57,11 @@ public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigura
         configure.accept(publishConfigurator);
     }
 
+    @Override
+    public void setSerializer(Class<? extends com.myservicebus.serialization.MessageSerializer> serializerClass) {
+        this.serializerClass = serializerClass;
+    }
+
     public static Class<?> getClassFromType(Type type) {
         if (type instanceof Class<?>) {
             return (Class<?>) type;
@@ -78,6 +84,13 @@ public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigura
         serviceCollection.addSingleton(TopologyRegistry.class, sp -> () -> topology);
         serviceCollection.addSingleton(SendPipe.class, sp -> () -> new SendPipe(sendConfigurator.build()));
         serviceCollection.addSingleton(PublishPipe.class, sp -> () -> new PublishPipe(publishConfigurator.build()));
+        serviceCollection.addSingleton(com.myservicebus.serialization.MessageSerializer.class, sp -> () -> {
+            try {
+                return serializerClass.getDeclaredConstructor().newInstance();
+            } catch (Exception ex) {
+                throw new RuntimeException(ex);
+            }
+        });
     }
 
     @Override

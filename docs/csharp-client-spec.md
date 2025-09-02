@@ -30,5 +30,5 @@ The ServiceBus C# client provides a lightweight messaging abstraction for buildi
 - Outgoing messages include host information such as machine name, process details, and framework version to aid in diagnostics and tracing.
 
 ## Behavior
-- Message serialization uses `EnvelopeMessageSerializer` and embeds metadata in headers consistent with `message-envelope.md`.
+- Message serialization defaults to `EnvelopeMessageSerializer` but can be swapped (e.g., `RawJsonMessageSerializer`) via `SetSerializer<T>()` during registration.
 - Send, publish, and respond operations are asynchronous and honor cancellation tokens.

@@ -13,6 +13,7 @@ public class EnvelopeMessageSerializer : IMessageSerializer
     [Throws(typeof(NotSupportedException))]
     public Task<byte[]> SerializeAsync<T>(MessageSerializationContext<T> context) where T : class
     {
+        context.Headers["content_type"] = "application/vnd.mybus.envelope+json";
         var messageType = typeof(T);
         var envelope = new Envelope<T>()
         {

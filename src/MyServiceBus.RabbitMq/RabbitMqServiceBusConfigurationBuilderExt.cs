@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using MyServiceBus.Serialization;
 using RabbitMQ.Client;
 
 namespace MyServiceBus;
@@ -32,7 +33,8 @@ public static class RabbitMqServiceBusConfigurationBuilderExt
             sp.GetRequiredService<ITransportFactory>(),
             sp,
             sp.GetRequiredService<ISendPipe>(),
-            sp.GetRequiredService<IPublishPipe>()));
+            sp.GetRequiredService<IPublishPipe>(),
+            sp.GetRequiredService<IMessageSerializer>()));
 
         return builder;
     }

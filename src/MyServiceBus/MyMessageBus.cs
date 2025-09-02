@@ -12,6 +12,7 @@ public class MyMessageBus : IMessageBus
     private readonly IServiceProvider _serviceProvider;
     private readonly ISendPipe _sendPipe;
     private readonly IPublishPipe _publishPipe;
+    private readonly IMessageSerializer _messageSerializer;
 
     private readonly List<IReceiveTransport> _activeTransports = new();
 
@@ -19,12 +20,13 @@ public class MyMessageBus : IMessageBus
     private readonly Dictionary<string, (Type MessageType, IConsumePipe Pipe)> _consumers = new();
 
     public MyMessageBus(ITransportFactory transportFactory, IServiceProvider serviceProvider,
-        ISendPipe sendPipe, IPublishPipe publishPipe)
+        ISendPipe sendPipe, IPublishPipe publishPipe, IMessageSerializer messageSerializer)
     {
         _transportFactory = transportFactory;
         _serviceProvider = serviceProvider;
         _sendPipe = sendPipe;
         _publishPipe = publishPipe;
+        _messageSerializer = messageSerializer;
     }
 
     [Throws(typeof(UriFormatException))]
@@ -36,7 +38,7 @@ public class MyMessageBus : IMessageBus
         var uri = new Uri($"rabbitmq://localhost/{exchangeName}");
         var transport = await _transportFactory.GetSendTransport(uri, cancellationToken);
 
-        var context = new SendContext(MessageTypeCache.GetMessageTypes(typeof(T)), new EnvelopeMessageSerializer(), cancellationToken)
+        var context = new SendContext(MessageTypeCache.GetMessageTypes(typeof(T)), _messageSerializer, cancellationToken)
         {
             RoutingKey = exchangeName,
             MessageId = Guid.NewGuid().ToString()
@@ -102,7 +104,7 @@ public class MyMessageBus : IMessageBus
             return;
 
         var consumeContextType = typeof(ConsumeContextImpl<>).MakeGenericType(registration.MessageType);
-        var consumeContext = (ConsumeContext)Activator.CreateInstance(consumeContextType, context, _transportFactory, _sendPipe, _publishPipe)
+        var consumeContext = (ConsumeContext)Activator.CreateInstance(consumeContextType, context, _transportFactory, _sendPipe, _publishPipe, _messageSerializer)
             ?? throw new InvalidOperationException("Failed to create ConsumeContext");
 
         await registration.Pipe.Send(consumeContext);

@@ -29,7 +29,6 @@ public class SendContext : BasePipeContext
     public async Task<ReadOnlyMemory<byte>> Serialize<T>(T message)
         where T : class
     {
-        Headers["content_type"] = "application/vnd.mybus.envelope+json";
         var context = new MessageSerializationContext<T>(message)
         {
             MessageId = Guid.NewGuid(),
