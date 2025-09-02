@@ -9,12 +9,29 @@ public class ConnectionProvider {
 
     public ConnectionProvider(ConnectionFactory connectionFactory) {
         this.connectionFactory = connectionFactory;
+        this.connectionFactory.setAutomaticRecoveryEnabled(true);
+        this.connectionFactory.setTopologyRecoveryEnabled(true);
     }
 
     public synchronized Connection getOrCreateConnection() throws Exception {
-        if (connection == null || !connection.isOpen()) {
-            connection = connectionFactory.newConnection();
+        if (connection != null && connection.isOpen()) {
+            return connection;
         }
-        return connection;
+
+        long delay = 100;
+        while (true) {
+            try {
+                connection = connectionFactory.newConnection();
+                connection.addShutdownListener(cause -> {
+                    synchronized (ConnectionProvider.this) {
+                        connection = null;
+                    }
+                });
+                return connection;
+            } catch (Exception ex) {
+                Thread.sleep(delay);
+                delay = Math.min(delay * 2, 5000);
+            }
+        }
     }
 }

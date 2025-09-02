@@ -1,6 +1,10 @@
 using Microsoft.Extensions.DependencyInjection;
 using MyServiceBus.Serialization;
 using RabbitMQ.Client;
+using RabbitMQ.Client.Events;
+using System;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace MyServiceBus;
 
@@ -22,6 +26,8 @@ public static class RabbitMqServiceBusConfigurationBuilderExt
             var factory = new ConnectionFactory
             {
                 HostName = rabbitConfigurator.ClientHost,
+                AutomaticRecoveryEnabled = true,
+                TopologyRecoveryEnabled = true,
                 //DispatchConsumersAsync = true
             };
 
@@ -43,7 +49,8 @@ public static class RabbitMqServiceBusConfigurationBuilderExt
 public sealed class ConnectionProvider
 {
     private readonly IConnectionFactory connectionFactory;
-    private IConnection connection;
+    private IConnection? connection;
+    private readonly SemaphoreSlim connectionLock = new(1, 1);
 
     public ConnectionProvider(IConnectionFactory connectionFactory)
     {
@@ -51,5 +58,46 @@ public sealed class ConnectionProvider
     }
 
     public async Task<IConnection> GetOrCreateConnectionAsync(CancellationToken cancellationToken = default)
-        => connection ??= await connectionFactory.CreateConnectionAsync(cancellationToken);
+    {
+        if (connection?.IsOpen == true)
+            return connection;
+
+        await connectionLock.WaitAsync(cancellationToken);
+        try
+        {
+            if (connection?.IsOpen == true)
+                return connection;
+
+            var delay = TimeSpan.FromMilliseconds(100);
+            while (!cancellationToken.IsCancellationRequested)
+            {
+                try
+                {
+                    var conn = await connectionFactory.CreateConnectionAsync(cancellationToken);
+                    conn.ConnectionShutdownAsync += (_, _) =>
+                    {
+                        connection?.Dispose();
+                        connection = null;
+                        return Task.CompletedTask;
+                    };
+
+                    connection = conn;
+                    return conn;
+                }
+                catch when (!cancellationToken.IsCancellationRequested)
+                {
+                    await Task.Delay(delay, cancellationToken);
+                    delay *= 2;
+                    if (delay > TimeSpan.FromSeconds(5))
+                        delay = TimeSpan.FromSeconds(5);
+                }
+            }
+
+            throw new OperationCanceledException("Cancelled while attempting to connect");
+        }
+        finally
+        {
+            connectionLock.Release();
+        }
+    }
 }
