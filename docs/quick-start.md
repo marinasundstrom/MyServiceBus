@@ -75,17 +75,17 @@ interfaces rather than concrete implementations.
 
 Consumers are registered as scoped dependencies and created per message.
 
-```java
+```csharp
 public class MyService
 {
-    private IPublishEndpoint publishEndpoint;
+    private readonly IPublishEndpoint publishEndpoint;
 
     public MyService(IPublishEndpoint publishEndpoint)
     {
         this.publishEndpoint = publishEndpoint;
     }
 
-    public async Task DoWork(MyEvent ev) 
+    public async Task DoWork(MyEvent ev)
     {
         await publishEndpoint.Publish(ev);
     }
