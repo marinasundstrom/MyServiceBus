@@ -1,5 +1,6 @@
 package com.myservicebus.rabbitmq;
 
+import com.myservicebus.ConsumerRegistry;
 import java.util.function.Consumer;
 
 public class RabbitMqFactoryConfigurator {
@@ -24,7 +25,18 @@ public class RabbitMqFactoryConfigurator {
     public void receiveEndpoint(String queueName, Consumer<ReceiveEndpointConfigurator> configure) {
         if (configure != null) {
             configure.accept((context, consumerClass) -> {
-                // Endpoint wiring will be added with full transport support
+                try {
+                    ConsumerRegistry registry = context.getServiceProvider().getService(ConsumerRegistry.class);
+                    boolean found = registry.getAll().stream()
+                            .anyMatch(def -> def.getConsumerType().equals(consumerClass));
+                    if (!found) {
+                        throw new IllegalStateException(
+                                "Consumer " + consumerClass.getSimpleName() + " not registered");
+                    }
+                } catch (Exception ex) {
+                    throw new RuntimeException(
+                            "Failed to configure consumer " + consumerClass.getSimpleName(), ex);
+                }
             });
         }
     }
