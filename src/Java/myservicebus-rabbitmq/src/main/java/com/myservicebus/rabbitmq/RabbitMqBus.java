@@ -1,9 +1,12 @@
 package com.myservicebus.rabbitmq;
 
+import com.myservicebus.BusRegistrationConfigurator;
+import com.myservicebus.BusRegistrationConfiguratorImpl;
 import com.myservicebus.ServiceBus;
 import com.myservicebus.di.ServiceCollection;
 import java.io.IOException;
 import java.util.concurrent.TimeoutException;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 public class RabbitMqBus {
@@ -14,17 +17,13 @@ public class RabbitMqBus {
     }
 
     public static RabbitMqBus configure(ServiceCollection services,
-            Consumer<RabbitMqBusRegistrationConfigurator> configure) {
-        RabbitMqBusRegistrationConfiguratorImpl cfg = new RabbitMqBusRegistrationConfiguratorImpl(services);
-        if (configure != null) {
-            configure.accept(cfg);
+            Consumer<BusRegistrationConfigurator> configureBus,
+            BiConsumer<BusRegistrationContext, RabbitMqFactoryConfigurator> configure) {
+        BusRegistrationConfiguratorImpl cfg = new BusRegistrationConfiguratorImpl(services);
+        if (configureBus != null) {
+            configureBus.accept(cfg);
         }
-        RabbitMqTransport.configure(cfg, (context, factoryCfg) -> {
-            factoryCfg.host(cfg.getHost(), h -> {
-                h.username(cfg.getUsername());
-                h.password(cfg.getPassword());
-            });
-        });
+        RabbitMqTransport.configure(cfg, configure);
         cfg.complete();
         ServiceBus serviceBus = new ServiceBus(services.build());
         return new RabbitMqBus(serviceBus);
