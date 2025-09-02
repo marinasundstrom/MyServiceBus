@@ -23,7 +23,7 @@ public class GenericRequestClient<TRequest> implements RequestClient<TRequest> {
     }
 
     @Override
-    public <T1, T2> CompletableFuture<Response.Two<T1, T2>> getResponse(TRequest request, Class<T1> responseType1,
+    public <T1, T2> CompletableFuture<Response2<T1, T2>> getResponse(TRequest request, Class<T1> responseType1,
             Class<T2> responseType2, CancellationToken cancellationToken) {
         return transport.sendRequest(requestType, request, responseType1, responseType2, cancellationToken);
     }
