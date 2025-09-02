@@ -144,7 +144,7 @@ public class ServiceBus implements SendEndpoint, PublishEndpoint {
         String exchange = NamingConventions.getExchangeName(message.getClass());
         SendContext ctx = new SendContext(message, cancellationToken);
         return publishPipe.send(ctx).thenCompose(v -> {
-            var endpoint = sendEndpointProvider.getSendEndpoint("rabbitmq://localhost/" + exchange);
+            var endpoint = sendEndpointProvider.getSendEndpoint("rabbitmq://localhost/exchange/" + exchange);
             return endpoint.send(ctx).thenRun(() -> {
                 System.out.println("📤 Published message of type " + message.getClass().getSimpleName());
             });

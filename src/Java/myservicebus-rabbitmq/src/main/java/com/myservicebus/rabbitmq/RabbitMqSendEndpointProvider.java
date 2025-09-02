@@ -5,8 +5,9 @@ package com.myservicebus.rabbitmq;
   import com.myservicebus.SendEndpointProvider;
   import com.myservicebus.SendPipe;
   import com.myservicebus.SendTransport;
-  import com.myservicebus.serialization.MessageSerializer;
-  import java.util.concurrent.CompletableFuture;
+import com.myservicebus.serialization.MessageSerializer;
+import java.net.URI;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * Provides send endpoints backed by RabbitMQ transports.
@@ -24,8 +25,16 @@ package com.myservicebus.rabbitmq;
 
     @Override
     public SendEndpoint getSendEndpoint(String uri) {
-          String exchange = uri.substring(uri.lastIndexOf('/') + 1);
-          SendTransport transport = transportFactory.getSendTransport(exchange);
+        URI target = URI.create(uri);
+        String path = target.getPath();
+        SendTransport transport;
+        if (path.startsWith("/exchange/")) {
+            String exchange = path.substring("/exchange/".length());
+            transport = transportFactory.getSendTransport(exchange);
+        } else {
+            String queue = path.startsWith("/") ? path.substring(1) : path;
+            transport = transportFactory.getQueueTransport(queue);
+        }
           RabbitMqSendEndpoint endpoint = new RabbitMqSendEndpoint(transport, serializer);
           return new SendEndpoint() {
               @Override
