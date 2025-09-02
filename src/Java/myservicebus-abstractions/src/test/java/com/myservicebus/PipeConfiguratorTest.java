@@ -2,7 +2,6 @@ package com.myservicebus;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -43,7 +42,7 @@ class PipeConfiguratorTest {
     void retryFilterRetriesOnFailure() {
         PipeConfigurator<TestContext> configurator = new PipeConfigurator<>();
         AtomicInteger attempts = new AtomicInteger();
-        configurator.useRetry(2, Duration.ofMillis(1));
+        configurator.useRetry(2);
         configurator.useExecute(ctx -> {
             if (attempts.incrementAndGet() < 3) {
                 CompletableFuture<Void> failed = new CompletableFuture<>();

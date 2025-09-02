@@ -20,6 +20,10 @@ public class PipeConfigurator<TContext extends PipeContext> {
         useFilter(new DelegateFilter(callback));
     }
 
+    public void useRetry(int retryCount) {
+        useRetry(retryCount, null);
+    }
+
     public void useRetry(int retryCount, Duration delay) {
         useFilter(new RetryFilter<>(retryCount, delay));
     }

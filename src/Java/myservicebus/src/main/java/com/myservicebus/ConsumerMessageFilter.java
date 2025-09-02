@@ -33,10 +33,11 @@ public class ConsumerMessageFilter<T> implements Filter<ConsumeContext<T>> {
             }
             return consumerFuture.thenCompose(v -> next.send(context)).handle((v, ex) -> {
                 if (ex != null) {
-                    context.respondFault(ex instanceof Exception ? (Exception) ex : new RuntimeException(ex),
+                    Throwable cause = ex instanceof CompletionException && ex.getCause() != null ? ex.getCause() : ex;
+                    context.respondFault(cause instanceof Exception ? (Exception) cause : new RuntimeException(cause),
                             CancellationToken.none).join();
                     throw new CompletionException(
-                            new RuntimeException("Consumer " + consumerType.getSimpleName() + " failed", ex));
+                            new RuntimeException("Consumer " + consumerType.getSimpleName() + " failed", cause));
                 }
                 return null;
             });

@@ -133,7 +133,7 @@ await pipe.Send(context);
 
 ```java
 PipeConfigurator<ConsumeContext<SubmitOrder>> configurator = new PipeConfigurator<>();
-configurator.useRetry(3, null);
+configurator.useRetry(3);
 configurator.useExecute(ctx -> {
     System.out.println("Received " + ctx.getMessage().getOrderId());
     return CompletableFuture.completedFuture(null);
