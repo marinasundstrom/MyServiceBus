@@ -1,13 +1,15 @@
 package com.myservicebus.rabbitmq;
 
 import com.myservicebus.BusRegistrationConfigurator;
-import com.myservicebus.RequestClient;
+import com.myservicebus.RequestClientFactory;
+import com.myservicebus.RequestClientTransport;
 import com.myservicebus.SendEndpointProvider;
+import com.myservicebus.GenericRequestClientFactory;
 import com.myservicebus.di.ServiceCollection;
 import com.rabbitmq.client.ConnectionFactory;
 
 import com.myservicebus.rabbitmq.ConnectionProvider;
-import com.myservicebus.rabbitmq.RabbitMqRequestClient;
+import com.myservicebus.rabbitmq.RabbitMqRequestClientTransport;
 
 public class RabbitMqTransport {
 
@@ -36,6 +38,9 @@ public class RabbitMqTransport {
         });
 
         services.addSingleton(SendEndpointProvider.class, sp -> () -> sp.getService(RabbitMqSendEndpointProvider.class));
-        services.addScoped(RequestClient.class, sp -> () -> new RabbitMqRequestClient(sp.getService(ConnectionProvider.class)));
+        services.addSingleton(RequestClientTransport.class,
+                sp -> () -> new RabbitMqRequestClientTransport(sp.getService(ConnectionProvider.class)));
+        services.addSingleton(RequestClientFactory.class,
+                sp -> () -> new GenericRequestClientFactory(sp.getService(RequestClientTransport.class)));
     }
 }

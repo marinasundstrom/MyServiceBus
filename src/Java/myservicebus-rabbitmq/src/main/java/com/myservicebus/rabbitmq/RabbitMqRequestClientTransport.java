@@ -13,7 +13,7 @@ import com.myservicebus.Envelope;
 import com.myservicebus.Fault;
 import com.myservicebus.HostInfo;
 import com.myservicebus.NamingConventions;
-import com.myservicebus.RequestClient;
+import com.myservicebus.RequestClientTransport;
 import com.myservicebus.tasks.CancellationToken;
 import com.rabbitmq.client.AMQP;
 import com.rabbitmq.client.BuiltinExchangeType;
@@ -22,21 +22,21 @@ import com.rabbitmq.client.Connection;
 import com.rabbitmq.client.DeliverCallback;
 
 /**
- * RabbitMQ-specific implementation of {@link RequestClient}.
+ * RabbitMQ transport implementation for request/response.
  */
-public class RabbitMqRequestClient<TRequest> implements RequestClient<TRequest> {
+public class RabbitMqRequestClientTransport implements RequestClientTransport {
     private final ConnectionProvider connectionProvider;
     private final ObjectMapper mapper;
 
-    public RabbitMqRequestClient(ConnectionProvider connectionProvider) {
+    public RabbitMqRequestClientTransport(ConnectionProvider connectionProvider) {
         this.connectionProvider = connectionProvider;
         this.mapper = new ObjectMapper();
         this.mapper.findAndRegisterModules();
     }
 
     @Override
-    public <TResponse> CompletableFuture<TResponse> getResponse(TRequest request, Class<TResponse> responseType,
-            CancellationToken cancellationToken) {
+    public <TRequest, TResponse> CompletableFuture<TResponse> sendRequest(Class<TRequest> requestType, TRequest request,
+            Class<TResponse> responseType, CancellationToken cancellationToken) {
         CompletableFuture<TResponse> future = new CompletableFuture<>();
         try {
             Connection connection = connectionProvider.getOrCreateConnection();
@@ -54,8 +54,7 @@ public class RabbitMqRequestClient<TRequest> implements RequestClient<TRequest> 
                     future.complete(envelope.getMessage());
                 } catch (Exception ex) {
                     try {
-                        JavaType faultInner = mapper.getTypeFactory().constructParametricType(Fault.class,
-                                request.getClass());
+                        JavaType faultInner = mapper.getTypeFactory().constructParametricType(Fault.class, requestType);
                         JavaType faultType = mapper.getTypeFactory().constructParametricType(Envelope.class, faultInner);
                         Envelope<Fault<TRequest>> fault = mapper.readValue(delivery.getBody(), faultType);
                         String msg = fault.getMessage().getExceptions().isEmpty() ? "Request faulted"
@@ -77,7 +76,7 @@ public class RabbitMqRequestClient<TRequest> implements RequestClient<TRequest> 
             channel.basicConsume(responseQueue, true, callback, consumerTag -> {
             });
 
-            String exchange = NamingConventions.getExchangeName(request.getClass());
+            String exchange = NamingConventions.getExchangeName(requestType);
             channel.exchangeDeclare(exchange, BuiltinExchangeType.FANOUT, true);
 
             Envelope<TRequest> envelope = new Envelope<>();
@@ -86,7 +85,7 @@ public class RabbitMqRequestClient<TRequest> implements RequestClient<TRequest> 
             envelope.setSentTime(OffsetDateTime.now());
             envelope.setDestinationAddress("rabbitmq://localhost/" + exchange);
             envelope.setResponseAddress("rabbitmq://localhost/" + responseExchange);
-            envelope.setMessageType(List.of(NamingConventions.getMessageUrn(request.getClass())));
+            envelope.setMessageType(List.of(NamingConventions.getMessageUrn(requestType)));
             envelope.setMessage(request);
             envelope.setHeaders(Map.of());
             envelope.setContentType("application/json");
