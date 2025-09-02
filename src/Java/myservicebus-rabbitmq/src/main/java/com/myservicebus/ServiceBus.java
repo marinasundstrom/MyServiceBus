@@ -26,6 +26,7 @@ public class ServiceBus {
     private final ConnectionProvider connectionProvider;
     private final SendEndpointProvider sendEndpointProvider;
     private final PublishPipe publishPipe;
+    private final SendPipe sendPipe;
     private Connection connection;
     private Channel channel;
     private ObjectMapper mapper;
@@ -35,6 +36,7 @@ public class ServiceBus {
         this.connectionProvider = serviceProvider.getService(ConnectionProvider.class);
         this.sendEndpointProvider = serviceProvider.getService(SendEndpointProvider.class);
         this.publishPipe = serviceProvider.getService(PublishPipe.class);
+        this.sendPipe = serviceProvider.getService(SendPipe.class);
 
         mapper = new ObjectMapper();
         mapper.findAndRegisterModules();
@@ -141,6 +143,7 @@ public class ServiceBus {
         String exchange = NamingConventions.getExchangeName(message.getClass());
         SendContext ctx = new SendContext(message, CancellationToken.none);
         publishPipe.send(ctx).join();
+        sendPipe.send(ctx).join();
         var endpoint = sendEndpointProvider.getSendEndpoint("rabbitmq://localhost/" + exchange);
         try {
             endpoint.send(ctx.getMessage(), CancellationToken.none).join();
