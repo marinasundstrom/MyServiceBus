@@ -2,6 +2,7 @@ namespace MyServiceBus;
 
 using Microsoft.Extensions.DependencyInjection;
 using MyServiceBus.Topology;
+using System.Linq;
 using System.Reflection;
 
 public static class RabbitMqConfiguratorExtensions
@@ -10,14 +11,17 @@ public static class RabbitMqConfiguratorExtensions
     public static void ConfigureEndpoints(this IRabbitMqFactoryConfigurator configurator, IBusRegistrationContext context)
     {
         var registry = context.ServiceProvider.GetRequiredService<TopologyRegistry>();
+        var formatter = configurator.EndpointNameFormatter;
 
         foreach (var consumer in registry.Consumers)
         {
             var consumerType = consumer.ConsumerType;
+            var messageType = consumer.Bindings.First().MessageType;
+            var queueName = formatter?.Format(messageType) ?? consumer.QueueName;
 
             try
             {
-                configurator.ReceiveEndpoint(consumer.QueueName, endpoint =>
+                configurator.ReceiveEndpoint(queueName, [Throws(typeof(AmbiguousMatchException), typeof(InvalidOperationException))] (endpoint) =>
                 {
                     var method = typeof(ReceiveEndpointConfigurator)
                         .GetMethod("ConfigureConsumer")!

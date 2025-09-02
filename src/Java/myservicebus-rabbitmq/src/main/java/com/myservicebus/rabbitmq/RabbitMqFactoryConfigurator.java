@@ -1,6 +1,7 @@
 package com.myservicebus.rabbitmq;
 
 import com.myservicebus.ConsumerTopology;
+import com.myservicebus.EndpointNameFormatter;
 import com.myservicebus.TopologyRegistry;
 import com.myservicebus.MessageBinding;
 import java.util.HashMap;
@@ -12,6 +13,7 @@ public class RabbitMqFactoryConfigurator {
     private String username = "guest";
     private String password = "guest";
     private final Map<Class<?>, String> exchangeNames = new HashMap<>();
+    private EndpointNameFormatter endpointNameFormatter;
 
     public void host(String host) {
         this.clientHost = host;
@@ -59,6 +61,17 @@ public class RabbitMqFactoryConfigurator {
         }
     }
 
+    public void configureEndpoints(BusRegistrationContext context) {
+        TopologyRegistry registry = context.getServiceProvider().getService(TopologyRegistry.class);
+        for (ConsumerTopology def : registry.getConsumers()) {
+            Class<?> messageType = def.getBindings().get(0).getMessageType();
+            String queueName = endpointNameFormatter != null ? endpointNameFormatter.format(messageType)
+                    : def.getQueueName();
+            Class<?> consumerClass = def.getConsumerType();
+            receiveEndpoint(queueName, e -> e.configureConsumer(context, consumerClass));
+        }
+    }
+
     public String getClientHost() {
         return clientHost;
     }
@@ -69,6 +82,10 @@ public class RabbitMqFactoryConfigurator {
 
     public String getPassword() {
         return password;
+    }
+
+    public void setEndpointNameFormatter(EndpointNameFormatter formatter) {
+        this.endpointNameFormatter = formatter;
     }
 
     private static class RabbitMqHostConfiguratorImpl implements RabbitMqHostConfigurator {
