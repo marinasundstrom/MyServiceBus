@@ -11,8 +11,8 @@ public class CancellationToken {
     }
 
     public boolean isCancelled() {
-        return cancelled.get();
+        return cancelled != null && cancelled.get();
     }
 
-    public static CancellationToken none = new CancellationToken(null);
+    public static CancellationToken none = new CancellationToken(new AtomicBoolean(false));
 }

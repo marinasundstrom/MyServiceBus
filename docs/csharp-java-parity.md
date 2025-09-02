@@ -9,4 +9,4 @@
 | Telemetry & host metadata | Implemented | Partially implemented | Java adds basic host metadata; richer diagnostics remain pending. |
 | Cancellation propagation | Implemented | Implemented | Pipe contexts expose cancellation tokens. |
 | Transport abstraction | Implemented | Implemented | RabbitMQ transport factories ensure exchanges exist before use. |
-| Retries | Implemented | Not implemented | Java specification lists retries as future work. |
+| Retries | Implemented | Implemented | Java automatically retries consumers with a built-in policy. |
