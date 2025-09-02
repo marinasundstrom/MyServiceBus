@@ -1,15 +1,17 @@
 package com.myservicebus.rabbitmq;
 
+import java.util.Map;
+
 public class MessageConfigurator<T> {
-    Class<T> clz;
+    private final Class<T> clz;
+    private final Map<Class<?>, String> exchangeNames;
 
-    public MessageConfigurator(Class<T> clz) {
+    public MessageConfigurator(Class<T> clz, Map<Class<?>, String> exchangeNames) {
         this.clz = clz;
+        this.exchangeNames = exchangeNames;
     }
 
-    public void setEntityName(String string) {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'setEntityName'");
+    public void setEntityName(String name) {
+        exchangeNames.put(clz, name);
     }
-
 }
