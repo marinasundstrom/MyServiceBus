@@ -1,7 +1,12 @@
 namespace MyServiceBus;
 
+using System;
+using System.Collections.Generic;
+
 internal sealed class RabbitMqFactoryConfigurator : IRabbitMqFactoryConfigurator
 {
+    private readonly Dictionary<Type, string> _exchangeNames = new();
+
     public RabbitMqFactoryConfigurator()
     {
     }
@@ -12,13 +17,13 @@ internal sealed class RabbitMqFactoryConfigurator : IRabbitMqFactoryConfigurator
 
     public void Message<T>(Action<MessageConfigurator> configure)
     {
-        var configurator = new MessageConfigurator();
+        var configurator = new MessageConfigurator(typeof(T), _exchangeNames);
         configure(configurator);
     }
 
     public void ReceiveEndpoint(string queueName, Action<ReceiveEndpointConfigurator> configure)
     {
-        var configurator = new ReceiveEndpointConfigurator();
+        var configurator = new ReceiveEndpointConfigurator(queueName, _exchangeNames);
         configure(configurator);
     }
 
@@ -33,7 +38,7 @@ internal sealed class RabbitMqFactoryConfigurator : IRabbitMqFactoryConfigurator
 
 internal class RabbitMqHostConfigurator : IRabbitMqHostConfigurator
 {
-    private RabbitMqFactoryConfigurator rabbitMqFactoryConfigurator;
+    private readonly RabbitMqFactoryConfigurator rabbitMqFactoryConfigurator;
 
     public RabbitMqHostConfigurator(RabbitMqFactoryConfigurator rabbitMqFactoryConfigurator)
     {

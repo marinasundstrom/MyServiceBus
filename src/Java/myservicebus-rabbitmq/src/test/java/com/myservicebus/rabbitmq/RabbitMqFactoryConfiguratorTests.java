@@ -49,4 +49,28 @@ public class RabbitMqFactoryConfiguratorTests {
         assertEquals("custom-queue", def.getQueueName());
         assertEquals("custom-exchange", def.getBindings().get(0).getEntityName());
     }
+
+    @Test
+    public void configureEndpointsUsesFormatter() {
+        ServiceCollection services = new ServiceCollection();
+        BusRegistrationConfiguratorImpl cfg = new BusRegistrationConfiguratorImpl(services);
+        cfg.addConsumer(MyConsumer.class);
+
+        RabbitMqTransport.configure(cfg);
+        cfg.complete();
+
+        ServiceProvider provider = services.build();
+        BusRegistrationContext context = new BusRegistrationContext(provider);
+        RabbitMqFactoryConfigurator factoryConfigurator = provider.getService(RabbitMqFactoryConfigurator.class);
+
+        factoryConfigurator.configureEndpoints(context, mt -> "formatted-" + mt.getSimpleName().toLowerCase());
+
+        TopologyRegistry registry = provider.getService(TopologyRegistry.class);
+        ConsumerTopology def = registry.getConsumers().stream()
+                .filter(d -> d.getConsumerType().equals(MyConsumer.class))
+                .findFirst()
+                .orElseThrow();
+
+        assertEquals("formatted-mymessage", def.getQueueName());
+    }
 }

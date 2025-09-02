@@ -16,6 +16,7 @@
 
   <ItemGroup>
     <ProjectReference Include="../../src/MyServiceBus/MyServiceBus.csproj" />
+    <ProjectReference Include="../../src/MyServiceBus.RabbitMq/MyServiceBus.RabbitMq.csproj" />
   </ItemGroup>
 
   <ItemGroup>

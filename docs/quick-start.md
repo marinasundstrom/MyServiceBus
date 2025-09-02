@@ -21,8 +21,12 @@ builder.Services.AddServiceBus(x =>
             h.Username("guest");
             h.Password("guest");
         });
-
-        cfg.ConfigureEndpoints(context);
+        cfg.Message<SubmitOrder>(m => m.SetEntityName("submit-order-exchange"));
+        cfg.ReceiveEndpoint("submit-order-queue", e =>
+        {
+            e.ConfigureConsumer<SubmitOrderConsumer>(context);
+        });
+        cfg.ConfigureEndpoints(context, KebabCaseEndpointNameFormatter.Instance); // auto-configure remaining consumers
     });
 });
 ```
@@ -36,10 +40,11 @@ RabbitMqBus bus = RabbitMqBus.configure(services, x -> {
     x.addConsumer(SubmitOrderConsumer.class);
 }, (context, cfg) -> {
     cfg.host("rabbitmq://localhost");
-
+    cfg.message(SubmitOrder.class, m -> m.setEntityName("submit-order-exchange"));
     cfg.receiveEndpoint("submit-order-queue", e -> {
         e.configureConsumer(context, SubmitOrderConsumer.class);
     });
+    cfg.configureEndpoints(context, KebabCaseEndpointNameFormatter.INSTANCE); // auto-configure remaining consumers
 });
 
 bus.start();

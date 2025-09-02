@@ -1,6 +1,7 @@
 package com.myservicebus.rabbitmq;
 
 import com.myservicebus.ConsumerTopology;
+import com.myservicebus.EndpointNameFormatter;
 import com.myservicebus.TopologyRegistry;
 import com.myservicebus.MessageBinding;
 import java.util.HashMap;
@@ -56,6 +57,20 @@ public class RabbitMqFactoryConfigurator {
     public <T> void message(Class<T> messageType, Consumer<MessageConfigurator<T>> configure) {
         if (configure != null) {
             configure.accept(new MessageConfigurator<>(messageType, exchangeNames));
+        }
+    }
+
+    public void configureEndpoints(BusRegistrationContext context) {
+        configureEndpoints(context, null);
+    }
+
+    public void configureEndpoints(BusRegistrationContext context, EndpointNameFormatter formatter) {
+        TopologyRegistry registry = context.getServiceProvider().getService(TopologyRegistry.class);
+        for (ConsumerTopology def : registry.getConsumers()) {
+            Class<?> messageType = def.getBindings().get(0).getMessageType();
+            String queueName = formatter != null ? formatter.format(messageType) : def.getQueueName();
+            Class<?> consumerClass = def.getConsumerType();
+            receiveEndpoint(queueName, e -> e.configureConsumer(context, consumerClass));
         }
     }
 
