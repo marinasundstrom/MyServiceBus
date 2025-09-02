@@ -1,5 +1,6 @@
 using System;
 using Microsoft.Extensions.DependencyInjection;
+using MyServiceBus.Serialization;
 
 namespace MyServiceBus;
 
@@ -15,6 +16,8 @@ public interface IRegistrationConfigurator
     void ConfigureSend(Action<PipeConfigurator<SendContext>> configure);
 
     void ConfigurePublish(Action<PipeConfigurator<SendContext>> configure);
+
+    void SetSerializer<TSerializer>() where TSerializer : class, IMessageSerializer;
 
     /*
     IConsumerRegistrationConfigurator<T> AddConsumer<T>(Action<IRegistrationContext, IConsumerConfigurator<T>> configure = null)

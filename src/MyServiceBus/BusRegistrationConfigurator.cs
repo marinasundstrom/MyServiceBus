@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using MyServiceBus.Topology;
+using MyServiceBus.Serialization;
 using System;
 using System.Reflection;
 
@@ -10,6 +11,7 @@ public class BusRegistrationConfigurator : IBusRegistrationConfigurator
     private TopologyRegistry _topology = new TopologyRegistry();
     private readonly PipeConfigurator<SendContext> sendConfigurator = new();
     private readonly PipeConfigurator<SendContext> publishConfigurator = new();
+    private Type serializerType = typeof(EnvelopeMessageSerializer);
 
     public IServiceCollection Services { get; }
 
@@ -57,6 +59,11 @@ public class BusRegistrationConfigurator : IBusRegistrationConfigurator
         configure(publishConfigurator);
     }
 
+    public void SetSerializer<TSerializer>() where TSerializer : class, IMessageSerializer
+    {
+        serializerType = typeof(TSerializer);
+    }
+
     [Throws(typeof(TargetInvocationException))]
     private static Type[] GetHandledMessageTypes(Type consumerType)
     {
@@ -73,5 +80,6 @@ public class BusRegistrationConfigurator : IBusRegistrationConfigurator
         Services.AddSingleton<IPostBuildAction>(_ => new ConsumerRegistrationAction(_topology));
         Services.AddSingleton<ISendPipe>(_ => new SendPipe(sendConfigurator.Build()));
         Services.AddSingleton<IPublishPipe>(_ => new PublishPipe(publishConfigurator.Build()));
+        Services.AddSingleton(typeof(IMessageSerializer), serializerType);
     }
 }

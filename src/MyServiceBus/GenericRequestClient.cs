@@ -7,10 +7,12 @@ public sealed class GenericRequestClient<TRequest> : IRequestClient<TRequest>, I
     where TRequest : class
 {
     private readonly ITransportFactory _transportFactory;
+    private readonly IMessageSerializer _serializer;
 
-    public GenericRequestClient(ITransportFactory transportFactory)
+    public GenericRequestClient(ITransportFactory transportFactory, IMessageSerializer serializer)
     {
         this._transportFactory = transportFactory;
+        _serializer = serializer;
     }
 
     public void Dispose()
@@ -66,7 +68,7 @@ public sealed class GenericRequestClient<TRequest> : IRequestClient<TRequest>, I
         var uri = new Uri($"rabbitmq://localhost/{exchangeName}");
         var requestSendTransport = await _transportFactory.GetSendTransport(uri, cancellationToken);
 
-        var sendContext = new SendContext(MessageTypeCache.GetMessageTypes(typeof(TRequest)), new EnvelopeMessageSerializer(), cancellationToken)
+        var sendContext = new SendContext(MessageTypeCache.GetMessageTypes(typeof(TRequest)), _serializer, cancellationToken)
         {
             //RoutingKey = exchangeName,
             ResponseAddress = new Uri($"queue:{NamingConventions.GetQueueName(typeof(T))}"),

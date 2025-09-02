@@ -143,10 +143,9 @@ public class ServiceBus {
         String exchange = NamingConventions.getExchangeName(message.getClass());
         SendContext ctx = new SendContext(message, CancellationToken.none);
         publishPipe.send(ctx).join();
-        sendPipe.send(ctx).join();
         var endpoint = sendEndpointProvider.getSendEndpoint("rabbitmq://localhost/" + exchange);
         try {
-            endpoint.send(ctx.getMessage(), CancellationToken.none).join();
+            endpoint.send(ctx).join();
             System.out.println("📤 Published message of type " + message.getClass().getSimpleName());
         } catch (Exception ex) {
             throw new IOException("Failed to publish message", ex);

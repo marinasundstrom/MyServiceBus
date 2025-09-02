@@ -1,5 +1,6 @@
 namespace MyServiceBus.Tests;
 
+using System.Collections.Generic;
 using MyServiceBus.Serialization;
 using Xunit;
 
@@ -25,7 +26,7 @@ public class EnvelopeMessageSerializerTests
             MessageId = Guid.NewGuid(),
             CorrelationId = null,
             MessageType = [NamingConventions.GetMessageUrn(typeof(SampleMessage))],
-            Headers = { },
+            Headers = new Dictionary<string, object>(),
             SentTime = DateTimeOffset.Now,
             HostInfo = new HostInfo
             {

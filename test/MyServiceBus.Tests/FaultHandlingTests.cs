@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using MyServiceBus;
+using MyServiceBus.Serialization;
 using MyServiceBus.Topology;
 using Xunit;
 using Xunit.Sdk;
@@ -39,7 +40,8 @@ public class FaultHandlingTests
 
         var context = new ConsumeContextImpl<TestMessage>(receiveContext, transportFactory,
             new SendPipe(Pipe.Empty<SendContext>()),
-            new PublishPipe(Pipe.Empty<SendContext>()));
+            new PublishPipe(Pipe.Empty<SendContext>()),
+            new EnvelopeMessageSerializer());
         var filter = new ConsumerMessageFilter<FaultingConsumer, TestMessage>(provider);
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => filter.Send(context, Pipe.Empty<ConsumeContext<TestMessage>>()));

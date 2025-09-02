@@ -3,6 +3,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using MyServiceBus;
+using MyServiceBus.Serialization;
 using MyServiceBus.Topology;
 using Xunit;
 
@@ -36,7 +37,7 @@ public class SendPublishFilterTests
         publishCfg.UseExecute(ctx => { publishExecuted = true; return Task.CompletedTask; });
 
         var bus = new MyMessageBus(new StubTransportFactory(), new ServiceCollection().BuildServiceProvider(),
-            new SendPipe(sendCfg.Build()), new PublishPipe(publishCfg.Build()));
+            new SendPipe(sendCfg.Build()), new PublishPipe(publishCfg.Build()), new EnvelopeMessageSerializer());
 
         await bus.Publish(new TestMessage());
 

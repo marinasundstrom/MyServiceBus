@@ -17,7 +17,7 @@ The ServiceBus Java client mirrors the C# design by providing an asynchronous me
 - `respondFault` packages the original message and exception details into a `Fault<T>` and sends it to the `faultAddress` or `responseAddress`.
 
 ### RabbitMQ Transport
-- `RabbitMqSendEndpointProvider` creates `RabbitMqSendEndpoint` instances that serialize envelopes with host metadata and forward them through cached `RabbitMqSendTransport` objects.
+  - `RabbitMqSendEndpointProvider` uses the configured `MessageSerializer` (default `EnvelopeMessageSerializer`) to encode messages before forwarding them through cached `RabbitMqSendTransport` objects.
 - `RabbitMqTransportFactory` ensures exchanges exist before obtaining transports and reuses a shared connection via `ConnectionProvider`.
 - `RabbitMqSendTransport` sets the `content_type` header to `application/vnd.mybus.envelope+json` when publishing messages.
 
