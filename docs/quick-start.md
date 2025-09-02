@@ -37,7 +37,7 @@ builder.Services.AddServiceBus(x =>
 ```java
 ServiceCollection services = new ServiceCollection();
 
-RabbitMqBus bus = RabbitMqBus.configure(services, x -> {
+RabbitMqBusFactory.configure(services, x -> {
     x.addConsumer(SubmitOrderConsumer.class);
 }, (context, cfg) -> {
     cfg.host("rabbitmq://localhost");
@@ -48,6 +48,9 @@ RabbitMqBus bus = RabbitMqBus.configure(services, x -> {
     cfg.setEndpointNameFormatter(KebabCaseEndpointNameFormatter.INSTANCE);
     cfg.configureEndpoints(context); // auto-configure remaining consumers
 });
+
+ServiceProvider provider = services.build();
+ServiceBus bus = provider.getService(ServiceBus.class);
 
 bus.start();
 ```
@@ -91,7 +94,7 @@ public class MyService
 
 ### Java
 
-`RabbitMqBus.configure` populates a `ServiceCollection` with analogous
+`RabbitMqBusFactory.configure` populates a `ServiceCollection` with analogous
 types:
 
 - `ServiceBus` – **singleton** providing `start`, `publish`, and
@@ -299,7 +302,7 @@ builder.Services.AddServiceBus(x =>
 ```java
 ServiceCollection services = new ServiceCollection();
 
-RabbitMqBus bus = RabbitMqBus.configure(services, x -> {
+RabbitMqBusFactory.configure(services, x -> {
     x.addConsumer(SubmitOrderConsumer.class, SubmitOrder.class, cfg -> {
         cfg.useRetry(3);
         cfg.useFilter(new LoggingFilter<>());
@@ -319,6 +322,9 @@ RabbitMqBus bus = RabbitMqBus.configure(services, x -> {
 }, (context, cfg) -> {
     cfg.host("rabbitmq://localhost");
 });
+
+ServiceProvider provider = services.build();
+ServiceBus bus = provider.getService(ServiceBus.class);
 
 bus.start();
 ```

@@ -7,15 +7,17 @@ import java.util.concurrent.TimeoutException;
 
 import com.myservicebus.MyService;
 import com.myservicebus.MyServiceImpl;
+import com.myservicebus.ServiceBus;
 import com.myservicebus.di.ServiceCollection;
-import com.myservicebus.rabbitmq.RabbitMqBus;
+import com.myservicebus.di.ServiceProvider;
+import com.myservicebus.rabbitmq.RabbitMqBusFactory;
 
 public class Main {
     public static void main(String[] args) {
         ServiceCollection services = new ServiceCollection();
         services.addScoped(MyService.class, MyServiceImpl.class);
 
-        RabbitMqBus serviceBus = RabbitMqBus.configure(services, cfg -> {
+        RabbitMqBusFactory.configure(services, cfg -> {
             cfg.addConsumer(SubmitOrderConsumer.class);
             cfg.addConsumer(OrderSubmittedConsumer.class);
         }, (context, cfg) -> {
@@ -24,6 +26,9 @@ public class Main {
                 h.password("guest");
             });
         });
+
+        ServiceProvider provider = services.build();
+        ServiceBus serviceBus = provider.getService(ServiceBus.class);
 
         try {
             serviceBus.start();
@@ -51,7 +56,7 @@ public class Main {
         ServiceCollection services = new ServiceCollection();
         services.addScoped(MyService.class, MyServiceImpl.class);
 
-        var serviceBus = RabbitMqBus.configure(services, cfg -> {
+        RabbitMqBusFactory.configure(services, cfg -> {
             cfg.addConsumer(SubmitOrderConsumer.class);
         }, (context, cfg) -> {
             cfg.host("localhost", h -> {
@@ -60,17 +65,20 @@ public class Main {
             });
 
             // cfg.message(SubmitOrder.class, m -> {
-            // m.setEntityName("TestApp.SubmitOrder");
+            //     m.setEntityName("TestApp.SubmitOrder");
             // });
 
             // cfg.message(OrderSubmitted.class, m -> {
-            // m.setEntityName("TestApp.OrderSubmitted");
+            //     m.setEntityName("TestApp.OrderSubmitted");
             // });
 
             // cfg.receiveEndpoint("submit-order-consumer", e -> {
-            // e.configureConsumer(context, SubmitOrderConsumer.class);
+            //     e.configureConsumer(context, SubmitOrderConsumer.class);
             // });
         });
+
+        ServiceProvider provider = services.build();
+        ServiceBus serviceBus = provider.getService(ServiceBus.class);
 
         serviceBus.start();
 

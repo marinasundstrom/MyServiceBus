@@ -110,11 +110,14 @@ Register the bus:
 ```java
 ServiceCollection services = new ServiceCollection();
 
-RabbitMqBus bus = RabbitMqBus.configure(services, x -> {
+RabbitMqBusFactory.configure(services, x -> {
     x.addConsumer(SubmitOrderConsumer.class);
 }, (context, cfg) -> {
     cfg.configureEndpoints(context);
 });
+
+ServiceProvider provider = services.build();
+ServiceBus bus = provider.getService(ServiceBus.class);
 
 bus.start();
 ```
