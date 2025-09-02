@@ -5,8 +5,6 @@ import java.lang.reflect.GenericArrayType;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 
-import com.myservicebus.Consumer;
-import com.myservicebus.NamingConventions;
 import com.myservicebus.di.ServiceCollection;
 
 public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigurator {

@@ -4,7 +4,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.JavaType;
-import com.myservicebus.HostInfoProvider;
 import java.time.OffsetDateTime;
 import java.util.*;
 import java.util.UUID;
@@ -14,25 +13,34 @@ import org.junit.jupiter.api.Test;
 public class BatchHandlingTest {
     static class SampleMessage {
         private String value;
-        public SampleMessage() {}
-        public SampleMessage(String value) { this.value = value; }
-        public String getValue() { return value; }
-        public void setValue(String value) { this.value = value; }
+
+        public SampleMessage() {
+        }
+
+        public SampleMessage(String value) {
+            this.value = value;
+        }
+
+        public String getValue() {
+            return value;
+        }
+
+        public void setValue(String value) {
+            this.value = value;
+        }
     }
 
     @Test
     public void envelopeSerializerHandlesBatchMessage() throws Exception {
         Batch<SampleMessage> batch = new Batch<>(
-            new SampleMessage("A"),
-            new SampleMessage("B")
-        );
+                new SampleMessage("A"),
+                new SampleMessage("B"));
 
         Envelope<Batch<SampleMessage>> envelope = new Envelope<>();
         envelope.setMessageId(UUID.randomUUID());
         envelope.setMessageType(List.of(
-            NamingConventions.getMessageUrn(Batch.class),
-            NamingConventions.getMessageUrn(SampleMessage.class)
-        ));
+                NamingConventions.getMessageUrn(Batch.class),
+                NamingConventions.getMessageUrn(SampleMessage.class)));
         envelope.setHeaders(new HashMap<>());
         envelope.setSentTime(OffsetDateTime.now());
         envelope.setHost(HostInfoProvider.capture());

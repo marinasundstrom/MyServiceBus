@@ -8,9 +8,6 @@ import com.myservicebus.GenericRequestClientFactory;
 import com.myservicebus.di.ServiceCollection;
 import com.rabbitmq.client.ConnectionFactory;
 
-import com.myservicebus.rabbitmq.ConnectionProvider;
-import com.myservicebus.rabbitmq.RabbitMqRequestClientTransport;
-
 public class RabbitMqTransport {
 
     // Equivalent to "UsingRabbitMq" in .NET impl
@@ -37,7 +34,8 @@ public class RabbitMqTransport {
             return new RabbitMqSendEndpointProvider(factory);
         });
 
-        services.addSingleton(SendEndpointProvider.class, sp -> () -> sp.getService(RabbitMqSendEndpointProvider.class));
+        services.addSingleton(SendEndpointProvider.class,
+                sp -> () -> sp.getService(RabbitMqSendEndpointProvider.class));
         services.addSingleton(RequestClientTransport.class,
                 sp -> () -> new RabbitMqRequestClientTransport(sp.getService(ConnectionProvider.class)));
         services.addSingleton(RequestClientFactory.class,
