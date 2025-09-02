@@ -33,6 +33,23 @@ public class Main {
 }
 ```
 
+### Connecting to an existing Guice injector
+
+If you already have a Guice `Injector`, call `connectAndBuild` to reuse it:
+
+```java
+import com.google.inject.Guice;
+import com.google.inject.Injector;
+import com.myservicebus.di.ServiceCollection;
+import com.myservicebus.di.ServiceProvider;
+
+Injector existing = Guice.createInjector();
+ServiceCollection services = new ServiceCollection();
+services.addSingleton(MyService.class, MyServiceImpl.class);
+
+ServiceProvider provider = services.connectAndBuild(existing);
+```
+
 Constructor injection using Guice's `@Inject`:
 
 ```java
