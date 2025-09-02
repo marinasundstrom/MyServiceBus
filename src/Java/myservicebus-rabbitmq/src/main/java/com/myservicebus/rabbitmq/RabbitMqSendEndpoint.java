@@ -1,6 +1,5 @@
 package com.myservicebus.rabbitmq;
 
-import java.net.InetAddress;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
@@ -9,7 +8,7 @@ import java.util.concurrent.CompletableFuture;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.myservicebus.Envelope;
-import com.myservicebus.HostInfo;
+import com.myservicebus.HostInfoProvider;
 import com.myservicebus.NamingConventions;
 import com.myservicebus.SendEndpoint;
 import com.myservicebus.SendTransport;
@@ -41,15 +40,7 @@ public class RabbitMqSendEndpoint implements SendEndpoint {
             envelope.setMessage(message);
             envelope.setHeaders(Map.of());
             envelope.setContentType("application/json");
-            envelope.setHost(new HostInfo(
-                    InetAddress.getLocalHost().getHostName(),
-                    "java",
-                    (int) ProcessHandle.current().pid(),
-                    "my-app",
-                    "1.0.0",
-                    System.getProperty("java.version"),
-                    "8.0.10.0",
-                    System.getProperty("os.name") + " " + System.getProperty("os.version")));
+            envelope.setHost(HostInfoProvider.capture());
 
             byte[] body = mapper.writeValueAsBytes(envelope);
             transport.send(body);

@@ -1,6 +1,5 @@
 package com.myservicebus.rabbitmq;
 
-import java.net.InetAddress;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
@@ -11,7 +10,7 @@ import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.myservicebus.Envelope;
 import com.myservicebus.Fault;
-import com.myservicebus.HostInfo;
+import com.myservicebus.HostInfoProvider;
 import com.myservicebus.NamingConventions;
 import com.myservicebus.RequestClientTransport;
 import com.myservicebus.tasks.CancellationToken;
@@ -89,15 +88,7 @@ public class RabbitMqRequestClientTransport implements RequestClientTransport {
             envelope.setMessage(request);
             envelope.setHeaders(Map.of());
             envelope.setContentType("application/json");
-            envelope.setHost(new HostInfo(
-                    InetAddress.getLocalHost().getHostName(),
-                    "java",
-                    (int) ProcessHandle.current().pid(),
-                    "my-app",
-                    "1.0.0",
-                    System.getProperty("java.version"),
-                    "8.0.10.0",
-                    System.getProperty("os.name") + " " + System.getProperty("os.version")));
+            envelope.setHost(HostInfoProvider.capture());
 
             byte[] body = mapper.writeValueAsBytes(envelope);
             AMQP.BasicProperties props = new AMQP.BasicProperties.Builder()

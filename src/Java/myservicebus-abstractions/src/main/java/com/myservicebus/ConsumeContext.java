@@ -9,6 +9,7 @@ import java.util.concurrent.CompletableFuture;
 import com.myservicebus.tasks.CancellationToken;
 import com.myservicebus.NamingConventions;
 import com.myservicebus.SendEndpoint;
+import com.myservicebus.HostInfoProvider;
 
 /**
  * Context passed to consumers when a message is received.
@@ -87,7 +88,7 @@ public class ConsumeContext<T>
         fault.setMessage(message);
         fault.setFaultId(UUID.randomUUID());
         fault.setSentTime(OffsetDateTime.now());
-        fault.setHost(getHostInfo());
+        fault.setHost(HostInfoProvider.capture());
         fault.setExceptions(Collections.singletonList(ExceptionInfo.fromException(exception)));
 
         Object id = headers.get("messageId");
@@ -102,22 +103,6 @@ public class ConsumeContext<T>
 
         SendEndpoint endpoint = getSendEndpoint(address);
         return endpoint.send(fault, cancellationToken);
-    }
-
-    private static HostInfo getHostInfo() {
-        String machine;
-        try {
-            machine = java.net.InetAddress.getLocalHost().getHostName();
-        } catch (Exception ex) {
-            machine = "unknown";
-        }
-
-        String processName = java.lang.management.ManagementFactory.getRuntimeMXBean().getName();
-        int pid = (int) ProcessHandle.current().pid();
-        String framework = System.getProperty("java.version");
-        String os = System.getProperty("os.name") + " " + System.getProperty("os.version");
-
-        return new HostInfo(machine, processName, pid, "unknown", "unknown", framework, "your-custom-version", os);
     }
 
     @Override

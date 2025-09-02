@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.JavaType;
+import com.myservicebus.HostInfoProvider;
 import java.time.OffsetDateTime;
 import java.util.*;
 import java.util.UUID;
@@ -34,16 +35,7 @@ public class BatchHandlingTest {
         ));
         envelope.setHeaders(new HashMap<>());
         envelope.setSentTime(OffsetDateTime.now());
-        envelope.setHost(new HostInfo(
-            "machine",
-            "process",
-            1,
-            "assembly",
-            "1.0.0",
-            System.getProperty("java.version"),
-            "test",
-            System.getProperty("os.name")
-        ));
+        envelope.setHost(HostInfoProvider.capture());
         envelope.setMessage(batch);
 
         ObjectMapper mapper = new ObjectMapper();

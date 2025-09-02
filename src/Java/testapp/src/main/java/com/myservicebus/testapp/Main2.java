@@ -1,7 +1,5 @@
 package com.myservicebus.testapp;
 
-import java.net.InetAddress;
-import java.net.UnknownHostException;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
@@ -15,10 +13,11 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.myservicebus.Envelope;
 import com.myservicebus.Fault;
 import com.myservicebus.HostInfo;
+import com.myservicebus.HostInfoProvider;
 
 public class Main2 {
 
-    private static void test() throws JsonProcessingException, UnknownHostException {
+    private static void test() throws JsonProcessingException {
         ObjectMapper mapper = new ObjectMapper();
         mapper.findAndRegisterModules(); // For Java time serialization
         mapper.enable(SerializationFeature.INDENT_OUTPUT); // Pretty print
@@ -31,7 +30,7 @@ public class Main2 {
     }
 
     private static void testMessageDeserializationWithFaultWrapper(ObjectMapper mapper)
-            throws JsonProcessingException, UnknownHostException {
+            throws JsonProcessingException {
         // 📨 Step 1: Build original message
         SubmitOrder message = new SubmitOrder(UUID.randomUUID(), "");
 
@@ -54,26 +53,7 @@ public class Main2 {
         envelope.setSourceAddress("rabbitmq://localhost/source");
         envelope.setDestinationAddress("rabbitmq://localhost/destination");
 
-        String machineName = InetAddress.getLocalHost().getHostName();
-        String processName = "java";
-        long processId = ProcessHandle.current().pid(); // Java 9+
-        String serviceName = "my-app";
-        String serviceVersion = "1.0.0";
-        String frameworkVersion = System.getProperty("java.version");
-        String platform = "8.0.10.0"; // define or detect if needed
-        String operatingSystemVersion = System.getProperty("os.name") + " " + System.getProperty("os.version");
-
-        HostInfo host = new HostInfo(
-                machineName,
-                processName,
-                (int) processId,
-                serviceName,
-                serviceVersion,
-                frameworkVersion,
-                platform,
-                operatingSystemVersion);
-
-        envelope.setHost(host);
+        envelope.setHost(HostInfoProvider.capture());
 
         // 📝 Step 4: Serialize
         String json = mapper.writeValueAsString(envelope);
@@ -106,17 +86,8 @@ public class Main2 {
         envelope.setHeaders(Map.of("Application-Header", "SomeValue"));
         envelope.setContentType("application/json");
 
-        // Host info (mocked)
-        HostInfo host = new HostInfo(
-                "MyMachine",
-                "java",
-                12345,
-                "my-service",
-                "1.0.0",
-                System.getProperty("java.version"),
-                "8.0.10.0",
-                System.getProperty("os.name") + " " + System.getProperty("os.version"));
-        envelope.setHost(host);
+        // Host info
+        envelope.setHost(HostInfoProvider.capture());
 
         // Serialize to JSON
         String json = mapper.writeValueAsString(envelope);
