@@ -12,6 +12,8 @@ import com.myservicebus.Envelope;
 import com.myservicebus.Fault;
 import com.myservicebus.HostInfoProvider;
 import com.myservicebus.NamingConventions;
+import com.myservicebus.RequestFaultException;
+import com.myservicebus.Response;
 import com.myservicebus.RequestClientTransport;
 import com.myservicebus.tasks.CancellationToken;
 import com.rabbitmq.client.AMQP;
@@ -56,12 +58,86 @@ public class RabbitMqRequestClientTransport implements RequestClientTransport {
                         JavaType faultInner = mapper.getTypeFactory().constructParametricType(Fault.class, requestType);
                         JavaType faultType = mapper.getTypeFactory().constructParametricType(Envelope.class, faultInner);
                         Envelope<Fault<TRequest>> fault = mapper.readValue(delivery.getBody(), faultType);
-                        String msg = fault.getMessage().getExceptions().isEmpty() ? "Request faulted"
-                                : fault.getMessage().getExceptions().get(0).getMessage();
-                        future.completeExceptionally(new RuntimeException(msg));
+                          String msg = fault.getMessage().getExceptions().isEmpty() ? "Request faulted"
+                                  : fault.getMessage().getExceptions().get(0).getMessage();
+                          future.completeExceptionally(new RequestFaultException(msg));
                     } catch (Exception inner) {
                         future.completeExceptionally(inner);
                     }
+                } finally {
+                    try {
+                        channel.basicCancel(tag);
+                        channel.queueDelete(responseQueue);
+                        channel.close();
+                    } catch (Exception ignore) {
+                    }
+                }
+            };
+
+            channel.basicConsume(responseQueue, true, callback, consumerTag -> {
+            });
+
+            String exchange = NamingConventions.getExchangeName(requestType);
+            channel.exchangeDeclare(exchange, BuiltinExchangeType.FANOUT, true);
+
+            Envelope<TRequest> envelope = new Envelope<>();
+            envelope.setMessageId(UUID.randomUUID());
+            envelope.setConversationId(UUID.randomUUID());
+            envelope.setSentTime(OffsetDateTime.now());
+            envelope.setDestinationAddress("rabbitmq://localhost/exchange/" + exchange);
+            envelope.setResponseAddress("rabbitmq://localhost/exchange/" + responseExchange);
+            envelope.setMessageType(List.of(NamingConventions.getMessageUrn(requestType)));
+            envelope.setMessage(request);
+            envelope.setHeaders(Map.of());
+            envelope.setContentType("application/json");
+            envelope.setHost(HostInfoProvider.capture());
+
+            byte[] body = mapper.writeValueAsBytes(envelope);
+            AMQP.BasicProperties props = new AMQP.BasicProperties.Builder()
+                    .contentType("application/vnd.mybus.envelope+json")
+                    .build();
+            channel.basicPublish(exchange, "", props, body);
+        } catch (Exception ex) {
+            future.completeExceptionally(ex);
+        }
+        return future;
+    }
+
+    @Override
+    public <TRequest, T1, T2> CompletableFuture<Response.Two<T1, T2>> sendRequest(Class<TRequest> requestType, TRequest request,
+            Class<T1> responseType1, Class<T2> responseType2, CancellationToken cancellationToken) {
+        CompletableFuture<Response.Two<T1, T2>> future = new CompletableFuture<>();
+        try {
+            Connection connection = connectionProvider.getOrCreateConnection();
+            Channel channel = connection.createChannel();
+
+            String responseExchange = "resp-" + UUID.randomUUID();
+            String responseQueue = channel.queueDeclare().getQueue();
+            channel.exchangeDeclare(responseExchange, BuiltinExchangeType.FANOUT, true);
+            channel.queueBind(responseQueue, responseExchange, "");
+
+            DeliverCallback callback = (tag, delivery) -> {
+                try {
+                    try {
+                        JavaType type1 = mapper.getTypeFactory().constructParametricType(Envelope.class, responseType1);
+                          Envelope<T1> env1 = mapper.readValue(delivery.getBody(), type1);
+                          future.complete(Response.Two.fromT1(env1.getMessage()));
+                      } catch (Exception ex1) {
+                          JavaType type2 = mapper.getTypeFactory().constructParametricType(Envelope.class, responseType2);
+                          Envelope<T2> env2 = mapper.readValue(delivery.getBody(), type2);
+                          future.complete(Response.Two.fromT2(env2.getMessage()));
+                      }
+                  } catch (Exception ex) {
+                      try {
+                          JavaType faultInner = mapper.getTypeFactory().constructParametricType(Fault.class, requestType);
+                          JavaType faultType = mapper.getTypeFactory().constructParametricType(Envelope.class, faultInner);
+                          Envelope<Fault<TRequest>> fault = mapper.readValue(delivery.getBody(), faultType);
+                          String msg = fault.getMessage().getExceptions().isEmpty() ? "Request faulted"
+                                  : fault.getMessage().getExceptions().get(0).getMessage();
+                          future.completeExceptionally(new RequestFaultException(msg));
+                      } catch (Exception inner) {
+                          future.completeExceptionally(inner);
+                      }
                 } finally {
                     try {
                         channel.basicCancel(tag);

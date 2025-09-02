@@ -1,0 +1,118 @@
+using System;
+using System.Threading.Tasks;
+using MyServiceBus;
+using MyServiceBus.Serialization;
+using MyServiceBus.Topology;
+using Xunit;
+
+public class GenericRequestClientTests
+{
+    class OrderRequest
+    {
+        public bool Accept { get; set; }
+    }
+
+    class OrderAccepted
+    {
+        public string Message { get; set; } = string.Empty;
+    }
+
+    class OrderRejected
+    {
+        public string Reason { get; set; } = string.Empty;
+    }
+
+    [Fact]
+    [Throws(typeof(Exception))]
+    public async Task Returns_expected_response_for_multiple_types()
+    {
+        var transportFactory = new MediatorTransportFactory();
+        var serializer = new EnvelopeMessageSerializer();
+
+        var topology = new ReceiveEndpointTopology
+        {
+            QueueName = "order-request",
+            ExchangeName = NamingConventions.GetExchangeName(typeof(OrderRequest))!,
+            RoutingKey = "",
+            ExchangeType = "fanout",
+            Durable = true,
+            AutoDelete = false
+        };
+
+        var receive = await transportFactory.CreateReceiveTransport(topology, [Throws(typeof(InvalidOperationException))] async (ctx) =>
+        {
+            if (ctx.TryGetMessage<OrderRequest>(out var request))
+            {
+                object response = request.Accept
+                    ? new OrderAccepted { Message = "ok" }
+                    : new OrderRejected { Reason = "no" };
+
+                var send = await transportFactory.GetSendTransport(ctx.ResponseAddress!);
+                var types = MessageTypeCache.GetMessageTypes(response.GetType());
+                var sendContext = new SendContext(types, serializer)
+                {
+                    MessageId = Guid.NewGuid().ToString()
+                };
+                await send.Send(response, sendContext);
+            }
+        });
+
+        await receive.Start();
+
+        var client = new GenericRequestClient<OrderRequest>(transportFactory, serializer);
+
+        var response = await client.GetResponseAsync<OrderAccepted, OrderRejected>(new OrderRequest { Accept = true });
+        Assert.True(response.Is(out Response<OrderAccepted> accepted));
+        Assert.False(response.Is(out Response<OrderRejected> rejected));
+
+        response = await client.GetResponseAsync<OrderAccepted, OrderRejected>(new OrderRequest { Accept = false });
+        Assert.False(response.Is(out accepted));
+        Assert.True(response.Is(out rejected));
+
+        await receive.Stop();
+    }
+
+    [Fact]
+    [Throws(typeof(RequestFaultException))]
+    public async Task Throws_when_fault_received()
+    {
+        var transportFactory = new MediatorTransportFactory();
+        var serializer = new EnvelopeMessageSerializer();
+
+        var topology = new ReceiveEndpointTopology
+        {
+            QueueName = "order-fault",
+            ExchangeName = NamingConventions.GetExchangeName(typeof(OrderRequest))!,
+            RoutingKey = "",
+            ExchangeType = "fanout",
+            Durable = true,
+            AutoDelete = false
+        };
+
+        var receive = await transportFactory.CreateReceiveTransport(topology, [Throws(typeof(InvalidOperationException))] async (ctx) =>
+        {
+            if (ctx.TryGetMessage<OrderRequest>(out var request))
+            {
+                var send = await transportFactory.GetSendTransport(ctx.ResponseAddress!);
+                var fault = new Fault<OrderRequest>
+                {
+                    Message = request,
+                    Exceptions = [new ExceptionInfo { Message = "bad" }]
+                };
+                var types = MessageTypeCache.GetMessageTypes(fault.GetType());
+                var sendContext = new SendContext(types, serializer)
+                {
+                    MessageId = Guid.NewGuid().ToString()
+                };
+                await send.Send(fault, sendContext);
+            }
+        });
+
+        await receive.Start();
+
+        var client = new GenericRequestClient<OrderRequest>(transportFactory, serializer);
+        await Assert.ThrowsAsync<RequestFaultException>([Throws(typeof(UriFormatException))] () => client.GetResponseAsync<OrderAccepted, OrderRejected>(new OrderRequest { Accept = true }));
+
+        await receive.Stop();
+    }
+}
