@@ -111,6 +111,65 @@ class SubmitOrderConsumer implements Consumer<SubmitOrder> {
 }
 ```
 
+## Request/Response
+
+### C#
+
+```csharp
+class CheckOrderStatusConsumer : IConsumer<CheckOrderStatus>
+{
+    public async Task Consume(ConsumeContext<CheckOrderStatus> context)
+    {
+        await context.RespondAsync(new OrderStatus(context.Message.OrderId, "Pending"));
+    }
+}
+
+var client = serviceProvider.GetRequiredService<IRequestClient<CheckOrderStatus>>();
+Response<OrderStatus> response = await client.GetResponseAsync<OrderStatus>(new CheckOrderStatus { OrderId = Guid.NewGuid() });
+Console.WriteLine(response.Message.Status);
+```
+
+### Java
+
+```java
+class CheckOrderStatusConsumer implements Consumer<CheckOrderStatus> {
+    @Override
+    public CompletableFuture<Void> consume(ConsumeContext<CheckOrderStatus> context) {
+        return context.respond(new OrderStatus(context.getMessage().getOrderId(), "Pending"), CancellationToken.none);
+    }
+}
+
+RequestClientFactory factory = serviceProvider.getService(RequestClientFactory.class);
+RequestClient<CheckOrderStatus> client = factory.create(CheckOrderStatus.class);
+OrderStatus response = client.getResponse(new CheckOrderStatus(UUID.randomUUID()), OrderStatus.class, CancellationToken.none).join();
+System.out.println(response.getStatus());
+```
+
+## Mediator (In-Memory Transport)
+
+### C#
+
+```csharp
+builder.Services.AddServiceBus(x =>
+{
+    x.AddConsumer<SubmitOrderConsumer>();
+    x.UsingMediator();
+});
+```
+
+### Java
+
+```java
+ServiceCollection services = new ServiceCollection();
+MediatorBus bus = MediatorBus.configure(services, cfg -> {
+    cfg.addConsumer(SubmitOrderConsumer.class);
+});
+
+bus.publish(new SubmitOrder(UUID.randomUUID()));
+```
+
+The mediator dispatches messages in-memory, making it useful for lightweight scenarios and testing without a broker.
+
 ## Filters
 
 Filters let you insert cross-cutting behavior into the consume pipeline.
@@ -197,65 +256,6 @@ RabbitMqBus bus = RabbitMqBus.configure(services, x -> {
 
 bus.start();
 ```
-
-## Request/Response
-
-### C#
-
-```csharp
-class CheckOrderStatusConsumer : IConsumer<CheckOrderStatus>
-{
-    public async Task Consume(ConsumeContext<CheckOrderStatus> context)
-    {
-        await context.RespondAsync(new OrderStatus(context.Message.OrderId, "Pending"));
-    }
-}
-
-var client = serviceProvider.GetRequiredService<IRequestClient<CheckOrderStatus>>();
-Response<OrderStatus> response = await client.GetResponseAsync<OrderStatus>(new CheckOrderStatus { OrderId = Guid.NewGuid() });
-Console.WriteLine(response.Message.Status);
-```
-
-### Java
-
-```java
-class CheckOrderStatusConsumer implements Consumer<CheckOrderStatus> {
-    @Override
-    public CompletableFuture<Void> consume(ConsumeContext<CheckOrderStatus> context) {
-        return context.respond(new OrderStatus(context.getMessage().getOrderId(), "Pending"), CancellationToken.none);
-    }
-}
-
-RequestClientFactory factory = serviceProvider.getService(RequestClientFactory.class);
-RequestClient<CheckOrderStatus> client = factory.create(CheckOrderStatus.class);
-OrderStatus response = client.getResponse(new CheckOrderStatus(UUID.randomUUID()), OrderStatus.class, CancellationToken.none).join();
-System.out.println(response.getStatus());
-```
-
-## Mediator (In-Memory Transport)
-
-### C#
-
-```csharp
-builder.Services.AddServiceBus(x =>
-{
-    x.AddConsumer<SubmitOrderConsumer>();
-    x.UsingMediator();
-});
-```
-
-### Java
-
-```java
-ServiceCollection services = new ServiceCollection();
-MediatorBus bus = MediatorBus.configure(services, cfg -> {
-    cfg.addConsumer(SubmitOrderConsumer.class);
-});
-
-bus.publish(new SubmitOrder(UUID.randomUUID()));
-```
-
-The mediator dispatches messages in-memory, making it useful for lightweight scenarios and testing without a broker.
 
 ## Unit Testing with the In-Memory Test Harness
 
