@@ -1,6 +1,7 @@
 package com.myservicebus.rabbitmq;
 
 import com.myservicebus.BusRegistrationConfigurator;
+import com.myservicebus.BusRegistrationContext;
 import com.myservicebus.SendEndpointProvider;
 import com.myservicebus.di.ServiceCollection;
 import com.rabbitmq.client.ConnectionFactory;

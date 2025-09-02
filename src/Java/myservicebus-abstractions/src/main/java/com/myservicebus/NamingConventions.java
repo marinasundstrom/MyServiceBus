@@ -1,13 +1,24 @@
 package com.myservicebus;
 
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
 public class NamingConventions {
+    private static final Map<Class<?>, String> exchangeNameOverrides = new ConcurrentHashMap<>();
 
     public static String getMessageUrn(Class<?> messageType) {
         return String.format("urn:message:%s", getMessageName(messageType));
     }
 
     public static String getExchangeName(Class<?> messageType) {
-        return getMessageName(messageType);
+        String override = exchangeNameOverrides.get(messageType);
+        return override != null ? override : getMessageName(messageType);
+    }
+
+    public static void setExchangeName(Class<?> messageType, String name) {
+        if (messageType != null && name != null) {
+            exchangeNameOverrides.put(messageType, name);
+        }
     }
 
     public static String getMessageName(Class<?> messageType) {

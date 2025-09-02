@@ -2,6 +2,10 @@ package com.myservicebus.rabbitmq;
 
 import java.util.function.Consumer;
 
+import com.myservicebus.BusRegistrationContext;
+import com.myservicebus.MessageConfigurator;
+import com.myservicebus.ReceiveEndpointConfigurator;
+
 public class RabbitMqFactoryConfigurator {
     private String clientHost = "localhost";
     private String username = "guest";

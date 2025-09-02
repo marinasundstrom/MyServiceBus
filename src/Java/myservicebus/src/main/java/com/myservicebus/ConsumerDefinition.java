@@ -5,14 +5,19 @@ import com.myservicebus.NamingConventions;
 public class ConsumerDefinition<TConsumer, TMessage> {
     private final Class<TConsumer> consumerType;
     private final Class<TMessage> messageType;
-    private final String queueName;
-    private final String exchangeName;
+    private String queueName;
+    private String exchangeName;
 
     public ConsumerDefinition(Class<TConsumer> consumerType, Class<TMessage> messageType) {
+        this(consumerType, messageType, null, null);
+    }
+
+    public ConsumerDefinition(Class<TConsumer> consumerType, Class<TMessage> messageType, String queueName,
+            String exchangeName) {
         this.consumerType = consumerType;
         this.messageType = messageType;
-        this.queueName = NamingConventions.getQueueName(messageType);
-        this.exchangeName = NamingConventions.getExchangeName(messageType);
+        this.queueName = queueName != null ? queueName : NamingConventions.getQueueName(messageType);
+        this.exchangeName = exchangeName != null ? exchangeName : NamingConventions.getExchangeName(messageType);
     }
 
     public Class getMessageType() {
@@ -29,5 +34,17 @@ public class ConsumerDefinition<TConsumer, TMessage> {
 
     public Class getConsumerType() {
         return consumerType;
+    }
+
+    void setQueueName(String queueName) {
+        if (queueName != null) {
+            this.queueName = queueName;
+        }
+    }
+
+    void setExchangeName(String exchangeName) {
+        if (exchangeName != null) {
+            this.exchangeName = exchangeName;
+        }
     }
 }
