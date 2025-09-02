@@ -41,11 +41,24 @@ public class MediatorSendEndpoint implements SendEndpoint {
                             null,
                             cancellationToken,
                             provider);
+                    CompletableFuture<Void> task;
                     try {
-                        tasks.add((CompletableFuture<Void>) consumer.consume(ctx));
+                        task = (CompletableFuture<Void>) consumer.consume(ctx);
                     } catch (Exception ex) {
-                        tasks.add(CompletableFuture.failedFuture(ex));
+                        task = ctx.respondFault(ex, cancellationToken)
+                                .thenCompose(v -> CompletableFuture.failedFuture(new RuntimeException(
+                                        "Consumer " + def.getConsumerType().getSimpleName() + " failed", ex)));
                     }
+
+                    task = task.exceptionallyCompose(ex -> {
+                        Exception exception = ex instanceof Exception ? (Exception) ex
+                                : new RuntimeException(ex);
+                        return ctx.respondFault(exception, cancellationToken)
+                                .thenCompose(v -> CompletableFuture.failedFuture(new RuntimeException(
+                                        "Consumer " + def.getConsumerType().getSimpleName() + " failed", exception)));
+                    });
+
+                    tasks.add(task);
                 }
             }
         }
