@@ -22,11 +22,10 @@ public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigura
 
         // Loop through all implemented interfaces
         for (Type iface : consumerClass.getGenericInterfaces()) {
-            if (iface instanceof ParameterizedType) {
-                ParameterizedType pt = (ParameterizedType) iface;
-                if (pt.getRawType() == Consumer.class) {
+            if (iface instanceof ParameterizedType pt) {
+                Type raw = pt.getRawType();
+                if (raw instanceof Class<?> rawClass && Consumer.class.isAssignableFrom(rawClass)) {
                     Type actualType = pt.getActualTypeArguments()[0];
-                    System.out.println("Generic type: " + actualType);
                     Class<?> messageType = getClassFromType(actualType);
                     topology.registerConsumer(consumerClass,
                             NamingConventions.getQueueName(messageType),

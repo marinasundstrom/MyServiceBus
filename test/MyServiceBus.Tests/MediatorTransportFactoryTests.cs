@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using MyServiceBus;
 using MyServiceBus.Serialization;
 using MyServiceBus.Topology;
 using Xunit;
@@ -19,6 +20,16 @@ public class MediatorTransportFactoryTests
         public string Value { get; set; } = string.Empty;
     }
 
+    class RequestMessage
+    {
+        public string Value { get; set; } = string.Empty;
+    }
+
+    class ResponseMessage
+    {
+        public string Value { get; set; } = string.Empty;
+    }
+
     class SampleConsumer : IConsumer<ConsumerMessage>
     {
         public static TaskCompletionSource<ConsumerMessage> Received = new();
@@ -29,6 +40,53 @@ public class MediatorTransportFactoryTests
             Received.TrySetResult(context.Message);
             return Task.CompletedTask;
         }
+    }
+
+    class SampleHandler : Handler<ConsumerMessage>
+    {
+        public static TaskCompletionSource<ConsumerMessage> Received = new();
+
+        public override Task Handle(ConsumerMessage message, CancellationToken cancellationToken)
+        {
+            Received.TrySetResult(message);
+            return Task.CompletedTask;
+        }
+    }
+
+    class ResponseHandler : Handler<RequestMessage, ResponseMessage>
+    {
+        public static TaskCompletionSource<CancellationToken> ReceivedToken = new();
+
+        public override Task<ResponseMessage> Handle(RequestMessage message, CancellationToken cancellationToken)
+        {
+            ReceivedToken.TrySetResult(cancellationToken);
+            return Task.FromResult(new ResponseMessage { Value = message.Value + "-response" });
+        }
+    }
+
+    class TestConsumeContext<T> : ConsumeContext<T> where T : class
+    {
+        public T Message { get; }
+        public CancellationToken CancellationToken { get; }
+        public TaskCompletionSource<object?> Response { get; } = new();
+
+        public TestConsumeContext(T message, CancellationToken cancellationToken)
+        {
+            Message = message;
+            CancellationToken = cancellationToken;
+        }
+
+        public Task RespondAsync<TResponse>(TResponse message, CancellationToken cancellationToken = default)
+        {
+            Response.TrySetResult(message);
+            return Task.CompletedTask;
+        }
+
+        public Task PublishAsync<TMessage>(object message, CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+        public Task PublishAsync<TMessage>(TMessage message, CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+        public ISendEndpoint GetSendEndpoint(Uri uri) => throw new NotImplementedException();
     }
 
     [Fact]
@@ -96,5 +154,51 @@ public class MediatorTransportFactoryTests
         Assert.Equal("hello", message.Value);
 
         await hosted.StopAsync(CancellationToken.None);
+    }
+
+    [Fact]
+    [Throws(typeof(EqualException), typeof(Exception))]
+    public async Task Publish_delivers_message_to_registered_handler()
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddServiceBus(cfg =>
+        {
+            cfg.UsingMediator();
+            cfg.AddConsumer<SampleHandler>();
+        });
+
+        using var provider = services.BuildServiceProvider();
+
+        var hosted = provider.GetRequiredService<IHostedService>();
+        await hosted.StartAsync(CancellationToken.None);
+
+        SampleHandler.Received = new TaskCompletionSource<ConsumerMessage>();
+
+        var bus = provider.GetRequiredService<IMessageBus>();
+        await bus.Publish(new ConsumerMessage { Value = "handler" });
+
+        var message = await SampleHandler.Received.Task;
+        Assert.Equal("handler", message.Value);
+
+        await hosted.StopAsync(CancellationToken.None);
+    }
+
+    [Fact]
+    [Throws(typeof(EqualException), typeof(Exception))]
+    public async Task Handler_with_result_responds()
+    {
+        ResponseHandler.ReceivedToken = new TaskCompletionSource<CancellationToken>();
+
+        using var cts = new CancellationTokenSource();
+        var context = new TestConsumeContext<RequestMessage>(new RequestMessage { Value = "hi" }, cts.Token);
+
+        await ((IConsumer<RequestMessage>)new ResponseHandler()).Consume(context);
+
+        var response = Assert.IsType<ResponseMessage>(await context.Response.Task);
+        Assert.Equal("hi-response", response.Value);
+
+        var token = await ResponseHandler.ReceivedToken.Task;
+        Assert.Equal(cts.Token, token);
     }
 }
