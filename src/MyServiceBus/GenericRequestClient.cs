@@ -20,6 +20,7 @@ public sealed class GenericRequestClient<TRequest> : IRequestClient<TRequest>, I
 
     }
 
+    [Throws(typeof(UriFormatException), typeof(InvalidOperationException), typeof(ArgumentOutOfRangeException))]
     public async Task<Response<T>> GetResponseAsync<T>(TRequest request, CancellationToken cancellationToken = default, RequestTimeout timeout = default) where T : class
     {
         var taskCompletionSource = new TaskCompletionSource<Response<T>>();
@@ -36,7 +37,7 @@ public sealed class GenericRequestClient<TRequest> : IRequestClient<TRequest>, I
 
         IReceiveTransport? responseReceiveTransport = null;
 
-        var responseHandler = async (ReceiveContext context) =>
+        var responseHandler = [Throws(typeof(ObjectDisposedException))] async (ReceiveContext context) =>
         {
             try
             {
@@ -65,13 +66,12 @@ public sealed class GenericRequestClient<TRequest> : IRequestClient<TRequest>, I
 
         var exchangeName = NamingConventions.GetExchangeName(request.GetType());
 
-        var uri = new Uri($"rabbitmq://localhost/{exchangeName}");
+        var uri = new Uri($"rabbitmq://localhost/exchange/{exchangeName}");
         var requestSendTransport = await _transportFactory.GetSendTransport(uri, cancellationToken);
 
         var sendContext = new SendContext(MessageTypeCache.GetMessageTypes(typeof(TRequest)), _serializer, cancellationToken)
         {
-            //RoutingKey = exchangeName,
-            ResponseAddress = new Uri($"queue:{NamingConventions.GetQueueName(typeof(T))}"),
+            ResponseAddress = new Uri($"rabbitmq://localhost/exchange/{NamingConventions.GetExchangeName(typeof(T))}"),
             MessageId = Guid.NewGuid().ToString()
         };
 
