@@ -1,6 +1,9 @@
 package com.myservicebus;
 
+import java.time.OffsetDateTime;
+import java.util.Collections;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 import com.myservicebus.tasks.CancellationToken;
@@ -72,6 +75,49 @@ public class ConsumeContext<T>
         }
         SendEndpoint endpoint = getSendEndpoint(responseAddress);
         return endpoint.send(message, cancellationToken);
+    }
+
+    public CompletableFuture<Void> respondFault(Exception exception, CancellationToken cancellationToken) {
+        String address = faultAddress != null ? faultAddress : responseAddress;
+        if (address == null) {
+            return CompletableFuture.completedFuture(null);
+        }
+
+        Fault<T> fault = new Fault<>();
+        fault.setMessage(message);
+        fault.setFaultId(UUID.randomUUID());
+        fault.setSentTime(OffsetDateTime.now());
+        fault.setHost(getHostInfo());
+        fault.setExceptions(Collections.singletonList(ExceptionInfo.fromException(exception)));
+
+        Object id = headers.get("messageId");
+        if (id instanceof UUID uuid) {
+            fault.setMessageId(uuid);
+        } else if (id instanceof String s) {
+            try {
+                fault.setMessageId(UUID.fromString(s));
+            } catch (IllegalArgumentException ignored) {
+            }
+        }
+
+        SendEndpoint endpoint = getSendEndpoint(address);
+        return endpoint.send(fault, cancellationToken);
+    }
+
+    private static HostInfo getHostInfo() {
+        String machine;
+        try {
+            machine = java.net.InetAddress.getLocalHost().getHostName();
+        } catch (Exception ex) {
+            machine = "unknown";
+        }
+
+        String processName = java.lang.management.ManagementFactory.getRuntimeMXBean().getName();
+        int pid = (int) ProcessHandle.current().pid();
+        String framework = System.getProperty("java.version");
+        String os = System.getProperty("os.name") + " " + System.getProperty("os.version");
+
+        return new HostInfo(machine, processName, pid, "unknown", "unknown", framework, "your-custom-version", os);
     }
 
     @Override
