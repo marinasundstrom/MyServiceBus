@@ -1,12 +1,16 @@
 package com.myservicebus.rabbitmq;
 
 import com.myservicebus.ConsumerRegistry;
+import com.myservicebus.ConsumerDefinition;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.function.Consumer;
 
 public class RabbitMqFactoryConfigurator {
     private String clientHost = "localhost";
     private String username = "guest";
     private String password = "guest";
+    private final Map<Class<?>, String> exchangeNames = new HashMap<>();
 
     public void host(String host) {
         this.clientHost = host;
@@ -27,11 +31,17 @@ public class RabbitMqFactoryConfigurator {
             configure.accept((context, consumerClass) -> {
                 try {
                     ConsumerRegistry registry = context.getServiceProvider().getService(ConsumerRegistry.class);
-                    boolean found = registry.getAll().stream()
-                            .anyMatch(def -> def.getConsumerType().equals(consumerClass));
-                    if (!found) {
-                        throw new IllegalStateException(
-                                "Consumer " + consumerClass.getSimpleName() + " not registered");
+                    ConsumerDefinition<?, ?> def = registry.getAll().stream()
+                            .filter(d -> d.getConsumerType().equals(consumerClass))
+                            .findFirst()
+                            .orElseThrow(() -> new IllegalStateException(
+                                    "Consumer " + consumerClass.getSimpleName() + " not registered"));
+
+                    def.setQueueName(queueName);
+
+                    String exchange = exchangeNames.get(def.getMessageType());
+                    if (exchange != null) {
+                        def.setExchangeName(exchange);
                     }
                 } catch (Exception ex) {
                     throw new RuntimeException(
@@ -43,7 +53,7 @@ public class RabbitMqFactoryConfigurator {
 
     public <T> void message(Class<T> messageType, Consumer<MessageConfigurator<T>> configure) {
         if (configure != null) {
-            configure.accept(new MessageConfigurator<>(messageType));
+            configure.accept(new MessageConfigurator<>(messageType, exchangeNames));
         }
     }
 
