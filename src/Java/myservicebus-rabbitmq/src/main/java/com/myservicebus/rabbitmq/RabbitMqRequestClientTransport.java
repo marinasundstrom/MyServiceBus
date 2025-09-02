@@ -13,7 +13,7 @@ import com.myservicebus.Envelope;
 import com.myservicebus.Fault;
 import com.myservicebus.HostInfo;
 import com.myservicebus.NamingConventions;
-import com.myservicebus.RequestClient;
+import com.myservicebus.RequestClientTransport;
 import com.myservicebus.tasks.CancellationToken;
 import com.rabbitmq.client.AMQP;
 import com.rabbitmq.client.BuiltinExchangeType;
@@ -22,20 +22,20 @@ import com.rabbitmq.client.Connection;
 import com.rabbitmq.client.DeliverCallback;
 
 /**
- * RabbitMQ-specific implementation of {@link RequestClient}.
+ * RabbitMQ transport implementation for request/response.
  */
-public class RabbitMqRequestClient<TRequest> implements RequestClient<TRequest> {
+public class RabbitMqRequestClientTransport implements RequestClientTransport {
     private final ConnectionProvider connectionProvider;
     private final ObjectMapper mapper;
 
-    public RabbitMqRequestClient(ConnectionProvider connectionProvider) {
+    public RabbitMqRequestClientTransport(ConnectionProvider connectionProvider) {
         this.connectionProvider = connectionProvider;
         this.mapper = new ObjectMapper();
         this.mapper.findAndRegisterModules();
     }
 
     @Override
-    public <TResponse> CompletableFuture<TResponse> getResponse(TRequest request, Class<TResponse> responseType,
+    public <TRequest, TResponse> CompletableFuture<TResponse> sendRequest(TRequest request, Class<TResponse> responseType,
             CancellationToken cancellationToken) {
         CompletableFuture<TResponse> future = new CompletableFuture<>();
         try {
