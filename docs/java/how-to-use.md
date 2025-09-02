@@ -13,34 +13,31 @@ import java.util.UUID;
 
 import com.myservicebus.MyService;
 import com.myservicebus.MyServiceImpl;
-import com.myservicebus.ServiceBus;
 import com.myservicebus.di.ServiceCollection;
-import com.myservicebus.rabbitmq.RabbitMqBusRegistrationConfiguratorExtensions;
+import com.myservicebus.rabbitmq.RabbitMqBus;
 
 public class Main {
     public static void main(String[] args) throws Exception {
         ServiceCollection services = new ServiceCollection();
         services.addScoped(MyService.class, MyServiceImpl.class);
 
-        var serviceBus = ServiceBus.configure(services, x -> {
+        var bus = RabbitMqBus.configure(services, x -> {
             x.addConsumer(SubmitOrderConsumer.class);
+        }, (context, cfg) -> {
+            cfg.host("rabbitmq://localhost");
 
-            RabbitMqBusRegistrationConfiguratorExtensions.usingRabbitMq(x, (context, cfg) -> {
-                cfg.host("rabbitmq://localhost");
-
-                cfg.receiveEndpoint("submit-order-queue", e -> {
-                    e.configureConsumer(context, SubmitOrderConsumer.class);
-                });
+            cfg.receiveEndpoint("submit-order-queue", e -> {
+                e.configureConsumer(context, SubmitOrderConsumer.class);
             });
         });
 
-        serviceBus.start();
+        bus.start();
 
         System.out.println("Up and running");
 
         SubmitOrder message = new SubmitOrder(UUID.randomUUID());
 
-        serviceBus.publish(message);
+        bus.publish(message);
 
         System.out.println("Waiting");
 
