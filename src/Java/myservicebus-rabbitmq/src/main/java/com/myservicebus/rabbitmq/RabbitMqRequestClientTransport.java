@@ -14,6 +14,7 @@ import com.myservicebus.HostInfoProvider;
 import com.myservicebus.NamingConventions;
 import com.myservicebus.RequestFaultException;
 import com.myservicebus.Response;
+import com.myservicebus.Response2;
 import com.myservicebus.RequestClientTransport;
 import com.myservicebus.tasks.CancellationToken;
 import com.rabbitmq.client.AMQP;
@@ -104,9 +105,9 @@ public class RabbitMqRequestClientTransport implements RequestClientTransport {
     }
 
     @Override
-    public <TRequest, T1, T2> CompletableFuture<Response.Two<T1, T2>> sendRequest(Class<TRequest> requestType, TRequest request,
+    public <TRequest, T1, T2> CompletableFuture<Response2<T1, T2>> sendRequest(Class<TRequest> requestType, TRequest request,
             Class<T1> responseType1, Class<T2> responseType2, CancellationToken cancellationToken) {
-        CompletableFuture<Response.Two<T1, T2>> future = new CompletableFuture<>();
+        CompletableFuture<Response2<T1, T2>> future = new CompletableFuture<>();
         try {
             Connection connection = connectionProvider.getOrCreateConnection();
             Channel channel = connection.createChannel();
@@ -121,11 +122,11 @@ public class RabbitMqRequestClientTransport implements RequestClientTransport {
                     try {
                         JavaType type1 = mapper.getTypeFactory().constructParametricType(Envelope.class, responseType1);
                           Envelope<T1> env1 = mapper.readValue(delivery.getBody(), type1);
-                          future.complete(Response.Two.fromT1(env1.getMessage()));
+                          future.complete(Response2.fromT1(env1.getMessage()));
                       } catch (Exception ex1) {
                           JavaType type2 = mapper.getTypeFactory().constructParametricType(Envelope.class, responseType2);
                           Envelope<T2> env2 = mapper.readValue(delivery.getBody(), type2);
-                          future.complete(Response.Two.fromT2(env2.getMessage()));
+                          future.complete(Response2.fromT2(env2.getMessage()));
                       }
                   } catch (Exception ex) {
                       try {
