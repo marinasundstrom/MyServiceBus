@@ -12,9 +12,10 @@ import com.myservicebus.tasks.CancellationToken;
  * Context passed to consumers when a message is received.
  *
  * <p>
- * Currently the send and publish related members act as no-ops, returning a
- * completed future. This mirrors the .NET implementation where those features
- * are placeholders awaiting a full transport implementation.
+ * Provides basic send and publish capabilities by delegating to an injected
+ * {@link SendEndpointProvider}. The URI scheme used matches the RabbitMQ
+ * implementation: publishes target an exchange URI while sends target a queue
+ * URI.
  * </p>
  */
 public class ConsumeContext<T>
@@ -55,7 +56,7 @@ public class ConsumeContext<T>
     @Override
     public <TMessage> CompletableFuture<Void> publish(TMessage message, CancellationToken cancellationToken) {
         String exchange = NamingConventions.getExchangeName(message.getClass());
-        SendEndpoint endpoint = getSendEndpoint("rabbitmq://localhost/" + exchange);
+        SendEndpoint endpoint = getSendEndpoint("rabbitmq://localhost/exchange/" + exchange);
         return endpoint.send(message, cancellationToken);
     }
 

@@ -22,6 +22,8 @@ public class ConsumeContextTest {
         }
     }
 
+    static class FakeMessage {}
+
     @Test
     public void consumeContextUsesProvidedCancellationToken() {
         CancellationTokenSource cts = new CancellationTokenSource();
@@ -35,5 +37,27 @@ public class ConsumeContextTest {
                 new StubProvider());
 
         Assertions.assertSame(token, ctx.getCancellationToken());
+    }
+
+    @Test
+    public void publishUsesExchangeUri() {
+        class CapturingProvider implements SendEndpointProvider {
+            String uri;
+
+            @Override
+            public SendEndpoint getSendEndpoint(String uri) {
+                this.uri = uri;
+                return new StubSendEndpoint();
+            }
+        }
+
+        CapturingProvider provider = new CapturingProvider();
+        ConsumeContext<FakeMessage> ctx = new ConsumeContext<>(new FakeMessage(), Map.of(), provider);
+
+        ctx.publish(new FakeMessage(), CancellationToken.none).join();
+
+        Assertions.assertEquals(
+                "rabbitmq://localhost/exchange/TestApp:FakeMessage",
+                provider.uri);
     }
 }
