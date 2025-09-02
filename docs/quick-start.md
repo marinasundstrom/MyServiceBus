@@ -26,7 +26,8 @@ builder.Services.AddServiceBus(x =>
         {
             e.ConfigureConsumer<SubmitOrderConsumer>(context);
         });
-        cfg.ConfigureEndpoints(context, KebabCaseEndpointNameFormatter.Instance); // auto-configure remaining consumers
+        cfg.SetEndpointNameFormatter(KebabCaseEndpointNameFormatter.Instance);
+        cfg.ConfigureEndpoints(context); // auto-configure remaining consumers
     });
 });
 ```
@@ -44,11 +45,14 @@ RabbitMqBus bus = RabbitMqBus.configure(services, x -> {
     cfg.receiveEndpoint("submit-order-queue", e -> {
         e.configureConsumer(context, SubmitOrderConsumer.class);
     });
-    cfg.configureEndpoints(context, KebabCaseEndpointNameFormatter.INSTANCE); // auto-configure remaining consumers
+    cfg.setEndpointNameFormatter(KebabCaseEndpointNameFormatter.INSTANCE);
+    cfg.configureEndpoints(context); // auto-configure remaining consumers
 });
 
 bus.start();
 ```
+
+Built-in endpoint name formatters include `DefaultEndpointNameFormatter`, `KebabCaseEndpointNameFormatter`, and `SnakeCaseEndpointNameFormatter`.
 
 ## Publishing
 

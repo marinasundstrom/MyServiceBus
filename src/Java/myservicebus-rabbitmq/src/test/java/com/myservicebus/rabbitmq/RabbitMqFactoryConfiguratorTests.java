@@ -63,7 +63,8 @@ public class RabbitMqFactoryConfiguratorTests {
         BusRegistrationContext context = new BusRegistrationContext(provider);
         RabbitMqFactoryConfigurator factoryConfigurator = provider.getService(RabbitMqFactoryConfigurator.class);
 
-        factoryConfigurator.configureEndpoints(context, mt -> "formatted-" + mt.getSimpleName().toLowerCase());
+        factoryConfigurator.setEndpointNameFormatter(mt -> "formatted-" + mt.getSimpleName().toLowerCase());
+        factoryConfigurator.configureEndpoints(context);
 
         TopologyRegistry registry = provider.getService(TopologyRegistry.class);
         ConsumerTopology def = registry.getConsumers().stream()

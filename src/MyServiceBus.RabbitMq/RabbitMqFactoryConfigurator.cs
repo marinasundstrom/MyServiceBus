@@ -6,6 +6,7 @@ using System.Collections.Generic;
 internal sealed class RabbitMqFactoryConfigurator : IRabbitMqFactoryConfigurator
 {
     private readonly Dictionary<Type, string> _exchangeNames = new();
+    private IEndpointNameFormatter? _endpointNameFormatter;
 
     public RabbitMqFactoryConfigurator()
     {
@@ -14,6 +15,7 @@ internal sealed class RabbitMqFactoryConfigurator : IRabbitMqFactoryConfigurator
     public string ClientHost { get; private set; } = "localhost";
     public string Password { get; internal set; }
     public string Username { get; internal set; }
+    public IEndpointNameFormatter? EndpointNameFormatter => _endpointNameFormatter;
 
     public void Message<T>(Action<MessageConfigurator> configure)
     {
@@ -33,6 +35,11 @@ internal sealed class RabbitMqFactoryConfigurator : IRabbitMqFactoryConfigurator
 
         IRabbitMqHostConfigurator? configurator = new RabbitMqHostConfigurator(this);
         configure?.Invoke(configurator!);
+    }
+
+    public void SetEndpointNameFormatter(IEndpointNameFormatter formatter)
+    {
+        _endpointNameFormatter = formatter;
     }
 }
 

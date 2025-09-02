@@ -39,6 +39,7 @@ public class RabbitMqFactoryConfiguratorTests
     class TestRabbitMqFactoryConfigurator : IRabbitMqFactoryConfigurator
     {
         private readonly Dictionary<Type, string> _exchangeNames = new();
+        public IEndpointNameFormatter? EndpointNameFormatter { get; private set; }
 
         public void Message<T>(Action<MessageConfigurator> configure)
         {
@@ -52,6 +53,11 @@ public class RabbitMqFactoryConfiguratorTests
 
         public void Host(string host, Action<IRabbitMqHostConfigurator>? configure = null)
         {
+        }
+
+        public void SetEndpointNameFormatter(IEndpointNameFormatter formatter)
+        {
+            EndpointNameFormatter = formatter;
         }
     }
 
@@ -96,7 +102,8 @@ public class RabbitMqFactoryConfiguratorTests
         var context = new TestBusRegistrationContext(provider);
 
         var configurator = new TestRabbitMqFactoryConfigurator();
-        configurator.ConfigureEndpoints(context, new StaticFormatter());
+        configurator.SetEndpointNameFormatter(new StaticFormatter());
+        configurator.ConfigureEndpoints(context);
 
         var def = registry.Consumers.First(c => c.ConsumerType == typeof(MyConsumer));
         Assert.Equal("formatted-mymessage", def.QueueName);

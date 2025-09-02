@@ -9,12 +9,9 @@ public static class RabbitMqConfiguratorExtensions
 {
     [Throws(typeof(InvalidOperationException))]
     public static void ConfigureEndpoints(this IRabbitMqFactoryConfigurator configurator, IBusRegistrationContext context)
-        => ConfigureEndpoints(configurator, context, null);
-
-    [Throws(typeof(InvalidOperationException))]
-    public static void ConfigureEndpoints(this IRabbitMqFactoryConfigurator configurator, IBusRegistrationContext context, IEndpointNameFormatter? formatter)
     {
         var registry = context.ServiceProvider.GetRequiredService<TopologyRegistry>();
+        var formatter = configurator.EndpointNameFormatter;
 
         foreach (var consumer in registry.Consumers)
         {
