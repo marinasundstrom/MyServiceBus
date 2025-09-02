@@ -1,15 +1,16 @@
-package com.myservicebus;
+package com.myservicebus.ditestapp;
 
+import com.myservicebus.MyScopedService;
+import com.myservicebus.MySecondService;
+import com.myservicebus.MyService;
 import com.myservicebus.di.ServiceCollection;
 import com.myservicebus.di.ServiceProvider;
 import com.myservicebus.di.ServiceScope;
 
 public class Main {
     public static void main(String[] args) {
-        System.out.println("test");
-
         ServiceCollection services = new ServiceCollection();
-        services.addSingleton(MyService.class, (sp) -> () -> new MyServiceImpl(sp));
+        services.addSingleton(MyService.class, (sp) -> () -> new com.myservicebus.MyServiceImpl(sp));
         services.addScoped(MyScopedService.class);
         services.addScoped(MySecondService.class);
 
