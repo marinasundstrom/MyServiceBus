@@ -4,7 +4,7 @@
 | --- | --- | --- | --- |
 | Message sending | Implemented | Implemented | `ConsumeContext` resolves send endpoints in both clients. |
 | Publishing | Implemented | Implemented | Messages are routed to exchanges derived from message type conventions. |
-| Request–response helpers | Implemented | Not implemented | Java lacks `GenericRequestClient` and related helpers. |
+| Request–response helpers | Implemented | Implemented | Both clients provide `GenericRequestClient` and related helpers. |
 | Fault handling | Implemented | Partially implemented | Java can respond with `Fault<T>` but lacks global fault dispatching. |
 | Telemetry & host metadata | Implemented | Partially implemented | Java adds basic host metadata; richer diagnostics remain pending. |
 | Cancellation propagation | Implemented | Implemented | Pipe contexts expose cancellation tokens. |
