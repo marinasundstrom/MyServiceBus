@@ -57,6 +57,51 @@ public class ConsumeContextTests
         }
     }
 
+    [Fact]
+    [Throws(typeof(UriFormatException), typeof(EncoderFallbackException), typeof(InvalidOperationException))]
+    public async Task Publish_uses_exchange_uri()
+    {
+        var json = Encoding.UTF8.GetBytes("{\"messageId\":\"00000000-0000-0000-0000-000000000000\",\"messageType\":[],\"message\":{}}");
+        var envelope = new EnvelopeMessageContext(json, new Dictionary<string, object>());
+        var receiveContext = new ReceiveContextImpl(envelope, CancellationToken.None);
+        var factory = new CapturingTransportFactory();
+
+        var ctx = new ConsumeContextImpl<FakeMessage>(receiveContext, factory,
+            new SendPipe(Pipe.Empty<SendContext>()),
+            new PublishPipe(Pipe.Empty<SendContext>()),
+            new EnvelopeMessageSerializer());
+
+        await ctx.PublishAsync(new FakeMessage());
+
+        Assert.Equal(new Uri("rabbitmq://localhost/exchange/MyServiceBus.Tests:FakeMessage"), factory.Address);
+    }
+
+    class FakeMessage { }
+
+    class CapturingTransportFactory : ITransportFactory
+    {
+        public Uri? Address { get; private set; }
+
+        public Task<ISendTransport> GetSendTransport(Uri address, CancellationToken cancellationToken = default)
+        {
+            Address = address;
+            return Task.FromResult<ISendTransport>(new StubSendTransport());
+        }
+
+        [Throws(typeof(NotImplementedException))]
+        public Task<IReceiveTransport> CreateReceiveTransport(
+            ReceiveEndpointTopology topology,
+            Func<ReceiveContext, Task> handler,
+            CancellationToken cancellationToken = default)
+            => throw new NotImplementedException();
+
+        class StubSendTransport : ISendTransport
+        {
+            public Task Send<T>(T message, SendContext context, CancellationToken cancellationToken = default) where T : class
+                => Task.CompletedTask;
+        }
+    }
+
     class StubTransportFactory : ITransportFactory
     {
         [Throws(typeof(NotImplementedException))]

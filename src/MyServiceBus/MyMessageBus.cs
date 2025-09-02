@@ -3,6 +3,7 @@ using MyServiceBus.Serialization;
 using MyServiceBus.Topology;
 using System;
 using System.Reflection;
+using System.Runtime.InteropServices;
 
 namespace MyServiceBus;
 
@@ -29,13 +30,13 @@ public class MyMessageBus : IMessageBus
         _messageSerializer = messageSerializer;
     }
 
-    [Throws(typeof(UriFormatException))]
+    [Throws(typeof(UriFormatException), typeof(InvalidOperationException))]
     public async Task Publish<T>(T message, CancellationToken cancellationToken = default)
        where T : class
     {
         var exchangeName = NamingConventions.GetExchangeName(message.GetType());
 
-        var uri = new Uri($"rabbitmq://localhost/{exchangeName}");
+        var uri = new Uri($"rabbitmq://localhost/exchange/{exchangeName}");
         var transport = await _transportFactory.GetSendTransport(uri, cancellationToken);
 
         var context = new SendContext(MessageTypeCache.GetMessageTypes(typeof(T)), _messageSerializer, cancellationToken)
@@ -96,7 +97,7 @@ public class MyMessageBus : IMessageBus
         await Task.WhenAll(_activeTransports.Select(async transport => await transport.Stop(cancellationToken)));
     }
 
-    [Throws(typeof(InvalidOperationException), typeof(ArgumentException), typeof(NotSupportedException))]
+    [Throws(typeof(InvalidOperationException), typeof(ArgumentException), typeof(NotSupportedException), typeof(InvalidCastException), typeof(TargetInvocationException), typeof(MemberAccessException), typeof(InvalidComObjectException), typeof(COMException))]
     private async Task HandleMessageAsync(ReceiveContext context)
     {
         var messageTypeName = context.MessageType.First();

@@ -33,16 +33,18 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
         return new TransportSendEndpoint(_transportFactory, _sendPipe, _messageSerializer, uri);
     }
 
+    [Throws(typeof(UriFormatException), typeof(InvalidOperationException))]
     public async Task PublishAsync<T>(T message, CancellationToken cancellationToken = default)
     {
-        await PublishAsync((object)message, cancellationToken);
+        await PublishAsync<T>((object)message!, cancellationToken);
     }
 
+    [Throws(typeof(UriFormatException), typeof(InvalidOperationException))]
     public async Task PublishAsync<T>(object message, CancellationToken cancellationToken = default)
     {
         var exchangeName = NamingConventions.GetExchangeName(typeof(T));
 
-        var uri = new Uri($"rabbitmq://localhost/{exchangeName}");
+        var uri = new Uri($"rabbitmq://localhost/exchange/{exchangeName}");
         var transport = await _transportFactory.GetSendTransport(uri, cancellationToken);
 
         var context = new SendContext(MessageTypeCache.GetMessageTypes(typeof(T)), _messageSerializer, cancellationToken)
@@ -55,11 +57,13 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
         await transport.Send(message, context, cancellationToken);
     }
 
+    [Throws(typeof(InvalidOperationException))]
     public async Task RespondAsync<T>(T message, CancellationToken cancellationToken = default)
     {
         await RespondAsync<T>((object)message, cancellationToken);
     }
 
+    [Throws(typeof(InvalidOperationException))]
     public async Task RespondAsync<T>(object message, CancellationToken cancellationToken = default)
     {
         var address = receiveContext.ResponseAddress ??
@@ -76,6 +80,7 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
         await transport.Send(message, context, cancellationToken);
     }
 
+    [Throws(typeof(InvalidOperationException))]
     internal async Task RespondFaultAsync(Exception exception, CancellationToken cancellationToken = default)
     {
         var address = receiveContext.FaultAddress ?? receiveContext.ResponseAddress;
@@ -102,6 +107,7 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
         await transport.Send(fault, context, cancellationToken);
     }
 
+    [Throws(typeof(InvalidOperationException))]
     private static HostInfo GetHostInfo<T>() where T : class => new HostInfo
     {
         MachineName = Environment.MachineName,
@@ -129,9 +135,11 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
             _address = address;
         }
 
+        [Throws(typeof(InvalidOperationException))]
         public Task Send<T>(T message, CancellationToken cancellationToken = default)
             => Send<T>((object)message, cancellationToken);
 
+        [Throws(typeof(InvalidOperationException))]
         public async Task Send<T>(object message, CancellationToken cancellationToken = default)
         {
             var transport = await _transportFactory.GetSendTransport(_address, cancellationToken);
