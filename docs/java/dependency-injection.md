@@ -50,6 +50,22 @@ services.addSingleton(MyService.class, MyServiceImpl.class);
 ServiceProvider provider = services.connectAndBuild(existing);
 ```
 
+### Registering bindings for factories
+
+Sometimes the service you want to register is itself a factory. Use the
+overload that accepts a lambda so the factory can resolve any dependencies
+from the `ServiceProvider` before constructing itself:
+
+```java
+services.addSingleton(WidgetFactory.class, sp -> () -> {
+    Dependency dep = sp.getService(Dependency.class);
+    return new WidgetFactory(dep);
+});
+
+WidgetFactory factory = provider.getService(WidgetFactory.class);
+Widget widget = factory.create();
+```
+
 Constructor injection using Guice's `@Inject`:
 
 ```java
