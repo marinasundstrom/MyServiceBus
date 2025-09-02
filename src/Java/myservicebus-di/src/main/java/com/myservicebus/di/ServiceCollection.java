@@ -165,4 +165,41 @@ public class ServiceCollection {
 
         return provider;
     }
+
+    public ServiceProvider connectAndBuild(Injector parentInjector) {
+        if (built) {
+            throw new IllegalStateException("ServiceCollection.build() called more than once.");
+        }
+        built = true;
+
+        MutableHolder<ServiceProvider> holder = new MutableHolder<>();
+
+        modules.add(0, new AbstractModule() {
+            @Override
+            protected void configure() {
+                bindScope(Scoped.class, perMessageScope);
+                bind(PerMessageScope.class).toInstance(perMessageScope);
+            }
+        });
+
+        modules.add(new AbstractModule() {
+            @Override
+            protected void configure() {
+                bind(ServiceProvider.class).toProvider(holder::get);
+            }
+        });
+
+        Injector injector = parentInjector.createChildInjector(new ArrayList<>(modules));
+
+        ServiceProviderImpl provider = new ServiceProviderImpl(injector, perMessageScope);
+        holder.set(provider);
+
+        deferredScopedProviders.forEach(p -> p.accept(holder.get()));
+
+        injector = injector.createChildInjector(deferredModules);
+
+        provider.setInjector(injector);
+
+        return provider;
+    }
 }
