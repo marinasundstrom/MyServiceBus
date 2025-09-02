@@ -8,8 +8,9 @@ import java.util.concurrent.TimeoutException;
 import com.myservicebus.MyService;
 import com.myservicebus.MyServiceImpl;
 import com.myservicebus.RequestClientFactory;
-import com.myservicebus.SendEndpointProvider;
+import com.myservicebus.SendEndpoint;
 import com.myservicebus.ServiceBus;
+import com.myservicebus.PublishEndpoint;
 import com.myservicebus.di.ServiceCollection;
 import com.myservicebus.di.ServiceProvider;
 import com.myservicebus.rabbitmq.RabbitMqBusFactory;
@@ -44,21 +45,21 @@ public class Main {
         var app = Javalin.create().start(5301);
 
         app.get("/publish", ctx -> {
+            var publishEndpoint = provider.getService(PublishEndpoint.class);
             SubmitOrder message = new SubmitOrder(UUID.randomUUID(), "MT Clone Java");
             try {
-                serviceBus.publish(message);
+                publishEndpoint.publish(message, CancellationToken.none).join();
                 ctx.result("Published SubmitOrder");
-            } catch (IOException e) {
+            } catch (Exception e) {
                 ctx.status(500).result("Failed to publish message");
             }
         });
 
         app.get("/send", ctx -> {
-            var sendEndpointProvider = provider.getService(SendEndpointProvider.class);
-            var sendEndpoint = sendEndpointProvider.getSendEndpoint("");
+            var sendEndpoint = provider.getService(SendEndpoint.class);
             SubmitOrder message = new SubmitOrder(UUID.randomUUID(), "MT Clone Java");
             try {
-                sendEndpoint.send(message, CancellationToken.none);
+                sendEndpoint.send(message, CancellationToken.none).join();
                 ctx.result("Published SubmitOrder");
             } catch (Exception e) {
                 ctx.status(500).result("Failed to publish message");

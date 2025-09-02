@@ -100,14 +100,18 @@ types:
 - `ServiceBus` – **singleton** providing `start`, `publish`, and
   transport management.
 - `PublishEndpoint` – **scoped** facade for publishing events.
-- `SendEndpointProvider` – **singleton**; call `getSendEndpoint(uri)` to
-  obtain a `SendEndpoint` when sending.
+- `SendEndpoint` – **singleton** handle for sending to queues derived from
+  message types.
+- `SendEndpointProvider` – **singleton** for resolving endpoints by URI
+  when needed.
 - `RequestClientFactory` – **singleton** used to create transient
   `RequestClient<T>` instances for request/response.
 
 Consumers are registered as scoped services. Because Java's container
 cannot infer generic types, endpoints and request clients are typically
-obtained from providers or factories rather than injected directly.
+obtained from providers or factories rather than injected directly. A
+`SendEndpoint` is registered directly for convenience and routes
+messages based on their type.
 
 ```java
 public class MyService {
@@ -150,9 +154,8 @@ await endpoint.Send(new SubmitOrder { OrderId = Guid.NewGuid() });
 ### Java
 
 ```java
-SendEndpointProvider provider = serviceProvider.getService(SendEndpointProvider.class);
-SendEndpoint endpoint = provider.getSendEndpoint("rabbitmq://localhost/submit-order");
-endpoint.send(new SubmitOrder(UUID.randomUUID()), CancellationToken.none).join();
+SendEndpoint endpoint = serviceProvider.getService(SendEndpoint.class);
+endpoint.send(new SubmitOrder(UUID.randomUUID()), CancellationToken.none()).join();
 ```
 
 ## Consuming Messages

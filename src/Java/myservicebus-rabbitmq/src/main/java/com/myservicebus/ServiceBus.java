@@ -5,6 +5,7 @@ import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeFormatterBuilder;
 import java.time.temporal.ChronoField;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeoutException;
 
 import com.fasterxml.jackson.core.JsonParser;
@@ -17,16 +18,16 @@ import com.myservicebus.di.ServiceCollection;
 import com.myservicebus.di.ServiceProvider;
 import com.myservicebus.tasks.CancellationToken;
 import com.myservicebus.rabbitmq.ConnectionProvider;
+import com.myservicebus.PublishEndpoint;
 import com.rabbitmq.client.BuiltinExchangeType;
 import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.Connection;
 
-public class ServiceBus {
+public class ServiceBus implements SendEndpoint, PublishEndpoint {
     private final ServiceProvider serviceProvider;
     private final ConnectionProvider connectionProvider;
     private final SendEndpointProvider sendEndpointProvider;
     private final PublishPipe publishPipe;
-    private final SendPipe sendPipe;
     private Connection connection;
     private Channel channel;
     private ObjectMapper mapper;
@@ -36,7 +37,6 @@ public class ServiceBus {
         this.connectionProvider = serviceProvider.getService(ConnectionProvider.class);
         this.sendEndpointProvider = serviceProvider.getService(SendEndpointProvider.class);
         this.publishPipe = serviceProvider.getService(PublishPipe.class);
-        this.sendPipe = serviceProvider.getService(SendPipe.class);
 
         mapper = new ObjectMapper();
         mapper.findAndRegisterModules();
@@ -136,20 +136,39 @@ public class ServiceBus {
         }
     }
 
-    public void publish(Object message) throws IOException {
+    @Override
+    public <T> CompletableFuture<Void> publish(T message, CancellationToken cancellationToken) {
         if (message == null)
-            throw new IllegalArgumentException("Message cannot be null");
+            return CompletableFuture.failedFuture(new IllegalArgumentException("Message cannot be null"));
 
         String exchange = NamingConventions.getExchangeName(message.getClass());
-        SendContext ctx = new SendContext(message, CancellationToken.none);
-        publishPipe.send(ctx).join();
-        var endpoint = sendEndpointProvider.getSendEndpoint("rabbitmq://localhost/" + exchange);
-        try {
-            endpoint.send(ctx).join();
-            System.out.println("📤 Published message of type " + message.getClass().getSimpleName());
-        } catch (Exception ex) {
-            throw new IOException("Failed to publish message", ex);
-        }
+        SendContext ctx = new SendContext(message, cancellationToken);
+        return publishPipe.send(ctx).thenCompose(v -> {
+            var endpoint = sendEndpointProvider.getSendEndpoint("rabbitmq://localhost/" + exchange);
+            return endpoint.send(ctx).thenRun(() -> {
+                System.out.println("📤 Published message of type " + message.getClass().getSimpleName());
+            });
+        });
+    }
+
+    public <T> CompletableFuture<Void> publish(T message) {
+        return publish(message, CancellationToken.none);
+    }
+
+    @Override
+    public <T> CompletableFuture<Void> send(T message, CancellationToken cancellationToken) {
+        if (message == null)
+            return CompletableFuture
+                    .failedFuture(new IllegalArgumentException("Message cannot be null"));
+
+        String queue = NamingConventions.getQueueName(message.getClass());
+        SendContext ctx = new SendContext(message, cancellationToken);
+        var endpoint = sendEndpointProvider.getSendEndpoint("rabbitmq://localhost/" + queue);
+        return endpoint.send(ctx);
+    }
+
+    public <T> CompletableFuture<Void> send(T message) {
+        return send(message, CancellationToken.none);
     }
 
     public void stop() throws IOException, TimeoutException {
