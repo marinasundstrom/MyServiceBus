@@ -82,8 +82,8 @@ public class RabbitMqRequestClientTransport implements RequestClientTransport {
             envelope.setMessageId(UUID.randomUUID());
             envelope.setConversationId(UUID.randomUUID());
             envelope.setSentTime(OffsetDateTime.now());
-            envelope.setDestinationAddress("rabbitmq://localhost/" + exchange);
-            envelope.setResponseAddress("rabbitmq://localhost/" + responseExchange);
+            envelope.setDestinationAddress("rabbitmq://localhost/exchange/" + exchange);
+            envelope.setResponseAddress("rabbitmq://localhost/exchange/" + responseExchange);
             envelope.setMessageType(List.of(NamingConventions.getMessageUrn(requestType)));
             envelope.setMessage(request);
             envelope.setHeaders(Map.of());
