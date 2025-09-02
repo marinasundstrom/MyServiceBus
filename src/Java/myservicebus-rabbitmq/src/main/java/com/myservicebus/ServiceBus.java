@@ -79,6 +79,14 @@ public class ServiceBus {
         for (ConsumerTopology consumerDef : topology.getConsumers()) {
             String queue = consumerDef.getQueueName();
 
+            PipeConfigurator<ConsumeContext<Object>> configurator = new PipeConfigurator<>();
+            configurator.useRetry(3, null);
+            @SuppressWarnings({"unchecked", "rawtypes"})
+            Filter<ConsumeContext<Object>> consumerFilter =
+                    new ConsumerMessageFilter(serviceProvider, consumerDef.getConsumerType());
+            configurator.useFilter(consumerFilter);
+            Pipe<ConsumeContext<Object>> pipe = configurator.build();
+
             for (MessageBinding binding : consumerDef.getBindings()) {
                 String exchangeName = binding.getEntityName();
                 channel.exchangeDeclare(exchangeName, BuiltinExchangeType.FANOUT, true);
@@ -88,38 +96,32 @@ public class ServiceBus {
 
             MessageBinding binding = consumerDef.getBindings().get(0);
             channel.basicConsume(queue, false, (tag, delivery) -> {
-                try (var scope = serviceProvider.createScope()) {
-                    var scopedServiceProvider = scope.getServiceProvider();
+                try {
+                    var type = mapper
+                            .getTypeFactory()
+                            .constructParametricType(Envelope.class, binding.getMessageType());
 
-                    Consumer<Object> consumer = (Consumer<Object>) scopedServiceProvider
-                            .getService(consumerDef.getConsumerType());
+                    var envelope = (Envelope<?>) mapper.readValue(delivery.getBody(), type);
+
+                    ConsumeContext<Object> ctx = new ConsumeContext<>(
+                            envelope.getMessage(),
+                            envelope.getHeaders(),
+                            envelope.getResponseAddress(),
+                            envelope.getFaultAddress(),
+                            CancellationToken.none,
+                            sendEndpointProvider);
+
+                    pipe.send(ctx).join();
+
+                    channel.basicAck(delivery.getEnvelope().getDeliveryTag(), false);
+                } catch (Exception e) {
                     try {
-                        var type = mapper
-                                .getTypeFactory()
-                                .constructParametricType(Envelope.class, binding.getMessageType());
-
-                        var envelope = (Envelope<?>) mapper.readValue(delivery.getBody(), type);
-
-                        ConsumeContext<Object> ctx = new ConsumeContext<>(
-                                envelope.getMessage(),
-                                envelope.getHeaders(),
-                                envelope.getResponseAddress(),
-                                envelope.getFaultAddress(),
-                                CancellationToken.none,
-                                sendEndpointProvider);
-
-                        consumer.consume(ctx).get();
-
-                        channel.basicAck(delivery.getEnvelope().getDeliveryTag(), false);
-                    } catch (Exception e) {
-                        try {
-                            channel.basicNack(delivery.getEnvelope().getDeliveryTag(), false, false);
-                        } catch (IOException ioEx) {
-                            ioEx.printStackTrace();
-                        }
-
-                        e.printStackTrace();
+                        channel.basicNack(delivery.getEnvelope().getDeliveryTag(), false, false);
+                    } catch (IOException ioEx) {
+                        ioEx.printStackTrace();
                     }
+
+                    e.printStackTrace();
                 }
             }, tag -> {
             });

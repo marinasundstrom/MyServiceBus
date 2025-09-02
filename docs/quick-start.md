@@ -111,6 +111,37 @@ class SubmitOrderConsumer implements Consumer<SubmitOrder> {
 }
 ```
 
+## Filters
+
+Filters let you insert cross-cutting behavior into the consume pipeline.
+
+### C#
+
+```csharp
+var configurator = new PipeConfigurator<ConsumeContext<SubmitOrder>>();
+configurator.UseRetry(3);
+configurator.UseExecute(ctx =>
+{
+    Console.WriteLine($"Received {ctx.Message.OrderId}");
+    return Task.CompletedTask;
+});
+IPipe<ConsumeContext<SubmitOrder>> pipe = configurator.Build();
+await pipe.Send(context);
+```
+
+### Java
+
+```java
+PipeConfigurator<ConsumeContext<SubmitOrder>> configurator = new PipeConfigurator<>();
+configurator.useRetry(3, null);
+configurator.useExecute(ctx -> {
+    System.out.println("Received " + ctx.getMessage().getOrderId());
+    return CompletableFuture.completedFuture(null);
+});
+Pipe<ConsumeContext<SubmitOrder>> pipe = configurator.build();
+pipe.send(context).join();
+```
+
 ## Request/Response
 
 ### C#
