@@ -78,7 +78,7 @@ public class Main {
                         .getResponse(new TestRequest("Foo"), TestResponse.class, CancellationToken.none).get();
                 ctx.result(response.getMessage());
             } catch (Exception e) {
-                ctx.status(500).result("Failed to send request");
+                ctx.status(500).result("Failed to get response: " + e.getMessage());
             }
         });
 
