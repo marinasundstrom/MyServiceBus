@@ -79,6 +79,11 @@ types:
 
 - `ServiceBus` – **singleton** providing `start`, `publish`, and
   transport management.
+- `PublishEndpoint` – **scoped** facade for publishing events.
+  `ConsumeContext` implements this interface so it can be injected
+  directly. The context resolves the underlying endpoint using
+  `SendEndpointProvider` when `publish` is called, eliminating the need
+  for a `PublishEndpointProvider`.
 - `SendEndpointProvider` – **singleton**; call `getSendEndpoint(uri)` to
   obtain a `SendEndpoint` when sending.
 - `RequestClientFactory` – **singleton** used to create transient
