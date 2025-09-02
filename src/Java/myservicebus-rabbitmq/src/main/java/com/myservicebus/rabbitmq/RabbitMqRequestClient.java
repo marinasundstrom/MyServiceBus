@@ -1,4 +1,4 @@
-package com.myservicebus;
+package com.myservicebus.rabbitmq;
 
 import java.net.InetAddress;
 import java.time.OffsetDateTime;
@@ -9,7 +9,11 @@ import java.util.concurrent.CompletableFuture;
 
 import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.myservicebus.rabbitmq.ConnectionProvider;
+import com.myservicebus.Envelope;
+import com.myservicebus.Fault;
+import com.myservicebus.HostInfo;
+import com.myservicebus.NamingConventions;
+import com.myservicebus.RequestClient;
 import com.myservicebus.tasks.CancellationToken;
 import com.rabbitmq.client.AMQP;
 import com.rabbitmq.client.BuiltinExchangeType;
@@ -17,11 +21,14 @@ import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.Connection;
 import com.rabbitmq.client.DeliverCallback;
 
-public class GenericRequestClient<TRequest> implements RequestClient<TRequest> {
+/**
+ * RabbitMQ-specific implementation of {@link RequestClient}.
+ */
+public class RabbitMqRequestClient<TRequest> implements RequestClient<TRequest> {
     private final ConnectionProvider connectionProvider;
     private final ObjectMapper mapper;
 
-    public GenericRequestClient(ConnectionProvider connectionProvider) {
+    public RabbitMqRequestClient(ConnectionProvider connectionProvider) {
         this.connectionProvider = connectionProvider;
         this.mapper = new ObjectMapper();
         this.mapper.findAndRegisterModules();

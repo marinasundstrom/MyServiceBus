@@ -1,9 +1,13 @@
 package com.myservicebus.rabbitmq;
 
 import com.myservicebus.BusRegistrationConfigurator;
+import com.myservicebus.RequestClient;
 import com.myservicebus.SendEndpointProvider;
 import com.myservicebus.di.ServiceCollection;
 import com.rabbitmq.client.ConnectionFactory;
+
+import com.myservicebus.rabbitmq.ConnectionProvider;
+import com.myservicebus.rabbitmq.RabbitMqRequestClient;
 
 public class RabbitMqTransport {
 
@@ -32,5 +36,6 @@ public class RabbitMqTransport {
         });
 
         services.addSingleton(SendEndpointProvider.class, sp -> () -> sp.getService(RabbitMqSendEndpointProvider.class));
+        services.addScoped(RequestClient.class, sp -> () -> new RabbitMqRequestClient(sp.getService(ConnectionProvider.class)));
     }
 }
