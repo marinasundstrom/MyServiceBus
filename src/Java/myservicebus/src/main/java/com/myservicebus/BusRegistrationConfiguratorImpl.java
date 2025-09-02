@@ -6,6 +6,7 @@ import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 
 import com.myservicebus.Consumer;
+import com.myservicebus.NamingConventions;
 import com.myservicebus.di.ServiceCollection;
 import com.myservicebus.GenericRequestClient;
 import com.myservicebus.RequestClient;
@@ -14,7 +15,7 @@ import com.myservicebus.rabbitmq.ConnectionProvider;
 public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigurator {
 
     private ServiceCollection serviceCollection;
-    private ConsumerRegistry registry = new ConsumerRegistry();
+    private TopologyRegistry topology = new TopologyRegistry();
 
     public BusRegistrationConfiguratorImpl(ServiceCollection serviceCollection) {
         this.serviceCollection = serviceCollection;
@@ -32,7 +33,9 @@ public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigura
                     Type actualType = pt.getActualTypeArguments()[0];
                     System.out.println("Generic type: " + actualType);
                     Class<?> messageType = getClassFromType(actualType);
-                    registry.register(consumerClass, messageType);
+                    topology.registerConsumer(consumerClass,
+                            NamingConventions.getQueueName(messageType),
+                            messageType);
                 }
             }
         }
@@ -57,7 +60,7 @@ public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigura
     }
 
     public void complete() {
-        serviceCollection.addSingleton(ConsumerRegistry.class, sp -> () -> registry);
+        serviceCollection.addSingleton(TopologyRegistry.class, sp -> () -> topology);
         serviceCollection.addScoped(RequestClient.class,
                 sp -> () -> new GenericRequestClient<>(sp.getService(ConnectionProvider.class)));
     }

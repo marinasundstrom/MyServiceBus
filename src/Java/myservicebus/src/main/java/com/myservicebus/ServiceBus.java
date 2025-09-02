@@ -23,6 +23,9 @@ import com.myservicebus.Consumer;
 import com.myservicebus.NamingConventions;
 import com.myservicebus.SendEndpointProvider;
 import com.myservicebus.rabbitmq.ConnectionProvider;
+import com.myservicebus.TopologyRegistry;
+import com.myservicebus.ConsumerTopology;
+import com.myservicebus.MessageBinding;
 import com.rabbitmq.client.BuiltinExchangeType;
 import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.Connection;
@@ -80,28 +83,29 @@ public class ServiceBus {
             throw new IOException("Failed to start RabbitMQ connection", ex);
         }
 
-        ConsumerRegistry registry = serviceProvider.getService(ConsumerRegistry.class);
+        TopologyRegistry topology = serviceProvider.getService(TopologyRegistry.class);
 
-        for (ConsumerDefinition<?, ?> def : registry.getAll()) {
-            // String exchange = def.getExchangeName();
-            String queue = def.getQueueName();
+        for (ConsumerTopology consumerDef : topology.getConsumers()) {
+            String queue = consumerDef.getQueueName();
 
-            String exchangeName = def.getExchangeName();
+            for (MessageBinding binding : consumerDef.getBindings()) {
+                String exchangeName = binding.getEntityName();
+                channel.exchangeDeclare(exchangeName, BuiltinExchangeType.FANOUT, true);
+                channel.queueDeclare(queue, true, false, false, null);
+                channel.queueBind(queue, exchangeName, "");
+            }
 
-            channel.exchangeDeclare(exchangeName, BuiltinExchangeType.FANOUT, true);
-            channel.queueDeclare(queue, true, false, false, null);
-            channel.queueBind(queue, exchangeName, "");
-
+            MessageBinding binding = consumerDef.getBindings().get(0);
             channel.basicConsume(queue, false, (tag, delivery) -> {
                 try (var scope = serviceProvider.createScope()) {
                     var scopedServiceProvider = scope.getServiceProvider();
 
                     Consumer<Object> consumer = (Consumer<Object>) scopedServiceProvider
-                            .getService(def.getConsumerType());
+                            .getService(consumerDef.getConsumerType());
                     try {
                         var type = mapper
                                 .getTypeFactory()
-                                .constructParametricType(Envelope.class, def.getMessageType());
+                                .constructParametricType(Envelope.class, binding.getMessageType());
 
                         var envelope = (Envelope<?>) mapper.readValue(delivery.getBody(), type);
 
