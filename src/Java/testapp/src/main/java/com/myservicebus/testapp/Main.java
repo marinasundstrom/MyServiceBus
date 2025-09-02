@@ -17,6 +17,7 @@ public class Main {
 
         RabbitMqBus serviceBus = RabbitMqBus.configure(services, cfg -> {
             cfg.addConsumer(SubmitOrderConsumer.class);
+            cfg.addConsumer(OrderSubmittedConsumer.class);
         }, (context, cfg) -> {
             cfg.host("localhost", h -> {
                 h.username("guest");

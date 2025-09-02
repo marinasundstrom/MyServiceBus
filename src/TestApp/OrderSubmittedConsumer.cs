@@ -8,7 +8,9 @@ class OrderSubmittedConsumer :
 {
     public Task Consume(ConsumeContext<OrderSubmitted> context)
     {
-        Console.WriteLine($"Order submitted");
+        var message = context.Message;
+
+        Console.WriteLine($"Order submitted: {message.OrderId}");
 
         return Task.CompletedTask;
     }

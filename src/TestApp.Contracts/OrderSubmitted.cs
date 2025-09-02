@@ -1,3 +1,3 @@
 ﻿namespace TestApp;
 
-public record OrderSubmitted { }
+public record OrderSubmitted(Guid OrderId);
