@@ -36,7 +36,11 @@ dotnet build
 dotnet test
 ```
 
+For a full walkthrough in both C# and Java, see the [Quick Start guide](docs/quick-start.md).
+
 ### Sample usage
+
+#### C#
 The following example publishes a `SubmitOrder` message that is handled by a consumer which then publishes an `OrderSubmitted` event:
 
 ```csharp
@@ -84,6 +88,41 @@ await publishEndpoint.Publish(new SubmitOrder
 {
     OrderId = Guid.NewGuid()
 });
+```
+
+#### Java
+Define the messages and consumer:
+
+```java
+record SubmitOrder(UUID orderId) { }
+record OrderSubmitted(UUID orderId) { }
+
+class SubmitOrderConsumer implements Consumer<SubmitOrder> {
+    @Override
+    public CompletableFuture<Void> consume(ConsumeContext<SubmitOrder> context) {
+        return context.publish(new OrderSubmitted(context.getMessage().orderId()), CancellationToken.none);
+    }
+}
+```
+
+Register the bus:
+
+```java
+ServiceCollection services = new ServiceCollection();
+
+RabbitMqBus bus = RabbitMqBus.configure(services, x -> {
+    x.addConsumer(SubmitOrderConsumer.class);
+}, (context, cfg) -> {
+    cfg.configureEndpoints(context);
+});
+
+bus.start();
+```
+
+Publish the `SubmitOrder` message:
+
+```java
+bus.publish(new SubmitOrder(UUID.randomUUID()), CancellationToken.none).join();
 ```
 
 ## Repository structure
