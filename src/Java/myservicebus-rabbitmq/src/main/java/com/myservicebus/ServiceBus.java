@@ -18,11 +18,12 @@ import com.myservicebus.di.ServiceCollection;
 import com.myservicebus.di.ServiceProvider;
 import com.myservicebus.tasks.CancellationToken;
 import com.myservicebus.rabbitmq.ConnectionProvider;
+import com.myservicebus.PublishEndpoint;
 import com.rabbitmq.client.BuiltinExchangeType;
 import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.Connection;
 
-public class ServiceBus implements SendEndpoint {
+public class ServiceBus implements SendEndpoint, PublishEndpoint {
     private final ServiceProvider serviceProvider;
     private final ConnectionProvider connectionProvider;
     private final SendEndpointProvider sendEndpointProvider;
@@ -135,20 +136,23 @@ public class ServiceBus implements SendEndpoint {
         }
     }
 
-    public void publish(Object message) throws IOException {
+    @Override
+    public <T> CompletableFuture<Void> publish(T message, CancellationToken cancellationToken) {
         if (message == null)
-            throw new IllegalArgumentException("Message cannot be null");
+            return CompletableFuture.failedFuture(new IllegalArgumentException("Message cannot be null"));
 
         String exchange = NamingConventions.getExchangeName(message.getClass());
-        SendContext ctx = new SendContext(message, CancellationToken.none);
-        publishPipe.send(ctx).join();
-        var endpoint = sendEndpointProvider.getSendEndpoint("rabbitmq://localhost/" + exchange);
-        try {
-            endpoint.send(ctx).join();
-            System.out.println("📤 Published message of type " + message.getClass().getSimpleName());
-        } catch (Exception ex) {
-            throw new IOException("Failed to publish message", ex);
-        }
+        SendContext ctx = new SendContext(message, cancellationToken);
+        return publishPipe.send(ctx).thenCompose(v -> {
+            var endpoint = sendEndpointProvider.getSendEndpoint("rabbitmq://localhost/" + exchange);
+            return endpoint.send(ctx).thenRun(() -> {
+                System.out.println("📤 Published message of type " + message.getClass().getSimpleName());
+            });
+        });
+    }
+
+    public <T> CompletableFuture<Void> publish(T message) {
+        return publish(message, CancellationToken.none);
     }
 
     @Override

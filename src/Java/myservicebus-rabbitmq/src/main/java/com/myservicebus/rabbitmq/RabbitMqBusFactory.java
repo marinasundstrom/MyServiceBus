@@ -4,6 +4,7 @@ import com.myservicebus.BusRegistrationConfigurator;
 import com.myservicebus.BusRegistrationConfiguratorImpl;
 import com.myservicebus.ServiceBus;
 import com.myservicebus.SendEndpoint;
+import com.myservicebus.PublishEndpoint;
 import com.myservicebus.di.ServiceCollection;
 import com.myservicebus.di.ServiceProvider;
 import java.util.function.BiConsumer;
@@ -35,6 +36,7 @@ public final class RabbitMqBusFactory {
             return new ServiceBus(sp);
         });
         services.addSingleton(SendEndpoint.class, sp -> () -> sp.getService(ServiceBus.class));
+        services.addScoped(PublishEndpoint.class, sp -> () -> sp.getService(ServiceBus.class));
     }
 
     public static void configure(ServiceCollection services,
