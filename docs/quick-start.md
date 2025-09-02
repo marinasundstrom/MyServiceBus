@@ -115,31 +115,68 @@ class SubmitOrderConsumer implements Consumer<SubmitOrder> {
 
 Filters let you insert cross-cutting behavior into the consume pipeline.
 
-### C#
+### Defining a Filter
+
+Filters are regular classes that implement `IFilter`/`Filter`.
+
+#### C#
 
 ```csharp
-var configurator = new PipeConfigurator<ConsumeContext<SubmitOrder>>();
-configurator.UseRetry(3);
-configurator.UseExecute(ctx =>
+class LoggingFilter<TMessage> : IFilter<ConsumeContext<TMessage>> where TMessage : class
 {
-    Console.WriteLine($"Received {ctx.Message.OrderId}");
-    return Task.CompletedTask;
-});
-IPipe<ConsumeContext<SubmitOrder>> pipe = configurator.Build();
-await pipe.Send(context);
+    public async Task Send(ConsumeContext<TMessage> context, IPipe<ConsumeContext<TMessage>> next)
+    {
+        Console.WriteLine($"Received {typeof(TMessage).Name}");
+        await next.Send(context);
+    }
+}
 ```
 
-### Java
+#### Java
 
 ```java
-PipeConfigurator<ConsumeContext<SubmitOrder>> configurator = new PipeConfigurator<>();
-configurator.useRetry(3);
-configurator.useExecute(ctx -> {
-    System.out.println("Received " + ctx.getMessage().getOrderId());
-    return CompletableFuture.completedFuture(null);
+class LoggingFilter<T> implements Filter<ConsumeContext<T>> {
+    @Override
+    public CompletableFuture<Void> send(ConsumeContext<T> context, Pipe<ConsumeContext<T>> next) {
+        System.out.println("Received " + context.getMessage().getClass().getSimpleName());
+        return next.send(context);
+    }
+}
+```
+
+### Adding Filters to the Bus
+
+Use the consumer registration to configure the pipe and attach filters.
+
+#### C#
+
+```csharp
+builder.Services.AddServiceBus(x =>
+{
+    x.AddConsumer<SubmitOrderConsumer, SubmitOrder>(cfg =>
+    {
+        cfg.UseRetry(3);
+        cfg.UseFilter(new LoggingFilter<SubmitOrder>());
+    });
+    x.UsingRabbitMq((_, cfg) => { /* transport config */ });
 });
-Pipe<ConsumeContext<SubmitOrder>> pipe = configurator.build();
-pipe.send(context).join();
+```
+
+#### Java
+
+```java
+ServiceCollection services = new ServiceCollection();
+
+RabbitMqBus bus = RabbitMqBus.configure(services, x -> {
+    x.addConsumer(SubmitOrderConsumer.class, SubmitOrder.class, cfg -> {
+        cfg.useRetry(3);
+        cfg.useFilter(new LoggingFilter<>());
+    });
+}, (context, cfg) -> {
+    cfg.host("rabbitmq://localhost");
+});
+
+bus.start();
 ```
 
 ## Request/Response

@@ -85,6 +85,8 @@ public class ServiceBus {
             Filter<ConsumeContext<Object>> consumerFilter =
                     new ConsumerMessageFilter(serviceProvider, consumerDef.getConsumerType());
             configurator.useFilter(consumerFilter);
+            if (consumerDef.getConfigure() != null)
+                consumerDef.getConfigure().accept(configurator);
             Pipe<ConsumeContext<Object>> pipe = configurator.build();
 
             for (MessageBinding binding : consumerDef.getBindings()) {

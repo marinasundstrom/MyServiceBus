@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using MyServiceBus.Serialization;
 using MyServiceBus.Topology;
+using System;
 using System.Reflection;
 
 namespace MyServiceBus;
@@ -42,7 +43,7 @@ public class MyMessageBus : IMessageBus
     }
 
     [Throws(typeof(InvalidOperationException), typeof(ArgumentException))]
-    public async Task AddConsumer<TMessage, TConsumer>(ConsumerTopology consumer, CancellationToken cancellationToken = default)
+    public async Task AddConsumer<TMessage, TConsumer>(ConsumerTopology consumer, Delegate? configure = null, CancellationToken cancellationToken = default)
         where TConsumer : class, IConsumer<TMessage>
         where TMessage : class
     {
@@ -63,6 +64,8 @@ public class MyMessageBus : IMessageBus
         var configurator = new PipeConfigurator<ConsumeContext<TMessage>>();
         configurator.UseRetry(3);
         configurator.UseFilter(new ConsumerMessageFilter<TConsumer, TMessage>(_serviceProvider));
+        if (configure is Action<PipeConfigurator<ConsumeContext<TMessage>>> cfg)
+            cfg(configurator);
         var pipe = new ConsumePipe<TMessage>(configurator.Build());
 
         var messageUrn = NamingConventions.GetMessageUrn(messageType);

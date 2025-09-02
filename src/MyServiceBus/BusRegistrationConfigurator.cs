@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using MyServiceBus.Topology;
+using System;
 using System.Reflection;
 
 namespace MyServiceBus;
@@ -25,8 +26,23 @@ public class BusRegistrationConfigurator : IBusRegistrationConfigurator
 
         _topology.RegisterConsumer<TConsumer>(
           queueName: NamingConventions.GetQueueName(messageType),
+          configurePipe: null,
           messageTypes: messageType
       );
+    }
+
+    [Throws(typeof(InvalidOperationException))]
+    public void AddConsumer<TConsumer, TMessage>(Action<PipeConfigurator<ConsumeContext<TMessage>>>? configure = null)
+        where TConsumer : class, IConsumer<TMessage>
+        where TMessage : class
+    {
+        Services.AddScoped<TConsumer>();
+        Services.AddScoped<IConsumer, TConsumer>(sp => sp.GetRequiredService<TConsumer>());
+
+        _topology.RegisterConsumer<TConsumer>(
+            queueName: NamingConventions.GetQueueName(typeof(TMessage)),
+            configurePipe: configure,
+            messageTypes: typeof(TMessage));
     }
 
     [Throws(typeof(TargetInvocationException))]

@@ -4,6 +4,7 @@ import java.lang.reflect.Array;
 import java.lang.reflect.GenericArrayType;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
+import java.util.function.Consumer;
 
 import com.myservicebus.di.ServiceCollection;
 
@@ -24,15 +25,23 @@ public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigura
         for (Type iface : consumerClass.getGenericInterfaces()) {
             if (iface instanceof ParameterizedType pt) {
                 Type raw = pt.getRawType();
-                if (raw instanceof Class<?> rawClass && Consumer.class.isAssignableFrom(rawClass)) {
+                if (raw instanceof Class<?> rawClass && com.myservicebus.Consumer.class.isAssignableFrom(rawClass)) {
                     Type actualType = pt.getActualTypeArguments()[0];
                     Class<?> messageType = getClassFromType(actualType);
                     topology.registerConsumer(consumerClass,
                             NamingConventions.getQueueName(messageType),
+                            null,
                             messageType);
                 }
             }
         }
+    }
+
+    @Override
+    public <TMessage, TConsumer extends com.myservicebus.Consumer<TMessage>> void addConsumer(Class<TConsumer> consumerClass, Class<TMessage> messageClass,
+            Consumer<PipeConfigurator<ConsumeContext<TMessage>>> configure) {
+        serviceCollection.addScoped(consumerClass);
+        topology.registerConsumer(consumerClass, NamingConventions.getQueueName(messageClass), (java.util.function.Consumer) configure, messageClass);
     }
 
     public static Class<?> getClassFromType(Type type) {
