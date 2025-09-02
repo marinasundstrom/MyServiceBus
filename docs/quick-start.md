@@ -124,3 +124,48 @@ bus.publish(new SubmitOrder(UUID.randomUUID()));
 ```
 
 The mediator dispatches messages in-memory, making it useful for lightweight scenarios and testing without a broker.
+
+## Unit Testing with the In-Memory Test Harness
+
+### C#
+
+```csharp
+[Fact]
+public async Task publishes_order_submitted()
+{
+    var harness = new InMemoryTestHarness();
+    await harness.Start();
+
+    harness.RegisterHandler<SubmitOrder>(async context =>
+    {
+        await context.PublishAsync(new OrderSubmitted(context.Message.OrderId));
+    });
+
+    await harness.Send(new SubmitOrder { OrderId = Guid.NewGuid() });
+
+    Assert.True(harness.WasConsumed<SubmitOrder>());
+
+    await harness.Stop();
+}
+```
+
+### Java
+
+```java
+@Test
+public void publishesOrderSubmitted() {
+    InMemoryTestHarness harness = new InMemoryTestHarness();
+    harness.start().join();
+
+    harness.registerHandler(SubmitOrder.class, ctx ->
+        ctx.publish(new OrderSubmitted(ctx.getMessage().getOrderId()), CancellationToken.none)
+    );
+
+    harness.send(new SubmitOrder(UUID.randomUUID())).join();
+    assertTrue(harness.wasConsumed(SubmitOrder.class));
+
+    harness.stop().join();
+}
+```
+
+The harness enables verifying message flows in isolation without needing a running broker.
