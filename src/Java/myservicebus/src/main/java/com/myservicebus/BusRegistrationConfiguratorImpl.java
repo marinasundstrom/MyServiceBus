@@ -12,6 +12,8 @@ public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigura
 
     private ServiceCollection serviceCollection;
     private TopologyRegistry topology = new TopologyRegistry();
+    private PipeConfigurator<SendContext> sendConfigurator = new PipeConfigurator<>();
+    private PipeConfigurator<SendContext> publishConfigurator = new PipeConfigurator<>();
 
     public BusRegistrationConfiguratorImpl(ServiceCollection serviceCollection) {
         this.serviceCollection = serviceCollection;
@@ -44,6 +46,16 @@ public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigura
         topology.registerConsumer(consumerClass, NamingConventions.getQueueName(messageClass), (java.util.function.Consumer) configure, messageClass);
     }
 
+    @Override
+    public void configureSend(Consumer<PipeConfigurator<SendContext>> configure) {
+        configure.accept(sendConfigurator);
+    }
+
+    @Override
+    public void configurePublish(Consumer<PipeConfigurator<SendContext>> configure) {
+        configure.accept(publishConfigurator);
+    }
+
     public static Class<?> getClassFromType(Type type) {
         if (type instanceof Class<?>) {
             return (Class<?>) type;
@@ -64,6 +76,8 @@ public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigura
 
     public void complete() {
         serviceCollection.addSingleton(TopologyRegistry.class, sp -> () -> topology);
+        serviceCollection.addSingleton(SendPipe.class, sp -> () -> new SendPipe(sendConfigurator.build()));
+        serviceCollection.addSingleton(PublishPipe.class, sp -> () -> new PublishPipe(publishConfigurator.build()));
     }
 
     @Override

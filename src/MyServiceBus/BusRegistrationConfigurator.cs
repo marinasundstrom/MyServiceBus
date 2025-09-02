@@ -8,6 +8,8 @@ namespace MyServiceBus;
 public class BusRegistrationConfigurator : IBusRegistrationConfigurator
 {
     private TopologyRegistry _topology = new TopologyRegistry();
+    private readonly PipeConfigurator<SendContext> sendConfigurator = new();
+    private readonly PipeConfigurator<SendContext> publishConfigurator = new();
 
     public IServiceCollection Services { get; }
 
@@ -45,6 +47,16 @@ public class BusRegistrationConfigurator : IBusRegistrationConfigurator
             messageTypes: typeof(TMessage));
     }
 
+    public void ConfigureSend(Action<PipeConfigurator<SendContext>> configure)
+    {
+        configure(sendConfigurator);
+    }
+
+    public void ConfigurePublish(Action<PipeConfigurator<SendContext>> configure)
+    {
+        configure(publishConfigurator);
+    }
+
     [Throws(typeof(TargetInvocationException))]
     private static Type[] GetHandledMessageTypes(Type consumerType)
     {
@@ -59,5 +71,7 @@ public class BusRegistrationConfigurator : IBusRegistrationConfigurator
     {
         Services.AddSingleton(_topology);
         Services.AddSingleton<IPostBuildAction>(_ => new ConsumerRegistrationAction(_topology));
+        Services.AddSingleton<ISendPipe>(_ => new SendPipe(sendConfigurator.Build()));
+        Services.AddSingleton<IPublishPipe>(_ => new PublishPipe(publishConfigurator.Build()));
     }
 }

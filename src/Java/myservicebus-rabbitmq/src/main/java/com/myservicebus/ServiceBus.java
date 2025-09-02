@@ -25,6 +25,7 @@ public class ServiceBus {
     private final ServiceProvider serviceProvider;
     private final ConnectionProvider connectionProvider;
     private final SendEndpointProvider sendEndpointProvider;
+    private final PublishPipe publishPipe;
     private Connection connection;
     private Channel channel;
     private ObjectMapper mapper;
@@ -33,6 +34,7 @@ public class ServiceBus {
         this.serviceProvider = serviceProvider;
         this.connectionProvider = serviceProvider.getService(ConnectionProvider.class);
         this.sendEndpointProvider = serviceProvider.getService(SendEndpointProvider.class);
+        this.publishPipe = serviceProvider.getService(PublishPipe.class);
 
         mapper = new ObjectMapper();
         mapper.findAndRegisterModules();
@@ -137,9 +139,11 @@ public class ServiceBus {
             throw new IllegalArgumentException("Message cannot be null");
 
         String exchange = NamingConventions.getExchangeName(message.getClass());
+        SendContext ctx = new SendContext(message, CancellationToken.none);
+        publishPipe.send(ctx).join();
         var endpoint = sendEndpointProvider.getSendEndpoint("rabbitmq://localhost/" + exchange);
         try {
-            endpoint.send(message, CancellationToken.none).join();
+            endpoint.send(ctx.getMessage(), CancellationToken.none).join();
             System.out.println("📤 Published message of type " + message.getClass().getSimpleName());
         } catch (Exception ex) {
             throw new IOException("Failed to publish message", ex);

@@ -10,20 +10,25 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
 {
     private readonly ReceiveContext receiveContext;
     private readonly ITransportFactory _transportFactory;
+    private readonly ISendPipe _sendPipe;
+    private readonly IPublishPipe _publishPipe;
     private TMessage? message;
 
-    public ConsumeContextImpl(ReceiveContext receiveContext, ITransportFactory transportFactory)
+    public ConsumeContextImpl(ReceiveContext receiveContext, ITransportFactory transportFactory,
+        ISendPipe sendPipe, IPublishPipe publishPipe)
         : base(receiveContext.CancellationToken)
     {
         this.receiveContext = receiveContext;
         this._transportFactory = transportFactory;
+        _sendPipe = sendPipe;
+        _publishPipe = publishPipe;
     }
 
     public TMessage Message => message is null ? (receiveContext.TryGetMessage(out message) ? message : default) : message;
 
     public ISendEndpoint GetSendEndpoint(Uri uri)
     {
-        return new TransportSendEndpoint(_transportFactory, uri);
+        return new TransportSendEndpoint(_transportFactory, _sendPipe, uri);
     }
 
     public async Task PublishAsync<T>(T message, CancellationToken cancellationToken = default)
@@ -43,6 +48,8 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
             MessageId = Guid.NewGuid().ToString()
         };
 
+        await _publishPipe.Send(context);
+        await _sendPipe.Send(context);
         await transport.Send(message, context, cancellationToken);
     }
 
@@ -63,6 +70,7 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
             MessageId = Guid.NewGuid().ToString()
         };
 
+        await _sendPipe.Send(context);
         await transport.Send(message, context, cancellationToken);
     }
 
@@ -88,6 +96,7 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
             MessageId = Guid.NewGuid().ToString()
         };
 
+        await _sendPipe.Send(context);
         await transport.Send(fault, context, cancellationToken);
     }
 
@@ -106,11 +115,13 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
     class TransportSendEndpoint : ISendEndpoint
     {
         readonly ITransportFactory _transportFactory;
+        readonly ISendPipe _sendPipe;
         readonly Uri _address;
 
-        public TransportSendEndpoint(ITransportFactory transportFactory, Uri address)
+        public TransportSendEndpoint(ITransportFactory transportFactory, ISendPipe sendPipe, Uri address)
         {
             _transportFactory = transportFactory;
+            _sendPipe = sendPipe;
             _address = address;
         }
 
@@ -125,6 +136,7 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
                 MessageId = Guid.NewGuid().ToString()
             };
 
+            await _sendPipe.Send(context);
             await transport.Send(message, context, cancellationToken);
         }
     }

@@ -44,7 +44,9 @@ public class ConsumeContextTests
         try
         {
             var receiveContext = new ReceiveContextImpl(envelope, cts.Token);
-            var sut = new ConsumeContextImpl<string>(receiveContext, new StubTransportFactory());
+            var sut = new ConsumeContextImpl<string>(receiveContext, new StubTransportFactory(),
+                new SendPipe(Pipe.Empty<SendContext>()),
+                new PublishPipe(Pipe.Empty<SendContext>()));
 
             Assert.Equal(cts.Token, sut.CancellationToken);
         }

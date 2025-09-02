@@ -12,6 +12,10 @@ public interface IRegistrationConfigurator
         where TConsumer : class, IConsumer<TMessage>
         where TMessage : class;
 
+    void ConfigureSend(Action<PipeConfigurator<SendContext>> configure);
+
+    void ConfigurePublish(Action<PipeConfigurator<SendContext>> configure);
+
     /*
     IConsumerRegistrationConfigurator<T> AddConsumer<T>(Action<IRegistrationContext, IConsumerConfigurator<T>> configure = null)
             where T : class, IConsumer;

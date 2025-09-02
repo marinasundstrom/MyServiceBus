@@ -1,10 +1,11 @@
 package com.myservicebus.rabbitmq;
 
 import com.myservicebus.BusRegistrationConfigurator;
+import com.myservicebus.GenericRequestClientFactory;
 import com.myservicebus.RequestClientFactory;
 import com.myservicebus.RequestClientTransport;
 import com.myservicebus.SendEndpointProvider;
-import com.myservicebus.GenericRequestClientFactory;
+import com.myservicebus.SendPipe;
 import com.myservicebus.di.ServiceCollection;
 import com.rabbitmq.client.ConnectionFactory;
 
@@ -31,7 +32,8 @@ public class RabbitMqTransport {
 
         services.addSingleton(RabbitMqSendEndpointProvider.class, sp -> () -> {
             RabbitMqTransportFactory factory = sp.getService(RabbitMqTransportFactory.class);
-            return new RabbitMqSendEndpointProvider(factory);
+            SendPipe sendPipe = sp.getService(SendPipe.class);
+            return new RabbitMqSendEndpointProvider(factory, sendPipe);
         });
 
         services.addSingleton(SendEndpointProvider.class,

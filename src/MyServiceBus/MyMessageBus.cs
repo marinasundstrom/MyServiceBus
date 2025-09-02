@@ -10,16 +10,21 @@ public class MyMessageBus : IMessageBus
 {
     private readonly ITransportFactory _transportFactory;
     private readonly IServiceProvider _serviceProvider;
+    private readonly ISendPipe _sendPipe;
+    private readonly IPublishPipe _publishPipe;
 
     private readonly List<IReceiveTransport> _activeTransports = new();
 
     // Key = message type URN, Value = registration containing message type and pipeline
     private readonly Dictionary<string, (Type MessageType, IConsumePipe Pipe)> _consumers = new();
 
-    public MyMessageBus(ITransportFactory transportFactory, IServiceProvider serviceProvider)
+    public MyMessageBus(ITransportFactory transportFactory, IServiceProvider serviceProvider,
+        ISendPipe sendPipe, IPublishPipe publishPipe)
     {
         _transportFactory = transportFactory;
         _serviceProvider = serviceProvider;
+        _sendPipe = sendPipe;
+        _publishPipe = publishPipe;
     }
 
     [Throws(typeof(UriFormatException))]
@@ -37,8 +42,8 @@ public class MyMessageBus : IMessageBus
             MessageId = Guid.NewGuid().ToString()
         };
 
-        //context.Headers["message-type"] = typeof(T).FullName!;
-
+        await _publishPipe.Send(context);
+        await _sendPipe.Send(context);
         await transport.Send(message, context, cancellationToken);
     }
 
@@ -97,7 +102,7 @@ public class MyMessageBus : IMessageBus
             return;
 
         var consumeContextType = typeof(ConsumeContextImpl<>).MakeGenericType(registration.MessageType);
-        var consumeContext = (ConsumeContext)Activator.CreateInstance(consumeContextType, context, _transportFactory)
+        var consumeContext = (ConsumeContext)Activator.CreateInstance(consumeContextType, context, _transportFactory, _sendPipe, _publishPipe)
             ?? throw new InvalidOperationException("Failed to create ConsumeContext");
 
         await registration.Pipe.Send(consumeContext);

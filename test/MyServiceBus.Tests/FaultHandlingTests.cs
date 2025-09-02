@@ -37,7 +37,9 @@ public class FaultHandlingTests
             ResponseAddress = new Uri("rabbitmq://localhost/response")
         };
 
-        var context = new ConsumeContextImpl<TestMessage>(receiveContext, transportFactory);
+        var context = new ConsumeContextImpl<TestMessage>(receiveContext, transportFactory,
+            new SendPipe(Pipe.Empty<SendContext>()),
+            new PublishPipe(Pipe.Empty<SendContext>()));
         var filter = new ConsumerMessageFilter<FaultingConsumer, TestMessage>(provider);
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => filter.Send(context, Pipe.Empty<ConsumeContext<TestMessage>>()));
