@@ -2,6 +2,8 @@
 
 This guide compares basic usage of MyServiceBus in C# and Java. It covers setup, configuration, transports, and the common ways to publish, send, and consume messages, including the in-memory mediator.
 
+For an explanation of why the C# and Java examples differ, see the [design decisions](design-decisions.md).
+
 ## Setup and Configuration
 
 ### C#
