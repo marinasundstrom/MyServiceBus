@@ -7,10 +7,12 @@ import com.rabbitmq.client.Channel;
 public class RabbitMqSendTransport implements SendTransport {
     private final Channel channel;
     private final String exchange;
+    private final String routingKey;
 
-    public RabbitMqSendTransport(Channel channel, String exchange) {
+    public RabbitMqSendTransport(Channel channel, String exchange, String routingKey) {
         this.channel = channel;
         this.exchange = exchange;
+        this.routingKey = routingKey;
     }
 
     @Override
@@ -19,7 +21,7 @@ public class RabbitMqSendTransport implements SendTransport {
             AMQP.BasicProperties props = new AMQP.BasicProperties.Builder()
                     .contentType("application/vnd.mybus.envelope+json")
                     .build();
-            channel.basicPublish(exchange, "", props, data);
+            channel.basicPublish(exchange, routingKey, props, data);
         } catch (Exception e) {
             throw new RuntimeException("Failed to send message", e);
         }
