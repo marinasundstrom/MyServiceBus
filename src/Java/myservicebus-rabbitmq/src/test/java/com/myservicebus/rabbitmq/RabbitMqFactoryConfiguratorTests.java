@@ -40,13 +40,13 @@ public class RabbitMqFactoryConfiguratorTests {
             e.configureConsumer(context, MyConsumer.class);
         });
 
-        ConsumerRegistry registry = provider.getService(ConsumerRegistry.class);
-        ConsumerDefinition<?, ?> def = registry.getAll().stream()
+        TopologyRegistry registry = provider.getService(TopologyRegistry.class);
+        ConsumerTopology def = registry.getConsumers().stream()
                 .filter(d -> d.getConsumerType().equals(MyConsumer.class))
                 .findFirst()
                 .orElseThrow();
 
         assertEquals("custom-queue", def.getQueueName());
-        assertEquals("custom-exchange", def.getExchangeName());
+        assertEquals("custom-exchange", def.getBindings().get(0).getEntityName());
     }
 }

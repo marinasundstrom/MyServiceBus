@@ -1,7 +1,7 @@
 package com.myservicebus.mediator;
 
-import com.myservicebus.ConsumerDefinition;
-import com.myservicebus.ConsumerRegistry;
+import com.myservicebus.ConsumerTopology;
+import com.myservicebus.TopologyRegistry;
 import com.myservicebus.ConsumeContext;
 import com.myservicebus.Consumer;
 import com.myservicebus.SendEndpoint;
@@ -22,12 +22,14 @@ public class MediatorSendEndpoint implements SendEndpoint {
 
     @Override
     public <T> CompletableFuture<Void> send(T message, CancellationToken cancellationToken) {
-        ConsumerRegistry registry = serviceProvider.getService(ConsumerRegistry.class);
-        List<ConsumerDefinition<?, ?>> defs = registry.getAll();
+        TopologyRegistry registry = serviceProvider.getService(TopologyRegistry.class);
+        List<ConsumerTopology> defs = registry.getConsumers();
         List<CompletableFuture<Void>> tasks = new ArrayList<>();
 
-        for (ConsumerDefinition<?, ?> def : defs) {
-            if (def.getMessageType().isAssignableFrom(message.getClass())) {
+        for (ConsumerTopology def : defs) {
+            boolean match = def.getBindings().stream()
+                    .anyMatch(b -> b.getMessageType().isAssignableFrom(message.getClass()));
+            if (match) {
                 try (ServiceScope scope = serviceProvider.createScope()) {
                     ServiceProvider scoped = scope.getServiceProvider();
                     @SuppressWarnings("unchecked")

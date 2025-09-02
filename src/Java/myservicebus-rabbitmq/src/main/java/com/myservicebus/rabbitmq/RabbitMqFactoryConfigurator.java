@@ -1,7 +1,8 @@
 package com.myservicebus.rabbitmq;
 
-import com.myservicebus.ConsumerRegistry;
-import com.myservicebus.ConsumerDefinition;
+import com.myservicebus.ConsumerTopology;
+import com.myservicebus.TopologyRegistry;
+import com.myservicebus.MessageBinding;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Consumer;
@@ -30,8 +31,8 @@ public class RabbitMqFactoryConfigurator {
         if (configure != null) {
             configure.accept((context, consumerClass) -> {
                 try {
-                    ConsumerRegistry registry = context.getServiceProvider().getService(ConsumerRegistry.class);
-                    ConsumerDefinition<?, ?> def = registry.getAll().stream()
+                    TopologyRegistry registry = context.getServiceProvider().getService(TopologyRegistry.class);
+                    ConsumerTopology def = registry.getConsumers().stream()
                             .filter(d -> d.getConsumerType().equals(consumerClass))
                             .findFirst()
                             .orElseThrow(() -> new IllegalStateException(
@@ -39,9 +40,10 @@ public class RabbitMqFactoryConfigurator {
 
                     def.setQueueName(queueName);
 
-                    String exchange = exchangeNames.get(def.getMessageType());
+                    MessageBinding binding = def.getBindings().get(0);
+                    String exchange = exchangeNames.get(binding.getMessageType());
                     if (exchange != null) {
-                        def.setExchangeName(exchange);
+                        binding.setEntityName(exchange);
                     }
                 } catch (Exception ex) {
                     throw new RuntimeException(
