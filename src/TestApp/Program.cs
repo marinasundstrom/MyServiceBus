@@ -102,7 +102,7 @@ app.MapGet("/publish", async (IMessageBus messageBus, CancellationToken cancella
 
 app.MapPost("/send", async (ISendEndpoint sendEndpoint, CancellationToken cancellationToken = default) =>
 {
-    await sendEndpoint.Send(new SubmitOrder { OrderId = Guid.NewGuid() }, cancellationToken);
+    await sendEndpoint.Send(new SubmitOrder { OrderId = Guid.NewGuid(), Message = "MT Clone C#" }, cancellationToken);
 })
 .WithName("Test_Send")
 .WithTags("Test");

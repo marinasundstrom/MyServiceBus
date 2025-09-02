@@ -90,6 +90,13 @@ app.MapGet("/publish", async (IPublishEndpoint publishEndpoint, CancellationToke
 .WithName("Test_Publish")
 .WithTags("Test");
 
+app.MapPost("/send", async (ISendEndpoint sendEndpoint, CancellationToken cancellationToken = default) =>
+{
+    await sendEndpoint.Send(new SubmitOrder { OrderId = Guid.NewGuid(), Message = "MT" }, cancellationToken);
+})
+.WithName("Test_Send")
+.WithTags("Test");
+
 app.Run();
 
 record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)

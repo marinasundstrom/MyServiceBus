@@ -8,11 +8,13 @@ class TestRequestConsumer :
 {
     public async Task Consume(ConsumeContext<TestRequest> context)
     {
-        Console.WriteLine($"Request: {context.Message.Message}");
+        var message = context.Message.Message;
+
+        Console.WriteLine($"Request: {message}");
 
         await context.RespondAsync(new TestResponse
         {
-            Message = "Foo"
+            Message = $"{message} 42"
         });
     }
 }

@@ -7,10 +7,13 @@ import java.util.concurrent.TimeoutException;
 
 import com.myservicebus.MyService;
 import com.myservicebus.MyServiceImpl;
+import com.myservicebus.RequestClientFactory;
+import com.myservicebus.SendEndpointProvider;
 import com.myservicebus.ServiceBus;
 import com.myservicebus.di.ServiceCollection;
 import com.myservicebus.di.ServiceProvider;
 import com.myservicebus.rabbitmq.RabbitMqBusFactory;
+import com.myservicebus.tasks.CancellationToken;
 
 public class Main {
     public static void main(String[] args) {
@@ -20,6 +23,7 @@ public class Main {
         RabbitMqBusFactory.configure(services, cfg -> {
             cfg.addConsumer(SubmitOrderConsumer.class);
             cfg.addConsumer(OrderSubmittedConsumer.class);
+            cfg.addConsumer(TestRequestConsumer.class);
         }, (context, cfg) -> {
             cfg.host("localhost", h -> {
                 h.username("guest");
@@ -49,47 +53,30 @@ public class Main {
             }
         });
 
-        System.out.println("Up and running");
-    }
-
-    public static void main_old(String[] args) throws Exception {
-        ServiceCollection services = new ServiceCollection();
-        services.addScoped(MyService.class, MyServiceImpl.class);
-
-        RabbitMqBusFactory.configure(services, cfg -> {
-            cfg.addConsumer(SubmitOrderConsumer.class);
-        }, (context, cfg) -> {
-            cfg.host("localhost", h -> {
-                h.username("guest");
-                h.password("guest");
-            });
-
-            // cfg.message(SubmitOrder.class, m -> {
-            //     m.setEntityName("TestApp.SubmitOrder");
-            // });
-
-            // cfg.message(OrderSubmitted.class, m -> {
-            //     m.setEntityName("TestApp.OrderSubmitted");
-            // });
-
-            // cfg.receiveEndpoint("submit-order-consumer", e -> {
-            //     e.configureConsumer(context, SubmitOrderConsumer.class);
-            // });
+        app.get("/send", ctx -> {
+            var sendEndpointProvider = provider.getService(SendEndpointProvider.class);
+            var sendEndpoint = sendEndpointProvider.getSendEndpoint("");
+            SubmitOrder message = new SubmitOrder(UUID.randomUUID(), "MT Clone Java");
+            try {
+                sendEndpoint.send(message, CancellationToken.none);
+                ctx.result("Published SubmitOrder");
+            } catch (Exception e) {
+                ctx.status(500).result("Failed to publish message");
+            }
         });
 
-        ServiceProvider provider = services.build();
-        ServiceBus serviceBus = provider.getService(ServiceBus.class);
-
-        serviceBus.start();
+        app.get("/request", ctx -> {
+            var requestClientFactory = provider.getService(RequestClientFactory.class);
+            var requestClient = requestClientFactory.create(TestRequest.class);
+            try {
+                var response = requestClient
+                        .getResponse(new TestRequest("Foo"), TestResponse.class, CancellationToken.none).get();
+                ctx.result(response.getMessage());
+            } catch (Exception e) {
+                ctx.status(500).result("Failed to publish message");
+            }
+        });
 
         System.out.println("Up and running");
-
-        SubmitOrder message = new SubmitOrder(UUID.randomUUID(), "MT Clone Java");
-
-        serviceBus.publish(message);
-
-        System.out.println("Waiting");
-
-        System.in.read();
     }
 }
