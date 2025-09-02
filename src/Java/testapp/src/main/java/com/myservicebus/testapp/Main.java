@@ -8,7 +8,7 @@ import java.util.concurrent.TimeoutException;
 import com.myservicebus.MyService;
 import com.myservicebus.MyServiceImpl;
 import com.myservicebus.RequestClientFactory;
-import com.myservicebus.SendEndpointProvider;
+import com.myservicebus.SendEndpoint;
 import com.myservicebus.ServiceBus;
 import com.myservicebus.di.ServiceCollection;
 import com.myservicebus.di.ServiceProvider;
@@ -54,11 +54,10 @@ public class Main {
         });
 
         app.get("/send", ctx -> {
-            var sendEndpointProvider = provider.getService(SendEndpointProvider.class);
-            var sendEndpoint = sendEndpointProvider.getSendEndpoint("");
+            var sendEndpoint = provider.getService(SendEndpoint.class);
             SubmitOrder message = new SubmitOrder(UUID.randomUUID(), "MT Clone Java");
             try {
-                sendEndpoint.send(message, CancellationToken.none);
+                sendEndpoint.send(message, CancellationToken.none).join();
                 ctx.result("Published SubmitOrder");
             } catch (Exception e) {
                 ctx.status(500).result("Failed to publish message");

@@ -5,6 +5,7 @@ import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeFormatterBuilder;
 import java.time.temporal.ChronoField;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeoutException;
 
 import com.fasterxml.jackson.core.JsonParser;
@@ -21,12 +22,11 @@ import com.rabbitmq.client.BuiltinExchangeType;
 import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.Connection;
 
-public class ServiceBus {
+public class ServiceBus implements SendEndpoint {
     private final ServiceProvider serviceProvider;
     private final ConnectionProvider connectionProvider;
     private final SendEndpointProvider sendEndpointProvider;
     private final PublishPipe publishPipe;
-    private final SendPipe sendPipe;
     private Connection connection;
     private Channel channel;
     private ObjectMapper mapper;
@@ -36,7 +36,6 @@ public class ServiceBus {
         this.connectionProvider = serviceProvider.getService(ConnectionProvider.class);
         this.sendEndpointProvider = serviceProvider.getService(SendEndpointProvider.class);
         this.publishPipe = serviceProvider.getService(PublishPipe.class);
-        this.sendPipe = serviceProvider.getService(SendPipe.class);
 
         mapper = new ObjectMapper();
         mapper.findAndRegisterModules();
@@ -150,6 +149,22 @@ public class ServiceBus {
         } catch (Exception ex) {
             throw new IOException("Failed to publish message", ex);
         }
+    }
+
+    @Override
+    public <T> CompletableFuture<Void> send(T message, CancellationToken cancellationToken) {
+        if (message == null)
+            return CompletableFuture
+                    .failedFuture(new IllegalArgumentException("Message cannot be null"));
+
+        String queue = NamingConventions.getQueueName(message.getClass());
+        SendContext ctx = new SendContext(message, cancellationToken);
+        var endpoint = sendEndpointProvider.getSendEndpoint("rabbitmq://localhost/" + queue);
+        return endpoint.send(ctx);
+    }
+
+    public <T> CompletableFuture<Void> send(T message) {
+        return send(message, CancellationToken.none);
     }
 
     public void stop() throws IOException, TimeoutException {
