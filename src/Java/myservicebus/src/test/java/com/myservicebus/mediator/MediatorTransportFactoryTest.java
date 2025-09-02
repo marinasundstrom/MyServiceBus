@@ -2,6 +2,8 @@ package com.myservicebus.mediator;
 
 import com.myservicebus.ConsumeContext;
 import com.myservicebus.Consumer;
+import com.myservicebus.Handler;
+import com.myservicebus.tasks.CancellationToken;
 import com.myservicebus.di.ServiceCollection;
 import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.Assertions;
@@ -24,6 +26,16 @@ public class MediatorTransportFactoryTest {
         }
     }
 
+    public static class TestHandler implements Handler<TestMessage> {
+        static CompletableFuture<TestMessage> received = new CompletableFuture<>();
+
+        @Override
+        public CompletableFuture<Void> handle(TestMessage message, CancellationToken cancellationToken) {
+            received.complete(message);
+            return CompletableFuture.completedFuture(null);
+        }
+    }
+
     @Test
     public void publishDeliversMessageToConsumer() {
         ServiceCollection services = new ServiceCollection();
@@ -35,5 +47,18 @@ public class MediatorTransportFactoryTest {
         bus.publish(new TestMessage("hello"));
 
         Assertions.assertEquals("hello", TestConsumer.received.join().getValue());
+    }
+
+    @Test
+    public void publishDeliversMessageToHandler() {
+        ServiceCollection services = new ServiceCollection();
+        MediatorBus bus = MediatorBus.configure(services, cfg -> {
+            cfg.addConsumer(TestHandler.class);
+        });
+
+        TestHandler.received = new CompletableFuture<>();
+        bus.publish(new TestMessage("handler"));
+
+        Assertions.assertEquals("handler", TestHandler.received.join().getValue());
     }
 }

@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using MyServiceBus;
 using MyServiceBus.Serialization;
 using MyServiceBus.Topology;
 using Xunit;
@@ -27,6 +28,17 @@ public class MediatorTransportFactoryTests
         public Task Consume(ConsumeContext<ConsumerMessage> context)
         {
             Received.TrySetResult(context.Message);
+            return Task.CompletedTask;
+        }
+    }
+
+    class SampleHandler : Handler<ConsumerMessage>
+    {
+        public static TaskCompletionSource<ConsumerMessage> Received = new();
+
+        public override Task Handle(ConsumerMessage message, CancellationToken cancellationToken)
+        {
+            Received.TrySetResult(message);
             return Task.CompletedTask;
         }
     }
@@ -94,6 +106,34 @@ public class MediatorTransportFactoryTests
 
         var message = await SampleConsumer.Received.Task;
         Assert.Equal("hello", message.Value);
+
+        await hosted.StopAsync(CancellationToken.None);
+    }
+
+    [Fact]
+    [Throws(typeof(EqualException), typeof(Exception))]
+    public async Task Publish_delivers_message_to_registered_handler()
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddServiceBus(cfg =>
+        {
+            cfg.UsingMediator();
+            cfg.AddConsumer<SampleHandler>();
+        });
+
+        using var provider = services.BuildServiceProvider();
+
+        var hosted = provider.GetRequiredService<IHostedService>();
+        await hosted.StartAsync(CancellationToken.None);
+
+        SampleHandler.Received = new TaskCompletionSource<ConsumerMessage>();
+
+        var bus = provider.GetRequiredService<IMessageBus>();
+        await bus.Publish(new ConsumerMessage { Value = "handler" });
+
+        var message = await SampleHandler.Received.Task;
+        Assert.Equal("handler", message.Value);
 
         await hosted.StopAsync(CancellationToken.None);
     }
