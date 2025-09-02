@@ -21,7 +21,7 @@ The ServiceBus C# client provides a lightweight messaging abstraction for buildi
 - All pipe contexts carry a `CancellationToken`, allowing operations to observe shutdown or timeout signals.
 
 ### Transport Abstraction
-- An `ITransportFactory` resolves `ISendTransport` and `IReceiveTransport` implementations; the RabbitMQ factory ensures exchanges and queues exist before use.
+- An `ITransportFactory` resolves `ISendTransport` and `IReceiveTransport` implementations; the RabbitMQ factory ensures exchanges and queues exist before use and relies on a shared `ConnectionProvider` that reconnects with exponential backoff when the link drops.
 
 ### Error Handling and Faults
 - When consumers encounter exceptions, `Fault<T>` messages describe the failure and are dispatched to the configured fault address.
