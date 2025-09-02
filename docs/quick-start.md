@@ -72,6 +72,23 @@ interfaces rather than concrete implementations.
 
 Consumers are registered as scoped dependencies and created per message.
 
+```java
+public class MyService
+{
+    private IPublishEndpoint publishEndpoint;
+
+    public MyService(IPublishEndpoint publishEndpoint)
+    {
+        this.publishEndpoint = publishEndpoint;
+    }
+
+    public async Task DoWork(MyEvent ev) 
+    {
+        await publishEndpoint.Publish(ev);
+    }
+}
+```
+
 ### Java
 
 `RabbitMqBus.configure` populates a `ServiceCollection` with analogous
@@ -80,10 +97,6 @@ types:
 - `ServiceBus` – **singleton** providing `start`, `publish`, and
   transport management.
 - `PublishEndpoint` – **scoped** facade for publishing events.
-  `ConsumeContext` implements this interface so it can be injected
-  directly. The context resolves the underlying endpoint using
-  `SendEndpointProvider` when `publish` is called, eliminating the need
-  for a `PublishEndpointProvider`.
 - `SendEndpointProvider` – **singleton**; call `getSendEndpoint(uri)` to
   obtain a `SendEndpoint` when sending.
 - `RequestClientFactory` – **singleton** used to create transient
@@ -92,6 +105,20 @@ types:
 Consumers are registered as scoped services. Because Java's container
 cannot infer generic types, endpoints and request clients are typically
 obtained from providers or factories rather than injected directly.
+
+```java
+public class MyService {
+    private final PublishEndpoint publishEndpoint;
+
+    public MyService(PublishEndpoint publishEndpoint) {
+        this.publishEndpoint = publishEndpoint;
+    }
+
+    public CompletableFuture<Void> doWork(MyEvent event) {
+        return publishEndpoint.publish(event, CancellationToken.none());
+    }
+}
+```
 
 ## Publishing
 
