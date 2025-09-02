@@ -35,8 +35,8 @@ public class RabbitMqRequestClientTransport implements RequestClientTransport {
     }
 
     @Override
-    public <TRequest, TResponse> CompletableFuture<TResponse> sendRequest(TRequest request, Class<TResponse> responseType,
-            CancellationToken cancellationToken) {
+    public <TRequest, TResponse> CompletableFuture<TResponse> sendRequest(Class<TRequest> requestType, TRequest request,
+            Class<TResponse> responseType, CancellationToken cancellationToken) {
         CompletableFuture<TResponse> future = new CompletableFuture<>();
         try {
             Connection connection = connectionProvider.getOrCreateConnection();
@@ -54,8 +54,7 @@ public class RabbitMqRequestClientTransport implements RequestClientTransport {
                     future.complete(envelope.getMessage());
                 } catch (Exception ex) {
                     try {
-                        JavaType faultInner = mapper.getTypeFactory().constructParametricType(Fault.class,
-                                request.getClass());
+                        JavaType faultInner = mapper.getTypeFactory().constructParametricType(Fault.class, requestType);
                         JavaType faultType = mapper.getTypeFactory().constructParametricType(Envelope.class, faultInner);
                         Envelope<Fault<TRequest>> fault = mapper.readValue(delivery.getBody(), faultType);
                         String msg = fault.getMessage().getExceptions().isEmpty() ? "Request faulted"
@@ -77,7 +76,7 @@ public class RabbitMqRequestClientTransport implements RequestClientTransport {
             channel.basicConsume(responseQueue, true, callback, consumerTag -> {
             });
 
-            String exchange = NamingConventions.getExchangeName(request.getClass());
+            String exchange = NamingConventions.getExchangeName(requestType);
             channel.exchangeDeclare(exchange, BuiltinExchangeType.FANOUT, true);
 
             Envelope<TRequest> envelope = new Envelope<>();
@@ -86,7 +85,7 @@ public class RabbitMqRequestClientTransport implements RequestClientTransport {
             envelope.setSentTime(OffsetDateTime.now());
             envelope.setDestinationAddress("rabbitmq://localhost/" + exchange);
             envelope.setResponseAddress("rabbitmq://localhost/" + responseExchange);
-            envelope.setMessageType(List.of(NamingConventions.getMessageUrn(request.getClass())));
+            envelope.setMessageType(List.of(NamingConventions.getMessageUrn(requestType)));
             envelope.setMessage(request);
             envelope.setHeaders(Map.of());
             envelope.setContentType("application/json");

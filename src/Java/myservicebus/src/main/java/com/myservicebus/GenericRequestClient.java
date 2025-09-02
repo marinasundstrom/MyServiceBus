@@ -19,6 +19,6 @@ public class GenericRequestClient<TRequest> implements RequestClient<TRequest> {
     @Override
     public <TResponse> CompletableFuture<TResponse> getResponse(TRequest request, Class<TResponse> responseType,
             CancellationToken cancellationToken) {
-        return transport.sendRequest(request, responseType, cancellationToken);
+        return transport.sendRequest(requestType, request, responseType, cancellationToken);
     }
 }
