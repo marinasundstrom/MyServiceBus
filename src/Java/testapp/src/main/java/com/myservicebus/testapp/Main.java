@@ -14,7 +14,7 @@ public class Main {
 
         var serviceBus = RabbitMqBus.configure(services, cfg -> {
             cfg.addConsumer(SubmitOrderConsumer.class);
-
+        }, (context, cfg) -> {
             cfg.host("localhost", h -> {
                 h.username("guest");
                 h.password("guest");
@@ -24,11 +24,11 @@ public class Main {
              * cfg.message(SubmitOrder.class, m -> {
              * m.setEntityName("TestApp.SubmitOrder");
              * });
-             * 
+             *
              * cfg.message(OrderSubmitted.class, m -> {
              * m.setEntityName("TestApp.OrderSubmitted");
              * });
-             * 
+             *
              * cfg.receiveEndpoint("submit-order-consumer", e -> {
              * e.configureConsumer(context, SubmitOrderConsumer.class);
              * });
