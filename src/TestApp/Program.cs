@@ -9,7 +9,7 @@ builder.Services.AddServiceBus(x =>
 {
     x.AddConsumer<SubmitOrderConsumer>();
     x.AddConsumer<OrderSubmittedConsumer>();
-    // x.AddConsumer<TestRequestConsumer>();
+    x.AddConsumer<TestRequestConsumer>();
 
     x.UsingRabbitMq((context, cfg) =>
     {
@@ -111,11 +111,11 @@ app.MapPost("/send", async (ISendEndpoint sendEndpoint, CancellationToken cancel
 app.MapGet("/request", async Task<Results<Ok<string>, InternalServerError<string>, NoContent>> (IRequestClient<TestRequest> client, CancellationToken cancellationToken = default) =>
 {
     var message = new TestRequest() { Message = "Foo" };
-    var response = await client.GetResponseAsync<TestResponse, Fault<TestResponse>>(message, null, cancellationToken);
+    var response = await client.GetResponseAsync<TestResponse, Fault<TestRequest>>(message, null, cancellationToken);
 
     if (response.Is(out Response<TestResponse> status))
         return TypedResults.Ok(status.Message.Message);
-    else if (response.Is(out Response<Fault<TestResponse>> fault))
+    else if (response.Is(out Response<Fault<TestRequest>> fault))
         return TypedResults.InternalServerError(fault.Message.Exceptions[0].Message);
 
     return TypedResults.NoContent();
