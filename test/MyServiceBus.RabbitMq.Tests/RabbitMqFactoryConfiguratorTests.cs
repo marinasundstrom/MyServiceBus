@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 using Xunit;
 using Xunit.Sdk;
 
-namespace MyServiceBus.Tests;
+namespace MyServiceBus.RabbitMq.Tests;
 
 public class RabbitMqFactoryConfiguratorTests
 {
