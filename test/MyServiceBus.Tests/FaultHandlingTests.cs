@@ -18,11 +18,12 @@ public class FaultHandlingTests
 
     class FaultingConsumer : IConsumer<TestMessage>
     {
+        [Throws(typeof(InvalidOperationException))]
         public Task Consume(ConsumeContext<TestMessage> context) => throw new InvalidOperationException("boom");
     }
 
     [Fact]
-    [Throws(typeof(EqualException), typeof(Exception))]
+    [Throws(typeof(Exception))]
     public async Task Sends_fault_when_consumer_throws()
     {
         var services = new ServiceCollection();
@@ -42,9 +43,14 @@ public class FaultHandlingTests
             new SendPipe(Pipe.Empty<SendContext>()),
             new PublishPipe(Pipe.Empty<SendContext>()),
             new EnvelopeMessageSerializer());
-        var filter = new ConsumerMessageFilter<FaultingConsumer, TestMessage>(provider);
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => filter.Send(context, Pipe.Empty<ConsumeContext<TestMessage>>()));
+        var configurator = new PipeConfigurator<ConsumeContext<TestMessage>>();
+        configurator.UseFilter(new ConsumerFaultFilter<FaultingConsumer, TestMessage>(provider));
+        configurator.UseRetry(1);
+        configurator.UseFilter(new ConsumerMessageFilter<FaultingConsumer, TestMessage>(provider));
+        var pipe = new ConsumePipe<TestMessage>(configurator.Build());
+
+        await pipe.Send(context);
 
         var fault = Assert.IsType<Fault<TestMessage>>(transportFactory.SendTransport.Sent);
         Assert.Equal("boom", fault.Exceptions[0].Message);
@@ -68,6 +74,7 @@ public class FaultHandlingTests
         public Task<ISendTransport> GetSendTransport(Uri address, CancellationToken cancellationToken = default)
             => Task.FromResult<ISendTransport>(SendTransport);
 
+        [Throws(typeof(NotImplementedException))]
         public Task<IReceiveTransport> CreateReceiveTransport(ReceiveEndpointTopology topology, Func<ReceiveContext, Task> handler, CancellationToken cancellationToken = default)
             => throw new NotImplementedException();
     }
@@ -81,6 +88,7 @@ public class FaultHandlingTests
         public Uri? FaultAddress { get; set; }
         public IDictionary<string, object> Headers { get; } = new Dictionary<string, object>();
         public CancellationToken CancellationToken => CancellationToken.None;
+        [Throws(typeof(InvalidCastException))]
         public bool TryGetMessage<T>(out T? message) where T : class
         {
             if (typeof(T) == typeof(TestMessage))

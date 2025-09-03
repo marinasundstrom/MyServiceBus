@@ -72,6 +72,7 @@ public class MyMessageBus : IMessageBus
         var receiveTransport = await _transportFactory.CreateReceiveTransport(topology, HandleMessageAsync, cancellationToken);
 
         var configurator = new PipeConfigurator<ConsumeContext<TMessage>>();
+        configurator.UseFilter(new ConsumerFaultFilter<TConsumer, TMessage>(_serviceProvider));
         configurator.UseRetry(3);
         configurator.UseFilter(new ConsumerMessageFilter<TConsumer, TMessage>(_serviceProvider));
         if (configure is Action<PipeConfigurator<ConsumeContext<TMessage>>> cfg)
@@ -99,7 +100,7 @@ public class MyMessageBus : IMessageBus
         await Task.WhenAll(_activeTransports.Select(async transport => await transport.Stop(cancellationToken)));
     }
 
-    [Throws(typeof(InvalidOperationException), typeof(ArgumentException), typeof(NotSupportedException), typeof(InvalidCastException), typeof(TargetInvocationException), typeof(MemberAccessException), typeof(InvalidComObjectException), typeof(COMException))]
+    [Throws(typeof(InvalidOperationException), typeof(ArgumentException), typeof(NotSupportedException), typeof(InvalidCastException), typeof(TargetInvocationException), typeof(MemberAccessException), typeof(InvalidComObjectException), typeof(COMException), typeof(TypeLoadException))]
     private async Task HandleMessageAsync(ReceiveContext context)
     {
         var messageTypeName = context.MessageType.First();

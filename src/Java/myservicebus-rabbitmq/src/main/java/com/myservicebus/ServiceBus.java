@@ -8,6 +8,8 @@ import java.time.temporal.ChronoField;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeoutException;
 
+import org.slf4j.Logger;
+
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.DeserializationContext;
 import com.fasterxml.jackson.databind.JsonDeserializer;
@@ -28,6 +30,7 @@ public class ServiceBus implements SendEndpoint, PublishEndpoint {
     private final ConnectionProvider connectionProvider;
     private final SendEndpointProvider sendEndpointProvider;
     private final PublishPipe publishPipe;
+    private final Logger logger;
     private Connection connection;
     private Channel channel;
     private ObjectMapper mapper;
@@ -37,6 +40,7 @@ public class ServiceBus implements SendEndpoint, PublishEndpoint {
         this.connectionProvider = serviceProvider.getService(ConnectionProvider.class);
         this.sendEndpointProvider = serviceProvider.getService(SendEndpointProvider.class);
         this.publishPipe = serviceProvider.getService(PublishPipe.class);
+        this.logger = serviceProvider.getService(Logger.class);
 
         mapper = new ObjectMapper();
         mapper.findAndRegisterModules();
@@ -75,6 +79,7 @@ public class ServiceBus implements SendEndpoint, PublishEndpoint {
             connection = connectionProvider.getOrCreateConnection();
             channel = connection.createChannel();
         } catch (Exception ex) {
+            logger.error("Failed to start RabbitMQ connection", ex);
             throw new IOException("Failed to start RabbitMQ connection", ex);
         }
 
@@ -84,6 +89,10 @@ public class ServiceBus implements SendEndpoint, PublishEndpoint {
             String queue = consumerDef.getQueueName();
 
             PipeConfigurator<ConsumeContext<Object>> configurator = new PipeConfigurator<>();
+            @SuppressWarnings({"unchecked", "rawtypes"})
+            Filter<ConsumeContext<Object>> faultFilter =
+                    new ConsumerFaultFilter(serviceProvider, consumerDef.getConsumerType());
+            configurator.useFilter(faultFilter);
             configurator.useRetry(3);
             @SuppressWarnings({"unchecked", "rawtypes"})
             Filter<ConsumeContext<Object>> consumerFilter =
@@ -124,15 +133,15 @@ public class ServiceBus implements SendEndpoint, PublishEndpoint {
                     try {
                         channel.basicNack(delivery.getEnvelope().getDeliveryTag(), false, false);
                     } catch (IOException ioEx) {
-                        ioEx.printStackTrace();
+                        logger.error("Failed to nack message", ioEx);
                     }
 
-                    e.printStackTrace();
+                    logger.error("Message handler faulted", e);
                 }
             }, tag -> {
             });
 
-            System.out.println("🚀 Service bus started. Listening on queue: " + queue);
+            logger.info("🚀 Service bus started. Listening on queue: {}", queue);
         }
     }
 
@@ -151,7 +160,7 @@ public class ServiceBus implements SendEndpoint, PublishEndpoint {
         return publishPipe.send(context).thenCompose(v -> {
             var endpoint = sendEndpointProvider.getSendEndpoint("rabbitmq://localhost/exchange/" + exchange);
             return endpoint.send(context).thenRun(() -> {
-                System.out.println("📤 Published message of type " + context.getMessage().getClass().getSimpleName());
+                logger.info("📤 Published message of type {}", context.getMessage().getClass().getSimpleName());
             });
         });
     }

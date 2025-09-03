@@ -1,11 +1,9 @@
 package com.myservicebus;
 
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
 
 import com.myservicebus.di.ServiceProvider;
 import com.myservicebus.di.ServiceScope;
-import com.myservicebus.tasks.CancellationToken;
 
 /**
  * Filter that resolves a consumer from the service provider and invokes it.
@@ -31,18 +29,7 @@ public class ConsumerMessageFilter<T> implements Filter<ConsumeContext<T>> {
             } catch (Exception ex) {
                 consumerFuture = CompletableFuture.failedFuture(ex);
             }
-            return consumerFuture.thenCompose(v -> next.send(context)).handle((v, ex) -> {
-                if (ex != null) {
-                    Throwable cause = ex instanceof CompletionException && ex.getCause() != null ? ex.getCause() : ex;
-                    context.respondFault(cause instanceof Exception ? (Exception) cause : new RuntimeException(cause),
-                            CancellationToken.none).join();
-
-                    // TODO: Log instead
-                    throw new CompletionException(
-                            new RuntimeException("Consumer " + consumerType.getSimpleName() + " failed", cause));
-                }
-                return null;
-            });
+            return consumerFuture.thenCompose(v -> next.send(context));
         }
     }
 }
