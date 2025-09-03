@@ -52,15 +52,18 @@ class SubmitOrderConsumer : IConsumer<SubmitOrder>
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddServiceBus(x =>
 {
+    // Register your consumers
     x.AddConsumer<SubmitOrderConsumer>();
-    x.UsingRabbitMq((context, cfg) => cfg.ConfigureEndpoints(context));
+
+    // Your transport and auto-configure endpoints
+    x.UsingRabbitMq((context, cfg) =>
+    {
+        cfg.ConfigureEndpoints(context);
+    });
 });
 
 var app = builder.Build();
 await app.StartAsync();
-
-await app.Services.GetRequiredService<IPublishEndpoint>()
-    .Publish(new SubmitOrder(Guid.NewGuid()));
 ```
 
 The following example publishes a `SubmitOrder` message that is handled by a consumer which then publishes an `OrderSubmitted` event:
@@ -86,20 +89,6 @@ class SubmitOrderConsumer :
 }
 ```
 
-Register the bus in the dependency injection container:
-
-```csharp
-builder.Services.AddServiceBus(x =>
-{
-    x.AddConsumer<SubmitOrderConsumer>();
-
-    x.UsingRabbitMq((context, cfg) =>
-    {
-        cfg.ConfigureEndpoints(context);
-    });
-});
-```
-
 Publish the `SubmitOrder` message:
 
 ```csharp
@@ -113,40 +102,8 @@ await publishEndpoint.Publish(new SubmitOrder
 ```
 
 #### Java
-```java
-record SubmitOrder(UUID orderId) { }
 
-class SubmitOrderConsumer implements Consumer<SubmitOrder> {
-    @Override
-    public CompletableFuture<Void> consume(ConsumeContext<SubmitOrder> ctx) {
-        return CompletableFuture.completedFuture(null);
-    }
-}
-
-ServiceCollection services = new ServiceCollection();
-RabbitMqBusFactory.configure(services, x -> {
-    x.addConsumer(SubmitOrderConsumer.class);
-}, (context, cfg) -> cfg.host("rabbitmq://localhost"));
-
-ServiceBus bus = services.build().getService(ServiceBus.class);
-bus.start();
-
-bus.publish(new SubmitOrder(UUID.randomUUID()), CancellationToken.none);
-```
-
-Define the messages and consumer:
-
-```java
-record SubmitOrder(UUID orderId) { }
-record OrderSubmitted(UUID orderId) { }
-
-class SubmitOrderConsumer implements Consumer<SubmitOrder> {
-    @Override
-    public CompletableFuture<Void> consume(ConsumeContext<SubmitOrder> context) {
-        return context.publish(new OrderSubmitted(context.getMessage().orderId()), CancellationToken.none);
-    }
-}
-```
+Register the 
 
 Register the bus:
 
@@ -163,6 +120,20 @@ ServiceProvider provider = services.build();
 ServiceBus bus = provider.getService(ServiceBus.class);
 
 bus.start();
+```
+
+Define the messages and consumer:
+
+```java
+record SubmitOrder(UUID orderId) { }
+record OrderSubmitted(UUID orderId) { }
+
+class SubmitOrderConsumer implements Consumer<SubmitOrder> {
+    @Override
+    public CompletableFuture<Void> consume(ConsumeContext<SubmitOrder> context) {
+        return context.publish(new OrderSubmitted(context.getMessage().orderId()), CancellationToken.none);
+    }
+}
 ```
 
 Publish the `SubmitOrder` message:

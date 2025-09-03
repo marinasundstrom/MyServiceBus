@@ -6,6 +6,68 @@ For an explanation of why the C# and Java examples differ, see the [design decis
 
 ## Basics
 
+### Setup
+
+#### C#
+
+```csharp
+var builder = WebApplication.CreateBuilder(args);
+builder.Services.AddServiceBus(x =>
+{
+    // Register your consumers
+    x.AddConsumer<SubmitOrderConsumer>();
+
+    // Your transport and auto-configure endpoints
+    x.UsingRabbitMq((context, cfg) =>
+    {
+        cfg.ConfigureEndpoints(context);
+    });
+});
+
+var app = builder.Build();
+await app.StartAsync();
+```
+
+**Without host**
+
+Outside of an ASP.NET host (or generic host), a factory can populate an
+`IServiceCollection` directly:
+
+```csharp
+var services = new ServiceCollection();
+
+RabbitMqBusFactory.Configure(services, x =>
+{
+    x.AddConsumer<SubmitOrderConsumer>();
+}, (context, cfg) =>
+{
+    cfg.ConfigureEndpoints(context);
+});
+
+var provider = services.BuildServiceProvider();
+var bus = provider.GetRequiredService<IMessageBus>();
+await bus.StartAsync();
+```
+
+#### Java
+
+
+```java
+ServiceCollection services = new ServiceCollection();
+
+RabbitMqBusFactory.configure(services, x -> {
+    x.addConsumer(SubmitOrderConsumer.class);
+}, (context, cfg) -> {
+    cfg.configureEndpoints(context);
+});
+
+ServiceProvider provider = services.build();
+ServiceBus bus = provider.getService(ServiceBus.class);
+
+bus.start();
+```
+
+
 ### Publishing
 
 Publish raises an event to all interested consumers. It is fan-out by
@@ -198,29 +260,6 @@ builder.Services.AddServiceBus(x =>
     x.AddConsumer<SubmitOrderConsumer>();
     x.UsingMediator();
 });
-```
-
-Outside of an ASP.NET host, a factory can populate an
-`IServiceCollection` directly:
-
-```csharp
-var services = new ServiceCollection();
-
-RabbitMqBusFactory.Configure(services, x =>
-{
-    x.AddConsumer<SubmitOrderConsumer>();
-}, (context, cfg) =>
-{
-    cfg.Host("localhost");
-    cfg.ReceiveEndpoint("submit-order-queue", e =>
-    {
-        e.ConfigureConsumer<SubmitOrderConsumer>(context);
-    });
-});
-
-var provider = services.BuildServiceProvider();
-var bus = provider.GetRequiredService<IMessageBus>();
-await bus.StartAsync();
 ```
 
 #### Java
