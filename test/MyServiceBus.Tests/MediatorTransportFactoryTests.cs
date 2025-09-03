@@ -76,15 +76,15 @@ public class MediatorTransportFactoryTests
             CancellationToken = cancellationToken;
         }
 
-        public Task RespondAsync<TResponse>(TResponse message, CancellationToken cancellationToken = default)
+        public Task RespondAsync<TResponse>(TResponse message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default)
         {
             Response.TrySetResult(message);
             return Task.CompletedTask;
         }
 
-        public Task PublishAsync<TMessage>(object message, CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task PublishAsync<TMessage>(object message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default) => Task.CompletedTask;
 
-        public Task PublishAsync<TMessage>(TMessage message, CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task PublishAsync<TMessage>(TMessage message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default) => Task.CompletedTask;
 
         public ISendEndpoint GetSendEndpoint(Uri uri) => throw new NotImplementedException();
     }

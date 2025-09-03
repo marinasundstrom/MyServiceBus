@@ -85,9 +85,9 @@ using IServiceScope scope = serviceScopeFactory.CreateScope();
 
 var publishEndpoint = scope.GetService<IPublishEndpoint>();
 await publishEndpoint.Publish(new SubmitOrder
-{
+{ 
     OrderId = Guid.NewGuid()
-});
+}, ctx => ctx.Headers["trace-id"] = Guid.NewGuid());
 ```
 
 #### Java
@@ -125,7 +125,7 @@ bus.start();
 Publish the `SubmitOrder` message:
 
 ```java
-bus.publish(new SubmitOrder(UUID.randomUUID()), CancellationToken.none).join();
+bus.publish(new SubmitOrder(UUID.randomUUID()), ctx -> ctx.getHeaders().put("trace-id", UUID.randomUUID())).join();
 ```
 
 ## Repository structure

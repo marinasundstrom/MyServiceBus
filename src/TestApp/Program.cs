@@ -95,14 +95,14 @@ app.MapPost("/publish", async (IPublishEndpoint publishEndpoint, CancellationTok
 app.MapGet("/publish", async (IMessageBus messageBus, CancellationToken cancellationToken = default) =>
 {
     var message = new SubmitOrder() { OrderId = Guid.NewGuid(), Message = "MT Clone C#" };
-    await messageBus.Publish(message, cancellationToken);
+    await messageBus.Publish(message, null, cancellationToken);
 })
 .WithName("Test_Publish")
 .WithTags("Test");
 
 app.MapPost("/send", async (ISendEndpoint sendEndpoint, CancellationToken cancellationToken = default) =>
 {
-    await sendEndpoint.Send(new SubmitOrder { OrderId = Guid.NewGuid(), Message = "MT Clone C#" }, cancellationToken);
+    await sendEndpoint.Send(new SubmitOrder { OrderId = Guid.NewGuid(), Message = "MT Clone C#" }, null, cancellationToken);
 })
 .WithName("Test_Send")
 .WithTags("Test");
@@ -110,7 +110,7 @@ app.MapPost("/send", async (ISendEndpoint sendEndpoint, CancellationToken cancel
 app.MapGet("/request", async (IRequestClient<TestRequest> client, CancellationToken cancellationToken = default) =>
 {
     var message = new TestRequest() { Message = "Foo" };
-    var x = await client.GetResponseAsync<TestResponse>(message, cancellationToken);
+    var x = await client.GetResponseAsync<TestResponse>(message, null, cancellationToken);
 
     Console.WriteLine(x.Message);
 })
@@ -141,11 +141,14 @@ public class HostedService : IHostedService
             await Task.Delay(200, cancellationToken);
 
             var message = new SubmitOrder() { OrderId = Guid.NewGuid() };
-            await messageBus.Publish(message, cancellationToken);
+            await messageBus.Publish(message, null, cancellationToken);
         }
         catch (ArgumentOutOfRangeException)
         {
             // Ignore invalid delay values
+        }
+        catch (OperationCanceledException operationCanceledException)
+        {
         }
     }
 

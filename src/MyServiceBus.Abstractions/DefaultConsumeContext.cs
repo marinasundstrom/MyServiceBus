@@ -15,17 +15,17 @@ public class DefaultConsumeContext<TMessage> : BasePipeContext, ConsumeContext<T
 
     public TMessage Message { get; }
 
-    public Task RespondAsync<T>(T message, CancellationToken cancellationToken = default)
+    public Task RespondAsync<T>(T message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default)
     {
         return Task.CompletedTask;
     }
 
-    public Task PublishAsync<T>(object message, CancellationToken cancellationToken = default)
+    public Task PublishAsync<T>(object message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default)
     {
         return Task.CompletedTask;
     }
 
-    public Task PublishAsync<T>(T message, CancellationToken cancellationToken = default)
+    public Task PublishAsync<T>(T message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default)
     {
         return Task.CompletedTask;
     }
@@ -35,4 +35,3 @@ public class DefaultConsumeContext<TMessage> : BasePipeContext, ConsumeContext<T
         throw new NotImplementedException();
     }
 }
-

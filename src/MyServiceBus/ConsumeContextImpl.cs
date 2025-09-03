@@ -34,13 +34,13 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
     }
 
     [Throws(typeof(UriFormatException), typeof(InvalidOperationException))]
-    public async Task PublishAsync<T>(T message, CancellationToken cancellationToken = default)
+    public async Task PublishAsync<T>(T message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default)
     {
-        await PublishAsync<T>((object)message!, cancellationToken);
+        await PublishAsync<T>((object)message!, contextCallback, cancellationToken);
     }
 
     [Throws(typeof(UriFormatException), typeof(InvalidOperationException))]
-    public async Task PublishAsync<T>(object message, CancellationToken cancellationToken = default)
+    public async Task PublishAsync<T>(object message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default)
     {
         var exchangeName = NamingConventions.GetExchangeName(typeof(T));
 
@@ -52,19 +52,21 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
             MessageId = Guid.NewGuid().ToString()
         };
 
+        contextCallback?.Invoke(context);
+
         await _publishPipe.Send(context);
         await _sendPipe.Send(context);
         await transport.Send(message, context, cancellationToken);
     }
 
     [Throws(typeof(InvalidOperationException))]
-    public async Task RespondAsync<T>(T message, CancellationToken cancellationToken = default)
+    public async Task RespondAsync<T>(T message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default)
     {
-        await RespondAsync<T>((object)message, cancellationToken);
+        await RespondAsync<T>((object)message, contextCallback, cancellationToken);
     }
 
     [Throws(typeof(InvalidOperationException))]
-    public async Task RespondAsync<T>(object message, CancellationToken cancellationToken = default)
+    public async Task RespondAsync<T>(object message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default)
     {
         var address = receiveContext.ResponseAddress ??
                       throw new InvalidOperationException("ResponseAddress not specified");
@@ -75,6 +77,8 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
         {
             MessageId = Guid.NewGuid().ToString()
         };
+
+        contextCallback?.Invoke(context);
 
         await _sendPipe.Send(context);
         await transport.Send(message, context, cancellationToken);
@@ -136,17 +140,19 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
         }
 
         [Throws(typeof(InvalidOperationException))]
-        public Task Send<T>(T message, CancellationToken cancellationToken = default)
-            => Send<T>((object)message, cancellationToken);
+        public Task Send<T>(T message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default)
+            => Send<T>((object)message, contextCallback, cancellationToken);
 
         [Throws(typeof(InvalidOperationException))]
-        public async Task Send<T>(object message, CancellationToken cancellationToken = default)
+        public async Task Send<T>(object message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default)
         {
             var transport = await _transportFactory.GetSendTransport(_address, cancellationToken);
             var context = new SendContext(MessageTypeCache.GetMessageTypes(typeof(T)), _serializer, cancellationToken)
             {
                 MessageId = Guid.NewGuid().ToString()
             };
+
+            contextCallback?.Invoke(context);
 
             await _sendPipe.Send(context);
             await transport.Send(message, context, cancellationToken);

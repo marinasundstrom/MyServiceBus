@@ -61,7 +61,7 @@ public interface IHandler<in TMessage, TResult> : IConsumer<TMessage>
     async Task IConsumer<TMessage>.Consume(ConsumeContext<TMessage> context)
     {
         var result = await Handle(context.Message, context.CancellationToken).ConfigureAwait(false);
-        await context.RespondAsync(result, context.CancellationToken).ConfigureAwait(false);
+        await context.RespondAsync(result, null, context.CancellationToken).ConfigureAwait(false);
     }
 }
 
@@ -81,7 +81,7 @@ public abstract class Handler<TMessage, TResult> : IHandler<TMessage, TResult>
     public async Task Consume(ConsumeContext<TMessage> context)
     {
         var result = await Handle(context.Message, context.CancellationToken).ConfigureAwait(false);
-        await context.RespondAsync(result, context.CancellationToken).ConfigureAwait(false);
+        await context.RespondAsync(result, null, context.CancellationToken).ConfigureAwait(false);
     }
 }
 

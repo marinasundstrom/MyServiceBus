@@ -21,7 +21,7 @@ public sealed class GenericRequestClient<TRequest> : IRequestClient<TRequest>, I
     }
 
     [Throws(typeof(UriFormatException), typeof(RequestFaultException), typeof(ArgumentOutOfRangeException))]
-    public async Task<Response<T>> GetResponseAsync<T>(TRequest request, CancellationToken cancellationToken = default, RequestTimeout timeout = default) where T : class
+    public async Task<Response<T>> GetResponseAsync<T>(TRequest request, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default, RequestTimeout timeout = default) where T : class
     {
         var taskCompletionSource = new TaskCompletionSource<Response<T>>();
 
@@ -75,6 +75,8 @@ public sealed class GenericRequestClient<TRequest> : IRequestClient<TRequest>, I
             MessageId = Guid.NewGuid().ToString()
         };
 
+        contextCallback?.Invoke(sendContext);
+
         await requestSendTransport.Send(request, sendContext, cancellationToken);
 
         using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -96,7 +98,7 @@ public sealed class GenericRequestClient<TRequest> : IRequestClient<TRequest>, I
     }
 
     [Throws(typeof(UriFormatException), typeof(RequestFaultException), typeof(ArgumentOutOfRangeException))]
-    public async Task<Response<T1, T2>> GetResponseAsync<T1, T2>(TRequest request, CancellationToken cancellationToken = default, RequestTimeout timeout = default)
+    public async Task<Response<T1, T2>> GetResponseAsync<T1, T2>(TRequest request, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default, RequestTimeout timeout = default)
         where T1 : class
         where T2 : class
     {
@@ -157,6 +159,8 @@ public sealed class GenericRequestClient<TRequest> : IRequestClient<TRequest>, I
             ResponseAddress = new Uri($"rabbitmq://localhost/exchange/{responseExchange}"),
             MessageId = Guid.NewGuid().ToString()
         };
+
+        contextCallback?.Invoke(sendContext);
 
         await requestSendTransport.Send(request, sendContext, cancellationToken);
 
