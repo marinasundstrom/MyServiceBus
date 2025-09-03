@@ -12,6 +12,8 @@ class TestRequestConsumer :
 
         Console.WriteLine($"Request: {message}");
 
+        throw new InvalidOperationException();
+
         await context.RespondAsync(new TestResponse
         {
             Message = $"{message} 42"

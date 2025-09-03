@@ -1,6 +1,7 @@
 using MyServiceBus;
 using TestApp;
 using System.Linq;
+using Microsoft.AspNetCore.Http.HttpResults;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -107,12 +108,17 @@ app.MapPost("/send", async (ISendEndpoint sendEndpoint, CancellationToken cancel
 .WithName("Test_Send")
 .WithTags("Test");
 
-app.MapGet("/request", async (IRequestClient<TestRequest> client, CancellationToken cancellationToken = default) =>
+app.MapGet("/request", async Task<Results<Ok<string>, InternalServerError<string>, NoContent>> (IRequestClient<TestRequest> client, CancellationToken cancellationToken = default) =>
 {
     var message = new TestRequest() { Message = "Foo" };
-    var x = await client.GetResponseAsync<TestResponse>(message, null, cancellationToken);
+    var response = await client.GetResponseAsync<TestResponse, Fault<TestResponse>>(message, null, cancellationToken);
 
-    Console.WriteLine(x.Message);
+    if (response.Is(out Response<TestResponse> status))
+        return TypedResults.Ok(status.Message.Message);
+    else if (response.Is(out Response<Fault<TestResponse>> fault))
+        return TypedResults.InternalServerError(fault.Message.Exceptions[0].Message);
+
+    return TypedResults.NoContent();
 })
 .WithName("Test_Request")
 .WithTags("Test");
