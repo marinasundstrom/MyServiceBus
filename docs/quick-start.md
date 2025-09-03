@@ -217,6 +217,8 @@ OrderStatus response = client.getResponse(new CheckOrderStatus(UUID.randomUUID()
 System.out.println(response.getStatus());
 ```
 
+If the consumer responds with a `Fault<CheckOrderStatus>` but the client only requests `OrderStatus`, `GetResponseAsync` throws `RequestFaultException`. Include `Fault<CheckOrderStatus>` as a second response type to observe fault details.
+
 ### Handling Multiple Response Types
 
 #### C#
