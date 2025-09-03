@@ -10,19 +10,20 @@ For an explanation of why the C# and Java examples differ, see the [design decis
 
 Publish raises an event to all interested consumers. It is fan-out by
 message type and does not target a specific queue. Use it for domain
-events; headers can be added for tracing and metadata.
+events. See [Adding Headers](#adding-headers) to attach tracing or
+other metadata.
 
 #### C#
 
 ```csharp
 IMessageBus bus = serviceProvider.GetRequiredService<IMessageBus>();
-await bus.Publish(new SubmitOrder { OrderId = Guid.NewGuid() }, ctx => ctx.Headers["trace-id"] = Guid.NewGuid());
+await bus.Publish(new SubmitOrder { OrderId = Guid.NewGuid() });
 ```
 
 #### Java
 
 ```java
-bus.publish(new SubmitOrder(UUID.randomUUID()), ctx -> ctx.getHeaders().put("trace-id", UUID.randomUUID()));
+bus.publish(new SubmitOrder(UUID.randomUUID()));
 ```
 
 
@@ -36,14 +37,14 @@ instead of broadcasting.
 
 ```csharp
 ISendEndpoint endpoint = serviceProvider.GetRequiredService<ISendEndpoint>();
-await endpoint.Send(new SubmitOrder { OrderId = Guid.NewGuid() }, ctx => ctx.Headers["trace-id"] = Guid.NewGuid());
+await endpoint.Send(new SubmitOrder { OrderId = Guid.NewGuid() });
 ```
 
 #### Java
 
 ```java
 SendEndpoint endpoint = serviceProvider.getService(SendEndpoint.class);
-endpoint.send(new SubmitOrder(UUID.randomUUID()), ctx -> ctx.getHeaders().put("trace-id", UUID.randomUUID())).join();
+endpoint.send(new SubmitOrder(UUID.randomUUID())).join();
 ```
 
 ### Consuming Messages
@@ -94,7 +95,7 @@ class CheckOrderStatusConsumer : IConsumer<CheckOrderStatus>
 }
 
 var client = serviceProvider.GetRequiredService<IRequestClient<CheckOrderStatus>>();
-Response<OrderStatus> response = await client.GetResponseAsync<OrderStatus>(new CheckOrderStatus { OrderId = Guid.NewGuid() }, ctx => ctx.Headers["trace-id"] = Guid.NewGuid());
+Response<OrderStatus> response = await client.GetResponseAsync<OrderStatus>(new CheckOrderStatus { OrderId = Guid.NewGuid() });
 Console.WriteLine(response.Message.Status);
 ```
 
@@ -148,6 +149,39 @@ response.as(OrderStatus.class)
     .ifPresent(r -> System.out.println(r.getMessage().getStatus()));
 response.as(Fault.class)
     .ifPresent(r -> System.out.println(r.getMessage().getExceptions().get(0).getMessage()));
+```
+
+
+### Adding Headers
+
+Headers let you attach metadata such as tracing information or
+correlation identifiers. Set them using the send, publish, or request
+context.
+
+#### C#
+
+```csharp
+IMessageBus bus = serviceProvider.GetRequiredService<IMessageBus>();
+await bus.Publish(new SubmitOrder { OrderId = Guid.NewGuid() }, ctx => ctx.Headers["trace-id"] = Guid.NewGuid());
+
+IRequestClient<CheckOrderStatus> client = serviceProvider.GetRequiredService<IRequestClient<CheckOrderStatus>>();
+Response<OrderStatus> response = await client.GetResponseAsync<OrderStatus>(
+    new CheckOrderStatus { OrderId = Guid.NewGuid() },
+    ctx => ctx.Headers["trace-id"] = Guid.NewGuid());
+```
+
+#### Java
+
+```java
+bus.publish(new SubmitOrder(UUID.randomUUID()), ctx -> ctx.getHeaders().put("trace-id", UUID.randomUUID()));
+
+RequestClientFactory factory = serviceProvider.getService(RequestClientFactory.class);
+RequestClient<CheckOrderStatus> client = factory.create(CheckOrderStatus.class);
+OrderStatus response = client.getResponse(
+    new CheckOrderStatus(UUID.randomUUID()),
+    OrderStatus.class,
+    ctx -> ctx.getHeaders().put("trace-id", UUID.randomUUID()),
+    CancellationToken.none).join();
 ```
 
 
