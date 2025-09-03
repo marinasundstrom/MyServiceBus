@@ -1,5 +1,7 @@
 package com.myservicebus;
 
 public interface ReceiveTransport {
-    void onReceive(java.util.function.Supplier<byte[]> data);
+    void start() throws Exception;
+
+    void stop() throws Exception;
 }

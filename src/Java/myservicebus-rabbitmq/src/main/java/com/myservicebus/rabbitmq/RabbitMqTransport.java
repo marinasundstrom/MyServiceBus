@@ -30,6 +30,9 @@ public class RabbitMqTransport {
             return new RabbitMqTransportFactory(provider);
         });
 
+        services.addSingleton(com.myservicebus.TransportFactory.class,
+                sp -> () -> sp.getService(RabbitMqTransportFactory.class));
+
         services.addSingleton(RabbitMqSendEndpointProvider.class, sp -> () -> {
             RabbitMqTransportFactory factory = sp.getService(RabbitMqTransportFactory.class);
             SendPipe sendPipe = sp.getService(SendPipe.class);
