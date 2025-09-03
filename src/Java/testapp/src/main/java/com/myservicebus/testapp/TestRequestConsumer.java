@@ -4,16 +4,24 @@ import java.util.concurrent.CompletableFuture;
 
 import javax.naming.OperationNotSupportedException;
 
+import com.google.inject.Inject;
 import com.myservicebus.ConsumeContext;
 import com.myservicebus.Consumer;
+import org.slf4j.Logger;
 
 class TestRequestConsumer implements Consumer<TestRequest> {
+    private final Logger logger;
+
+    @Inject
+    public TestRequestConsumer(Logger logger) {
+        this.logger = logger;
+    }
+
     @Override
     public CompletableFuture<Void> consume(ConsumeContext<TestRequest> context) throws Exception {
-        var message = context
-                .getMessage();
+        var message = context.getMessage();
 
-        System.out.println("Request: " + message);
+        logger.info("Request: {}", message);
 
         var response = new TestResponse(message + " 42");
 

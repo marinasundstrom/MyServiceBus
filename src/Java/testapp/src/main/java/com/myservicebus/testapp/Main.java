@@ -4,7 +4,6 @@ import io.javalin.Javalin;
 import java.io.IOException;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicReference;
 
 import com.myservicebus.ExceptionInfo;
 import com.myservicebus.Fault;
@@ -20,6 +19,7 @@ import com.myservicebus.di.ServiceProvider;
 import com.myservicebus.di.ServiceScope;
 import com.myservicebus.rabbitmq.RabbitMqBusFactory;
 import com.myservicebus.tasks.CancellationToken;
+import org.slf4j.Logger;
 
 public class Main {
     public static void main(String[] args) {
@@ -38,12 +38,13 @@ public class Main {
         });
 
         ServiceProvider provider = services.build();
+        final Logger logger = provider.getService(Logger.class);
         ServiceBus serviceBus = provider.getService(ServiceBus.class);
 
         try {
             serviceBus.start();
         } catch (IOException | TimeoutException e) {
-            e.printStackTrace();
+            logger.error("Failed to start service bus", e);
             return;
         }
 
@@ -58,6 +59,7 @@ public class Main {
                     publishEndpoint.publish(message, CancellationToken.none).join();
                     ctx.result("Published SubmitOrder");
                 } catch (Exception e) {
+                    logger.error("Failed to publish message", e);
                     ctx.status(500).result("Failed to publish message");
                 }
             }
@@ -70,6 +72,7 @@ public class Main {
                 sendEndpoint.send(message, CancellationToken.none).join();
                 ctx.result("Sent SubmitOrder");
             } catch (Exception e) {
+                logger.error("Failed to send message", e);
                 ctx.status(500).result("Failed to send message");
             }
         });
@@ -83,6 +86,7 @@ public class Main {
                         .get();
                 ctx.result(response.getMessage().toString());
             } catch (Exception exc) {
+                logger.error("Failed to get response", exc);
                 ctx.result(exc.getMessage().toString());
             }
         });
@@ -109,10 +113,11 @@ public class Main {
                     ctx.status(500).result(message);
                 });
             } catch (Exception e) {
+                logger.error("Failed to get response", e);
                 ctx.status(500).result("Failed to get response: " + e.getMessage());
             }
         });
 
-        System.out.println("Up and running");
+        logger.info("Up and running");
     }
 }
