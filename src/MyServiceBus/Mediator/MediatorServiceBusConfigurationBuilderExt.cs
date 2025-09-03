@@ -11,7 +11,7 @@ public static class MediatorServiceBusConfigurationBuilderExt
         c?.Invoke(configuration);
         builder.Services.AddSingleton<IMediatorFactoryConfigurator>(configuration);
         builder.Services.AddSingleton<ITransportFactory, MediatorTransportFactory>();
-        builder.Services.AddSingleton<IMessageBus>(sp => new MyMessageBus(
+        builder.Services.AddSingleton<IMessageBus>(sp => new MessageBus(
             sp.GetRequiredService<ITransportFactory>(),
             sp,
             sp.GetRequiredService<ISendPipe>(),

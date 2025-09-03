@@ -52,7 +52,7 @@ public class SendContext : BasePipeContext, ISendContext
         Assembly = typeof(T).Assembly.GetName().Name ?? "unknown",
         AssemblyVersion = typeof(T).Assembly.GetName().Version?.ToString() ?? "unknown",
         FrameworkVersion = System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription,
-        MassTransitVersion = typeof(MyMessageBus).Assembly.GetName().Version?.ToString() ?? "unknown",
+        MassTransitVersion = typeof(MessageBus).Assembly.GetName().Version?.ToString() ?? "unknown",
         OperatingSystemVersion = Environment.OSVersion.VersionString
     };
 }

@@ -36,7 +36,7 @@ public class SendPublishFilterTests
         var publishCfg = new PipeConfigurator<SendContext>();
         publishCfg.UseExecute(ctx => { publishExecuted = true; return Task.CompletedTask; });
 
-        var bus = new MyMessageBus(new StubTransportFactory(), new ServiceCollection().BuildServiceProvider(),
+        var bus = new MessageBus(new StubTransportFactory(), new ServiceCollection().BuildServiceProvider(),
             new SendPipe(sendCfg.Build()), new PublishPipe(publishCfg.Build()), new EnvelopeMessageSerializer());
 
         await bus.Publish(new TestMessage());

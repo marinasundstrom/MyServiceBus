@@ -20,14 +20,11 @@ import com.myservicebus.di.ServiceCollection;
 import com.myservicebus.di.ServiceProvider;
 import com.myservicebus.tasks.CancellationToken;
 import com.myservicebus.rabbitmq.ConnectionProvider;
-import com.myservicebus.PublishEndpoint;
-import com.myservicebus.TransportSendEndpointProvider;
-import com.myservicebus.ErrorTransportFilter;
 import com.rabbitmq.client.BuiltinExchangeType;
 import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.Connection;
 
-public class ServiceBus implements SendEndpoint, PublishEndpoint {
+public class RabbitMqMessageBus implements MessageBus {
     private final ServiceProvider serviceProvider;
     private final ConnectionProvider connectionProvider;
     private final SendEndpointProvider sendEndpointProvider;
@@ -38,7 +35,7 @@ public class ServiceBus implements SendEndpoint, PublishEndpoint {
     private Channel channel;
     private ObjectMapper mapper;
 
-    public ServiceBus(ServiceProvider serviceProvider) {
+    public RabbitMqMessageBus(ServiceProvider serviceProvider) {
         this.serviceProvider = serviceProvider;
         this.connectionProvider = serviceProvider.getService(ConnectionProvider.class);
         this.sendEndpointProvider = serviceProvider.getService(SendEndpointProvider.class);
@@ -70,12 +67,12 @@ public class ServiceBus implements SendEndpoint, PublishEndpoint {
         mapper.registerModule(module);
     }
 
-    public static ServiceBus configure(ServiceCollection services,
+    public static RabbitMqMessageBus configure(ServiceCollection services,
             java.util.function.Consumer<BusRegistrationConfigurator> configure) {
         var busRegistrationConfigurator = new BusRegistrationConfiguratorImpl(services);
         configure.accept(busRegistrationConfigurator);
         busRegistrationConfigurator.complete();
-        return new ServiceBus(services.build());
+        return new RabbitMqMessageBus(services.build());
     }
 
     public void start() throws IOException, TimeoutException {
@@ -93,17 +90,17 @@ public class ServiceBus implements SendEndpoint, PublishEndpoint {
             String queue = consumerDef.getQueueName();
 
             PipeConfigurator<ConsumeContext<Object>> configurator = new PipeConfigurator<>();
-            @SuppressWarnings({"unchecked", "rawtypes"})
+            @SuppressWarnings({ "unchecked", "rawtypes" })
             Filter<ConsumeContext<Object>> errorFilter = new ErrorTransportFilter();
             configurator.useFilter(errorFilter);
-            @SuppressWarnings({"unchecked", "rawtypes"})
-            Filter<ConsumeContext<Object>> faultFilter =
-                    new ConsumerFaultFilter(serviceProvider, consumerDef.getConsumerType());
+            @SuppressWarnings({ "unchecked", "rawtypes" })
+            Filter<ConsumeContext<Object>> faultFilter = new ConsumerFaultFilter(serviceProvider,
+                    consumerDef.getConsumerType());
             configurator.useFilter(faultFilter);
             configurator.useRetry(3);
-            @SuppressWarnings({"unchecked", "rawtypes"})
-            Filter<ConsumeContext<Object>> consumerFilter =
-                    new ConsumerMessageFilter(serviceProvider, consumerDef.getConsumerType());
+            @SuppressWarnings({ "unchecked", "rawtypes" })
+            Filter<ConsumeContext<Object>> consumerFilter = new ConsumerMessageFilter(serviceProvider,
+                    consumerDef.getConsumerType());
             configurator.useFilter(consumerFilter);
             if (consumerDef.getConfigure() != null)
                 consumerDef.getConfigure().accept(configurator);

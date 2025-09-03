@@ -7,7 +7,7 @@ using System.Runtime.InteropServices;
 
 namespace MyServiceBus;
 
-public class MyMessageBus : IMessageBus
+public class MessageBus : IMessageBus
 {
     private readonly ITransportFactory _transportFactory;
     private readonly IServiceProvider _serviceProvider;
@@ -20,7 +20,7 @@ public class MyMessageBus : IMessageBus
     // Key = message type URN, Value = registration containing message type and pipeline
     private readonly Dictionary<string, (Type MessageType, IConsumePipe Pipe)> _consumers = new();
 
-    public MyMessageBus(ITransportFactory transportFactory, IServiceProvider serviceProvider,
+    public MessageBus(ITransportFactory transportFactory, IServiceProvider serviceProvider,
         ISendPipe sendPipe, IPublishPipe publishPipe, IMessageSerializer messageSerializer)
     {
         _transportFactory = transportFactory;

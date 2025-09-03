@@ -35,7 +35,7 @@ public static class RabbitMqServiceBusConfigurationBuilderExt
         });
 
         builder.Services.AddSingleton<ITransportFactory, RabbitMqTransportFactory>();
-        builder.Services.AddSingleton<IMessageBus>(sp => new MyMessageBus(
+        builder.Services.AddSingleton<IMessageBus>(sp => new MessageBus(
             sp.GetRequiredService<ITransportFactory>(),
             sp,
             sp.GetRequiredService<ISendPipe>(),

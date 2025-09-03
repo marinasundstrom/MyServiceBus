@@ -34,7 +34,7 @@ public class PublishHeaderTests
     public async Task Applies_headers_to_context()
     {
         var factory = new StubTransportFactory();
-        var bus = new MyMessageBus(factory, new ServiceCollection().BuildServiceProvider(),
+        var bus = new MessageBus(factory, new ServiceCollection().BuildServiceProvider(),
             new SendPipe(Pipe.Empty<SendContext>()), new PublishPipe(Pipe.Empty<SendContext>()), new EnvelopeMessageSerializer());
 
         await bus.Publish(new TestMessage(), ctx => ctx.Headers["foo"] = "bar");

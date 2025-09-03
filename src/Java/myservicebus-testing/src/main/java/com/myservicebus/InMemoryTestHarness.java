@@ -8,15 +8,9 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
-import com.myservicebus.Fault;
 import com.myservicebus.di.ServiceProvider;
 import com.myservicebus.di.ServiceScope;
 import com.myservicebus.tasks.CancellationToken;
-import com.myservicebus.RequestClientTransport;
-import com.myservicebus.RequestFaultException;
-import com.myservicebus.Response2;
-import com.myservicebus.TopologyRegistry;
-import com.myservicebus.ConsumerTopology;
 
 public class InMemoryTestHarness implements RequestClientTransport, TransportSendEndpointProvider {
     private final Map<Class<?>, List<com.myservicebus.Consumer<?>>> handlers = new ConcurrentHashMap<>();
@@ -30,7 +24,8 @@ public class InMemoryTestHarness implements RequestClientTransport, TransportSen
 
     public InMemoryTestHarness(ServiceProvider serviceProvider) {
         this.serviceProvider = serviceProvider;
-        this.consumeContextProvider = serviceProvider != null ? serviceProvider.getService(ConsumeContextProvider.class) : null;
+        this.consumeContextProvider = serviceProvider != null ? serviceProvider.getService(ConsumeContextProvider.class)
+                : null;
     }
 
     public CompletableFuture<Void> start() {
@@ -107,7 +102,8 @@ public class InMemoryTestHarness implements RequestClientTransport, TransportSen
                                     .getService(ct.getConsumerType());
                             @SuppressWarnings("unchecked")
                             ConsumeContext<Object> consumeContext = new ConsumeContext<>(message, context.getHeaders(),
-                                    responseAddress, faultAddress, context.getCancellationToken(), InMemoryTestHarness.this);
+                                    responseAddress, faultAddress, context.getCancellationToken(),
+                                    InMemoryTestHarness.this);
                             ConsumeContextProvider ctxProvider = scoped.getService(ConsumeContextProvider.class);
                             ctxProvider.setContext(consumeContext);
                             try {
@@ -129,7 +125,8 @@ public class InMemoryTestHarness implements RequestClientTransport, TransportSen
     }
 
     @Override
-    public <TRequest, TResponse> CompletableFuture<TResponse> sendRequest(Class<TRequest> requestType, SendContext context,
+    public <TRequest, TResponse> CompletableFuture<TResponse> sendRequest(Class<TRequest> requestType,
+            SendContext context,
             Class<TResponse> responseType) {
         CompletableFuture<TResponse> future = new CompletableFuture<>();
         com.myservicebus.Consumer<TResponse> handler = ctx -> {
@@ -239,4 +236,3 @@ public class InMemoryTestHarness implements RequestClientTransport, TransportSen
         }
     }
 }
-

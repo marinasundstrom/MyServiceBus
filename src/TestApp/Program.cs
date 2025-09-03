@@ -111,10 +111,16 @@ app.MapGet("/send", async (ISendEndpointProvider sendEndpointProvider, Cancellat
 
 app.MapGet("/request", async Task<Results<Ok<string>, InternalServerError>> (IRequestClient<TestRequest> client, CancellationToken cancellationToken = default) =>
 {
-    var message = new TestRequest() { Message = "Foo" };
-    var response = await client.GetResponseAsync<TestResponse>(message, null, cancellationToken);
-
-    return TypedResults.Ok(response.Message.Message);
+    try
+    {
+        var message = new TestRequest() { Message = "Foo" };
+        var response = await client.GetResponseAsync<TestResponse>(message, null, cancellationToken);
+        return TypedResults.Ok(response.Message.Message);
+    }
+    catch (RequestFaultException requestFaultException)
+    {
+        return TypedResults.Ok(requestFaultException.Message);
+    }
 })
 .WithName("Test_Request")
 .WithTags("Test");
