@@ -1,12 +1,16 @@
 # Feature Walkthrough
 
-This guide compares basic usage of MyServiceBus in C# and Java. It is split into basic and advanced sections so newcomers can focus on fundamental messaging patterns before exploring configuration and other features.
+This guide compares basic usage of MyServiceBus in C# and Java. It is split into basics and advanced sections so newcomers can focus on fundamental messaging patterns before exploring configuration and other features.
 
 For an explanation of why the C# and Java examples differ, see the [design decisions](design-decisions.md).
 
-## Basic
+## Basics
 
 ### Publishing
+
+Publish raises an event to all interested consumers. It is fan-out by
+message type and does not target a specific queue. Use it for domain
+events; headers can be added for tracing and metadata.
 
 #### C#
 
@@ -24,6 +28,10 @@ bus.publish(new SubmitOrder(UUID.randomUUID()), ctx -> ctx.getHeaders().put("tra
 
 ### Sending
 
+Send delivers a command to a specific endpoint/queue, where exactly one
+consumer processes it. Use this for directed, point-to-point operations
+instead of broadcasting.
+
 #### C#
 
 ```csharp
@@ -38,8 +46,11 @@ SendEndpoint endpoint = serviceProvider.getService(SendEndpoint.class);
 endpoint.send(new SubmitOrder(UUID.randomUUID()), ctx -> ctx.getHeaders().put("trace-id", UUID.randomUUID())).join();
 ```
 
-
 ### Consuming Messages
+
+Define consumers to handle messages. The consume context provides the
+message, headers, and helpers to publish, send, or respond. Completing
+successfully acknowledges the message; throwing creates a fault.
 
 #### C#
 
@@ -66,6 +77,10 @@ class SubmitOrderConsumer implements Consumer<SubmitOrder> {
 
 
 ### Request/Response
+
+Use request/response for RPC-style interactions over the bus. A consumer
+responds to a request, and the client correlates replies, propagates
+headers, and manages timeouts.
 
 #### C#
 
@@ -103,6 +118,10 @@ If the consumer responds with a `Fault<CheckOrderStatus>` but the client only re
 
 #### Handling Multiple Response Types
 
+Clients can await more than one possible response (e.g., success or
+fault). Inspect the typed result to branch accordingly and surface rich
+fault details when something fails.
+
 ##### C#
 
 ```csharp
@@ -134,6 +153,9 @@ response.as(Fault.class)
 
 ### Mediator (In-Memory Transport)
 
+Run the same messaging model entirely in-process without a broker. Ideal
+for tests, local tools, or lightweight modules.
+
 #### C#
 
 ```csharp
@@ -161,6 +183,10 @@ The mediator dispatches messages in-memory, making it useful for lightweight sce
 ## Advanced
 
 ### Configuration
+
+Configure the bus by registering consumers, selecting a transport,
+connecting to the broker, customizing entity names, and auto-configuring
+endpoints with a name formatter.
 
 #### C#
 
@@ -458,4 +484,3 @@ public void publishesOrderSubmitted() {
 ```
 
 The harness enables verifying message flows in isolation without needing a running broker.
-
