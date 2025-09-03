@@ -2,12 +2,7 @@ package com.myservicebus.serialization;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.myservicebus.Envelope;
-import com.myservicebus.HostInfoProvider;
-import com.myservicebus.NamingConventions;
-import com.myservicebus.SendContext;
-import java.time.OffsetDateTime;
-import java.util.List;
-import java.util.UUID;
+import java.io.IOException;
 
 public class EnvelopeMessageSerializer implements MessageSerializer {
     private final ObjectMapper mapper;
@@ -18,16 +13,19 @@ public class EnvelopeMessageSerializer implements MessageSerializer {
     }
 
     @Override
-    public byte[] serialize(SendContext context) throws Exception {
+    public <T> byte[] serialize(MessageSerializationContext<T> context) throws IOException {
         context.getHeaders().put("content_type", "application/vnd.mybus.envelope+json");
-        Envelope<Object> envelope = new Envelope<>();
-        envelope.setMessageId(UUID.randomUUID());
-        envelope.setSentTime(OffsetDateTime.now());
-        envelope.setMessageType(List.of(NamingConventions.getMessageUrn(context.getMessage().getClass())));
+        Envelope<T> envelope = new Envelope<>();
+        envelope.setMessageId(context.getMessageId());
+        envelope.setCorrelationId(context.getCorrelationId());
+        envelope.setResponseAddress(context.getResponseAddress() != null ? context.getResponseAddress().toString() : null);
+        envelope.setFaultAddress(context.getFaultAddress() != null ? context.getFaultAddress().toString() : null);
+        envelope.setSentTime(context.getSentTime());
+        envelope.setMessageType(context.getMessageType());
         envelope.setMessage(context.getMessage());
         envelope.setHeaders(context.getHeaders());
         envelope.setContentType("application/json");
-        envelope.setHost(HostInfoProvider.capture());
+        envelope.setHost(context.getHostInfo());
         return mapper.writeValueAsBytes(envelope);
     }
 }

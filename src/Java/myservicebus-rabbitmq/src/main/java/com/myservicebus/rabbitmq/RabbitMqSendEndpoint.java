@@ -16,7 +16,7 @@ public class RabbitMqSendEndpoint {
 
     public CompletableFuture<Void> send(SendContext context) {
         try {
-            byte[] body = serializer.serialize(context);
+            byte[] body = context.serialize(serializer);
             transport.send(body);
             return CompletableFuture.completedFuture(null);
         } catch (Exception e) {

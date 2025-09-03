@@ -1,7 +1,12 @@
 package com.myservicebus;
 
+import com.myservicebus.serialization.MessageSerializationContext;
+import com.myservicebus.serialization.MessageSerializer;
+import java.time.OffsetDateTime;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import com.myservicebus.tasks.CancellationToken;
 
@@ -25,6 +30,19 @@ public class SendContext implements PipeContext {
 
     public Map<String, Object> getHeaders() {
         return headers;
+    }
+
+    public byte[] serialize(MessageSerializer serializer) throws Exception {
+        MessageSerializationContext<Object> context = new MessageSerializationContext<>(message);
+        context.setMessageId(UUID.randomUUID());
+        context.setCorrelationId(null);
+        context.setMessageType(List.of(NamingConventions.getMessageUrn(message.getClass())));
+        context.setResponseAddress(null);
+        context.setFaultAddress(null);
+        context.setHeaders(headers);
+        context.setSentTime(OffsetDateTime.now());
+        context.setHostInfo(HostInfoProvider.capture());
+        return serializer.serialize(context);
     }
 
     @Override
