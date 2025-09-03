@@ -45,6 +45,8 @@ public sealed class RabbitMqReceiveTransport : IReceiveTransport
                     headers["content_type"] = "application/vnd.mybus.envelope+json";
                 }
 
+                headers["faultAddress"] = $"rabbitmq://localhost/exchange/{_queueName}_error";
+
                 var transportMessage = new RabbitMqTransportMessage(headers, props.Persistent, payload);
                 var messageContext = _contextFactory.CreateMessageContext(transportMessage);
 
@@ -56,7 +58,7 @@ public sealed class RabbitMqReceiveTransport : IReceiveTransport
             }
             catch (Exception exc)
             {
-                await _channel.BasicNackAsync(ea.DeliveryTag, false, requeue: false);
+                await _channel.BasicAckAsync(ea.DeliveryTag, multiple: false);
                 Console.WriteLine($"Message handling failed: {exc}");
             }
         };

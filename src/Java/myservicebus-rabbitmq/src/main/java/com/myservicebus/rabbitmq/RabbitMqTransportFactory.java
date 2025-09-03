@@ -44,9 +44,7 @@ public class RabbitMqTransportFactory {
                 channel.queueDeclare(errorQueue, true, false, false, null);
                 channel.queueBind(errorQueue, errorExchange, "");
 
-                Map<String, Object> args = new HashMap<>();
-                args.put("x-dead-letter-exchange", errorExchange);
-                channel.queueDeclare(queue, true, false, false, args);
+                channel.queueDeclare(queue, true, false, false, null);
 
                 return new RabbitMqSendTransport(channel, "", queue);
             } catch (Exception e) {

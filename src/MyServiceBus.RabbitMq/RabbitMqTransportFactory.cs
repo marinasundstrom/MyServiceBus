@@ -88,17 +88,11 @@ public sealed class RabbitMqTransportFactory : ITransportFactory
             cancellationToken: cancellationToken
         );
 
-        var queueArgs = new Dictionary<string, object>
-        {
-            ["x-dead-letter-exchange"] = errorExchange
-        };
-
         await channel.QueueDeclareAsync(
             queue: topology.QueueName,
             durable: topology.Durable,
             exclusive: false,
             autoDelete: topology.AutoDelete,
-            arguments: queueArgs,
             cancellationToken: cancellationToken
         );
 

@@ -72,6 +72,7 @@ public class MyMessageBus : IMessageBus
         var receiveTransport = await _transportFactory.CreateReceiveTransport(topology, HandleMessageAsync, cancellationToken);
 
         var configurator = new PipeConfigurator<ConsumeContext<TMessage>>();
+        configurator.UseFilter(new ErrorTransportFilter<TMessage>());
         configurator.UseFilter(new ConsumerFaultFilter<TConsumer, TMessage>(_serviceProvider));
         configurator.UseRetry(3);
         configurator.UseFilter(new ConsumerMessageFilter<TConsumer, TMessage>(_serviceProvider));
