@@ -41,20 +41,22 @@ dotnet test
 Minimal steps to configure MyServiceBus and publish a message. For a broader tour of the library, see the [feature walkthrough](docs/feature-walkthrough.md) divided into basics and advanced sections.
 
 #### C#
-Register the bus using `Host.CreateDefaultBuilder`:
+Register the bus with the ASP.NET host builder:
 
 ```csharp
-using IHost host = Host.CreateDefaultBuilder()
-    .ConfigureServices((context, services) =>
-    {
-        RabbitMqBusFactory.Configure(services, x =>
-        {
-            x.AddConsumer<SubmitOrderConsumer>();
-        }, (busContext, cfg) => cfg.ConfigureEndpoints(busContext));
-    })
-    .Build();
+var builder = WebApplication.CreateBuilder(args);
+builder.Services.AddServiceBus(x =>
+{
+    x.AddConsumer<SubmitOrderConsumer>();
 
-await host.StartAsync();
+    x.UsingRabbitMq((context, cfg) =>
+    {
+        cfg.ConfigureEndpoints(context);
+    });
+});
+
+var app = builder.Build();
+await app.StartAsync();
 
 var bus = host.Services.GetRequiredService<IMessageBus>();
 ```

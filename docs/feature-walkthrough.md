@@ -9,22 +9,28 @@ For an explanation of why the C# and Java examples differ, see the [design decis
 ### Setup
 
 #### C#
-Use host-based registration via `Host.CreateDefaultBuilder`:
+Using the ASP.NET Core host builder:
 
 ```csharp
-using IHost host = Host.CreateDefaultBuilder()
-    .ConfigureServices((context, services) =>
-    {
-        RabbitMqBusFactory.Configure(services, x =>
-        {
-            x.AddConsumer<SubmitOrderConsumer>();
-        }, (busContext, cfg) => cfg.ConfigureEndpoints(busContext));
-    })
-    .Build();
+var builder = WebApplication.CreateBuilder(args);
+builder.Services.AddServiceBus(x =>
+{
+    x.AddConsumer<SubmitOrderConsumer>();
 
-await host.StartAsync();
-IServiceProvider serviceProvider = host.Services;
+    x.UsingRabbitMq((context, cfg) =>
+    {
+        cfg.ConfigureEndpoints(context);
+    });
+});
+
+var app = builder.Build();
+await app.StartAsync();
 ```
+
+**Without host**
+
+Outside of an ASP.NET host (or generic host), a factory can populate an
+`IServiceCollection` directly.
 
 To mirror the Java initialization using `ServiceCollection`:
 
