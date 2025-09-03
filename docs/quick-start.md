@@ -217,6 +217,36 @@ OrderStatus response = client.getResponse(new CheckOrderStatus(UUID.randomUUID()
 System.out.println(response.getStatus());
 ```
 
+### Handling Multiple Response Types
+
+#### C#
+
+```csharp
+var client = serviceProvider.GetRequiredService<IRequestClient<CheckOrderStatus>>();
+Response<OrderStatus, Fault<CheckOrderStatus>> response =
+    await client.GetResponseAsync<OrderStatus, Fault<CheckOrderStatus>>(new CheckOrderStatus { OrderId = Guid.NewGuid() });
+
+if (response.Is(out Response<OrderStatus> status))
+    Console.WriteLine(status.Message.Status);
+else if (response.Is(out Response<Fault<CheckOrderStatus>> fault))
+    Console.WriteLine(fault.Message.Exceptions[0].Message);
+```
+
+#### Java
+
+```java
+RequestClientFactory factory = serviceProvider.getService(RequestClientFactory.class);
+RequestClient<CheckOrderStatus> client = factory.create(CheckOrderStatus.class);
+Response2<OrderStatus, Fault<?>> response =
+    client.getResponse(new CheckOrderStatus(UUID.randomUUID()),
+        OrderStatus.class, Fault.class, CancellationToken.none).join();
+
+response.as(OrderStatus.class)
+    .ifPresent(r -> System.out.println(r.getMessage().getStatus()));
+response.as(Fault.class)
+    .ifPresent(r -> System.out.println(r.getMessage().getExceptions().get(0).getMessage()));
+```
+
 ## Mediator (In-Memory Transport)
 
 ### C#
