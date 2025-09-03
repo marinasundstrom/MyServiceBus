@@ -3,6 +3,7 @@ package com.myservicebus.mediator;
 import com.myservicebus.ConsumerTopology;
 import com.myservicebus.TopologyRegistry;
 import com.myservicebus.ConsumeContext;
+import com.myservicebus.ConsumeContextProvider;
 import com.myservicebus.Consumer;
 import com.myservicebus.SendEndpoint;
 import com.myservicebus.Retry;
@@ -43,25 +44,30 @@ public class MediatorSendEndpoint implements SendEndpoint {
                             null,
                             cancellationToken,
                             provider);
+                    ConsumeContextProvider ctxProvider = scoped.getService(ConsumeContextProvider.class);
+                    ctxProvider.setContext(ctx);
+                    try {
+                        Supplier<CompletableFuture<Void>> invoke = () -> {
+                            try {
+                                return (CompletableFuture<Void>) consumer.consume(ctx);
+                            } catch (Exception ex) {
+                                return CompletableFuture.failedFuture(ex);
+                            }
+                        };
 
-                    Supplier<CompletableFuture<Void>> invoke = () -> {
-                        try {
-                            return (CompletableFuture<Void>) consumer.consume(ctx);
-                        } catch (Exception ex) {
-                            return CompletableFuture.failedFuture(ex);
-                        }
-                    };
+                        CompletableFuture<Void> task = Retry.executeAsync(invoke, 3, null, cancellationToken)
+                                .exceptionallyCompose(ex -> {
+                                    Exception exception = ex instanceof Exception ? (Exception) ex
+                                            : new RuntimeException(ex);
+                                    return ctx.respondFault(exception, cancellationToken)
+                                            .thenCompose(v -> CompletableFuture.failedFuture(new RuntimeException(
+                                                    "Consumer " + def.getConsumerType().getSimpleName() + " failed", exception)));
+                                });
 
-                    CompletableFuture<Void> task = Retry.executeAsync(invoke, 3, null, cancellationToken)
-                            .exceptionallyCompose(ex -> {
-                                Exception exception = ex instanceof Exception ? (Exception) ex
-                                        : new RuntimeException(ex);
-                                return ctx.respondFault(exception, cancellationToken)
-                                        .thenCompose(v -> CompletableFuture.failedFuture(new RuntimeException(
-                                                "Consumer " + def.getConsumerType().getSimpleName() + " failed", exception)));
-                            });
-
-                    tasks.add(task);
+                        tasks.add(task);
+                    } finally {
+                        ctxProvider.clear();
+                    }
                 }
             }
         }

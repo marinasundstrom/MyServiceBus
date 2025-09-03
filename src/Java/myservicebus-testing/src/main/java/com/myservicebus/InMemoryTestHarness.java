@@ -16,10 +16,11 @@ import com.myservicebus.Response2;
 import com.myservicebus.TopologyRegistry;
 import com.myservicebus.ConsumerTopology;
 
-public class InMemoryTestHarness implements RequestClientTransport, SendEndpointProvider {
+public class InMemoryTestHarness implements RequestClientTransport, TransportSendEndpointProvider {
     private final Map<Class<?>, List<com.myservicebus.Consumer<?>>> handlers = new ConcurrentHashMap<>();
     private final List<Object> consumed = Collections.synchronizedList(new ArrayList<>());
     private final ServiceProvider serviceProvider;
+    private final ConsumeContextProvider consumeContextProvider;
 
     public InMemoryTestHarness() {
         this(null);
@@ -27,6 +28,7 @@ public class InMemoryTestHarness implements RequestClientTransport, SendEndpoint
 
     public InMemoryTestHarness(ServiceProvider serviceProvider) {
         this.serviceProvider = serviceProvider;
+        this.consumeContextProvider = serviceProvider != null ? serviceProvider.getService(ConsumeContextProvider.class) : null;
     }
 
     public CompletableFuture<Void> start() {
@@ -68,7 +70,16 @@ public class InMemoryTestHarness implements RequestClientTransport, SendEndpoint
                     faultAddress, context.getCancellationToken(), this);
             future = future.thenCompose(v -> {
                 try {
-                    return handler.consume(consumeContext).thenRun(() -> consumed.add(message));
+                    if (consumeContextProvider != null) {
+                        consumeContextProvider.setContext(consumeContext);
+                    }
+                    try {
+                        return handler.consume(consumeContext).thenRun(() -> consumed.add(message));
+                    } finally {
+                        if (consumeContextProvider != null) {
+                            consumeContextProvider.clear();
+                        }
+                    }
                 } catch (Exception e) {
                     CompletableFuture<Void> failed = new CompletableFuture<>();
                     failed.completeExceptionally(e);
@@ -95,7 +106,13 @@ public class InMemoryTestHarness implements RequestClientTransport, SendEndpoint
                             @SuppressWarnings("unchecked")
                             ConsumeContext<Object> consumeContext = new ConsumeContext<>(message, context.getHeaders(),
                                     responseAddress, faultAddress, context.getCancellationToken(), InMemoryTestHarness.this);
-                            return consumer.consume(consumeContext).thenRun(() -> consumed.add(message));
+                            ConsumeContextProvider ctxProvider = scoped.getService(ConsumeContextProvider.class);
+                            ctxProvider.setContext(consumeContext);
+                            try {
+                                return consumer.consume(consumeContext).thenRun(() -> consumed.add(message));
+                            } finally {
+                                ctxProvider.clear();
+                            }
                         } catch (Exception e) {
                             CompletableFuture<Void> failed = new CompletableFuture<>();
                             failed.completeExceptionally(e);

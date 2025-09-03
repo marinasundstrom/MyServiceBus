@@ -23,19 +23,25 @@ class ServiceBusPublishFilterTest {
         publishCfg.useExecute(ctx -> { publishCalled.set(true); return CompletableFuture.completedFuture(null); });
 
         ServiceCollection services = new ServiceCollection();
-         services.addSingleton(SendPipe.class, sp -> () -> new SendPipe(sendCfg.build()));
-         services.addSingleton(PublishPipe.class, sp -> () -> new PublishPipe(publishCfg.build()));
-         services.addSingleton(SendEndpointProvider.class, sp -> () -> uri -> new SendEndpoint() {
-             @Override
-             public CompletableFuture<Void> send(SendContext ctx) {
-                 return sp.getService(SendPipe.class).send(ctx);
-             }
+        services.addSingleton(SendPipe.class, sp -> () -> new SendPipe(sendCfg.build()));
+        services.addSingleton(PublishPipe.class, sp -> () -> new PublishPipe(publishCfg.build()));
+        services.addSingleton(ConsumeContextProvider.class, sp -> () -> new ConsumeContextProvider());
+        services.addSingleton(SendEndpointProvider.class,
+                sp -> () -> new SendEndpointProviderImpl(
+                        sp.getService(ConsumeContextProvider.class),
+                        sp.getService(TransportSendEndpointProvider.class)));
+        services.addSingleton(TransportSendEndpointProvider.class, sp -> () -> uri -> new SendEndpoint() {
+            @Override
+            public CompletableFuture<Void> send(SendContext ctx) {
+                return sp.getService(SendPipe.class).send(ctx);
+            }
 
-             @Override
-             public <T> CompletableFuture<Void> send(T message, com.myservicebus.tasks.CancellationToken cancellationToken) {
-                 return send(new SendContext(message, cancellationToken));
-             }
-         });
+            @Override
+            public <T> CompletableFuture<Void> send(T message,
+                    com.myservicebus.tasks.CancellationToken cancellationToken) {
+                return send(new SendContext(message, cancellationToken));
+            }
+        });
         services.addSingleton(ConnectionProvider.class, sp -> () -> new ConnectionProvider(new ConnectionFactory()));
 
         ServiceBus bus = new ServiceBus(services.build());

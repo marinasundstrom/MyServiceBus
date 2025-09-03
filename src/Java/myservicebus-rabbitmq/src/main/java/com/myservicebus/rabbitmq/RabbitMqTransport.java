@@ -4,8 +4,8 @@ import com.myservicebus.BusRegistrationConfigurator;
 import com.myservicebus.GenericRequestClientFactory;
 import com.myservicebus.RequestClientFactory;
 import com.myservicebus.RequestClientTransport;
-import com.myservicebus.SendEndpointProvider;
 import com.myservicebus.SendPipe;
+import com.myservicebus.TransportSendEndpointProvider;
 import com.myservicebus.di.ServiceCollection;
 import com.rabbitmq.client.ConnectionFactory;
 
@@ -36,8 +36,7 @@ public class RabbitMqTransport {
             com.myservicebus.serialization.MessageSerializer serializer = sp.getService(com.myservicebus.serialization.MessageSerializer.class);
             return new RabbitMqSendEndpointProvider(factory, sendPipe, serializer);
         });
-
-        services.addSingleton(SendEndpointProvider.class,
+        services.addSingleton(TransportSendEndpointProvider.class,
                 sp -> () -> sp.getService(RabbitMqSendEndpointProvider.class));
         services.addSingleton(RequestClientTransport.class,
                 sp -> () -> new RabbitMqRequestClientTransport(sp.getService(ConnectionProvider.class)));

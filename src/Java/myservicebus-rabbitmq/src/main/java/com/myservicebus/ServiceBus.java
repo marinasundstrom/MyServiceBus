@@ -21,6 +21,7 @@ import com.myservicebus.di.ServiceProvider;
 import com.myservicebus.tasks.CancellationToken;
 import com.myservicebus.rabbitmq.ConnectionProvider;
 import com.myservicebus.PublishEndpoint;
+import com.myservicebus.TransportSendEndpointProvider;
 import com.rabbitmq.client.BuiltinExchangeType;
 import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.Connection;
@@ -29,6 +30,7 @@ public class ServiceBus implements SendEndpoint, PublishEndpoint {
     private final ServiceProvider serviceProvider;
     private final ConnectionProvider connectionProvider;
     private final SendEndpointProvider sendEndpointProvider;
+    private final TransportSendEndpointProvider transportSendEndpointProvider;
     private final PublishPipe publishPipe;
     private final Logger logger;
     private Connection connection;
@@ -39,6 +41,7 @@ public class ServiceBus implements SendEndpoint, PublishEndpoint {
         this.serviceProvider = serviceProvider;
         this.connectionProvider = serviceProvider.getService(ConnectionProvider.class);
         this.sendEndpointProvider = serviceProvider.getService(SendEndpointProvider.class);
+        this.transportSendEndpointProvider = serviceProvider.getService(TransportSendEndpointProvider.class);
         this.publishPipe = serviceProvider.getService(PublishPipe.class);
         this.logger = serviceProvider.getService(Logger.class);
 
@@ -124,7 +127,7 @@ public class ServiceBus implements SendEndpoint, PublishEndpoint {
                             envelope.getResponseAddress(),
                             envelope.getFaultAddress(),
                             CancellationToken.none,
-                            sendEndpointProvider);
+                            transportSendEndpointProvider);
 
                     pipe.send(ctx).join();
 
