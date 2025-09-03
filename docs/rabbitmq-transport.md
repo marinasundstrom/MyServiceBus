@@ -22,3 +22,41 @@ The `RabbitMqTransportFactory` sets the `x-dead-letter-exchange` argument when d
 ### Java
 `RabbitMqTransportFactory` and example consumers perform the same configuration. Consumers should `basicAck` on success and `basicNack` with `requeue=false` on failure to forward messages to the error queue.
 
+### Reprocessing Dead-letter Messages
+
+Messages that fault are moved to `<queue>_error`. To inspect or replay them, connect a consumer to the error queue like any other receive endpoint.
+
+#### C#
+```csharp
+public class RetrySubmitOrderConsumer : IConsumer<SubmitOrder>
+{
+    public async Task Consume(ConsumeContext<SubmitOrder> context)
+    {
+        var endpoint = context.GetSendEndpoint(new Uri("rabbitmq://localhost/submit-order-queue"));
+        await endpoint.Send(context.Message);
+    }
+}
+
+// during configuration
+cfg.ReceiveEndpoint("submit-order-queue_error", e =>
+{
+    e.ConfigureConsumer<RetrySubmitOrderConsumer>(context);
+});
+```
+
+#### Java
+```java
+class RetrySubmitOrderConsumer implements Consumer<SubmitOrder> {
+    @Override
+    public CompletableFuture<Void> consume(ConsumeContext<SubmitOrder> ctx) {
+        SendEndpoint endpoint = ctx.getSendEndpoint("rabbitmq://localhost/submit-order-queue");
+        return endpoint.send(ctx.getMessage());
+    }
+}
+
+// during configuration
+cfg.receiveEndpoint("submit-order-queue_error", e -> {
+    e.configureConsumer(context, RetrySubmitOrderConsumer.class);
+});
+```
+
