@@ -3,6 +3,7 @@ package com.myservicebus.di;
 import com.google.inject.*;
 import com.google.inject.Module;
 import com.google.inject.multibindings.Multibinder;
+import org.slf4j.Logger;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -145,6 +146,13 @@ public class ServiceCollection {
         modules.add(new AbstractModule() {
             @Override
             protected void configure() {
+                bind(Logger.class).toProvider(Slf4jLoggerProvider.class);
+            }
+        });
+
+        modules.add(new AbstractModule() {
+            @Override
+            protected void configure() {
                 bind(ServiceProvider.class).toProvider(holder::get);
             }
         });
@@ -179,6 +187,13 @@ public class ServiceCollection {
             protected void configure() {
                 bindScope(Scoped.class, perMessageScope);
                 bind(PerMessageScope.class).toInstance(perMessageScope);
+            }
+        });
+
+        modules.add(new AbstractModule() {
+            @Override
+            protected void configure() {
+                bind(Logger.class).toProvider(Slf4jLoggerProvider.class);
             }
         });
 

@@ -1,6 +1,7 @@
 using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace MyServiceBus;
 
@@ -19,6 +20,7 @@ public class ConsumePipe<TMessage> : IConsumePipe
         this.pipe = pipe;
     }
 
+    [Throws(typeof(InvalidCastException))]
     public Task Send(ConsumeContext context)
     {
         return pipe.Send((ConsumeContext<TMessage>)context);
@@ -36,7 +38,6 @@ public class ConsumerMessageFilter<TConsumer, TMessage> : IFilter<ConsumeContext
         this.provider = provider;
     }
 
-    [Throws(typeof(InvalidOperationException))]
     public async Task Send(ConsumeContext<TMessage> context, IPipe<ConsumeContext<TMessage>> next)
     {
         try
@@ -53,8 +54,8 @@ public class ConsumerMessageFilter<TConsumer, TMessage> : IFilter<ConsumeContext
                 await ctx.RespondFaultAsync(ex);
             }
 
-            // TODO: Log instead
-            throw new InvalidOperationException($"Consumer {typeof(TConsumer).Name} failed", ex);
+            var logger = provider.GetService<ILogger<ConsumerMessageFilter<TConsumer, TMessage>>>();
+            logger?.LogError(ex, "Consumer {Consumer} failed", typeof(TConsumer).Name);
         }
     }
 }
