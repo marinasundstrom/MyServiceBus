@@ -57,6 +57,43 @@ bus.start();
 
 Built-in endpoint name formatters include `DefaultEndpointNameFormatter`, `KebabCaseEndpointNameFormatter`, and `SnakeCaseEndpointNameFormatter`.
 
+## Logging
+
+Both clients rely on their platform's logging abstractions so bus activity can be observed using familiar tooling.
+
+### C#
+
+Enable console logging with the extensions framework:
+
+```csharp
+var builder = WebApplication.CreateBuilder(args);
+builder.Logging.AddConsole();
+
+builder.Services.AddServiceBus(x =>
+{
+    // bus configuration
+});
+```
+
+### Java
+
+MyServiceBus uses SLF4J. Include a binding such as `slf4j-simple` and configure it before starting the bus:
+
+```java
+System.setProperty("org.slf4j.simpleLogger.defaultLogLevel", "info");
+ServiceCollection services = new ServiceCollection();
+
+RabbitMqBusFactory.configure(services, x -> {
+    // consumers and other options
+}, (context, cfg) -> {
+    cfg.host("rabbitmq://localhost");
+});
+
+ServiceProvider provider = services.build();
+ServiceBus bus = provider.getService(ServiceBus.class);
+bus.start();
+```
+
 ## Dependency Injection
 
 MyServiceBus registers common messaging abstractions in each client's
