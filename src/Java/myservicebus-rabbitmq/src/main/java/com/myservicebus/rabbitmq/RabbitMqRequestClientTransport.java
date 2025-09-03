@@ -60,9 +60,7 @@ public class RabbitMqRequestClientTransport implements RequestClientTransport {
                         JavaType faultType = mapper.getTypeFactory().constructParametricType(Envelope.class,
                                 faultInner);
                         Envelope<Fault<TRequest>> fault = mapper.readValue(delivery.getBody(), faultType);
-                        String msg = fault.getMessage().getExceptions().isEmpty() ? "Request faulted"
-                                : fault.getMessage().getExceptions().get(0).getMessage();
-                        future.completeExceptionally(new RequestFaultException(msg));
+                        future.completeExceptionally(new RequestFaultException(requestType.getSimpleName(), fault.getMessage()));
                     } catch (Exception inner) {
                         future.completeExceptionally(inner);
                     }
@@ -141,9 +139,7 @@ public class RabbitMqRequestClientTransport implements RequestClientTransport {
                         JavaType faultType = mapper.getTypeFactory().constructParametricType(Envelope.class,
                                 faultInner);
                         Envelope<Fault<TRequest>> fault = mapper.readValue(delivery.getBody(), faultType);
-                        String msg = fault.getMessage().getExceptions().isEmpty() ? "Request faulted"
-                                : fault.getMessage().getExceptions().get(0).getMessage();
-                        future.completeExceptionally(new RequestFaultException(msg));
+                        future.completeExceptionally(new RequestFaultException(requestType.getSimpleName(), fault.getMessage()));
                     } catch (Exception inner) {
                         future.completeExceptionally(inner);
                     }

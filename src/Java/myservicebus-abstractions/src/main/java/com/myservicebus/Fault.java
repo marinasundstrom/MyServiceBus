@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -14,7 +15,7 @@ public class Fault<T> {
     private T message;
 
     @JsonProperty("exceptions")
-    private List<ExceptionInfo> exceptions;
+    private List<ExceptionInfo> exceptions = new ArrayList<>();
 
     @JsonProperty("host")
     private HostInfo host;
@@ -33,6 +34,4 @@ public class Fault<T> {
 
     @JsonProperty("correlationId")
     private UUID correlationId;
-
-    // add more if needed (headers, etc.)
 }
