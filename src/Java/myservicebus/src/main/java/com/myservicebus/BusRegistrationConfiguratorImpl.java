@@ -7,6 +7,7 @@ import java.lang.reflect.Type;
 import java.util.function.Consumer;
 
 import com.myservicebus.di.ServiceCollection;
+import com.myservicebus.topology.TopologyRegistry;
 
 public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigurator {
 

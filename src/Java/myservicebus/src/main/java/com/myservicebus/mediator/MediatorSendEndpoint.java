@@ -1,15 +1,15 @@
 package com.myservicebus.mediator;
 
-import com.myservicebus.ConsumerTopology;
-import com.myservicebus.TopologyRegistry;
 import com.myservicebus.ConsumeContext;
 import com.myservicebus.ConsumeContextProvider;
 import com.myservicebus.Consumer;
-import com.myservicebus.SendEndpoint;
 import com.myservicebus.Retry;
+import com.myservicebus.SendEndpoint;
 import com.myservicebus.di.ServiceProvider;
 import com.myservicebus.di.ServiceScope;
 import com.myservicebus.tasks.CancellationToken;
+import com.myservicebus.topology.ConsumerTopology;
+import com.myservicebus.topology.TopologyRegistry;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Supplier;

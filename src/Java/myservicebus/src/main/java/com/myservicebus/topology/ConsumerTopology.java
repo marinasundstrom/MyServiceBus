@@ -1,8 +1,11 @@
-package com.myservicebus;
+package com.myservicebus.topology;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
+
+import com.myservicebus.ConsumeContext;
+import com.myservicebus.PipeConfigurator;
 
 public class ConsumerTopology {
     private Class<?> consumerType;
