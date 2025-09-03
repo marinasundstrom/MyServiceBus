@@ -16,6 +16,7 @@ public sealed class RabbitMqTransportFactory : ITransportFactory
         _connectionProvider = connectionProvider;
     }
 
+    [Throws(typeof(OverflowException))]
     public async Task<ISendTransport> GetSendTransport(Uri address, CancellationToken cancellationToken = default)
     {
         string exchange;
@@ -56,6 +57,7 @@ public sealed class RabbitMqTransportFactory : ITransportFactory
             exchange: topology.ExchangeName,
             type: topology.ExchangeType,
             durable: topology.Durable,
+            autoDelete: topology.AutoDelete,
             cancellationToken: cancellationToken
         );
 
@@ -91,6 +93,7 @@ public sealed class RabbitMqTransportFactory : ITransportFactory
         }
     }
 
+    [Throws(typeof(InvalidOperationException), typeof(OverflowException))]
     private static void ParseExchangeSettings(Uri address, ref bool durable, ref bool autoDelete)
     {
         if (string.IsNullOrEmpty(address.Query))

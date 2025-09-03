@@ -61,7 +61,7 @@ class RabbitMqSendEndpointProviderTest {
         StubFactory() { super(null); }
 
         @Override
-        public SendTransport getSendTransport(String exchange) {
+        public SendTransport getSendTransport(String exchange, boolean durable, boolean autoDelete) {
             this.exchange = exchange;
             return transport;
         }
