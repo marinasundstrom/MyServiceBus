@@ -1,10 +1,5 @@
 package com.myservicebus;
 
-import java.io.IOException;
-import java.time.OffsetDateTime;
-import java.time.format.DateTimeFormatter;
-import java.time.format.DateTimeFormatterBuilder;
-import java.time.temporal.ChronoField;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -12,14 +7,9 @@ import java.util.function.Function;
 
 import org.slf4j.Logger;
 
-import com.fasterxml.jackson.core.JsonParser;
-import com.fasterxml.jackson.databind.DeserializationContext;
-import com.fasterxml.jackson.databind.JsonDeserializer;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.myservicebus.di.ServiceCollection;
 import com.myservicebus.di.ServiceProvider;
+import com.myservicebus.serialization.MessageDeserializer;
 import com.myservicebus.tasks.CancellationToken;
 import com.myservicebus.topology.ConsumerTopology;
 import com.myservicebus.topology.MessageBinding;
@@ -32,7 +22,7 @@ public class MessageBus implements SendEndpoint, PublishEndpoint {
     private final TransportSendEndpointProvider transportSendEndpointProvider;
     private final PublishPipe publishPipe;
     private final Logger logger;
-    private final ObjectMapper mapper;
+    private final MessageDeserializer messageDeserializer;
     private final List<ReceiveTransport> receiveTransports = new ArrayList<>();
 
     public MessageBus(ServiceProvider serviceProvider) {
@@ -42,25 +32,13 @@ public class MessageBus implements SendEndpoint, PublishEndpoint {
         this.transportSendEndpointProvider = serviceProvider.getService(TransportSendEndpointProvider.class);
         this.publishPipe = serviceProvider.getService(PublishPipe.class);
         this.logger = serviceProvider.getService(Logger.class);
-
-        mapper = new ObjectMapper();
-        mapper.findAndRegisterModules();
-        mapper.enable(SerializationFeature.INDENT_OUTPUT);
-        mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
-
-        JavaTimeModule module = new JavaTimeModule();
-        DateTimeFormatter formatter = new DateTimeFormatterBuilder()
-                .appendPattern("yyyy-MM-dd'T'HH:mm:ss")
-                .appendFraction(ChronoField.NANO_OF_SECOND, 0, 6, true)
-                .appendOffset("+HH:MM", "Z")
-                .toFormatter();
-        module.addDeserializer(OffsetDateTime.class, new JsonDeserializer<>() {
-            @Override
-            public OffsetDateTime deserialize(JsonParser p, DeserializationContext ctxt) throws IOException {
-                return OffsetDateTime.parse(p.getText(), formatter);
-            }
-        });
-        mapper.registerModule(module);
+        MessageDeserializer md;
+        try {
+            md = serviceProvider.getService(MessageDeserializer.class);
+        } catch (Exception ex) {
+            md = new com.myservicebus.serialization.EnvelopeMessageDeserializer();
+        }
+        this.messageDeserializer = md;
     }
 
     public static MessageBus configure(ServiceCollection services,
@@ -75,55 +53,58 @@ public class MessageBus implements SendEndpoint, PublishEndpoint {
         TopologyRegistry topology = serviceProvider.getService(TopologyRegistry.class);
 
         for (ConsumerTopology consumerDef : topology.getConsumers()) {
-            PipeConfigurator<ConsumeContext<Object>> configurator = new PipeConfigurator<>();
-            @SuppressWarnings({ "unchecked", "rawtypes" })
-            Filter<ConsumeContext<Object>> errorFilter = new ErrorTransportFilter();
-            configurator.useFilter(errorFilter);
-            @SuppressWarnings({ "unchecked", "rawtypes" })
-            Filter<ConsumeContext<Object>> faultFilter = new ConsumerFaultFilter(serviceProvider,
-                    consumerDef.getConsumerType());
-            configurator.useFilter(faultFilter);
-            configurator.useRetry(3);
-            @SuppressWarnings({ "unchecked", "rawtypes" })
-            Filter<ConsumeContext<Object>> consumerFilter = new ConsumerMessageFilter(serviceProvider,
-                    consumerDef.getConsumerType());
-            configurator.useFilter(consumerFilter);
-            if (consumerDef.getConfigure() != null)
-                consumerDef.getConfigure().accept(configurator);
-            Pipe<ConsumeContext<Object>> pipe = configurator.build();
-
-            Function<byte[], CompletableFuture<Void>> handler = body -> {
-                try {
-                    MessageBinding binding = consumerDef.getBindings().get(0);
-                    var type = mapper.getTypeFactory().constructParametricType(Envelope.class, binding.getMessageType());
-                    Envelope<?> envelope = mapper.readValue(body, type);
-
-                    String faultAddress = envelope.getFaultAddress() != null ? envelope.getFaultAddress()
-                            : transportFactory.getPublishAddress(consumerDef.getQueueName() + "_error");
-
-                    ConsumeContext<Object> ctx = new ConsumeContext<>(
-                            envelope.getMessage(),
-                            envelope.getHeaders(),
-                            envelope.getResponseAddress(),
-                            faultAddress,
-                            CancellationToken.none,
-                            transportSendEndpointProvider);
-                    return pipe.send(ctx);
-                } catch (Exception e) {
-                    CompletableFuture<Void> f = new CompletableFuture<>();
-                    f.completeExceptionally(e);
-                    return f;
-                }
-            };
-
-            ReceiveTransport transport = transportFactory.createReceiveTransport(consumerDef.getQueueName(),
-                    consumerDef.getBindings(), handler);
-            receiveTransports.add(transport);
+            addConsumer(consumerDef);
         }
 
         for (ReceiveTransport transport : receiveTransports) {
             transport.start();
         }
+    }
+
+    public void addConsumer(ConsumerTopology consumerDef) throws Exception {
+        PipeConfigurator<ConsumeContext<Object>> configurator = new PipeConfigurator<>();
+        @SuppressWarnings({ "unchecked", "rawtypes" })
+        Filter<ConsumeContext<Object>> errorFilter = new ErrorTransportFilter();
+        configurator.useFilter(errorFilter);
+        @SuppressWarnings({ "unchecked", "rawtypes" })
+        Filter<ConsumeContext<Object>> faultFilter = new ConsumerFaultFilter(serviceProvider,
+                consumerDef.getConsumerType());
+        configurator.useFilter(faultFilter);
+        configurator.useRetry(3);
+        @SuppressWarnings({ "unchecked", "rawtypes" })
+        Filter<ConsumeContext<Object>> consumerFilter = new ConsumerMessageFilter(serviceProvider,
+                consumerDef.getConsumerType());
+        configurator.useFilter(consumerFilter);
+        if (consumerDef.getConfigure() != null)
+            consumerDef.getConfigure().accept(configurator);
+        Pipe<ConsumeContext<Object>> pipe = configurator.build();
+
+        Function<byte[], CompletableFuture<Void>> handler = body -> {
+            try {
+                MessageBinding binding = consumerDef.getBindings().get(0);
+                Envelope<?> envelope = messageDeserializer.deserialize(body, binding.getMessageType());
+
+                String faultAddress = envelope.getFaultAddress() != null ? envelope.getFaultAddress()
+                        : transportFactory.getPublishAddress(consumerDef.getQueueName() + "_error");
+
+                ConsumeContext<Object> ctx = new ConsumeContext<>(
+                        envelope.getMessage(),
+                        envelope.getHeaders(),
+                        envelope.getResponseAddress(),
+                        faultAddress,
+                        CancellationToken.none,
+                        transportSendEndpointProvider);
+                return pipe.send(ctx);
+            } catch (Exception e) {
+                CompletableFuture<Void> f = new CompletableFuture<>();
+                f.completeExceptionally(e);
+                return f;
+            }
+        };
+
+        ReceiveTransport transport = transportFactory.createReceiveTransport(consumerDef.getQueueName(),
+                consumerDef.getBindings(), handler);
+        receiveTransports.add(transport);
     }
 
     public void stop() throws Exception {
