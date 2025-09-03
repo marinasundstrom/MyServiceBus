@@ -28,9 +28,10 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
 
     public TMessage Message => message is null ? (receiveContext.TryGetMessage(out message) ? message : default) : message;
 
-    public ISendEndpoint GetSendEndpoint(Uri uri)
+    public Task<ISendEndpoint> GetSendEndpoint(Uri uri)
     {
-        return new TransportSendEndpoint(_transportFactory, _sendPipe, _messageSerializer, uri);
+        ISendEndpoint endpoint = new TransportSendEndpoint(_transportFactory, _sendPipe, _messageSerializer, uri);
+        return Task.FromResult(endpoint);
     }
 
     [Throws(typeof(UriFormatException), typeof(InvalidOperationException))]

@@ -7,10 +7,13 @@ namespace MyServiceBus;
 public class DefaultConsumeContext<TMessage> : BasePipeContext, ConsumeContext<TMessage>
     where TMessage : class
 {
-    public DefaultConsumeContext(TMessage message, CancellationToken cancellationToken = default)
+    readonly ISendEndpointProvider? sendEndpointProvider;
+
+    public DefaultConsumeContext(TMessage message, ISendEndpointProvider? sendEndpointProvider = null, CancellationToken cancellationToken = default)
         : base(cancellationToken)
     {
         Message = message;
+        this.sendEndpointProvider = sendEndpointProvider;
     }
 
     public TMessage Message { get; }
@@ -30,8 +33,12 @@ public class DefaultConsumeContext<TMessage> : BasePipeContext, ConsumeContext<T
         return Task.CompletedTask;
     }
 
+    [Throws(typeof(InvalidOperationException))]
     public Task<ISendEndpoint> GetSendEndpoint(Uri uri)
     {
-        throw new NotImplementedException();
+        if (sendEndpointProvider == null)
+            throw new InvalidOperationException("SendEndpointProvider not configured");
+
+        return sendEndpointProvider.GetSendEndpoint(uri);
     }
 }
