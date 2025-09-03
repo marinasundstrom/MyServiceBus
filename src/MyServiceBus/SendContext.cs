@@ -35,6 +35,7 @@ public class SendContext : BasePipeContext, ISendContext
             CorrelationId = null,
             MessageType = [.. messageTypes.Select(x => NamingConventions.GetMessageUrn(x))],
             ResponseAddress = ResponseAddress,
+            FaultAddress = FaultAddress,
             Headers = Headers,
             SentTime = DateTimeOffset.Now,
             HostInfo = GetHostInfo<T>(),

@@ -46,6 +46,8 @@ public class RabbitMqRequestClientTransport implements RequestClientTransport {
             String responseQueue = channel.queueDeclare().getQueue();
             channel.exchangeDeclare(responseExchange, BuiltinExchangeType.FANOUT, false, true, null);
             channel.queueBind(responseQueue, responseExchange, "");
+            String address = "rabbitmq://localhost/exchange/" + responseExchange
+                    + "?durable=false&autodelete=true";
 
             DeliverCallback callback = (tag, delivery) -> {
                 try {
@@ -85,7 +87,8 @@ public class RabbitMqRequestClientTransport implements RequestClientTransport {
             envelope.setConversationId(UUID.randomUUID());
             envelope.setSentTime(OffsetDateTime.now());
             envelope.setDestinationAddress("rabbitmq://localhost/exchange/" + exchange);
-            envelope.setResponseAddress("rabbitmq://localhost/exchange/" + responseExchange + "?durable=false&autodelete=true");
+            envelope.setResponseAddress(address);
+            envelope.setFaultAddress(address);
             envelope.setMessageType(List.of(NamingConventions.getMessageUrn(requestType)));
             @SuppressWarnings("unchecked")
             TRequest request = (TRequest) context.getMessage();
@@ -118,6 +121,8 @@ public class RabbitMqRequestClientTransport implements RequestClientTransport {
             String responseQueue = channel.queueDeclare().getQueue();
             channel.exchangeDeclare(responseExchange, BuiltinExchangeType.FANOUT, false, true, null);
             channel.queueBind(responseQueue, responseExchange, "");
+            String address = "rabbitmq://localhost/exchange/" + responseExchange
+                    + "?durable=false&autodelete=true";
 
             DeliverCallback callback = (tag, delivery) -> {
                 try {
@@ -163,7 +168,8 @@ public class RabbitMqRequestClientTransport implements RequestClientTransport {
             envelope.setConversationId(UUID.randomUUID());
             envelope.setSentTime(OffsetDateTime.now());
             envelope.setDestinationAddress("rabbitmq://localhost/exchange/" + exchange);
-            envelope.setResponseAddress("rabbitmq://localhost/exchange/" + responseExchange + "?durable=false&autodelete=true");
+            envelope.setResponseAddress(address);
+            envelope.setFaultAddress(address);
             envelope.setMessageType(List.of(NamingConventions.getMessageUrn(requestType)));
             @SuppressWarnings("unchecked")
             TRequest request = (TRequest) context.getMessage();

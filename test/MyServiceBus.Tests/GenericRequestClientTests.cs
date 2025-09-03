@@ -39,11 +39,11 @@ public class GenericRequestClientTests
             AutoDelete = false
         };
 
-        var captured = new TaskCompletionSource<Uri>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var captured = new TaskCompletionSource<(Uri Response, Uri Fault)>(TaskCreationOptions.RunContinuationsAsynchronously);
 
         var receive = await transportFactory.CreateReceiveTransport(topology, [Throws(typeof(InvalidOperationException))] async (ctx) =>
         {
-            captured.TrySetResult(ctx.ResponseAddress!);
+            captured.TrySetResult((ctx.ResponseAddress!, ctx.FaultAddress!));
 
             if (ctx.TryGetMessage<OrderRequest>(out var request))
             {
@@ -62,9 +62,10 @@ public class GenericRequestClientTests
         var client = new GenericRequestClient<OrderRequest>(transportFactory, serializer);
         await client.GetResponseAsync<OrderAccepted>(new OrderRequest { Accept = true });
 
-        var responseAddress = await captured.Task;
-        Assert.Contains("durable=false", responseAddress.Query);
-        Assert.Contains("autodelete=true", responseAddress.Query);
+        var addresses = await captured.Task;
+        Assert.Contains("durable=false", addresses.Response.Query);
+        Assert.Contains("autodelete=true", addresses.Response.Query);
+        Assert.Equal(addresses.Response, addresses.Fault);
 
         await receive.Stop();
     }
