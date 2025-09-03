@@ -9,29 +9,24 @@ For an explanation of why the C# and Java examples differ, see the [design decis
 ### Setup
 
 #### C#
+Use host-based registration via `Host.CreateDefaultBuilder`:
 
 ```csharp
-var builder = WebApplication.CreateBuilder(args);
-builder.Services.AddServiceBus(x =>
-{
-    // Register your consumers
-    x.AddConsumer<SubmitOrderConsumer>();
-
-    // Your transport and auto-configure endpoints
-    x.UsingRabbitMq((context, cfg) =>
+using IHost host = Host.CreateDefaultBuilder()
+    .ConfigureServices((context, services) =>
     {
-        cfg.ConfigureEndpoints(context);
-    });
-});
+        RabbitMqBusFactory.Configure(services, x =>
+        {
+            x.AddConsumer<SubmitOrderConsumer>();
+        }, (busContext, cfg) => cfg.ConfigureEndpoints(busContext));
+    })
+    .Build();
 
-var app = builder.Build();
-await app.StartAsync();
+await host.StartAsync();
+IServiceProvider serviceProvider = host.Services;
 ```
 
-**Without host**
-
-Outside of an ASP.NET host (or generic host), a factory can populate an
-`IServiceCollection` directly:
+To mirror the Java initialization using `ServiceCollection`:
 
 ```csharp
 var services = new ServiceCollection();
@@ -44,8 +39,8 @@ RabbitMqBusFactory.Configure(services, x =>
     cfg.ConfigureEndpoints(context);
 });
 
-var provider = services.BuildServiceProvider();
-var bus = provider.GetRequiredService<IMessageBus>();
+IServiceProvider serviceProvider = services.BuildServiceProvider();
+var bus = serviceProvider.GetRequiredService<IMessageBus>();
 await bus.StartAsync();
 ```
 
@@ -64,7 +59,7 @@ RabbitMqBusFactory.configure(services, x -> {
 ServiceProvider provider = services.build();
 ServiceBus bus = provider.getService(ServiceBus.class);
 
-bus.start();
+bus.start().join();
 ```
 
 

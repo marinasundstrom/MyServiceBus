@@ -1,6 +1,6 @@
 # ✉️ MyServiceBus
 
-MyServiceBus is a lightweight asynchronous messaging library inspired by MassTransit. It is designed to be minimal yet compatible with the MassTransit message envelope format, enabling services to send, publish, and consume messages across .NET and Java implementations.
+MyServiceBus (a working title) is a lightweight asynchronous messaging library inspired by MassTransit. It is designed to be minimal yet compatible with the MassTransit message envelope format, enabling services to send, publish, and consume messages across .NET and Java implementations.
 
 ## Goals
 - Provide a community-driven, open-source alternative to MassTransit and MediatR as they move toward commercial licensing.
@@ -41,69 +41,45 @@ dotnet test
 Minimal steps to configure MyServiceBus and publish a message. For a broader tour of the library, see the [feature walkthrough](docs/feature-walkthrough.md) divided into basics and advanced sections.
 
 #### C#
+Register the bus using `Host.CreateDefaultBuilder`:
+
+```csharp
+using IHost host = Host.CreateDefaultBuilder()
+    .ConfigureServices((context, services) =>
+    {
+        RabbitMqBusFactory.Configure(services, x =>
+        {
+            x.AddConsumer<SubmitOrderConsumer>();
+        }, (busContext, cfg) => cfg.ConfigureEndpoints(busContext));
+    })
+    .Build();
+
+await host.StartAsync();
+
+var bus = host.Services.GetRequiredService<IMessageBus>();
+```
+
+Define the messages and consumer:
+
 ```csharp
 public record SubmitOrder(Guid OrderId);
+public record OrderSubmitted(Guid OrderId);
 
 class SubmitOrderConsumer : IConsumer<SubmitOrder>
 {
-    public Task Consume(ConsumeContext<SubmitOrder> context) => Task.CompletedTask;
-}
-
-var builder = WebApplication.CreateBuilder(args);
-builder.Services.AddServiceBus(x =>
-{
-    // Register your consumers
-    x.AddConsumer<SubmitOrderConsumer>();
-
-    // Your transport and auto-configure endpoints
-    x.UsingRabbitMq((context, cfg) =>
-    {
-        cfg.ConfigureEndpoints(context);
-    });
-});
-
-var app = builder.Build();
-await app.StartAsync();
-```
-
-The following example publishes a `SubmitOrder` message that is handled by a consumer which then publishes an `OrderSubmitted` event:
-
-```csharp
-public record SubmitOrder
-{
-    public Guid OrderId { get; init; }
-}
-
-public record OrderSubmitted { }
-
-class SubmitOrderConsumer :
-    IConsumer<SubmitOrder>
-{
-    public async Task Consume(ConsumeContext<SubmitOrder> context)
-    {
-        await context.Publish<OrderSubmitted>(new
-        {
-            context.Message.OrderId
-        });
-    }
+    public Task Consume(ConsumeContext<SubmitOrder> context) =>
+        context.Publish(new OrderSubmitted(context.Message.OrderId));
 }
 ```
 
 Publish the `SubmitOrder` message:
 
 ```csharp
-using IServiceScope scope = serviceScopeFactory.CreateScope();
-
-var publishEndpoint = scope.GetService<IPublishEndpoint>();
-await publishEndpoint.Publish(new SubmitOrder
-{
-    OrderId = Guid.NewGuid()
-}, ctx => ctx.Headers["trace-id"] = Guid.NewGuid());
+await bus.Publish(new SubmitOrder(Guid.NewGuid()),
+    ctx => ctx.Headers["trace-id"] = Guid.NewGuid());
 ```
 
 #### Java
-
-Register the 
 
 Register the bus:
 
@@ -119,7 +95,7 @@ RabbitMqBusFactory.configure(services, x -> {
 ServiceProvider provider = services.build();
 ServiceBus bus = provider.getService(ServiceBus.class);
 
-bus.start();
+bus.start().join();
 ```
 
 Define the messages and consumer:
@@ -131,7 +107,7 @@ record OrderSubmitted(UUID orderId) { }
 class SubmitOrderConsumer implements Consumer<SubmitOrder> {
     @Override
     public CompletableFuture<Void> consume(ConsumeContext<SubmitOrder> context) {
-        return context.publish(new OrderSubmitted(context.getMessage().orderId()), CancellationToken.none);
+        return context.publish(new OrderSubmitted(context.getMessage().orderId()));
     }
 }
 ```
