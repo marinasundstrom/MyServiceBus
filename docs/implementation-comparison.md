@@ -25,4 +25,5 @@ Operations serialize messages into an envelope with a `content_type` of `applica
 ### C# vs. Java Clients
 - The Java `ConsumeContext.getSendEndpoint` throws `UnsupportedOperationException` when a provider is unavailable; the C# client resolves endpoints directly.
 - Java retries consumer operations using a built-in policy.
+- .NET applications rely on `Microsoft.Extensions.DependencyInjection` and `ILogger` abstractions, while the Java client ships with a simple service provider and SLF4J logging because the Java platform lacks standard DI and logging APIs.
 - Aside from language conventions, the API surface and behaviors aim to remain aligned across both clients.

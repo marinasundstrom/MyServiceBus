@@ -24,6 +24,10 @@ The ServiceBus Java client mirrors the C# design by providing an asynchronous me
 ### Cancellation Propagation
 - All pipe contexts expose a `CancellationToken` through `PipeContext`, enabling operations to observe shutdown or timeouts.
 
+### Dependency Injection and Logging
+- Services such as consumers and loggers are resolved via a lightweight `ServiceProvider`.
+- SLF4J `Logger` instances are registered with the container so components can inject them and record messages instead of writing to standard output.
+
 ## Behavior
 - Send and publish operations serialize messages into an envelope, encoding headers, host information, and message type.
 - The current Java client lacks implementations for advanced behaviors such as retries and request‑response helpers, which remain future work.
