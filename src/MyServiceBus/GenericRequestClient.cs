@@ -23,7 +23,7 @@ public sealed class GenericRequestClient<TRequest> : IRequestClient<TRequest>, I
     [Throws(typeof(UriFormatException), typeof(RequestFaultException), typeof(ArgumentOutOfRangeException))]
     public async Task<Response<T>> GetResponseAsync<T>(TRequest request, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default, RequestTimeout timeout = default) where T : class
     {
-        var taskCompletionSource = new TaskCompletionSource<Response<T>>();
+        var taskCompletionSource = new TaskCompletionSource<Response<T>>(TaskCreationOptions.RunContinuationsAsynchronously);
 
         var responseReceiveTopology = new ReceiveEndpointTopology
         {
@@ -102,7 +102,7 @@ public sealed class GenericRequestClient<TRequest> : IRequestClient<TRequest>, I
         where T1 : class
         where T2 : class
     {
-        var taskCompletionSource = new TaskCompletionSource<Response<T1, T2>>();
+        var taskCompletionSource = new TaskCompletionSource<Response<T1, T2>>(TaskCreationOptions.RunContinuationsAsynchronously);
 
         var responseExchange = $"resp-{Guid.NewGuid():N}";
         var responseReceiveTopology = new ReceiveEndpointTopology
