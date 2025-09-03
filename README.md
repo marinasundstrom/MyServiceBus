@@ -36,7 +36,7 @@ dotnet build
 dotnet test
 ```
 
-For a full walkthrough in both C# and Java, see the [Quick Start guide](docs/quick-start.md).
+For a brief setup, see the [Quick Start guide](docs/quick-start.md). For a detailed walkthrough in both C# and Java, see the [feature walkthrough](docs/feature-walkthrough.md).
 
 ### Sample usage
 

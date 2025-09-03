@@ -7,5 +7,5 @@
 - **Port core messaging features**: Implement publish/subscribe and request/response patterns, retries, and metrics in a way that fits platform conventions.
 - **Handle errors**: Replicate or adapt error-handling semantics as needed; checked exception support can be deferred.
 - **Integrate logging**: Use the platform's standard logging abstraction and ensure consumer failures are logged instead of crashing the process.
-- **Document and validate**: Update quick-start guides and add tests mirroring existing ones to verify feature parity.
+- **Document and validate**: Update the quick start guide and feature walkthrough and add tests mirroring existing ones to verify feature parity.
 
