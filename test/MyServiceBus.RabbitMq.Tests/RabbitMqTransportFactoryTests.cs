@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 using Shouldly;
 using Xunit;
 
-namespace MyServiceBus.Tests;
+namespace MyServiceBus.RabbitMq.Tests;
 
 public class RabbitMqTransportFactoryTests
 {
