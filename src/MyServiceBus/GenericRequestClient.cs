@@ -133,7 +133,9 @@ public sealed class GenericRequestClient<TRequest> : IRequestClient<TRequest>, I
                     return;
                 }
 
-                if (context.TryGetMessage<Fault<TRequest>>(out var fault))
+                if (!typeof(T1).IsAssignableFrom(typeof(Fault<TRequest>)) &&
+                    !typeof(T2).IsAssignableFrom(typeof(Fault<TRequest>)) &&
+                    context.TryGetMessage<Fault<TRequest>>(out var fault))
                 {
                     var exceptionMessage = fault.Exceptions.FirstOrDefault()?.Message ?? "Request faulted";
                     taskCompletionSource.TrySetException(new RequestFaultException(exceptionMessage));
