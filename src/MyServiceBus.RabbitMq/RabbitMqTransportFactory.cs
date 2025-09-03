@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Concurrent;
 using System.Threading.Tasks;
 using MyServiceBus.Topology;
@@ -18,9 +19,12 @@ public sealed class RabbitMqTransportFactory : ITransportFactory
     public async Task<ISendTransport> GetSendTransport(Uri address, CancellationToken cancellationToken = default)
     {
         string exchange;
+        bool durable = true;
+        bool autoDelete = false;
         try
         {
             exchange = ExtractExchange(address);
+            ParseExchangeSettings(address, ref durable, ref autoDelete);
         }
         catch (InvalidOperationException)
         {
@@ -31,7 +35,7 @@ public sealed class RabbitMqTransportFactory : ITransportFactory
         {
             var connection = await _connectionProvider.GetOrCreateConnectionAsync(cancellationToken);
             var channel = await connection.CreateChannelAsync(cancellationToken: cancellationToken);
-            await channel.ExchangeDeclareAsync(exchange, type: ExchangeType.Fanout, durable: true, cancellationToken: cancellationToken);
+            await channel.ExchangeDeclareAsync(exchange, type: ExchangeType.Fanout, durable: durable, autoDelete: autoDelete, cancellationToken: cancellationToken);
             sendTransport = new RabbitMqSendTransport(channel, exchange);
 
             _sendTransports.TryAdd(exchange, sendTransport);
@@ -84,6 +88,28 @@ public sealed class RabbitMqTransportFactory : ITransportFactory
         catch (InvalidOperationException ex)
         {
             throw new InvalidOperationException($"Could not extract exchange from '{address}'", ex);
+        }
+    }
+
+    private static void ParseExchangeSettings(Uri address, ref bool durable, ref bool autoDelete)
+    {
+        if (string.IsNullOrEmpty(address.Query))
+            return;
+
+        var query = address.Query.TrimStart('?').Split('&', StringSplitOptions.RemoveEmptyEntries);
+        foreach (var part in query)
+        {
+            var kv = part.Split('=', 2, StringSplitOptions.RemoveEmptyEntries);
+            if (kv.Length != 2)
+                continue;
+
+            var key = kv[0];
+            var value = kv[1];
+
+            if (key.Equals("durable", StringComparison.OrdinalIgnoreCase) && bool.TryParse(value, out var d))
+                durable = d;
+            else if (key.Equals("autodelete", StringComparison.OrdinalIgnoreCase) && bool.TryParse(value, out var ad))
+                autoDelete = ad;
         }
     }
 }
