@@ -2,8 +2,6 @@ package com.myservicebus.testapp;
 
 import java.util.concurrent.CompletableFuture;
 
-import javax.naming.OperationNotSupportedException;
-
 import com.google.inject.Inject;
 import com.myservicebus.ConsumeContext;
 import com.myservicebus.Consumer;
@@ -25,7 +23,7 @@ class TestRequestConsumer implements Consumer<TestRequest> {
 
         var response = new TestResponse(message + " 42");
 
-        throw new OperationNotSupportedException();
+        throw new IllegalStateException();
 
         // return context.respond(response, context.getCancellationToken());
     }
