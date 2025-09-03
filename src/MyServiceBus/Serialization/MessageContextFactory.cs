@@ -5,7 +5,7 @@ namespace MyServiceBus.Serialization;
 
 public class MessageContextFactory
 {
-    [Throws(typeof(InvalidOperationException))]
+    [Throws(typeof(InvalidOperationException), typeof(ArgumentException))]
     public IMessageContext CreateMessageContext(ITransportMessage transportMessage)
     {
         if (transportMessage.Headers.TryGetValue("content_type", out var contentTypeObj))
