@@ -17,3 +17,7 @@ This document explains why some MyServiceBus APIs differ from MassTransit and hi
 - **Testing** – Both platforms provide an in-memory test harness. The Java harness mirrors the C# API but returns `CompletableFuture` for each operation, requiring explicit coordination.
 
 These differences stem from language and platform constraints rather than divergent messaging semantics. Both clients aim to stay aligned conceptually so moving between them remains straightforward.
+
+## Dependency choices
+
+The .NET client builds on `System.Text.Json` and the `Microsoft.Extensions` stack for configuration, dependency injection, and logging. The Java client mirrors these roles with Jackson, Guice, and SLF4J. Both implementations use the RabbitMQ client provided by their platform. See [client dependencies](dependencies.md) for a full list.
