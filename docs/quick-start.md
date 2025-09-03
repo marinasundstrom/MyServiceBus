@@ -133,13 +133,13 @@ public class MyService {
 
 ```csharp
 IMessageBus bus = serviceProvider.GetRequiredService<IMessageBus>();
-await bus.Publish(new SubmitOrder { OrderId = Guid.NewGuid() });
+await bus.Publish(new SubmitOrder { OrderId = Guid.NewGuid() }, ctx => ctx.Headers["trace-id"] = Guid.NewGuid());
 ```
 
 ### Java
 
 ```java
-bus.publish(new SubmitOrder(UUID.randomUUID()));
+bus.publish(new SubmitOrder(UUID.randomUUID()), ctx -> ctx.getHeaders().put("trace-id", UUID.randomUUID()));
 ```
 
 ## Sending
@@ -148,14 +148,14 @@ bus.publish(new SubmitOrder(UUID.randomUUID()));
 
 ```csharp
 ISendEndpoint endpoint = serviceProvider.GetRequiredService<ISendEndpoint>();
-await endpoint.Send(new SubmitOrder { OrderId = Guid.NewGuid() });
+await endpoint.Send(new SubmitOrder { OrderId = Guid.NewGuid() }, ctx => ctx.Headers["trace-id"] = Guid.NewGuid());
 ```
 
 ### Java
 
 ```java
 SendEndpoint endpoint = serviceProvider.getService(SendEndpoint.class);
-endpoint.send(new SubmitOrder(UUID.randomUUID()), CancellationToken.none()).join();
+endpoint.send(new SubmitOrder(UUID.randomUUID()), ctx -> ctx.getHeaders().put("trace-id", UUID.randomUUID())).join();
 ```
 
 ## Consuming Messages
@@ -197,7 +197,7 @@ class CheckOrderStatusConsumer : IConsumer<CheckOrderStatus>
 }
 
 var client = serviceProvider.GetRequiredService<IRequestClient<CheckOrderStatus>>();
-Response<OrderStatus> response = await client.GetResponseAsync<OrderStatus>(new CheckOrderStatus { OrderId = Guid.NewGuid() });
+Response<OrderStatus> response = await client.GetResponseAsync<OrderStatus>(new CheckOrderStatus { OrderId = Guid.NewGuid() }, ctx => ctx.Headers["trace-id"] = Guid.NewGuid());
 Console.WriteLine(response.Message.Status);
 ```
 

@@ -24,8 +24,8 @@ public class RabbitMqFactoryConfiguratorTests
     {
         public Task StartAsync(CancellationToken cancellationToken) => Task.CompletedTask;
         public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
-        public Task Publish<T>(T message, CancellationToken cancellationToken = default) where T : class => Task.CompletedTask;
-        public Task AddConsumer<TMessage, TConsumer>(ConsumerTopology consumer, Delegate configure = null, CancellationToken cancellationToken = default)
+        public Task Publish<T>(T message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default) where T : class => Task.CompletedTask;
+        public Task AddConsumer<TMessage, TConsumer>(ConsumerTopology consumer, Delegate? configure = null, CancellationToken cancellationToken = default)
             where TConsumer : class, IConsumer<TMessage>
             where TMessage : class => Task.CompletedTask;
     }

@@ -11,7 +11,7 @@ public interface IMessageBus
 
     Task StopAsync(CancellationToken cancellationToken);
 
-    Task Publish<T>(T message, CancellationToken cancellationToken = default)
+    Task Publish<T>(T message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default)
            where T : class;
     Task AddConsumer<TMessage, TConsumer>(ConsumerTopology consumer, Delegate? configure = null, CancellationToken cancellationToken = default)
            where TConsumer : class, IConsumer<TMessage>

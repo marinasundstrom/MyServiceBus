@@ -2,8 +2,6 @@ package com.myservicebus;
 
 import java.util.concurrent.CompletableFuture;
 
-import com.myservicebus.tasks.CancellationToken;
-
 /**
  * Generic request client that delegates to a transport-specific implementation.
  */
@@ -17,14 +15,13 @@ public class GenericRequestClient<TRequest> implements RequestClient<TRequest> {
     }
 
     @Override
-    public <TResponse> CompletableFuture<TResponse> getResponse(TRequest request, Class<TResponse> responseType,
-            CancellationToken cancellationToken) {
-        return transport.sendRequest(requestType, request, responseType, cancellationToken);
+    public <TResponse> CompletableFuture<TResponse> getResponse(SendContext context, Class<TResponse> responseType) {
+        return transport.sendRequest(requestType, context, responseType);
     }
 
     @Override
-    public <T1, T2> CompletableFuture<Response2<T1, T2>> getResponse(TRequest request, Class<T1> responseType1,
-            Class<T2> responseType2, CancellationToken cancellationToken) {
-        return transport.sendRequest(requestType, request, responseType1, responseType2, cancellationToken);
+    public <T1, T2> CompletableFuture<Response2<T1, T2>> getResponse(SendContext context, Class<T1> responseType1,
+            Class<T2> responseType2) {
+        return transport.sendRequest(requestType, context, responseType1, responseType2);
     }
 }

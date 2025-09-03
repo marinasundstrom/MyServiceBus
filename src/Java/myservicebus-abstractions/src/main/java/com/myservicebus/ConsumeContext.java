@@ -7,6 +7,7 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 import com.myservicebus.tasks.CancellationToken;
+import com.myservicebus.SendContext;
 
 /**
  * Context passed to consumers when a message is received.
@@ -55,9 +56,15 @@ public class ConsumeContext<T>
 
     @Override
     public <TMessage> CompletableFuture<Void> publish(TMessage message, CancellationToken cancellationToken) {
-        String exchange = NamingConventions.getExchangeName(message.getClass());
+        SendContext ctx = new SendContext(message, cancellationToken);
+        return publish(ctx);
+    }
+
+    @Override
+    public CompletableFuture<Void> publish(SendContext context) {
+        String exchange = NamingConventions.getExchangeName(context.getMessage().getClass());
         SendEndpoint endpoint = getSendEndpoint("rabbitmq://localhost/exchange/" + exchange);
-        return endpoint.send(message, cancellationToken);
+        return endpoint.send(context);
     }
 
     @Override
@@ -69,11 +76,17 @@ public class ConsumeContext<T>
     }
 
     public <TMessage> CompletableFuture<Void> respond(TMessage message, CancellationToken cancellationToken) {
+        SendContext ctx = new SendContext(message, cancellationToken);
+        return respond(ctx);
+    }
+
+    @Override
+    public CompletableFuture<Void> respond(SendContext context) {
         if (responseAddress == null) {
             return CompletableFuture.completedFuture(null);
         }
         SendEndpoint endpoint = getSendEndpoint(responseAddress);
-        return endpoint.send(message, cancellationToken);
+        return endpoint.send(context);
     }
 
     public CompletableFuture<Void> respondFault(Exception exception, CancellationToken cancellationToken) {

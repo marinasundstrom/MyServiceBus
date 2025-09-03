@@ -2,7 +2,6 @@ package com.myservicebus.rabbitmq;
 
 import java.time.OffsetDateTime;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
@@ -13,10 +12,9 @@ import com.myservicebus.Fault;
 import com.myservicebus.HostInfoProvider;
 import com.myservicebus.NamingConventions;
 import com.myservicebus.RequestFaultException;
-import com.myservicebus.Response;
 import com.myservicebus.Response2;
 import com.myservicebus.RequestClientTransport;
-import com.myservicebus.tasks.CancellationToken;
+import com.myservicebus.SendContext;
 import com.rabbitmq.client.AMQP;
 import com.rabbitmq.client.BuiltinExchangeType;
 import com.rabbitmq.client.Channel;
@@ -37,8 +35,8 @@ public class RabbitMqRequestClientTransport implements RequestClientTransport {
     }
 
     @Override
-    public <TRequest, TResponse> CompletableFuture<TResponse> sendRequest(Class<TRequest> requestType, TRequest request,
-            Class<TResponse> responseType, CancellationToken cancellationToken) {
+    public <TRequest, TResponse> CompletableFuture<TResponse> sendRequest(Class<TRequest> requestType, SendContext context,
+            Class<TResponse> responseType) {
         CompletableFuture<TResponse> future = new CompletableFuture<>();
         try {
             Connection connection = connectionProvider.getOrCreateConnection();
@@ -89,8 +87,10 @@ public class RabbitMqRequestClientTransport implements RequestClientTransport {
             envelope.setDestinationAddress("rabbitmq://localhost/exchange/" + exchange);
             envelope.setResponseAddress("rabbitmq://localhost/exchange/" + responseExchange);
             envelope.setMessageType(List.of(NamingConventions.getMessageUrn(requestType)));
+            @SuppressWarnings("unchecked")
+            TRequest request = (TRequest) context.getMessage();
             envelope.setMessage(request);
-            envelope.setHeaders(Map.of());
+            envelope.setHeaders(context.getHeaders());
             envelope.setContentType("application/json");
             envelope.setHost(HostInfoProvider.capture());
 
@@ -107,8 +107,8 @@ public class RabbitMqRequestClientTransport implements RequestClientTransport {
 
     @Override
     public <TRequest, T1, T2> CompletableFuture<Response2<T1, T2>> sendRequest(Class<TRequest> requestType,
-            TRequest request,
-            Class<T1> responseType1, Class<T2> responseType2, CancellationToken cancellationToken) {
+            SendContext context,
+            Class<T1> responseType1, Class<T2> responseType2) {
         CompletableFuture<Response2<T1, T2>> future = new CompletableFuture<>();
         try {
             Connection connection = connectionProvider.getOrCreateConnection();
@@ -165,8 +165,10 @@ public class RabbitMqRequestClientTransport implements RequestClientTransport {
             envelope.setDestinationAddress("rabbitmq://localhost/exchange/" + exchange);
             envelope.setResponseAddress("rabbitmq://localhost/exchange/" + responseExchange);
             envelope.setMessageType(List.of(NamingConventions.getMessageUrn(requestType)));
+            @SuppressWarnings("unchecked")
+            TRequest request = (TRequest) context.getMessage();
             envelope.setMessage(request);
-            envelope.setHeaders(Map.of());
+            envelope.setHeaders(context.getHeaders());
             envelope.setContentType("application/json");
             envelope.setHost(HostInfoProvider.capture());
 

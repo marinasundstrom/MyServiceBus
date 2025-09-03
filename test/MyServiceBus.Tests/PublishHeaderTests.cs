@@ -1,0 +1,46 @@
+using System;
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
+using MyServiceBus;
+using MyServiceBus.Serialization;
+using MyServiceBus.Topology;
+using Xunit;
+
+public class PublishHeaderTests
+{
+    class TestMessage { }
+
+    class CaptureSendTransport : ISendTransport
+    {
+        public SendContext? Captured;
+        public Task Send<T>(T message, SendContext context, CancellationToken cancellationToken = default) where T : class
+        {
+            Captured = context;
+            return Task.CompletedTask;
+        }
+    }
+
+    class StubTransportFactory : ITransportFactory
+    {
+        public readonly CaptureSendTransport Transport = new();
+        public Task<ISendTransport> GetSendTransport(Uri address, CancellationToken cancellationToken = default)
+            => Task.FromResult<ISendTransport>(Transport);
+        public Task<IReceiveTransport> CreateReceiveTransport(ReceiveEndpointTopology topology, Func<ReceiveContext, Task> handler, CancellationToken cancellationToken = default)
+            => throw new NotImplementedException();
+    }
+
+    [Fact]
+    public async Task Applies_headers_to_context()
+    {
+        var factory = new StubTransportFactory();
+        var bus = new MyMessageBus(factory, new ServiceCollection().BuildServiceProvider(),
+            new SendPipe(Pipe.Empty<SendContext>()), new PublishPipe(Pipe.Empty<SendContext>()), new EnvelopeMessageSerializer());
+
+        await bus.Publish(new TestMessage(), ctx => ctx.Headers["foo"] = "bar");
+
+        Assert.NotNull(factory.Transport.Captured);
+        Assert.True(factory.Transport.Captured!.Headers.ContainsKey("foo"));
+        Assert.Equal("bar", factory.Transport.Captured!.Headers["foo"]);
+    }
+}

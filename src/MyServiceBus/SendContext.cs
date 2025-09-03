@@ -7,7 +7,7 @@ using MyServiceBus.Serialization;
 
 namespace MyServiceBus;
 
-public class SendContext : BasePipeContext
+public class SendContext : BasePipeContext, ISendContext
 {
     private readonly Type[] messageTypes;
     private readonly IMessageSerializer messageSerializer;

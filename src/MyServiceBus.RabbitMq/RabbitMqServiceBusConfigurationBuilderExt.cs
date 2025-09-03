@@ -95,6 +95,10 @@ public sealed class ConnectionProvider
 
             throw new OperationCanceledException("Cancelled while attempting to connect");
         }
+        catch (ArgumentOutOfRangeException argumentOutOfRangeException)
+        {
+            throw;
+        }
         finally
         {
             connectionLock.Release();

@@ -31,7 +31,7 @@ public class MyMessageBus : IMessageBus
     }
 
     [Throws(typeof(UriFormatException), typeof(InvalidOperationException))]
-    public async Task Publish<T>(T message, CancellationToken cancellationToken = default)
+    public async Task Publish<T>(T message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default)
        where T : class
     {
         var exchangeName = NamingConventions.GetExchangeName(message.GetType());
@@ -44,6 +44,8 @@ public class MyMessageBus : IMessageBus
             RoutingKey = exchangeName,
             MessageId = Guid.NewGuid().ToString()
         };
+
+        contextCallback?.Invoke(context);
 
         await _publishPipe.Send(context);
         await _sendPipe.Send(context);

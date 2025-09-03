@@ -141,12 +141,17 @@ public class ServiceBus implements SendEndpoint, PublishEndpoint {
         if (message == null)
             return CompletableFuture.failedFuture(new IllegalArgumentException("Message cannot be null"));
 
-        String exchange = NamingConventions.getExchangeName(message.getClass());
         SendContext ctx = new SendContext(message, cancellationToken);
-        return publishPipe.send(ctx).thenCompose(v -> {
+        return publish(ctx);
+    }
+
+    @Override
+    public CompletableFuture<Void> publish(SendContext context) {
+        String exchange = NamingConventions.getExchangeName(context.getMessage().getClass());
+        return publishPipe.send(context).thenCompose(v -> {
             var endpoint = sendEndpointProvider.getSendEndpoint("rabbitmq://localhost/exchange/" + exchange);
-            return endpoint.send(ctx).thenRun(() -> {
-                System.out.println("📤 Published message of type " + message.getClass().getSimpleName());
+            return endpoint.send(context).thenRun(() -> {
+                System.out.println("📤 Published message of type " + context.getMessage().getClass().getSimpleName());
             });
         });
     }
@@ -161,10 +166,15 @@ public class ServiceBus implements SendEndpoint, PublishEndpoint {
             return CompletableFuture
                     .failedFuture(new IllegalArgumentException("Message cannot be null"));
 
-        String queue = NamingConventions.getQueueName(message.getClass());
         SendContext ctx = new SendContext(message, cancellationToken);
+        return send(ctx);
+    }
+
+    @Override
+    public CompletableFuture<Void> send(SendContext context) {
+        String queue = NamingConventions.getQueueName(context.getMessage().getClass());
         var endpoint = sendEndpointProvider.getSendEndpoint("rabbitmq://localhost/" + queue);
-        return endpoint.send(ctx);
+        return endpoint.send(context);
     }
 
     public <T> CompletableFuture<Void> send(T message) {

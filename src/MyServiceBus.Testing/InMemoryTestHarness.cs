@@ -28,7 +28,7 @@ public class InMemoryTestHarness
         list.Add(ctx => handler((ConsumeContext<T>)ctx));
     }
 
-    public async Task Send<T>(T message, CancellationToken cancellationToken = default) where T : class
+    public async Task Send<T>(T message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default) where T : class
     {
         if (handlers.TryGetValue(message!.GetType(), out var list))
         {
@@ -43,8 +43,8 @@ public class InMemoryTestHarness
 
     public bool WasConsumed<T>() where T : class => consumed.OfType<T>().Any();
 
-    internal Task Publish<T>(T message, CancellationToken cancellationToken = default) where T : class
-        => Send(message, cancellationToken);
+    internal Task Publish<T>(T message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default) where T : class
+        => Send(message, contextCallback, cancellationToken);
 
     class TestConsumeContext<T> : ConsumeContext<T> where T : class
     {
@@ -63,14 +63,14 @@ public class InMemoryTestHarness
 
         public ISendEndpoint GetSendEndpoint(Uri uri) => new HarnessSendEndpoint(harness);
 
-        public Task PublishAsync<TMessage>(object message, CancellationToken cancellationToken = default) where TMessage : class
-            => harness.Send((TMessage)message, cancellationToken);
+        public Task PublishAsync<TMessage>(object message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default) where TMessage : class
+            => harness.Send((TMessage)message, contextCallback, cancellationToken);
 
-        public Task PublishAsync<TMessage>(TMessage message, CancellationToken cancellationToken = default) where TMessage : class
-            => harness.Send(message, cancellationToken);
+        public Task PublishAsync<TMessage>(TMessage message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default) where TMessage : class
+            => harness.Send(message, contextCallback, cancellationToken);
 
-        public Task RespondAsync<TMessage>(TMessage message, CancellationToken cancellationToken = default) where TMessage : class
-            => harness.Send(message, cancellationToken);
+        public Task RespondAsync<TMessage>(TMessage message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default) where TMessage : class
+            => harness.Send(message, contextCallback, cancellationToken);
     }
 
     class HarnessSendEndpoint : ISendEndpoint
@@ -79,10 +79,10 @@ public class InMemoryTestHarness
 
         public HarnessSendEndpoint(InMemoryTestHarness harness) => this.harness = harness;
 
-        public Task Send<T>(object message, CancellationToken cancellationToken = default) where T : class
-            => harness.Send((T)message, cancellationToken);
+        public Task Send<T>(object message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default) where T : class
+            => harness.Send((T)message, contextCallback, cancellationToken);
 
-        public Task Send<T>(T message, CancellationToken cancellationToken = default) where T : class
-            => harness.Send(message, cancellationToken);
+        public Task Send<T>(T message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default) where T : class
+            => harness.Send(message, contextCallback, cancellationToken);
     }
 }
