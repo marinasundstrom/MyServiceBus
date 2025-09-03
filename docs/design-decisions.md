@@ -1,6 +1,6 @@
 # Design Decisions
 
-This document explains why some MyServiceBus APIs differ from MassTransit and highlights key differences between the C# and Java examples in the [quick-start](quick-start.md).
+This document explains why some MyServiceBus APIs differ from MassTransit and highlights key differences between the C# and Java examples in the [feature walkthrough](feature-walkthrough.md).
 
 ## C# deviations from MassTransit
 
