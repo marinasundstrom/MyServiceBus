@@ -30,7 +30,7 @@ public class DefaultConsumeContext<TMessage> : BasePipeContext, ConsumeContext<T
         return Task.CompletedTask;
     }
 
-    public ISendEndpoint GetSendEndpoint(Uri uri)
+    public Task<ISendEndpoint> GetSendEndpoint(Uri uri)
     {
         throw new NotImplementedException();
     }

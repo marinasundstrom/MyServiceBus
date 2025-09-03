@@ -101,8 +101,9 @@ app.MapGet("/publish", async (IMessageBus messageBus, CancellationToken cancella
 .WithName("Test_Publish")
 .WithTags("Test");
 
-app.MapPost("/send", async (ISendEndpoint sendEndpoint, CancellationToken cancellationToken = default) =>
+app.MapGet("/send", async (ISendEndpointProvider sendEndpointProvider, CancellationToken cancellationToken = default) =>
 {
+    var sendEndpoint = await sendEndpointProvider.GetSendEndpoint(new Uri("rabbitmq://localhost/submit-order-queue"));
     await sendEndpoint.Send(new SubmitOrder { OrderId = Guid.NewGuid(), Message = "MT Clone C#" }, null, cancellationToken);
 })
 .WithName("Test_Send")

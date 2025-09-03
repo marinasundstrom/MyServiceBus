@@ -2,5 +2,5 @@ namespace MyServiceBus;
 
 public interface ISendEndpointProvider
 {
-    ISendEndpoint GetSendEndpoint(Uri uri);
+    Task<ISendEndpoint> GetSendEndpoint(Uri uri);
 }
