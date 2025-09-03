@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using MyServiceBus;
 using Xunit;
+using Xunit.Sdk;
 
 public class InMemoryHarnessDiTests
 {

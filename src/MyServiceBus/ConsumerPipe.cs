@@ -42,9 +42,21 @@ public class ConsumerMessageFilter<TConsumer, TMessage> : IFilter<ConsumeContext
     public async Task Send(ConsumeContext<TMessage> context, IPipe<ConsumeContext<TMessage>> next)
     {
         using var scope = provider.CreateScope();
-        var consumer = scope.ServiceProvider.GetRequiredService<TConsumer>();
-        await consumer.Consume(context);
-        await next.Send(context);
+        var contextProvider = scope.ServiceProvider.GetService<ConsumeContextProvider>();
+        if (contextProvider != null)
+            contextProvider.Context = context;
+
+        try
+        {
+            var consumer = scope.ServiceProvider.GetRequiredService<TConsumer>();
+            await consumer.Consume(context);
+            await next.Send(context);
+        }
+        finally
+        {
+            if (contextProvider != null)
+                contextProvider.Context = null;
+        }
     }
 }
 
@@ -59,6 +71,7 @@ public class ConsumerFaultFilter<TConsumer, TMessage> : IFilter<ConsumeContext<T
         this.provider = provider;
     }
 
+    [Throws(typeof(InvalidOperationException))]
     public async Task Send(ConsumeContext<TMessage> context, IPipe<ConsumeContext<TMessage>> next)
     {
         try

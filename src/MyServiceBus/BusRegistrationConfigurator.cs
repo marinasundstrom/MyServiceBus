@@ -20,7 +20,7 @@ public class BusRegistrationConfigurator : IBusRegistrationConfigurator
         Services = services;
     }
 
-    [Throws(typeof(InvalidOperationException))]
+    [Throws(typeof(InvalidOperationException), typeof(TargetInvocationException))]
     public void AddConsumer<TConsumer>() where TConsumer : class, IConsumer
     {
         Services.AddScoped<TConsumer>();
@@ -41,7 +41,7 @@ public class BusRegistrationConfigurator : IBusRegistrationConfigurator
         where TMessage : class
     {
         Services.AddScoped<TConsumer>();
-        Services.AddScoped<IConsumer, TConsumer>(sp => sp.GetRequiredService<TConsumer>());
+        Services.AddScoped<IConsumer, TConsumer>([Throws(typeof(InvalidOperationException))] (sp) => sp.GetRequiredService<TConsumer>());
 
         _topology.RegisterConsumer<TConsumer>(
             queueName: NamingConventions.GetQueueName(typeof(TMessage)),
@@ -64,7 +64,7 @@ public class BusRegistrationConfigurator : IBusRegistrationConfigurator
         serializerType = typeof(TSerializer);
     }
 
-    [Throws(typeof(TargetInvocationException))]
+    [Throws(typeof(TargetInvocationException), typeof(NotSupportedException))]
     private static Type[] GetHandledMessageTypes(Type consumerType)
     {
         return consumerType
@@ -81,5 +81,7 @@ public class BusRegistrationConfigurator : IBusRegistrationConfigurator
         Services.AddSingleton<ISendPipe>(_ => new SendPipe(sendConfigurator.Build()));
         Services.AddSingleton<IPublishPipe>(_ => new PublishPipe(publishConfigurator.Build()));
         Services.AddSingleton(typeof(IMessageSerializer), serializerType);
+        Services.AddScoped<ConsumeContextProvider>();
+        Services.AddScoped<ISendEndpointProvider, SendEndpointProvider>();
     }
 }

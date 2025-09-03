@@ -81,6 +81,11 @@ public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigura
     }
 
     public void complete() {
+        serviceCollection.addSingleton(ConsumeContextProvider.class, sp -> () -> new ConsumeContextProvider());
+        serviceCollection.addSingleton(SendEndpointProvider.class,
+                sp -> () -> new SendEndpointProviderImpl(
+                        sp.getService(ConsumeContextProvider.class),
+                        sp.getService(TransportSendEndpointProvider.class)));
         serviceCollection.addSingleton(TopologyRegistry.class, sp -> () -> topology);
         serviceCollection.addSingleton(SendPipe.class, sp -> () -> new SendPipe(sendConfigurator.build()));
         serviceCollection.addSingleton(PublishPipe.class, sp -> () -> new PublishPipe(publishConfigurator.build()));
