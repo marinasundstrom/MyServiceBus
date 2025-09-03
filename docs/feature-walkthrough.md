@@ -518,3 +518,37 @@ public void publishesOrderSubmitted() {
 ```
 
 The harness enables verifying message flows in isolation without needing a running broker.
+
+#### With Dependency Injection
+
+```csharp
+var services = new ServiceCollection();
+services.AddServiceBusTestHarness(cfg => cfg.AddConsumer<SubmitOrderConsumer>());
+
+var provider = services.BuildServiceProvider();
+var harness = provider.GetRequiredService<InMemoryTestHarness>();
+await harness.Start();
+
+await harness.Publish(new SubmitOrder());
+
+await harness.Stop();
+```
+
+#### Java
+
+```java
+ServiceCollection services = new ServiceCollection();
+TestingServiceExtensions.addServiceBusTestHarness(services, cfg -> {
+    cfg.addConsumer(SubmitOrderConsumer.class);
+});
+
+ServiceProvider provider = services.build();
+InMemoryTestHarness harness = provider.getService(InMemoryTestHarness.class);
+harness.start().join();
+
+harness.send(new SubmitOrder(UUID.randomUUID())).join();
+
+harness.stop().join();
+```
+
+The harness is registered for `IMessageBus` and `ITransportFactory`, so existing abstractions like `IRequestClient<T>` resolve from the container without special test hooks.
