@@ -25,14 +25,15 @@ public sealed class GenericRequestClient<TRequest> : IRequestClient<TRequest>, I
     {
         var taskCompletionSource = new TaskCompletionSource<Response<T>>(TaskCreationOptions.RunContinuationsAsynchronously);
 
+        var responseExchange = $"resp-{Guid.NewGuid():N}";
         var responseReceiveTopology = new ReceiveEndpointTopology
         {
-            QueueName = $"{NamingConventions.GetQueueName(typeof(T))}",
-            ExchangeName = NamingConventions.GetExchangeName(typeof(T))!, // standard MT routing
-            RoutingKey = "", // messageType.FullName!,
+            QueueName = responseExchange,
+            ExchangeName = responseExchange,
+            RoutingKey = "",
             ExchangeType = "fanout",
-            Durable = true,
-            AutoDelete = false
+            Durable = false,
+            AutoDelete = true
         };
 
         IReceiveTransport? responseReceiveTransport = null;
@@ -71,7 +72,7 @@ public sealed class GenericRequestClient<TRequest> : IRequestClient<TRequest>, I
 
         var sendContext = new SendContext(MessageTypeCache.GetMessageTypes(typeof(TRequest)), _serializer, cancellationToken)
         {
-            ResponseAddress = new Uri($"rabbitmq://localhost/exchange/{NamingConventions.GetExchangeName(typeof(T))}"),
+            ResponseAddress = new Uri($"rabbitmq://localhost/exchange/{responseExchange}?durable=false&autodelete=true"),
             MessageId = Guid.NewGuid().ToString()
         };
 
@@ -158,7 +159,7 @@ public sealed class GenericRequestClient<TRequest> : IRequestClient<TRequest>, I
 
         var sendContext = new SendContext(MessageTypeCache.GetMessageTypes(typeof(TRequest)), _serializer, cancellationToken)
         {
-            ResponseAddress = new Uri($"rabbitmq://localhost/exchange/{responseExchange}"),
+            ResponseAddress = new Uri($"rabbitmq://localhost/exchange/{responseExchange}?durable=false&autodelete=true"),
             MessageId = Guid.NewGuid().ToString()
         };
 

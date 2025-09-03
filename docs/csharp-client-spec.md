@@ -14,7 +14,7 @@ The ServiceBus C# client provides a lightweight messaging abstraction for buildi
 - `PublishAsync` uses message type conventions to determine the exchange and send published messages through the configured transport.
 
 ### Request–Response
-- `GenericRequestClient` sends requests and awaits responses or faults using temporary receive endpoints.
+- `GenericRequestClient` sends requests and awaits responses or faults using per-request temporary exchanges, mirroring the Java client.
 - Consumers can reply with `RespondAsync` or signal failures with `RespondFaultAsync`.
 - If a fault response is returned but no fault type is requested, `GenericRequestClient` throws `RequestFaultException`.
 
