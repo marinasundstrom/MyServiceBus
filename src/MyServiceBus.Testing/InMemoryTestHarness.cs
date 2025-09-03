@@ -164,7 +164,8 @@ public class InMemoryTestHarness : IMessageBus, ITransportFactory
 
         public CancellationToken CancellationToken => receiveContext.CancellationToken;
 
-        public ISendEndpoint GetSendEndpoint(Uri uri) => new HarnessSendEndpoint(harness);
+        public Task<ISendEndpoint> GetSendEndpoint(Uri uri) => Task.FromResult<ISendEndpoint>(new HarnessSendEndpoint(harness));
+        [Throws(typeof(ArgumentException))]
         public Task PublishAsync<TMessage>(object message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default)
             => harness.Publish((dynamic)message, contextCallback, cancellationToken);
 
@@ -181,6 +182,7 @@ public class InMemoryTestHarness : IMessageBus, ITransportFactory
 
         public HarnessSendEndpoint(InMemoryTestHarness harness) => this.harness = harness;
 
+        [Throws(typeof(ArgumentException))]
         public Task Send<T>(object message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default)
             => harness.Publish((dynamic)message, contextCallback, cancellationToken);
 

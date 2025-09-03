@@ -46,6 +46,7 @@ public class MediatorTransportFactoryTests
     {
         public static TaskCompletionSource<ConsumerMessage> Received = new();
 
+        [Throws(typeof(ObjectDisposedException))]
         public override Task Handle(ConsumerMessage message, CancellationToken cancellationToken)
         {
             Received.TrySetResult(message);
@@ -57,6 +58,7 @@ public class MediatorTransportFactoryTests
     {
         public static TaskCompletionSource<CancellationToken> ReceivedToken = new();
 
+        [Throws(typeof(ObjectDisposedException))]
         public override Task<ResponseMessage> Handle(RequestMessage message, CancellationToken cancellationToken)
         {
             ReceivedToken.TrySetResult(cancellationToken);
@@ -76,6 +78,7 @@ public class MediatorTransportFactoryTests
             CancellationToken = cancellationToken;
         }
 
+        [Throws(typeof(ObjectDisposedException))]
         public Task RespondAsync<TResponse>(TResponse message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default)
         {
             Response.TrySetResult(message);
@@ -86,7 +89,17 @@ public class MediatorTransportFactoryTests
 
         public Task PublishAsync<TMessage>(TMessage message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default) => Task.CompletedTask;
 
-        public ISendEndpoint GetSendEndpoint(Uri uri) => throw new NotImplementedException();
+        public Task<ISendEndpoint> GetSendEndpoint(Uri uri) =>
+            Task.FromResult<ISendEndpoint>(new StubSendEndpoint());
+
+        class StubSendEndpoint : ISendEndpoint
+        {
+            public Task Send<T>(T message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default)
+                => Task.CompletedTask;
+
+            public Task Send<T>(object message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default)
+                => Task.CompletedTask;
+        }
     }
 
     [Fact]
@@ -102,7 +115,7 @@ public class MediatorTransportFactoryTests
             RoutingKey = ""
         };
 
-        var receive = await factory.CreateReceiveTransport(topology, [Throws(typeof(ObjectDisposedException))] (ctx) =>
+        var receive = await factory.CreateReceiveTransport(topology, [Throws(typeof(ObjectDisposedException), typeof(InvalidOperationException))] (ctx) =>
         {
             ctx.TryGetMessage<SampleMessage>(out var msg);
             tcs.SetResult(msg!);
