@@ -62,31 +62,36 @@ public sealed class RabbitMqTransportFactory : ITransportFactory
             cancellationToken: cancellationToken
         );
 
-        var errorExchange = topology.QueueName + "_error";
-        var errorQueue = errorExchange;
+        var hasErrorQueue = !topology.AutoDelete;
 
-        await channel.ExchangeDeclareAsync(
-            exchange: errorExchange,
-            type: ExchangeType.Fanout,
-            durable: topology.Durable,
-            autoDelete: topology.AutoDelete,
-            cancellationToken: cancellationToken
-        );
+        if (hasErrorQueue)
+        {
+            var errorExchange = topology.QueueName + "_error";
+            var errorQueue = errorExchange;
 
-        await channel.QueueDeclareAsync(
-            queue: errorQueue,
-            durable: topology.Durable,
-            exclusive: false,
-            autoDelete: topology.AutoDelete,
-            cancellationToken: cancellationToken
-        );
+            await channel.ExchangeDeclareAsync(
+                exchange: errorExchange,
+                type: ExchangeType.Fanout,
+                durable: topology.Durable,
+                autoDelete: topology.AutoDelete,
+                cancellationToken: cancellationToken
+            );
 
-        await channel.QueueBindAsync(
-            queue: errorQueue,
-            exchange: errorExchange,
-            routingKey: string.Empty,
-            cancellationToken: cancellationToken
-        );
+            await channel.QueueDeclareAsync(
+                queue: errorQueue,
+                durable: topology.Durable,
+                exclusive: false,
+                autoDelete: topology.AutoDelete,
+                cancellationToken: cancellationToken
+            );
+
+            await channel.QueueBindAsync(
+                queue: errorQueue,
+                exchange: errorExchange,
+                routingKey: string.Empty,
+                cancellationToken: cancellationToken
+            );
+        }
 
         await channel.QueueDeclareAsync(
             queue: topology.QueueName,
@@ -103,7 +108,7 @@ public sealed class RabbitMqTransportFactory : ITransportFactory
             cancellationToken: cancellationToken
         );
 
-        return new RabbitMqReceiveTransport(channel, topology.QueueName, handler);
+        return new RabbitMqReceiveTransport(channel, topology.QueueName, handler, hasErrorQueue);
     }
 
     [Throws(typeof(InvalidOperationException))]

@@ -47,7 +47,23 @@ public class RabbitMqSendEndpointProvider implements TransportSendEndpointProvid
             transport = transportFactory.getSendTransport(exchange, durable, autoDelete);
         } else {
             String queue = path.startsWith("/") ? path.substring(1) : path;
-            transport = transportFactory.getQueueTransport(queue);
+            boolean durable = true;
+            boolean autoDelete = false;
+            String query = target.getQuery();
+            if (query != null) {
+                String[] parts = query.split("&");
+                for (String part : parts) {
+                    String[] kv = part.split("=", 2);
+                    if (kv.length == 2) {
+                        if (kv[0].equalsIgnoreCase("durable")) {
+                            durable = Boolean.parseBoolean(kv[1]);
+                        } else if (kv[0].equalsIgnoreCase("autodelete")) {
+                            autoDelete = Boolean.parseBoolean(kv[1]);
+                        }
+                    }
+                }
+            }
+            transport = transportFactory.getQueueTransport(queue, durable, autoDelete);
         }
         RabbitMqSendEndpoint endpoint = new RabbitMqSendEndpoint(transport, serializer);
         return new SendEndpoint() {

@@ -15,13 +15,15 @@ public sealed class RabbitMqReceiveTransport : IReceiveTransport
     private readonly string _queueName;
     private readonly Func<ReceiveContext, Task> _messageHandler;
     private readonly MessageContextFactory _contextFactory = new();
+    private readonly bool _hasErrorQueue;
     private string _consumerTag;
 
-    public RabbitMqReceiveTransport(IChannel channel, string queueName, Func<ReceiveContext, Task> handler)
+    public RabbitMqReceiveTransport(IChannel channel, string queueName, Func<ReceiveContext, Task> handler, bool hasErrorQueue)
     {
         _channel = channel;
         _queueName = queueName;
         _messageHandler = handler;
+        _hasErrorQueue = hasErrorQueue;
     }
 
     public async Task Start(CancellationToken cancellationToken = default)
@@ -45,7 +47,8 @@ public sealed class RabbitMqReceiveTransport : IReceiveTransport
                     headers["content_type"] = "application/vnd.mybus.envelope+json";
                 }
 
-                headers["faultAddress"] = $"rabbitmq://localhost/exchange/{_queueName}_error";
+                if (_hasErrorQueue)
+                    headers["faultAddress"] = $"rabbitmq://localhost/exchange/{_queueName}_error";
 
                 var transportMessage = new RabbitMqTransportMessage(headers, props.Persistent, payload);
                 var messageContext = _contextFactory.CreateMessageContext(transportMessage);

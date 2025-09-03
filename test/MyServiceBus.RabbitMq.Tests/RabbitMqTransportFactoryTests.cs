@@ -91,4 +91,74 @@ public class RabbitMqTransportFactoryTests
             Arg.Is(false),
             Arg.Any<CancellationToken>());
     }
+
+    [Fact]
+    public async Task Does_not_declare_error_queue_for_autodelete_endpoints()
+    {
+        var channel = Substitute.For<IChannel>();
+
+        channel.ExchangeDeclareAsync(
+                Arg.Any<string>(),
+                Arg.Any<string>(),
+                Arg.Any<bool>(),
+                Arg.Any<bool>(),
+                Arg.Any<IDictionary<string, object?>?>(),
+                Arg.Any<bool>(),
+                Arg.Any<bool>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.CompletedTask);
+
+        channel.QueueDeclareAsync(
+                Arg.Any<string>(),
+                Arg.Any<bool>(),
+                Arg.Any<bool>(),
+                Arg.Any<bool>(),
+                Arg.Any<IDictionary<string, object?>?>(),
+                Arg.Any<bool>(),
+                Arg.Any<bool>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new QueueDeclareOk("ignored", 0, 0)));
+
+        channel.QueueBindAsync(
+                Arg.Any<string>(),
+                Arg.Any<string>(),
+                Arg.Any<string>(),
+                Arg.Any<IDictionary<string, object?>?>(),
+                Arg.Any<bool>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.CompletedTask);
+
+        var connection = Substitute.For<IConnection>();
+        connection.IsOpen.Returns(true);
+        connection.CreateChannelAsync(Arg.Any<CreateChannelOptions?>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(channel));
+
+        var factory = Substitute.For<IConnectionFactory>();
+        factory.CreateConnectionAsync(Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(connection));
+
+        var provider = new ConnectionProvider(factory);
+        var transportFactory = new RabbitMqTransportFactory(provider);
+
+        var topology = new ReceiveEndpointTopology
+        {
+            QueueName = "resp-temp",
+            ExchangeName = "resp-temp",
+            RoutingKey = string.Empty,
+            Durable = false,
+            AutoDelete = true
+        };
+
+        await transportFactory.CreateReceiveTransport(topology, _ => Task.CompletedTask);
+
+        await channel.DidNotReceive().QueueDeclareAsync(
+            "resp-temp_error",
+            Arg.Any<bool>(),
+            Arg.Any<bool>(),
+            Arg.Any<bool>(),
+            Arg.Any<IDictionary<string, object?>?>(),
+            Arg.Any<bool>(),
+            Arg.Any<bool>(),
+            Arg.Any<CancellationToken>());
+    }
 }
