@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using MyServiceBus.Topology;
 using RabbitMQ.Client;
@@ -61,11 +62,43 @@ public sealed class RabbitMqTransportFactory : ITransportFactory
             cancellationToken: cancellationToken
         );
 
+        var errorExchange = topology.ExchangeName + "_error";
+        var errorQueue = topology.QueueName + "_error";
+
+        await channel.ExchangeDeclareAsync(
+            exchange: errorExchange,
+            type: ExchangeType.Fanout,
+            durable: topology.Durable,
+            autoDelete: topology.AutoDelete,
+            cancellationToken: cancellationToken
+        );
+
+        await channel.QueueDeclareAsync(
+            queue: errorQueue,
+            durable: topology.Durable,
+            exclusive: false,
+            autoDelete: topology.AutoDelete,
+            cancellationToken: cancellationToken
+        );
+
+        await channel.QueueBindAsync(
+            queue: errorQueue,
+            exchange: errorExchange,
+            routingKey: string.Empty,
+            cancellationToken: cancellationToken
+        );
+
+        var queueArgs = new Dictionary<string, object>
+        {
+            ["x-dead-letter-exchange"] = errorExchange
+        };
+
         await channel.QueueDeclareAsync(
             queue: topology.QueueName,
             durable: topology.Durable,
             exclusive: false,
             autoDelete: topology.AutoDelete,
+            arguments: queueArgs,
             cancellationToken: cancellationToken
         );
 
@@ -93,7 +126,7 @@ public sealed class RabbitMqTransportFactory : ITransportFactory
         }
     }
 
-    [Throws(typeof(InvalidOperationException), typeof(OverflowException))]
+    [Throws(typeof(InvalidOperationException), typeof(OverflowException), typeof(ArgumentException))]
     private static void ParseExchangeSettings(Uri address, ref bool durable, ref bool autoDelete)
     {
         if (string.IsNullOrEmpty(address.Query))

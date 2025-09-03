@@ -1,6 +1,8 @@
 package com.myservicebus.rabbitmq;
 
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.HashMap;
+import java.util.Map;
 
 import com.myservicebus.SendTransport;
 import com.rabbitmq.client.Channel;
@@ -34,7 +36,18 @@ public class RabbitMqTransportFactory {
             try {
                 Connection connection = connectionProvider.getOrCreateConnection();
                 Channel channel = connection.createChannel();
-                channel.queueDeclare(queue, true, false, false, null);
+
+                String errorExchange = queue + "_error";
+                String errorQueue = queue + "_error";
+
+                channel.exchangeDeclare(errorExchange, "fanout", true, false, null);
+                channel.queueDeclare(errorQueue, true, false, false, null);
+                channel.queueBind(errorQueue, errorExchange, "");
+
+                Map<String, Object> args = new HashMap<>();
+                args.put("x-dead-letter-exchange", errorExchange);
+                channel.queueDeclare(queue, true, false, false, args);
+
                 return new RabbitMqSendTransport(channel, "", queue);
             } catch (Exception e) {
                 throw new RuntimeException("Failed to create send transport", e);
