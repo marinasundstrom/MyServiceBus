@@ -54,6 +54,10 @@ public class ConsumeContext<T>
         return headers;
     }
 
+    public String getFaultAddress() {
+        return faultAddress;
+    }
+
     @Override
     public <TMessage> CompletableFuture<Void> publish(TMessage message, CancellationToken cancellationToken) {
         SendContext ctx = new SendContext(message, cancellationToken);

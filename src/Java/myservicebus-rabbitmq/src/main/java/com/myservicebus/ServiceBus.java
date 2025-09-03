@@ -22,6 +22,7 @@ import com.myservicebus.tasks.CancellationToken;
 import com.myservicebus.rabbitmq.ConnectionProvider;
 import com.myservicebus.PublishEndpoint;
 import com.myservicebus.TransportSendEndpointProvider;
+import com.myservicebus.ErrorTransportFilter;
 import com.rabbitmq.client.BuiltinExchangeType;
 import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.Connection;
@@ -93,6 +94,9 @@ public class ServiceBus implements SendEndpoint, PublishEndpoint {
 
             PipeConfigurator<ConsumeContext<Object>> configurator = new PipeConfigurator<>();
             @SuppressWarnings({"unchecked", "rawtypes"})
+            Filter<ConsumeContext<Object>> errorFilter = new ErrorTransportFilter();
+            configurator.useFilter(errorFilter);
+            @SuppressWarnings({"unchecked", "rawtypes"})
             Filter<ConsumeContext<Object>> faultFilter =
                     new ConsumerFaultFilter(serviceProvider, consumerDef.getConsumerType());
             configurator.useFilter(faultFilter);
@@ -112,6 +116,12 @@ public class ServiceBus implements SendEndpoint, PublishEndpoint {
                 channel.queueBind(queue, exchangeName, "");
             }
 
+            String errorExchange = queue + "_error";
+            String errorQueue = errorExchange;
+            channel.exchangeDeclare(errorExchange, BuiltinExchangeType.FANOUT, true);
+            channel.queueDeclare(errorQueue, true, false, false, null);
+            channel.queueBind(errorQueue, errorExchange, "");
+
             MessageBinding binding = consumerDef.getBindings().get(0);
             channel.basicConsume(queue, false, (tag, delivery) -> {
                 try {
@@ -121,11 +131,15 @@ public class ServiceBus implements SendEndpoint, PublishEndpoint {
 
                     var envelope = (Envelope<?>) mapper.readValue(delivery.getBody(), type);
 
+                    String faultAddress = envelope.getFaultAddress() != null
+                            ? envelope.getFaultAddress()
+                            : "rabbitmq://localhost/exchange/" + queue + "_error";
+
                     ConsumeContext<Object> ctx = new ConsumeContext<>(
                             envelope.getMessage(),
                             envelope.getHeaders(),
                             envelope.getResponseAddress(),
-                            envelope.getFaultAddress(),
+                            faultAddress,
                             CancellationToken.none,
                             transportSendEndpointProvider);
 
@@ -134,9 +148,9 @@ public class ServiceBus implements SendEndpoint, PublishEndpoint {
                     channel.basicAck(delivery.getEnvelope().getDeliveryTag(), false);
                 } catch (Exception e) {
                     try {
-                        channel.basicNack(delivery.getEnvelope().getDeliveryTag(), false, false);
+                        channel.basicAck(delivery.getEnvelope().getDeliveryTag(), false);
                     } catch (IOException ioEx) {
-                        logger.error("Failed to nack message", ioEx);
+                        logger.error("Failed to ack message", ioEx);
                     }
 
                     logger.error("Message handler faulted", e);

@@ -14,13 +14,13 @@ These safeguards allow application code to await a usable connection without imp
 
 ## Dead-letter Handling
 
-MyServiceBus declares a dead-letter exchange and queue for each receive endpoint. Following MassTransit conventions, both the error exchange and queue are named by appending `_error` to the original queue name. When a consumer fails, the message is negatively acknowledged without requeue, and RabbitMQ moves it to the corresponding error queue.
+MyServiceBus declares an error exchange and queue for each receive endpoint. Following MassTransit conventions, both are named by appending `_error` to the original queue name. The `ErrorTransportFilter` catches unhandled exceptions and moves the message to the error transport, while the transport acknowledges the original delivery.
 
 ### C#
-The `RabbitMqTransportFactory` sets the `x-dead-letter-exchange` argument when declaring the queue and ensures the error exchange and queue exist.
+The `RabbitMqTransportFactory` ensures the error exchange and queue exist when the receive endpoint is created.
 
 ### Java
-`RabbitMqTransportFactory` and example consumers perform the same configuration. Consumers should `basicAck` on success and `basicNack` with `requeue=false` on failure to forward messages to the error queue.
+`ServiceBus` performs the same declarations and registers the `ErrorTransportFilter` so failed messages are forwarded to the error queue.
 
 ### Reprocessing Dead-letter Messages
 
