@@ -12,6 +12,7 @@ import com.myservicebus.MyServiceImpl;
 import com.myservicebus.RequestClientFactory;
 import com.myservicebus.Response;
 import com.myservicebus.SendEndpoint;
+import com.myservicebus.SendEndpointProvider;
 import com.myservicebus.ServiceBus;
 import com.myservicebus.PublishEndpoint;
 import com.myservicebus.di.ServiceCollection;
@@ -35,6 +36,8 @@ public class Main {
                 h.username("guest");
                 h.password("guest");
             });
+
+            cfg.configureEndpoints(context);
         });
 
         ServiceProvider provider = services.build();
@@ -66,7 +69,8 @@ public class Main {
         });
 
         app.get("/send", ctx -> {
-            var sendEndpoint = provider.getService(SendEndpoint.class);
+            var sendEndpointProvider = provider.getService(SendEndpointProvider.class);
+            var sendEndpoint = sendEndpointProvider.getSendEndpoint("rabbitmq://localhost/submit-order-queue");
             SubmitOrder message = new SubmitOrder(UUID.randomUUID(), "MT Clone Java");
             try {
                 sendEndpoint.send(message, CancellationToken.none).join();
