@@ -55,7 +55,6 @@ public class Main {
 
         app.get("/publish", ctx -> {
             try (ServiceScope scope = provider.createScope()) {
-
                 var publishEndpoint = scope.getServiceProvider().getService(PublishEndpoint.class);
                 SubmitOrder message = new SubmitOrder(UUID.randomUUID(), "MT Clone Java");
                 try {
