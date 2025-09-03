@@ -67,7 +67,7 @@ class RabbitMqSendEndpointProviderTest {
         }
 
         @Override
-        public SendTransport getQueueTransport(String queue) {
+        public SendTransport getQueueTransport(String queue, boolean durable, boolean autoDelete) {
             this.queue = queue;
             return transport;
         }

@@ -32,19 +32,26 @@ public class RabbitMqTransportFactory {
     }
 
     public SendTransport getQueueTransport(String queue) {
-        return queueTransports.computeIfAbsent(queue, q -> {
+        return getQueueTransport(queue, true, false);
+    }
+
+    public SendTransport getQueueTransport(String queue, boolean durable, boolean autoDelete) {
+        String key = queue + ":" + durable + ":" + autoDelete;
+        return queueTransports.computeIfAbsent(key, q -> {
             try {
                 Connection connection = connectionProvider.getOrCreateConnection();
                 Channel channel = connection.createChannel();
 
-                String errorExchange = queue + "_error";
-                String errorQueue = queue + "_error";
+                if (!autoDelete) {
+                    String errorExchange = queue + "_error";
+                    String errorQueue = queue + "_error";
 
-                channel.exchangeDeclare(errorExchange, "fanout", true, false, null);
-                channel.queueDeclare(errorQueue, true, false, false, null);
-                channel.queueBind(errorQueue, errorExchange, "");
+                    channel.exchangeDeclare(errorExchange, "fanout", durable, autoDelete, null);
+                    channel.queueDeclare(errorQueue, durable, false, autoDelete, null);
+                    channel.queueBind(errorQueue, errorExchange, "");
+                }
 
-                channel.queueDeclare(queue, true, false, false, null);
+                channel.queueDeclare(queue, durable, false, autoDelete, null);
 
                 return new RabbitMqSendTransport(channel, "", queue);
             } catch (Exception e) {
