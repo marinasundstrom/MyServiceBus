@@ -16,6 +16,7 @@ public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigura
     private PipeConfigurator<SendContext> sendConfigurator = new PipeConfigurator<>();
     private PipeConfigurator<SendContext> publishConfigurator = new PipeConfigurator<>();
     private Class<? extends com.myservicebus.serialization.MessageSerializer> serializerClass = com.myservicebus.serialization.EnvelopeMessageSerializer.class;
+    private Class<? extends com.myservicebus.serialization.MessageDeserializer> deserializerClass = com.myservicebus.serialization.EnvelopeMessageDeserializer.class;
 
     public BusRegistrationConfiguratorImpl(ServiceCollection serviceCollection) {
         this.serviceCollection = serviceCollection;
@@ -63,6 +64,10 @@ public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigura
         this.serializerClass = serializerClass;
     }
 
+    public void setDeserializer(Class<? extends com.myservicebus.serialization.MessageDeserializer> deserializerClass) {
+        this.deserializerClass = deserializerClass;
+    }
+
     public static Class<?> getClassFromType(Type type) {
         if (type instanceof Class<?>) {
             return (Class<?>) type;
@@ -93,6 +98,13 @@ public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigura
         serviceCollection.addSingleton(com.myservicebus.serialization.MessageSerializer.class, sp -> () -> {
             try {
                 return serializerClass.getDeclaredConstructor().newInstance();
+            } catch (Exception ex) {
+                throw new RuntimeException(ex);
+            }
+        });
+        serviceCollection.addSingleton(com.myservicebus.serialization.MessageDeserializer.class, sp -> () -> {
+            try {
+                return deserializerClass.getDeclaredConstructor().newInstance();
             } catch (Exception ex) {
                 throw new RuntimeException(ex);
             }
