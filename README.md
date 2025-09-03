@@ -38,7 +38,7 @@ dotnet test
 
 ### Quick start
 
-Minimal steps to configure MyServiceBus and publish a message. For a broader tour of the library, see the [feature walkthrough](docs/feature-walkthrough.md).
+Minimal steps to configure MyServiceBus and publish a message. For a broader tour of the library, see the [feature walkthrough](docs/feature-walkthrough.md) divided into basics and advanced sections.
 
 #### C#
 ```csharp
