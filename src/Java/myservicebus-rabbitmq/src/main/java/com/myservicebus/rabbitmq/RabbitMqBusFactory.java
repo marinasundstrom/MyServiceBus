@@ -2,7 +2,7 @@ package com.myservicebus.rabbitmq;
 
 import com.myservicebus.BusRegistrationConfigurator;
 import com.myservicebus.BusRegistrationConfiguratorImpl;
-import com.myservicebus.RabbitMqMessageBus;
+import com.myservicebus.MessageBus;
 import com.myservicebus.SendEndpoint;
 import com.myservicebus.PublishEndpoint;
 import com.myservicebus.di.ServiceCollection;
@@ -15,7 +15,7 @@ import java.util.function.Consumer;
  * service provider.
  * After calling {@link #configure(ServiceCollection, Consumer, BiConsumer)},
  * resolve
- * {@link RabbitMqMessageBus} from the built {@link ServiceProvider} and start
+ * {@link MessageBus} from the built {@link ServiceProvider} and start
  * it manually.
  */
 public final class RabbitMqBusFactory {
@@ -31,16 +31,16 @@ public final class RabbitMqBusFactory {
         }
         RabbitMqTransport.configure(cfg);
         cfg.complete();
-        services.addSingleton(RabbitMqMessageBus.class, sp -> () -> {
+        services.addSingleton(MessageBus.class, sp -> () -> {
             if (configure != null) {
                 BusRegistrationContext context = new BusRegistrationContext(sp);
                 RabbitMqFactoryConfigurator factoryConfigurator = sp.getService(RabbitMqFactoryConfigurator.class);
                 configure.accept(context, factoryConfigurator);
             }
-            return new RabbitMqMessageBus(sp);
+            return new MessageBus(sp);
         });
-        services.addSingleton(SendEndpoint.class, sp -> () -> sp.getService(RabbitMqMessageBus.class));
-        services.addScoped(PublishEndpoint.class, sp -> () -> sp.getService(RabbitMqMessageBus.class));
+        services.addSingleton(SendEndpoint.class, sp -> () -> sp.getService(MessageBus.class));
+        services.addScoped(PublishEndpoint.class, sp -> () -> sp.getService(MessageBus.class));
     }
 
     public static void configure(ServiceCollection services,

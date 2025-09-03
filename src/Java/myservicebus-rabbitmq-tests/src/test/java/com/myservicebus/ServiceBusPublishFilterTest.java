@@ -2,14 +2,18 @@ package com.myservicebus;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.net.URI;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Function;
 
 import org.junit.jupiter.api.Test;
 
 import com.myservicebus.di.ServiceCollection;
 import com.myservicebus.rabbitmq.ConnectionProvider;
 import com.rabbitmq.client.ConnectionFactory;
+import com.myservicebus.topology.MessageBinding;
 
 class ServiceBusPublishFilterTest {
     @Test
@@ -43,8 +47,30 @@ class ServiceBusPublishFilterTest {
             }
         });
         services.addSingleton(ConnectionProvider.class, sp -> () -> new ConnectionProvider(new ConnectionFactory()));
+        services.addSingleton(TransportFactory.class, sp -> () -> new TransportFactory() {
+            @Override
+            public SendTransport getSendTransport(URI address) {
+                return data -> {};
+            }
 
-        MessageBus bus = new RabbitMqMessageBus(services.build());
+            @Override
+            public ReceiveTransport createReceiveTransport(String queueName, List<MessageBinding> bindings,
+                    Function<byte[], CompletableFuture<Void>> handler) {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public String getPublishAddress(String exchange) {
+                return "rabbitmq://localhost/exchange/" + exchange;
+            }
+
+            @Override
+            public String getSendAddress(String queue) {
+                return "rabbitmq://localhost/" + queue;
+            }
+        });
+
+        MessageBus bus = new MessageBus(services.build());
 
         bus.publish("hi");
 

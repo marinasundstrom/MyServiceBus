@@ -12,7 +12,7 @@ import com.myservicebus.MyServiceImpl;
 import com.myservicebus.RequestClientFactory;
 import com.myservicebus.Response;
 import com.myservicebus.SendEndpointProvider;
-import com.myservicebus.RabbitMqMessageBus;
+import com.myservicebus.MessageBus;
 import com.myservicebus.PublishEndpoint;
 import com.myservicebus.di.ServiceCollection;
 import com.myservicebus.di.ServiceProvider;
@@ -41,11 +41,11 @@ public class Main {
 
         ServiceProvider provider = services.build();
         final Logger logger = provider.getService(Logger.class);
-        RabbitMqMessageBus serviceBus = provider.getService(RabbitMqMessageBus.class);
+        MessageBus serviceBus = provider.getService(MessageBus.class);
 
         try {
             serviceBus.start();
-        } catch (IOException | TimeoutException e) {
+        } catch (Exception e) {
             logger.error("Failed to start service bus", e);
             return;
         }
