@@ -24,7 +24,6 @@ public class ConsumerMessageFilter<T> implements Filter<ConsumeContext<T>> {
             ConsumeContextProvider ctxProvider = scoped.getService(ConsumeContextProvider.class);
             ctxProvider.setContext(context);
             try {
-                @SuppressWarnings("unchecked")
                 Consumer<T> consumer = (Consumer<T>) scoped.getService(consumerType);
                 CompletableFuture<Void> consumerFuture;
                 try {

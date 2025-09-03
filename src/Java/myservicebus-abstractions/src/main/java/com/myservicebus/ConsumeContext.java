@@ -7,7 +7,6 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 import com.myservicebus.tasks.CancellationToken;
-import com.myservicebus.SendContext;
 
 /**
  * Context passed to consumers when a message is received.

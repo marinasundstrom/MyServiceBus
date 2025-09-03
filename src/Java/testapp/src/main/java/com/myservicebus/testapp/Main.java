@@ -11,7 +11,6 @@ import com.myservicebus.MyService;
 import com.myservicebus.MyServiceImpl;
 import com.myservicebus.RequestClientFactory;
 import com.myservicebus.Response;
-import com.myservicebus.SendEndpoint;
 import com.myservicebus.SendEndpointProvider;
 import com.myservicebus.RabbitMqMessageBus;
 import com.myservicebus.PublishEndpoint;

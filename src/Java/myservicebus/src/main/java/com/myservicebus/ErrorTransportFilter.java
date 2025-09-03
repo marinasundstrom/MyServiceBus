@@ -4,7 +4,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 
 import com.myservicebus.tasks.CancellationToken;
-import com.myservicebus.SendEndpoint;
 
 public class ErrorTransportFilter<T> implements Filter<ConsumeContext<T>> {
     @Override
