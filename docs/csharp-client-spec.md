@@ -16,6 +16,7 @@ The ServiceBus C# client provides a lightweight messaging abstraction for buildi
 ### Request–Response
 - `GenericRequestClient` sends requests and awaits responses or faults using temporary receive endpoints.
 - Consumers can reply with `RespondAsync` or signal failures with `RespondFaultAsync`.
+- If a fault response is returned but no fault type is requested, `GenericRequestClient` throws `RequestFaultException`.
 
 ### Cancellation Propagation
 - All pipe contexts carry a `CancellationToken`, allowing operations to observe shutdown or timeout signals.
