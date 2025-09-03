@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Threading;
 using MyServiceBus.Serialization;
 
@@ -14,7 +15,7 @@ public interface ReceiveContext : PipeContext
 
     IDictionary<string, object> Headers { get; }
 
-    bool TryGetMessage<T>(out T? message)
+    bool TryGetMessage<T>([NotNullWhen(true)] out T? message)
         where T : class;
 }
 
@@ -38,7 +39,7 @@ public class ReceiveContextImpl : BasePipeContext, ReceiveContext
 
     public Uri? FaultAddress => messageContext.FaultAddress;
 
-    public bool TryGetMessage<T>(out T? message)
+    public bool TryGetMessage<T>([NotNullWhen(true)] out T? message)
         where T : class
     {
         return messageContext.TryGetMessage(out message);

@@ -4,11 +4,8 @@ using System.Text.Json.Serialization;
 
 namespace MyServiceBus;
 
-public class Fault<T>
-    where T : class
+public class Fault
 {
-    [JsonPropertyName("message")] public T Message { get; set; }
-
     [JsonPropertyName("exceptions")] public List<ExceptionInfo> Exceptions { get; set; } = new();
 
     [JsonPropertyName("host")] public HostInfo? Host { get; set; }
@@ -22,6 +19,12 @@ public class Fault<T>
     [JsonPropertyName("conversationId")] public Guid? ConversationId { get; set; }
 
     [JsonPropertyName("correlationId")] public Guid? CorrelationId { get; set; }
+}
+
+public class Fault<T> : Fault
+    where T : class
+{
+    [JsonPropertyName("message")] public T Message { get; set; }
 }
 
 public class ExceptionInfo

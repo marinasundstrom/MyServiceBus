@@ -1,3 +1,5 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace MyServiceBus;
 
 public class Response<T>
@@ -26,7 +28,7 @@ public class Response<T1, T2>
 
     public static Response<T1, T2> FromT2(T2 message) => new Response<T1, T2>(message);
 
-    public bool Is<T>(out Response<T> response)
+    public bool Is<T>([NotNullWhen(true)] out Response<T>? response)
         where T : class
     {
         if (_message is T typed)

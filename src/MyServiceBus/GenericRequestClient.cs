@@ -51,8 +51,7 @@ public sealed class GenericRequestClient<TRequest> : IRequestClient<TRequest>, I
 
                 if (context.TryGetMessage<Fault<TRequest>>(out var fault))
                 {
-                    var exceptionMessage = fault.Exceptions.FirstOrDefault()?.Message ?? "Request faulted";
-                    taskCompletionSource.TrySetException(new RequestFaultException(exceptionMessage));
+                    taskCompletionSource.TrySetException(new RequestFaultException("Send", fault!));
                 }
             }
             catch (Exception ex)
@@ -140,8 +139,7 @@ public sealed class GenericRequestClient<TRequest> : IRequestClient<TRequest>, I
                     !typeof(T2).IsAssignableFrom(typeof(Fault<TRequest>)) &&
                     context.TryGetMessage<Fault<TRequest>>(out var fault))
                 {
-                    var exceptionMessage = fault.Exceptions.FirstOrDefault()?.Message ?? "Request faulted";
-                    taskCompletionSource.TrySetException(new RequestFaultException(exceptionMessage));
+                    taskCompletionSource.TrySetException(new RequestFaultException("Send", fault));
                 }
             }
             catch (Exception ex)
