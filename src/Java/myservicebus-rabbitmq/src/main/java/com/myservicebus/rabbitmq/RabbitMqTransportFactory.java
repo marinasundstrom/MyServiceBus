@@ -15,12 +15,13 @@ public class RabbitMqTransportFactory {
         this.connectionProvider = connectionProvider;
     }
 
-    public SendTransport getSendTransport(String exchange) {
-        return exchangeTransports.computeIfAbsent(exchange, ex -> {
+    public SendTransport getSendTransport(String exchange, boolean durable, boolean autoDelete) {
+        String key = exchange + ":" + durable + ":" + autoDelete;
+        return exchangeTransports.computeIfAbsent(key, ex -> {
             try {
                 Connection connection = connectionProvider.getOrCreateConnection();
                 Channel channel = connection.createChannel();
-                channel.exchangeDeclare(exchange, "fanout", true);
+                channel.exchangeDeclare(exchange, "fanout", durable, autoDelete, null);
                 return new RabbitMqSendTransport(channel, exchange, "");
             } catch (Exception e) {
                 throw new RuntimeException("Failed to create send transport", e);

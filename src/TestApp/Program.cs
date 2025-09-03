@@ -108,7 +108,18 @@ app.MapPost("/send", async (ISendEndpoint sendEndpoint, CancellationToken cancel
 .WithName("Test_Send")
 .WithTags("Test");
 
-app.MapGet("/request", async Task<Results<Ok<string>, InternalServerError<string>, NoContent>> (IRequestClient<TestRequest> client, CancellationToken cancellationToken = default) =>
+app.MapGet("/request", async Task<Results<Ok<string>, InternalServerError>> (IRequestClient<TestRequest> client, CancellationToken cancellationToken = default) =>
+{
+    var message = new TestRequest() { Message = "Foo" };
+    var response = await client.GetResponseAsync<TestResponse>(message, null, cancellationToken);
+
+    return TypedResults.Ok(response.Message.Message);
+})
+.WithName("Test_Request")
+.WithTags("Test");
+
+
+app.MapGet("/request_multi", async Task<Results<Ok<string>, InternalServerError<string>, NoContent>> (IRequestClient<TestRequest> client, CancellationToken cancellationToken = default) =>
 {
     var message = new TestRequest() { Message = "Foo" };
     var response = await client.GetResponseAsync<TestResponse, Fault<TestRequest>>(message, null, cancellationToken);
@@ -120,7 +131,7 @@ app.MapGet("/request", async Task<Results<Ok<string>, InternalServerError<string
 
     return TypedResults.NoContent();
 })
-.WithName("Test_Request")
+.WithName("Test_RequestMulti")
 .WithTags("Test");
 
 app.Run();
