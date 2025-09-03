@@ -2,8 +2,10 @@ package com.myservicebus;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 
 import org.junit.jupiter.api.Test;
 
@@ -55,8 +57,10 @@ class RequestClientFaultTest {
         RequestClient<Ping> client = factory.create(Ping.class);
 
         CompletableFuture<Pong> response = client.getResponse(new Ping("hi"), Pong.class);
-        var ex = assertThrows(java.util.concurrent.CompletionException.class, response::join);
-        assertEquals("nope", ex.getCause().getMessage());
+        CompletionException ex = assertThrows(CompletionException.class, response::join);
+        assertTrue(ex.getCause() instanceof RequestFaultException);
+        RequestFaultException rfe = (RequestFaultException) ex.getCause();
+        assertEquals("nope", rfe.getFault().getExceptions().get(0).getMessage());
     }
 }
 

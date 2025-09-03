@@ -1,7 +1,19 @@
 package com.myservicebus;
 
+import java.util.stream.Collectors;
+
 public class RequestFaultException extends RuntimeException {
-    public RequestFaultException(String message) {
-        super(message);
+    private final Fault<?> fault;
+
+    public RequestFaultException(String requestType, Fault<?> fault) {
+        super("The " + requestType + " request faulted: " +
+                fault.getExceptions().stream()
+                        .map(ExceptionInfo::getMessage)
+                        .collect(Collectors.joining(System.lineSeparator())));
+        this.fault = fault;
+    }
+
+    public Fault<?> getFault() {
+        return fault;
     }
 }
