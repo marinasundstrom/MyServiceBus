@@ -36,6 +36,8 @@ public class ConsumerMessageFilter<T> implements Filter<ConsumeContext<T>> {
                     Throwable cause = ex instanceof CompletionException && ex.getCause() != null ? ex.getCause() : ex;
                     context.respondFault(cause instanceof Exception ? (Exception) cause : new RuntimeException(cause),
                             CancellationToken.none).join();
+
+                    // TODO: Log instead
                     throw new CompletionException(
                             new RuntimeException("Consumer " + consumerType.getSimpleName() + " failed", cause));
                 }

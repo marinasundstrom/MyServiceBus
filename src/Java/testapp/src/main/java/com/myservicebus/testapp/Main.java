@@ -6,6 +6,7 @@ import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 
+import com.myservicebus.ExceptionInfo;
 import com.myservicebus.Fault;
 import com.myservicebus.MyService;
 import com.myservicebus.MyServiceImpl;
@@ -78,6 +79,19 @@ public class Main {
             var requestClient = requestClientFactory.create(TestRequest.class);
             try {
                 var response = requestClient
+                        .getResponse(new TestRequest("Foo"), TestResponse.class, CancellationToken.none)
+                        .get();
+                ctx.result(response.getMessage().toString());
+            } catch (Exception exc) {
+                ctx.result(exc.getMessage().toString());
+            }
+        });
+
+        app.get("/request_multi", ctx -> {
+            var requestClientFactory = provider.getService(RequestClientFactory.class);
+            var requestClient = requestClientFactory.create(TestRequest.class);
+            try {
+                var response = requestClient
                         .getResponse(new TestRequest("Foo"), TestResponse.class,
                                 Fault.class, CancellationToken.none)
                         .get();
@@ -87,8 +101,12 @@ public class Main {
                 });
 
                 response.as(Fault.class).ifPresent(r -> {
-                    var exception = r.getMessage().getExceptions();
-                    ctx.result(exception.toString());
+                    var exception = (ExceptionInfo) r.getMessage().getExceptions().get(0);
+                    String message = exception.getMessage();
+                    if (message == null) {
+                        message = exception.toString();
+                    }
+                    ctx.status(500).result(message);
                 });
             } catch (Exception e) {
                 ctx.status(500).result("Failed to get response: " + e.getMessage());

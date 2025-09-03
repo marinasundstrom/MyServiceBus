@@ -53,6 +53,7 @@ public class ConsumerMessageFilter<TConsumer, TMessage> : IFilter<ConsumeContext
                 await ctx.RespondFaultAsync(ex);
             }
 
+            // TODO: Log instead
             throw new InvalidOperationException($"Consumer {typeof(TConsumer).Name} failed", ex);
         }
     }
