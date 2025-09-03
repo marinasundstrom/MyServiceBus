@@ -59,7 +59,6 @@ public class ConsumerFaultFilter<TConsumer, TMessage> : IFilter<ConsumeContext<T
         this.provider = provider;
     }
 
-    [Throws(typeof(InvalidOperationException))]
     public async Task Send(ConsumeContext<TMessage> context, IPipe<ConsumeContext<TMessage>> next)
     {
         try
@@ -74,7 +73,7 @@ public class ConsumerFaultFilter<TConsumer, TMessage> : IFilter<ConsumeContext<T
             }
 
             var logger = provider.GetService<ILogger<ConsumerFaultFilter<TConsumer, TMessage>>>();
-            logger?.LogError(ex, "Consumer {Consumer} failed", typeof(TConsumer).Name);
+            logger?.LogError(ex, "Consumer {Consumer} faulted", typeof(TConsumer).Name);
         }
     }
 }
