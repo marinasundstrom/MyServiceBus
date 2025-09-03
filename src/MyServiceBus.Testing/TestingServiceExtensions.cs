@@ -13,8 +13,8 @@ public static class TestingServiceExtensions
         configurator.Build();
 
         services.AddSingleton<InMemoryTestHarness>();
-        services.AddSingleton<IMessageBus>([Throws(typeof(InvalidOperationException))] sp => sp.GetRequiredService<InMemoryTestHarness>());
-        services.AddSingleton<ITransportFactory>([Throws(typeof(InvalidOperationException))] sp => sp.GetRequiredService<InMemoryTestHarness>());
+        services.AddSingleton<IMessageBus>([Throws(typeof(InvalidOperationException))] (sp) => sp.GetRequiredService<InMemoryTestHarness>());
+        services.AddSingleton<ITransportFactory>([Throws(typeof(InvalidOperationException))] (sp) => sp.GetRequiredService<InMemoryTestHarness>());
         services.AddScoped(typeof(IRequestClient<>), typeof(GenericRequestClient<>));
 
         return services;

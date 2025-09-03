@@ -1,11 +1,12 @@
 using System;
+using System.Text.Json;
 using MyServiceBus.Transports;
 
 namespace MyServiceBus.Serialization;
 
 public class MessageContextFactory
 {
-    [Throws(typeof(InvalidOperationException), typeof(ArgumentException))]
+    [Throws(typeof(InvalidOperationException), typeof(ArgumentException), typeof(JsonException))]
     public IMessageContext CreateMessageContext(ITransportMessage transportMessage)
     {
         if (transportMessage.Headers.TryGetValue("content_type", out var contentTypeObj))
