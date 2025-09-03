@@ -17,7 +17,7 @@ public sealed class RabbitMqTransportFactory : ITransportFactory
         _connectionProvider = connectionProvider;
     }
 
-    [Throws(typeof(OverflowException))]
+    [Throws(typeof(OverflowException), typeof(InvalidOperationException), typeof(ArgumentException))]
     public async Task<ISendTransport> GetSendTransport(Uri address, CancellationToken cancellationToken = default)
     {
         string exchange;
@@ -62,8 +62,8 @@ public sealed class RabbitMqTransportFactory : ITransportFactory
             cancellationToken: cancellationToken
         );
 
-        var errorExchange = topology.ExchangeName + "_error";
-        var errorQueue = topology.QueueName + "_error";
+        var errorExchange = topology.QueueName + "_error";
+        var errorQueue = errorExchange;
 
         await channel.ExchangeDeclareAsync(
             exchange: errorExchange,
