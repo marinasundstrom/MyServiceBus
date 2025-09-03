@@ -57,11 +57,12 @@ public class RabbitMqRequestClientTransport implements RequestClientTransport {
                 } catch (Exception ex) {
                     try {
                         JavaType faultInner = mapper.getTypeFactory().constructParametricType(Fault.class, requestType);
-                        JavaType faultType = mapper.getTypeFactory().constructParametricType(Envelope.class, faultInner);
+                        JavaType faultType = mapper.getTypeFactory().constructParametricType(Envelope.class,
+                                faultInner);
                         Envelope<Fault<TRequest>> fault = mapper.readValue(delivery.getBody(), faultType);
-                          String msg = fault.getMessage().getExceptions().isEmpty() ? "Request faulted"
-                                  : fault.getMessage().getExceptions().get(0).getMessage();
-                          future.completeExceptionally(new RequestFaultException(msg));
+                        String msg = fault.getMessage().getExceptions().isEmpty() ? "Request faulted"
+                                : fault.getMessage().getExceptions().get(0).getMessage();
+                        future.completeExceptionally(new RequestFaultException(msg));
                     } catch (Exception inner) {
                         future.completeExceptionally(inner);
                     }
@@ -105,7 +106,8 @@ public class RabbitMqRequestClientTransport implements RequestClientTransport {
     }
 
     @Override
-    public <TRequest, T1, T2> CompletableFuture<Response2<T1, T2>> sendRequest(Class<TRequest> requestType, TRequest request,
+    public <TRequest, T1, T2> CompletableFuture<Response2<T1, T2>> sendRequest(Class<TRequest> requestType,
+            TRequest request,
             Class<T1> responseType1, Class<T2> responseType2, CancellationToken cancellationToken) {
         CompletableFuture<Response2<T1, T2>> future = new CompletableFuture<>();
         try {
@@ -121,24 +123,25 @@ public class RabbitMqRequestClientTransport implements RequestClientTransport {
                 try {
                     try {
                         JavaType type1 = mapper.getTypeFactory().constructParametricType(Envelope.class, responseType1);
-                          Envelope<T1> env1 = mapper.readValue(delivery.getBody(), type1);
-                          future.complete(Response2.fromT1(env1.getMessage()));
-                      } catch (Exception ex1) {
-                          JavaType type2 = mapper.getTypeFactory().constructParametricType(Envelope.class, responseType2);
-                          Envelope<T2> env2 = mapper.readValue(delivery.getBody(), type2);
-                          future.complete(Response2.fromT2(env2.getMessage()));
-                      }
-                  } catch (Exception ex) {
-                      try {
-                          JavaType faultInner = mapper.getTypeFactory().constructParametricType(Fault.class, requestType);
-                          JavaType faultType = mapper.getTypeFactory().constructParametricType(Envelope.class, faultInner);
-                          Envelope<Fault<TRequest>> fault = mapper.readValue(delivery.getBody(), faultType);
-                          String msg = fault.getMessage().getExceptions().isEmpty() ? "Request faulted"
-                                  : fault.getMessage().getExceptions().get(0).getMessage();
-                          future.completeExceptionally(new RequestFaultException(msg));
-                      } catch (Exception inner) {
-                          future.completeExceptionally(inner);
-                      }
+                        Envelope<T1> env1 = mapper.readValue(delivery.getBody(), type1);
+                        future.complete(Response2.fromT1(env1.getMessage()));
+                    } catch (Exception ex1) {
+                        JavaType type2 = mapper.getTypeFactory().constructParametricType(Envelope.class, responseType2);
+                        Envelope<T2> env2 = mapper.readValue(delivery.getBody(), type2);
+                        future.complete(Response2.fromT2(env2.getMessage()));
+                    }
+                } catch (Exception ex) {
+                    try {
+                        JavaType faultInner = mapper.getTypeFactory().constructParametricType(Fault.class, requestType);
+                        JavaType faultType = mapper.getTypeFactory().constructParametricType(Envelope.class,
+                                faultInner);
+                        Envelope<Fault<TRequest>> fault = mapper.readValue(delivery.getBody(), faultType);
+                        String msg = fault.getMessage().getExceptions().isEmpty() ? "Request faulted"
+                                : fault.getMessage().getExceptions().get(0).getMessage();
+                        future.completeExceptionally(new RequestFaultException(msg));
+                    } catch (Exception inner) {
+                        future.completeExceptionally(inner);
+                    }
                 } finally {
                     try {
                         channel.basicCancel(tag);

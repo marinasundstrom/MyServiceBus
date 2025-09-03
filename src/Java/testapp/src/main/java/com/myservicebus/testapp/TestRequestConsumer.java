@@ -17,8 +17,8 @@ class TestRequestConsumer implements Consumer<TestRequest> {
 
         var response = new TestResponse(message + " 42");
 
-        // throw new OperationNotSupportedException();
+        throw new OperationNotSupportedException();
 
-        return context.respond(response, context.getCancellationToken());
+        // return context.respond(response, context.getCancellationToken());
     }
 }

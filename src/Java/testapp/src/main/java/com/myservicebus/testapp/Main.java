@@ -4,10 +4,13 @@ import io.javalin.Javalin;
 import java.io.IOException;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicReference;
 
+import com.myservicebus.Fault;
 import com.myservicebus.MyService;
 import com.myservicebus.MyServiceImpl;
 import com.myservicebus.RequestClientFactory;
+import com.myservicebus.Response;
 import com.myservicebus.SendEndpoint;
 import com.myservicebus.ServiceBus;
 import com.myservicebus.PublishEndpoint;
@@ -75,8 +78,20 @@ public class Main {
             var requestClient = requestClientFactory.create(TestRequest.class);
             try {
                 var response = requestClient
-                        .getResponse(new TestRequest("Foo"), TestResponse.class, CancellationToken.none).get();
-                ctx.result(response.getMessage());
+                        .getResponse(new TestRequest("Foo"), TestResponse.class,
+                                Fault.class, CancellationToken.none)
+                        .get();
+
+                var r1 = response.as(TestResponse.class);
+                var r2 = response.as(Fault.class);
+
+                if (r1.isPresent()) {
+                    var message1 = r1.get().getMessage();
+                    ctx.result(message1.getMessage());
+                } else if (r2.isPresent()) {
+                    var exception = r2.get().getMessage().getExceptions().get(0);
+                    ctx.result(exception.toString());
+                }
             } catch (Exception e) {
                 ctx.status(500).result("Failed to get response: " + e.getMessage());
             }
