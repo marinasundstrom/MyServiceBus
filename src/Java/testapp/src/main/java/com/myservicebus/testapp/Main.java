@@ -82,16 +82,14 @@ public class Main {
                                 Fault.class, CancellationToken.none)
                         .get();
 
-                var r1 = response.as(TestResponse.class);
-                var r2 = response.as(Fault.class);
+                response.as(TestResponse.class).ifPresent((Response<TestResponse> r) -> {
+                    ctx.result(r.getMessage().toString());
+                });
 
-                if (r1.isPresent()) {
-                    var message1 = r1.get().getMessage();
-                    ctx.result(message1.getMessage());
-                } else if (r2.isPresent()) {
-                    var exception = r2.get().getMessage().getExceptions().get(0);
+                response.as(Fault.class).ifPresent(r -> {
+                    var exception = r.getMessage().getExceptions();
                     ctx.result(exception.toString());
-                }
+                });
             } catch (Exception e) {
                 ctx.status(500).result("Failed to get response: " + e.getMessage());
             }
