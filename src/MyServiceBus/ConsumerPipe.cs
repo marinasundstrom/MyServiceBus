@@ -38,13 +38,32 @@ public class ConsumerMessageFilter<TConsumer, TMessage> : IFilter<ConsumeContext
         this.provider = provider;
     }
 
+    [Throws(typeof(Exception))]
+    public async Task Send(ConsumeContext<TMessage> context, IPipe<ConsumeContext<TMessage>> next)
+    {
+        using var scope = provider.CreateScope();
+        var consumer = scope.ServiceProvider.GetRequiredService<TConsumer>();
+        await consumer.Consume(context);
+        await next.Send(context);
+    }
+}
+
+public class ConsumerFaultFilter<TConsumer, TMessage> : IFilter<ConsumeContext<TMessage>>
+    where TConsumer : class
+    where TMessage : class
+{
+    readonly IServiceProvider provider;
+
+    public ConsumerFaultFilter(IServiceProvider provider)
+    {
+        this.provider = provider;
+    }
+
+    [Throws(typeof(InvalidOperationException))]
     public async Task Send(ConsumeContext<TMessage> context, IPipe<ConsumeContext<TMessage>> next)
     {
         try
         {
-            using var scope = provider.CreateScope();
-            var consumer = scope.ServiceProvider.GetRequiredService<TConsumer>();
-            await consumer.Consume(context);
             await next.Send(context);
         }
         catch (Exception ex)
@@ -54,7 +73,7 @@ public class ConsumerMessageFilter<TConsumer, TMessage> : IFilter<ConsumeContext
                 await ctx.RespondFaultAsync(ex);
             }
 
-            var logger = provider.GetService<ILogger<ConsumerMessageFilter<TConsumer, TMessage>>>();
+            var logger = provider.GetService<ILogger<ConsumerFaultFilter<TConsumer, TMessage>>>();
             logger?.LogError(ex, "Consumer {Consumer} failed", typeof(TConsumer).Name);
         }
     }

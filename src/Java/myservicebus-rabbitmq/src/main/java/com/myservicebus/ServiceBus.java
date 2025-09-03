@@ -84,6 +84,10 @@ public class ServiceBus implements SendEndpoint, PublishEndpoint {
             String queue = consumerDef.getQueueName();
 
             PipeConfigurator<ConsumeContext<Object>> configurator = new PipeConfigurator<>();
+            @SuppressWarnings({"unchecked", "rawtypes"})
+            Filter<ConsumeContext<Object>> faultFilter =
+                    new ConsumerFaultFilter(serviceProvider, consumerDef.getConsumerType());
+            configurator.useFilter(faultFilter);
             configurator.useRetry(3);
             @SuppressWarnings({"unchecked", "rawtypes"})
             Filter<ConsumeContext<Object>> consumerFilter =

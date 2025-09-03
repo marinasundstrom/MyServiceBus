@@ -53,9 +53,13 @@ class ConsumerMessageFilterTest {
                 CancellationToken.none,
                 sendProvider);
 
-        ConsumerMessageFilter<TestMessage> filter = new ConsumerMessageFilter<>(provider, FaultingConsumer.class);
+        PipeConfigurator<ConsumeContext<TestMessage>> configurator = new PipeConfigurator<>();
+        configurator.useFilter(new ConsumerFaultFilter<>(provider, FaultingConsumer.class));
+        configurator.useRetry(1);
+        configurator.useFilter(new ConsumerMessageFilter<>(provider, FaultingConsumer.class));
+        Pipe<ConsumeContext<TestMessage>> pipe = configurator.build();
 
-        CompletableFuture<Void> future = filter.send(ctx, Pipes.empty());
+        CompletableFuture<Void> future = pipe.send(ctx);
         assertDoesNotThrow(future::join);
 
         assertTrue(endpoint.sent instanceof Fault<?>);

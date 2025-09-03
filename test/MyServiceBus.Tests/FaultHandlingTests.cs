@@ -43,9 +43,14 @@ public class FaultHandlingTests
             new SendPipe(Pipe.Empty<SendContext>()),
             new PublishPipe(Pipe.Empty<SendContext>()),
             new EnvelopeMessageSerializer());
-        var filter = new ConsumerMessageFilter<FaultingConsumer, TestMessage>(provider);
 
-        await filter.Send(context, Pipe.Empty<ConsumeContext<TestMessage>>());
+        var configurator = new PipeConfigurator<ConsumeContext<TestMessage>>();
+        configurator.UseFilter(new ConsumerFaultFilter<FaultingConsumer, TestMessage>(provider));
+        configurator.UseRetry(1);
+        configurator.UseFilter(new ConsumerMessageFilter<FaultingConsumer, TestMessage>(provider));
+        var pipe = new ConsumePipe<TestMessage>(configurator.Build());
+
+        await pipe.Send(context);
 
         var fault = Assert.IsType<Fault<TestMessage>>(transportFactory.SendTransport.Sent);
         Assert.Equal("boom", fault.Exceptions[0].Message);
@@ -66,7 +71,6 @@ public class FaultHandlingTests
     {
         public readonly CaptureSendTransport SendTransport = new();
 
-        [Throws(typeof(InvalidOperationException))]
         public Task<ISendTransport> GetSendTransport(Uri address, CancellationToken cancellationToken = default)
             => Task.FromResult<ISendTransport>(SendTransport);
 
