@@ -1,4 +1,4 @@
-package com.myservicebus;
+package com.myservicebus.topology;
 
 public class MessageTopology {
     private Class<?> messageType;

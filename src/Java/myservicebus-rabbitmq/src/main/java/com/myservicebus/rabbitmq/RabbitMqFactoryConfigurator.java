@@ -1,9 +1,9 @@
 package com.myservicebus.rabbitmq;
 
-import com.myservicebus.ConsumerTopology;
 import com.myservicebus.EndpointNameFormatter;
-import com.myservicebus.TopologyRegistry;
-import com.myservicebus.MessageBinding;
+import com.myservicebus.topology.ConsumerTopology;
+import com.myservicebus.topology.MessageBinding;
+import com.myservicebus.topology.TopologyRegistry;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Consumer;

@@ -44,7 +44,7 @@ class ServiceBusPublishFilterTest {
         });
         services.addSingleton(ConnectionProvider.class, sp -> () -> new ConnectionProvider(new ConnectionFactory()));
 
-        ServiceBus bus = new ServiceBus(services.build());
+        MessageBus bus = new RabbitMqMessageBus(services.build());
 
         bus.publish("hi");
 
