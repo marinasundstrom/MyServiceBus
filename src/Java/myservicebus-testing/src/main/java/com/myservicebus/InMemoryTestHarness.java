@@ -8,10 +8,12 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
+import com.myservicebus.Fault;
 import com.myservicebus.di.ServiceProvider;
 import com.myservicebus.di.ServiceScope;
 import com.myservicebus.tasks.CancellationToken;
 import com.myservicebus.RequestClientTransport;
+import com.myservicebus.RequestFaultException;
 import com.myservicebus.Response2;
 import com.myservicebus.TopologyRegistry;
 import com.myservicebus.ConsumerTopology;
@@ -134,7 +136,17 @@ public class InMemoryTestHarness implements RequestClientTransport, TransportSen
             future.complete(responseType.cast(ctx.getMessage()));
             return CompletableFuture.completedFuture(null);
         };
+        com.myservicebus.Consumer<Fault> faultHandler = ctx -> {
+            @SuppressWarnings("unchecked")
+            Fault<TRequest> fault = (Fault<TRequest>) ctx.getMessage();
+            String msg = fault.getExceptions() != null && !fault.getExceptions().isEmpty()
+                    ? fault.getExceptions().get(0).getMessage()
+                    : "Request faulted";
+            future.completeExceptionally(new RequestFaultException(msg));
+            return CompletableFuture.completedFuture(null);
+        };
         registerHandler(responseType, handler);
+        registerHandler(Fault.class, faultHandler);
         sendInternal(context, "inmemory:response", null).exceptionally(ex -> {
             future.completeExceptionally(ex);
             return null;
@@ -143,6 +155,10 @@ public class InMemoryTestHarness implements RequestClientTransport, TransportSen
             List<com.myservicebus.Consumer<?>> list = handlers.get(responseType);
             if (list != null) {
                 list.remove(handler);
+            }
+            List<com.myservicebus.Consumer<?>> faultList = handlers.get(Fault.class);
+            if (faultList != null) {
+                faultList.remove(faultHandler);
             }
         });
     }
@@ -161,8 +177,19 @@ public class InMemoryTestHarness implements RequestClientTransport, TransportSen
             return CompletableFuture.completedFuture(null);
         };
 
+        com.myservicebus.Consumer<Fault> faultHandler = ctx -> {
+            @SuppressWarnings("unchecked")
+            Fault<TRequest> fault = (Fault<TRequest>) ctx.getMessage();
+            String msg = fault.getExceptions() != null && !fault.getExceptions().isEmpty()
+                    ? fault.getExceptions().get(0).getMessage()
+                    : "Request faulted";
+            future.completeExceptionally(new RequestFaultException(msg));
+            return CompletableFuture.completedFuture(null);
+        };
+
         registerHandler(responseType1, h1);
         registerHandler(responseType2, h2);
+        registerHandler(Fault.class, faultHandler);
 
         sendInternal(context, "inmemory:response", null).exceptionally(ex -> {
             future.completeExceptionally(ex);
@@ -177,6 +204,10 @@ public class InMemoryTestHarness implements RequestClientTransport, TransportSen
             List<com.myservicebus.Consumer<?>> list2 = handlers.get(responseType2);
             if (list2 != null) {
                 list2.remove(h2);
+            }
+            List<com.myservicebus.Consumer<?>> faultList = handlers.get(Fault.class);
+            if (faultList != null) {
+                faultList.remove(faultHandler);
             }
         });
     }

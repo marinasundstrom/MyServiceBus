@@ -70,9 +70,11 @@ public sealed class GenericRequestClient<TRequest> : IRequestClient<TRequest>, I
         var uri = new Uri($"rabbitmq://localhost/exchange/{exchangeName}");
         var requestSendTransport = await _transportFactory.GetSendTransport(uri, cancellationToken);
 
+        var responseAddress = new Uri($"rabbitmq://localhost/exchange/{responseExchange}?durable=false&autodelete=true");
         var sendContext = new SendContext(MessageTypeCache.GetMessageTypes(typeof(TRequest)), _serializer, cancellationToken)
         {
-            ResponseAddress = new Uri($"rabbitmq://localhost/exchange/{responseExchange}?durable=false&autodelete=true"),
+            ResponseAddress = responseAddress,
+            FaultAddress = responseAddress,
             MessageId = Guid.NewGuid().ToString()
         };
 
@@ -157,9 +159,11 @@ public sealed class GenericRequestClient<TRequest> : IRequestClient<TRequest>, I
         var uri = new Uri($"rabbitmq://localhost/exchange/{exchangeName}");
         var requestSendTransport = await _transportFactory.GetSendTransport(uri, cancellationToken);
 
+        var responseAddress = new Uri($"rabbitmq://localhost/exchange/{responseExchange}?durable=false&autodelete=true");
         var sendContext = new SendContext(MessageTypeCache.GetMessageTypes(typeof(TRequest)), _serializer, cancellationToken)
         {
-            ResponseAddress = new Uri($"rabbitmq://localhost/exchange/{responseExchange}?durable=false&autodelete=true"),
+            ResponseAddress = responseAddress,
+            FaultAddress = responseAddress,
             MessageId = Guid.NewGuid().ToString()
         };
 
