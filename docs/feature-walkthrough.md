@@ -200,6 +200,29 @@ builder.Services.AddServiceBus(x =>
 });
 ```
 
+Outside of an ASP.NET host, a factory can populate an
+`IServiceCollection` directly:
+
+```csharp
+var services = new ServiceCollection();
+
+RabbitMqBusFactory.Configure(services, x =>
+{
+    x.AddConsumer<SubmitOrderConsumer>();
+}, (context, cfg) =>
+{
+    cfg.Host("localhost");
+    cfg.ReceiveEndpoint("submit-order-queue", e =>
+    {
+        e.ConfigureConsumer<SubmitOrderConsumer>(context);
+    });
+});
+
+var provider = services.BuildServiceProvider();
+var bus = provider.GetRequiredService<IMessageBus>();
+await bus.StartAsync();
+```
+
 #### Java
 
 ```java
