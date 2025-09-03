@@ -8,7 +8,13 @@ public class RequestFaultException extends RuntimeException {
     public RequestFaultException(String requestType, Fault<?> fault) {
         super("The " + requestType + " request faulted: " +
                 fault.getExceptions().stream()
-                        .map(ExceptionInfo::getMessage)
+                        .map(m -> {
+                            var message = m.getMessage();
+                            if (message == null) {
+                                message = m.getExceptionType();
+                            }
+                            return message;
+                        })
                         .collect(Collectors.joining(System.lineSeparator())));
         this.fault = fault;
     }
