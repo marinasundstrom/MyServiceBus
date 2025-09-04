@@ -18,6 +18,7 @@ MyServiceBus (a working title) is a lightweight asynchronous messaging library i
 - Retries and error handling
 - Pipeline behaviors
 - OpenTelemetry support
+- Annotated for use with the [CheckedExceptions](https://github.com/JasonBock/CheckedExceptions) analyzer
 - Java client and server prototypes
 
 ## Getting Started
@@ -57,8 +58,7 @@ builder.Services.AddServiceBus(x =>
 
 var app = builder.Build();
 await app.StartAsync();
-
-var bus = host.Services.GetRequiredService<IMessageBus>();
+var bus = app.Services.GetRequiredService<IMessageBus>();
 ```
 
 Define the messages and consumer:

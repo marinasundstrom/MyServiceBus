@@ -26,6 +26,8 @@ builder.Services.AddServiceBus(x =>
 
 var app = builder.Build();
 await app.StartAsync();
+
+var bus = app.Services.GetRequiredService<IMessageBus>();
 ```
 
 **Without host**
