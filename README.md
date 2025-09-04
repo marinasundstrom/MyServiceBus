@@ -18,7 +18,7 @@ MyServiceBus (a working title) is a lightweight asynchronous messaging library i
 - Retries and error handling
 - Pipeline behaviors
 - OpenTelemetry support
-- Annotated for use with the [CheckedExceptions](https://github.com/JasonBock/CheckedExceptions) analyzer
+- Annotated for use with the [CheckedExceptions](https://github.com/marinasundstrom/CheckedExceptions) analyzer
 - Java client and server prototypes
 
 ## Getting Started
