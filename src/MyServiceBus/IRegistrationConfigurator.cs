@@ -1,6 +1,7 @@
 using System;
 using Microsoft.Extensions.DependencyInjection;
 using MyServiceBus.Serialization;
+using System.Reflection;
 
 namespace MyServiceBus;
 
@@ -8,6 +9,8 @@ public interface IRegistrationConfigurator
 //: IServiceCollection
 {
     void AddConsumer<T>() where T : class, IConsumer;
+
+    void AddConsumers(params Assembly[] assemblies);
 
     void AddConsumer<TConsumer, TMessage>(Action<PipeConfigurator<ConsumeContext<TMessage>>>? configure = null)
         where TConsumer : class, IConsumer<TMessage>

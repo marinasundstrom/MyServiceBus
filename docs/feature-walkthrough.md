@@ -16,6 +16,8 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddServiceBus(x =>
 {
     x.AddConsumer<SubmitOrderConsumer>();
+    // or register all consumers in an assembly
+    x.AddConsumers(typeof(SubmitOrderConsumer).Assembly);
 
     x.UsingRabbitMq((context, cfg) =>
     {
