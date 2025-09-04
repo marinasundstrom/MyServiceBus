@@ -58,4 +58,25 @@ class PipeConfiguratorTest {
         assertEquals(3, attempts.get());
         assertEquals(List.of("done"), ctx.calls);
     }
+
+    @Test
+    void messageRetryRetriesOnFailure() {
+        PipeConfigurator<TestContext> configurator = new PipeConfigurator<>();
+        AtomicInteger attempts = new AtomicInteger();
+        configurator.useMessageRetry(r -> r.immediate(2));
+        configurator.useExecute(ctx -> {
+            if (attempts.incrementAndGet() < 3) {
+                CompletableFuture<Void> failed = new CompletableFuture<>();
+                failed.completeExceptionally(new RuntimeException("fail"));
+                return failed;
+            }
+            ctx.calls.add("done");
+            return CompletableFuture.completedFuture(null);
+        });
+        Pipe<TestContext> pipe = configurator.build();
+        TestContext ctx = new TestContext();
+        pipe.send(ctx).join();
+        assertEquals(3, attempts.get());
+        assertEquals(List.of("done"), ctx.calls);
+    }
 }

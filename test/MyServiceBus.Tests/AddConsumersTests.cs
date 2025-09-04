@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using MyServiceBus;
 using Xunit;
+using Xunit.Sdk;
 
 public class AddConsumersTests
 {
@@ -14,7 +15,7 @@ public class AddConsumersTests
     }
 
     [Fact]
-    [Throws(typeof(InvalidOperationException), typeof(ArgumentException))]
+    [Throws(typeof(InvalidOperationException), typeof(ArgumentException), typeof(TrueException))]
     public async Task Should_register_all_consumers_from_assembly()
     {
         var services = new ServiceCollection();
