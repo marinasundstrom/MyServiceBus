@@ -92,6 +92,12 @@ public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigura
                 sp -> () -> new SendEndpointProviderImpl(
                         sp.getService(ConsumeContextProvider.class),
                         sp.getService(TransportSendEndpointProvider.class)));
+        serviceCollection.addScoped(PublishEndpointProvider.class,
+                sp -> () -> new PublishEndpointProviderImpl(
+                        sp.getService(ConsumeContextProvider.class),
+                        sp.getService(MessageBus.class)));
+        serviceCollection.addScoped(PublishEndpoint.class,
+                sp -> () -> sp.getService(PublishEndpointProvider.class).getPublishEndpoint());
         serviceCollection.addSingleton(TopologyRegistry.class, sp -> () -> topology);
         serviceCollection.addSingleton(SendPipe.class, sp -> () -> new SendPipe(sendConfigurator.build()));
         serviceCollection.addSingleton(PublishPipe.class, sp -> () -> new PublishPipe(publishConfigurator.build()));

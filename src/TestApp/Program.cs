@@ -102,7 +102,7 @@ app.MapGet("/publish", [Throws(typeof(Exception))] async (IMessageBus messageBus
     var message = new SubmitOrder() { OrderId = Guid.NewGuid(), Message = "MT Clone C#" };
     try
     {
-        await messageBus.Publish(message, null, cancellationToken);
+        await messageBus.PublishAsync(message, null, cancellationToken);
         logger.LogInformation("📤 Published SubmitOrder {OrderId} ✅", message.OrderId);
     }
     catch (Exception ex)
@@ -198,7 +198,7 @@ public class HostedService : IHostedService
             await Task.Delay(200, cancellationToken);
 
             var message = new SubmitOrder() { OrderId = Guid.NewGuid() };
-            await messageBus.Publish(message, null, cancellationToken);
+            await messageBus.PublishAsync(message, null, cancellationToken);
         }
         catch (ArgumentOutOfRangeException)
         {

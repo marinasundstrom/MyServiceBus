@@ -21,7 +21,7 @@ public class BusRegistrationConfigurator : IBusRegistrationConfigurator
         Services = services;
     }
 
-    [Throws(typeof(InvalidOperationException), typeof(TargetInvocationException))]
+    [Throws(typeof(InvalidOperationException), typeof(TargetInvocationException), typeof(NotSupportedException))]
     public void AddConsumer<TConsumer>() where TConsumer : class, IConsumer
     {
         Services.AddScoped<TConsumer>();
@@ -36,7 +36,7 @@ public class BusRegistrationConfigurator : IBusRegistrationConfigurator
       );
     }
 
-    [Throws(typeof(InvalidOperationException))]
+    [Throws(typeof(InvalidOperationException), typeof(ArgumentException))]
     public void AddConsumer<TConsumer, TMessage>(Action<PipeConfigurator<ConsumeContext<TMessage>>>? configure = null)
         where TConsumer : class, IConsumer<TMessage>
         where TMessage : class
@@ -50,7 +50,7 @@ public class BusRegistrationConfigurator : IBusRegistrationConfigurator
             messageTypes: typeof(TMessage));
     }
 
-    [Throws(typeof(InvalidOperationException), typeof(TargetInvocationException))]
+    [Throws(typeof(InvalidOperationException), typeof(TargetInvocationException), typeof(NotSupportedException))]
     public void AddConsumers(params Assembly[] assemblies)
     {
         var consumerTypes = assemblies
@@ -87,7 +87,7 @@ public class BusRegistrationConfigurator : IBusRegistrationConfigurator
         serializerType = typeof(TSerializer);
     }
 
-    [Throws(typeof(TargetInvocationException), typeof(NotSupportedException))]
+    [Throws(typeof(TargetInvocationException), typeof(NotSupportedException), typeof(InvalidOperationException))]
     private static Type[] GetHandledMessageTypes(Type consumerType)
     {
         return consumerType
@@ -106,5 +106,7 @@ public class BusRegistrationConfigurator : IBusRegistrationConfigurator
         Services.AddSingleton(typeof(IMessageSerializer), serializerType);
         Services.AddScoped<ConsumeContextProvider>();
         Services.AddScoped<ISendEndpointProvider, SendEndpointProvider>();
+        Services.AddScoped<IPublishEndpointProvider, PublishEndpointProvider>();
+        Services.AddScoped<IPublishEndpoint>([Throws(typeof(InvalidOperationException))] (sp) => sp.GetRequiredService<IPublishEndpointProvider>().GetPublishEndpoint());
     }
 }

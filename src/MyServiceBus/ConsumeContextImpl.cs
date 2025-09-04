@@ -37,13 +37,13 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
     }
 
     [Throws(typeof(UriFormatException), typeof(InvalidOperationException))]
-    public async Task PublishAsync<T>(T message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default)
+    public async Task PublishAsync<T>(T message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default) where T : class
     {
         await PublishAsync<T>((object)message!, contextCallback, cancellationToken);
     }
 
     [Throws(typeof(UriFormatException), typeof(InvalidOperationException))]
-    public async Task PublishAsync<T>(object message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default)
+    public async Task PublishAsync<T>(object message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default) where T : class
     {
         var exchangeName = NamingConventions.GetExchangeName(typeof(T));
 

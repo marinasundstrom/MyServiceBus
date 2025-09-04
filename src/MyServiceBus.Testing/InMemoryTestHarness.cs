@@ -9,7 +9,7 @@ using MyServiceBus.Topology;
 
 namespace MyServiceBus;
 
-public class InMemoryTestHarness : IMessageBus, ITransportFactory
+public class InMemoryTestHarness : IMessageBus, ITransportFactory, IReceiveEndpointConnector
 {
     readonly Dictionary<Type, List<Func<ReceiveContext, Task>>> handlers = new();
     readonly List<Func<ReceiveContext, Task>> receiveHandlers = new();
@@ -68,8 +68,12 @@ public class InMemoryTestHarness : IMessageBus, ITransportFactory
 
     public bool WasConsumed<T>() where T : class => consumed.OfType<T>().Any();
 
+    [Throws(typeof(ArgumentException), typeof(InvalidCastException))]
+    public Task PublishAsync<TMessage>(object message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default) where TMessage : class
+        => PublishAsync((TMessage)message, contextCallback, cancellationToken);
+
     [Throws(typeof(ArgumentException))]
-    public Task Publish<T>(T message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default) where T : class
+    public Task PublishAsync<T>(T message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default) where T : class
     {
         var serializer = provider?.GetService<IMessageSerializer>() ?? new EnvelopeMessageSerializer();
         var sendContext = new SendContext(MessageTypeCache.GetMessageTypes(typeof(T)), serializer, cancellationToken)
@@ -81,6 +85,10 @@ public class InMemoryTestHarness : IMessageBus, ITransportFactory
 
         return InternalSend(message, sendContext);
     }
+
+    public IPublishEndpoint GetPublishEndpoint() => this;
+
+    public Task<ISendEndpoint> GetSendEndpoint(Uri uri) => Task.FromResult<ISendEndpoint>(new HarnessSendEndpoint(this));
 
     [Throws(typeof(InvalidOperationException), typeof(ArgumentException))]
     public Task AddConsumer<TMessage, TConsumer>(ConsumerTopology consumer, Delegate? configure = null, CancellationToken cancellationToken = default)
@@ -104,7 +112,6 @@ public class InMemoryTestHarness : IMessageBus, ITransportFactory
         return Task.CompletedTask;
     }
 
-    [Throws(typeof(InvalidOperationException))]
     public Task<ISendTransport> GetSendTransport(Uri address, CancellationToken cancellationToken = default)
         => Task.FromResult<ISendTransport>(new HarnessSendTransport(this));
 
@@ -170,17 +177,12 @@ public class InMemoryTestHarness : IMessageBus, ITransportFactory
         public CancellationToken CancellationToken => receiveContext.CancellationToken;
 
         public Task<ISendEndpoint> GetSendEndpoint(Uri uri) => Task.FromResult<ISendEndpoint>(new HarnessSendEndpoint(harness));
-        [Throws(typeof(ArgumentException))]
-        public Task PublishAsync<TMessage>(object message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default)
-            => harness.Publish((dynamic)message, contextCallback, cancellationToken);
-
-        [Throws(typeof(ArgumentException))]
-        public Task PublishAsync<TMessage>(TMessage message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default)
-            => harness.Publish((dynamic)message!, contextCallback, cancellationToken);
-
-        [Throws(typeof(ArgumentException))]
+        public Task PublishAsync<TMessage>(object message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default) where TMessage : class
+            => harness.PublishAsync((TMessage)message, contextCallback, cancellationToken);
+        public Task PublishAsync<TMessage>(TMessage message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default) where TMessage : class
+            => harness.PublishAsync(message, contextCallback, cancellationToken);
         public Task RespondAsync<TMessage>(TMessage message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default)
-            => harness.Publish((dynamic)message!, contextCallback, cancellationToken);
+            => harness.PublishAsync((dynamic)message!, contextCallback, cancellationToken);
     }
 
     class HarnessSendEndpoint : ISendEndpoint
@@ -189,13 +191,10 @@ public class InMemoryTestHarness : IMessageBus, ITransportFactory
 
         public HarnessSendEndpoint(InMemoryTestHarness harness) => this.harness = harness;
 
-        [Throws(typeof(ArgumentException))]
         public Task Send<T>(object message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default)
-            => harness.Publish((dynamic)message, contextCallback, cancellationToken);
-
-        [Throws(typeof(ArgumentException))]
+            => harness.PublishAsync((dynamic)message!, contextCallback, cancellationToken);
         public Task Send<T>(T message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default)
-            => harness.Publish((dynamic)message!, contextCallback, cancellationToken);
+            => harness.PublishAsync((dynamic)message!, contextCallback, cancellationToken);
     }
 
     class HarnessReceiveTransport : IReceiveTransport
@@ -267,7 +266,6 @@ public class InMemoryTestHarness : IMessageBus, ITransportFactory
         public IDictionary<string, object> Headers { get; }
         public DateTimeOffset SentTime { get; }
 
-        [Throws(typeof(InvalidOperationException))]
         public bool TryGetMessage<T>(out T? msg) where T : class
         {
             if (message is T m)

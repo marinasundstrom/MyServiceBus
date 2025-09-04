@@ -7,7 +7,7 @@ using System.Runtime.InteropServices;
 
 namespace MyServiceBus;
 
-public class MessageBus : IMessageBus
+public class MessageBus : IMessageBus, IReceiveEndpointConnector
 {
     private readonly ITransportFactory _transportFactory;
     private readonly IServiceProvider _serviceProvider;
@@ -30,9 +30,14 @@ public class MessageBus : IMessageBus
         _messageSerializer = messageSerializer;
     }
 
+    [Throws(typeof(UriFormatException), typeof(InvalidOperationException), typeof(InvalidCastException))]
+    public Task PublishAsync<TMessage>(object message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default) where TMessage : class
+    {
+        return PublishAsync((TMessage)message, contextCallback, cancellationToken);
+    }
+
     [Throws(typeof(UriFormatException), typeof(InvalidOperationException))]
-    public async Task Publish<T>(T message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default)
-       where T : class
+    public async Task PublishAsync<T>(T message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default) where T : class
     {
         var exchangeName = NamingConventions.GetExchangeName(message.GetType());
 
@@ -50,6 +55,14 @@ public class MessageBus : IMessageBus
         await _publishPipe.Send(context);
         await _sendPipe.Send(context);
         await transport.Send(message, context, cancellationToken);
+    }
+
+    public IPublishEndpoint GetPublishEndpoint() => this;
+
+    public Task<ISendEndpoint> GetSendEndpoint(Uri uri)
+    {
+        ISendEndpoint endpoint = new TransportSendEndpoint(_transportFactory, _sendPipe, _messageSerializer, uri);
+        return Task.FromResult(endpoint);
     }
 
     [Throws(typeof(InvalidOperationException), typeof(ArgumentException))]

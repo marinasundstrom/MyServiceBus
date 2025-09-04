@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test;
 
 import com.myservicebus.di.ServiceCollection;
 import com.myservicebus.di.ServiceProvider;
+import com.myservicebus.di.ServiceScope;
 
 class RequestClientFaultTest {
 
@@ -53,13 +54,16 @@ class RequestClientFaultTest {
         });
 
         ServiceProvider provider = services.buildServiceProvider();
-        RequestClientFactory factory = provider.getService(RequestClientFactory.class);
-        RequestClient<Ping> client = factory.create(Ping.class);
+        try (ServiceScope scope = provider.createScope()) {
+            ServiceProvider scoped = scope.getServiceProvider();
+            RequestClientFactory factory = scoped.getService(RequestClientFactory.class);
+            RequestClient<Ping> client = factory.create(Ping.class);
 
-        CompletableFuture<Pong> response = client.getResponse(new Ping("hi"), Pong.class);
-        CompletionException ex = assertThrows(CompletionException.class, response::join);
-        assertTrue(ex.getCause() instanceof RequestFaultException);
-        RequestFaultException rfe = (RequestFaultException) ex.getCause();
-        assertEquals("nope", rfe.getFault().getExceptions().get(0).getMessage());
+            CompletableFuture<Pong> response = client.getResponse(new Ping("hi"), Pong.class);
+            CompletionException ex = assertThrows(CompletionException.class, response::join);
+            assertTrue(ex.getCause() instanceof RequestFaultException);
+            RequestFaultException rfe = (RequestFaultException) ex.getCause();
+            assertEquals("nope", rfe.getFault().getExceptions().get(0).getMessage());
+        }
     }
 }

@@ -15,7 +15,7 @@ import com.myservicebus.topology.ConsumerTopology;
 import com.myservicebus.topology.MessageBinding;
 import com.myservicebus.topology.TopologyRegistry;
 
-public class MessageBusImpl implements MessageBus {
+public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
     private final ServiceProvider serviceProvider;
     private final TransportFactory transportFactory;
     private final TransportSendEndpointProvider transportSendEndpointProvider;
@@ -137,23 +137,13 @@ public class MessageBusImpl implements MessageBus {
     }
 
     @Override
-    public <T> CompletableFuture<Void> send(T message, CancellationToken cancellationToken) {
-        if (message == null)
-            return CompletableFuture.failedFuture(new IllegalArgumentException("Message cannot be null"));
-        SendContext ctx = new SendContext(message, cancellationToken);
-        return send(ctx);
+    public PublishEndpoint getPublishEndpoint() {
+        return this;
     }
 
     @Override
-    public CompletableFuture<Void> send(SendContext context) {
-        String queue = NamingConventions.getQueueName(context.getMessage().getClass());
-        String address = transportFactory.getSendAddress(queue);
+    public SendEndpoint getSendEndpoint(String uri) {
         SendEndpointProvider provider = serviceProvider.getService(SendEndpointProvider.class);
-        SendEndpoint endpoint = provider.getSendEndpoint(address);
-        return endpoint.send(context);
-    }
-
-    public <T> CompletableFuture<Void> send(T message) {
-        return send(message, CancellationToken.none);
+        return provider.getSendEndpoint(uri);
     }
 }

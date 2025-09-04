@@ -5,15 +5,16 @@ using MyServiceBus.Topology;
 
 namespace MyServiceBus;
 
-public interface IMessageBus
+public interface IMessageBus :
+    IPublishEndpoint,
+    IPublishEndpointProvider,
+    ISendEndpointProvider
 {
     Task StartAsync(CancellationToken cancellationToken);
 
     Task StopAsync(CancellationToken cancellationToken);
 
-    Task Publish<T>(T message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default)
-           where T : class;
     Task AddConsumer<TMessage, TConsumer>(ConsumerTopology consumer, Delegate? configure = null, CancellationToken cancellationToken = default)
-           where TConsumer : class, IConsumer<TMessage>
-           where TMessage : class;
+        where TConsumer : class, IConsumer<TMessage>
+        where TMessage : class;
 }

@@ -22,11 +22,13 @@ public class SendPublishFilterTests
         public readonly CaptureSendTransport Transport = new();
         public Task<ISendTransport> GetSendTransport(Uri address, CancellationToken cancellationToken = default)
             => Task.FromResult<ISendTransport>(Transport);
+        [Throws(typeof(NotImplementedException))]
         public Task<IReceiveTransport> CreateReceiveTransport(ReceiveEndpointTopology topology, Func<ReceiveContext, Task> handler, CancellationToken cancellationToken = default)
             => throw new NotImplementedException();
     }
 
     [Fact]
+    [Throws(typeof(UriFormatException))]
     public async Task Executes_send_and_publish_filters()
     {
         var sendExecuted = false;
@@ -39,7 +41,7 @@ public class SendPublishFilterTests
         var bus = new MessageBus(new StubTransportFactory(), new ServiceCollection().BuildServiceProvider(),
             new SendPipe(sendCfg.Build()), new PublishPipe(publishCfg.Build()), new EnvelopeMessageSerializer());
 
-        await bus.Publish(new TestMessage());
+        await bus.PublishAsync(new TestMessage());
 
         Assert.True(sendExecuted);
         Assert.True(publishExecuted);
