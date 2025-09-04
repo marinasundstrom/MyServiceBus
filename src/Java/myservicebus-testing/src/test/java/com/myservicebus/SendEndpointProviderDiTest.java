@@ -15,8 +15,11 @@ class SendEndpointProviderDiTest {
         });
 
         ServiceProvider provider = services.buildServiceProvider();
-        SendEndpointProvider sendEndpointProvider = provider.getService(SendEndpointProvider.class);
-        SendEndpoint endpoint = sendEndpointProvider.getSendEndpoint("inmemory:test");
-        assertNotNull(endpoint);
+        try (ServiceScope scope = provider.createScope()) {
+            ServiceProvider scoped = scope.getServiceProvider();
+            SendEndpointProvider sendEndpointProvider = scoped.getService(SendEndpointProvider.class);
+            SendEndpoint endpoint = sendEndpointProvider.getSendEndpoint("inmemory:test");
+            assertNotNull(endpoint);
+        }
     }
 }

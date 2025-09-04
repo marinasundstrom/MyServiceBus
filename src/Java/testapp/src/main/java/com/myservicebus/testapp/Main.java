@@ -69,16 +69,19 @@ public class Main {
         });
 
         app.get("/send", ctx -> {
-            var sendEndpointProvider = provider.getService(SendEndpointProvider.class);
-            var sendEndpoint = sendEndpointProvider.getSendEndpoint("rabbitmq://localhost/submit-order-queue");
-            SubmitOrder message = new SubmitOrder(UUID.randomUUID(), "MT Clone Java");
-            try {
-                sendEndpoint.send(message, CancellationToken.none).join();
-                logger.info("📤 Sent SubmitOrder {} ✅", message.getOrderId());
-                ctx.result("Sent SubmitOrder");
-            } catch (Exception e) {
-                logger.error("❌ Failed to send message", e);
-                ctx.status(500).result("Failed to send message");
+            try (ServiceScope scope = provider.createScope()) {
+                var scopedSp = scope.getServiceProvider();
+                var sendEndpointProvider = scopedSp.getService(SendEndpointProvider.class);
+                var sendEndpoint = sendEndpointProvider.getSendEndpoint("rabbitmq://localhost/submit-order-queue");
+                SubmitOrder message = new SubmitOrder(UUID.randomUUID(), "MT Clone Java");
+                try {
+                    sendEndpoint.send(message, CancellationToken.none).join();
+                    logger.info("📤 Sent SubmitOrder {} ✅", message.getOrderId());
+                    ctx.result("Sent SubmitOrder");
+                } catch (Exception e) {
+                    logger.error("❌ Failed to send message", e);
+                    ctx.status(500).result("Failed to send message");
+                }
             }
         });
 

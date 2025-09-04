@@ -18,7 +18,6 @@ import com.myservicebus.topology.TopologyRegistry;
 public class MessageBus implements SendEndpoint, PublishEndpoint {
     private final ServiceProvider serviceProvider;
     private final TransportFactory transportFactory;
-    private final SendEndpointProvider sendEndpointProvider;
     private final TransportSendEndpointProvider transportSendEndpointProvider;
     private final PublishPipe publishPipe;
     private final Logger logger;
@@ -28,7 +27,6 @@ public class MessageBus implements SendEndpoint, PublishEndpoint {
     public MessageBus(ServiceProvider serviceProvider) {
         this.serviceProvider = serviceProvider;
         this.transportFactory = serviceProvider.getService(TransportFactory.class);
-        this.sendEndpointProvider = serviceProvider.getService(SendEndpointProvider.class);
         this.transportSendEndpointProvider = serviceProvider.getService(TransportSendEndpointProvider.class);
         this.publishPipe = serviceProvider.getService(PublishPipe.class);
         this.logger = serviceProvider.getService(Logger.class);
@@ -126,7 +124,8 @@ public class MessageBus implements SendEndpoint, PublishEndpoint {
         String exchange = NamingConventions.getExchangeName(context.getMessage().getClass());
         String address = transportFactory.getPublishAddress(exchange);
         return publishPipe.send(context).thenCompose(v -> {
-            SendEndpoint endpoint = sendEndpointProvider.getSendEndpoint(address);
+            SendEndpointProvider provider = serviceProvider.getService(SendEndpointProvider.class);
+            SendEndpoint endpoint = provider.getSendEndpoint(address);
             return endpoint.send(context).thenRun(() -> {
                 logger.info("📤 Published message of type {}", context.getMessage().getClass().getSimpleName());
             });
@@ -149,7 +148,8 @@ public class MessageBus implements SendEndpoint, PublishEndpoint {
     public CompletableFuture<Void> send(SendContext context) {
         String queue = NamingConventions.getQueueName(context.getMessage().getClass());
         String address = transportFactory.getSendAddress(queue);
-        SendEndpoint endpoint = sendEndpointProvider.getSendEndpoint(address);
+        SendEndpointProvider provider = serviceProvider.getService(SendEndpointProvider.class);
+        SendEndpoint endpoint = provider.getSendEndpoint(address);
         return endpoint.send(context);
     }
 
