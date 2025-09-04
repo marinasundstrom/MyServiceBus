@@ -18,6 +18,7 @@ This repository contains a .NET solution for MyServiceBus and a Java project. Fo
 ## Documentation
 - Write documentation in Markdown and place files in the `docs/` folder when appropriate.
 - See `docs/design-goals.md` for overarching design goals, including MassTransit familiarity and C#↔Java parity.
+- See `docs/design-guidelines.md` for architectural and feature parity guidance.
 
 ## Java project
 - The Java project resides in `src/Java`. See `src/Java/AGENTS.md` for instructions specific to that codebase.

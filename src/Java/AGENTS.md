@@ -1,6 +1,6 @@
 # AGENTS Instructions
 
-This directory contains the Java implementation of MyServiceBus.
+This directory contains the Java implementation of MyServiceBus. See `../../docs/design-guidelines.md` for architectural and feature parity guidelines.
 
 ## Code style
 - Use standard Java conventions (UpperCamelCase for classes and interfaces, lowerCamelCase for methods and variables).
