@@ -250,6 +250,8 @@ OrderStatus response = client.getResponse(new CheckOrderStatus(UUID.randomUUID()
 System.out.println(response.getStatus());
 ```
 
+The C# client provides the analogous `IScopedClientFactory` for creating `IRequestClient<T>` instances when you need to specify a destination address or default timeout.
+
 If the consumer responds with a `Fault<CheckOrderStatus>` but the client only requests `OrderStatus`, `GetResponseAsync` throws `RequestFaultException`. Include `Fault<CheckOrderStatus>` as a second response type to observe fault details.
 
 #### Handling Multiple Response Types

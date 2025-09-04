@@ -13,7 +13,7 @@ This document explains why some MyServiceBus APIs differ from MassTransit and hi
 - **Asynchronous style** – C# relies on `async`/`await` with `Task`, while Java returns `CompletableFuture` and callers often invoke `.join()`. This pattern reflects Java's lack of a language-level async keyword.
 - **Cancellation tokens** – Operations in Java require an explicit `CancellationToken.none` because the JDK has no built-in cancellation primitive comparable to .NET's `CancellationToken` parameter defaults.
 - **Endpoint resolution** – C# examples resolve `ISendEndpoint` from DI. Java acquires a `SendEndpoint` via a `SendEndpointProvider` and a URI, mirroring how MassTransit addresses endpoints but adapted for Java's type system.
-- **Request/response helpers** – The C# client injects `IRequestClient<T>`. Java creates a client through `RequestClientFactory` because Java cannot infer generic interfaces the same way.
+- **Request/response helpers** – The C# client injects `IRequestClient<T>` and also exposes `IScopedClientFactory` for manual creation. Java creates clients through `RequestClientFactory` because it cannot infer generic interfaces the same way.
 - **Testing** – Both platforms provide an in-memory test harness. The Java harness mirrors the C# API but returns `CompletableFuture` for each operation, requiring explicit coordination.
 
 These differences stem from language and platform constraints rather than divergent messaging semantics. Both clients aim to stay aligned conceptually so moving between them remains straightforward.

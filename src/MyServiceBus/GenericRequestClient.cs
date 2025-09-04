@@ -8,11 +8,19 @@ public sealed class GenericRequestClient<TRequest> : IRequestClient<TRequest>, I
 {
     private readonly ITransportFactory _transportFactory;
     private readonly IMessageSerializer _serializer;
+    private readonly Uri? _destinationAddress;
+    private readonly RequestTimeout _timeout;
 
-    public GenericRequestClient(ITransportFactory transportFactory, IMessageSerializer serializer)
+    public GenericRequestClient(
+        ITransportFactory transportFactory,
+        IMessageSerializer serializer,
+        Uri? destinationAddress = null,
+        RequestTimeout timeout = default)
     {
-        this._transportFactory = transportFactory;
+        _transportFactory = transportFactory;
         _serializer = serializer;
+        _destinationAddress = destinationAddress;
+        _timeout = timeout.TimeSpan == default ? RequestTimeout.Default : timeout;
     }
 
     public void Dispose()
@@ -20,7 +28,7 @@ public sealed class GenericRequestClient<TRequest> : IRequestClient<TRequest>, I
 
     }
 
-    [Throws(typeof(UriFormatException), typeof(RequestFaultException), typeof(ArgumentOutOfRangeException))]
+    [Throws(typeof(UriFormatException), typeof(ArgumentOutOfRangeException), typeof(InvalidOperationException))]
     public async Task<Response<T>> GetResponseAsync<T>(TRequest request, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default, RequestTimeout timeout = default) where T : class
     {
         var taskCompletionSource = new TaskCompletionSource<Response<T>>();
@@ -64,10 +72,8 @@ public sealed class GenericRequestClient<TRequest> : IRequestClient<TRequest>, I
 
         await responseReceiveTransport.Start(cancellationToken);
 
-        var exchangeName = NamingConventions.GetExchangeName(request.GetType());
-
-        var uri = new Uri($"rabbitmq://localhost/exchange/{exchangeName}");
-        var requestSendTransport = await _transportFactory.GetSendTransport(uri, cancellationToken);
+        var requestAddress = _destinationAddress ?? new Uri($"rabbitmq://localhost/exchange/{NamingConventions.GetExchangeName(request.GetType())}");
+        var requestSendTransport = await _transportFactory.GetSendTransport(requestAddress, cancellationToken);
 
         var responseAddress = new Uri($"rabbitmq://localhost/exchange/{responseExchange}?durable=false&autodelete=true");
         var sendContext = new SendContext(MessageTypeCache.GetMessageTypes(typeof(TRequest)), _serializer, cancellationToken)
@@ -82,7 +88,8 @@ public sealed class GenericRequestClient<TRequest> : IRequestClient<TRequest>, I
         await requestSendTransport.Send(request, sendContext, cancellationToken);
 
         using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        timeoutCts.CancelAfter(timeout.TimeSpan == default ? RequestTimeout.Default.TimeSpan : timeout.TimeSpan);
+        var actualTimeout = timeout.TimeSpan == default ? _timeout.TimeSpan : timeout.TimeSpan;
+        timeoutCts.CancelAfter(actualTimeout);
 
         await using var registration = timeoutCts.Token.Register([Throws(typeof(ObjectDisposedException))] () =>
         {
@@ -99,7 +106,7 @@ public sealed class GenericRequestClient<TRequest> : IRequestClient<TRequest>, I
         }
     }
 
-    [Throws(typeof(UriFormatException), typeof(RequestFaultException), typeof(ArgumentOutOfRangeException))]
+    [Throws(typeof(UriFormatException), typeof(ArgumentOutOfRangeException), typeof(InvalidOperationException))]
     public async Task<Response<T1, T2>> GetResponseAsync<T1, T2>(TRequest request, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default, RequestTimeout timeout = default)
         where T1 : class
         where T2 : class
@@ -152,10 +159,8 @@ public sealed class GenericRequestClient<TRequest> : IRequestClient<TRequest>, I
 
         await responseReceiveTransport.Start(cancellationToken);
 
-        var exchangeName = NamingConventions.GetExchangeName(request.GetType());
-
-        var uri = new Uri($"rabbitmq://localhost/exchange/{exchangeName}");
-        var requestSendTransport = await _transportFactory.GetSendTransport(uri, cancellationToken);
+        var requestAddress = _destinationAddress ?? new Uri($"rabbitmq://localhost/exchange/{NamingConventions.GetExchangeName(request.GetType())}");
+        var requestSendTransport = await _transportFactory.GetSendTransport(requestAddress, cancellationToken);
 
         var responseAddress = new Uri($"rabbitmq://localhost/exchange/{responseExchange}?durable=false&autodelete=true");
         var sendContext = new SendContext(MessageTypeCache.GetMessageTypes(typeof(TRequest)), _serializer, cancellationToken)
@@ -170,7 +175,8 @@ public sealed class GenericRequestClient<TRequest> : IRequestClient<TRequest>, I
         await requestSendTransport.Send(request, sendContext, cancellationToken);
 
         using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        timeoutCts.CancelAfter(timeout.TimeSpan == default ? RequestTimeout.Default.TimeSpan : timeout.TimeSpan);
+        var actualTimeout = timeout.TimeSpan == default ? _timeout.TimeSpan : timeout.TimeSpan;
+        timeoutCts.CancelAfter(actualTimeout);
 
         await using var registration = timeoutCts.Token.Register([Throws(typeof(ObjectDisposedException))] () =>
         {
