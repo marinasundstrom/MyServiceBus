@@ -4,6 +4,8 @@ This guide compares basic usage of MyServiceBus in C# and Java. It is split into
 
 For an explanation of why the C# and Java examples differ, see the [design decisions](design-decisions.md).
 
+Emojis like 🎉 and ✅ highlight events and results throughout this walkthrough.
+
 ## Basics
 
 ### Setup
@@ -73,7 +75,7 @@ bus.start().join();
 
 ### Publishing
 
-Publish raises an event to all interested consumers. It is fan-out by
+Publish raises an event 🎉 to all interested consumers. It is fan-out by
 message type and does not target a specific queue. Use it for domain
 events. See [Adding Headers](#adding-headers) to attach tracing or
 other metadata.
@@ -82,13 +84,14 @@ other metadata.
 
 ```csharp
 IMessageBus bus = serviceProvider.GetRequiredService<IMessageBus>();
+// 🚀 publish event
 await bus.Publish(new SubmitOrder { OrderId = Guid.NewGuid() });
 ```
 
 #### Java
 
 ```java
-bus.publish(new SubmitOrder(UUID.randomUUID()));
+bus.publish(new SubmitOrder(UUID.randomUUID())); // 🚀 publish event
 ```
 
 
@@ -116,7 +119,7 @@ endpoint.send(new SubmitOrder(UUID.randomUUID())).join();
 
 Define consumers to handle messages. The consume context provides the
 message, headers, and helpers to publish, send, or respond. Completing
-successfully acknowledges the message; throwing creates a fault.
+successfully acknowledges the message ✅; throwing creates a fault ❌.
 
 #### C#
 

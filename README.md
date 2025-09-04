@@ -74,7 +74,7 @@ class SubmitOrderConsumer : IConsumer<SubmitOrder>
 }
 ```
 
-Publish the `SubmitOrder` message:
+Publish the `SubmitOrder` message 🚀:
 
 ```csharp
 await bus.Publish(new SubmitOrder(Guid.NewGuid()),
@@ -126,6 +126,9 @@ bus.publish(new SubmitOrder(UUID.randomUUID()), ctx -> ctx.getHeaders().put("tra
 - `test/` – Test projects
 - `docs/` – Additional documentation and design goals
 - `docker-compose.yml` – Docker configuration for local infrastructure
+
+## Emoji usage
+Emojis appear throughout the documentation to mark noteworthy events and results. They're not limited to logging—you might find them in comments within sample snippets or other docs to highlight outcomes (e.g., 🎉 for an event, ✅ for success).
 
 ## Contributing
 Contributions are welcome! Please run `dotnet test` before submitting a pull request and follow the coding conventions described in `AGENTS.md`.
