@@ -26,13 +26,13 @@ public sealed class ServiceBusHostedService : IHostedService
 
         await messageBus.StartAsync(cancellationToken);
 
-        logger.LogInformation("Hosted service started");
+        logger.LogInformation("🚀 Service bus started");
     }
 
     public async Task StopAsync(CancellationToken cancellationToken)
     {
         await messageBus.StopAsync(cancellationToken);
 
-        logger.LogInformation("Hosted service stopped");
+        logger.LogInformation("🛑 Service bus stopped");
     }
 }
