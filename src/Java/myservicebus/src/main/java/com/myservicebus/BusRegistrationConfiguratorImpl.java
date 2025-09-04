@@ -34,7 +34,7 @@ public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigura
                     Type actualType = pt.getActualTypeArguments()[0];
                     Class<?> messageType = getClassFromType(actualType);
                     topology.registerConsumer(consumerClass,
-                            NamingConventions.getQueueName(messageType),
+                            KebabCaseEndpointNameFormatter.INSTANCE.format(messageType),
                             null,
                             messageType);
                 }
@@ -46,7 +46,7 @@ public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigura
     public <TMessage, TConsumer extends com.myservicebus.Consumer<TMessage>> void addConsumer(Class<TConsumer> consumerClass, Class<TMessage> messageClass,
             Consumer<PipeConfigurator<ConsumeContext<TMessage>>> configure) {
         serviceCollection.addScoped(consumerClass);
-        topology.registerConsumer(consumerClass, NamingConventions.getQueueName(messageClass), (java.util.function.Consumer) configure, messageClass);
+        topology.registerConsumer(consumerClass, KebabCaseEndpointNameFormatter.INSTANCE.format(messageClass), (java.util.function.Consumer) configure, messageClass);
     }
 
     @Override
