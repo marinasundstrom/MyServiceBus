@@ -331,9 +331,18 @@ OrderStatus response = client.getResponse(
 
 ### Error Handling
 
+MyServiceBus separates consumer failures into **faults** and **errors**.
+
+#### Faults
+
 When a consumer throws an exception that isn't handled and any configured
-retries are exhausted, MyServiceBus publishes a `Fault<T>` message and
-moves the original message to an error queue named `<queue>_error`,
+retries are exhausted, MyServiceBus publishes a `Fault<T>` message. This
+message contains the original payload and details about the captured
+exceptions so request clients or other observers can react to the failure.
+
+#### Errors
+
+The original message is moved to an error queue named `<queue>_error`,
 mirroring MassTransit. Messages can also land in the error queue if
 deserialization or middleware fails before the consumer runs.
 
