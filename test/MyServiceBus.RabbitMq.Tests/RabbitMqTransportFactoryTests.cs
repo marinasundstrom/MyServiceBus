@@ -2,6 +2,7 @@ using NSubstitute;
 using RabbitMQ.Client;
 using MyServiceBus;
 using MyServiceBus.Topology;
+using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
@@ -154,6 +155,46 @@ public class RabbitMqTransportFactoryTests
         await channel.DidNotReceive().QueueDeclareAsync(
             "resp-temp_error",
             Arg.Any<bool>(),
+            Arg.Any<bool>(),
+            Arg.Any<bool>(),
+            Arg.Any<IDictionary<string, object?>?>(),
+            Arg.Any<bool>(),
+            Arg.Any<bool>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Supports_exchange_scheme_uri()
+    {
+        var channel = Substitute.For<IChannel>();
+        channel.ExchangeDeclareAsync(
+                Arg.Any<string>(),
+                Arg.Any<string>(),
+                Arg.Any<bool>(),
+                Arg.Any<bool>(),
+                Arg.Any<IDictionary<string, object?>?>(),
+                Arg.Any<bool>(),
+                Arg.Any<bool>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.CompletedTask);
+
+        var connection = Substitute.For<IConnection>();
+        connection.IsOpen.Returns(true);
+        connection.CreateChannelAsync(Arg.Any<CreateChannelOptions?>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(channel));
+
+        var factory = Substitute.For<IConnectionFactory>();
+        factory.CreateConnectionAsync(Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(connection));
+
+        var provider = new ConnectionProvider(factory);
+        var transportFactory = new RabbitMqTransportFactory(provider);
+
+        await transportFactory.GetSendTransport(new Uri("exchange:orders"));
+
+        await channel.Received(1).ExchangeDeclareAsync(
+            "orders",
+            Arg.Any<string>(),
             Arg.Any<bool>(),
             Arg.Any<bool>(),
             Arg.Any<IDictionary<string, object?>?>(),

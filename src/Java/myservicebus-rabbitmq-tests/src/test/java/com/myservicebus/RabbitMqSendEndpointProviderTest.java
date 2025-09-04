@@ -53,6 +53,19 @@ class RabbitMqSendEndpointProviderTest {
         assertNull(factory.queue);
     }
 
+    @Test
+    void supportsExchangeSchemeAlias() {
+        StubFactory factory = new StubFactory();
+        SendPipe sendPipe = new SendPipe(ctx -> CompletableFuture.completedFuture(null));
+        MessageSerializer serializer = new EnvelopeMessageSerializer();
+        RabbitMqSendEndpointProvider provider = new RabbitMqSendEndpointProvider(factory, sendPipe, serializer);
+
+        provider.getSendEndpoint("exchange:my-exchange");
+
+        assertEquals("my-exchange", factory.exchange);
+        assertNull(factory.queue);
+    }
+
     static class StubFactory extends RabbitMqTransportFactory {
         String queue;
         String exchange;
