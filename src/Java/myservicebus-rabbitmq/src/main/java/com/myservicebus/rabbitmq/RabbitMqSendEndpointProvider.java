@@ -48,6 +48,28 @@ public class RabbitMqSendEndpointProvider implements TransportSendEndpointProvid
                 }
             }
             transport = transportFactory.getSendTransport(exchange, durable, autoDelete);
+        } else if ("queue".equalsIgnoreCase(target.getScheme())) {
+            String spec = target.getSchemeSpecificPart();
+            String queue = spec;
+            boolean durable = true;
+            boolean autoDelete = false;
+            int idx = spec.indexOf('?');
+            if (idx >= 0) {
+                String query = spec.substring(idx + 1);
+                queue = spec.substring(0, idx);
+                String[] parts = query.split("&");
+                for (String part : parts) {
+                    String[] kv = part.split("=", 2);
+                    if (kv.length == 2) {
+                        if (kv[0].equalsIgnoreCase("durable")) {
+                            durable = Boolean.parseBoolean(kv[1]);
+                        } else if (kv[0].equalsIgnoreCase("autodelete")) {
+                            autoDelete = Boolean.parseBoolean(kv[1]);
+                        }
+                    }
+                }
+            }
+            transport = transportFactory.getQueueTransport(queue, durable, autoDelete);
         } else if (path != null && path.startsWith("/exchange/")) {
             String exchange = path.substring("/exchange/".length());
             boolean durable = true;
