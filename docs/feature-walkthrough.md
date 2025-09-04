@@ -175,6 +175,12 @@ SendEndpoint endpoint = provider.getSendEndpoint("rabbitmq://localhost/submit-or
 endpoint.send(new SubmitOrder(UUID.randomUUID())).join();
 ```
 
+| Target | URI format | Example | Notes |
+|--------|------------|---------|-------|
+| Queue (logical) | `queue:<name>` | `queue:submit-order` | .NET shortcut that resolves against the configured transport |
+| Queue (RabbitMQ) | `rabbitmq://<host>/<queue>` | `rabbitmq://localhost/submit-order` | Sends to a queue via the default exchange |
+| Exchange (RabbitMQ) | `rabbitmq://<host>/exchange/<name>` | `rabbitmq://localhost/exchange/orders` | Publishes to the specified exchange; append `?durable=false&autodelete=true` to control exchange properties |
+
 ### Consuming Messages
 
 Define consumers to handle messages. The consume context provides the
