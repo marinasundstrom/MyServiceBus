@@ -33,7 +33,7 @@ public class PublishHeaderTests
     }
 
     [Fact]
-    [Throws(typeof(UriFormatException), typeof(InvalidOperationException), typeof(NotNullException))]
+    [Throws(typeof(UriFormatException), typeof(InvalidOperationException), typeof(ArgumentNullException))]
     public async Task Applies_headers_to_context()
     {
         var factory = new StubTransportFactory();
