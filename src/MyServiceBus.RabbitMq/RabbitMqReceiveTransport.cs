@@ -44,7 +44,7 @@ public sealed class RabbitMqReceiveTransport : IReceiveTransport
                 }
                 else if (!headers.ContainsKey("content_type"))
                 {
-                    headers["content_type"] = "application/vnd.mybus.envelope+json";
+                    headers["content_type"] = "application/vnd.masstransit+json";
                 }
 
                 if (_hasErrorQueue)

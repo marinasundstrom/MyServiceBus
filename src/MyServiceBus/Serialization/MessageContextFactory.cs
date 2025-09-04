@@ -13,7 +13,7 @@ public class MessageContextFactory
         {
             var contentType = contentTypeObj.ToString();
 
-            if (string.Equals(contentType, "application/vnd.mybus.envelope+json", StringComparison.OrdinalIgnoreCase)
+            if (string.Equals(contentType, "application/vnd.masstransit+json", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(contentType, "application/vnd.masstransit+json", StringComparison.OrdinalIgnoreCase))
             {
                 return new EnvelopeMessageContext(transportMessage.Payload, transportMessage.Headers);

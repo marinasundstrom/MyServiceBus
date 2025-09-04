@@ -35,7 +35,8 @@ public class RabbitMqRequestClientTransport implements RequestClientTransport {
     }
 
     @Override
-    public <TRequest, TResponse> CompletableFuture<TResponse> sendRequest(Class<TRequest> requestType, SendContext context,
+    public <TRequest, TResponse> CompletableFuture<TResponse> sendRequest(Class<TRequest> requestType,
+            SendContext context,
             Class<TResponse> responseType) {
         CompletableFuture<TResponse> future = new CompletableFuture<>();
         try {
@@ -60,7 +61,8 @@ public class RabbitMqRequestClientTransport implements RequestClientTransport {
                         JavaType faultType = mapper.getTypeFactory().constructParametricType(Envelope.class,
                                 faultInner);
                         Envelope<Fault<TRequest>> fault = mapper.readValue(delivery.getBody(), faultType);
-                        future.completeExceptionally(new RequestFaultException(requestType.getSimpleName(), fault.getMessage()));
+                        future.completeExceptionally(
+                                new RequestFaultException(requestType.getSimpleName(), fault.getMessage()));
                     } catch (Exception inner) {
                         future.completeExceptionally(inner);
                     }
@@ -97,7 +99,7 @@ public class RabbitMqRequestClientTransport implements RequestClientTransport {
 
             byte[] body = mapper.writeValueAsBytes(envelope);
             AMQP.BasicProperties props = new AMQP.BasicProperties.Builder()
-                    .contentType("application/vnd.mybus.envelope+json")
+                    .contentType("application/vnd.masstransit+json")
                     .build();
             channel.basicPublish(exchange, "", props, body);
         } catch (Exception ex) {
@@ -139,7 +141,8 @@ public class RabbitMqRequestClientTransport implements RequestClientTransport {
                         JavaType faultType = mapper.getTypeFactory().constructParametricType(Envelope.class,
                                 faultInner);
                         Envelope<Fault<TRequest>> fault = mapper.readValue(delivery.getBody(), faultType);
-                        future.completeExceptionally(new RequestFaultException(requestType.getSimpleName(), fault.getMessage()));
+                        future.completeExceptionally(
+                                new RequestFaultException(requestType.getSimpleName(), fault.getMessage()));
                     } catch (Exception inner) {
                         future.completeExceptionally(inner);
                     }
@@ -176,7 +179,7 @@ public class RabbitMqRequestClientTransport implements RequestClientTransport {
 
             byte[] body = mapper.writeValueAsBytes(envelope);
             AMQP.BasicProperties props = new AMQP.BasicProperties.Builder()
-                    .contentType("application/vnd.mybus.envelope+json")
+                    .contentType("application/vnd.masstransit+json")
                     .build();
             channel.basicPublish(exchange, "", props, body);
         } catch (Exception ex) {

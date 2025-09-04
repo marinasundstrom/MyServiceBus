@@ -22,7 +22,7 @@ public class TransportMessageFactoryTests
         var payload = Encoding.UTF8.GetBytes("{\"messageId\":\"00000000-0000-0000-0000-000000000000\",\"messageType\":[],\"message\":{}}");
         var headers = new Dictionary<string, object>
         {
-            {"content_type", "application/vnd.mybus.envelope+json"}
+            {"content_type", "application/vnd.masstransit+json"}
         };
         ITransportMessage transport = new StubTransportMessage { Headers = headers, Payload = payload };
         var factory = new MessageContextFactory();
@@ -64,7 +64,7 @@ public class TransportMessageFactoryTests
         var payload = Encoding.UTF8.GetBytes("{\"messageId\":\"00000000-0000-0000-0000-000000000000\",\"messageType\":[],\"headers\":{\"Custom\":\"123\"},\"message\":{}}");
         var headers = new Dictionary<string, object>
         {
-            {"content_type", "application/vnd.mybus.envelope+json"},
+            {"content_type", "application/vnd.masstransit+json"},
             {"Transport", "456"}
         };
         ITransportMessage transport = new StubTransportMessage { Headers = headers, Payload = payload };

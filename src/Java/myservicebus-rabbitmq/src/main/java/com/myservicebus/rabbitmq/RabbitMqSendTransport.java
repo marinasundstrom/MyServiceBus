@@ -19,7 +19,7 @@ public class RabbitMqSendTransport implements SendTransport {
     public void send(byte[] data) {
         try {
             AMQP.BasicProperties props = new AMQP.BasicProperties.Builder()
-                    .contentType("application/vnd.mybus.envelope+json")
+                    .contentType("application/vnd.masstransit+json")
                     .build();
             channel.basicPublish(exchange, routingKey, props, data);
         } catch (Exception e) {
@@ -27,4 +27,3 @@ public class RabbitMqSendTransport implements SendTransport {
         }
     }
 }
-

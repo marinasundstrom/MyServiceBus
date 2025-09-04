@@ -14,7 +14,7 @@ MyServiceBus provides a cross-language message bus with design goals to feel fam
 - **Retries**: Both clients support retry policies; the Java client applies a built-in retry mechanism.
 
 ## Behavior
-Operations serialize messages into an envelope with a `content_type` of `application/vnd.mybus.envelope+json`. Send, publish, and respond methods are asynchronous and honor cancellation tokens.
+Operations serialize messages into an envelope with a `content_type` of `application/vnd.masstransit+json`. Send, publish, and respond methods are asynchronous and honor cancellation tokens.
 
 ## Implementation Differences
 
