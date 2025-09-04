@@ -1,6 +1,9 @@
 # Service Scopes
 
-Core messaging abstractions follow MassTransit's lifetimes in both the .NET and Java clients.
+Core messaging abstractions follow MassTransit's lifetimes in both the .NET and Java clients. `IMessageBus` is registered as a
+singleton and implements publish and send interfaces, so simple events can be published directly without a scope. When sending
+commands or creating request clients, resolve the scoped `IPublishEndpoint`, `ISendEndpointProvider`, or `IRequestClient<T>`
+from a service scope to flow headers and cancellation tokens. This mirrors MassTransit's recommended usage patterns.
 
 | Abstraction | Scope | C# Implementation | Java Implementation | Description |
 |-------------|-------|-------------------|---------------------|-------------|

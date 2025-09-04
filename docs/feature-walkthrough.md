@@ -78,6 +78,11 @@ message type and does not target a specific queue. Use it for domain
 events. See [Adding Headers](#adding-headers) to attach tracing or
 other metadata.
 
+`IMessageBus` is a singleton and implements `IPublishEndpoint`, so you can
+publish directly from the bus as shown. In scoped code paths (such as an
+ASP.NET request or inside a consumer), prefer resolving `IPublishEndpoint`
+from the scope so headers and cancellation tokens flow automatically.
+
 #### C#
 
 ```csharp
@@ -99,6 +104,12 @@ bus.publish(new SubmitOrder(UUID.randomUUID())); // 🚀 publish event
 Send delivers a command to a specific endpoint/queue, where exactly one
 consumer processes it. Use this for directed, point-to-point operations
 instead of broadcasting.
+
+Sending and request/response operations rely on scoped abstractions. Resolve
+`ISendEndpointProvider` (or `ISendEndpoint` for the default queue) and
+`IRequestClient<T>` from a service scope rather than using the bus directly so
+contextual information like headers and cancellation tokens is propagated, in
+line with MassTransit.
 
 #### C#
 
@@ -360,6 +371,11 @@ interfaces rather than concrete implementations.
   Use `ISendEndpointProvider` (also scoped) to resolve endpoints by URI.
 - `IRequestClient<T>` – **scoped** helper for request/response exchanges.
 
+In scoped handlers or web requests, depend on these interfaces instead of
+`IMessageBus` so that headers, cancellation tokens, and other context flow as
+expected. This matches MassTransit's guidance of using scoped endpoint
+providers rather than the bus for send or request interactions.
+
 Consumers are registered as scoped dependencies and created per message.
 
 ```csharp
@@ -384,21 +400,24 @@ public class MyService
 `RabbitMqBusFactory.configure` populates a `ServiceCollection` with analogous
 types:
 
-- `ServiceBus` – **singleton** providing `start`, `publish`, and
-  transport management.
+- `ServiceBus` – **singleton** providing `start`, `publish`, and transport
+  management.
 - `PublishEndpoint` – **scoped** facade for publishing events.
-- `SendEndpoint` – **singleton** handle for sending to queues derived from
+- `SendEndpoint` – **scoped** handle for sending to queues derived from
   message types.
-- `SendEndpointProvider` – **singleton** for resolving endpoints by URI
-  when needed.
-- `RequestClientFactory` – **singleton** used to create transient
+- `SendEndpointProvider` – **scoped** for resolving endpoints by URI when
+  needed.
+- `RequestClientFactory` – **scoped** used to create transient
   `RequestClient<T>` instances for request/response.
 
-Consumers are registered as scoped services. Because Java's container
-cannot infer generic types, endpoints and request clients are typically
-obtained from providers or factories rather than injected directly. A
-`SendEndpoint` is registered directly for convenience and routes
-messages based on their type.
+In scoped handlers or web requests, depend on these interfaces instead of
+`ServiceBus` so that headers and cancellation tokens flow as expected,
+mirroring MassTransit's guidance.
+
+Consumers are registered as scoped services. Because Java's container cannot
+infer generic types, endpoints and request clients are typically obtained from
+providers or factories rather than injected directly. A `SendEndpoint` is
+registered directly for convenience and routes messages based on their type.
 
 ```java
 public class MyService {
