@@ -11,11 +11,9 @@ import java.util.function.Consumer;
 
 public class MediatorBus {
     private final ServiceProvider serviceProvider;
-    private final SendEndpointProvider endpointProvider;
 
     public MediatorBus(ServiceProvider provider) {
         this.serviceProvider = provider;
-        this.endpointProvider = provider.getService(SendEndpointProvider.class);
     }
 
     public static MediatorBus configure(ServiceCollection services,
@@ -29,7 +27,8 @@ public class MediatorBus {
 
     public void publish(Object message) {
         String exchange = NamingConventions.getExchangeName(message.getClass());
-        endpointProvider.getSendEndpoint("loopback://" + exchange)
+        SendEndpointProvider provider = serviceProvider.getService(SendEndpointProvider.class);
+        provider.getSendEndpoint("loopback://" + exchange)
                 .send(message, CancellationToken.none).join();
     }
 }

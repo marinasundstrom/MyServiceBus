@@ -64,9 +64,11 @@ RabbitMqBusFactory.configure(services, x -> {
 });
 
 ServiceProvider provider = services.buildServiceProvider();
-ServiceBus bus = provider.getService(ServiceBus.class);
-
-bus.start().join();
+try (ServiceScope scope = provider.createScope()) {
+    ServiceProvider sp = scope.getServiceProvider();
+    ServiceBus bus = sp.getService(ServiceBus.class);
+    bus.start().join();
+}
 ```
 
 
@@ -331,9 +333,11 @@ RabbitMqBusFactory.configure(services, x -> {
 });
 
 ServiceProvider provider = services.buildServiceProvider();
-ServiceBus bus = provider.getService(ServiceBus.class);
-
-bus.start();
+try (ServiceScope scope = provider.createScope()) {
+    ServiceProvider sp = scope.getServiceProvider();
+    ServiceBus bus = sp.getService(ServiceBus.class);
+    bus.start();
+}
 ```
 
 Built-in endpoint name formatters include `DefaultEndpointNameFormatter`, `KebabCaseEndpointNameFormatter`, and `SnakeCaseEndpointNameFormatter`.
@@ -443,8 +447,11 @@ RabbitMqBusFactory.configure(services, x -> {
 });
 
 ServiceProvider provider = services.buildServiceProvider();
-ServiceBus bus = provider.getService(ServiceBus.class);
-bus.start();
+try (ServiceScope scope = provider.createScope()) {
+    ServiceProvider sp = scope.getServiceProvider();
+    ServiceBus bus = sp.getService(ServiceBus.class);
+    bus.start();
+}
 ```
 
 
@@ -533,9 +540,11 @@ RabbitMqBusFactory.configure(services, x -> {
 });
 
 ServiceProvider provider = services.buildServiceProvider();
-ServiceBus bus = provider.getService(ServiceBus.class);
-
-bus.start();
+try (ServiceScope scope = provider.createScope()) {
+    ServiceProvider sp = scope.getServiceProvider();
+    ServiceBus bus = sp.getService(ServiceBus.class);
+    bus.start();
+}
 ```
 
 

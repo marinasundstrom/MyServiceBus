@@ -16,6 +16,7 @@ import com.myservicebus.MyServiceImpl;
 import com.myservicebus.ServiceBus;
 import com.myservicebus.di.ServiceCollection;
 import com.myservicebus.di.ServiceProvider;
+import com.myservicebus.di.ServiceScope;
 import com.myservicebus.rabbitmq.RabbitMqBusFactory;
 
 public class Main {
@@ -34,19 +35,22 @@ public class Main {
         });
 
         ServiceProvider provider = services.buildServiceProvider();
-        ServiceBus bus = provider.getService(ServiceBus.class);
+        try (ServiceScope scope = provider.createScope()) {
+            ServiceProvider sp = scope.getServiceProvider();
+            ServiceBus bus = sp.getService(ServiceBus.class);
 
-        bus.start();
+            bus.start();
 
-        System.out.println("Up and running");
+            System.out.println("Up and running");
 
-        SubmitOrder message = new SubmitOrder(UUID.randomUUID());
+            SubmitOrder message = new SubmitOrder(UUID.randomUUID());
 
-        bus.publish(message);
+            bus.publish(message);
 
-        System.out.println("Waiting");
+            System.out.println("Waiting");
 
-        System.in.read();
+            System.in.read();
+        }
     }
 }
 ```

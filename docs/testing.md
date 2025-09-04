@@ -89,7 +89,10 @@ InMemoryTestHarness harness = provider.getService(InMemoryTestHarness.class);
 harness.handler(ValueSubmitted.class, ctx -> CompletableFuture.completedFuture(null));
 
 harness.start();
-provider.getService(PublishingService.class).submit(UUID.randomUUID()).join();
+try (ServiceScope scope = provider.createScope()) {
+    ServiceProvider sp = scope.getServiceProvider();
+    sp.getService(PublishingService.class).submit(UUID.randomUUID()).join();
+}
 
 assertTrue(harness.consumed().any(ValueSubmitted.class));
 harness.stop();
