@@ -1,6 +1,9 @@
 package com.myservicebus.rabbitmq;
 
+import com.myservicebus.ConsumeContext;
 import com.myservicebus.EndpointNameFormatter;
+import com.myservicebus.PipeConfigurator;
+import com.myservicebus.RetryConfigurator;
 import com.myservicebus.topology.ConsumerTopology;
 import com.myservicebus.topology.MessageBinding;
 import com.myservicebus.topology.TopologyRegistry;
@@ -31,27 +34,8 @@ public class RabbitMqFactoryConfigurator {
 
     public void receiveEndpoint(String queueName, Consumer<ReceiveEndpointConfigurator> configure) {
         if (configure != null) {
-            configure.accept((context, consumerClass) -> {
-                try {
-                    TopologyRegistry registry = context.getServiceProvider().getService(TopologyRegistry.class);
-                    ConsumerTopology def = registry.getConsumers().stream()
-                            .filter(d -> d.getConsumerType().equals(consumerClass))
-                            .findFirst()
-                            .orElseThrow(() -> new IllegalStateException(
-                                    "Consumer " + consumerClass.getSimpleName() + " not registered"));
-
-                    def.setQueueName(queueName);
-
-                    MessageBinding binding = def.getBindings().get(0);
-                    String exchange = exchangeNames.get(binding.getMessageType());
-                    if (exchange != null) {
-                        binding.setEntityName(exchange);
-                    }
-                } catch (Exception ex) {
-                    throw new RuntimeException(
-                            "Failed to configure consumer " + consumerClass.getSimpleName(), ex);
-                }
-            });
+            ReceiveEndpointConfiguratorImpl cfg = new ReceiveEndpointConfiguratorImpl(queueName, exchangeNames);
+            configure.accept(cfg);
         }
     }
 
@@ -100,6 +84,56 @@ public class RabbitMqFactoryConfigurator {
         @Override
         public void password(String password) {
             this.password = password;
+        }
+    }
+
+    private static class ReceiveEndpointConfiguratorImpl implements ReceiveEndpointConfigurator {
+        private final String queueName;
+        private final Map<Class<?>, String> exchangeNames;
+        private java.util.function.Consumer<RetryConfigurator> retry;
+
+        ReceiveEndpointConfiguratorImpl(String queueName, Map<Class<?>, String> exchangeNames) {
+            this.queueName = queueName;
+            this.exchangeNames = exchangeNames;
+        }
+
+        @Override
+        public void useMessageRetry(java.util.function.Consumer<RetryConfigurator> configure) {
+            this.retry = configure;
+        }
+
+        @Override
+        public void configureConsumer(BusRegistrationContext context, Class<?> consumerClass) {
+            try {
+                TopologyRegistry registry = context.getServiceProvider().getService(TopologyRegistry.class);
+                ConsumerTopology def = registry.getConsumers().stream()
+                        .filter(d -> d.getConsumerType().equals(consumerClass))
+                        .findFirst()
+                        .orElseThrow(() -> new IllegalStateException(
+                                "Consumer " + consumerClass.getSimpleName() + " not registered"));
+
+                def.setQueueName(queueName);
+
+                MessageBinding binding = def.getBindings().get(0);
+                String exchange = exchangeNames.get(binding.getMessageType());
+                if (exchange != null) {
+                    binding.setEntityName(exchange);
+                }
+
+                if (retry != null) {
+                    RetryConfigurator rc = new RetryConfigurator();
+                    retry.accept(rc);
+                    java.util.function.Consumer<PipeConfigurator<ConsumeContext<Object>>> existing = def.getConfigure();
+                    def.setConfigure(pc -> {
+                        pc.useRetry(rc.getRetryCount(), rc.getDelay());
+                        if (existing != null)
+                            existing.accept(pc);
+                    });
+                }
+            } catch (Exception ex) {
+                throw new RuntimeException(
+                        "Failed to configure consumer " + consumerClass.getSimpleName(), ex);
+            }
         }
     }
 }

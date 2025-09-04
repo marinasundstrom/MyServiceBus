@@ -37,6 +37,7 @@ public class MessageConfigurator
         _exchangeNames = exchangeNames;
     }
 
+    [Throws(typeof(NotSupportedException))]
     public void SetEntityName(string name)
     {
         _exchangeNames[_messageType] = name;
@@ -47,11 +48,21 @@ public class ReceiveEndpointConfigurator
 {
     private readonly string _queueName;
     private readonly IDictionary<Type, string> _exchangeNames;
+    private int? _retryCount;
+    private TimeSpan? _retryDelay;
 
     public ReceiveEndpointConfigurator(string queueName, IDictionary<Type, string> exchangeNames)
     {
         _queueName = queueName;
         _exchangeNames = exchangeNames;
+    }
+
+    public void UseMessageRetry(Action<RetryConfigurator> configure)
+    {
+        var rc = new RetryConfigurator();
+        configure(rc);
+        _retryCount = rc.RetryCount;
+        _retryDelay = rc.Delay;
     }
 
     [Throws(typeof(InvalidOperationException))]
@@ -81,6 +92,17 @@ public class ReceiveEndpointConfigurator
                     binding.EntityName = entity;
             }
 
+            if (_retryCount.HasValue)
+            {
+                var retryMethod = typeof(ReceiveEndpointConfigurator)
+                    .GetMethod(nameof(ApplyRetry), BindingFlags.NonPublic | BindingFlags.Static)!
+                    .MakeGenericMethod(messageType);
+                var retryDelegate = (Delegate)retryMethod.Invoke(null, new object[] { _retryCount.Value, _retryDelay })!;
+                consumer.ConfigurePipe = consumer.ConfigurePipe != null
+                    ? Delegate.Combine(retryDelegate, consumer.ConfigurePipe)
+                    : retryDelegate;
+            }
+
             var method = typeof(IMessageBus).GetMethod("AddConsumer")!
                 .MakeGenericMethod(messageType, consumerType);
 
@@ -95,5 +117,11 @@ public class ReceiveEndpointConfigurator
         {
             throw new InvalidOperationException($"Failed to configure consumer {consumerType.Name}", ex);
         }
+    }
+
+    static Delegate ApplyRetry<T>(int retryCount, TimeSpan? delay)
+    {
+        void Configure(PipeConfigurator<ConsumeContext<T>> pipe) => pipe.UseRetry(retryCount, delay);
+        return (Action<PipeConfigurator<ConsumeContext<T>>>)Configure;
     }
 }

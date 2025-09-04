@@ -52,6 +52,33 @@ public class RabbitMqFactoryConfiguratorTests {
     }
 
     @Test
+    public void receiveEndpointAddsMessageRetry() {
+        ServiceCollection services = new ServiceCollection();
+        BusRegistrationConfiguratorImpl cfg = new BusRegistrationConfiguratorImpl(services);
+        cfg.addConsumer(MyConsumer.class);
+
+        RabbitMqTransport.configure(cfg);
+        cfg.complete();
+
+        ServiceProvider provider = services.buildServiceProvider();
+        BusRegistrationContext context = new BusRegistrationContext(provider);
+        RabbitMqFactoryConfigurator factoryConfigurator = provider.getService(RabbitMqFactoryConfigurator.class);
+
+        factoryConfigurator.receiveEndpoint("custom-queue", e -> {
+            e.useMessageRetry(r -> r.immediate(2));
+            e.configureConsumer(context, MyConsumer.class);
+        });
+
+        TopologyRegistry registry = provider.getService(TopologyRegistry.class);
+        ConsumerTopology def = registry.getConsumers().stream()
+                .filter(d -> d.getConsumerType().equals(MyConsumer.class))
+                .findFirst()
+                .orElseThrow();
+
+        assertNotNull(def.getConfigure());
+    }
+
+    @Test
     public void configureEndpointsUsesFormatter() {
         ServiceCollection services = new ServiceCollection();
         BusRegistrationConfiguratorImpl cfg = new BusRegistrationConfiguratorImpl(services);

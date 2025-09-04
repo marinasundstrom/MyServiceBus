@@ -92,6 +92,30 @@ public class RabbitMqFactoryConfiguratorTests
         Assert.Equal("custom-exchange", def.Bindings[0].EntityName);
     }
 
+    [Fact]
+    [Throws(typeof(NotNullException), typeof(Exception))]
+    public void ReceiveEndpoint_adds_message_retry()
+    {
+        var registry = new TopologyRegistry();
+        registry.RegisterConsumer<MyConsumer>("original-queue", null, typeof(MyMessage));
+
+        var services = new ServiceCollection();
+        services.AddSingleton(registry);
+        services.AddSingleton<IMessageBus, TestMessageBus>();
+        var provider = services.BuildServiceProvider();
+        var context = new TestBusRegistrationContext(provider);
+
+        var configurator = new TestRabbitMqFactoryConfigurator();
+        configurator.ReceiveEndpoint("custom-queue", [Throws(typeof(InvalidOperationException))] (e) =>
+        {
+            e.UseMessageRetry(r => r.Immediate(2));
+            e.ConfigureConsumer<MyConsumer>(context);
+        });
+
+        var def = registry.Consumers.First(c => c.ConsumerType == typeof(MyConsumer));
+        Assert.NotNull(def.ConfigurePipe);
+    }
+
     class StaticFormatter : IEndpointNameFormatter
     {
         public string Format(Type messageType) => "formatted-" + messageType.Name.ToLowerInvariant();

@@ -25,6 +25,14 @@ public class PipeConfigurator<TContext>
         UseFilter(new RetryFilter<TContext>(retryCount, delay));
     }
 
+    public void UseMessageRetry(Action<RetryConfigurator> configure)
+    {
+        var rc = new RetryConfigurator();
+        configure(rc);
+        UseRetry(rc.RetryCount, rc.Delay);
+    }
+
+    [Throws(typeof(ArgumentOutOfRangeException))]
     public IPipe<TContext> Build()
     {
         IPipe<TContext> next = Pipe.Empty<TContext>();

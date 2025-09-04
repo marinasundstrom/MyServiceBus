@@ -28,6 +28,12 @@ public class PipeConfigurator<TContext extends PipeContext> {
         useFilter(new RetryFilter<>(retryCount, delay));
     }
 
+    public void useMessageRetry(java.util.function.Consumer<RetryConfigurator> configure) {
+        RetryConfigurator rc = new RetryConfigurator();
+        configure.accept(rc);
+        useRetry(rc.getRetryCount(), rc.getDelay());
+    }
+
     public Pipe<TContext> build() {
         Pipe<TContext> next = Pipes.empty();
         for (int i = filters.size() - 1; i >= 0; i--) {

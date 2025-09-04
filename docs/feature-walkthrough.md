@@ -519,7 +519,7 @@ builder.Services.AddServiceBus(x =>
 {
     x.AddConsumer<SubmitOrderConsumer, SubmitOrder>(cfg =>
     {
-        cfg.UseRetry(3);
+        cfg.UseMessageRetry(r => r.Immediate(3));
         cfg.UseFilter(new LoggingFilter<SubmitOrder>());
         cfg.UseExecute(ctx =>
         {
@@ -540,7 +540,7 @@ ServiceCollection services = new ServiceCollection();
 
 RabbitMqBusFactory.configure(services, x -> {
     x.addConsumer(SubmitOrderConsumer.class, SubmitOrder.class, cfg -> {
-        cfg.useRetry(3);
+        cfg.useMessageRetry(r -> r.immediate(3));
         cfg.useFilter(new LoggingFilter<>());
         cfg.useExecute(ctx -> {
             System.out.println("Processing " + ctx.getMessage());
