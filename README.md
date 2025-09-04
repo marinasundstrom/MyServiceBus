@@ -74,7 +74,7 @@ class SubmitOrderConsumer : IConsumer<SubmitOrder>
 }
 ```
 
-Publish the `SubmitOrder` message:
+Publish the `SubmitOrder` message 🚀:
 
 ```csharp
 await bus.Publish(new SubmitOrder(Guid.NewGuid()),
@@ -124,7 +124,7 @@ bus.publish(new SubmitOrder(UUID.randomUUID()), ctx -> ctx.getHeaders().put("tra
 ## Repository structure
 - `src/` – C# and Java source code
 - `test/` – Test projects
-- `docs/` – Additional documentation and design goals
+- `docs/` – Additional documentation and design goals, including [emoji usage](docs/emoji-usage.md) guidelines
 - `docker-compose.yml` – Docker configuration for local infrastructure
 
 ## Contributing
