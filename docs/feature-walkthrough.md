@@ -342,9 +342,11 @@ exceptions so request clients or other observers can react to the failure.
 
 #### Errors
 
-The original message is moved to an error queue named `<queue>_error`,
-mirroring MassTransit. Messages can also land in the error queue if
-deserialization or middleware fails before the consumer runs.
+When the bus exhausts all retry or re-delivery policies (immediate,
+scheduled, etc.) and the consumer still fails, the original message is
+moved to an error queue named `<queue>_error`, mirroring MassTransit.
+Messages can also land in the error queue if deserialization or
+middleware fails before the consumer runs.
 
 Bind a consumer to `<queue>_error` to inspect or replay failed messages:
 
