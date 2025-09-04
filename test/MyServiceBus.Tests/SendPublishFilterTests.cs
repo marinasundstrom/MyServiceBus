@@ -20,6 +20,7 @@ public class SendPublishFilterTests
     class StubTransportFactory : ITransportFactory
     {
         public readonly CaptureSendTransport Transport = new();
+        [Throws(typeof(InvalidOperationException))]
         public Task<ISendTransport> GetSendTransport(Uri address, CancellationToken cancellationToken = default)
             => Task.FromResult<ISendTransport>(Transport);
         [Throws(typeof(NotImplementedException))]
@@ -28,7 +29,7 @@ public class SendPublishFilterTests
     }
 
     [Fact]
-    [Throws(typeof(UriFormatException))]
+    [Throws(typeof(UriFormatException), typeof(ArgumentOutOfRangeException), typeof(InvalidOperationException))]
     public async Task Executes_send_and_publish_filters()
     {
         var sendExecuted = false;
@@ -39,7 +40,8 @@ public class SendPublishFilterTests
         publishCfg.UseExecute(ctx => { publishExecuted = true; return Task.CompletedTask; });
 
         var bus = new MessageBus(new StubTransportFactory(), new ServiceCollection().BuildServiceProvider(),
-            new SendPipe(sendCfg.Build()), new PublishPipe(publishCfg.Build()), new EnvelopeMessageSerializer());
+            new SendPipe(sendCfg.Build()), new PublishPipe(publishCfg.Build()), new EnvelopeMessageSerializer(),
+            new Uri("loopback://localhost/"));
 
         await bus.PublishAsync(new TestMessage());
 

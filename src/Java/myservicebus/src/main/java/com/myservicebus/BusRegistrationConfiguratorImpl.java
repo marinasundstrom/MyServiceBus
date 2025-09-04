@@ -99,6 +99,7 @@ public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigura
         serviceCollection.addScoped(PublishEndpoint.class,
                 sp -> () -> sp.getService(PublishEndpointProvider.class).getPublishEndpoint());
         serviceCollection.addSingleton(TopologyRegistry.class, sp -> () -> topology);
+        serviceCollection.addSingleton(com.myservicebus.topology.BusTopology.class, sp -> () -> topology);
         serviceCollection.addSingleton(SendPipe.class, sp -> () -> new SendPipe(sendConfigurator.build()));
         serviceCollection.addSingleton(PublishPipe.class, sp -> () -> new PublishPipe(publishConfigurator.build()));
         serviceCollection.addSingleton(com.myservicebus.serialization.MessageSerializer.class, sp -> () -> {

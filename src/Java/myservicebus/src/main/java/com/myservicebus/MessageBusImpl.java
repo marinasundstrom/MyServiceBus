@@ -1,5 +1,6 @@
 package com.myservicebus;
 
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -11,6 +12,7 @@ import com.myservicebus.di.ServiceCollection;
 import com.myservicebus.di.ServiceProvider;
 import com.myservicebus.serialization.MessageDeserializer;
 import com.myservicebus.tasks.CancellationToken;
+import com.myservicebus.topology.BusTopology;
 import com.myservicebus.topology.ConsumerTopology;
 import com.myservicebus.topology.MessageBinding;
 import com.myservicebus.topology.TopologyRegistry;
@@ -23,6 +25,8 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
     private final Logger logger;
     private final MessageDeserializer messageDeserializer;
     private final List<ReceiveTransport> receiveTransports = new ArrayList<>();
+    private final URI address;
+    private final BusTopology topology;
 
     public MessageBusImpl(ServiceProvider serviceProvider) {
         this.serviceProvider = serviceProvider;
@@ -37,6 +41,10 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
             md = new com.myservicebus.serialization.EnvelopeMessageDeserializer();
         }
         this.messageDeserializer = md;
+        BusTopology top = serviceProvider.getService(TopologyRegistry.class);
+        this.topology = top != null ? top : new TopologyRegistry();
+        URI configuredAddress = serviceProvider.getService(URI.class);
+        this.address = configuredAddress != null ? configuredAddress : URI.create("loopback://localhost/");
     }
 
     public static MessageBus configure(ServiceCollection services,
@@ -109,6 +117,16 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
         for (ReceiveTransport transport : receiveTransports) {
             transport.stop();
         }
+    }
+
+    @Override
+    public URI getAddress() {
+        return address;
+    }
+
+    @Override
+    public BusTopology getTopology() {
+        return topology;
     }
 
     @Override
