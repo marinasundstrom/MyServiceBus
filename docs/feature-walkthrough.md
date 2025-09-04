@@ -12,6 +12,7 @@ For an explanation of why the C# and Java examples differ, see the [design decis
   - [Consuming Messages](#consuming-messages)
   - [Request/Response](#requestresponse)
   - [Adding Headers](#adding-headers)
+  - [Error Handling](#error-handling)
   - [Mediator (In-Memory Transport)](#mediator-in-memory-transport)
 - [Advanced](#advanced)
   - [Configuration](#configuration)
@@ -92,8 +93,9 @@ bus.start().join();
 
 Publish raises an event 🎉 to all interested consumers. It is fan-out by
 message type and does not target a specific queue. Use it for domain
-events. See [Adding Headers](#adding-headers) to attach tracing or
-other metadata.
+events or notifications. Multiple queues can listen to the same
+exchange or topic to receive the event. See
+[Adding Headers](#adding-headers) to attach tracing or other metadata.
 
 `IMessageBus` is a singleton and implements `IPublishEndpoint`, so you can
 publish directly from the bus as shown. In scoped code paths (such as an
@@ -187,6 +189,11 @@ endpoint.send(new SubmitOrder(UUID.randomUUID())).join();
 Define consumers to handle messages. The consume context provides the
 message, headers, and helpers to publish, send, or respond. Completing
 successfully acknowledges the message ✅; throwing creates a fault ❌.
+
+Consumers can bind to the same topic or exchange to subscribe to
+notifications or events. Multiple replicas of a service may bind to the
+same queue; the first instance to dequeue a message processes it,
+supporting scaling and resilience.
 
 #### C#
 
@@ -322,6 +329,43 @@ OrderStatus response = client.getResponse(
     CancellationToken.none).join();
 ```
 
+### Error Handling
+
+When a consumer throws an exception that isn't handled and any configured
+retries are exhausted, MyServiceBus publishes a `Fault<T>` message and
+moves the original message to an error queue named `<queue>_error`,
+mirroring MassTransit. Messages can also land in the error queue if
+deserialization or middleware fails before the consumer runs.
+
+Bind a consumer to `<queue>_error` to inspect or replay failed messages:
+
+#### C#
+
+```csharp
+cfg.ReceiveEndpoint("submit-order_error", e =>
+{
+    e.Handler<SubmitOrder>(context =>
+    {
+        // inspect, fix, or forward the failed message
+        return context.Forward(new Uri("queue:submit-order"), context.Message);
+    });
+});
+```
+
+#### Java
+
+```java
+cfg.receiveEndpoint("submit-order_error", e ->
+    e.handle(SubmitOrder.class, ctx -> {
+        // inspect, fix, or forward the failed message
+        return ctx.forward("queue:submit-order", ctx.getMessage());
+    })
+);
+```
+
+Inspect and process the error queue with a dedicated consumer or tool,
+then forward the message back to the original queue once the issue is
+resolved.
 
 ### Mediator (In-Memory Transport)
 
