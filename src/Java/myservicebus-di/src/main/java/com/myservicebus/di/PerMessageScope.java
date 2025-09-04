@@ -4,30 +4,39 @@ import com.google.inject.Key;
 import com.google.inject.Provider;
 import com.google.inject.Scope;
 
+import java.util.ArrayDeque;
+import java.util.Deque;
 import java.util.HashMap;
 import java.util.Map;
 
 public class PerMessageScope implements Scope {
-    private final ThreadLocal<Map<Key<?>, Object>> scopeContext = new ThreadLocal<>();
+    private final ThreadLocal<Deque<Map<Key<?>, Object>>> scopeContext = new ThreadLocal<>();
 
     public void enter() {
-        if (scopeContext.get() != null) {
-            throw new IllegalStateException("Scope already entered");
+        Deque<Map<Key<?>, Object>> deque = scopeContext.get();
+        if (deque == null) {
+            deque = new ArrayDeque<>();
+            scopeContext.set(deque);
         }
-        scopeContext.set(new HashMap<>());
+        deque.push(new HashMap<>());
     }
 
     public void exit() {
-        if (scopeContext.get() == null) {
+        Deque<Map<Key<?>, Object>> deque = scopeContext.get();
+        if (deque == null || deque.isEmpty()) {
             throw new IllegalStateException("No scope to exit");
         }
-        scopeContext.remove();
+        deque.pop();
+        if (deque.isEmpty()) {
+            scopeContext.remove();
+        }
     }
 
     @Override
     public <T> Provider<T> scope(Key<T> key, Provider<T> unscoped) {
         return () -> {
-            Map<Key<?>, Object> scope = scopeContext.get();
+            Deque<Map<Key<?>, Object>> deque = scopeContext.get();
+            Map<Key<?>, Object> scope = deque != null ? deque.peek() : null;
             if (scope == null) {
                 throw new IllegalStateException("No scope active. Did you forget to call enter()?");
             }
