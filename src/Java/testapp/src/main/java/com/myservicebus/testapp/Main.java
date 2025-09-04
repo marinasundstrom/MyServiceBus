@@ -45,8 +45,9 @@ public class Main {
 
         try {
             serviceBus.start();
+            logger.info("🚀 Test app started");
         } catch (Exception e) {
-            logger.error("Failed to start service bus", e);
+            logger.error("❌ Failed to start service bus", e);
             return;
         }
 
@@ -58,9 +59,10 @@ public class Main {
                 SubmitOrder message = new SubmitOrder(UUID.randomUUID(), "MT Clone Java");
                 try {
                     publishEndpoint.publish(message, CancellationToken.none).join();
+                    logger.info("📤 Published SubmitOrder {} ✅", message.getOrderId());
                     ctx.result("Published SubmitOrder");
                 } catch (Exception e) {
-                    logger.error("Failed to publish message", e);
+                    logger.error("❌ Failed to publish message", e);
                     ctx.status(500).result("Failed to publish message");
                 }
             }
@@ -72,9 +74,10 @@ public class Main {
             SubmitOrder message = new SubmitOrder(UUID.randomUUID(), "MT Clone Java");
             try {
                 sendEndpoint.send(message, CancellationToken.none).join();
+                logger.info("📤 Sent SubmitOrder {} ✅", message.getOrderId());
                 ctx.result("Sent SubmitOrder");
             } catch (Exception e) {
-                logger.error("Failed to send message", e);
+                logger.error("❌ Failed to send message", e);
                 ctx.status(500).result("Failed to send message");
             }
         });
@@ -86,9 +89,10 @@ public class Main {
                 var response = requestClient
                         .getResponse(new TestRequest("Foo"), TestResponse.class, CancellationToken.none)
                         .get();
+                logger.info("📨 Received response {} ✅", response.getMessage().toString());
                 ctx.result(response.getMessage().toString());
             } catch (Exception exc) {
-                logger.error("Failed to get response", exc);
+                logger.error("❌ Failed to get response", exc);
                 ctx.result(exc.getMessage().toString());
             }
         });
@@ -103,6 +107,7 @@ public class Main {
                         .get();
 
                 response.as(TestResponse.class).ifPresent((Response<TestResponse> r) -> {
+                    logger.info("📨 Received response {} ✅", r.getMessage().toString());
                     ctx.result(r.getMessage().toString());
                 });
 
@@ -112,14 +117,15 @@ public class Main {
                     if (message == null) {
                         message = exception.toString();
                     }
+                    logger.error("❌ Fault received: {}", message);
                     ctx.status(500).result(message);
                 });
             } catch (Exception e) {
-                logger.error("Failed to get response", e);
+                logger.error("❌ Failed to get response", e);
                 ctx.status(500).result("Failed to get response: " + e.getMessage());
             }
         });
 
-        logger.info("Up and running");
+        logger.info("✅ Up and running");
     }
 }

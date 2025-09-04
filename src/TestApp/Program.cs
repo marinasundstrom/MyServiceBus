@@ -2,6 +2,7 @@ using MyServiceBus;
 using TestApp;
 using System.Linq;
 using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.Extensions.Logging;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -11,7 +12,7 @@ builder.Services.AddServiceBus(x =>
     x.AddConsumer<OrderSubmittedConsumer>();
     x.AddConsumer<TestRequestConsumer>();
 
-    x.UsingRabbitMq((context, cfg) =>
+    x.UsingRabbitMq([Throws(typeof(InvalidOperationException))] (context, cfg) =>
     {
         cfg.Host("localhost", h =>
         {
@@ -46,6 +47,9 @@ builder.Services.AddServiceBus(x =>
 builder.Services.AddOpenApi();
 
 var app = builder.Build();
+
+var logger = app.Logger;
+logger.LogInformation("🚀 Starting TestApp");
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
@@ -93,49 +97,77 @@ app.MapPost("/publish", async (IPublishEndpoint publishEndpoint, CancellationTok
 .WithTags("Test");
 */
 
-app.MapGet("/publish", async (IMessageBus messageBus, CancellationToken cancellationToken = default) =>
+app.MapGet("/publish", [Throws(typeof(Exception))] async (IMessageBus messageBus, ILogger<Program> logger, CancellationToken cancellationToken = default) =>
 {
     var message = new SubmitOrder() { OrderId = Guid.NewGuid(), Message = "MT Clone C#" };
-    await messageBus.Publish(message, null, cancellationToken);
+    try
+    {
+        await messageBus.Publish(message, null, cancellationToken);
+        logger.LogInformation("📤 Published SubmitOrder {OrderId} ✅", message.OrderId);
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "❌ Failed to publish SubmitOrder {OrderId}", message.OrderId);
+        throw;
+    }
 })
 .WithName("Test_Publish")
 .WithTags("Test");
 
-app.MapGet("/send", async (ISendEndpointProvider sendEndpointProvider, CancellationToken cancellationToken = default) =>
+app.MapGet("/send", [Throws(typeof(UriFormatException))] async (ISendEndpointProvider sendEndpointProvider, ILogger<Program> logger, CancellationToken cancellationToken = default) =>
 {
     var sendEndpoint = await sendEndpointProvider.GetSendEndpoint(new Uri("rabbitmq://localhost/submit-order-queue"));
-    await sendEndpoint.Send(new SubmitOrder { OrderId = Guid.NewGuid(), Message = "MT Clone C#" }, null, cancellationToken);
+    var message = new SubmitOrder { OrderId = Guid.NewGuid(), Message = "MT Clone C#" };
+    try
+    {
+        await sendEndpoint.Send(message, null, cancellationToken);
+        logger.LogInformation("📤 Sent SubmitOrder {OrderId} ✅", message.OrderId);
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "❌ Failed to send SubmitOrder {OrderId}", message.OrderId);
+        throw;
+    }
 })
 .WithName("Test_Send")
 .WithTags("Test");
 
-app.MapGet("/request", async Task<Results<Ok<string>, InternalServerError>> (IRequestClient<TestRequest> client, CancellationToken cancellationToken = default) =>
+app.MapGet("/request", async Task<Results<Ok<string>, InternalServerError>> (IRequestClient<TestRequest> client, ILogger<Program> logger, CancellationToken cancellationToken = default) =>
 {
     try
     {
         var message = new TestRequest() { Message = "Foo" };
         var response = await client.GetResponseAsync<TestResponse>(message, null, cancellationToken);
+        logger.LogInformation("📨 Received response {Response} ✅", response.Message.Message);
         return TypedResults.Ok(response.Message.Message);
     }
     catch (RequestFaultException requestFaultException)
     {
-        return TypedResults.Ok(requestFaultException.Message);
+        logger.LogError(requestFaultException, "❌ Request fault");
+        return TypedResults.InternalServerError(requestFaultException.Message);
     }
 })
 .WithName("Test_Request")
 .WithTags("Test");
 
 
-app.MapGet("/request_multi", async Task<Results<Ok<string>, InternalServerError<string>, NoContent>> (IRequestClient<TestRequest> client, CancellationToken cancellationToken = default) =>
+app.MapGet("/request_multi", [Throws(typeof(RequestFaultException))] async Task<Results<Ok<string>, InternalServerError<string>, NoContent>> (IRequestClient<TestRequest> client, ILogger<Program> logger, CancellationToken cancellationToken = default) =>
 {
     var message = new TestRequest() { Message = "Foo" };
     var response = await client.GetResponseAsync<TestResponse, Fault<TestRequest>>(message, null, cancellationToken);
 
     if (response.Is(out Response<TestResponse> status))
+    {
+        logger.LogInformation("📨 Received response {Response} ✅", status.Message.Message);
         return TypedResults.Ok(status.Message.Message);
+    }
     else if (response.Is(out Response<Fault<TestRequest>> fault))
+    {
+        logger.LogError("❌ Fault received: {Message}", fault.Message.Exceptions[0].Message);
         return TypedResults.InternalServerError(fault.Message.Exceptions[0].Message);
+    }
 
+    logger.LogWarning("⚠️ No content");
     return TypedResults.NoContent();
 })
 .WithName("Test_RequestMulti")
@@ -158,6 +190,7 @@ public class HostedService : IHostedService
         this.messageBus = messageBus;
     }
 
+    [Throws(typeof(ObjectDisposedException))]
     public async Task StartAsync(CancellationToken cancellationToken)
     {
         try

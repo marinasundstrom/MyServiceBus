@@ -19,7 +19,7 @@ class OrderSubmittedConsumer implements Consumer<OrderSubmitted> {
     public CompletableFuture<Void> consume(ConsumeContext<OrderSubmitted> context) throws Exception {
         var orderId = context.getMessage().getOrderId();
 
-        logger.info("Order submitted: {}", orderId);
+        logger.info("📨 Order submitted: {} ✅", orderId);
 
         return CompletableFuture.completedFuture(null);
     }

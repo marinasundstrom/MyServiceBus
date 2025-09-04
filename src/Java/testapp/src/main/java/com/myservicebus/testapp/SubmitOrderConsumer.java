@@ -27,7 +27,7 @@ class SubmitOrderConsumer implements Consumer<SubmitOrder> {
 
         service.doWork();
 
-        logger.info("Order id: {} (from {})", orderId, message);
+        logger.info("📨 Order id: {} (from {}) ✅", orderId, message);
 
         return context.publish(new OrderSubmitted(orderId), context.getCancellationToken());
     }
