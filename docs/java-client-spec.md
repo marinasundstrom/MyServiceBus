@@ -18,6 +18,7 @@ The ServiceBus Java client mirrors the C# design by providing an asynchronous me
 
 ### Request–Response
 - `GenericRequestClient` sends requests and awaits responses or faults using per-request temporary exchanges.
+- `ScopedClientFactory` (via `RequestClientFactory`) creates `RequestClient<T>` instances with optional destination addresses and default timeouts.
 - Consumers can reply with `respond` or signal failures with `respondFault`.
 
 ### RabbitMQ Transport
