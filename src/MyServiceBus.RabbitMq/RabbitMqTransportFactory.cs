@@ -23,14 +23,32 @@ public sealed class RabbitMqTransportFactory : ITransportFactory
         string exchange;
         bool durable = true;
         bool autoDelete = false;
-        try
+
+        if (address.Scheme.Equals("exchange", StringComparison.OrdinalIgnoreCase))
         {
-            exchange = ExtractExchange(address);
-            ParseExchangeSettings(address, ref durable, ref autoDelete);
+            var spec = address.OriginalString.Substring("exchange:".Length);
+            string? query = null;
+            var idx = spec.IndexOf('?');
+            if (idx >= 0)
+            {
+                query = spec[(idx + 1)..];
+                spec = spec[..idx];
+            }
+
+            exchange = spec;
+            ParseExchangeSettings(query, ref durable, ref autoDelete);
         }
-        catch (InvalidOperationException)
+        else
         {
-            exchange = "default";
+            try
+            {
+                exchange = ExtractExchange(address);
+                ParseExchangeSettings(address.Query.TrimStart('?'), ref durable, ref autoDelete);
+            }
+            catch (InvalidOperationException)
+            {
+                exchange = "default";
+            }
         }
 
         if (!_sendTransports.TryGetValue(exchange, out var sendTransport))
@@ -126,12 +144,12 @@ public sealed class RabbitMqTransportFactory : ITransportFactory
     }
 
     [Throws(typeof(InvalidOperationException), typeof(OverflowException), typeof(ArgumentException))]
-    private static void ParseExchangeSettings(Uri address, ref bool durable, ref bool autoDelete)
+    private static void ParseExchangeSettings(string? queryString, ref bool durable, ref bool autoDelete)
     {
-        if (string.IsNullOrEmpty(address.Query))
+        if (string.IsNullOrEmpty(queryString))
             return;
 
-        var query = address.Query.TrimStart('?').Split('&', StringSplitOptions.RemoveEmptyEntries);
+        var query = queryString.Split('&', StringSplitOptions.RemoveEmptyEntries);
         foreach (var part in query)
         {
             var kv = part.Split('=', 2, StringSplitOptions.RemoveEmptyEntries);

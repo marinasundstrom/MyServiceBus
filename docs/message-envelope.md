@@ -13,7 +13,7 @@ It is either serialized as either pure JSON or BSON before being put on the tran
 | `requestId`          | `Guid?`                      | Identifies a request to match with a later response.                            | **R**         |
 | `initiatorId`        | `Guid?`                      | ID of the message that initiated the current flow.                              | Optional      |
 | `conversationId`     | `Guid?`                      | Groups related messages into a logical conversation.                            | **Y**         |
-| `sourceAddress`      | `string (URI)`               | Logical address of the sender (e.g., `queue:orders-service`).                   | **Y**         |
+| `sourceAddress`      | `string (URI)`               | Logical address of the sender (e.g., `queue:orders-service` or `exchange:events`).                   | **Y**         |
 | `destinationAddress` | `string (URI)`               | Logical address where the message should be delivered.                          | **Y**         |
 | `responseAddress`    | `string (URI)`               | Address where a consumer should send a response (used in request/response).     | **R**         |
 | `faultAddress`       | `string (URI)`               | Address to send fault messages if processing fails.                             | Optional      |

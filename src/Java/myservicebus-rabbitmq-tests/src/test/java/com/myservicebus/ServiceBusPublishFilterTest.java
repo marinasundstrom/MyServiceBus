@@ -77,7 +77,7 @@ class ServiceBusPublishFilterTest {
             }
         });
 
-        MessageBus bus = new MessageBusImpl(services.build());
+        MessageBus bus = new MessageBusImpl(services.buildServiceProvider());
 
         bus.publish("hi");
 
