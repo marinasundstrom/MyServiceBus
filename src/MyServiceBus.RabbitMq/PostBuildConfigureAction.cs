@@ -1,3 +1,5 @@
+using Microsoft.Extensions.DependencyInjection;
+
 namespace MyServiceBus;
 
 public class PostBuildConfigureAction : IPostBuildAction
@@ -13,9 +15,15 @@ public class PostBuildConfigureAction : IPostBuildAction
         _configurator = configurator;
     }
 
+    [Throws(typeof(InvalidOperationException))]
     public void Execute(IServiceProvider provider)
     {
         var context = new BusRegistrationContext(provider);
         _configure(context, _configurator);
+        if (_configurator is RabbitMqFactoryConfigurator cfg)
+        {
+            var bus = provider.GetRequiredService<IMessageBus>();
+            cfg.Apply(bus);
+        }
     }
 }

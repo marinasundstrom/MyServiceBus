@@ -6,6 +6,7 @@ using System.Collections.Generic;
 internal sealed class RabbitMqFactoryConfigurator : IRabbitMqFactoryConfigurator
 {
     private readonly Dictionary<Type, string> _exchangeNames = new();
+    private readonly List<Action<IMessageBus>> _endpointActions = new();
     private IEndpointNameFormatter? _endpointNameFormatter;
 
     public RabbitMqFactoryConfigurator()
@@ -25,7 +26,7 @@ internal sealed class RabbitMqFactoryConfigurator : IRabbitMqFactoryConfigurator
 
     public void ReceiveEndpoint(string queueName, Action<ReceiveEndpointConfigurator> configure)
     {
-        var configurator = new ReceiveEndpointConfigurator(queueName, _exchangeNames);
+        var configurator = new ReceiveEndpointConfigurator(queueName, _exchangeNames, _endpointActions);
         configure(configurator);
     }
 
@@ -40,6 +41,12 @@ internal sealed class RabbitMqFactoryConfigurator : IRabbitMqFactoryConfigurator
     public void SetEndpointNameFormatter(IEndpointNameFormatter formatter)
     {
         _endpointNameFormatter = formatter;
+    }
+
+    internal void Apply(IMessageBus bus)
+    {
+        foreach (var action in _endpointActions)
+            action(bus);
     }
 }
 

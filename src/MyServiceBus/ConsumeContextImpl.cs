@@ -36,7 +36,7 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
         return Task.FromResult(endpoint);
     }
 
-    [Throws(typeof(UriFormatException), typeof(InvalidOperationException))]
+    [Throws(typeof(UriFormatException), typeof(InvalidOperationException), typeof(InvalidCastException))]
     public async Task PublishAsync<T>(T message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default) where T : class
     {
         await PublishAsync<T>((object)message!, contextCallback, cancellationToken);
@@ -112,6 +112,16 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
 
         await _sendPipe.Send(context);
         await transport.Send(fault, context, cancellationToken);
+    }
+
+    [Throws(typeof(InvalidCastException))]
+    public Task Forward<T>(Uri address, T message, CancellationToken cancellationToken = default) where T : class
+        => Forward<T>(address, (object)message!, cancellationToken);
+
+    public async Task Forward<T>(Uri address, object message, CancellationToken cancellationToken = default) where T : class
+    {
+        var endpoint = await GetSendEndpoint(address).ConfigureAwait(false);
+        await endpoint.Send<T>(message, null, cancellationToken).ConfigureAwait(false);
     }
 
     [Throws(typeof(InvalidOperationException))]

@@ -32,12 +32,18 @@ public final class RabbitMqBusFactory {
         RabbitMqTransport.configure(cfg);
         cfg.complete();
         services.addSingleton(MessageBus.class, sp -> () -> {
+            RabbitMqFactoryConfigurator factoryConfigurator = sp.getService(RabbitMqFactoryConfigurator.class);
             if (configure != null) {
                 BusRegistrationContext context = new BusRegistrationContext(sp);
-                RabbitMqFactoryConfigurator factoryConfigurator = sp.getService(RabbitMqFactoryConfigurator.class);
                 configure.accept(context, factoryConfigurator);
             }
-            return new MessageBusImpl(sp);
+            MessageBusImpl bus = new MessageBusImpl(sp);
+            try {
+                factoryConfigurator.applyHandlers(bus);
+            } catch (Exception ex) {
+                throw new RuntimeException("Failed to apply handlers", ex);
+            }
+            return bus;
         });
         // services.addSingleton(ReceiveEndpointConnector.class, sp -> () ->
         // sp.getService(MessageBus.class));

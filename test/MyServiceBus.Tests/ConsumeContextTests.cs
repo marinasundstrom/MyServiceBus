@@ -15,7 +15,7 @@ using Xunit.Sdk;
 public class ConsumeContextTests
 {
     [Fact]
-    [Throws(typeof(EqualException))]
+    [Throws(typeof(EqualException), typeof(ArgumentOutOfRangeException))]
     public async Task Passes_Message_Through_Pipeline()
     {
         var collected = new List<string>();
@@ -74,6 +74,25 @@ public class ConsumeContextTests
         await ctx.PublishAsync(new FakeMessage());
 
         Assert.Equal(new Uri("rabbitmq://localhost/exchange/MyServiceBus.Tests:FakeMessage"), factory.Address);
+    }
+
+    [Fact]
+    [Throws(typeof(UriFormatException), typeof(EncoderFallbackException))]
+    public async Task Forward_uses_queue_uri()
+    {
+        var json = Encoding.UTF8.GetBytes("{\"messageId\":\"00000000-0000-0000-0000-000000000000\",\"messageType\":[],\"message\":{}}");
+        var envelope = new EnvelopeMessageContext(json, new Dictionary<string, object>());
+        var receiveContext = new ReceiveContextImpl(envelope, CancellationToken.None);
+        var factory = new CapturingTransportFactory();
+
+        var ctx = new ConsumeContextImpl<FakeMessage>(receiveContext, factory,
+            new SendPipe(Pipe.Empty<SendContext>()),
+            new PublishPipe(Pipe.Empty<SendContext>()),
+            new EnvelopeMessageSerializer());
+
+        await ctx.Forward(new Uri("queue:forward-queue"), new FakeMessage());
+
+        Assert.Equal(new Uri("queue:forward-queue"), factory.Address);
     }
 
     class FakeMessage { }

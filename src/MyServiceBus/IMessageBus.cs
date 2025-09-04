@@ -27,4 +27,8 @@ public interface IMessageBus :
     Task AddConsumer<TMessage, TConsumer>(ConsumerTopology consumer, Delegate? configure = null, CancellationToken cancellationToken = default)
         where TConsumer : class, IConsumer<TMessage>
         where TMessage : class;
+
+    Task AddHandler<TMessage>(string queueName, string exchangeName, Func<ConsumeContext<TMessage>, Task> handler,
+        int? retryCount = null, TimeSpan? retryDelay = null, CancellationToken cancellationToken = default)
+        where TMessage : class;
 }

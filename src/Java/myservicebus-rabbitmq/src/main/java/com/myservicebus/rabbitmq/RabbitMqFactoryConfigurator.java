@@ -4,9 +4,11 @@ import com.myservicebus.ConsumeContext;
 import com.myservicebus.EndpointNameFormatter;
 import com.myservicebus.PipeConfigurator;
 import com.myservicebus.RetryConfigurator;
+import com.myservicebus.NamingConventions;
 import com.myservicebus.topology.ConsumerTopology;
 import com.myservicebus.topology.MessageBinding;
 import com.myservicebus.topology.TopologyRegistry;
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Consumer;
@@ -17,6 +19,7 @@ public class RabbitMqFactoryConfigurator {
     private String password = "guest";
     private final Map<Class<?>, String> exchangeNames = new HashMap<>();
     private EndpointNameFormatter endpointNameFormatter;
+    private final java.util.List<HandlerRegistration<?>> handlerRegistrations = new java.util.ArrayList<>();
 
     public void host(String host) {
         this.clientHost = host;
@@ -34,7 +37,7 @@ public class RabbitMqFactoryConfigurator {
 
     public void receiveEndpoint(String queueName, Consumer<ReceiveEndpointConfigurator> configure) {
         if (configure != null) {
-            ReceiveEndpointConfiguratorImpl cfg = new ReceiveEndpointConfiguratorImpl(queueName, exchangeNames);
+            ReceiveEndpointConfiguratorImpl cfg = new ReceiveEndpointConfiguratorImpl(queueName, exchangeNames, handlerRegistrations);
             configure.accept(cfg);
         }
     }
@@ -54,6 +57,17 @@ public class RabbitMqFactoryConfigurator {
             Class<?> consumerClass = def.getConsumerType();
             receiveEndpoint(queueName, e -> e.configureConsumer(context, consumerClass));
         }
+    }
+
+    void applyHandlers(com.myservicebus.MessageBusImpl bus) throws Exception {
+        for (HandlerRegistration<?> reg : handlerRegistrations) {
+            applyHandler(bus, reg);
+        }
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private static <T> void applyHandler(com.myservicebus.MessageBusImpl bus, HandlerRegistration<T> reg) throws Exception {
+        bus.addHandler(reg.queueName, reg.messageType, reg.exchange, reg.handler, reg.retryCount, reg.retryDelay);
     }
 
     public String getClientHost() {
@@ -90,16 +104,26 @@ public class RabbitMqFactoryConfigurator {
     private static class ReceiveEndpointConfiguratorImpl implements ReceiveEndpointConfigurator {
         private final String queueName;
         private final Map<Class<?>, String> exchangeNames;
+        private final java.util.List<HandlerRegistration<?>> handlers;
+        private Integer retryCount;
+        private Duration retryDelay;
         private java.util.function.Consumer<RetryConfigurator> retry;
 
-        ReceiveEndpointConfiguratorImpl(String queueName, Map<Class<?>, String> exchangeNames) {
+        ReceiveEndpointConfiguratorImpl(String queueName, Map<Class<?>, String> exchangeNames, java.util.List<HandlerRegistration<?>> handlers) {
             this.queueName = queueName;
             this.exchangeNames = exchangeNames;
+            this.handlers = handlers;
         }
 
         @Override
         public void useMessageRetry(java.util.function.Consumer<RetryConfigurator> configure) {
             this.retry = configure;
+            if (configure != null) {
+                RetryConfigurator rc = new RetryConfigurator();
+                configure.accept(rc);
+                this.retryCount = rc.getRetryCount();
+                this.retryDelay = rc.getDelay();
+            }
         }
 
         @Override
@@ -134,6 +158,34 @@ public class RabbitMqFactoryConfigurator {
                 throw new RuntimeException(
                         "Failed to configure consumer " + consumerClass.getSimpleName(), ex);
             }
+        }
+
+        @Override
+        public <T> void handler(Class<T> messageType, java.util.function.Function<ConsumeContext<T>, java.util.concurrent.CompletableFuture<Void>> handler) {
+            String exchange = exchangeNames.containsKey(messageType)
+                    ? exchangeNames.get(messageType)
+                    : NamingConventions.getExchangeName(messageType);
+            handlers.add(new HandlerRegistration<>(queueName, messageType, exchange, handler, retryCount, retryDelay));
+        }
+    }
+
+    private static class HandlerRegistration<T> {
+        final String queueName;
+        final Class<T> messageType;
+        final String exchange;
+        final java.util.function.Function<ConsumeContext<T>, java.util.concurrent.CompletableFuture<Void>> handler;
+        final Integer retryCount;
+        final Duration retryDelay;
+
+        HandlerRegistration(String queueName, Class<T> messageType, String exchange,
+                java.util.function.Function<ConsumeContext<T>, java.util.concurrent.CompletableFuture<Void>> handler,
+                Integer retryCount, Duration retryDelay) {
+            this.queueName = queueName;
+            this.messageType = messageType;
+            this.exchange = exchange;
+            this.handler = handler;
+            this.retryCount = retryCount;
+            this.retryDelay = retryDelay;
         }
     }
 }

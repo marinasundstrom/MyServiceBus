@@ -60,4 +60,24 @@ public class ConsumeContextTest {
                 "rabbitmq://localhost/exchange/TestApp:FakeMessage",
                 provider.uri);
     }
+
+    @Test
+    public void forwardUsesQueueUri() {
+        class CapturingProvider implements SendEndpointProvider {
+            String uri;
+
+            @Override
+            public SendEndpoint getSendEndpoint(String uri) {
+                this.uri = uri;
+                return new StubSendEndpoint();
+            }
+        }
+
+        CapturingProvider provider = new CapturingProvider();
+        ConsumeContext<FakeMessage> ctx = new ConsumeContext<>(new FakeMessage(), Map.of(), provider);
+
+        ctx.forward("queue:forward-queue", new FakeMessage(), CancellationToken.none).join();
+
+        Assertions.assertEquals("queue:forward-queue", provider.uri);
+    }
 }

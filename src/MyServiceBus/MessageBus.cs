@@ -73,6 +73,40 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
         return Task.FromResult(endpoint);
     }
 
+    [Throws(typeof(InvalidOperationException))]
+    public async Task AddHandler<TMessage>(string queueName, string exchangeName, Func<ConsumeContext<TMessage>, Task> handler,
+        int? retryCount = null, TimeSpan? retryDelay = null, CancellationToken cancellationToken = default)
+        where TMessage : class
+    {
+        var topology = new ReceiveEndpointTopology
+        {
+            QueueName = queueName,
+            ExchangeName = exchangeName,
+            RoutingKey = string.Empty,
+            ExchangeType = "fanout",
+            Durable = true,
+            AutoDelete = false
+        };
+
+        var configurator = new PipeConfigurator<ConsumeContext<TMessage>>();
+        configurator.UseFilter(new ErrorTransportFilter<TMessage>());
+        configurator.UseFilter(new HandlerFaultFilter<TMessage>(_serviceProvider));
+        if (retryCount.HasValue)
+            configurator.UseRetry(retryCount.Value, retryDelay);
+        configurator.UseFilter(new HandlerMessageFilter<TMessage>(handler));
+        var pipe = new ConsumePipe<TMessage>(configurator.Build());
+
+        [Throws(typeof(InvalidCastException))]
+        async Task TransportHandler(ReceiveContext context)
+        {
+            var consumeContext = new ConsumeContextImpl<TMessage>(context, _transportFactory, _sendPipe, _publishPipe, _messageSerializer);
+            await pipe.Send(consumeContext).ConfigureAwait(false);
+        }
+
+        var receiveTransport = await _transportFactory.CreateReceiveTransport(topology, TransportHandler, cancellationToken);
+        _activeTransports.Add(receiveTransport);
+    }
+
     [Throws(typeof(InvalidOperationException), typeof(ArgumentException))]
     public async Task AddConsumer<TMessage, TConsumer>(ConsumerTopology consumer, Delegate? configure = null, CancellationToken cancellationToken = default)
         where TConsumer : class, IConsumer<TMessage>

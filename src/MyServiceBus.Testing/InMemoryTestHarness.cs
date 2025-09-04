@@ -17,6 +17,7 @@ public class InMemoryTestHarness : IMessageBus, ITransportFactory, IReceiveEndpo
     readonly IServiceProvider? provider;
     readonly IBusTopology topology;
 
+    [Throws(typeof(UriFormatException))]
     public Uri Address { get; } = new("loopback://localhost/");
     public IBusTopology Topology => topology;
 
@@ -118,6 +119,14 @@ public class InMemoryTestHarness : IMessageBus, ITransportFactory, IReceiveEndpo
         return Task.CompletedTask;
     }
 
+    [Throws(typeof(ArgumentException))]
+    public Task AddHandler<TMessage>(string queueName, string exchangeName, Func<ConsumeContext<TMessage>, Task> handler,
+        int? retryCount = null, TimeSpan? retryDelay = null, CancellationToken cancellationToken = default) where TMessage : class
+    {
+        RegisterHandler(handler);
+        return Task.CompletedTask;
+    }
+
     public Task<ISendTransport> GetSendTransport(Uri address, CancellationToken cancellationToken = default)
         => Task.FromResult<ISendTransport>(new HarnessSendTransport(this));
 
@@ -183,12 +192,22 @@ public class InMemoryTestHarness : IMessageBus, ITransportFactory, IReceiveEndpo
         public CancellationToken CancellationToken => receiveContext.CancellationToken;
 
         public Task<ISendEndpoint> GetSendEndpoint(Uri uri) => Task.FromResult<ISendEndpoint>(new HarnessSendEndpoint(harness));
+        [Throws(typeof(ArgumentException))]
         public Task PublishAsync<TMessage>(object message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default) where TMessage : class
             => harness.PublishAsync((TMessage)message, contextCallback, cancellationToken);
+        [Throws(typeof(ArgumentException))]
         public Task PublishAsync<TMessage>(TMessage message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default) where TMessage : class
             => harness.PublishAsync(message, contextCallback, cancellationToken);
         public Task RespondAsync<TMessage>(TMessage message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default)
             => harness.PublishAsync((dynamic)message!, contextCallback, cancellationToken);
+        [Throws(typeof(InvalidCastException))]
+        public Task Forward<T>(Uri address, T message, CancellationToken cancellationToken = default) where T : class
+            => Forward<T>(address, (object)message!, cancellationToken);
+        public async Task Forward<T>(Uri address, object message, CancellationToken cancellationToken = default) where T : class
+        {
+            var endpoint = await GetSendEndpoint(address).ConfigureAwait(false);
+            await endpoint.Send<T>(message, null, cancellationToken).ConfigureAwait(false);
+        }
     }
 
     class HarnessSendEndpoint : ISendEndpoint

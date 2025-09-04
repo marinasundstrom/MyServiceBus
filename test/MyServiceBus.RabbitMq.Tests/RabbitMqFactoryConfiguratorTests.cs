@@ -35,6 +35,8 @@ public class RabbitMqFactoryConfiguratorTests
             where TConsumer : class, IConsumer<TMessage>
             where TMessage : class => Task.CompletedTask;
 
+        public Task AddHandler<TMessage>(string queueName, string exchangeName, Func<ConsumeContext<TMessage>, Task> handler, int? retryCount = null, TimeSpan? retryDelay = null, CancellationToken cancellationToken = default) where TMessage : class => Task.CompletedTask;
+
         class StubSendEndpoint : ISendEndpoint
         {
             public Task Send<T>(T message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default) => Task.CompletedTask;
@@ -61,7 +63,7 @@ public class RabbitMqFactoryConfiguratorTests
 
         public void ReceiveEndpoint(string queueName, Action<ReceiveEndpointConfigurator> configure)
         {
-            configure(new ReceiveEndpointConfigurator(queueName, _exchangeNames));
+            configure(new ReceiveEndpointConfigurator(queueName, _exchangeNames, new List<Action<IMessageBus>>()));
         }
 
         public void Host(string host, Action<IRabbitMqHostConfigurator>? configure = null)

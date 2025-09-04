@@ -49,13 +49,15 @@ public class ReceiveEndpointConfigurator
 {
     private readonly string _queueName;
     private readonly IDictionary<Type, string> _exchangeNames;
+    private readonly IList<Action<IMessageBus>> _endpointActions;
     private int? _retryCount;
     private TimeSpan? _retryDelay;
 
-    public ReceiveEndpointConfigurator(string queueName, IDictionary<Type, string> exchangeNames)
+    public ReceiveEndpointConfigurator(string queueName, IDictionary<Type, string> exchangeNames, IList<Action<IMessageBus>> endpointActions)
     {
         _queueName = queueName;
         _exchangeNames = exchangeNames;
+        _endpointActions = endpointActions;
     }
 
     public void UseMessageRetry(Action<RetryConfigurator> configure)
@@ -118,6 +120,16 @@ public class ReceiveEndpointConfigurator
         {
             throw new InvalidOperationException($"Failed to configure consumer {consumerType.Name}", ex);
         }
+    }
+
+    [Throws(typeof(NotSupportedException))]
+    public void Handler<T>(Func<ConsumeContext<T>, Task> handler)
+        where T : class
+    {
+        var exchangeName = _exchangeNames.TryGetValue(typeof(T), out var entity)
+            ? entity
+            : NamingConventions.GetExchangeName(typeof(T))!;
+        _endpointActions.Add([Throws(typeof(NullReferenceException))] (bus) => bus.AddHandler(_queueName, exchangeName, handler, _retryCount, _retryDelay, CancellationToken.None).GetAwaiter().GetResult());
     }
 
     static Delegate ApplyRetry<T>(int retryCount, TimeSpan? delay)
