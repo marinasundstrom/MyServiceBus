@@ -7,8 +7,8 @@ import com.myservicebus.di.ServiceCollection;
 public class MediatorTransport {
     public static void configure(BusRegistrationConfigurator x) {
         ServiceCollection services = x.getServiceCollection();
-        services.addSingleton(MediatorSendEndpointProvider.class, sp -> () -> new MediatorSendEndpointProvider(sp));
-        services.addSingleton(TransportSendEndpointProvider.class,
+        services.addScoped(MediatorSendEndpointProvider.class, sp -> () -> new MediatorSendEndpointProvider(sp));
+        services.addScoped(TransportSendEndpointProvider.class,
                 sp -> () -> sp.getService(MediatorSendEndpointProvider.class));
     }
 }
