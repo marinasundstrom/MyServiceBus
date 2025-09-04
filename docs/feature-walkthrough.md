@@ -3,6 +3,23 @@
 This guide compares basic usage of MyServiceBus in C# and Java. It is split into basics and advanced sections so newcomers can focus on fundamental messaging patterns before exploring configuration and other features.
 
 For an explanation of why the C# and Java examples differ, see the [design decisions](design-decisions.md).
+## Contents
+
+- [Basics](#basics)
+  - [Setup](#setup)
+  - [Publishing](#publishing)
+  - [Sending](#sending)
+  - [Consuming Messages](#consuming-messages)
+  - [Request/Response](#requestresponse)
+  - [Adding Headers](#adding-headers)
+  - [Mediator (In-Memory Transport)](#mediator-in-memory-transport)
+- [Advanced](#advanced)
+  - [Configuration](#configuration)
+  - [Dependency Injection](#dependency-injection)
+  - [Logging](#logging)
+  - [Filters](#filters)
+  - [Unit Testing with the In-Memory Test Harness](#unit-testing-with-the-in-memory-test-harness)
+
 ## Basics
 
 ### Setup
@@ -646,3 +663,8 @@ harness.stop().join();
 ```
 
 The harness is registered for `IMessageBus` and `ITransportFactory`, so existing abstractions like `IRequestClient<T>` resolve from the container without special test hooks.
+
+## Next Steps
+
+- Read the [design goals](design-goals.md) for MyServiceBus.
+- Explore the [design guidelines](design-guidelines.md) for architectural patterns and feature parity.
