@@ -124,11 +124,8 @@ bus.publish(new SubmitOrder(UUID.randomUUID()), ctx -> ctx.getHeaders().put("tra
 ## Repository structure
 - `src/` – C# and Java source code
 - `test/` – Test projects
-- `docs/` – Additional documentation and design goals
+- `docs/` – Additional documentation and design goals, including [emoji usage](docs/emoji-usage.md) guidelines
 - `docker-compose.yml` – Docker configuration for local infrastructure
-
-## Emoji usage
-Emojis appear throughout the documentation to mark noteworthy events and results. They're not limited to logging—you might find them in comments within sample snippets or other docs to highlight outcomes (e.g., 🎉 for an event, ✅ for success).
 
 ## Contributing
 Contributions are welcome! Please run `dotnet test` before submitting a pull request and follow the coding conventions described in `AGENTS.md`.

@@ -3,9 +3,6 @@
 This guide compares basic usage of MyServiceBus in C# and Java. It is split into basics and advanced sections so newcomers can focus on fundamental messaging patterns before exploring configuration and other features.
 
 For an explanation of why the C# and Java examples differ, see the [design decisions](design-decisions.md).
-
-Emojis like 🎉 and ✅ highlight events and results throughout this walkthrough.
-
 ## Basics
 
 ### Setup
