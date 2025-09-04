@@ -19,7 +19,8 @@ class TestRequestConsumer implements Consumer<TestRequest> {
     public CompletableFuture<Void> consume(ConsumeContext<TestRequest> context) throws Exception {
         var message = context.getMessage();
 
-        logger.info("Request: {}", message);
+        logger.info("📨 Request: {}", message);
+        logger.warn("⚠️ Throwing IllegalStateException");
 
         var response = new TestResponse(message + " 42");
 

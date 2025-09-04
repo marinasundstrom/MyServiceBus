@@ -18,6 +18,18 @@ Reference - for compatibility with MassTransit
 
 * `TestApp_MassTransit` - a project using MassTransit, for reference
 
+## Logging Emojis
+
+The sample applications use emojis to highlight message flow and results:
+
+- 🚀 start
+- 📤 outgoing message
+- 📨 incoming message
+- ✅ success
+- ❌ failure
+- ⚠️ warning or handled error
+- ℹ️ informational note
+
 ## RabbitMQ
 
 ```

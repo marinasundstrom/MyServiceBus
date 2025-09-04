@@ -1,6 +1,7 @@
 using MassTransit;
 using TestApp;
 using System.Linq;
+using Microsoft.Extensions.Logging;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -45,6 +46,9 @@ builder.Services.AddOpenApi();
 
 var app = builder.Build();
 
+var logger = app.Logger;
+logger.LogInformation("🚀 Starting TestApp_MassTransit");
+
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
@@ -82,18 +86,37 @@ app.MapGet("/weatherforecast", () =>
 })
 .WithName("GetWeatherForecast");
 
-app.MapGet("/publish", async (IPublishEndpoint publishEndpoint, CancellationToken cancellationToken = default) =>
+app.MapGet("/publish", [Throws(typeof(Exception))] async (IPublishEndpoint publishEndpoint, ILogger<Program> logger, CancellationToken cancellationToken = default) =>
 {
     var message = new SubmitOrder() { OrderId = Guid.NewGuid(), Message = "MT" };
-    await publishEndpoint.Publish(message, cancellationToken);
+    try
+    {
+        await publishEndpoint.Publish(message, cancellationToken);
+        logger.LogInformation("📤 Published SubmitOrder {OrderId} ✅", message.OrderId);
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "❌ Failed to publish SubmitOrder {OrderId}", message.OrderId);
+        throw;
+    }
 })
 .WithName("Test_Publish")
 .WithTags("Test");
 
-app.MapGet("/send", async (ISendEndpointProvider sendEndpointProvider, CancellationToken cancellationToken = default) =>
+app.MapGet("/send", [Throws(typeof(UriFormatException))] async (ISendEndpointProvider sendEndpointProvider, ILogger<Program> logger, CancellationToken cancellationToken = default) =>
 {
-    var sendEndpoint = await sendEndpointProvider.GetSendEndpoint(new Uri("rabbitmq://localhost/submit-order-queue"));
-    await sendEndpoint.Send(new SubmitOrder { OrderId = Guid.NewGuid(), Message = "MT" }, cancellationToken);
+    try
+    {
+        var sendEndpoint = await sendEndpointProvider.GetSendEndpoint(new Uri("rabbitmq://localhost/submit-order-queue"));
+        var message = new SubmitOrder { OrderId = Guid.NewGuid(), Message = "MT" };
+        await sendEndpoint.Send(message, cancellationToken);
+        logger.LogInformation("📤 Sent SubmitOrder {OrderId} ✅", message.OrderId);
+    }
+    catch (UriFormatException ex)
+    {
+        logger.LogError(ex, "❌ Failed to send SubmitOrder");
+        throw;
+    }
 })
 .WithName("Test_Send")
 .WithTags("Test");
