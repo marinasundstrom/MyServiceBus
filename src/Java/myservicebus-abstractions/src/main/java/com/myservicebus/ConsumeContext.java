@@ -92,6 +92,15 @@ public class ConsumeContext<T>
         return endpoint.send(context);
     }
 
+    public <TMessage> CompletableFuture<Void> forward(String destination, TMessage message, CancellationToken cancellationToken) {
+        SendEndpoint endpoint = getSendEndpoint(destination);
+        return endpoint.send(message, cancellationToken);
+    }
+
+    public <TMessage> CompletableFuture<Void> forward(String destination, TMessage message) {
+        return forward(destination, message, CancellationToken.none);
+    }
+
     public CompletableFuture<Void> respondFault(Exception exception, CancellationToken cancellationToken) {
         String address = faultAddress != null ? faultAddress : responseAddress;
         if (address == null) {

@@ -113,6 +113,47 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
         receiveTransports.add(transport);
     }
 
+    public <T> void addHandler(String queueName, Class<T> messageType, String exchange,
+            java.util.function.Function<ConsumeContext<T>, CompletableFuture<Void>> handler,
+            Integer retryCount, java.time.Duration retryDelay) throws Exception {
+        PipeConfigurator<ConsumeContext<T>> configurator = new PipeConfigurator<>();
+        @SuppressWarnings({ "unchecked", "rawtypes" })
+        Filter<ConsumeContext<T>> errorFilter = new ErrorTransportFilter();
+        configurator.useFilter(errorFilter);
+        @SuppressWarnings({ "unchecked", "rawtypes" })
+        Filter<ConsumeContext<T>> faultFilter = new HandlerFaultFilter(serviceProvider);
+        configurator.useFilter(faultFilter);
+        if (retryCount != null) {
+            configurator.useRetry(retryCount, retryDelay);
+        }
+        configurator.useFilter(new HandlerMessageFilter<>(handler));
+        Pipe<ConsumeContext<T>> pipe = configurator.build();
+
+        java.util.function.Function<byte[], CompletableFuture<Void>> transportHandler = body -> {
+            try {
+                Envelope<?> envelope = messageDeserializer.deserialize(body, messageType);
+                String faultAddress = envelope.getFaultAddress() != null ? envelope.getFaultAddress()
+                        : transportFactory.getPublishAddress(queueName + "_error");
+                ConsumeContext<T> ctx = new ConsumeContext<>((T) envelope.getMessage(), envelope.getHeaders(),
+                        envelope.getResponseAddress(), faultAddress, CancellationToken.none, transportSendEndpointProvider);
+                return pipe.send(ctx);
+            } catch (Exception e) {
+                CompletableFuture<Void> f = new CompletableFuture<>();
+                f.completeExceptionally(e);
+                return f;
+            }
+        };
+
+        java.util.List<MessageBinding> bindings = new java.util.ArrayList<>();
+        MessageBinding binding = new MessageBinding();
+        binding.setMessageType(messageType);
+        binding.setEntityName(exchange);
+        bindings.add(binding);
+
+        ReceiveTransport transport = transportFactory.createReceiveTransport(queueName, bindings, transportHandler);
+        receiveTransports.add(transport);
+    }
+
     public void stop() throws Exception {
         for (ReceiveTransport transport : receiveTransports) {
             transport.stop();
