@@ -143,7 +143,7 @@ app.MapGet("/request", async Task<Results<Ok<string>, InternalServerError<string
     }
     catch (RequestFaultException requestFaultException)
     {
-        logger.LogError(requestFaultException, "❌ Request fault");
+        logger.LogWarning(requestFaultException, "⚠️ Fault: {Message}", requestFaultException.Message);
         return TypedResults.InternalServerError(requestFaultException.Message);
     }
 })
