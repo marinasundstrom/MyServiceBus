@@ -5,7 +5,7 @@ MyServiceBus (a working title) is a lightweight asynchronous messaging library i
 ## Goals
 - Provide a community-driven, open-source alternative to MassTransit and MediatR as they move toward commercial licensing.
 - Offer a familiar API for developers coming from MassTransit.
-- Maintain feature parity between the C# and Java clients with consistent behavior across languages.
+- Maintain feature parity between the C# and Java clients with consistent behavior across languages. See the [design guidelines](docs/design-guidelines.md) for architectural and feature parity.
 
 ## Features
 - Fire-and-forget message sending
