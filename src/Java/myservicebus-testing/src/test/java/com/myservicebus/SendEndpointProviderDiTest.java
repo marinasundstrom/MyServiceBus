@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 
 import com.myservicebus.di.ServiceCollection;
 import com.myservicebus.di.ServiceProvider;
+import com.myservicebus.di.ServiceScope;
 
 class SendEndpointProviderDiTest {
     @Test

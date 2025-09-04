@@ -114,7 +114,7 @@ app.MapGet("/publish", [Throws(typeof(Exception))] async (IMessageBus messageBus
 .WithName("Test_Publish")
 .WithTags("Test");
 
-app.MapGet("/send", [Throws(typeof(UriFormatException))] async (ISendEndpointProvider sendEndpointProvider, ILogger<Program> logger, CancellationToken cancellationToken = default) =>
+app.MapGet("/send", [Throws(typeof(Exception))] async (ISendEndpointProvider sendEndpointProvider, ILogger<Program> logger, CancellationToken cancellationToken = default) =>
 {
     var sendEndpoint = await sendEndpointProvider.GetSendEndpoint(new Uri("rabbitmq://localhost/submit-order-queue"));
     var message = new SubmitOrder { OrderId = Guid.NewGuid(), Message = "MT Clone C#" };
@@ -132,7 +132,7 @@ app.MapGet("/send", [Throws(typeof(UriFormatException))] async (ISendEndpointPro
 .WithName("Test_Send")
 .WithTags("Test");
 
-app.MapGet("/request", async Task<Results<Ok<string>, InternalServerError>> (IRequestClient<TestRequest> client, ILogger<Program> logger, CancellationToken cancellationToken = default) =>
+app.MapGet("/request", async Task<Results<Ok<string>, InternalServerError<string>>> (IRequestClient<TestRequest> client, ILogger<Program> logger, CancellationToken cancellationToken = default) =>
 {
     try
     {
@@ -156,12 +156,12 @@ app.MapGet("/request_multi", [Throws(typeof(RequestFaultException))] async Task<
     var message = new TestRequest() { Message = "Foo" };
     var response = await client.GetResponseAsync<TestResponse, Fault<TestRequest>>(message, null, cancellationToken);
 
-    if (response.Is(out Response<TestResponse> status))
+    if (response.Is(out Response<TestResponse>? status))
     {
         logger.LogInformation("📨 Received response {Response} ✅", status.Message.Message);
         return TypedResults.Ok(status.Message.Message);
     }
-    else if (response.Is(out Response<Fault<TestRequest>> fault))
+    else if (response.Is(out Response<Fault<TestRequest>>? fault))
     {
         logger.LogError("❌ Fault received: {Message}", fault.Message.Exceptions[0].Message);
         return TypedResults.InternalServerError(fault.Message.Exceptions[0].Message);

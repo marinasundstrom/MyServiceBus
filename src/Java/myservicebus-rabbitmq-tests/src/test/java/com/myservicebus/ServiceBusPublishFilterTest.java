@@ -22,9 +22,15 @@ class ServiceBusPublishFilterTest {
         AtomicBoolean publishCalled = new AtomicBoolean(false);
 
         PipeConfigurator<SendContext> sendCfg = new PipeConfigurator<>();
-        sendCfg.useExecute(ctx -> { sendCalled.set(true); return CompletableFuture.completedFuture(null); });
+        sendCfg.useExecute(ctx -> {
+            sendCalled.set(true);
+            return CompletableFuture.completedFuture(null);
+        });
         PipeConfigurator<SendContext> publishCfg = new PipeConfigurator<>();
-        publishCfg.useExecute(ctx -> { publishCalled.set(true); return CompletableFuture.completedFuture(null); });
+        publishCfg.useExecute(ctx -> {
+            publishCalled.set(true);
+            return CompletableFuture.completedFuture(null);
+        });
 
         ServiceCollection services = new ServiceCollection();
         services.addSingleton(SendPipe.class, sp -> () -> new SendPipe(sendCfg.build()));
@@ -50,7 +56,8 @@ class ServiceBusPublishFilterTest {
         services.addSingleton(TransportFactory.class, sp -> () -> new TransportFactory() {
             @Override
             public SendTransport getSendTransport(URI address) {
-                return data -> {};
+                return data -> {
+                };
             }
 
             @Override
@@ -70,7 +77,7 @@ class ServiceBusPublishFilterTest {
             }
         });
 
-        MessageBus bus = new MessageBus(services.build());
+        MessageBus bus = new MessageBusImpl(services.build());
 
         bus.publish("hi");
 

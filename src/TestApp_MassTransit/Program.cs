@@ -103,7 +103,7 @@ app.MapGet("/publish", [Throws(typeof(Exception))] async (IPublishEndpoint publi
 .WithName("Test_Publish")
 .WithTags("Test");
 
-app.MapGet("/send", [Throws(typeof(UriFormatException))] async (ISendEndpointProvider sendEndpointProvider, ILogger<Program> logger, CancellationToken cancellationToken = default) =>
+app.MapGet("/send", [Throws(typeof(Exception))] async (ISendEndpointProvider sendEndpointProvider, ILogger<Program> logger, CancellationToken cancellationToken = default) =>
 {
     try
     {

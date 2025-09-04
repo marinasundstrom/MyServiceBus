@@ -3,6 +3,7 @@ package com.myservicebus.rabbitmq;
 import com.myservicebus.BusRegistrationConfigurator;
 import com.myservicebus.BusRegistrationConfiguratorImpl;
 import com.myservicebus.MessageBus;
+import com.myservicebus.MessageBusImpl;
 import com.myservicebus.SendEndpoint;
 import com.myservicebus.PublishEndpoint;
 import com.myservicebus.di.ServiceCollection;
@@ -37,7 +38,7 @@ public final class RabbitMqBusFactory {
                 RabbitMqFactoryConfigurator factoryConfigurator = sp.getService(RabbitMqFactoryConfigurator.class);
                 configure.accept(context, factoryConfigurator);
             }
-            return new MessageBus(sp);
+            return new MessageBusImpl(sp);
         });
         services.addSingleton(SendEndpoint.class, sp -> () -> sp.getService(MessageBus.class));
         services.addScoped(PublishEndpoint.class, sp -> () -> sp.getService(MessageBus.class));
