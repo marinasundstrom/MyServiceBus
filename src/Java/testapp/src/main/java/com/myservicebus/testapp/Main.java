@@ -9,7 +9,7 @@ import com.myservicebus.ExceptionInfo;
 import com.myservicebus.Fault;
 import com.myservicebus.MyService;
 import com.myservicebus.MyServiceImpl;
-import com.myservicebus.RequestClientFactory;
+import com.myservicebus.ScopedClientFactory;
 import com.myservicebus.Response;
 import com.myservicebus.SendEndpointProvider;
 import com.myservicebus.MessageBus;
@@ -88,7 +88,7 @@ public class Main {
         app.get("/request", ctx -> {
             try (ServiceScope scope = provider.createScope()) {
                 var scopedSp = scope.getServiceProvider();
-                var requestClientFactory = scopedSp.getService(RequestClientFactory.class);
+                var requestClientFactory = scopedSp.getService(ScopedClientFactory.class);
                 var requestClient = requestClientFactory.create(TestRequest.class);
                 try {
                     var response = requestClient
@@ -106,7 +106,7 @@ public class Main {
         app.get("/request_multi", ctx -> {
             try (ServiceScope scope = provider.createScope()) {
                 var scopedSp = scope.getServiceProvider();
-                var requestClientFactory = scopedSp.getService(RequestClientFactory.class);
+                var requestClientFactory = scopedSp.getService(ScopedClientFactory.class);
                 var requestClient = requestClientFactory.create(TestRequest.class);
                 try {
                     var response = requestClient
