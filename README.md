@@ -95,11 +95,8 @@ RabbitMqBusFactory.configure(services, x -> {
 });
 
 ServiceProvider provider = services.buildServiceProvider();
-try (ServiceScope scope = provider.createScope()) {
-    ServiceProvider sp = scope.getServiceProvider();
-    ServiceBus bus = sp.getService(ServiceBus.class);
-    bus.start().join();
-}
+ServiceBus bus = provider.getService(ServiceBus.class);
+bus.start().join();
 ```
 
 Define the messages and consumer:

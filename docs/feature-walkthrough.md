@@ -65,12 +65,9 @@ RabbitMqBusFactory.configure(services, x -> {
     cfg.configureEndpoints(context);
 });
 
-ServiceProvider provider = services.buildServiceProvider();
-try (ServiceScope scope = provider.createScope()) {
-    ServiceProvider sp = scope.getServiceProvider();
-    ServiceBus bus = sp.getService(ServiceBus.class);
-    bus.start().join();
-}
+ServiceProvider serviceProvider = services.buildServiceProvider();
+ServiceBus bus = serviceProvider.getService(ServiceBus.class);
+bus.start().join();
 ```
 
 
@@ -92,6 +89,7 @@ await bus.Publish(new SubmitOrder { OrderId = Guid.NewGuid() });
 #### Java
 
 ```java
+ServiceBus bus = serviceProvider.getService(ServiceBus.class);
 bus.publish(new SubmitOrder(UUID.randomUUID())); // 🚀 publish event
 ```
 
@@ -242,6 +240,7 @@ Response<OrderStatus> response = await client.GetResponseAsync<OrderStatus>(
 #### Java
 
 ```java
+ServiceBus bus = serviceProvider.getService(ServiceBus.class);
 bus.publish(new SubmitOrder(UUID.randomUUID()), ctx -> ctx.getHeaders().put("trace-id", UUID.randomUUID()));
 
 RequestClientFactory factory = serviceProvider.getService(RequestClientFactory.class);
