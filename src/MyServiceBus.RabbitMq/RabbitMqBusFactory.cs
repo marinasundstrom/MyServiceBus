@@ -28,5 +28,6 @@ public static class RabbitMqBusFactory
 
         services.AddHostedService<ServiceBusHostedService>();
         services.AddScoped(typeof(IRequestClient<>), typeof(GenericRequestClient<>));
+        services.AddScoped<IScopedClientFactory, RequestClientFactory>();
     }
 }

@@ -13,5 +13,6 @@ from a service scope to flow headers and cancellation tokens. This mirrors MassT
 | `IPublishEndpointProvider` | Scoped | `PublishEndpointProvider` (`src/MyServiceBus/PublishEndpointProvider.cs`) | `PublishEndpointProviderImpl` (`src/Java/myservicebus/src/main/java/com/myservicebus/PublishEndpointProviderImpl.java`) | Resolves the active publish endpoint |
 | `ISendEndpointProvider` | Scoped | `SendEndpointProvider` (`src/MyServiceBus/SendEndpointProvider.cs`) | `SendEndpointProviderImpl` (`src/Java/myservicebus/src/main/java/com/myservicebus/SendEndpointProviderImpl.java`) | Resolves send endpoints by URI |
 | `IRequestClient<T>` | Scoped | `GenericRequestClient` (`src/MyServiceBus/GenericRequestClient.cs`) | `GenericRequestClient` (`src/Java/myservicebus/src/main/java/com/myservicebus/GenericRequestClient.java`) via `GenericRequestClientFactory` | Request/response helper |
+| `IScopedClientFactory` | Scoped | `RequestClientFactory` (`src/MyServiceBus/RequestClientFactory.cs`) | `GenericRequestClientFactory` (`src/Java/myservicebus/src/main/java/com/myservicebus/GenericRequestClientFactory.java`) | Creates request clients |
 
-The Java client registers a scoped `RequestClientFactory` that creates transient `GenericRequestClient` instances.
+Both clients register scoped request client factories (`IScopedClientFactory` in C# and `RequestClientFactory` in Java) that create transient `GenericRequestClient` instances.

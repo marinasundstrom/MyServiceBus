@@ -24,7 +24,7 @@ public class InMemoryHarnessDiTests
     }
 
     [Fact]
-    [Throws(typeof(InvalidOperationException), typeof(ArgumentException))]
+    [Throws(typeof(InvalidOperationException), typeof(ArgumentException), typeof(TrueException))]
     public async Task Should_resolve_consumer_from_di()
     {
         var services = new ServiceCollection();
@@ -61,6 +61,32 @@ public class InMemoryHarnessDiTests
         await harness.Start();
 
         var client = provider.GetRequiredService<IRequestClient<CheckOrder>>();
+        var orderId = Guid.NewGuid();
+        var response = await client.GetResponseAsync<OrderStatus>(new CheckOrder(orderId));
+
+        Assert.Equal(orderId, response.Message.OrderId);
+
+        await harness.Stop();
+    }
+
+    [Fact]
+    [Throws(typeof(InvalidOperationException), typeof(RequestFaultException), typeof(UriFormatException))]
+    public async Task Should_create_request_client_from_factory()
+    {
+        var services = new ServiceCollection();
+        services.AddServiceBusTestHarness(x =>
+        {
+            x.AddConsumer<CheckOrderConsumer>();
+        });
+
+        var provider = services.BuildServiceProvider();
+        var harness = provider.GetRequiredService<InMemoryTestHarness>();
+
+        await harness.Start();
+
+        var factory = provider.GetRequiredService<IScopedClientFactory>();
+        var address = new Uri($"rabbitmq://localhost/exchange/{NamingConventions.GetExchangeName(typeof(CheckOrder))}");
+        var client = factory.CreateRequestClient<CheckOrder>(address);
         var orderId = Guid.NewGuid();
         var response = await client.GetResponseAsync<OrderStatus>(new CheckOrder(orderId));
 
