@@ -3,6 +3,7 @@ using MyServiceBus.Topology;
 using MyServiceBus.Serialization;
 using System;
 using System.Reflection;
+using System.Linq;
 
 namespace MyServiceBus;
 
@@ -47,6 +48,28 @@ public class BusRegistrationConfigurator : IBusRegistrationConfigurator
             queueName: KebabCaseEndpointNameFormatter.Instance.Format(typeof(TMessage)),
             configurePipe: configure,
             messageTypes: typeof(TMessage));
+    }
+
+    [Throws(typeof(InvalidOperationException), typeof(TargetInvocationException))]
+    public void AddConsumers(params Assembly[] assemblies)
+    {
+        var consumerTypes = assemblies
+            .SelectMany(a => a.GetTypes())
+            .Where(t => typeof(IConsumer).IsAssignableFrom(t)
+                        && t.IsClass
+                        && !t.IsAbstract
+                        && !t.ContainsGenericParameters);
+
+        var method = GetType().GetMethods()
+            .First(m => m.Name == nameof(AddConsumer)
+                        && m.GetGenericArguments().Length == 1
+                        && m.GetParameters().Length == 0);
+
+        foreach (var type in consumerTypes)
+        {
+            var generic = method.MakeGenericMethod(type);
+            generic.Invoke(this, null);
+        }
     }
 
     public void ConfigureSend(Action<PipeConfigurator<SendContext>> configure)
