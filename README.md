@@ -10,7 +10,7 @@ MyServiceBus (a working title) is a lightweight asynchronous messaging library i
 ## Features
 - Fire-and-forget message sending
 - Publish/subscribe pattern
-- Request/response pattern (`RequestClient`)
+- Request/response pattern (`RequestClient` and scoped client factory)
 - RabbitMQ transport
 - In-memory mediator
 - Compatibility with MassTransit message envelopes
