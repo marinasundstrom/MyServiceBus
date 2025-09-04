@@ -56,7 +56,7 @@ class RequestClientFaultTest {
         ServiceProvider provider = services.buildServiceProvider();
         try (ServiceScope scope = provider.createScope()) {
             ServiceProvider scoped = scope.getServiceProvider();
-            RequestClientFactory factory = scoped.getService(RequestClientFactory.class);
+            ScopedClientFactory factory = scoped.getService(ScopedClientFactory.class);
             RequestClient<Ping> client = factory.create(Ping.class);
 
             CompletableFuture<Pong> response = client.getResponse(new Ping("hi"), Pong.class);

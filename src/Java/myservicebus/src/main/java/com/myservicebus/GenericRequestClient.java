@@ -1,5 +1,6 @@
 package com.myservicebus;
 
+import java.net.URI;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -8,10 +9,19 @@ import java.util.concurrent.CompletableFuture;
 public class GenericRequestClient<TRequest> implements RequestClient<TRequest> {
     private final Class<TRequest> requestType;
     private final RequestClientTransport transport;
+    private final URI destinationAddress;
+    private final RequestTimeout timeout;
 
     public GenericRequestClient(Class<TRequest> requestType, RequestClientTransport transport) {
+        this(requestType, transport, null, RequestTimeout.DEFAULT);
+    }
+
+    public GenericRequestClient(Class<TRequest> requestType, RequestClientTransport transport, URI destinationAddress,
+            RequestTimeout timeout) {
         this.requestType = requestType;
         this.transport = transport;
+        this.destinationAddress = destinationAddress;
+        this.timeout = timeout == null ? RequestTimeout.DEFAULT : timeout;
     }
 
     @Override
