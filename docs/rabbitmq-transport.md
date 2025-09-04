@@ -32,7 +32,7 @@ public class RetrySubmitOrderConsumer : IConsumer<SubmitOrder>
 {
     public async Task Consume(ConsumeContext<SubmitOrder> context)
     {
-        var endpoint = context.GetSendEndpoint(new Uri("rabbitmq://localhost/submit-order-queue"));
+        var endpoint = context.GetSendEndpoint(new Uri("rabbitmq://localhost/orders-queue"));
         await endpoint.Send(context.Message);
     }
 }
@@ -49,7 +49,7 @@ cfg.ReceiveEndpoint("submit-order-queue_error", e =>
 class RetrySubmitOrderConsumer implements Consumer<SubmitOrder> {
     @Override
     public CompletableFuture<Void> consume(ConsumeContext<SubmitOrder> ctx) {
-        SendEndpoint endpoint = ctx.getSendEndpoint("rabbitmq://localhost/submit-order-queue");
+        SendEndpoint endpoint = ctx.getSendEndpoint("rabbitmq://localhost/orders-queue");
         return endpoint.send(ctx.getMessage());
     }
 }

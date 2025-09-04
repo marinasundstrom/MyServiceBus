@@ -107,7 +107,7 @@ app.MapGet("/send", [Throws(typeof(Exception))] async (ISendEndpointProvider sen
 {
     try
     {
-        var sendEndpoint = await sendEndpointProvider.GetSendEndpoint(new Uri("rabbitmq://localhost/submit-order-queue"));
+        var sendEndpoint = await sendEndpointProvider.GetSendEndpoint(new Uri("rabbitmq://localhost/orders-queue"));
         var message = new SubmitOrder { OrderId = Guid.NewGuid(), Message = "MT" };
         await sendEndpoint.Send(message, cancellationToken);
         logger.LogInformation("📤 Sent SubmitOrder {OrderId} ✅", message.OrderId);

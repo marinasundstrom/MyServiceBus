@@ -116,7 +116,7 @@ app.MapGet("/publish", [Throws(typeof(Exception))] async (IMessageBus messageBus
 
 app.MapGet("/send", [Throws(typeof(Exception))] async (ISendEndpointProvider sendEndpointProvider, ILogger<Program> logger, CancellationToken cancellationToken = default) =>
 {
-    var sendEndpoint = await sendEndpointProvider.GetSendEndpoint(new Uri("rabbitmq://localhost/submit-order-queue"));
+    var sendEndpoint = await sendEndpointProvider.GetSendEndpoint(new Uri("rabbitmq://localhost/orders-queue"));
     var message = new SubmitOrder { OrderId = Guid.NewGuid(), Message = "MT Clone C#" };
     try
     {

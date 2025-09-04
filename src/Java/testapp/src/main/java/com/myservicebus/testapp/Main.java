@@ -72,7 +72,7 @@ public class Main {
             try (ServiceScope scope = provider.createScope()) {
                 var scopedSp = scope.getServiceProvider();
                 var sendEndpointProvider = scopedSp.getService(SendEndpointProvider.class);
-                var sendEndpoint = sendEndpointProvider.getSendEndpoint("rabbitmq://localhost/submit-order-queue");
+                var sendEndpoint = sendEndpointProvider.getSendEndpoint("rabbitmq://localhost/orders-queue");
                 SubmitOrder message = new SubmitOrder(UUID.randomUUID(), "MT Clone Java");
                 try {
                     sendEndpoint.send(message, CancellationToken.none).join();
