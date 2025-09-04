@@ -120,6 +120,7 @@ public class ReceiveEndpointConfigurator
     }
 
     static Delegate ApplyRetry<T>(int retryCount, TimeSpan? delay)
+        where T : class
     {
         void Configure(PipeConfigurator<ConsumeContext<T>> pipe) => pipe.UseRetry(retryCount, delay);
         return (Action<PipeConfigurator<ConsumeContext<T>>>)Configure;

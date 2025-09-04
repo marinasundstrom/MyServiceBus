@@ -296,6 +296,24 @@ builder.Services.AddServiceBus(x =>
 });
 ```
 
+To use compatibility handler interfaces that provide a MassTransit-style
+`Handle` method, derive from the `Handler<T>` base class (or implement
+`IHandler<T>`/`IHandler<T,TResult>`):
+
+```csharp
+public class SubmitOrderHandler : Handler<SubmitOrder>
+{
+    public override Task Handle(SubmitOrder message, CancellationToken cancellationToken = default)
+        => Console.Out.WriteLineAsync($"Processing {message.OrderId}");
+}
+
+builder.Services.AddServiceBus(x =>
+{
+    x.AddConsumer<SubmitOrderHandler>(); // uses compatibility handler
+    x.UsingMediator();
+});
+```
+
 #### Java
 
 ```java
