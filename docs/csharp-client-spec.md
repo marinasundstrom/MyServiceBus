@@ -7,6 +7,7 @@ The ServiceBus C# client provides a lightweight messaging abstraction for buildi
 
 ### Message Sending
 - `ConsumeContext` supplies `GetSendEndpoint` to send messages to arbitrary addresses.
+- `ConsumeContext` offers `Forward` to redirect a consumed message to another address.
 - `SendContext` captures headers, correlation and response addresses, and serializes messages into the ServiceBus envelope format.
 - Messages automatically include a `content_type` header with value `application/vnd.masstransit+json`. When a consumed message lacks this header, the client assumes the envelope content type.
 
@@ -27,6 +28,9 @@ The ServiceBus C# client provides a lightweight messaging abstraction for buildi
 
 ### Error Handling and Faults
 - When consumers encounter exceptions, `Fault<T>` messages describe the failure and are dispatched to the configured fault address.
+
+### Receive Endpoint Handlers
+- `ReceiveEndpoint` can register inline handlers via `Handler<T>` as an alternative to consumer classes.
 
 ### Telemetry and Host Metadata
 - Outgoing messages include host information such as machine name, process details, and framework version to aid in diagnostics and tracing.

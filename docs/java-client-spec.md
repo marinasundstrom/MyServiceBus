@@ -8,6 +8,7 @@ The ServiceBus Java client mirrors the C# design by providing an asynchronous me
 ### Consume Context
 - `ConsumeContext` carries the consumed message, headers, and a `CancellationToken`.
 - `getSendEndpoint` resolves a `SendEndpoint` for a given URI; attempting to resolve without a provider throws `UnsupportedOperationException`.
+- `forward` redirects the consumed message to another destination using a resolved send endpoint.
 
 ### Publishing
 - `publish` uses `NamingConventions.getExchangeName` to derive an exchange name and sends the message via a resolved endpoint backed by the RabbitMQ transport.
@@ -15,6 +16,9 @@ The ServiceBus Java client mirrors the C# design by providing an asynchronous me
 ### Responding
 - `respond` forwards messages to the `responseAddress` when available; otherwise it completes immediately.
 - `respondFault` packages the original message and exception details into a `Fault<T>` and sends it to the `faultAddress` or `responseAddress`.
+
+### Receive Endpoint Handlers
+- `receiveEndpoint` can register inline handlers with `handle` instead of using dedicated consumer classes.
 
 ### Request–Response
 - `GenericRequestClient` sends requests and awaits responses or faults using per-request temporary exchanges.
