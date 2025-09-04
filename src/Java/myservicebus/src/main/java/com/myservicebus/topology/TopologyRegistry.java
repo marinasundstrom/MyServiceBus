@@ -8,14 +8,16 @@ import com.myservicebus.ConsumeContext;
 import com.myservicebus.NamingConventions;
 import com.myservicebus.PipeConfigurator;
 
-public class TopologyRegistry {
+public class TopologyRegistry implements BusTopology {
     private final List<MessageTopology> messages = new ArrayList<>();
     private final List<ConsumerTopology> consumers = new ArrayList<>();
 
+    @Override
     public List<MessageTopology> getMessages() {
         return messages;
     }
 
+    @Override
     public List<ConsumerTopology> getConsumers() {
         return consumers;
     }

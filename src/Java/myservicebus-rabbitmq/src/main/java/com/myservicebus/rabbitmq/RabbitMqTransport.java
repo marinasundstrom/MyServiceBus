@@ -8,6 +8,7 @@ import com.myservicebus.SendPipe;
 import com.myservicebus.TransportSendEndpointProvider;
 import com.myservicebus.di.ServiceCollection;
 import com.rabbitmq.client.ConnectionFactory;
+import java.net.URI;
 
 public class RabbitMqTransport {
 
@@ -25,6 +26,7 @@ public class RabbitMqTransport {
             factory.setPassword(factoryConfigurator.getPassword());
             return new ConnectionProvider(factory);
         });
+        services.addSingleton(URI.class, sp -> () -> URI.create("rabbitmq://" + factoryConfigurator.getClientHost() + "/"));
         services.addSingleton(RabbitMqTransportFactory.class, sp -> () -> {
             ConnectionProvider provider = sp.getService(ConnectionProvider.class);
             return new RabbitMqTransportFactory(provider);

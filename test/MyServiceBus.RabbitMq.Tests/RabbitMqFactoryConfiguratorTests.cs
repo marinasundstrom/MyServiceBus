@@ -22,6 +22,9 @@ public class RabbitMqFactoryConfiguratorTests
 
     class TestMessageBus : IMessageBus
     {
+        [Throws(typeof(UriFormatException))]
+        public Uri Address => new("loopback://localhost/");
+        public IBusTopology Topology => new TopologyRegistry();
         public Task StartAsync(CancellationToken cancellationToken) => Task.CompletedTask;
         public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
         public Task PublishAsync<T>(object message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default) where T : class => Task.CompletedTask;
@@ -49,6 +52,7 @@ public class RabbitMqFactoryConfiguratorTests
     {
         private readonly Dictionary<Type, string> _exchangeNames = new();
         public IEndpointNameFormatter? EndpointNameFormatter { get; private set; }
+        public string ClientHost => "localhost";
 
         public void Message<T>(Action<MessageConfigurator> configure)
         {
@@ -84,7 +88,7 @@ public class RabbitMqFactoryConfiguratorTests
         var context = new TestBusRegistrationContext(provider);
 
         var configurator = new TestRabbitMqFactoryConfigurator();
-        configurator.Message<MyMessage>(m => m.SetEntityName("custom-exchange"));
+        configurator.Message<MyMessage>([Throws(typeof(NotSupportedException))] (m) => m.SetEntityName("custom-exchange"));
         configurator.ReceiveEndpoint("custom-queue", [Throws(typeof(InvalidOperationException))] (e) => e.ConfigureConsumer<MyConsumer>(context));
 
         var def = registry.Consumers.First(c => c.ConsumerType == typeof(MyConsumer));

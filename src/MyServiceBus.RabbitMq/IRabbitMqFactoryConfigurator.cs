@@ -18,6 +18,7 @@ public interface IRabbitMqFactoryConfigurator
     void Host(string host, Action<IRabbitMqHostConfigurator>? configure = null);
     void SetEndpointNameFormatter(IEndpointNameFormatter formatter);
     IEndpointNameFormatter? EndpointNameFormatter { get; }
+    string ClientHost { get; }
 }
 
 public interface IRabbitMqHostConfigurator

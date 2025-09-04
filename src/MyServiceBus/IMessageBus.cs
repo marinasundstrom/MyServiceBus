@@ -10,6 +10,16 @@ public interface IMessageBus :
     IPublishEndpointProvider,
     ISendEndpointProvider
 {
+    /// <summary>
+    /// The InputAddress of the default bus endpoint
+    /// </summary>
+    Uri Address { get; }
+
+    /// <summary>
+    /// The bus topology
+    /// </summary>
+    IBusTopology Topology { get; }
+
     Task StartAsync(CancellationToken cancellationToken);
 
     Task StopAsync(CancellationToken cancellationToken);

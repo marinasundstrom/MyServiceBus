@@ -15,16 +15,22 @@ public class InMemoryTestHarness : IMessageBus, ITransportFactory, IReceiveEndpo
     readonly List<Func<ReceiveContext, Task>> receiveHandlers = new();
     readonly List<object> consumed = new();
     readonly IServiceProvider? provider;
+    readonly IBusTopology topology;
+
+    public Uri Address { get; } = new("loopback://localhost/");
+    public IBusTopology Topology => topology;
 
     public IReadOnlyCollection<object> Consumed => consumed.AsReadOnly();
 
     public InMemoryTestHarness()
     {
+        topology = new TopologyRegistry();
     }
 
     public InMemoryTestHarness(IServiceProvider provider)
     {
         this.provider = provider;
+        topology = provider.GetService<TopologyRegistry>() ?? new TopologyRegistry();
     }
 
     public Task Start() => StartAsync(CancellationToken.None);

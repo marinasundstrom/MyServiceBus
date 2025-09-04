@@ -100,6 +100,7 @@ public class BusRegistrationConfigurator : IBusRegistrationConfigurator
     public void Build()
     {
         Services.AddSingleton(_topology);
+        Services.AddSingleton<IBusTopology>(_ => _topology);
         Services.AddSingleton<IPostBuildAction>(_ => new ConsumerRegistrationAction(_topology));
         Services.AddSingleton<ISendPipe>(_ => new SendPipe(sendConfigurator.Build()));
         Services.AddSingleton<IPublishPipe>(_ => new PublishPipe(publishConfigurator.Build()));

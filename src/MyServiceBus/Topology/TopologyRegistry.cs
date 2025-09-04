@@ -4,7 +4,7 @@ using System.Linq;
 
 namespace MyServiceBus.Topology;
 
-public class TopologyRegistry
+public class TopologyRegistry : IBusTopology
 {
     public List<MessageTopology> Messages { get; } = new();
     public List<ConsumerTopology> Consumers { get; } = new();

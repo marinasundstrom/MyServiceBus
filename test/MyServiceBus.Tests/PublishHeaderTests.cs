@@ -24,6 +24,7 @@ public class PublishHeaderTests
     class StubTransportFactory : ITransportFactory
     {
         public readonly CaptureSendTransport Transport = new();
+        [Throws(typeof(InvalidOperationException))]
         public Task<ISendTransport> GetSendTransport(Uri address, CancellationToken cancellationToken = default)
             => Task.FromResult<ISendTransport>(Transport);
         [Throws(typeof(NotImplementedException))]
@@ -32,12 +33,13 @@ public class PublishHeaderTests
     }
 
     [Fact]
-    [Throws(typeof(UriFormatException))]
+    [Throws(typeof(UriFormatException), typeof(InvalidOperationException), typeof(NotNullException))]
     public async Task Applies_headers_to_context()
     {
         var factory = new StubTransportFactory();
         var bus = new MessageBus(factory, new ServiceCollection().BuildServiceProvider(),
-            new SendPipe(Pipe.Empty<SendContext>()), new PublishPipe(Pipe.Empty<SendContext>()), new EnvelopeMessageSerializer());
+            new SendPipe(Pipe.Empty<SendContext>()), new PublishPipe(Pipe.Empty<SendContext>()), new EnvelopeMessageSerializer(),
+            new Uri("loopback://localhost/"));
 
         await bus.PublishAsync(new TestMessage(), [Throws(typeof(NotSupportedException))] (ctx) => ctx.Headers["foo"] = "bar");
 
