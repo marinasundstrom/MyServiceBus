@@ -50,10 +50,12 @@ class InMemoryHarnessDiTest {
         });
 
         ServiceProvider provider = services.buildServiceProvider();
-        RequestClientFactory factory = provider.getService(RequestClientFactory.class);
-        RequestClient<Ping> client = factory.create(Ping.class);
-
-        Pong response = client.getResponse(new Ping("hi"), Pong.class).join();
-        assertEquals("hi", response.getValue());
+        try (ServiceScope scope = provider.createScope()) {
+            ServiceProvider scoped = scope.getServiceProvider();
+            RequestClientFactory factory = scoped.getService(RequestClientFactory.class);
+            RequestClient<Ping> client = factory.create(Ping.class);
+            Pong response = client.getResponse(new Ping("hi"), Pong.class).join();
+            assertEquals("hi", response.getValue());
+        }
     }
 }

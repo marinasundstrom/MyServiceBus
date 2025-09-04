@@ -14,7 +14,7 @@ public class AddConsumersTests
     }
 
     [Fact]
-    [Throws(typeof(InvalidOperationException))]
+    [Throws(typeof(InvalidOperationException), typeof(ArgumentException))]
     public async Task Should_register_all_consumers_from_assembly()
     {
         var services = new ServiceCollection();
@@ -28,7 +28,7 @@ public class AddConsumersTests
 
         await harness.Start();
 
-        await harness.Publish(new Ping(Guid.NewGuid()));
+        await harness.PublishAsync(new Ping(Guid.NewGuid()));
 
         Assert.True(harness.WasConsumed<Ping>());
 

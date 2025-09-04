@@ -15,7 +15,7 @@ public class TestingServiceExtensions {
                 sp -> () -> (TransportSendEndpointProvider) sp.getService(InMemoryTestHarness.class));
         services.addSingleton(RequestClientTransport.class,
                 sp -> () -> (RequestClientTransport) sp.getService(InMemoryTestHarness.class));
-        services.addSingleton(RequestClientFactory.class, sp -> () -> new GenericRequestClientFactory(
+        services.addScoped(RequestClientFactory.class, sp -> () -> new GenericRequestClientFactory(
                 sp.getService(RequestClientTransport.class)));
 
         return services;

@@ -19,26 +19,12 @@ public class PublishingServiceTests
         public Task Submit(Guid value) => publishEndpoint.PublishAsync(new ValueSubmitted(value));
     }
 
-    class PublishEndpointAdapter : IPublishEndpoint
-    {
-        readonly MyServiceBus.IMessageBus bus;
-
-        public PublishEndpointAdapter(MyServiceBus.IMessageBus bus) => this.bus = bus;
-
-        public Task PublishAsync<T>(object message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default)
-            => bus.Publish((dynamic)message, contextCallback, cancellationToken);
-
-        public Task PublishAsync<T>(T message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default)
-            => bus.Publish((dynamic)message!, contextCallback, cancellationToken);
-    }
-
     [Fact]
-    [Throws(typeof(InvalidOperationException))]
+    [Throws(typeof(InvalidOperationException), typeof(ArgumentException))]
     public async Task Should_publish_message_from_service()
     {
         var services = new ServiceCollection();
         services.AddServiceBusTestHarness(_ => { });
-        services.AddScoped<IPublishEndpoint, PublishEndpointAdapter>();
         services.AddScoped<PublishingService>();
 
         var provider = services.BuildServiceProvider();

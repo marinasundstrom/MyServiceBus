@@ -24,7 +24,7 @@ public class InMemoryHarnessDiTests
     }
 
     [Fact]
-    [Throws(typeof(InvalidOperationException))]
+    [Throws(typeof(InvalidOperationException), typeof(ArgumentException))]
     public async Task Should_resolve_consumer_from_di()
     {
         var services = new ServiceCollection();
@@ -38,7 +38,7 @@ public class InMemoryHarnessDiTests
 
         await harness.Start();
 
-        await harness.Publish(new SubmitOrder(Guid.NewGuid()));
+        await harness.PublishAsync(new SubmitOrder(Guid.NewGuid()));
 
         Assert.True(harness.WasConsumed<SubmitOrder>());
 
@@ -46,7 +46,7 @@ public class InMemoryHarnessDiTests
     }
 
     [Fact]
-    [Throws(typeof(InvalidOperationException))]
+    [Throws(typeof(InvalidOperationException), typeof(RequestFaultException))]
     public async Task Should_resolve_request_client()
     {
         var services = new ServiceCollection();

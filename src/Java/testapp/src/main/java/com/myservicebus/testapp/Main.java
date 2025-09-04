@@ -86,46 +86,52 @@ public class Main {
         });
 
         app.get("/request", ctx -> {
-            var requestClientFactory = provider.getService(RequestClientFactory.class);
-            var requestClient = requestClientFactory.create(TestRequest.class);
-            try {
-                var response = requestClient
-                        .getResponse(new TestRequest("Foo"), TestResponse.class, CancellationToken.none)
-                        .get();
-                logger.info("📨 Received response {} ✅", response.getMessage().toString());
-                ctx.result(response.getMessage().toString());
-            } catch (Exception exc) {
-                logger.error("❌ Failed to get response", exc);
-                ctx.result(exc.getMessage().toString());
+            try (ServiceScope scope = provider.createScope()) {
+                var scopedSp = scope.getServiceProvider();
+                var requestClientFactory = scopedSp.getService(RequestClientFactory.class);
+                var requestClient = requestClientFactory.create(TestRequest.class);
+                try {
+                    var response = requestClient
+                            .getResponse(new TestRequest("Foo"), TestResponse.class, CancellationToken.none)
+                            .get();
+                    logger.info("📨 Received response {} ✅", response.getMessage().toString());
+                    ctx.result(response.getMessage().toString());
+                } catch (Exception exc) {
+                    logger.error("❌ Failed to get response", exc);
+                    ctx.result(exc.getMessage().toString());
+                }
             }
         });
 
         app.get("/request_multi", ctx -> {
-            var requestClientFactory = provider.getService(RequestClientFactory.class);
-            var requestClient = requestClientFactory.create(TestRequest.class);
-            try {
-                var response = requestClient
-                        .getResponse(new TestRequest("Foo"), TestResponse.class,
-                                Fault.class, CancellationToken.none)
-                        .get();
+            try (ServiceScope scope = provider.createScope()) {
+                var scopedSp = scope.getServiceProvider();
+                var requestClientFactory = scopedSp.getService(RequestClientFactory.class);
+                var requestClient = requestClientFactory.create(TestRequest.class);
+                try {
+                    var response = requestClient
+                            .getResponse(new TestRequest("Foo"), TestResponse.class,
+                                    Fault.class, CancellationToken.none)
+                            .get();
 
-                response.as(TestResponse.class).ifPresent((Response<TestResponse> r) -> {
-                    logger.info("📨 Received response {} ✅", r.getMessage().toString());
-                    ctx.result(r.getMessage().toString());
-                });
+                    response.as(TestResponse.class).ifPresent((Response<TestResponse> r) -> {
+                        logger.info("📨 Received response {} ✅", r.getMessage().toString());
+                        ctx.result(r.getMessage().toString());
+                    });
 
-                response.as(Fault.class).ifPresent(r -> {
-                    var exception = (ExceptionInfo) r.getMessage().getExceptions().get(0);
-                    String message = exception.getMessage();
-                    if (message == null) {
-                        message = exception.toString();
-                    }
-                    logger.error("❌ Fault received: {}", message);
-                    ctx.status(500).result(message);
-                });
-            } catch (Exception e) {
-                logger.error("❌ Failed to get response", e);
-                ctx.status(500).result("Failed to get response: " + e.getMessage());
+                    response.as(Fault.class).ifPresent(r -> {
+                        var exception = (ExceptionInfo) r.getMessage().getExceptions().get(0);
+                        String message = exception.getMessage();
+                        if (message == null) {
+                            message = exception.toString();
+                        }
+                        logger.error("❌ Fault received: {}", message);
+                        ctx.status(500).result(message);
+                    });
+                } catch (Exception e) {
+                    logger.error("❌ Failed to get response", e);
+                    ctx.status(500).result("Failed to get response: " + e.getMessage());
+                }
             }
         });
 

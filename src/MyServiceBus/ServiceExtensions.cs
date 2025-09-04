@@ -13,6 +13,8 @@ public static class ServiceExtensions
 
         services.AddHostedService<ServiceBusHostedService>();
 
+        services.AddSingleton<IReceiveEndpointConnector>([Throws(typeof(InvalidCastException))] (sp) => (IReceiveEndpointConnector)sp.GetRequiredService<IMessageBus>());
+
         services.AddScoped(typeof(IRequestClient<>), typeof(GenericRequestClient<>));
 
         return services;

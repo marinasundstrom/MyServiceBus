@@ -85,9 +85,9 @@ public class MediatorTransportFactoryTests
             return Task.CompletedTask;
         }
 
-        public Task PublishAsync<TMessage>(object message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task PublishAsync<TMessage>(object message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default) where TMessage : class => Task.CompletedTask;
 
-        public Task PublishAsync<TMessage>(TMessage message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task PublishAsync<TMessage>(TMessage message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default) where TMessage : class => Task.CompletedTask;
 
         public Task<ISendEndpoint> GetSendEndpoint(Uri uri) =>
             Task.FromResult<ISendEndpoint>(new StubSendEndpoint());
@@ -161,7 +161,7 @@ public class MediatorTransportFactoryTests
         SampleConsumer.Received = new TaskCompletionSource<ConsumerMessage>();
 
         var bus = provider.GetRequiredService<IMessageBus>();
-        await bus.Publish(new ConsumerMessage { Value = "hello" });
+        await bus.PublishAsync(new ConsumerMessage { Value = "hello" });
 
         var message = await SampleConsumer.Received.Task;
         Assert.Equal("hello", message.Value);
@@ -189,7 +189,7 @@ public class MediatorTransportFactoryTests
         SampleHandler.Received = new TaskCompletionSource<ConsumerMessage>();
 
         var bus = provider.GetRequiredService<IMessageBus>();
-        await bus.Publish(new ConsumerMessage { Value = "handler" });
+        await bus.PublishAsync(new ConsumerMessage { Value = "handler" });
 
         var message = await SampleHandler.Received.Task;
         Assert.Equal("handler", message.Value);

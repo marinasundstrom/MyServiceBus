@@ -26,18 +26,20 @@ public class PublishHeaderTests
         public readonly CaptureSendTransport Transport = new();
         public Task<ISendTransport> GetSendTransport(Uri address, CancellationToken cancellationToken = default)
             => Task.FromResult<ISendTransport>(Transport);
+        [Throws(typeof(NotImplementedException))]
         public Task<IReceiveTransport> CreateReceiveTransport(ReceiveEndpointTopology topology, Func<ReceiveContext, Task> handler, CancellationToken cancellationToken = default)
             => throw new NotImplementedException();
     }
 
     [Fact]
+    [Throws(typeof(UriFormatException))]
     public async Task Applies_headers_to_context()
     {
         var factory = new StubTransportFactory();
         var bus = new MessageBus(factory, new ServiceCollection().BuildServiceProvider(),
             new SendPipe(Pipe.Empty<SendContext>()), new PublishPipe(Pipe.Empty<SendContext>()), new EnvelopeMessageSerializer());
 
-        await bus.Publish(new TestMessage(), ctx => ctx.Headers["foo"] = "bar");
+        await bus.PublishAsync(new TestMessage(), [Throws(typeof(NotSupportedException))] (ctx) => ctx.Headers["foo"] = "bar");
 
         Assert.NotNull(factory.Transport.Captured);
         Assert.True(factory.Transport.Captured!.Headers.ContainsKey("foo"));

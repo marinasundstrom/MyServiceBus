@@ -43,7 +43,7 @@ public class RabbitMqTransport {
                 sp -> () -> sp.getService(RabbitMqSendEndpointProvider.class));
         services.addSingleton(RequestClientTransport.class,
                 sp -> () -> new RabbitMqRequestClientTransport(sp.getService(ConnectionProvider.class)));
-        services.addSingleton(RequestClientFactory.class,
+        services.addScoped(RequestClientFactory.class,
                 sp -> () -> new GenericRequestClientFactory(sp.getService(RequestClientTransport.class)));
     }
 }
