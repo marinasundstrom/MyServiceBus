@@ -164,6 +164,7 @@ public class RabbitMqTransportFactoryTests
     }
 
     [Fact]
+    [Throws(typeof(OverflowException))]
     public async Task Supports_exchange_scheme_uri()
     {
         var channel = Substitute.For<IChannel>();
@@ -195,6 +196,65 @@ public class RabbitMqTransportFactoryTests
         await channel.Received(1).ExchangeDeclareAsync(
             "orders",
             Arg.Any<string>(),
+            Arg.Any<bool>(),
+            Arg.Any<bool>(),
+            Arg.Any<IDictionary<string, object?>?>(),
+            Arg.Any<bool>(),
+            Arg.Any<bool>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    [Throws(typeof(OverflowException))]
+    public async Task Supports_queue_scheme_uri()
+    {
+        var channel = Substitute.For<IChannel>();
+        channel.ExchangeDeclareAsync(
+                Arg.Any<string>(),
+                Arg.Any<string>(),
+                Arg.Any<bool>(),
+                Arg.Any<bool>(),
+                Arg.Any<IDictionary<string, object?>?>(),
+                Arg.Any<bool>(),
+                Arg.Any<bool>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.CompletedTask);
+        channel.QueueDeclareAsync(
+                Arg.Any<string>(),
+                Arg.Any<bool>(),
+                Arg.Any<bool>(),
+                Arg.Any<bool>(),
+                Arg.Any<IDictionary<string, object?>?>(),
+                Arg.Any<bool>(),
+                Arg.Any<bool>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new QueueDeclareOk("ignored", 0, 0)));
+        channel.QueueBindAsync(
+                Arg.Any<string>(),
+                Arg.Any<string>(),
+                Arg.Any<string>(),
+                Arg.Any<IDictionary<string, object?>?>(),
+                Arg.Any<bool>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.CompletedTask);
+
+        var connection = Substitute.For<IConnection>();
+        connection.IsOpen.Returns(true);
+        connection.CreateChannelAsync(Arg.Any<CreateChannelOptions?>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(channel));
+
+        var factory = Substitute.For<IConnectionFactory>();
+        factory.CreateConnectionAsync(Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(connection));
+
+        var provider = new ConnectionProvider(factory);
+        var transportFactory = new RabbitMqTransportFactory(provider);
+
+        await transportFactory.GetSendTransport(new Uri("queue:orders"));
+
+        await channel.Received(1).QueueDeclareAsync(
+            "orders",
+            Arg.Any<bool>(),
             Arg.Any<bool>(),
             Arg.Any<bool>(),
             Arg.Any<IDictionary<string, object?>?>(),

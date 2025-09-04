@@ -11,6 +11,7 @@ public sealed class RabbitMqTransportFactory : ITransportFactory
 {
     private readonly ConnectionProvider _connectionProvider;
     private readonly ConcurrentDictionary<string, ISendTransport> _sendTransports = new();
+    private readonly ConcurrentDictionary<string, ISendTransport> _queueTransports = new();
 
     public RabbitMqTransportFactory(ConnectionProvider connectionProvider)
     {
@@ -20,7 +21,8 @@ public sealed class RabbitMqTransportFactory : ITransportFactory
     [Throws(typeof(OverflowException), typeof(InvalidOperationException), typeof(ArgumentException))]
     public async Task<ISendTransport> GetSendTransport(Uri address, CancellationToken cancellationToken = default)
     {
-        string exchange;
+        string? exchange = null;
+        string? queue = null;
         bool durable = true;
         bool autoDelete = false;
 
@@ -38,19 +40,86 @@ public sealed class RabbitMqTransportFactory : ITransportFactory
             exchange = spec;
             ParseExchangeSettings(query, ref durable, ref autoDelete);
         }
+        else if (address.Scheme.Equals("queue", StringComparison.OrdinalIgnoreCase))
+        {
+            var spec = address.OriginalString.Substring("queue:".Length);
+            string? query = null;
+            var idx = spec.IndexOf('?');
+            if (idx >= 0)
+            {
+                query = spec[(idx + 1)..];
+                spec = spec[..idx];
+            }
+
+            queue = spec;
+            ParseExchangeSettings(query, ref durable, ref autoDelete);
+        }
         else
         {
-            try
+            var path = address.AbsolutePath.Trim('/');
+            if (path.StartsWith("exchange/", StringComparison.OrdinalIgnoreCase))
             {
-                exchange = ExtractExchange(address);
-                ParseExchangeSettings(address.Query.TrimStart('?'), ref durable, ref autoDelete);
+                exchange = path["exchange/".Length..];
             }
-            catch (InvalidOperationException)
+            else if (!string.IsNullOrEmpty(path))
             {
+                queue = path;
+            }
+
+            ParseExchangeSettings(address.Query.TrimStart('?'), ref durable, ref autoDelete);
+
+            if (exchange == null && queue == null)
                 exchange = "default";
-            }
         }
 
+        if (queue != null)
+        {
+            if (!_queueTransports.TryGetValue(queue, out var queueTransport))
+            {
+                var connection = await _connectionProvider.GetOrCreateConnectionAsync(cancellationToken);
+                var channel = await connection.CreateChannelAsync(cancellationToken: cancellationToken);
+
+                if (!autoDelete)
+                {
+                    var errorExchange = queue + "_error";
+                    var errorQueue = errorExchange;
+
+                    await channel.ExchangeDeclareAsync(
+                        exchange: errorExchange,
+                        type: ExchangeType.Fanout,
+                        durable: durable,
+                        autoDelete: autoDelete,
+                        cancellationToken: cancellationToken);
+
+                    await channel.QueueDeclareAsync(
+                        queue: errorQueue,
+                        durable: durable,
+                        exclusive: false,
+                        autoDelete: autoDelete,
+                        cancellationToken: cancellationToken);
+
+                    await channel.QueueBindAsync(
+                        queue: errorQueue,
+                        exchange: errorExchange,
+                        routingKey: string.Empty,
+                        cancellationToken: cancellationToken);
+                }
+
+                await channel.QueueDeclareAsync(
+                    queue: queue,
+                    durable: durable,
+                    exclusive: false,
+                    autoDelete: autoDelete,
+                    cancellationToken: cancellationToken);
+
+                queueTransport = new RabbitMqQueueSendTransport(channel, queue);
+                _queueTransports.TryAdd(queue, queueTransport);
+            }
+
+            return queueTransport;
+        }
+
+        exchange ??= "default";
         if (!_sendTransports.TryGetValue(exchange, out var sendTransport))
         {
             var connection = await _connectionProvider.GetOrCreateConnectionAsync(cancellationToken);
@@ -129,21 +198,7 @@ public sealed class RabbitMqTransportFactory : ITransportFactory
         return new RabbitMqReceiveTransport(channel, topology.QueueName, handler, hasErrorQueue);
     }
 
-    [Throws(typeof(InvalidOperationException))]
-    private string ExtractExchange(Uri address)
-    {
-        // Very simple mapping logic for now
-        try
-        {
-            return address.Segments.LastOrDefault()?.Trim('/') ?? "default";
-        }
-        catch (InvalidOperationException ex)
-        {
-            throw new InvalidOperationException($"Could not extract exchange from '{address}'", ex);
-        }
-    }
-
-    [Throws(typeof(InvalidOperationException), typeof(OverflowException), typeof(ArgumentException))]
+    [Throws(typeof(OverflowException), typeof(ArgumentException))]
     private static void ParseExchangeSettings(string? queryString, ref bool durable, ref bool autoDelete)
     {
         if (string.IsNullOrEmpty(queryString))
