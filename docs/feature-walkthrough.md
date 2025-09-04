@@ -123,22 +123,55 @@ consumer processes it. Use this for directed, point-to-point operations
 instead of broadcasting.
 
 Sending and request/response operations rely on scoped abstractions. Resolve
-`ISendEndpointProvider` (or `ISendEndpoint` for the default queue) and
-`IRequestClient<T>` from a service scope rather than using the bus directly so
-contextual information like headers and cancellation tokens is propagated, in
-line with MassTransit.
+`ISendEndpointProvider` and `IRequestClient<T>` from a service scope rather
+than using the bus directly so contextual information like headers and
+cancellation tokens is propagated, in line with MassTransit.
+
+To target a specific queue, obtain a send endpoint for its URI and ensure a
+consumer is wired to that queue.
 
 #### C#
 
 ```csharp
-ISendEndpoint endpoint = serviceProvider.GetRequiredService<ISendEndpoint>();
+// register the consumer and its endpoint
+builder.Services.AddServiceBus(x =>
+{
+    x.AddConsumer<SubmitOrderConsumer>();
+
+    x.UsingRabbitMq((context, cfg) =>
+    {
+        cfg.ReceiveEndpoint("submit-order", e =>
+        {
+            e.ConfigureConsumer<SubmitOrderConsumer>(context);
+        });
+    });
+});
+
+// resolve a send endpoint for the queue
+ISendEndpointProvider provider = serviceProvider.GetRequiredService<ISendEndpointProvider>();
+ISendEndpoint endpoint = await provider.GetSendEndpoint(new Uri("queue:submit-order"));
 await endpoint.Send(new SubmitOrder { OrderId = Guid.NewGuid() });
 ```
 
 #### Java
 
 ```java
-SendEndpoint endpoint = serviceProvider.getService(SendEndpoint.class);
+// register the consumer and its endpoint
+ServiceCollection services = new ServiceCollection();
+
+RabbitMqBusFactory.configure(services, x -> {
+    x.addConsumer(SubmitOrderConsumer.class);
+}, (context, cfg) -> {
+    cfg.receiveEndpoint("submit-order", e ->
+        e.configureConsumer(SubmitOrderConsumer.class, context)
+    );
+});
+
+ServiceProvider serviceProvider = services.buildServiceProvider();
+
+// resolve a send endpoint for the queue
+SendEndpointProvider provider = serviceProvider.getService(SendEndpointProvider.class);
+SendEndpoint endpoint = provider.getSendEndpoint("rabbitmq://localhost/submit-order");
 endpoint.send(new SubmitOrder(UUID.randomUUID())).join();
 ```
 
