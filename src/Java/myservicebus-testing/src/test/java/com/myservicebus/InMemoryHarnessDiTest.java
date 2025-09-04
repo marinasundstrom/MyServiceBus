@@ -49,7 +49,7 @@ class InMemoryHarnessDiTest {
             cfg.addConsumer(PingConsumer.class);
         });
 
-        ServiceProvider provider = services.build();
+        ServiceProvider provider = services.buildServiceProvider();
         RequestClientFactory factory = provider.getService(RequestClientFactory.class);
         RequestClient<Ping> client = factory.create(Ping.class);
 
@@ -57,4 +57,3 @@ class InMemoryHarnessDiTest {
         assertEquals("hi", response.getValue());
     }
 }
-

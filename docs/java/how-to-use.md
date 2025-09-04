@@ -33,7 +33,7 @@ public class Main {
             });
         });
 
-        ServiceProvider provider = services.build();
+        ServiceProvider provider = services.buildServiceProvider();
         ServiceBus bus = provider.getService(ServiceBus.class);
 
         bus.start();

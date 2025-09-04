@@ -46,7 +46,7 @@ public class MessageBus implements SendEndpoint, PublishEndpoint {
         var cfg = new BusRegistrationConfiguratorImpl(services);
         configure.accept(cfg);
         cfg.complete();
-        return new MessageBus(services.build());
+        return new MessageBus(services.buildServiceProvider());
     }
 
     public void start() throws Exception {

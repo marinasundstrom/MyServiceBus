@@ -64,7 +64,7 @@ RabbitMqBusFactory.configure(services, x -> {
     cfg.configureEndpoints(context);
 });
 
-ServiceProvider provider = services.build();
+ServiceProvider provider = services.buildServiceProvider();
 ServiceBus bus = provider.getService(ServiceBus.class);
 
 bus.start().join();
@@ -330,7 +330,7 @@ RabbitMqBusFactory.configure(services, x -> {
     cfg.configureEndpoints(context); // auto-configure remaining consumers
 });
 
-ServiceProvider provider = services.build();
+ServiceProvider provider = services.buildServiceProvider();
 ServiceBus bus = provider.getService(ServiceBus.class);
 
 bus.start();
@@ -442,7 +442,7 @@ RabbitMqBusFactory.configure(services, x -> {
     cfg.host("rabbitmq://localhost");
 });
 
-ServiceProvider provider = services.build();
+ServiceProvider provider = services.buildServiceProvider();
 ServiceBus bus = provider.getService(ServiceBus.class);
 bus.start();
 ```
@@ -532,7 +532,7 @@ RabbitMqBusFactory.configure(services, x -> {
     cfg.host("rabbitmq://localhost");
 });
 
-ServiceProvider provider = services.build();
+ServiceProvider provider = services.buildServiceProvider();
 ServiceBus bus = provider.getService(ServiceBus.class);
 
 bus.start();
@@ -607,7 +607,7 @@ TestingServiceExtensions.addServiceBusTestHarness(services, cfg -> {
     cfg.addConsumer(SubmitOrderConsumer.class);
 });
 
-ServiceProvider provider = services.build();
+ServiceProvider provider = services.buildServiceProvider();
 InMemoryTestHarness harness = provider.getService(InMemoryTestHarness.class);
 harness.start().join();
 

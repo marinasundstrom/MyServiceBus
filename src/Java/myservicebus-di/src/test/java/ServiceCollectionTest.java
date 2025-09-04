@@ -13,7 +13,7 @@ public class ServiceCollectionTest {
     void testSingletonSelfBinding() {
         ServiceCollection sc = new ServiceCollection();
         sc.addSingleton(ProcessorImpl.class);
-        ServiceProvider sp = sc.build();
+        ServiceProvider sp = sc.buildServiceProvider();
 
         ProcessorImpl p1 = sp.getService(ProcessorImpl.class);
         ProcessorImpl p2 = sp.getService(ProcessorImpl.class);
@@ -26,7 +26,7 @@ public class ServiceCollectionTest {
     void testSingletonInterfaceBinding() {
         ServiceCollection sc = new ServiceCollection();
         sc.addSingleton(Processor.class, ProcessorImpl.class);
-        ServiceProvider sp = sc.build();
+        ServiceProvider sp = sc.buildServiceProvider();
 
         Processor p = sp.getService(Processor.class);
         assertEquals("processed", p.process());
@@ -36,7 +36,7 @@ public class ServiceCollectionTest {
     void testSingletonProviderBinding() {
         ServiceCollection sc = new ServiceCollection();
         sc.addSingleton(Processor.class, sp -> () -> new ProcessorImpl());
-        ServiceProvider sp = sc.build();
+        ServiceProvider sp = sc.buildServiceProvider();
 
         Processor p = sp.getService(Processor.class);
         assertEquals("processed", p.process());
@@ -46,7 +46,7 @@ public class ServiceCollectionTest {
     void testScopedSelfBinding() {
         ServiceCollection sc = new ServiceCollection();
         sc.addScoped(ProcessorImpl.class);
-        ServiceProvider sp = sc.build();
+        ServiceProvider sp = sc.buildServiceProvider();
 
         ProcessorImpl p1 = null;
 
@@ -69,7 +69,7 @@ public class ServiceCollectionTest {
     void testScopedInterfaceBinding() {
         ServiceCollection sc = new ServiceCollection();
         sc.addScoped(Processor.class, ProcessorImpl.class);
-        ServiceProvider sp = sc.build();
+        ServiceProvider sp = sc.buildServiceProvider();
 
         Processor p1 = null;
 
@@ -92,7 +92,7 @@ public class ServiceCollectionTest {
     void testScopedProviderBinding() {
         ServiceCollection sc = new ServiceCollection();
         sc.addScoped(Processor.class, sp -> () -> new ProcessorImpl());
-        ServiceProvider sp = sc.build();
+        ServiceProvider sp = sc.buildServiceProvider();
 
         Processor p1 = null;
 
@@ -119,7 +119,7 @@ public class ServiceCollectionTest {
         collection.addMultiBinding(Handler.class, HandlerB.class);
 
         // Act
-        ServiceProvider provider = collection.build();
+        ServiceProvider provider = collection.buildServiceProvider();
         Set<Handler> handlers = provider.getServices(Handler.class);
 
         // Assert
@@ -138,7 +138,7 @@ public class ServiceCollectionTest {
         ServiceCollection sc = new ServiceCollection();
         sc.addScopedMultiBinding(Processor.class, ProcessorImpl.class);
         sc.addScopedMultiBinding(Processor.class, AnotherProcessor.class);
-        ServiceProvider sp = sc.build();
+        ServiceProvider sp = sc.buildServiceProvider();
 
         Set<Processor> scopedSet1 = null;
 

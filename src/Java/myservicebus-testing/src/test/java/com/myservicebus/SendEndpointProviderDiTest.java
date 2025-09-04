@@ -11,9 +11,10 @@ class SendEndpointProviderDiTest {
     @Test
     void resolves_send_endpoint_provider() {
         ServiceCollection services = new ServiceCollection();
-        TestingServiceExtensions.addServiceBusTestHarness(services, cfg -> {});
+        TestingServiceExtensions.addServiceBusTestHarness(services, cfg -> {
+        });
 
-        ServiceProvider provider = services.build();
+        ServiceProvider provider = services.buildServiceProvider();
         SendEndpointProvider sendEndpointProvider = provider.getService(SendEndpointProvider.class);
         SendEndpoint endpoint = sendEndpointProvider.getSendEndpoint("inmemory:test");
         assertNotNull(endpoint);

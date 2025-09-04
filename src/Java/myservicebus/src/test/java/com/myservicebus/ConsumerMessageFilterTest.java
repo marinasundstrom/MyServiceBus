@@ -15,8 +15,14 @@ import com.myservicebus.tasks.CancellationToken;
 class ConsumerMessageFilterTest {
     static class TestMessage {
         private String text;
-        TestMessage(String text) { this.text = text; }
-        public String getText() { return text; }
+
+        TestMessage(String text) {
+            this.text = text;
+        }
+
+        public String getText() {
+            return text;
+        }
     }
 
     static class FaultingConsumer implements Consumer<TestMessage> {
@@ -28,6 +34,7 @@ class ConsumerMessageFilterTest {
 
     static class CaptureEndpoint implements SendEndpoint {
         Object sent;
+
         @Override
         public <T> CompletableFuture<Void> send(T message, CancellationToken cancellationToken) {
             this.sent = message;
@@ -40,7 +47,7 @@ class ConsumerMessageFilterTest {
         ServiceCollection services = new ServiceCollection();
         services.addScoped(FaultingConsumer.class);
         services.addSingleton(ConsumeContextProvider.class, sp -> () -> new ConsumeContextProvider());
-        ServiceProvider provider = services.build();
+        ServiceProvider provider = services.buildServiceProvider();
 
         CaptureEndpoint endpoint = new CaptureEndpoint();
         SendEndpointProvider sendProvider = uri -> endpoint;

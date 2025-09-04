@@ -52,7 +52,7 @@ class RequestClientFaultTest {
             cfg.addConsumer(FaultingConsumer.class);
         });
 
-        ServiceProvider provider = services.build();
+        ServiceProvider provider = services.buildServiceProvider();
         RequestClientFactory factory = provider.getService(RequestClientFactory.class);
         RequestClient<Ping> client = factory.create(Ping.class);
 
@@ -63,4 +63,3 @@ class RequestClientFaultTest {
         assertEquals("nope", rfe.getFault().getExceptions().get(0).getMessage());
     }
 }
-

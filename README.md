@@ -94,7 +94,7 @@ RabbitMqBusFactory.configure(services, x -> {
     cfg.configureEndpoints(context);
 });
 
-ServiceProvider provider = services.build();
+ServiceProvider provider = services.buildServiceProvider();
 ServiceBus bus = provider.getService(ServiceBus.class);
 
 bus.start().join();

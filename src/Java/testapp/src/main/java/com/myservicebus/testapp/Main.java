@@ -39,7 +39,7 @@ public class Main {
             cfg.configureEndpoints(context);
         });
 
-        ServiceProvider provider = services.build();
+        ServiceProvider provider = services.buildServiceProvider();
         final Logger logger = provider.getService(Logger.class);
         MessageBus serviceBus = provider.getService(MessageBus.class);
 

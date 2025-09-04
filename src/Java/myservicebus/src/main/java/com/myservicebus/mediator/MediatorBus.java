@@ -24,7 +24,7 @@ public class MediatorBus {
         configure.accept(busRegistrationConfigurator);
         MediatorTransport.configure(busRegistrationConfigurator);
         busRegistrationConfigurator.complete();
-        return new MediatorBus(services.build());
+        return new MediatorBus(services.buildServiceProvider());
     }
 
     public void publish(Object message) {

@@ -126,7 +126,7 @@ public class ServiceCollection {
         });
     }
 
-    public ServiceProvider build() {
+    public ServiceProvider buildServiceProvider() {
         if (built) {
             throw new IllegalStateException("ServiceCollection.build() called more than once.");
         }

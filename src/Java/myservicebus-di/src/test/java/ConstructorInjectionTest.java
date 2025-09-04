@@ -16,7 +16,7 @@ public class ConstructorInjectionTest {
         collection.addMultiBinding(Handler.class, HandlerB.class);
         collection.addSingleton(HandlerConsumer.class);
 
-        ServiceProvider provider = collection.build();
+        ServiceProvider provider = collection.buildServiceProvider();
 
         HandlerConsumer consumer = provider.getService(HandlerConsumer.class);
         Set<Handler> handlers = consumer.getHandlers();

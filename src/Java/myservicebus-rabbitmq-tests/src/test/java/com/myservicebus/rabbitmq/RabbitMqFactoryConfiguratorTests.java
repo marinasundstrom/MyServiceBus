@@ -31,7 +31,7 @@ public class RabbitMqFactoryConfiguratorTests {
         RabbitMqTransport.configure(cfg);
         cfg.complete();
 
-        ServiceProvider provider = services.build();
+        ServiceProvider provider = services.buildServiceProvider();
         BusRegistrationContext context = new BusRegistrationContext(provider);
         RabbitMqFactoryConfigurator factoryConfigurator = provider.getService(RabbitMqFactoryConfigurator.class);
 
@@ -60,7 +60,7 @@ public class RabbitMqFactoryConfiguratorTests {
         RabbitMqTransport.configure(cfg);
         cfg.complete();
 
-        ServiceProvider provider = services.build();
+        ServiceProvider provider = services.buildServiceProvider();
         BusRegistrationContext context = new BusRegistrationContext(provider);
         RabbitMqFactoryConfigurator factoryConfigurator = provider.getService(RabbitMqFactoryConfigurator.class);
 

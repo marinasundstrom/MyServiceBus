@@ -18,7 +18,7 @@ public class Main {
         services.addScoped(MyScopedService.class);
         services.addScoped(MySecondService.class);
 
-        ServiceProvider provider = services.build();
+        ServiceProvider provider = services.buildServiceProvider();
 
         try (ServiceScope scope = provider.createScope()) {
             var scopedSp = scope.getServiceProvider();

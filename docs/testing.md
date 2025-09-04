@@ -84,7 +84,7 @@ ServiceCollection services = new ServiceCollection();
 TestingServiceExtensions.addServiceBusTestHarness(services, cfg -> {});
 services.addScoped(PublishingService.class);
 
-ServiceProvider provider = services.build();
+ServiceProvider provider = services.buildServiceProvider();
 InMemoryTestHarness harness = provider.getService(InMemoryTestHarness.class);
 harness.handler(ValueSubmitted.class, ctx -> CompletableFuture.completedFuture(null));
 
