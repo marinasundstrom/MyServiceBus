@@ -4,7 +4,7 @@ This repository contains a .NET solution for MyServiceBus and a Java project. Fo
 
 ## Code style
 - Use standard C# conventions (PascalCase for types and methods, camelCase for locals and parameters).
-- Prefer `dotnet format` to automatically format files.
+- Run `dotnet format` only on files you create or modify to automatically format them.
  
 ## Exception handling
 - The CheckedExceptions analyzer is enabled; treat THROWS diagnostics as warnings and avoid auto-fixes that clutter code.
@@ -14,11 +14,14 @@ This repository contains a .NET solution for MyServiceBus and a Java project. Fo
 
 ## Testing
 - From the repository root, run `dotnet test` and ensure all tests pass before committing.
+- When adding features or changing API/behavior, implement them for both the C# and Java codebases.
+- Create or update tests for each language to cover new functionality.
 
 ## Documentation
 - Write documentation in Markdown and place files in the `docs/` folder when appropriate.
 - See `docs/design-goals.md` for overarching design goals, including MassTransit familiarity and C#↔Java parity.
-- See `docs/design-guidelines.md` for architectural and feature parity guidance.
+- Review `docs/myservicebus-spec.md`, `docs/design-guidelines.md`, and related design documents for solution details; keep them and other docs up to date.
+- `docs/feature-walkthrough.md` is the canonical source for usage samples of MyServiceBus.
 
 ## Java project
 - The Java project resides in `src/Java`. See `src/Java/AGENTS.md` for instructions specific to that codebase.
