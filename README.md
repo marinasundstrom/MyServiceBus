@@ -1,5 +1,8 @@
 # ✉️ MyServiceBus
 
+[![.NET CI](https://github.com/marinasundstrom/MyServiceBus/actions/workflows/dotnet.yml/badge.svg)](https://github.com/marinasundstrom/MyServiceBus/actions/workflows/dotnet.yml)
+[![Java CI](https://github.com/marinasundstrom/MyServiceBus/actions/workflows/java.yml/badge.svg)](https://github.com/marinasundstrom/MyServiceBus/actions/workflows/java.yml)
+
 MyServiceBus (a working title) is a lightweight asynchronous messaging library inspired by MassTransit. It is designed to be minimal yet compatible with the MassTransit message envelope format and protocol, enabling services to send, publish, and consume messages across .NET and Java implementations or directly with MassTransit clients.
 
 ## Goals
