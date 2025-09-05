@@ -18,7 +18,7 @@ public sealed class RabbitMqTransportFactory : ITransportFactory
         _connectionProvider = connectionProvider;
     }
 
-    [Throws(typeof(OverflowException), typeof(InvalidOperationException), typeof(ArgumentException))]
+    [Throws(typeof(OverflowException), typeof(InvalidOperationException), typeof(ArgumentException), typeof(OperationCanceledException))]
     public async Task<ISendTransport> GetSendTransport(Uri address, CancellationToken cancellationToken = default)
     {
         string? exchange = null;
@@ -133,6 +133,7 @@ public sealed class RabbitMqTransportFactory : ITransportFactory
         return sendTransport;
     }
 
+    [Throws(typeof(ObjectDisposedException))]
     public async Task<IReceiveTransport> CreateReceiveTransport(
         ReceiveEndpointTopology topology,
         Func<ReceiveContext, Task> handler,
@@ -150,6 +151,7 @@ public sealed class RabbitMqTransportFactory : ITransportFactory
         );
 
         var hasErrorQueue = !topology.AutoDelete;
+        IDictionary<string, object?>? mainQueueArguments = null;
 
         if (hasErrorQueue)
         {
@@ -178,6 +180,11 @@ public sealed class RabbitMqTransportFactory : ITransportFactory
                 routingKey: string.Empty,
                 cancellationToken: cancellationToken
             );
+
+            mainQueueArguments = new Dictionary<string, object?>
+            {
+                ["x-dead-letter-exchange"] = errorExchange
+            };
         }
 
         await channel.QueueDeclareAsync(
@@ -185,6 +192,7 @@ public sealed class RabbitMqTransportFactory : ITransportFactory
             durable: topology.Durable,
             exclusive: false,
             autoDelete: topology.AutoDelete,
+            arguments: mainQueueArguments,
             cancellationToken: cancellationToken
         );
 
