@@ -27,8 +27,9 @@ class SubmitOrderConsumer implements Consumer<SubmitOrder> {
 
         service.doWork();
 
-        logger.info("📨 Order id: {} (from {}) ✅", orderId, message);
+        String replica = System.getenv().getOrDefault("HTTP_PORT", "unknown");
+        logger.info("📨 Order id: {} (from {}) handled by {} ✅", orderId, message, replica);
 
-        return context.publish(new OrderSubmitted(orderId), context.getCancellationToken());
+        return context.publish(new OrderSubmitted(orderId, replica), context.getCancellationToken());
     }
 }

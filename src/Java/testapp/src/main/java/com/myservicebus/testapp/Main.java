@@ -26,12 +26,14 @@ public class Main {
         ServiceCollection services = new ServiceCollection();
         services.addScoped(MyService.class, MyServiceImpl.class);
 
+        String rabbitMqHost = System.getenv().getOrDefault("RABBITMQ_HOST", "localhost");
+
         RabbitMqBusFactory.configure(services, cfg -> {
             cfg.addConsumer(SubmitOrderConsumer.class);
             cfg.addConsumer(OrderSubmittedConsumer.class);
             cfg.addConsumer(TestRequestConsumer.class);
         }, (context, cfg) -> {
-            cfg.host("localhost", h -> {
+            cfg.host(rabbitMqHost, h -> {
                 h.username("guest");
                 h.password("guest");
             });
@@ -51,7 +53,8 @@ public class Main {
             return;
         }
 
-        var app = Javalin.create().start(5301);
+        int httpPort = Integer.parseInt(System.getenv().getOrDefault("HTTP_PORT", "5301"));
+        var app = Javalin.create().start(httpPort);
 
         app.get("/publish", ctx -> {
             try (ServiceScope scope = provider.createScope()) {
