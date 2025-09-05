@@ -1,10 +1,11 @@
 {
+    "defaultExceptionClassification": "Ignored",
+    "exceptions": {
+        "System.ArgumentNullException": "Ignored",
+        "System.IO.IOException": "Informational",
+        "System.TimeoutException": "NonStrict",
+        "System.Exception": "Strict"
+    },
     "disableXmlDocInterop": false,
-    "ignoredExceptions": [],
-    "treatThrowsExceptionAsCatchRest": true,
-    "informationalExceptions": {
-        "System.IO.NotImplementedException": "Always",
-        "System.IO.IOException": "Propagation",
-        "System.TimeoutException": "Always"
-    }
+    "treatThrowsExceptionAsCatchRest": true
 }

@@ -11,7 +11,7 @@
     <PackageVersion Include="NSubstitute" Version="5.1.0" />
     <PackageVersion Include="Shouldly" Version="4.2.1" />
     <PackageVersion Include="RabbitMq.Client" Version="7.1.2" />
-    <PackageVersion Include="Sundstrom.CheckedExceptions" Version="2.2.4" />
+    <PackageVersion Include="Sundstrom.CheckedExceptions" Version="2.5.1" />
     <PackageVersion Include="MassTransit.RabbitMQ" Version="8.4.0" />
     <PackageVersion Include="coverlet.collector" Version="6.0.2" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
