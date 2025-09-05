@@ -12,6 +12,8 @@ import java.util.function.Function;
 
 import org.junit.jupiter.api.Test;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
 import com.myservicebus.MessageBusImpl;
 import com.myservicebus.di.ServiceCollection;
 import com.myservicebus.di.ServiceProvider;
@@ -61,7 +63,9 @@ class ErrorQueueTest {
         Envelope<MyMessage> envelope = new Envelope<>();
         envelope.setMessage(new MyMessage());
         envelope.setHeaders(new HashMap<>());
-        byte[] body = new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsBytes(envelope);
+        ObjectMapper mapper = new ObjectMapper();
+        mapper.disable(SerializationFeature.FAIL_ON_EMPTY_BEANS);
+        byte[] body = mapper.writeValueAsBytes(envelope);
         try {
             factory.handler.apply(new TransportMessage(body, headers)).join();
         } catch (Exception ignored) {
