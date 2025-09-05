@@ -107,7 +107,8 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
                         faultAddress,
                         errorAddress,
                         CancellationToken.none,
-                        transportSendEndpointProvider);
+                        transportSendEndpointProvider,
+                        this.address);
                 return pipe.send(ctx);
             } catch (Exception e) {
                 CompletableFuture<Void> f = new CompletableFuture<>();
@@ -150,7 +151,8 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
                 String errorAddress = transportFactory.getPublishAddress(queueName + "_error");
                 ConsumeContext<T> ctx = new ConsumeContext<>((T) envelope.getMessage(), envelope.getHeaders(),
                         envelope.getResponseAddress(), faultAddress, errorAddress, CancellationToken.none,
-                        transportSendEndpointProvider);
+                        transportSendEndpointProvider,
+                        this.address);
                 return pipe.send(ctx);
             } catch (Exception e) {
                 CompletableFuture<Void> f = new CompletableFuture<>();

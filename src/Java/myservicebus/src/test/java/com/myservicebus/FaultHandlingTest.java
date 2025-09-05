@@ -4,6 +4,7 @@ import com.myservicebus.tasks.CancellationToken;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.net.URI;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -41,7 +42,8 @@ public class FaultHandlingTest {
                 "fault-queue",
                 null,
                 CancellationToken.none,
-                provider);
+                provider,
+                URI.create("rabbitmq://localhost/"));
 
         RuntimeException ex = new RuntimeException("boom");
         ctx.respondFault(ex, CancellationToken.none).join();

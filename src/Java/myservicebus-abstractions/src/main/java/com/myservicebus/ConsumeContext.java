@@ -5,6 +5,7 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.net.URI;
 
 import com.myservicebus.tasks.CancellationToken;
 
@@ -31,18 +32,28 @@ public class ConsumeContext<T>
     private final String errorAddress;
     private final CancellationToken cancellationToken;
     private final SendEndpointProvider sendEndpointProvider;
+    private final URI busAddress;
 
     public ConsumeContext(T message, Map<String, Object> headers, SendEndpointProvider provider) {
-        this(message, headers, null, null, null, CancellationToken.none, provider);
+        this(message, headers, null, null, null, CancellationToken.none, provider, URI.create("loopback://localhost/"));
+    }
+
+    public ConsumeContext(T message, Map<String, Object> headers, SendEndpointProvider provider, URI busAddress) {
+        this(message, headers, null, null, null, CancellationToken.none, provider, busAddress);
     }
 
     public ConsumeContext(T message, Map<String, Object> headers, String responseAddress, String faultAddress,
             CancellationToken cancellationToken, SendEndpointProvider provider) {
-        this(message, headers, responseAddress, faultAddress, null, cancellationToken, provider);
+        this(message, headers, responseAddress, faultAddress, null, cancellationToken, provider, URI.create("loopback://localhost/"));
     }
 
     public ConsumeContext(T message, Map<String, Object> headers, String responseAddress, String faultAddress,
-            String errorAddress, CancellationToken cancellationToken, SendEndpointProvider provider) {
+            CancellationToken cancellationToken, SendEndpointProvider provider, URI busAddress) {
+        this(message, headers, responseAddress, faultAddress, null, cancellationToken, provider, busAddress);
+    }
+
+    public ConsumeContext(T message, Map<String, Object> headers, String responseAddress, String faultAddress,
+            String errorAddress, CancellationToken cancellationToken, SendEndpointProvider provider, URI busAddress) {
         this.message = message;
         this.headers = headers;
         this.responseAddress = responseAddress;
@@ -50,6 +61,7 @@ public class ConsumeContext<T>
         this.errorAddress = errorAddress;
         this.cancellationToken = cancellationToken;
         this.sendEndpointProvider = provider;
+        this.busAddress = busAddress;
     }
 
     public T getMessage() {
@@ -77,7 +89,10 @@ public class ConsumeContext<T>
     @Override
     public CompletableFuture<Void> publish(SendContext context) {
         String exchange = NamingConventions.getExchangeName(context.getMessage().getClass());
-        SendEndpoint endpoint = getSendEndpoint("rabbitmq://localhost/exchange/" + exchange);
+        URI dest = busAddress.resolve("exchange/" + exchange);
+        context.setSourceAddress(busAddress);
+        context.setDestinationAddress(dest);
+        SendEndpoint endpoint = getSendEndpoint(dest.toString());
         return endpoint.send(context);
     }
 
@@ -99,6 +114,8 @@ public class ConsumeContext<T>
         if (responseAddress == null) {
             return CompletableFuture.completedFuture(null);
         }
+        context.setSourceAddress(busAddress);
+        context.setDestinationAddress(URI.create(responseAddress));
         SendEndpoint endpoint = getSendEndpoint(responseAddress);
         return endpoint.send(context);
     }

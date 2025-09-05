@@ -4,6 +4,8 @@ import com.myservicebus.tasks.CancellationToken;
 import com.myservicebus.tasks.CancellationTokenSource;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicReference;
+import java.net.URI;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -52,7 +54,7 @@ public class ConsumeContextTest {
         }
 
         CapturingProvider provider = new CapturingProvider();
-        ConsumeContext<FakeMessage> ctx = new ConsumeContext<>(new FakeMessage(), Map.of(), provider);
+        ConsumeContext<FakeMessage> ctx = new ConsumeContext<>(new FakeMessage(), Map.of(), provider, URI.create("rabbitmq://localhost/"));
 
         ctx.publish(new FakeMessage(), CancellationToken.none).join();
 
@@ -79,5 +81,29 @@ public class ConsumeContextTest {
         ctx.forward("queue:forward-queue", new FakeMessage(), CancellationToken.none).join();
 
         Assertions.assertEquals("queue:forward-queue", provider.uri);
+    }
+
+    @Test
+    public void publishSetsSourceAndDestinationAddresses() {
+        AtomicReference<SendContext> captured = new AtomicReference<>();
+        SendEndpointProvider provider = uri -> new SendEndpoint() {
+            @Override
+            public CompletableFuture<Void> send(SendContext ctx) {
+                captured.set(ctx);
+                return CompletableFuture.completedFuture(null);
+            }
+
+            @Override
+            public <T> CompletableFuture<Void> send(T message, CancellationToken cancellationToken) {
+                return send(new SendContext(message, cancellationToken));
+            }
+        };
+
+        ConsumeContext<FakeMessage> ctx = new ConsumeContext<>(new FakeMessage(), Map.of(), provider, URI.create("rabbitmq://localhost/"));
+
+        ctx.publish(new FakeMessage()).join();
+
+        Assertions.assertEquals(URI.create("rabbitmq://localhost/"), captured.get().getSourceAddress());
+        Assertions.assertEquals(URI.create("rabbitmq://localhost/exchange/TestApp:FakeMessage"), captured.get().getDestinationAddress());
     }
 }

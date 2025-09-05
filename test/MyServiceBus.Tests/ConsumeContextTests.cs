@@ -47,7 +47,8 @@ public class ConsumeContextTests
             var sut = new ConsumeContextImpl<string>(receiveContext, new StubTransportFactory(),
                 new SendPipe(Pipe.Empty<SendContext>()),
                 new PublishPipe(Pipe.Empty<SendContext>()),
-                new EnvelopeMessageSerializer());
+                new EnvelopeMessageSerializer(),
+                new Uri("rabbitmq://localhost/"));
 
             Assert.Equal(cts.Token, sut.CancellationToken);
         }
@@ -69,11 +70,14 @@ public class ConsumeContextTests
         var ctx = new ConsumeContextImpl<FakeMessage>(receiveContext, factory,
             new SendPipe(Pipe.Empty<SendContext>()),
             new PublishPipe(Pipe.Empty<SendContext>()),
-            new EnvelopeMessageSerializer());
+            new EnvelopeMessageSerializer(),
+            new Uri("rabbitmq://localhost/"));
 
         await ctx.PublishAsync(new FakeMessage());
 
         Assert.Equal(new Uri("rabbitmq://localhost/exchange/MyServiceBus.Tests:FakeMessage"), factory.Address);
+        Assert.Equal(new Uri("rabbitmq://localhost/"), factory.Context!.SourceAddress);
+        Assert.Equal(new Uri("rabbitmq://localhost/exchange/MyServiceBus.Tests:FakeMessage"), factory.Context!.DestinationAddress);
     }
 
     [Fact]
@@ -88,7 +92,8 @@ public class ConsumeContextTests
         var ctx = new ConsumeContextImpl<FakeMessage>(receiveContext, factory,
             new SendPipe(Pipe.Empty<SendContext>()),
             new PublishPipe(Pipe.Empty<SendContext>()),
-            new EnvelopeMessageSerializer());
+            new EnvelopeMessageSerializer(),
+            new Uri("rabbitmq://localhost/"));
 
         await ctx.Forward(new Uri("queue:forward-queue"), new FakeMessage());
 
@@ -100,11 +105,12 @@ public class ConsumeContextTests
     class CapturingTransportFactory : ITransportFactory
     {
         public Uri? Address { get; private set; }
+        public SendContext? Context { get; private set; }
 
         public Task<ISendTransport> GetSendTransport(Uri address, CancellationToken cancellationToken = default)
         {
             Address = address;
-            return Task.FromResult<ISendTransport>(new StubSendTransport());
+            return Task.FromResult<ISendTransport>(new StubSendTransport(this));
         }
 
         [Throws(typeof(NotImplementedException))]
@@ -116,8 +122,18 @@ public class ConsumeContextTests
 
         class StubSendTransport : ISendTransport
         {
+            readonly CapturingTransportFactory _factory;
+
+            public StubSendTransport(CapturingTransportFactory factory)
+            {
+                _factory = factory;
+            }
+
             public Task Send<T>(T message, SendContext context, CancellationToken cancellationToken = default) where T : class
-                => Task.CompletedTask;
+            {
+                _factory.Context = context;
+                return Task.CompletedTask;
+            }
         }
     }
 

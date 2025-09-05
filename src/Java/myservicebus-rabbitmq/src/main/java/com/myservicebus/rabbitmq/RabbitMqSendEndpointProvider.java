@@ -13,12 +13,14 @@ public class RabbitMqSendEndpointProvider implements TransportSendEndpointProvid
     private final RabbitMqTransportFactory transportFactory;
     private final SendPipe sendPipe;
     private final MessageSerializer serializer;
+    private final URI busAddress;
 
     public RabbitMqSendEndpointProvider(RabbitMqTransportFactory transportFactory, SendPipe sendPipe,
-            MessageSerializer serializer) {
+            MessageSerializer serializer, URI busAddress) {
         this.transportFactory = transportFactory;
         this.sendPipe = sendPipe;
         this.serializer = serializer;
+        this.busAddress = busAddress;
     }
 
     @Override
@@ -113,6 +115,8 @@ public class RabbitMqSendEndpointProvider implements TransportSendEndpointProvid
         return new SendEndpoint() {
             @Override
             public CompletableFuture<Void> send(SendContext ctx) {
+                ctx.setSourceAddress(busAddress);
+                ctx.setDestinationAddress(target);
                 return sendPipe.send(ctx).thenCompose(v -> endpoint.send(ctx));
             }
 
