@@ -22,7 +22,7 @@ class ErrorQueueTest {
 
     @Test
     void sendsFaultedMessagesToErrorQueue() throws Exception {
-        List<Object> errorMessages = new ArrayList<>();
+        List<SendContext> errorMessages = new ArrayList<>();
         StubFactory factory = new StubFactory();
 
         ServiceCollection services = new ServiceCollection();
@@ -36,7 +36,7 @@ class ErrorQueueTest {
             @Override
             public CompletableFuture<Void> send(SendContext ctx) {
                 if (uri.equals(factory.errorAddress)) {
-                    errorMessages.add(ctx.getMessage());
+                    errorMessages.add(ctx);
                 }
                 return CompletableFuture.completedFuture(null);
             }
@@ -68,7 +68,12 @@ class ErrorQueueTest {
         }
 
         assertEquals(1, errorMessages.size());
-        assertTrue(errorMessages.get(0) instanceof MyMessage);
+        Map<String, Object> errorHeaders = errorMessages.get(0).getHeaders();
+        assertEquals(RuntimeException.class.getName(), errorHeaders.get(MessageHeaders.EXCEPTION_TYPE));
+        assertEquals("fault", errorHeaders.get(MessageHeaders.REASON));
+        assertEquals(0, errorHeaders.get(MessageHeaders.REDELIVERY_COUNT));
+        assertTrue(errorHeaders.containsKey(MessageHeaders.HOST_MACHINE));
+        assertTrue(errorHeaders.containsKey(MessageHeaders.HOST_PROCESS));
     }
 
     static class StubFactory implements TransportFactory {
