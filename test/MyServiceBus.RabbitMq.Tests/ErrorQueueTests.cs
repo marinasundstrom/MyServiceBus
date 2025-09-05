@@ -35,10 +35,11 @@ public class ErrorQueueTests
         var provider = services.BuildServiceProvider();
 
         var errorUri = new Uri("rabbitmq://localhost/exchange/test-queue_error");
+        var faultUri = new Uri("rabbitmq://localhost/exchange/custom_fault");
         var json = Encoding.UTF8.GetBytes($"{{\"messageId\":\"00000000-0000-0000-0000-000000000000\",\"messageType\":[],\"message\":{{\"text\":\"hi\"}}}}");
-        var headers = new Dictionary<string, object> { [MessageHeaders.FaultAddress] = errorUri.ToString() };
+        var headers = new Dictionary<string, object> { [MessageHeaders.FaultAddress] = faultUri.ToString() };
         var envelope = new EnvelopeMessageContext(json, headers);
-        var receiveContext = new ReceiveContextImpl(envelope);
+        var receiveContext = new ReceiveContextImpl(envelope, errorUri);
 
         var transportFactory = new CaptureTransportFactory();
         var context = new ConsumeContextImpl<TestMessage>(receiveContext, transportFactory,

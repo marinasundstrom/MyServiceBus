@@ -161,7 +161,7 @@ public class InMemoryTestHarness : IMessageBus, ITransportFactory, IReceiveEndpo
             context.FaultAddress,
             DateTimeOffset.UtcNow);
 
-        var receiveContext = new ReceiveContextImpl(msgContext, context.CancellationToken);
+        var receiveContext = new ReceiveContextImpl(msgContext, null, context.CancellationToken);
 
         List<Func<ReceiveContext, Task>> snapshot;
         lock (receiveHandlers)

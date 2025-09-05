@@ -47,13 +47,13 @@ public sealed class RabbitMqReceiveTransport : IReceiveTransport
                     headers["content_type"] = "application/vnd.masstransit+json";
                 }
 
-                if (_hasErrorQueue)
-                    headers[MessageHeaders.FaultAddress] = $"rabbitmq://localhost/exchange/{_queueName}_error";
-
                 var transportMessage = new RabbitMqTransportMessage(headers, props.Persistent, payload);
                 var messageContext = _contextFactory.CreateMessageContext(transportMessage);
 
-                var context = new ReceiveContextImpl(messageContext);
+                var errorAddress = _hasErrorQueue
+                    ? new Uri($"rabbitmq://localhost/exchange/{_queueName}_error")
+                    : null;
+                var context = new ReceiveContextImpl(messageContext, errorAddress);
 
                 await _messageHandler.Invoke(context);
 

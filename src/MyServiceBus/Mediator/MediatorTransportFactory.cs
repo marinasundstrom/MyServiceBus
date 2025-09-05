@@ -146,7 +146,7 @@ public class MediatorTransportFactory : ITransportFactory
                 context.FaultAddress,
                 DateTimeOffset.UtcNow);
 
-            var receiveContext = new ReceiveContextImpl(msgContext);
+            var receiveContext = new ReceiveContextImpl(msgContext, null);
             return _factory.Dispatch(_exchange, receiveContext);
         }
     }

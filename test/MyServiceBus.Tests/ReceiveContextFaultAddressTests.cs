@@ -19,7 +19,7 @@ public class ReceiveContextFaultAddressTests
             [MessageHeaders.FaultAddress] = "rabbitmq://localhost/exchange/test_queue_error"
         };
         var envelope = new EnvelopeMessageContext(json, headers);
-        var receiveContext = new ReceiveContextImpl(envelope);
+        var receiveContext = new ReceiveContextImpl(envelope, null);
         Assert.Equal(new Uri("rabbitmq://localhost/exchange/test_queue_error"), receiveContext.FaultAddress);
     }
 
@@ -33,7 +33,7 @@ public class ReceiveContextFaultAddressTests
             [MessageHeaders.FaultAddress] = "rabbitmq://localhost/exchange/test_queue_error"
         };
         var raw = new RawJsonMessageContext(json, headers);
-        var receiveContext = new ReceiveContextImpl(raw);
+        var receiveContext = new ReceiveContextImpl(raw, null);
         Assert.Equal(new Uri("rabbitmq://localhost/exchange/test_queue_error"), receiveContext.FaultAddress);
     }
 }

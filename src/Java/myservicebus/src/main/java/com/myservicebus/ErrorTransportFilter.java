@@ -11,9 +11,9 @@ public class ErrorTransportFilter<T> implements Filter<ConsumeContext<T>> {
         return next.send(context).handle((v, ex) -> {
             if (ex != null) {
                 Throwable cause = ex instanceof CompletionException && ex.getCause() != null ? ex.getCause() : ex;
-                String faultAddress = context.getFaultAddress();
-                if (faultAddress != null) {
-                    SendEndpoint endpoint = context.getSendEndpoint(faultAddress);
+                String errorAddress = context.getErrorAddress();
+                if (errorAddress != null) {
+                    SendEndpoint endpoint = context.getSendEndpoint(errorAddress);
                     endpoint.send(context.getMessage(), CancellationToken.none).join();
                 }
                 throw new CompletionException(cause);

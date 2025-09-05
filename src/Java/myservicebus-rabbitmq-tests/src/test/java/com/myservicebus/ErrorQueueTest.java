@@ -57,12 +57,15 @@ class ErrorQueueTest {
 
         // simulate message arrival
         Map<String, Object> headers = new HashMap<>();
-        headers.put(MessageHeaders.FAULT_ADDRESS, factory.errorAddress);
+        headers.put(MessageHeaders.FAULT_ADDRESS, "rabbitmq://localhost/exchange/custom_fault");
         Envelope<MyMessage> envelope = new Envelope<>();
         envelope.setMessage(new MyMessage());
         envelope.setHeaders(new HashMap<>());
         byte[] body = new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsBytes(envelope);
-        factory.handler.apply(new TransportMessage(body, headers)).join();
+        try {
+            factory.handler.apply(new TransportMessage(body, headers)).join();
+        } catch (Exception ignored) {
+        }
 
         assertEquals(1, errorMessages.size());
         assertTrue(errorMessages.get(0) instanceof MyMessage);

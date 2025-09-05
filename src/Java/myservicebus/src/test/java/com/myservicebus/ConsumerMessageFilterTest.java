@@ -68,7 +68,7 @@ class ConsumerMessageFilterTest {
         Pipe<ConsumeContext<TestMessage>> pipe = configurator.build();
 
         CompletableFuture<Void> future = pipe.send(ctx);
-        assertDoesNotThrow(future::join);
+        assertThrows(RuntimeException.class, future::join);
 
         assertTrue(endpoint.sent instanceof Fault<?>);
         @SuppressWarnings("unchecked")

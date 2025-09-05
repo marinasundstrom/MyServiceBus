@@ -98,15 +98,14 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
                         faultAddress = s;
                     }
                 }
-                if (faultAddress == null) {
-                    faultAddress = transportFactory.getPublishAddress(consumerDef.getQueueName() + "_error");
-                }
+                String errorAddress = transportFactory.getPublishAddress(consumerDef.getQueueName() + "_error");
 
                 ConsumeContext<Object> ctx = new ConsumeContext<>(
                         envelope.getMessage(),
                         envelope.getHeaders(),
                         envelope.getResponseAddress(),
                         faultAddress,
+                        errorAddress,
                         CancellationToken.none,
                         transportSendEndpointProvider);
                 return pipe.send(ctx);
@@ -148,11 +147,10 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
                         faultAddress = s;
                     }
                 }
-                if (faultAddress == null) {
-                    faultAddress = transportFactory.getPublishAddress(queueName + "_error");
-                }
+                String errorAddress = transportFactory.getPublishAddress(queueName + "_error");
                 ConsumeContext<T> ctx = new ConsumeContext<>((T) envelope.getMessage(), envelope.getHeaders(),
-                        envelope.getResponseAddress(), faultAddress, CancellationToken.none, transportSendEndpointProvider);
+                        envelope.getResponseAddress(), faultAddress, errorAddress, CancellationToken.none,
+                        transportSendEndpointProvider);
                 return pipe.send(ctx);
             } catch (Exception e) {
                 CompletableFuture<Void> f = new CompletableFuture<>();
