@@ -34,10 +34,8 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
         this.transportSendEndpointProvider = serviceProvider.getService(TransportSendEndpointProvider.class);
         this.publishPipe = serviceProvider.getService(PublishPipe.class);
         this.logger = serviceProvider.getService(Logger.class);
-        MessageDeserializer md;
-        try {
-            md = serviceProvider.getService(MessageDeserializer.class);
-        } catch (Exception ex) {
+        MessageDeserializer md = serviceProvider.getService(MessageDeserializer.class);
+        if (md == null) {
             md = new com.myservicebus.serialization.EnvelopeMessageDeserializer();
         }
         this.messageDeserializer = md;
