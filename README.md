@@ -1,10 +1,11 @@
 # ✉️ MyServiceBus
 
-MyServiceBus (a working title) is a lightweight asynchronous messaging library inspired by MassTransit. It is designed to be minimal yet compatible with the MassTransit message envelope format, enabling services to send, publish, and consume messages across .NET and Java implementations.
+MyServiceBus (a working title) is a lightweight asynchronous messaging library inspired by MassTransit. It is designed to be minimal yet compatible with the MassTransit message envelope format and protocol, enabling services to send, publish, and consume messages across .NET and Java implementations or directly with MassTransit clients.
 
 ## Goals
 - Provide a community-driven, open-source alternative to MassTransit and MediatR as they move toward commercial licensing.
 - Offer a familiar API for developers coming from MassTransit.
+- Ensure wire-level and API compatibility with MassTransit so any client can communicate with MassTransit services.
 - Maintain feature parity between the C# and Java clients with consistent behavior across languages. See the [design guidelines](docs/design-guidelines.md) for architectural and feature parity.
 
 ## Features
@@ -15,11 +16,16 @@ MyServiceBus (a working title) is a lightweight asynchronous messaging library i
 - In-memory mediator
 - Compatibility with MassTransit message envelopes
 - Raw JSON messages
-- Retries and error handling
+- Fault and error handling semantics aligned with MassTransit
 - Pipeline behaviors
 - OpenTelemetry support
 - Annotated for use with the [CheckedExceptions](https://github.com/marinasundstrom/CheckedExceptions) analyzer
 - Java client and server prototypes
+
+## Specification
+- [MyServiceBus Specification](docs/myservicebus-spec.md)
+- [ServiceBus Transport Specification](docs/transport-spec.md)
+- [Differences from MassTransit](docs/masstransit-differences.md)
 
 ## Getting Started
 ### Prerequisites
