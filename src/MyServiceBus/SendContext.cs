@@ -25,6 +25,8 @@ public class SendContext : BasePipeContext, ISendContext
     public string? CorrelationId { get; set; }
     public Uri? ResponseAddress { get; set; }
     public Uri? FaultAddress { get; set; }
+    public Uri? SourceAddress { get; set; }
+    public Uri? DestinationAddress { get; set; }
 
     public async Task<ReadOnlyMemory<byte>> Serialize<T>(T message)
         where T : class
@@ -33,9 +35,11 @@ public class SendContext : BasePipeContext, ISendContext
         {
             MessageId = Guid.NewGuid(),
             CorrelationId = null,
-            MessageType = [.. messageTypes.Select(x => NamingConventions.GetMessageUrn(x))],
+            MessageType = [..messageTypes.Select(x => NamingConventions.GetMessageUrn(x))],
             ResponseAddress = ResponseAddress,
             FaultAddress = FaultAddress,
+            SourceAddress = SourceAddress ?? new Uri("loopback://localhost/source"),
+            DestinationAddress = DestinationAddress ?? new Uri($"loopback://localhost/{typeof(T).Name}"),
             Headers = Headers,
             SentTime = DateTimeOffset.Now,
             HostInfo = GetHostInfo<T>(),

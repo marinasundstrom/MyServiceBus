@@ -18,6 +18,10 @@ public class EnvelopeMessageSerializer implements MessageSerializer {
         Envelope<T> envelope = new Envelope<>();
         envelope.setMessageId(context.getMessageId());
         envelope.setCorrelationId(context.getCorrelationId());
+        envelope.setSourceAddress(
+                context.getSourceAddress() != null ? context.getSourceAddress().toString() : null);
+        envelope.setDestinationAddress(
+                context.getDestinationAddress() != null ? context.getDestinationAddress().toString() : null);
         envelope.setResponseAddress(
                 context.getResponseAddress() != null ? context.getResponseAddress().toString() : null);
         envelope.setFaultAddress(context.getFaultAddress() != null ? context.getFaultAddress().toString() : null);
