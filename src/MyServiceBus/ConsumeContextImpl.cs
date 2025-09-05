@@ -13,10 +13,11 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
     private readonly ISendPipe _sendPipe;
     private readonly IPublishPipe _publishPipe;
     private readonly IMessageSerializer _messageSerializer;
+    private readonly Uri _address;
     private TMessage? message;
 
     public ConsumeContextImpl(ReceiveContext receiveContext, ITransportFactory transportFactory,
-        ISendPipe sendPipe, IPublishPipe publishPipe, IMessageSerializer messageSerializer)
+        ISendPipe sendPipe, IPublishPipe publishPipe, IMessageSerializer messageSerializer, Uri address)
         : base(receiveContext.CancellationToken)
     {
         this.receiveContext = receiveContext;
@@ -24,6 +25,7 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
         _sendPipe = sendPipe;
         _publishPipe = publishPipe;
         _messageSerializer = messageSerializer;
+        _address = address;
     }
 
     internal ReceiveContext ReceiveContext => receiveContext;
@@ -32,7 +34,7 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
 
     public Task<ISendEndpoint> GetSendEndpoint(Uri uri)
     {
-        ISendEndpoint endpoint = new TransportSendEndpoint(_transportFactory, _sendPipe, _messageSerializer, uri);
+        ISendEndpoint endpoint = new TransportSendEndpoint(_transportFactory, _sendPipe, _messageSerializer, uri, _address);
         return Task.FromResult(endpoint);
     }
 
@@ -47,12 +49,15 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
     {
         var exchangeName = NamingConventions.GetExchangeName(typeof(T));
 
-        var uri = new Uri($"rabbitmq://localhost/exchange/{exchangeName}");
+        var uri = new Uri(_address, $"exchange/{exchangeName}");
         var transport = await _transportFactory.GetSendTransport(uri, cancellationToken);
 
         var context = new SendContext(MessageTypeCache.GetMessageTypes(typeof(T)), _messageSerializer, cancellationToken)
         {
-            MessageId = Guid.NewGuid().ToString()
+            MessageId = Guid.NewGuid().ToString(),
+            SourceAddress = _address,
+            DestinationAddress = uri,
+            RoutingKey = exchangeName
         };
 
         contextCallback?.Invoke(context);
@@ -78,7 +83,9 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
 
         var context = new SendContext(MessageTypeCache.GetMessageTypes(typeof(T)), _messageSerializer, cancellationToken)
         {
-            MessageId = Guid.NewGuid().ToString()
+            MessageId = Guid.NewGuid().ToString(),
+            SourceAddress = _address,
+            DestinationAddress = address
         };
 
         contextCallback?.Invoke(context);
@@ -107,7 +114,9 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
         var transport = await _transportFactory.GetSendTransport(address, cancellationToken);
         var context = new SendContext(MessageTypeCache.GetMessageTypes(typeof(Fault<TMessage>)), _messageSerializer, cancellationToken)
         {
-            MessageId = Guid.NewGuid().ToString()
+            MessageId = Guid.NewGuid().ToString(),
+            SourceAddress = _address,
+            DestinationAddress = address
         };
 
         await _sendPipe.Send(context);

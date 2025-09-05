@@ -11,13 +11,15 @@ public class TransportSendEndpoint : ISendEndpoint
     readonly ISendPipe _sendPipe;
     readonly IMessageSerializer _serializer;
     readonly Uri _address;
+    readonly Uri _sourceAddress;
 
-    public TransportSendEndpoint(ITransportFactory transportFactory, ISendPipe sendPipe, IMessageSerializer serializer, Uri address)
+    public TransportSendEndpoint(ITransportFactory transportFactory, ISendPipe sendPipe, IMessageSerializer serializer, Uri address, Uri sourceAddress)
     {
         _transportFactory = transportFactory;
         _sendPipe = sendPipe;
         _serializer = serializer;
         _address = address;
+        _sourceAddress = sourceAddress;
     }
 
     [Throws(typeof(InvalidOperationException))]
@@ -30,7 +32,9 @@ public class TransportSendEndpoint : ISendEndpoint
         var transport = await _transportFactory.GetSendTransport(_address, cancellationToken);
         var context = new SendContext(MessageTypeCache.GetMessageTypes(typeof(T)), _serializer, cancellationToken)
         {
-            MessageId = Guid.NewGuid().ToString()
+            MessageId = Guid.NewGuid().ToString(),
+            SourceAddress = _sourceAddress,
+            DestinationAddress = _address
         };
 
         contextCallback?.Invoke(context);

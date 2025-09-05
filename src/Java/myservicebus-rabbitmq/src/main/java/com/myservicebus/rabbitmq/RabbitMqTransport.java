@@ -39,7 +39,8 @@ public class RabbitMqTransport {
             RabbitMqTransportFactory factory = sp.getService(RabbitMqTransportFactory.class);
             SendPipe sendPipe = sp.getService(SendPipe.class);
             com.myservicebus.serialization.MessageSerializer serializer = sp.getService(com.myservicebus.serialization.MessageSerializer.class);
-            return new RabbitMqSendEndpointProvider(factory, sendPipe, serializer);
+            URI busAddress = sp.getService(URI.class);
+            return new RabbitMqSendEndpointProvider(factory, sendPipe, serializer, busAddress);
         });
         services.addSingleton(TransportSendEndpointProvider.class,
                 sp -> () -> sp.getService(RabbitMqSendEndpointProvider.class));

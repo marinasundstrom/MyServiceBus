@@ -45,7 +45,8 @@ public class ErrorQueueTests
         var context = new ConsumeContextImpl<TestMessage>(receiveContext, transportFactory,
             new SendPipe(Pipe.Empty<SendContext>()),
             new PublishPipe(Pipe.Empty<SendContext>()),
-            new EnvelopeMessageSerializer());
+            new EnvelopeMessageSerializer(),
+            new Uri("rabbitmq://localhost/"));
 
         var configurator = new PipeConfigurator<ConsumeContext<TestMessage>>();
         configurator.UseFilter(new ErrorTransportFilter<TestMessage>());

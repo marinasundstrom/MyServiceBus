@@ -71,7 +71,7 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
 
     public Task<ISendEndpoint> GetSendEndpoint(Uri uri)
     {
-        ISendEndpoint endpoint = new TransportSendEndpoint(_transportFactory, _sendPipe, _messageSerializer, uri);
+        ISendEndpoint endpoint = new TransportSendEndpoint(_transportFactory, _sendPipe, _messageSerializer, uri, _address);
         return Task.FromResult(endpoint);
     }
 
@@ -101,7 +101,7 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
         [Throws(typeof(InvalidCastException))]
         async Task TransportHandler(ReceiveContext context)
         {
-            var consumeContext = new ConsumeContextImpl<TMessage>(context, _transportFactory, _sendPipe, _publishPipe, _messageSerializer);
+            var consumeContext = new ConsumeContextImpl<TMessage>(context, _transportFactory, _sendPipe, _publishPipe, _messageSerializer, _address);
             await pipe.Send(consumeContext).ConfigureAwait(false);
         }
 
@@ -166,7 +166,7 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
             return;
 
         var consumeContextType = typeof(ConsumeContextImpl<>).MakeGenericType(registration.MessageType);
-        var consumeContext = (ConsumeContext)Activator.CreateInstance(consumeContextType, context, _transportFactory, _sendPipe, _publishPipe, _messageSerializer)
+        var consumeContext = (ConsumeContext)Activator.CreateInstance(consumeContextType, context, _transportFactory, _sendPipe, _publishPipe, _messageSerializer, _address)
             ?? throw new InvalidOperationException("Failed to create ConsumeContext");
 
         await registration.Pipe.Send(consumeContext);
