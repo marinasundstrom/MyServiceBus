@@ -11,7 +11,11 @@ public class MessageContextFactory
     {
         if (transportMessage.Headers.TryGetValue("content_type", out var contentTypeObj))
         {
-            var contentType = contentTypeObj.ToString();
+            var contentType = contentTypeObj switch
+            {
+                byte[] bytes => System.Text.Encoding.UTF8.GetString(bytes),
+                _ => contentTypeObj.ToString(),
+            };
 
             if (string.Equals(contentType, "application/vnd.masstransit+json", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(contentType, "application/vnd.masstransit+json", StringComparison.OrdinalIgnoreCase))
