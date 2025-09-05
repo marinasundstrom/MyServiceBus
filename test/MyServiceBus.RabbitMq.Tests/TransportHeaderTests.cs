@@ -5,6 +5,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
+using MyServiceBus;
 using MyServiceBus.Serialization;
 
 namespace MyServiceBus.RabbitMq.Tests;
@@ -14,20 +15,20 @@ public class TransportHeaderTests
     class TestMessage { }
 
     [Fact]
+    [Throws(typeof(NotSupportedException))]
     public async Task Underscore_headers_are_applied_to_basic_properties()
     {
         var channel = Substitute.For<IChannel>();
-        IBasicProperties? captured = null;
-        channel.CreateBasicProperties().Returns(new BasicProperties());
+        BasicProperties? captured = null;
         channel.BasicPublishAsync(
             Arg.Any<string>(),
             Arg.Any<string>(),
             Arg.Any<bool>(),
-            Arg.Any<IBasicProperties>(),
+            Arg.Any<BasicProperties>(),
             Arg.Any<ReadOnlyMemory<byte>>(),
             Arg.Any<CancellationToken>())
-            .Returns(Task.CompletedTask)
-            .AndDoes(ci => captured = ci.Arg<IBasicProperties>());
+            .Returns(_ => ValueTask.CompletedTask)
+            .AndDoes(ci => captured = ci.Arg<BasicProperties>());
 
         var transport = new RabbitMqSendTransport(channel, "test");
         var context = new SendContext(MessageTypeCache.GetMessageTypes(typeof(TestMessage)), new EnvelopeMessageSerializer())

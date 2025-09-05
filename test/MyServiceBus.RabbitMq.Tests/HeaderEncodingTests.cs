@@ -8,6 +8,8 @@ using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using MyServiceBus;
+using MyServiceBus.Serialization;
 
 namespace MyServiceBus.RabbitMq.Tests;
 
@@ -22,21 +24,20 @@ public class HeaderEncodingTests
     }
 
     [Fact]
-    [Throws(typeof(UriFormatException), typeof(ArgumentException), typeof(InvalidOperationException))]
+    [Throws(typeof(UriFormatException), typeof(ArgumentException), typeof(InvalidOperationException), typeof(JsonException))]
     public async Task Faulted_message_headers_include_mt_prefix()
     {
         var channel = Substitute.For<IChannel>();
-        IBasicProperties? captured = null;
-        channel.CreateBasicProperties().Returns(new BasicProperties());
+        BasicProperties? captured = null;
         channel.BasicPublishAsync(
             Arg.Any<string>(),
             Arg.Any<string>(),
             Arg.Any<bool>(),
-            Arg.Any<IBasicProperties>(),
+            Arg.Any<BasicProperties>(),
             Arg.Any<ReadOnlyMemory<byte>>(),
             Arg.Any<CancellationToken>())
-            .Returns(Task.CompletedTask)
-            .AndDoes(ci => captured = ci.Arg<IBasicProperties>());
+            .Returns(_ => ValueTask.CompletedTask)
+            .AndDoes(ci => captured = ci.Arg<BasicProperties>());
 
         var services = new ServiceCollection();
         services.AddTransient<FaultingConsumer>();

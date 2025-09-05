@@ -22,8 +22,10 @@ public sealed class RabbitMqQueueSendTransport : ISendTransport
     {
         var body = await context.Serialize(message);
 
-        var props = _channel.CreateBasicProperties();
-        props.Persistent = true;
+        var props = new BasicProperties
+        {
+            Persistent = true
+        };
 
         if (context.Headers != null)
         {

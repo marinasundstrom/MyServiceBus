@@ -13,7 +13,7 @@ namespace MyServiceBus.RabbitMq.Tests;
 
 public class RabbitMqTransportFactoryTests
 {
-    [Fact(Skip = "Not working")]
+    [Fact]
     [Throws(typeof(Exception))]
     public async Task Declares_dead_letter_exchange_and_queue()
     {
@@ -164,7 +164,7 @@ public class RabbitMqTransportFactoryTests
     }
 
     [Fact]
-    [Throws(typeof(OverflowException))]
+    [Throws(typeof(OverflowException), typeof(InvalidOperationException))]
     public async Task Supports_exchange_scheme_uri()
     {
         var channel = Substitute.For<IChannel>();
@@ -205,7 +205,7 @@ public class RabbitMqTransportFactoryTests
     }
 
     [Fact]
-    [Throws(typeof(OverflowException))]
+    [Throws(typeof(OverflowException), typeof(InvalidOperationException))]
     public async Task Supports_queue_scheme_uri()
     {
         var channel = Substitute.For<IChannel>();
