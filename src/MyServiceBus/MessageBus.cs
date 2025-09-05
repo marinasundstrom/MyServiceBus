@@ -38,24 +38,26 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
 
     public IBusTopology Topology => _topology;
 
-    [Throws(typeof(UriFormatException), typeof(InvalidOperationException), typeof(InvalidCastException))]
+    [Throws(typeof(UriFormatException), typeof(InvalidOperationException), typeof(InvalidCastException), typeof(ArgumentOutOfRangeException))]
     public Task PublishAsync<TMessage>(object message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default) where TMessage : class
     {
         return PublishAsync((TMessage)message, contextCallback, cancellationToken);
     }
 
-    [Throws(typeof(UriFormatException), typeof(InvalidOperationException))]
+    [Throws(typeof(UriFormatException), typeof(InvalidOperationException), typeof(ArgumentOutOfRangeException))]
     public async Task PublishAsync<T>(T message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default) where T : class
     {
         var exchangeName = NamingConventions.GetExchangeName(message.GetType());
 
-        var uri = new Uri($"rabbitmq://localhost/exchange/{exchangeName}");
+        var uri = new Uri(_address, $"exchange/{exchangeName}");
         var transport = await _transportFactory.GetSendTransport(uri, cancellationToken);
 
         var context = new SendContext(MessageTypeCache.GetMessageTypes(typeof(T)), _messageSerializer, cancellationToken)
         {
             RoutingKey = exchangeName,
-            MessageId = Guid.NewGuid().ToString()
+            MessageId = Guid.NewGuid().ToString(),
+            SourceAddress = _address,
+            DestinationAddress = uri
         };
 
         contextCallback?.Invoke(context);
@@ -73,7 +75,7 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
         return Task.FromResult(endpoint);
     }
 
-    [Throws(typeof(InvalidOperationException))]
+    [Throws(typeof(InvalidOperationException), typeof(ArgumentOutOfRangeException))]
     public async Task AddHandler<TMessage>(string queueName, string exchangeName, Func<ConsumeContext<TMessage>, Task> handler,
         int? retryCount = null, TimeSpan? retryDelay = null, CancellationToken cancellationToken = default)
         where TMessage : class
