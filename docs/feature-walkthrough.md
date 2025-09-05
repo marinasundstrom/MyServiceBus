@@ -12,6 +12,7 @@ For an explanation of why the C# and Java examples differ, see the [design decis
   - [Consuming Messages](#consuming-messages)
   - [Request/Response](#requestresponse)
   - [Adding Headers](#adding-headers)
+  - [Retries](#retries)
   - [Error Handling](#error-handling)
   - [Mediator (In-Memory Transport)](#mediator-in-memory-transport)
 - [Advanced](#advanced)
@@ -329,12 +330,14 @@ OrderStatus response = client.getResponse(
     CancellationToken.none).join();
 ```
 
+### Retries
+
+Transient issues like network hiccups or temporary I/O errors may succeed on a subsequent attempt. To handle these cases automatically, MyServiceBus retries each consumer three times before considering it failed. After the retry limit is reached, the message is faulted; see [Faults](#faults) for details.
+
 ### Error Handling
 
 MyServiceBus separates consumer failures into **faults** and **errors**.
 
-Transient issues like network hiccups or temporary I/O errors may succeed on a subsequent attempt.
-To handle these cases automatically, MyServiceBus retries each consumer three times before considering it failed.
 
 #### Faults
 
