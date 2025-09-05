@@ -2,6 +2,7 @@
 
 - **Confirm prerequisites**: Ensure build tools, package managers, and a compatible runtime exist for the target platform.
 - **Understand repository architecture**: Study the existing C# and Java clients to learn message flows and core abstractions.
+- **Review core docs**: Check the specifications, design guidelines, and design goals to ensure the port aligns with existing expectations.
 - **Assess feature parity**: Catalog current features (serialization, routing, retries, telemetry) and determine how to provide them on the new platform.
 - **Provision infrastructure**: Configure a message broker (e.g., RabbitMQ) or an in-memory transport appropriate for the platform.
 - **Port core messaging features**: Implement publish/subscribe and request/response patterns, retries, and metrics in a way that fits platform conventions.
