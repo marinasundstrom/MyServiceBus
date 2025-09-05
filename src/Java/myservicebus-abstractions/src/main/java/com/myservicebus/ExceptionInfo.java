@@ -22,12 +22,14 @@ public class ExceptionInfo {
 
     public static ExceptionInfo fromException(Throwable exception) {
         ExceptionInfo info = new ExceptionInfo();
-        info.setExceptionType(exception.getClass().getName());
-        info.setMessage(exception.getMessage());
-        info.setStackTrace(getStackTrace(exception));
-        info.setSource(exception.getClass().getPackageName());
-        if (exception.getCause() != null) {
-            info.setInnerException(fromException(exception.getCause()));
+        info.exceptionType = exception.getClass().getName();
+        info.message = exception.getMessage();
+        info.stackTrace = getStackTrace(exception);
+        Package pkg = exception.getClass().getPackage();
+        info.source = pkg != null ? pkg.getName() : null;
+        Throwable cause = exception.getCause();
+        if (cause != null) {
+            info.innerException = fromException(cause);
         }
         return info;
     }
