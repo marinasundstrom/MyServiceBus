@@ -10,6 +10,7 @@ import java.util.function.Function;
 
 import org.junit.jupiter.api.Test;
 
+import com.myservicebus.TransportMessage;
 import com.myservicebus.di.ServiceCollection;
 import com.myservicebus.rabbitmq.ConnectionProvider;
 import com.rabbitmq.client.ConnectionFactory;
@@ -62,7 +63,7 @@ class ServiceBusPublishFilterTest {
 
             @Override
             public ReceiveTransport createReceiveTransport(String queueName, List<MessageBinding> bindings,
-                    Function<byte[], CompletableFuture<Void>> handler) {
+                    Function<TransportMessage, CompletableFuture<Void>> handler) {
                 throw new UnsupportedOperationException();
             }
 
