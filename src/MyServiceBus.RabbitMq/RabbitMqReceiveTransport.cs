@@ -48,7 +48,7 @@ public sealed class RabbitMqReceiveTransport : IReceiveTransport
                 }
 
                 if (_hasErrorQueue)
-                    headers["faultAddress"] = $"rabbitmq://localhost/exchange/{_queueName}_error";
+                    headers[MessageHeaders.FaultAddress] = $"rabbitmq://localhost/exchange/{_queueName}_error";
 
                 var transportMessage = new RabbitMqTransportMessage(headers, props.Persistent, payload);
                 var messageContext = _contextFactory.CreateMessageContext(transportMessage);

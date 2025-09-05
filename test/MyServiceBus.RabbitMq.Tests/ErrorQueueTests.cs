@@ -27,7 +27,7 @@ public class ErrorQueueTests
     }
 
     [Fact]
-    [Throws(typeof(UriFormatException), typeof(EncoderFallbackException), typeof(ArgumentOutOfRangeException))]
+    [Throws(typeof(UriFormatException), typeof(EncoderFallbackException), typeof(ArgumentOutOfRangeException), typeof(JsonException))]
     public async Task Moves_message_to_error_queue_when_consumer_faults()
     {
         var services = new ServiceCollection();
@@ -36,7 +36,7 @@ public class ErrorQueueTests
 
         var errorUri = new Uri("rabbitmq://localhost/exchange/test-queue_error");
         var json = Encoding.UTF8.GetBytes($"{{\"messageId\":\"00000000-0000-0000-0000-000000000000\",\"messageType\":[],\"message\":{{\"text\":\"hi\"}}}}");
-        var headers = new Dictionary<string, object> { ["faultAddress"] = errorUri.ToString() };
+        var headers = new Dictionary<string, object> { [MessageHeaders.FaultAddress] = errorUri.ToString() };
         var envelope = new EnvelopeMessageContext(json, headers);
         var receiveContext = new ReceiveContextImpl(envelope);
 
@@ -74,6 +74,7 @@ public class ErrorQueueTests
         public readonly CaptureSendTransport SendTransport = new();
         public Uri? Address { get; private set; }
 
+        [Throws(typeof(InvalidOperationException))]
         public Task<ISendTransport> GetSendTransport(Uri address, CancellationToken cancellationToken = default)
         {
             Address = address;

@@ -10,7 +10,7 @@ public class RawJsonMessageContext : IMessageContext
     private readonly Dictionary<Type, object> _messageCache = new();
     private readonly IDictionary<string, object> _transportHeaders;
 
-    [Throws(typeof(JsonException))]
+    [Throws(typeof(JsonException), typeof(ArgumentException))]
     public RawJsonMessageContext(byte[] jsonBytes, IDictionary<string, object> transportHeaders)
     {
         _jsonDocument = JsonDocument.Parse(jsonBytes);
@@ -23,7 +23,7 @@ public class RawJsonMessageContext : IMessageContext
         MessageType = new List<string>();
         SentTime = DateTime.UtcNow;
 
-        if (transportHeaders.TryGetValue("faultAddress", out var header))
+        if (transportHeaders.TryGetValue(MessageHeaders.FaultAddress, out var header))
         {
             if (header is string str)
                 FaultAddress = new Uri(str);

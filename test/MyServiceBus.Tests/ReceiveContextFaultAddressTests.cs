@@ -10,13 +10,13 @@ using Xunit;
 public class ReceiveContextFaultAddressTests
 {
     [Fact]
-    [Throws(typeof(EncoderFallbackException), typeof(UriFormatException))]
+    [Throws(typeof(EncoderFallbackException), typeof(UriFormatException), typeof(JsonException))]
     public void Envelope_context_reads_fault_address_from_transport_headers()
     {
         var json = Encoding.UTF8.GetBytes("{\"messageId\":\"00000000-0000-0000-0000-000000000000\",\"messageType\":[],\"message\":{}}");
         var headers = new Dictionary<string, object>
         {
-            ["faultAddress"] = "rabbitmq://localhost/exchange/test_queue_error"
+            [MessageHeaders.FaultAddress] = "rabbitmq://localhost/exchange/test_queue_error"
         };
         var envelope = new EnvelopeMessageContext(json, headers);
         var receiveContext = new ReceiveContextImpl(envelope);
@@ -24,13 +24,13 @@ public class ReceiveContextFaultAddressTests
     }
 
     [Fact]
-    [Throws(typeof(EncoderFallbackException), typeof(UriFormatException))]
+    [Throws(typeof(EncoderFallbackException), typeof(UriFormatException), typeof(JsonException))]
     public void Raw_context_reads_fault_address_from_transport_headers()
     {
         var json = Encoding.UTF8.GetBytes("{}");
         var headers = new Dictionary<string, object>
         {
-            ["faultAddress"] = "rabbitmq://localhost/exchange/test_queue_error"
+            [MessageHeaders.FaultAddress] = "rabbitmq://localhost/exchange/test_queue_error"
         };
         var raw = new RawJsonMessageContext(json, headers);
         var receiveContext = new ReceiveContextImpl(raw);
