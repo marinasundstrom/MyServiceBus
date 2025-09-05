@@ -20,20 +20,21 @@ public sealed class RabbitMqQueueSendTransport : ISendTransport
     public async Task Send<T>(T message, SendContext context, CancellationToken cancellationToken = default)
         where T : class
     {
-        var props = new BasicProperties
-        {
-            Persistent = true
-        };
-
         var body = await context.Serialize(message);
+
+        var props = _channel.CreateBasicProperties();
+        props.Persistent = true;
 
         if (context.Headers != null)
         {
             try
             {
-                props.Headers = context.Headers.ToDictionary(kv => kv.Key, kv => (object?)kv.Value);
                 if (context.Headers.TryGetValue("content_type", out var ct))
                     props.ContentType = ct.ToString();
+
+                props.Headers = context.Headers.ToDictionary(
+                    kv => kv.Key,
+                    kv => kv.Value is string s ? (object)System.Text.Encoding.UTF8.GetBytes(s) : kv.Value);
             }
             catch (Exception ex)
             {

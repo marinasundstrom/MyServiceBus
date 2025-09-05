@@ -82,7 +82,10 @@ class ErrorQueueTest {
 
         @Override
         public SendTransport getSendTransport(URI address) {
-            return data -> {
+            return new SendTransport() {
+                @Override
+                public void send(byte[] data, Map<String, Object> headers, String contentType) {
+                }
             };
         }
 
