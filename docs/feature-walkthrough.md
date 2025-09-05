@@ -203,7 +203,7 @@ class SubmitOrderConsumer : IConsumer<SubmitOrder>
 {
     public async Task Consume(ConsumeContext<SubmitOrder> context)
     {
-        await context.Publish(new OrderSubmitted(context.Message.OrderId, "replica-1"));
+        await context.Publish(new OrderSubmitted(context.Message.OrderId));
     }
 }
 ```
@@ -214,7 +214,7 @@ class SubmitOrderConsumer : IConsumer<SubmitOrder>
 class SubmitOrderConsumer implements Consumer<SubmitOrder> {
     @Override
     public CompletableFuture<Void> consume(ConsumeContext<SubmitOrder> context) {
-        return context.publish(new OrderSubmitted(context.getMessage().getOrderId(), "replica-1"), CancellationToken.none);
+        return context.publish(new OrderSubmitted(context.getMessage().getOrderId()), CancellationToken.none);
     }
 }
 ```
@@ -719,7 +719,7 @@ public async Task publishes_order_submitted()
 
     harness.RegisterHandler<SubmitOrder>(async context =>
     {
-        await context.PublishAsync(new OrderSubmitted(context.Message.OrderId, "replica-1"));
+        await context.PublishAsync(new OrderSubmitted(context.Message.OrderId));
     });
 
     await harness.Send(new SubmitOrder { OrderId = Guid.NewGuid() });
@@ -739,7 +739,7 @@ public void publishesOrderSubmitted() {
     harness.start().join();
 
     harness.registerHandler(SubmitOrder.class, ctx ->
-        ctx.publish(new OrderSubmitted(ctx.getMessage().getOrderId(), "replica-1"), CancellationToken.none)
+        ctx.publish(new OrderSubmitted(ctx.getMessage().getOrderId()), CancellationToken.none)
     );
 
     harness.send(new SubmitOrder(UUID.randomUUID())).join();

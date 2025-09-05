@@ -115,7 +115,6 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class OrderSubmitted {
     private UUID orderId;
-    private String replica;
 }
 ```
 
@@ -148,11 +147,9 @@ class SubmitOrderConsumer implements Consumer<SubmitOrder> {
 
         service.doWork();
 
-        String replica = System.getenv().getOrDefault("HTTP_PORT", "unknown");
-
         System.out.println("Hello, World!");
 
-        return context.publish(new OrderSubmitted(orderId, replica), CancellationToken.none);
+        return context.publish(new OrderSubmitted(orderId), CancellationToken.none);
     }
 }
 ```
