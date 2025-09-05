@@ -333,6 +333,9 @@ OrderStatus response = client.getResponse(
 
 MyServiceBus separates consumer failures into **faults** and **errors**.
 
+Transient issues like network hiccups or temporary I/O errors may succeed on a subsequent attempt.
+To handle these cases automatically, MyServiceBus retries each consumer three times before considering it failed.
+
 #### Faults
 
 When a consumer throws an exception that isn't handled and any configured
