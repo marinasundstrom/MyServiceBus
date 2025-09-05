@@ -15,7 +15,7 @@ public class RabbitMqTransportFactoryTests
 {
     [Fact]
     [Throws(typeof(Exception))]
-    public async Task Declares_dead_letter_exchange_and_queue()
+    public async Task Declares_error_exchange_and_queue()
     {
         var channel = Substitute.For<IChannel>();
         IDictionary<string, object?>? mainQueueArgs = null;
@@ -80,8 +80,7 @@ public class RabbitMqTransportFactoryTests
 
         await transportFactory.CreateReceiveTransport(topology, _ => Task.CompletedTask);
 
-        mainQueueArgs.ShouldNotBeNull();
-        mainQueueArgs!["x-dead-letter-exchange"].ShouldBe("submit-order-queue_error");
+        mainQueueArgs.ShouldBeNull();
         await channel.Received(1).QueueDeclareAsync(
             "submit-order-queue_error",
             Arg.Is(true),
@@ -94,6 +93,7 @@ public class RabbitMqTransportFactoryTests
     }
 
     [Fact]
+    [Throws(typeof(ObjectDisposedException), typeof(OperationCanceledException))]
     public async Task Does_not_declare_error_queue_for_autodelete_endpoints()
     {
         var channel = Substitute.For<IChannel>();
@@ -164,7 +164,7 @@ public class RabbitMqTransportFactoryTests
     }
 
     [Fact]
-    [Throws(typeof(OverflowException), typeof(InvalidOperationException))]
+    [Throws(typeof(OverflowException), typeof(InvalidOperationException), typeof(ArgumentException), typeof(OperationCanceledException), typeof(UriFormatException))]
     public async Task Supports_exchange_scheme_uri()
     {
         var channel = Substitute.For<IChannel>();
@@ -205,7 +205,7 @@ public class RabbitMqTransportFactoryTests
     }
 
     [Fact]
-    [Throws(typeof(OverflowException), typeof(InvalidOperationException))]
+    [Throws(typeof(OverflowException), typeof(InvalidOperationException), typeof(ArgumentException), typeof(OperationCanceledException), typeof(UriFormatException))]
     public async Task Supports_queue_scheme_uri()
     {
         var channel = Substitute.For<IChannel>();
