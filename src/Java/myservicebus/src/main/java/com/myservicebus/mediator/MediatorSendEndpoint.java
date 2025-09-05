@@ -1,20 +1,34 @@
 package com.myservicebus.mediator;
 
 import com.myservicebus.ConsumeContext;
-import com.myservicebus.ConsumeContextProvider;
 import com.myservicebus.Consumer;
-import com.myservicebus.Retry;
+import com.myservicebus.ConsumerFaultFilter;
+import com.myservicebus.ConsumerMessageFilter;
+import com.myservicebus.ErrorTransportFilter;
+import com.myservicebus.Filter;
+import com.myservicebus.Pipe;
+import com.myservicebus.PipeConfigurator;
 import com.myservicebus.SendEndpoint;
 import com.myservicebus.di.ServiceProvider;
-import com.myservicebus.di.ServiceScope;
 import com.myservicebus.tasks.CancellationToken;
 import com.myservicebus.topology.ConsumerTopology;
 import com.myservicebus.topology.TopologyRegistry;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
-import java.util.function.Supplier;
 
+/**
+ * Send endpoint for the in-memory mediator transport.
+ *
+ * <p>
+ * Consumers are resolved through a filter pipeline that includes retry
+ * semantics, matching the C# implementation.
+ * </p>
+ */
 public class MediatorSendEndpoint implements SendEndpoint {
+    private static final int DEFAULT_RETRY_ATTEMPTS = 3;
+
     private final ServiceProvider serviceProvider;
     private final MediatorSendEndpointProvider provider;
 
@@ -24,54 +38,44 @@ public class MediatorSendEndpoint implements SendEndpoint {
     }
 
     @Override
+    @SuppressWarnings({"unchecked", "rawtypes"})
     public <T> CompletableFuture<Void> send(T message, CancellationToken cancellationToken) {
         TopologyRegistry registry = serviceProvider.getService(TopologyRegistry.class);
-        List<ConsumerTopology> defs = registry.getConsumers();
+        List<ConsumerTopology> consumerTopologies = registry.getConsumers();
         List<CompletableFuture<Void>> tasks = new ArrayList<>();
 
-        for (ConsumerTopology def : defs) {
-            boolean match = def.getBindings().stream()
+        for (ConsumerTopology consumerTopology : consumerTopologies) {
+            boolean match = consumerTopology.getBindings().stream()
                     .anyMatch(b -> b.getMessageType().isAssignableFrom(message.getClass()));
             if (match) {
-                try (ServiceScope scope = serviceProvider.createScope()) {
-                    ServiceProvider scoped = scope.getServiceProvider();
-                    @SuppressWarnings("unchecked")
-                    Consumer<Object> consumer = (Consumer<Object>) scoped.getService(def.getConsumerType());
-                    ConsumeContext<Object> ctx = new ConsumeContext<>(
-                            message,
-                            new HashMap<>(),
-                            null,
-                            null,
-                            cancellationToken,
-                            provider);
-                    ConsumeContextProvider ctxProvider = scoped.getService(ConsumeContextProvider.class);
-                    ctxProvider.setContext(ctx);
-                    try {
-                        Supplier<CompletableFuture<Void>> invoke = () -> {
-                            try {
-                                return (CompletableFuture<Void>) consumer.consume(ctx);
-                            } catch (Exception ex) {
-                                return CompletableFuture.failedFuture(ex);
-                            }
-                        };
+                PipeConfigurator<ConsumeContext<Object>> configurator = new PipeConfigurator<>();
+                Filter<ConsumeContext<Object>> errorFilter = new ErrorTransportFilter<>();
+                configurator.useFilter(errorFilter);
+                Class<? extends Consumer<Object>> consumerType = (Class<? extends Consumer<Object>>) consumerTopology
+                        .getConsumerType();
+                Filter<ConsumeContext<Object>> faultFilter = new ConsumerFaultFilter<>(serviceProvider, consumerType);
+                configurator.useFilter(faultFilter);
+                configurator.useRetry(DEFAULT_RETRY_ATTEMPTS);
+                Filter<ConsumeContext<Object>> consumerFilter = new ConsumerMessageFilter<>(serviceProvider, consumerType);
+                configurator.useFilter(consumerFilter);
+                if (consumerTopology.getConfigure() != null)
+                    consumerTopology.getConfigure().accept((PipeConfigurator) configurator);
 
-                        CompletableFuture<Void> task = Retry.executeAsync(invoke, 3, null, cancellationToken)
-                                .exceptionallyCompose(ex -> {
-                                    Exception exception = ex instanceof Exception ? (Exception) ex
-                                            : new RuntimeException(ex);
-                                    return ctx.respondFault(exception, cancellationToken)
-                                            .thenCompose(v -> CompletableFuture.failedFuture(new RuntimeException(
-                                                    "Consumer " + def.getConsumerType().getSimpleName() + " failed", exception)));
-                                });
+                Pipe<ConsumeContext<Object>> pipe = configurator.build();
 
-                        tasks.add(task);
-                    } finally {
-                        ctxProvider.clear();
-                    }
-                }
+                ConsumeContext<Object> ctx = new ConsumeContext<>(
+                        message,
+                        new HashMap<>(),
+                        null,
+                        null,
+                        cancellationToken,
+                        provider);
+
+                tasks.add(pipe.send(ctx));
             }
         }
 
         return CompletableFuture.allOf(tasks.toArray(new CompletableFuture[0]));
     }
 }
+
