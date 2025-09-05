@@ -10,6 +10,7 @@ public class RawJsonMessageContext : IMessageContext
     private readonly Dictionary<Type, object> _messageCache = new();
     private readonly IDictionary<string, object> _transportHeaders;
 
+    [Throws(typeof(JsonException))]
     public RawJsonMessageContext(byte[] jsonBytes, IDictionary<string, object> transportHeaders)
     {
         _jsonDocument = JsonDocument.Parse(jsonBytes);
@@ -21,6 +22,14 @@ public class RawJsonMessageContext : IMessageContext
         Headers = new Dictionary<string, object>(transportHeaders);
         MessageType = new List<string>();
         SentTime = DateTime.UtcNow;
+
+        if (transportHeaders.TryGetValue("faultAddress", out var header))
+        {
+            if (header is string str)
+                FaultAddress = new Uri(str);
+            else if (header is Uri uri)
+                FaultAddress = uri;
+        }
     }
 
     public Guid MessageId { get; }
@@ -31,7 +40,7 @@ public class RawJsonMessageContext : IMessageContext
     public Uri? FaultAddress { get; }
     public DateTimeOffset SentTime { get; }
 
-    [Throws(typeof(InvalidOperationException), typeof(ObjectDisposedException))]
+    [Throws(typeof(ObjectDisposedException))]
     public bool TryGetMessage<T>(out T? message) where T : class
     {
         if (_messageCache.TryGetValue(typeof(T), out var cached))
