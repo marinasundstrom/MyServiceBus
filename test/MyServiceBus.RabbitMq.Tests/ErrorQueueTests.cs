@@ -27,7 +27,7 @@ public class ErrorQueueTests
     }
 
     [Fact]
-    [Throws(typeof(UriFormatException), typeof(EncoderFallbackException), typeof(ArgumentOutOfRangeException), typeof(JsonException))]
+    [Throws(typeof(UriFormatException), typeof(EncoderFallbackException), typeof(ArgumentOutOfRangeException), typeof(JsonException), typeof(ArgumentException))]
     public async Task Moves_message_to_error_queue_when_consumer_faults()
     {
         var services = new ServiceCollection();
@@ -57,15 +57,24 @@ public class ErrorQueueTests
         transportFactory.Address.ShouldBe(errorUri);
         var sent = transportFactory.SendTransport.Sent.ShouldBeOfType<TestMessage>();
         sent.Text.ShouldBe("hi");
+
+        var errorHeaders = transportFactory.SendTransport.Context!.Headers;
+        errorHeaders[MessageHeaders.ExceptionType].ShouldBe(typeof(InvalidOperationException).FullName);
+        errorHeaders[MessageHeaders.Reason].ShouldBe("fault");
+        errorHeaders[MessageHeaders.RedeliveryCount].ShouldBe(0);
+        errorHeaders.ShouldContainKey(MessageHeaders.HostMachineName);
+        errorHeaders.ShouldContainKey(MessageHeaders.HostProcessName);
     }
 
     class CaptureSendTransport : ISendTransport
     {
         public object? Sent { get; private set; }
+        public SendContext? Context { get; private set; }
 
         public Task Send<T>(T message, SendContext context, CancellationToken cancellationToken = default) where T : class
         {
             Sent = message;
+            Context = context;
             return Task.CompletedTask;
         }
     }
@@ -75,7 +84,6 @@ public class ErrorQueueTests
         public readonly CaptureSendTransport SendTransport = new();
         public Uri? Address { get; private set; }
 
-        [Throws(typeof(InvalidOperationException))]
         public Task<ISendTransport> GetSendTransport(Uri address, CancellationToken cancellationToken = default)
         {
             Address = address;
