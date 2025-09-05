@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.myservicebus.serialization.EnvelopeMessageSerializer;
 import com.myservicebus.serialization.MessageSerializer;
 import com.myservicebus.tasks.CancellationToken;
+import com.myservicebus.MessageHeaders;
 import org.junit.jupiter.api.Test;
 
 import java.net.URI;
@@ -44,5 +45,24 @@ public class EnvelopeMessageSerializerTest {
                 URI.create("loopback://localhost/" + SampleMessage.class.getSimpleName()).toString(),
                 envelope.getDestinationAddress());
     }
-}
 
+    @Test
+    public void envelopeOmitsMtHostHeaders() throws Exception {
+        SampleMessage message = new SampleMessage();
+        message.setValue("Test");
+
+        MessageSerializer serializer = new EnvelopeMessageSerializer();
+        SendContext context = new SendContext(message, CancellationToken.none);
+        context.getHeaders().put(MessageHeaders.HOST_MACHINE, "machine");
+
+        byte[] bytes = context.serialize(serializer);
+
+        ObjectMapper mapper = new ObjectMapper();
+        mapper.findAndRegisterModules();
+        Envelope<SampleMessage> envelope = mapper.readValue(bytes,
+                mapper.getTypeFactory().constructParametricType(Envelope.class, SampleMessage.class));
+
+        assertNotNull(envelope);
+        assertFalse(envelope.getHeaders().containsKey(MessageHeaders.HOST_MACHINE));
+    }
+}

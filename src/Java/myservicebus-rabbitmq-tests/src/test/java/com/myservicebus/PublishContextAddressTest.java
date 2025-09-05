@@ -46,7 +46,7 @@ class PublishContextAddressTest {
         services.addSingleton(TransportFactory.class, sp -> () -> new TransportFactory() {
             @Override
             public SendTransport getSendTransport(URI address) {
-                return data -> {
+                return (data, headers, contentType) -> {
                 };
             }
 

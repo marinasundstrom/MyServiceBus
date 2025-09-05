@@ -3,6 +3,8 @@ package com.myservicebus.serialization;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.myservicebus.Envelope;
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
 
 public class EnvelopeMessageSerializer implements MessageSerializer {
     private final ObjectMapper mapper;
@@ -15,6 +17,14 @@ public class EnvelopeMessageSerializer implements MessageSerializer {
     @Override
     public <T> byte[] serialize(MessageSerializationContext<T> context) throws IOException {
         context.getHeaders().put("content_type", "application/vnd.masstransit+json");
+
+        Map<String, Object> headers = new HashMap<>();
+        context.getHeaders().forEach((k, v) -> {
+            if (!k.startsWith("MT-Host-")) {
+                headers.put(k, v);
+            }
+        });
+
         Envelope<T> envelope = new Envelope<>();
         envelope.setMessageId(context.getMessageId());
         envelope.setCorrelationId(context.getCorrelationId());
@@ -28,7 +38,7 @@ public class EnvelopeMessageSerializer implements MessageSerializer {
         envelope.setSentTime(context.getSentTime());
         envelope.setMessageType(context.getMessageType());
         envelope.setMessage(context.getMessage());
-        envelope.setHeaders(context.getHeaders());
+        envelope.setHeaders(headers);
         envelope.setContentType("application/json");
         envelope.setHost(context.getHostInfo());
         return mapper.writeValueAsBytes(envelope);
