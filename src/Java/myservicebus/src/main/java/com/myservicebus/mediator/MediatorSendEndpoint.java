@@ -1,6 +1,7 @@
 package com.myservicebus.mediator;
 
 import com.myservicebus.ConsumeContext;
+import com.myservicebus.Consumer;
 import com.myservicebus.ConsumerFaultFilter;
 import com.myservicebus.ConsumerMessageFilter;
 import com.myservicebus.ErrorTransportFilter;
@@ -26,6 +27,8 @@ import java.util.concurrent.CompletableFuture;
  * </p>
  */
 public class MediatorSendEndpoint implements SendEndpoint {
+    private static final int DEFAULT_RETRY_ATTEMPTS = 3;
+
     private final ServiceProvider serviceProvider;
     private final MediatorSendEndpointProvider provider;
 
@@ -35,29 +38,28 @@ public class MediatorSendEndpoint implements SendEndpoint {
     }
 
     @Override
+    @SuppressWarnings({"unchecked", "rawtypes"})
     public <T> CompletableFuture<Void> send(T message, CancellationToken cancellationToken) {
         TopologyRegistry registry = serviceProvider.getService(TopologyRegistry.class);
-        List<ConsumerTopology> defs = registry.getConsumers();
+        List<ConsumerTopology> consumerTopologies = registry.getConsumers();
         List<CompletableFuture<Void>> tasks = new ArrayList<>();
 
-        for (ConsumerTopology def : defs) {
-            boolean match = def.getBindings().stream()
+        for (ConsumerTopology consumerTopology : consumerTopologies) {
+            boolean match = consumerTopology.getBindings().stream()
                     .anyMatch(b -> b.getMessageType().isAssignableFrom(message.getClass()));
             if (match) {
                 PipeConfigurator<ConsumeContext<Object>> configurator = new PipeConfigurator<>();
-                @SuppressWarnings({"unchecked", "rawtypes"})
-                Filter<ConsumeContext<Object>> errorFilter = new ErrorTransportFilter();
+                Filter<ConsumeContext<Object>> errorFilter = new ErrorTransportFilter<>();
                 configurator.useFilter(errorFilter);
-                @SuppressWarnings({"unchecked", "rawtypes"})
-                Filter<ConsumeContext<Object>> faultFilter = new ConsumerFaultFilter(serviceProvider, def.getConsumerType());
+                Class<? extends Consumer<Object>> consumerType = (Class<? extends Consumer<Object>>) consumerTopology
+                        .getConsumerType();
+                Filter<ConsumeContext<Object>> faultFilter = new ConsumerFaultFilter<>(serviceProvider, consumerType);
                 configurator.useFilter(faultFilter);
-                configurator.useRetry(3);
-                @SuppressWarnings({"unchecked", "rawtypes"})
-                Filter<ConsumeContext<Object>> consumerFilter = new ConsumerMessageFilter(serviceProvider,
-                        def.getConsumerType());
+                configurator.useRetry(DEFAULT_RETRY_ATTEMPTS);
+                Filter<ConsumeContext<Object>> consumerFilter = new ConsumerMessageFilter<>(serviceProvider, consumerType);
                 configurator.useFilter(consumerFilter);
-                if (def.getConfigure() != null)
-                    def.getConfigure().accept((PipeConfigurator) configurator);
+                if (consumerTopology.getConfigure() != null)
+                    consumerTopology.getConfigure().accept((PipeConfigurator) configurator);
 
                 Pipe<ConsumeContext<Object>> pipe = configurator.build();
 
