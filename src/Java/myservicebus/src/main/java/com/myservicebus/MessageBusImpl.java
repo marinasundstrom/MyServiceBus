@@ -197,6 +197,8 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
     public CompletableFuture<Void> publish(SendContext context) {
         String exchange = NamingConventions.getExchangeName(context.getMessage().getClass());
         String address = transportFactory.getPublishAddress(exchange);
+        context.setSourceAddress(this.address);
+        context.setDestinationAddress(URI.create(address));
         return publishPipe.send(context).thenCompose(v -> {
             SendEndpointProvider provider = serviceProvider.getService(SendEndpointProvider.class);
             SendEndpoint endpoint = provider.getSendEndpoint(address);
