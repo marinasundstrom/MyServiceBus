@@ -29,6 +29,7 @@ The ServiceBus Java client mirrors the C# design by providing an asynchronous me
   - `RabbitMqSendEndpointProvider` uses the configured `MessageSerializer` (default `EnvelopeMessageSerializer`) to encode messages before forwarding them through cached `RabbitMqSendTransport` objects. Queue URIs such as `rabbitmq://host/orders` send directly to the named queue via the default exchange, while URIs containing `/exchange/` (for example `rabbitmq://host/exchange/orders`) or using the `exchange:<name>` shortcut publish to the specified exchange.
   - `RabbitMqTransportFactory` ensures exchanges exist before obtaining transports and reuses a shared connection via `ConnectionProvider`, which verifies the link is open and waits with exponential backoff to re-establish it when necessary.
   - `RabbitMqSendTransport` sets the `content_type` header to `application/vnd.masstransit+json` when publishing messages.
+  - Headers beginning with `_` map to standard transport properties (e.g., `_correlation_id` sets the AMQP `correlation-id`).
 
 ### Cancellation Propagation
 - All pipe contexts expose a `CancellationToken` through `PipeContext`, enabling operations to observe shutdown or timeouts.

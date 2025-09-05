@@ -29,12 +29,56 @@ public sealed class RabbitMqQueueSendTransport : ISendTransport
         {
             try
             {
-                if (context.Headers.TryGetValue("content_type", out var ct))
-                    props.ContentType = ct.ToString();
+                Dictionary<string, object?>? headers = null;
 
-                props.Headers = context.Headers.ToDictionary(
-                    kv => kv.Key,
-                    kv => kv.Value is string s ? (object)System.Text.Encoding.UTF8.GetBytes(s) : kv.Value);
+                foreach (var kv in context.Headers)
+                {
+                    if (kv.Key.StartsWith("_"))
+                    {
+                        var key = kv.Key[1..];
+                        var value = kv.Value?.ToString();
+
+                        switch (key)
+                        {
+                            case "content_type":
+                                props.ContentType = value;
+                                break;
+                            case "correlation_id":
+                                props.CorrelationId = value;
+                                break;
+                            case "message_id":
+                                props.MessageId = value;
+                                break;
+                            case "reply_to":
+                                props.ReplyTo = value;
+                                break;
+                            case "type":
+                                props.Type = value;
+                                break;
+                            case "user_id":
+                                props.UserId = value;
+                                break;
+                            case "app_id":
+                                props.AppId = value;
+                                break;
+                            case "expiration":
+                                props.Expiration = value;
+                                break;
+                            default:
+                                headers ??= new Dictionary<string, object?>();
+                                headers[key] = kv.Value is string s ? System.Text.Encoding.UTF8.GetBytes(s) : kv.Value;
+                                break;
+                        }
+                    }
+                    else
+                    {
+                        headers ??= new Dictionary<string, object?>();
+                        headers[kv.Key] = kv.Value is string s ? System.Text.Encoding.UTF8.GetBytes(s) : kv.Value;
+                    }
+                }
+
+                if (headers != null && headers.Count > 0)
+                    props.Headers = headers;
             }
             catch (Exception ex)
             {

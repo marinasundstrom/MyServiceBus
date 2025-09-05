@@ -10,6 +10,7 @@ The ServiceBus C# client provides a lightweight messaging abstraction for buildi
 - `ConsumeContext` offers `Forward` to redirect a consumed message to another address.
 - `SendContext` captures headers, correlation and response addresses, and serializes messages into the ServiceBus envelope format.
 - Messages automatically include a `content_type` header with value `application/vnd.masstransit+json`. When a consumed message lacks this header, the client assumes the envelope content type.
+- Headers prefixed with `_` are applied to the underlying transport properties (for example, `_correlation_id` sets the AMQP `correlation-id`).
 
 ### Publishing
 - `PublishAsync` uses message type conventions to determine the exchange and send published messages through the configured transport.
