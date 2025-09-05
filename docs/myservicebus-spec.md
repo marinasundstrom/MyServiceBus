@@ -2,6 +2,16 @@
 
 MyServiceBus is a lightweight message bus modeled on MassTransit's semantics. It maintains wire-level compatibility with MassTransit's message envelope, contracts, and protocol so MyServiceBus clients can interoperate directly with MassTransit services. This specification defines the expected behavior for any implementation regardless of programming language or transport. The C# implementation in `src/MyServiceBus` and the Java implementation in `src/Java/myservicebus` were reviewed to ensure these semantics are reflected in both clients.
 
+## Architecture
+
+MyServiceBus composes a distributed bus from a small set of building blocks:
+
+- **Bus** – Coordinates configuration and orchestrates send, publish, and consume operations.
+- **Endpoints** – Addressable sources or destinations that host the pipelines for each operation.
+- **Pipes** – A pipe-and-filter pipeline allows middleware to observe and transform messages.
+- **Transports** – Pluggable implementations move serialized envelopes between endpoints.
+- **Serialization** – Messages are wrapped in an envelope and encoded using a pluggable serializer.
+
 ## Core Concepts
 
 - **Envelope** – Messages use the MassTransit envelope format and carry headers, addresses, correlation and host metadata. The default `content_type` is `application/vnd.masstransit+json`.
