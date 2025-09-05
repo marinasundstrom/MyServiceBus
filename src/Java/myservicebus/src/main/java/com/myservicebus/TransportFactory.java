@@ -11,7 +11,7 @@ public interface TransportFactory {
     SendTransport getSendTransport(URI address);
 
     ReceiveTransport createReceiveTransport(String queueName, List<MessageBinding> bindings,
-            Function<TransportMessage, CompletableFuture<Void>> handler) throws Exception;
+            Function<TransportMessage, CompletableFuture<Void>> handler);
 
     String getPublishAddress(String exchange);
 

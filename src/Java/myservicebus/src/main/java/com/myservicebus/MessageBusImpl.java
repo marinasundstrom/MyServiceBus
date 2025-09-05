@@ -53,19 +53,29 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
         return new MessageBusImpl(services.buildServiceProvider());
     }
 
-    public void start() throws Exception {
-        TopologyRegistry topology = serviceProvider.getService(TopologyRegistry.class);
+    public void start() {
+        try {
+            TopologyRegistry topology = serviceProvider.getService(TopologyRegistry.class);
 
-        for (ConsumerTopology consumerDef : topology.getConsumers()) {
-            addConsumer(consumerDef);
-        }
+            for (ConsumerTopology consumerDef : topology.getConsumers()) {
+                addConsumer(consumerDef);
+            }
 
-        for (ReceiveTransport transport : receiveTransports) {
-            transport.start();
+            for (ReceiveTransport transport : receiveTransports) {
+                transport.start();
+            }
+        } catch (RuntimeException e) {
+            throw new IllegalStateException("Failed to start message bus", e);
         }
     }
 
-    public void addConsumer(ConsumerTopology consumerDef) throws Exception {
+    public void addConsumer(ConsumerTopology consumerDef) {
+        if (consumerDef == null)
+            throw new IllegalArgumentException("Consumer topology cannot be null");
+        if (consumerDef.getQueueName() == null || consumerDef.getQueueName().isBlank())
+            throw new IllegalArgumentException("Queue name cannot be null or empty");
+        if (consumerDef.getBindings() == null || consumerDef.getBindings().isEmpty())
+            throw new IllegalStateException("Consumer must have at least one binding");
         PipeConfigurator<ConsumeContext<Object>> configurator = new PipeConfigurator<>();
         @SuppressWarnings({ "unchecked", "rawtypes" })
         Filter<ConsumeContext<Object>> errorFilter = new ErrorTransportFilter();
@@ -122,7 +132,18 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
 
     public <T> void addHandler(String queueName, Class<T> messageType, String exchange,
             java.util.function.Function<ConsumeContext<T>, CompletableFuture<Void>> handler,
-            Integer retryCount, java.time.Duration retryDelay) throws Exception {
+            Integer retryCount, java.time.Duration retryDelay) {
+        if (queueName == null || queueName.isBlank())
+            throw new IllegalArgumentException("Queue name cannot be null or empty");
+        if (messageType == null)
+            throw new IllegalArgumentException("Message type cannot be null");
+        if (exchange == null || exchange.isBlank())
+            throw new IllegalArgumentException("Exchange cannot be null or empty");
+        if (handler == null)
+            throw new IllegalArgumentException("Handler cannot be null");
+        if (retryCount != null && retryCount < 0)
+            throw new IllegalArgumentException("retryCount must be >= 0");
+
         PipeConfigurator<ConsumeContext<T>> configurator = new PipeConfigurator<>();
         @SuppressWarnings({ "unchecked", "rawtypes" })
         Filter<ConsumeContext<T>> errorFilter = new ErrorTransportFilter();
@@ -169,10 +190,18 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
         receiveTransports.add(transport);
     }
 
-    public void stop() throws Exception {
+    public void stop() {
+        IllegalStateException first = null;
         for (ReceiveTransport transport : receiveTransports) {
-            transport.stop();
+            try {
+                transport.stop();
+            } catch (RuntimeException e) {
+                if (first == null)
+                    first = new IllegalStateException("Failed to stop message bus", e);
+            }
         }
+        if (first != null)
+            throw first;
     }
 
     @Override

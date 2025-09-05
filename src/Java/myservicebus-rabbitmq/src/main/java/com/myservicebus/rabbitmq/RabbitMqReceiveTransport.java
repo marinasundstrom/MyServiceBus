@@ -31,32 +31,40 @@ public class RabbitMqReceiveTransport implements ReceiveTransport {
     }
 
     @Override
-    public void start() throws Exception {
-        DeliverCallback callback = (tag, delivery) -> {
-            Map<String, Object> headers = delivery.getProperties().getHeaders();
-            if (headers == null) {
-                headers = new HashMap<>();
-            }
-            headers.putIfAbsent(MessageHeaders.FAULT_ADDRESS, faultAddress);
-
-            TransportMessage tm = new TransportMessage(delivery.getBody(), headers);
-            handler.apply(tm).whenComplete((v, ex) -> {
-                try {
-                    channel.basicAck(delivery.getEnvelope().getDeliveryTag(), false);
-                } catch (IOException ioEx) {
-                    logger.error("Failed to ack message", ioEx);
+    public void start() {
+        try {
+            DeliverCallback callback = (tag, delivery) -> {
+                Map<String, Object> headers = delivery.getProperties().getHeaders();
+                if (headers == null) {
+                    headers = new HashMap<>();
                 }
-            });
-        };
+                headers.putIfAbsent(MessageHeaders.FAULT_ADDRESS, faultAddress);
 
-        channel.basicConsume(queueName, false, callback, tag -> {
-        });
+                TransportMessage tm = new TransportMessage(delivery.getBody(), headers);
+                handler.apply(tm).whenComplete((v, ex) -> {
+                    try {
+                        channel.basicAck(delivery.getEnvelope().getDeliveryTag(), false);
+                    } catch (IOException ioEx) {
+                        logger.error("Failed to ack message", ioEx);
+                    }
+                });
+            };
+
+            channel.basicConsume(queueName, false, callback, tag -> {
+            });
+        } catch (Exception e) {
+            throw new IllegalStateException("Failed to start receive transport", e);
+        }
     }
 
     @Override
-    public void stop() throws Exception {
-        if (channel != null && channel.isOpen()) {
-            channel.close();
+    public void stop() {
+        try {
+            if (channel != null && channel.isOpen()) {
+                channel.close();
+            }
+        } catch (Exception e) {
+            throw new IllegalStateException("Failed to stop receive transport", e);
         }
     }
 }

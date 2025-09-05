@@ -75,11 +75,20 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
         return Task.FromResult(endpoint);
     }
 
-    [Throws(typeof(InvalidOperationException), typeof(ArgumentOutOfRangeException))]
+    [Throws(typeof(InvalidOperationException), typeof(ArgumentException))]
     public async Task AddHandler<TMessage>(string queueName, string exchangeName, Func<ConsumeContext<TMessage>, Task> handler,
         int? retryCount = null, TimeSpan? retryDelay = null, CancellationToken cancellationToken = default)
         where TMessage : class
     {
+        if (string.IsNullOrWhiteSpace(queueName))
+            throw new ArgumentException("Queue name cannot be null or empty.", nameof(queueName));
+        if (string.IsNullOrWhiteSpace(exchangeName))
+            throw new ArgumentException("Exchange name cannot be null or empty.", nameof(exchangeName));
+        if (handler is null)
+            throw new ArgumentException("Handler cannot be null.", nameof(handler));
+        if (retryCount.HasValue && retryCount < 0)
+            throw new ArgumentOutOfRangeException(nameof(retryCount));
+
         var topology = new ReceiveEndpointTopology
         {
             QueueName = queueName,
@@ -114,6 +123,13 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
         where TConsumer : class, IConsumer<TMessage>
         where TMessage : class
     {
+        if (consumer is null)
+            throw new ArgumentException("Consumer topology cannot be null.", nameof(consumer));
+        if (string.IsNullOrWhiteSpace(consumer.QueueName))
+            throw new ArgumentException("Queue name cannot be null or empty.", nameof(consumer.QueueName));
+        if (consumer.Bindings.Count == 0)
+            throw new InvalidOperationException("Consumer must have at least one binding.");
+
         var messageType = consumer.Bindings.First().MessageType;
 
         var topology = new ReceiveEndpointTopology

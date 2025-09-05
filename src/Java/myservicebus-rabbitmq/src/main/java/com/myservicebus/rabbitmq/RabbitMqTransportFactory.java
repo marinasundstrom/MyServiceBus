@@ -80,25 +80,29 @@ public class RabbitMqTransportFactory implements TransportFactory {
 
     @Override
     public ReceiveTransport createReceiveTransport(String queueName, List<MessageBinding> bindings,
-            Function<TransportMessage, CompletableFuture<Void>> handler) throws Exception {
-        Connection connection = connectionProvider.getOrCreateConnection();
-        Channel channel = connection.createChannel();
+            Function<TransportMessage, CompletableFuture<Void>> handler) {
+        try {
+            Connection connection = connectionProvider.getOrCreateConnection();
+            Channel channel = connection.createChannel();
 
-        for (MessageBinding binding : bindings) {
-            String exchangeName = binding.getEntityName();
-            channel.exchangeDeclare(exchangeName, BuiltinExchangeType.FANOUT, true);
-            channel.queueDeclare(queueName, true, false, false, null);
-            channel.queueBind(queueName, exchangeName, "");
+            for (MessageBinding binding : bindings) {
+                String exchangeName = binding.getEntityName();
+                channel.exchangeDeclare(exchangeName, BuiltinExchangeType.FANOUT, true);
+                channel.queueDeclare(queueName, true, false, false, null);
+                channel.queueBind(queueName, exchangeName, "");
+            }
+
+            String errorExchange = queueName + "_error";
+            String errorQueue = errorExchange;
+            channel.exchangeDeclare(errorExchange, BuiltinExchangeType.FANOUT, true);
+            channel.queueDeclare(errorQueue, true, false, false, null);
+            channel.queueBind(errorQueue, errorExchange, "");
+
+            String faultAddress = getPublishAddress(queueName + "_error");
+            return new RabbitMqReceiveTransport(channel, queueName, handler, faultAddress);
+        } catch (Exception e) {
+            throw new IllegalStateException("Failed to create receive transport", e);
         }
-
-        String errorExchange = queueName + "_error";
-        String errorQueue = errorExchange;
-        channel.exchangeDeclare(errorExchange, BuiltinExchangeType.FANOUT, true);
-        channel.queueDeclare(errorQueue, true, false, false, null);
-        channel.queueBind(errorQueue, errorExchange, "");
-
-        String faultAddress = getPublishAddress(queueName + "_error");
-        return new RabbitMqReceiveTransport(channel, queueName, handler, faultAddress);
     }
 
     @Override

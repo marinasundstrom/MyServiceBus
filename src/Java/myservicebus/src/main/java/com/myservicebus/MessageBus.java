@@ -9,7 +9,7 @@ public interface MessageBus extends PublishEndpoint, PublishEndpointProvider, Se
 
     BusTopology getTopology();
 
-    void start() throws Exception;
+    void start();
 
-    void stop() throws Exception;
+    void stop();
 }

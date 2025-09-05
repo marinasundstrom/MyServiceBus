@@ -1,7 +1,7 @@
 package com.myservicebus;
 
 public interface ReceiveTransport {
-    void start() throws Exception;
+    void start();
 
-    void stop() throws Exception;
+    void stop();
 }
