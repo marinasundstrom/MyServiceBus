@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.net.URI;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
@@ -57,7 +58,10 @@ class ServiceBusPublishFilterTest {
         services.addSingleton(TransportFactory.class, sp -> () -> new TransportFactory() {
             @Override
             public SendTransport getSendTransport(URI address) {
-                return data -> {
+                return new SendTransport() {
+                    @Override
+                    public void send(byte[] data, Map<String, Object> headers, String contentType) {
+                    }
                 };
             }
 

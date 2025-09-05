@@ -2,6 +2,7 @@ package com.myservicebus;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
 import org.junit.jupiter.api.Test;
@@ -82,7 +83,11 @@ class RabbitMqSendEndpointProviderTest {
     static class StubFactory extends RabbitMqTransportFactory {
         String queue;
         String exchange;
-        SendTransport transport = data -> {};
+        SendTransport transport = new SendTransport() {
+            @Override
+            public void send(byte[] data, Map<String, Object> headers, String contentType) {
+            }
+        };
 
         StubFactory() { super(null); }
 
