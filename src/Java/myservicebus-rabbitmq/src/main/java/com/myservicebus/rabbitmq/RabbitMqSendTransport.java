@@ -22,17 +22,56 @@ public class RabbitMqSendTransport implements SendTransport {
     public void send(byte[] data, Map<String, Object> headers, String contentType) {
         try {
             Map<String, Object> amqpHeaders = new HashMap<>();
+            AMQP.BasicProperties.Builder builder = new AMQP.BasicProperties.Builder().contentType(contentType);
+
             headers.forEach((k, v) -> {
-                if (v instanceof String s)
-                    amqpHeaders.put(k, s.getBytes(StandardCharsets.UTF_8));
-                else
-                    amqpHeaders.put(k, v);
+                if (k.startsWith("_")) {
+                    String key = k.substring(1);
+                    String value = v == null ? null : v.toString();
+                    switch (key) {
+                        case "content_type":
+                            builder.contentType(value);
+                            break;
+                        case "correlation_id":
+                            builder.correlationId(value);
+                            break;
+                        case "message_id":
+                            builder.messageId(value);
+                            break;
+                        case "reply_to":
+                            builder.replyTo(value);
+                            break;
+                        case "type":
+                            builder.type(value);
+                            break;
+                        case "user_id":
+                            builder.userId(value);
+                            break;
+                        case "app_id":
+                            builder.appId(value);
+                            break;
+                        case "expiration":
+                            builder.expiration(value);
+                            break;
+                        default:
+                            if (v instanceof String s)
+                                amqpHeaders.put(key, s.getBytes(StandardCharsets.UTF_8));
+                            else
+                                amqpHeaders.put(key, v);
+                            break;
+                    }
+                } else {
+                    if (v instanceof String s)
+                        amqpHeaders.put(k, s.getBytes(StandardCharsets.UTF_8));
+                    else
+                        amqpHeaders.put(k, v);
+                }
             });
 
-            AMQP.BasicProperties props = new AMQP.BasicProperties.Builder()
-                    .contentType(contentType)
-                    .headers(amqpHeaders)
-                    .build();
+            if (!amqpHeaders.isEmpty())
+                builder.headers(amqpHeaders);
+
+            AMQP.BasicProperties props = builder.build();
             channel.basicPublish(exchange, routingKey, props, data);
         } catch (Exception e) {
             throw new RuntimeException("Failed to send message", e);
