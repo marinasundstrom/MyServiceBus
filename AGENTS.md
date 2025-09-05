@@ -4,7 +4,7 @@ This repository contains a .NET solution for MyServiceBus and a Java project. Fo
 
 ## Code style
 - Use standard C# conventions (PascalCase for types and methods, camelCase for locals and parameters).
-- Prefer `dotnet format` to automatically format files.
+- Run `dotnet format` only on files you create or modify to automatically format them.
  
 ## Exception handling
 - The CheckedExceptions analyzer is enabled; treat THROWS diagnostics as warnings and avoid auto-fixes that clutter code.
