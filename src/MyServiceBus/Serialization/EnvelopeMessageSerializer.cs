@@ -14,14 +14,13 @@ public class EnvelopeMessageSerializer : IMessageSerializer
     public Task<byte[]> SerializeAsync<T>(MessageSerializationContext<T> context) where T : class
     {
         context.Headers["content_type"] = "application/vnd.masstransit+json";
-        var messageType = typeof(T);
         var envelope = new Envelope<T>()
         {
             MessageId = context.MessageId,
             CorrelationId = context.CorrelationId,
             ConversationId = null,
-            //SourceAddress = new Uri("rabbitmq://localhost/source"),
-            //DestinationAddress = new Uri("rabbitmq://localhost/source" + messageType.Name),
+            SourceAddress = context.SourceAddress,
+            DestinationAddress = context.DestinationAddress,
             ResponseAddress = context.ResponseAddress,
             FaultAddress = context.FaultAddress,
             MessageType = (List<string>)context.MessageType,

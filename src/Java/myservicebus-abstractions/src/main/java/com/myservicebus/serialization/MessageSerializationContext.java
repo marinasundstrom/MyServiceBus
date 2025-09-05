@@ -13,6 +13,8 @@ public class MessageSerializationContext<T> {
     private List<String> messageType;
     private URI responseAddress;
     private URI faultAddress;
+    private URI sourceAddress;
+    private URI destinationAddress;
     private Map<String, Object> headers;
     private OffsetDateTime sentTime;
     private T message;
@@ -60,6 +62,22 @@ public class MessageSerializationContext<T> {
 
     public void setFaultAddress(URI faultAddress) {
         this.faultAddress = faultAddress;
+    }
+
+    public URI getSourceAddress() {
+        return sourceAddress;
+    }
+
+    public void setSourceAddress(URI sourceAddress) {
+        this.sourceAddress = sourceAddress;
+    }
+
+    public URI getDestinationAddress() {
+        return destinationAddress;
+    }
+
+    public void setDestinationAddress(URI destinationAddress) {
+        this.destinationAddress = destinationAddress;
     }
 
     public Map<String, Object> getHeaders() {

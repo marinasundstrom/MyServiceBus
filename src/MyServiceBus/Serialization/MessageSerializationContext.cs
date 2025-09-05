@@ -18,6 +18,10 @@ public class MessageSerializationContext<T>
 
     public Uri? FaultAddress { get; set; }
 
+    public Uri? SourceAddress { get; set; }
+
+    public Uri? DestinationAddress { get; set; }
+
     public IDictionary<string, object> Headers { get; set; }
 
     public DateTimeOffset SentTime { get; set; }
