@@ -35,6 +35,7 @@ public class ConsumerFaultFilter<T> implements Filter<ConsumeContext<T>> {
                 context.respondFault(cause instanceof Exception ? (Exception) cause : new RuntimeException(cause),
                         CancellationToken.none).join();
                 logger.error("Consumer {} faulted", consumerType.getSimpleName(), cause);
+                throw new CompletionException(cause);
             }
             return null;
         });

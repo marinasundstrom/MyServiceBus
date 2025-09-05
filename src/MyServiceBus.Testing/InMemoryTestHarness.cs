@@ -18,7 +18,7 @@ public class InMemoryTestHarness : IMessageBus, ITransportFactory, IReceiveEndpo
     readonly IBusTopology topology;
 
     [Throws(typeof(UriFormatException))]
-    public Uri Address { get; } = new("loopback://localhost/");
+    public Uri Address => new("loopback://localhost/");
     public IBusTopology Topology => topology;
 
     public IReadOnlyCollection<object> Consumed => consumed.AsReadOnly();
@@ -161,7 +161,7 @@ public class InMemoryTestHarness : IMessageBus, ITransportFactory, IReceiveEndpo
             context.FaultAddress,
             DateTimeOffset.UtcNow);
 
-        var receiveContext = new ReceiveContextImpl(msgContext, context.CancellationToken);
+        var receiveContext = new ReceiveContextImpl(msgContext, null, context.CancellationToken);
 
         List<Func<ReceiveContext, Task>> snapshot;
         lock (receiveHandlers)
@@ -192,7 +192,7 @@ public class InMemoryTestHarness : IMessageBus, ITransportFactory, IReceiveEndpo
         public CancellationToken CancellationToken => receiveContext.CancellationToken;
 
         public Task<ISendEndpoint> GetSendEndpoint(Uri uri) => Task.FromResult<ISendEndpoint>(new HarnessSendEndpoint(harness));
-        [Throws(typeof(ArgumentException))]
+        [Throws(typeof(ArgumentException), typeof(InvalidCastException))]
         public Task PublishAsync<TMessage>(object message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default) where TMessage : class
             => harness.PublishAsync((TMessage)message, contextCallback, cancellationToken);
         [Throws(typeof(ArgumentException))]

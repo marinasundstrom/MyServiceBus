@@ -6,6 +6,7 @@ using MyServiceBus;
 using MyServiceBus.Serialization;
 using MyServiceBus.Topology;
 using Xunit;
+using Xunit.Sdk;
 
 public class PublishHeaderTests
 {
@@ -24,7 +25,7 @@ public class PublishHeaderTests
     class StubTransportFactory : ITransportFactory
     {
         public readonly CaptureSendTransport Transport = new();
-        [Throws(typeof(InvalidOperationException))]
+
         public Task<ISendTransport> GetSendTransport(Uri address, CancellationToken cancellationToken = default)
             => Task.FromResult<ISendTransport>(Transport);
         [Throws(typeof(NotImplementedException))]
@@ -33,11 +34,11 @@ public class PublishHeaderTests
     }
 
     [Fact]
-    [Throws(typeof(UriFormatException), typeof(InvalidOperationException), typeof(ArgumentNullException))]
+    [Throws(typeof(UriFormatException), typeof(InvalidOperationException), typeof(NotNullException))]
     public async Task Applies_headers_to_context()
     {
         var factory = new StubTransportFactory();
-        var bus = new MessageBus(factory, new ServiceCollection().BuildServiceProvider(),
+        var bus = new MyServiceBus.MessageBus(factory, new ServiceCollection().BuildServiceProvider(),
             new SendPipe(Pipe.Empty<SendContext>()), new PublishPipe(Pipe.Empty<SendContext>()), new EnvelopeMessageSerializer(),
             new Uri("loopback://localhost/"));
 

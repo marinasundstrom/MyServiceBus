@@ -25,8 +25,9 @@ public class FaultHandlingTest {
 
     static class CaptureProvider implements SendEndpointProvider {
         final CaptureEndpoint endpoint = new CaptureEndpoint();
+        String lastAddress;
         @Override
-        public SendEndpoint getSendEndpoint(String uri) { return endpoint; }
+        public SendEndpoint getSendEndpoint(String uri) { lastAddress = uri; return endpoint; }
     }
 
     @Test
@@ -36,7 +37,8 @@ public class FaultHandlingTest {
         ConsumeContext<TestMessage> ctx = new ConsumeContext<>(
                 new TestMessage("hi"),
                 Map.of("messageId", id),
-                "queue", // response address
+                null,
+                "fault-queue",
                 null,
                 CancellationToken.none,
                 provider);
@@ -45,6 +47,7 @@ public class FaultHandlingTest {
         ctx.respondFault(ex, CancellationToken.none).join();
 
         Assertions.assertTrue(provider.endpoint.sent instanceof Fault<?>);
+        Assertions.assertEquals("fault-queue", provider.lastAddress);
         @SuppressWarnings("unchecked")
         Fault<TestMessage> fault = (Fault<TestMessage>) provider.endpoint.sent;
         Assertions.assertEquals("boom", fault.getExceptions().get(0).getMessage());

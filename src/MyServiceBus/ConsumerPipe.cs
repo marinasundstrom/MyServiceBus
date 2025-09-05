@@ -87,6 +87,7 @@ public class ConsumerFaultFilter<TConsumer, TMessage> : IFilter<ConsumeContext<T
 
             var logger = provider.GetService<ILogger<ConsumerFaultFilter<TConsumer, TMessage>>>();
             logger?.LogError(ex, "Consumer {Consumer} faulted", typeof(TConsumer).Name);
+            throw;
         }
     }
 }

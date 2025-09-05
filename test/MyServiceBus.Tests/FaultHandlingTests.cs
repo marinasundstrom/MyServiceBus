@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 using MyServiceBus;
 using MyServiceBus.Serialization;
 using MyServiceBus.Topology;
+using Shouldly;
 using Xunit;
 using Xunit.Sdk;
 
@@ -24,7 +25,7 @@ public class FaultHandlingTests
 
     [Fact]
     [Throws(typeof(Exception))]
-    public async Task Sends_fault_when_consumer_throws()
+    public async Task Sends_fault_to_fault_address_when_consumer_throws()
     {
         var services = new ServiceCollection();
         services.AddTransient<FaultingConsumer>();
@@ -32,11 +33,12 @@ public class FaultHandlingTests
 
         var transportFactory = new CaptureTransportFactory();
 
+        var faultUri = new Uri("rabbitmq://localhost/fault");
         var receiveContext = new StubReceiveContext
         {
             Message = new TestMessage { Text = "hi" },
             MessageId = Guid.NewGuid(),
-            ResponseAddress = new Uri("rabbitmq://localhost/response")
+            FaultAddress = faultUri
         };
 
         var context = new ConsumeContextImpl<TestMessage>(receiveContext, transportFactory,
@@ -50,8 +52,9 @@ public class FaultHandlingTests
         configurator.UseFilter(new ConsumerMessageFilter<FaultingConsumer, TestMessage>(provider));
         var pipe = new ConsumePipe<TestMessage>(configurator.Build());
 
-        await pipe.Send(context);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => pipe.Send(context));
 
+        transportFactory.Address.ShouldBe(faultUri);
         var fault = Assert.IsType<Fault<TestMessage>>(transportFactory.SendTransport.Sent);
         Assert.Equal("boom", fault.Exceptions[0].Message);
     }
@@ -70,9 +73,13 @@ public class FaultHandlingTests
     class CaptureTransportFactory : ITransportFactory
     {
         public readonly CaptureSendTransport SendTransport = new();
+        public Uri? Address { get; private set; }
 
         public Task<ISendTransport> GetSendTransport(Uri address, CancellationToken cancellationToken = default)
-            => Task.FromResult<ISendTransport>(SendTransport);
+        {
+            Address = address;
+            return Task.FromResult<ISendTransport>(SendTransport);
+        }
 
         [Throws(typeof(NotImplementedException))]
         public Task<IReceiveTransport> CreateReceiveTransport(ReceiveEndpointTopology topology, Func<ReceiveContext, Task> handler, CancellationToken cancellationToken = default)
@@ -86,6 +93,7 @@ public class FaultHandlingTests
         public IList<string> MessageType { get; set; } = [NamingConventions.GetMessageUrn(typeof(TestMessage))];
         public Uri? ResponseAddress { get; set; }
         public Uri? FaultAddress { get; set; }
+        public Uri? ErrorAddress { get; set; }
         public IDictionary<string, object> Headers { get; } = new Dictionary<string, object>();
         public CancellationToken CancellationToken => CancellationToken.None;
         [Throws(typeof(InvalidCastException))]

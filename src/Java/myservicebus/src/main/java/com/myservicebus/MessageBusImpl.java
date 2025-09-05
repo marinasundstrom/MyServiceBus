@@ -85,19 +85,27 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
             consumerDef.getConfigure().accept(configurator);
         Pipe<ConsumeContext<Object>> pipe = configurator.build();
 
-        Function<byte[], CompletableFuture<Void>> handler = body -> {
+        Function<TransportMessage, CompletableFuture<Void>> handler = transportMessage -> {
             try {
                 MessageBinding binding = consumerDef.getBindings().get(0);
-                Envelope<?> envelope = messageDeserializer.deserialize(body, binding.getMessageType());
+                Envelope<?> envelope = messageDeserializer.deserialize(transportMessage.getBody(),
+                        binding.getMessageType());
 
-                String faultAddress = envelope.getFaultAddress() != null ? envelope.getFaultAddress()
-                        : transportFactory.getPublishAddress(consumerDef.getQueueName() + "_error");
+                String faultAddress = envelope.getFaultAddress();
+                if (faultAddress == null && transportMessage.getHeaders() != null) {
+                    Object header = transportMessage.getHeaders().get(MessageHeaders.FAULT_ADDRESS);
+                    if (header instanceof String s) {
+                        faultAddress = s;
+                    }
+                }
+                String errorAddress = transportFactory.getPublishAddress(consumerDef.getQueueName() + "_error");
 
                 ConsumeContext<Object> ctx = new ConsumeContext<>(
                         envelope.getMessage(),
                         envelope.getHeaders(),
                         envelope.getResponseAddress(),
                         faultAddress,
+                        errorAddress,
                         CancellationToken.none,
                         transportSendEndpointProvider);
                 return pipe.send(ctx);
@@ -129,13 +137,20 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
         configurator.useFilter(new HandlerMessageFilter<>(handler));
         Pipe<ConsumeContext<T>> pipe = configurator.build();
 
-        java.util.function.Function<byte[], CompletableFuture<Void>> transportHandler = body -> {
+        java.util.function.Function<TransportMessage, CompletableFuture<Void>> transportHandler = tm -> {
             try {
-                Envelope<?> envelope = messageDeserializer.deserialize(body, messageType);
-                String faultAddress = envelope.getFaultAddress() != null ? envelope.getFaultAddress()
-                        : transportFactory.getPublishAddress(queueName + "_error");
+                Envelope<?> envelope = messageDeserializer.deserialize(tm.getBody(), messageType);
+                String faultAddress = envelope.getFaultAddress();
+                if (faultAddress == null && tm.getHeaders() != null) {
+                    Object header = tm.getHeaders().get(MessageHeaders.FAULT_ADDRESS);
+                    if (header instanceof String s) {
+                        faultAddress = s;
+                    }
+                }
+                String errorAddress = transportFactory.getPublishAddress(queueName + "_error");
                 ConsumeContext<T> ctx = new ConsumeContext<>((T) envelope.getMessage(), envelope.getHeaders(),
-                        envelope.getResponseAddress(), faultAddress, CancellationToken.none, transportSendEndpointProvider);
+                        envelope.getResponseAddress(), faultAddress, errorAddress, CancellationToken.none,
+                        transportSendEndpointProvider);
                 return pipe.send(ctx);
             } catch (Exception e) {
                 CompletableFuture<Void> f = new CompletableFuture<>();

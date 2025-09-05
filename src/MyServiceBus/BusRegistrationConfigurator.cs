@@ -4,6 +4,7 @@ using MyServiceBus.Serialization;
 using System;
 using System.Reflection;
 using System.Linq;
+using System.Text.RegularExpressions;
 
 namespace MyServiceBus;
 
@@ -21,7 +22,7 @@ public class BusRegistrationConfigurator : IBusRegistrationConfigurator
         Services = services;
     }
 
-    [Throws(typeof(InvalidOperationException), typeof(TargetInvocationException), typeof(NotSupportedException))]
+    [Throws(typeof(InvalidOperationException), typeof(TargetInvocationException), typeof(NotSupportedException), typeof(ArgumentException))]
     public void AddConsumer<TConsumer>() where TConsumer : class, IConsumer
     {
         Services.AddScoped<TConsumer>();
@@ -36,7 +37,7 @@ public class BusRegistrationConfigurator : IBusRegistrationConfigurator
       );
     }
 
-    [Throws(typeof(InvalidOperationException), typeof(ArgumentException))]
+    [Throws(typeof(InvalidOperationException), typeof(ArgumentException), typeof(RegexMatchTimeoutException))]
     public void AddConsumer<TConsumer, TMessage>(Action<PipeConfigurator<ConsumeContext<TMessage>>>? configure = null)
         where TConsumer : class, IConsumer<TMessage>
         where TMessage : class
@@ -50,7 +51,7 @@ public class BusRegistrationConfigurator : IBusRegistrationConfigurator
             messageTypes: typeof(TMessage));
     }
 
-    [Throws(typeof(InvalidOperationException), typeof(TargetInvocationException), typeof(NotSupportedException))]
+    [Throws(typeof(InvalidOperationException), typeof(TargetInvocationException), typeof(NotSupportedException), typeof(OverflowException))]
     public void AddConsumers(params Assembly[] assemblies)
     {
         var consumerTypes = assemblies
@@ -102,8 +103,8 @@ public class BusRegistrationConfigurator : IBusRegistrationConfigurator
         Services.AddSingleton(_topology);
         Services.AddSingleton<IBusTopology>(_ => _topology);
         Services.AddSingleton<IPostBuildAction>(_ => new ConsumerRegistrationAction(_topology));
-        Services.AddSingleton<ISendPipe>(_ => new SendPipe(sendConfigurator.Build()));
-        Services.AddSingleton<IPublishPipe>(_ => new PublishPipe(publishConfigurator.Build()));
+        Services.AddSingleton<ISendPipe>([Throws(typeof(ArgumentOutOfRangeException))] (_) => new SendPipe(sendConfigurator.Build()));
+        Services.AddSingleton<IPublishPipe>([Throws(typeof(ArgumentOutOfRangeException))] (_) => new PublishPipe(publishConfigurator.Build()));
         Services.AddSingleton(typeof(IMessageSerializer), serializerType);
         Services.AddScoped<ConsumeContextProvider>();
         Services.AddScoped<ISendEndpointProvider, SendEndpointProvider>();

@@ -92,6 +92,10 @@ public class MediatorTransportFactoryTests
         public Task<ISendEndpoint> GetSendEndpoint(Uri uri) =>
             Task.FromResult<ISendEndpoint>(new StubSendEndpoint());
 
+        public Task Forward<T>(Uri address, T message, CancellationToken cancellationToken = default) where T : class => Task.CompletedTask;
+
+        public Task Forward<T>(Uri address, object message, CancellationToken cancellationToken = default) where T : class => Task.CompletedTask;
+
         class StubSendEndpoint : ISendEndpoint
         {
             public Task Send<T>(T message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default)
@@ -115,7 +119,7 @@ public class MediatorTransportFactoryTests
             RoutingKey = ""
         };
 
-        var receive = await factory.CreateReceiveTransport(topology, [Throws(typeof(ObjectDisposedException), typeof(InvalidOperationException))] (ctx) =>
+        var receive = await factory.CreateReceiveTransport(topology, [Throws(typeof(InvalidOperationException))] (ctx) =>
         {
             ctx.TryGetMessage<SampleMessage>(out var msg);
             tcs.SetResult(msg!);

@@ -17,23 +17,28 @@ public class EnvelopeMessageContext : IMessageContext
     private Uri? _responseAddress;
     private Uri? _faultAddress;
 
+    [Throws(typeof(JsonException), typeof(ArgumentException))]
     public EnvelopeMessageContext(byte[] jsonBytes, IDictionary<string, object> transportHeaders)
     {
         _jsonDocument = JsonDocument.Parse(jsonBytes);
         _transportHeaders = transportHeaders;
     }
 
+    [Throws(typeof(InvalidOperationException), typeof(FormatException))]
     public Guid MessageId =>
         (_messageId ??= TryGetProperty("messageId")?.GetGuid()).GetValueOrDefault();
 
+    [Throws(typeof(InvalidOperationException), typeof(FormatException))]
     public Guid? CorrelationId =>
         _correlationId ??= TryGetProperty("correlationId")?.GetGuid();
 
+    [Throws(typeof(InvalidOperationException), typeof(JsonException))]
     public IList<string> MessageType =>
         _messageType ??= TryGetProperty("messageType")?.Deserialize<List<string>>() ?? new();
 
     public Uri? ResponseAddress
     {
+        [Throws(typeof(InvalidOperationException), typeof(UriFormatException))]
         get
         {
             if (_responseAddress is not null)
@@ -51,6 +56,7 @@ public class EnvelopeMessageContext : IMessageContext
 
     public Uri? FaultAddress
     {
+        [Throws(typeof(InvalidOperationException), typeof(UriFormatException))]
         get
         {
             if (_faultAddress is not null)
@@ -58,16 +64,25 @@ public class EnvelopeMessageContext : IMessageContext
                 return _faultAddress;
             }
             var s = TryGetProperty("faultAddress")?.GetString();
-            if (s is not null)
+            if (s is null && _transportHeaders.TryGetValue(MessageHeaders.FaultAddress, out var header))
             {
-                _faultAddress = new Uri(s);
+                if (header is string str)
+                    s = str;
+                else if (header is Uri uri)
+                    _faultAddress = uri;
             }
+
+            if (s is not null)
+                _faultAddress = new Uri(s);
+
             return _faultAddress;
         }
     }
 
+    [Throws(typeof(InvalidOperationException))]
     public IDictionary<string, object> Headers => _headers ??= MergeHeaders();
 
+    [Throws(typeof(InvalidOperationException), typeof(FormatException))]
     public DateTimeOffset SentTime =>
         _sentTime ??= TryGetProperty("sentTime")?.GetDateTimeOffset() ?? default;
 
@@ -100,12 +115,13 @@ public class EnvelopeMessageContext : IMessageContext
         }
     }
 
-    [Throws(typeof(InvalidOperationException), typeof(ObjectDisposedException))]
+    [Throws(typeof(InvalidOperationException))]
     private JsonElement? TryGetProperty(string propertyName)
     {
         return _jsonDocument.RootElement.TryGetProperty(propertyName, out var value) ? value : null;
     }
 
+    [Throws(typeof(InvalidOperationException), typeof(JsonException))]
     private Dictionary<string, object> MergeHeaders()
     {
         var envelopeHeaders = TryGetProperty("headers")?.Deserialize<Dictionary<string, object>>() ?? new();

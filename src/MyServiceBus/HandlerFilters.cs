@@ -47,6 +47,7 @@ public class HandlerFaultFilter<TMessage> : IFilter<ConsumeContext<TMessage>>
 
             var logger = provider.GetService<ILogger<HandlerFaultFilter<TMessage>>>();
             logger?.LogError(ex, "Handler faulted");
+            throw;
         }
     }
 }

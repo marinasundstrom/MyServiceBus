@@ -15,10 +15,10 @@ public class ErrorTransportFilter<TMessage> : IFilter<ConsumeContext<TMessage>>
         {
             if (context is ConsumeContextImpl<TMessage> ctx)
             {
-                var faultAddress = ctx.ReceiveContext.FaultAddress;
-                if (faultAddress != null)
+                var errorAddress = ctx.ReceiveContext.ErrorAddress;
+                if (errorAddress != null)
                 {
-                    var endpoint = await ctx.GetSendEndpoint(faultAddress);
+                    var endpoint = await ctx.GetSendEndpoint(errorAddress);
                     await endpoint.Send(ctx.Message, cancellationToken: context.CancellationToken);
                 }
             }

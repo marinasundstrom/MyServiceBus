@@ -28,19 +28,26 @@ public class ConsumeContext<T>
     private final Map<String, Object> headers;
     private final String responseAddress;
     private final String faultAddress;
+    private final String errorAddress;
     private final CancellationToken cancellationToken;
     private final SendEndpointProvider sendEndpointProvider;
 
     public ConsumeContext(T message, Map<String, Object> headers, SendEndpointProvider provider) {
-        this(message, headers, null, null, CancellationToken.none, provider);
+        this(message, headers, null, null, null, CancellationToken.none, provider);
     }
 
     public ConsumeContext(T message, Map<String, Object> headers, String responseAddress, String faultAddress,
             CancellationToken cancellationToken, SendEndpointProvider provider) {
+        this(message, headers, responseAddress, faultAddress, null, cancellationToken, provider);
+    }
+
+    public ConsumeContext(T message, Map<String, Object> headers, String responseAddress, String faultAddress,
+            String errorAddress, CancellationToken cancellationToken, SendEndpointProvider provider) {
         this.message = message;
         this.headers = headers;
         this.responseAddress = responseAddress;
         this.faultAddress = faultAddress;
+        this.errorAddress = errorAddress;
         this.cancellationToken = cancellationToken;
         this.sendEndpointProvider = provider;
     }
@@ -55,6 +62,10 @@ public class ConsumeContext<T>
 
     public String getFaultAddress() {
         return faultAddress;
+    }
+
+    public String getErrorAddress() {
+        return errorAddress;
     }
 
     @Override

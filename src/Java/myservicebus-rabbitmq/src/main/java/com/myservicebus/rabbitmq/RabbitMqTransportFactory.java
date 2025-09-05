@@ -9,6 +9,7 @@ import java.util.function.Function;
 import com.myservicebus.ReceiveTransport;
 import com.myservicebus.SendTransport;
 import com.myservicebus.TransportFactory;
+import com.myservicebus.TransportMessage;
 import com.myservicebus.topology.MessageBinding;
 import com.rabbitmq.client.BuiltinExchangeType;
 import com.rabbitmq.client.Channel;
@@ -79,7 +80,7 @@ public class RabbitMqTransportFactory implements TransportFactory {
 
     @Override
     public ReceiveTransport createReceiveTransport(String queueName, List<MessageBinding> bindings,
-            Function<byte[], CompletableFuture<Void>> handler) throws Exception {
+            Function<TransportMessage, CompletableFuture<Void>> handler) throws Exception {
         Connection connection = connectionProvider.getOrCreateConnection();
         Channel channel = connection.createChannel();
 
@@ -96,7 +97,8 @@ public class RabbitMqTransportFactory implements TransportFactory {
         channel.queueDeclare(errorQueue, true, false, false, null);
         channel.queueBind(errorQueue, errorExchange, "");
 
-        return new RabbitMqReceiveTransport(channel, queueName, handler);
+        String faultAddress = getPublishAddress(queueName + "_error");
+        return new RabbitMqReceiveTransport(channel, queueName, handler, faultAddress);
     }
 
     @Override
