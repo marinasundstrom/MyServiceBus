@@ -68,16 +68,13 @@ OrderSubmitted response = client
 
 We are using `lombok` to generate property getters and setters, as well as default constructors, for messages.
 
-If you are using Maven:
+If you are using Gradle:
 
-```xml
-<!-- Lombok -->
-<dependency>
-    <groupId>org.projectlombok</groupId>
-    <artifactId>lombok</artifactId>
-    <version>1.18.30</version>
-    <scope>provided</scope>
-</dependency>
+```gradle
+dependencies {
+    compileOnly 'org.projectlombok:lombok:1.18.30'
+    annotationProcessor 'org.projectlombok:lombok:1.18.30'
+}
 ```
 
 ### Request message
