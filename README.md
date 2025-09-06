@@ -38,15 +38,25 @@ See samples below.
 - Java Development Kit (for the Java prototype)
 
 ### Building
-```bash
-dotnet restore
-dotnet build
-```
+- .NET
+  ```bash
+  dotnet restore
+  dotnet build
+  ```
+- Java (Maven reactor in `src/Java`)
+  ```bash
+  (cd src/Java && mvn -DskipTests install)
+  ```
 
 ### Running tests
-```bash
-dotnet test
-```
+- .NET
+  ```bash
+  dotnet test
+  ```
+- Java
+  ```bash
+  (cd src/Java && mvn test)
+  ```
 
 ### Getting started
 
@@ -137,9 +147,19 @@ bus.publish(new SubmitOrder(UUID.randomUUID()), ctx -> ctx.getHeaders().put("tra
 - `docs/` – Additional documentation and design goals, including [emoji usage](docs/emoji-usage.md) guidelines
 - `docker-compose.yml` – Docker configuration for local infrastructure
 
+## Java quickstart
+- Build and run the Java test app only (from repo root):
+  ```bash
+  RABBITMQ_HOST=localhost HTTP_PORT=5301 \
+    mvn -f src/Java/pom.xml -pl testapp -am -DskipTests exec:java
+  ```
+- Build all Java modules:
+  ```bash
+  (cd src/Java && mvn -DskipTests install)
+  ```
+
 ## Contributing
 Contributions are welcome! Please run `dotnet test` before submitting a pull request and follow the coding conventions described in `AGENTS.md`.
 
 ## License
 This project is licensed under the [MIT License](LICENSE).
-

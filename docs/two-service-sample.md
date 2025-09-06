@@ -20,12 +20,28 @@ The service listens on `http://localhost:5112` and publishes `SubmitOrder` messa
 
 ## 3. Run two Java service replicas
 
-In separate terminals run:
+Run the Java test app twice on different ports. The Maven reactor will build only what’s needed (`-pl testapp -am`).
+
+In two separate terminals, from the repository root:
 
 ```bash
-HTTP_PORT=5301 mvn -f src/Java/pom.xml -pl testapp -am exec:java
-HTTP_PORT=5302 mvn -f src/Java/pom.xml -pl testapp -am exec:java
+// Build all modules
+ mvn -f src/Java/pom.xml -DskipTests install 
+
+# Instance 1
+RABBITMQ_HOST=localhost HTTP_PORT=5301 \
+  mvn -f src/Java/pom.xml -pl testapp -am -DskipTests exec:java
+
+# Instance 2
+RABBITMQ_HOST=localhost HTTP_PORT=5302 \
+  mvn -f src/Java/pom.xml -pl testapp -am -DskipTests exec:java
 ```
+
+Notes:
+- `RABBITMQ_HOST` defaults to `localhost` if not set.
+- `HTTP_PORT` selects the HTTP port for each replica.
+- `-pl testapp -am` builds `testapp` and its dependencies only.
+- `-Dexec.mainClass` is required since the exec plugin isn’t bound in the POM.
 
 Each instance consumes `SubmitOrder` messages from the same queue.
 
@@ -46,3 +62,10 @@ curl http://localhost:5301/publish
 ```
 
 The .NET service logs the received `SubmitOrder`.
+
+## Troubleshooting
+- If Maven reports missing modules, run a full reactor build first:
+  ```bash
+  (cd src/Java && mvn -DskipTests install)
+  ```
+- Ensure RabbitMQ is reachable at `RABBITMQ_HOST` and credentials are `guest/guest` (default in compose).
