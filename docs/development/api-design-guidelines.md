@@ -21,6 +21,11 @@ Keep implementation details hidden to maintain flexibility and prevent misuse:
 - Helper utilities and internal conventions.
 - Diagnostic infrastructure beyond lightweight logging and metrics abstractions.
 
+## Exception Handling
+
+- Surface exception types and semantics that mirror MassTransit so consumers experience consistent behavior across C# and Java.
+- When a fault message lacks exception details, derive the `RequestFaultException` message from the exception type to keep parity.
+
 ## General Principles
 
 1. **Interfaces first** – Rely primarily on interfaces, not concrete types, and keep concrete implementations internal.
