@@ -21,6 +21,13 @@ subprojects {
     group = rootProject.group
     version = rootProject.version
 
+    // Use a stable, Lombok-compatible toolchain
+    java {
+        toolchain {
+            languageVersion = JavaLanguageVersion.of(17)
+        }
+    }
+
     repositories {
         mavenCentral()
     }
