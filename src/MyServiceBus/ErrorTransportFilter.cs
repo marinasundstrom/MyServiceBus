@@ -1,12 +1,19 @@
 using System;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 
 namespace MyServiceBus;
 
 public class ErrorTransportFilter<TMessage> : IFilter<ConsumeContext<TMessage>>
     where TMessage : class
 {
-    [Throws(typeof(FormatException))]
+    private readonly ILogger<ErrorTransportFilter<TMessage>>? logger;
+
+    public ErrorTransportFilter(ILogger<ErrorTransportFilter<TMessage>>? logger = null)
+    {
+        this.logger = logger;
+    }
+
     public async Task Send(ConsumeContext<TMessage> context, IPipe<ConsumeContext<TMessage>> next)
     {
         try
@@ -24,7 +31,13 @@ public class ErrorTransportFilter<TMessage> : IFilter<ConsumeContext<TMessage>>
                     var headers = ctx.ReceiveContext.Headers;
                     int redeliveryCount = 0;
                     if (headers.TryGetValue(MessageHeaders.RedeliveryCount, out var value))
-                        redeliveryCount = Convert.ToInt32(value);
+                    {
+                        if (!int.TryParse(value?.ToString(), out redeliveryCount))
+                        {
+                            logger?.LogWarning("Malformed RedeliveryCount header: {HeaderValue}", value);
+                            redeliveryCount = 0;
+                        }
+                    }
 
                     await endpoint.Send(ctx.Message, [Throws(typeof(NotSupportedException))] (sendCtx) =>
                     {

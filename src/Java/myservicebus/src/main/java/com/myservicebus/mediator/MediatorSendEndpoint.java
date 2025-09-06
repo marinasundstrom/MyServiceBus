@@ -48,7 +48,7 @@ public class MediatorSendEndpoint implements SendEndpoint {
             if (match) {
                 PipeConfigurator<ConsumeContext<Object>> configurator = new PipeConfigurator<>();
                 configurator.useFilter(new OpenTelemetryConsumeFilter<>());
-                Filter<ConsumeContext<Object>> errorFilter = new ErrorTransportFilter<>();
+                Filter<ConsumeContext<Object>> errorFilter = new ErrorTransportFilter<>(serviceProvider);
                 configurator.useFilter(errorFilter);
                 Class<? extends Consumer<Object>> consumerType = (Class<? extends Consumer<Object>>) consumerTopology
                         .getConsumerType();
