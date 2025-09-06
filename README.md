@@ -28,8 +28,8 @@ See samples below.
 - Java client and server prototypes
 
 ## Specification
-- [MyServiceBus Specification](docs/myservicebus-spec.md)
-- [ServiceBus Transport Specification](docs/transport-spec.md)
+- [MyServiceBus Specification](docs/specs/myservicebus-spec.md)
+- [ServiceBus Transport Specification](docs/specs/transport-spec.md)
 - [Differences from MassTransit](docs/masstransit-differences.md)
 
 ## Getting Started

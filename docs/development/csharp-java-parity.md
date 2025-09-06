@@ -1,6 +1,6 @@
 # C# and Java Client Feature Parity
 
-This matrix tracks behavioral parity across the two client implementations. The expected semantics are defined in the [MyServiceBus Specification](myservicebus-spec.md).
+This matrix tracks behavioral parity across the two client implementations. The expected semantics are defined in the [MyServiceBus Specification](specs/myservicebus-spec.md).
 
 | Feature | C# Implementation | Java Implementation | Notes |
 | --- | --- | --- | --- |
