@@ -22,13 +22,10 @@ import java.util.concurrent.CompletableFuture;
  * Send endpoint for the in-memory mediator transport.
  *
  * <p>
- * Consumers are resolved through a filter pipeline that includes retry
- * semantics, matching the C# implementation.
+ * Consumers are resolved through a filter pipeline.
  * </p>
  */
 public class MediatorSendEndpoint implements SendEndpoint {
-    private static final int DEFAULT_RETRY_ATTEMPTS = 3;
-
     private final ServiceProvider serviceProvider;
     private final MediatorSendEndpointProvider provider;
 
@@ -55,11 +52,10 @@ public class MediatorSendEndpoint implements SendEndpoint {
                         .getConsumerType();
                 Filter<ConsumeContext<Object>> faultFilter = new ConsumerFaultFilter<>(serviceProvider, consumerType);
                 configurator.useFilter(faultFilter);
-                configurator.useRetry(DEFAULT_RETRY_ATTEMPTS);
-                Filter<ConsumeContext<Object>> consumerFilter = new ConsumerMessageFilter<>(serviceProvider, consumerType);
-                configurator.useFilter(consumerFilter);
                 if (consumerTopology.getConfigure() != null)
                     consumerTopology.getConfigure().accept((PipeConfigurator) configurator);
+                Filter<ConsumeContext<Object>> consumerFilter = new ConsumerMessageFilter<>(serviceProvider, consumerType);
+                configurator.useFilter(consumerFilter);
 
                 Pipe<ConsumeContext<Object>> pipe = configurator.build(serviceProvider);
 

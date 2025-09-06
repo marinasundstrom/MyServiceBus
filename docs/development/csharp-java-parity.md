@@ -12,5 +12,5 @@ This matrix tracks behavioral parity across the two client implementations. The 
 | Header mapping | Implemented | Implemented | Headers beginning with `_` map to native transport properties. |
 | Cancellation propagation | Implemented | Implemented | Pipe contexts expose cancellation tokens. |
 | Transport abstraction | Implemented | Implemented | RabbitMQ transport factories ensure exchanges exist before use. |
-| Retries | Implemented | Implemented | Java automatically retries consumers with a built-in policy. |
+| Retries | Implemented | Implemented | Both clients require explicit configuration to retry consumers. |
 | Configuration API (host, queue, message overrides, endpoint formatter) | Implemented | Implemented | Both clients support overriding names and automatic endpoint configuration with custom formatters. |

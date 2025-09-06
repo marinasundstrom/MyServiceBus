@@ -6,7 +6,7 @@ cross-language interoperability and minimal dependencies. Consider MyServiceBus 
 - **Cross-platform services** – run C# and Java consumers side-by-side while sharing contracts and transports.
 - **Lightweight runtime** – the Java client relies only on small DI and logging abstractions, keeping deployments slim.
 - **Familiar concepts** – MassTransit experience transfers directly; configuration and messaging patterns mirror the .NET world.
-- **Built-in retries** – consumer operations retry by default so transient errors do not surface to callers.
+- **Configurable retries** – opt into retry policies through filters to handle transient failures.
 - **Explicit control** – applications start and stop the bus manually, providing deterministic lifecycle management.
 
 These characteristics make MyServiceBus a pragmatic option for Java teams integrating with existing MassTransit ecosystems or
