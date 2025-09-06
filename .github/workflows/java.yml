@@ -20,6 +20,6 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '17'
-      - name: Build with Maven
+      - name: Build with Gradle
         working-directory: src/Java
-        run: mvn -B test
+        run: ./gradlew test

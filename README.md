@@ -35,7 +35,7 @@ See samples below.
 ## Getting Started
 ### Prerequisites
 - [.NET SDK](https://dotnet.microsoft.com/download)
-- Java (for the Java modules): JDK 17 + Maven
+- Java (for the Java modules): JDK 17 (Gradle wrapper included)
 
 ### Building
 - .NET
@@ -52,7 +52,7 @@ See samples below.
   ```
 - Java
   ```bash
-  (cd src/Java && mvn test)
+  (cd src/Java && ./gradlew test)
   ```
 
 ### Getting started

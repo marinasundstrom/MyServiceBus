@@ -1,0 +1,5 @@
+dependencies {
+    api project(':myservicebus-abstractions')
+    api project(':myservicebus-di')
+    api project(':myservicebus-tasks')
+}

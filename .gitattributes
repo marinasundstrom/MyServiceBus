@@ -1,1 +1,6 @@
 * text=auto eol=lf
+
+# Ensure Gradle wrapper scripts are treated as text
+src/Java/gradlew text eol=lf
+src/Java/gradlew.bat text eol=crlf
+

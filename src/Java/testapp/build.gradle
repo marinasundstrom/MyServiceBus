@@ -1,0 +1,15 @@
+plugins {
+    id 'application'
+}
+
+group = 'com.myservicebus.testapp'
+
+application {
+    mainClass = 'com.myservicebus.testapp.Main'
+}
+
+dependencies {
+    implementation project(':myservicebus-rabbitmq')
+    implementation "org.slf4j:slf4j-simple:${slf4jVersion}"
+    implementation "io.javalin:javalin:${javalinVersion}"
+}
