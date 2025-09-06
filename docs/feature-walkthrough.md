@@ -2,7 +2,7 @@
 
 This guide compares basic usage of MyServiceBus in C# and Java. It is split into basics and advanced sections so newcomers can focus on fundamental messaging patterns before exploring configuration and other features.
 
-For an explanation of why the C# and Java examples differ, see the [design decisions](design-decisions.md).
+For an explanation of why the C# and Java examples differ, see the [design decisions](development/design-decisions.md).
 For Java build and run instructions, including optional JDK 17 toolchain setup and how to run the test app, see `src/Java/README.md`.
 ## Contents
 
@@ -788,5 +788,5 @@ The harness is registered for `IMessageBus` and `ITransportFactory`, so existing
 
 ## Next Steps
 
-- Read the [design goals](design-goals.md) for MyServiceBus.
-- Explore the [design guidelines](design-guidelines.md) for architectural patterns and feature parity.
+- Read the [design goals](development/design-goals.md) for MyServiceBus.
+- Explore the [design guidelines](development/design-guidelines.md) for architectural patterns and feature parity.
