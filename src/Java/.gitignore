@@ -5,5 +5,3 @@ build/
 # IDE files
 .project
 .classpath
-
-gradle/wrapper/gradle-wrapper.jar

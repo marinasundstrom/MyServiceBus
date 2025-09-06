@@ -4,3 +4,5 @@
 src/Java/gradlew text eol=lf
 src/Java/gradlew.bat text eol=crlf
 
+# Store Gradle wrapper JARs in Git LFS
+**/gradle/wrapper/gradle-wrapper.jar filter=lfs diff=lfs merge=lfs -text
