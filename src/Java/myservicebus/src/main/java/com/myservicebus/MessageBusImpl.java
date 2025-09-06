@@ -16,6 +16,7 @@ import com.myservicebus.topology.BusTopology;
 import com.myservicebus.topology.ConsumerTopology;
 import com.myservicebus.topology.MessageBinding;
 import com.myservicebus.topology.TopologyRegistry;
+import com.myservicebus.NamingConventions;
 
 public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
     private final ServiceProvider serviceProvider;
@@ -85,11 +86,23 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
 
         Function<TransportMessage, CompletableFuture<Void>> handler = transportMessage -> {
             try {
-                MessageBinding binding = consumerDef.getBindings().get(0);
-                Envelope<?> envelope = messageDeserializer.deserialize(transportMessage.getBody(),
+                Envelope<Object> envelope = messageDeserializer.deserialize(transportMessage.getBody(), Object.class);
+                String messageTypeUrn = envelope.getMessageType() != null && !envelope.getMessageType().isEmpty()
+                        ? envelope.getMessageType().get(0)
+                        : null;
+                MessageBinding binding = consumerDef.getBindings().stream()
+                        .filter(b -> NamingConventions.getMessageUrn(b.getMessageType()).equals(messageTypeUrn))
+                        .findFirst()
+                        .orElse(null);
+                if (binding == null) {
+                    logger.warn("Received message with unregistered type {}", messageTypeUrn);
+                    return CompletableFuture.completedFuture(null);
+                }
+
+                Envelope<?> typedEnvelope = messageDeserializer.deserialize(transportMessage.getBody(),
                         binding.getMessageType());
 
-                String faultAddress = envelope.getFaultAddress();
+                String faultAddress = typedEnvelope.getFaultAddress();
                 if (faultAddress == null && transportMessage.getHeaders() != null) {
                     Object header = transportMessage.getHeaders().get(MessageHeaders.FAULT_ADDRESS);
                     if (header instanceof String s) {
@@ -99,9 +112,9 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
                 String errorAddress = transportFactory.getPublishAddress(consumerDef.getQueueName() + "_error");
 
                 ConsumeContext<Object> ctx = new ConsumeContext<>(
-                        envelope.getMessage(),
-                        envelope.getHeaders(),
-                        envelope.getResponseAddress(),
+                        typedEnvelope.getMessage(),
+                        typedEnvelope.getHeaders(),
+                        typedEnvelope.getResponseAddress(),
                         faultAddress,
                         errorAddress,
                         CancellationToken.none,
@@ -139,8 +152,18 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
 
         java.util.function.Function<TransportMessage, CompletableFuture<Void>> transportHandler = tm -> {
             try {
-                Envelope<?> envelope = messageDeserializer.deserialize(tm.getBody(), messageType);
-                String faultAddress = envelope.getFaultAddress();
+                Envelope<Object> envelope = messageDeserializer.deserialize(tm.getBody(), Object.class);
+                String messageTypeUrn = envelope.getMessageType() != null && !envelope.getMessageType().isEmpty()
+                        ? envelope.getMessageType().get(0)
+                        : null;
+                String expectedUrn = NamingConventions.getMessageUrn(messageType);
+                if (!expectedUrn.equals(messageTypeUrn)) {
+                    logger.warn("Received message with unregistered type {}", messageTypeUrn);
+                    return CompletableFuture.completedFuture(null);
+                }
+
+                Envelope<?> typedEnvelope = messageDeserializer.deserialize(tm.getBody(), messageType);
+                String faultAddress = typedEnvelope.getFaultAddress();
                 if (faultAddress == null && tm.getHeaders() != null) {
                     Object header = tm.getHeaders().get(MessageHeaders.FAULT_ADDRESS);
                     if (header instanceof String s) {
@@ -148,8 +171,8 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
                     }
                 }
                 String errorAddress = transportFactory.getPublishAddress(queueName + "_error");
-                ConsumeContext<T> ctx = new ConsumeContext<>((T) envelope.getMessage(), envelope.getHeaders(),
-                        envelope.getResponseAddress(), faultAddress, errorAddress, CancellationToken.none,
+                ConsumeContext<T> ctx = new ConsumeContext<>((T) typedEnvelope.getMessage(), typedEnvelope.getHeaders(),
+                        typedEnvelope.getResponseAddress(), faultAddress, errorAddress, CancellationToken.none,
                         transportSendEndpointProvider,
                         this.address);
                 return pipe.send(ctx);

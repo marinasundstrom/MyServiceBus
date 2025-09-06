@@ -15,6 +15,7 @@ import org.junit.jupiter.api.Test;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.myservicebus.MessageBusImpl;
+import com.myservicebus.NamingConventions;
 import com.myservicebus.di.ServiceCollection;
 import com.myservicebus.di.ServiceProvider;
 import com.myservicebus.topology.MessageBinding;
@@ -63,6 +64,7 @@ class ErrorQueueTest {
         Envelope<MyMessage> envelope = new Envelope<>();
         envelope.setMessage(new MyMessage());
         envelope.setHeaders(new HashMap<>());
+        envelope.setMessageType(List.of(NamingConventions.getMessageUrn(MyMessage.class)));
         ObjectMapper mapper = new ObjectMapper();
         mapper.disable(SerializationFeature.FAIL_ON_EMPTY_BEANS);
         byte[] body = mapper.writeValueAsBytes(envelope);
