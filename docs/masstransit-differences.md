@@ -10,6 +10,8 @@ MassTransit is the reference for MyServiceBus, and the project strives for full 
 - **Built-in Java retries** – the Java client automatically retries consumer operations; MassTransit configures retries through filters.
 - **Manual Java lifecycle** – Java applications start the bus explicitly, whereas MassTransit integrates with ASP.NET hosting.
 - **Checked exceptions** – the C# client uses `[Throws]` annotations and the Java client uses checked or runtime exceptions to surface errors.
+- **Typed filter registry** – the Java client selects filters at runtime using a registry keyed by context and message `Class` tokens, while MassTransit and the C# client bind filters via generics.
 
 Despite these differences, MyServiceBus aligns with MassTransit's message envelope format, pipe-and-filter pipeline, fault contracts, and transport abstractions so clients can interoperate across both projects.
+
 
