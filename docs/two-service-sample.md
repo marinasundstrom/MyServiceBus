@@ -26,13 +26,13 @@ In two separate terminals, from the repository root:
 
 ```bash
 # Build all Java modules (once)
-./gradlew -p src/Java build -x test
+./gradlew build -x test
 
 # Instance 1
-RABBITMQ_HOST=localhost HTTP_PORT=5301 ./gradlew -p src/Java/testapp run
+RABBITMQ_HOST=localhost HTTP_PORT=5301 ./gradlew -p testapp run
 
 # Instance 2
-RABBITMQ_HOST=localhost HTTP_PORT=5302 ./gradlew -p src/Java/testapp run
+RABBITMQ_HOST=localhost HTTP_PORT=5302 ./gradlew -p testapp run
 ```
 
 Notes:
