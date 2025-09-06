@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
 import com.myservicebus.tasks.CancellationToken;
 import com.myservicebus.di.ServiceCollection;
 import com.myservicebus.di.ServiceProvider;
+import com.google.inject.Inject;
 
 class PipeConfiguratorTest {
     static class TestContext implements PipeContext {
@@ -30,6 +31,7 @@ class PipeConfiguratorTest {
     static class DiFilter implements Filter<TestContext> {
         private final Counter counter;
 
+        @Inject
         DiFilter(Counter counter) {
             this.counter = counter;
         }
