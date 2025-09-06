@@ -5,11 +5,21 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.stream.Collectors;
 
+import org.slf4j.Logger;
+
+import com.myservicebus.di.ServiceProvider;
 import com.myservicebus.tasks.CancellationToken;
 
 public class ErrorTransportFilter<T> implements Filter<ConsumeContext<T>> {
+    private final ServiceProvider provider;
+
+    public ErrorTransportFilter(ServiceProvider provider) {
+        this.provider = provider;
+    }
+
     @Override
     public CompletableFuture<Void> send(ConsumeContext<T> context, Pipe<ConsumeContext<T>> next) {
+        Logger logger = provider.getService(Logger.class);
         return next.send(context).handle((v, ex) -> {
             if (ex != null) {
                 Throwable cause = ex instanceof CompletionException && ex.getCause() != null ? ex.getCause() : ex;
@@ -18,8 +28,19 @@ public class ErrorTransportFilter<T> implements Filter<ConsumeContext<T>> {
                     SendEndpoint endpoint = context.getSendEndpoint(errorAddress);
                     int tmp = 0;
                     Object value = context.getHeaders().get(MessageHeaders.REDELIVERY_COUNT);
-                    if (value instanceof Number n)
+                    if (value instanceof Number n) {
                         tmp = n.intValue();
+                    } else if (value instanceof String s) {
+                        try {
+                            tmp = Integer.parseInt(s);
+                        } catch (NumberFormatException nfe) {
+                            if (logger != null)
+                                logger.warn("Malformed RedeliveryCount header: {}", s);
+                            tmp = 0;
+                        }
+                    } else if (value != null && logger != null) {
+                        logger.warn("Malformed RedeliveryCount header: {}", value);
+                    }
 
                     final int redelivery = tmp;
                     final HostInfo host = HostInfoProvider.capture();

@@ -69,7 +69,7 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
         PipeConfigurator<ConsumeContext<Object>> configurator = new PipeConfigurator<>();
         configurator.useFilter(new OpenTelemetryConsumeFilter<>());
         @SuppressWarnings({ "unchecked", "rawtypes" })
-        Filter<ConsumeContext<Object>> errorFilter = new ErrorTransportFilter();
+        Filter<ConsumeContext<Object>> errorFilter = new ErrorTransportFilter(serviceProvider);
         configurator.useFilter(errorFilter);
         @SuppressWarnings({ "unchecked", "rawtypes" })
         Filter<ConsumeContext<Object>> faultFilter = new ConsumerFaultFilter(serviceProvider,
@@ -126,7 +126,7 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
         PipeConfigurator<ConsumeContext<T>> configurator = new PipeConfigurator<>();
         configurator.useFilter(new OpenTelemetryConsumeFilter<>());
         @SuppressWarnings({ "unchecked", "rawtypes" })
-        Filter<ConsumeContext<T>> errorFilter = new ErrorTransportFilter();
+        Filter<ConsumeContext<T>> errorFilter = new ErrorTransportFilter(serviceProvider);
         configurator.useFilter(errorFilter);
         @SuppressWarnings({ "unchecked", "rawtypes" })
         Filter<ConsumeContext<T>> faultFilter = new HandlerFaultFilter(serviceProvider);

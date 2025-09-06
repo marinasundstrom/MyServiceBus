@@ -4,6 +4,7 @@ using MyServiceBus.Topology;
 using System;
 using System.Reflection;
 using System.Runtime.InteropServices;
+using Microsoft.Extensions.Logging;
 
 namespace MyServiceBus;
 
@@ -93,7 +94,8 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
 
         var configurator = new PipeConfigurator<ConsumeContext<TMessage>>();
         configurator.UseFilter(new OpenTelemetryConsumeFilter<TMessage>());
-        configurator.UseFilter(new ErrorTransportFilter<TMessage>());
+        var errorLogger = _serviceProvider.GetService<ILogger<ErrorTransportFilter<TMessage>>>();
+        configurator.UseFilter(new ErrorTransportFilter<TMessage>(errorLogger));
         configurator.UseFilter(new HandlerFaultFilter<TMessage>(_serviceProvider));
         if (retryCount.HasValue)
             configurator.UseRetry(retryCount.Value, retryDelay);
@@ -133,7 +135,8 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
 
         var configurator = new PipeConfigurator<ConsumeContext<TMessage>>();
         configurator.UseFilter(new OpenTelemetryConsumeFilter<TMessage>());
-        configurator.UseFilter(new ErrorTransportFilter<TMessage>());
+        var errorLogger = _serviceProvider.GetService<ILogger<ErrorTransportFilter<TMessage>>>();
+        configurator.UseFilter(new ErrorTransportFilter<TMessage>(errorLogger));
         configurator.UseFilter(new ConsumerFaultFilter<TConsumer, TMessage>(_serviceProvider));
         if (configure is Action<PipeConfigurator<ConsumeContext<TMessage>>> cfg)
             cfg(configurator);

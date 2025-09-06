@@ -27,7 +27,7 @@ public class ErrorQueueTests
     }
 
     [Fact]
-    [Throws(typeof(UriFormatException), typeof(EncoderFallbackException), typeof(ArgumentOutOfRangeException), typeof(JsonException), typeof(ArgumentException))]
+    [Throws(typeof(UriFormatException), typeof(JsonException), typeof(ArgumentException), typeof(KeyNotFoundException))]
     public async Task Moves_message_to_error_queue_when_consumer_faults()
     {
         var services = new ServiceCollection();
@@ -65,6 +65,44 @@ public class ErrorQueueTests
         errorHeaders[MessageHeaders.RedeliveryCount].ShouldBe(0);
         errorHeaders.ShouldContainKey(MessageHeaders.HostMachineName);
         errorHeaders.ShouldContainKey(MessageHeaders.HostProcessName);
+    }
+
+    [Fact]
+    [Throws(typeof(UriFormatException), typeof(JsonException), typeof(ArgumentException), typeof(KeyNotFoundException))]
+    public async Task Sanitizes_malformed_redelivery_count_header()
+    {
+        var services = new ServiceCollection();
+        services.AddTransient<FaultingConsumer>();
+        var provider = services.BuildServiceProvider();
+
+        var errorUri = new Uri("rabbitmq://localhost/exchange/test-queue_error");
+        var faultUri = new Uri("rabbitmq://localhost/exchange/custom_fault");
+        var json = Encoding.UTF8.GetBytes($"{{\"messageId\":\"00000000-0000-0000-0000-000000000000\",\"messageType\":[],\"message\":{{\"text\":\"hi\"}}}}");
+        var headers = new Dictionary<string, object>
+        {
+            [MessageHeaders.FaultAddress] = faultUri.ToString(),
+            [MessageHeaders.RedeliveryCount] = "not-a-number"
+        };
+        var envelope = new EnvelopeMessageContext(json, headers);
+        var receiveContext = new ReceiveContextImpl(envelope, errorUri);
+
+        var transportFactory = new CaptureTransportFactory();
+        var context = new ConsumeContextImpl<TestMessage>(receiveContext, transportFactory,
+            new SendPipe(Pipe.Empty<SendContext>()),
+            new PublishPipe(Pipe.Empty<SendContext>()),
+            new EnvelopeMessageSerializer(),
+            new Uri("rabbitmq://localhost/"));
+
+        var configurator = new PipeConfigurator<ConsumeContext<TestMessage>>();
+        configurator.UseFilter(new ErrorTransportFilter<TestMessage>());
+        configurator.UseFilter(new ConsumerMessageFilter<FaultingConsumer, TestMessage>(provider));
+        var pipe = new ConsumePipe<TestMessage>(configurator.Build());
+
+        await Should.ThrowAsync<InvalidOperationException>(() => pipe.Send(context));
+
+        transportFactory.Address.ShouldBe(errorUri);
+        var errorHeaders = transportFactory.SendTransport.Context!.Headers;
+        errorHeaders[MessageHeaders.RedeliveryCount].ShouldBe(0);
     }
 
     class CaptureSendTransport : ISendTransport
