@@ -148,10 +148,10 @@ bus.publish(new SubmitOrder(UUID.randomUUID()), ctx -> ctx.getHeaders().put("tra
 - `docker-compose.yml` – Docker configuration for local infrastructure
 
 ## Java quickstart
-- Build and run the Java test app only (from repo root):
+- Run the Java test app only:
   ```bash
   RABBITMQ_HOST=localhost HTTP_PORT=5301 \
-    mvn -f src/Java/pom.xml -pl testapp -am -DskipTests exec:java
+    (cd src/Java/testapp && ./run.sh)
   ```
 - Build all Java modules:
   ```bash
