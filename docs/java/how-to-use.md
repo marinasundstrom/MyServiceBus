@@ -150,3 +150,42 @@ class SubmitOrderConsumer implements Consumer<SubmitOrder> {
     }
 }
 ```
+
+## Filters and Pipelines
+
+The Java client uses specialized filter interfaces to attach middleware to
+specific context types. Implement `ConsumeFilter<T>` for consumer pipelines or
+`SendFilter<T>` for send pipelines.
+
+```java
+class AuditFilter implements ConsumeFilter<SubmitOrder> {
+    @Override
+    public void handle(ConsumeContext<SubmitOrder> ctx,
+                       Pipe<ConsumeContext<SubmitOrder>, SubmitOrder> next) {
+        System.out.println("Audit " + ctx.getMessage().getOrderId());
+        next.run(ctx);
+    }
+}
+```
+
+Filters are composed into a `TypedPipe` and registered using a `PipeRegistry`
+keyed by message and context `Class` tokens:
+
+```java
+ConsumeFilter<SubmitOrder> audit = new AuditFilter();
+TypedPipe<ConsumeContext<SubmitOrder>, SubmitOrder> pipe =
+    new TypedPipe<>(List.of(audit));
+PipeRegistry registry = new PipeRegistry();
+registry.register(SubmitOrder.class, ConsumeContext.class, pipe);
+
+ConsumeContext<SubmitOrder> ctx = /* obtain context */;
+registry.dispatch(ctx, SubmitOrder.class);
+```
+
+### Divergence from C# and MassTransit
+
+MassTransit and the C# client bind filters using generics, so the compiler
+selects the correct pipeline for each message and context. Java's type erasure
+prevents that, so the Java client dispatches filters through a runtime registry
+indexed by `Class` tokens.
+
