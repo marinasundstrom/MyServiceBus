@@ -5,7 +5,7 @@ using MyServiceBus.Transports;
 
 namespace MyServiceBus.RabbitMq;
 
-public class RabbitMqTransportMessage : ITransportMessage
+internal class RabbitMqTransportMessage : ITransportMessage
 {
     public RabbitMqTransportMessage(IDictionary<string, object?> headers, bool isDurable, byte[] payload)
     {
