@@ -1,0 +1,46 @@
+
+group = 'com.myservicebus'
+version = '1.0-SNAPSHOT'
+
+ext {
+    lombokVersion = '1.18.34'
+    jacksonVersion = '2.17.2'
+    rabbitmqVersion = '5.20.0'
+    guiceVersion = '5.1.0'
+    slf4jVersion = '2.0.13'
+    junitVersion = '5.10.0'
+    // JUnit Platform version aligned with JUnit Jupiter 5.10.x
+    junitPlatformVersion = '1.10.0'
+    mockitoVersion = '5.11.0'
+    javalinVersion = '6.7.0'
+}
+
+subprojects {
+    apply plugin: 'java-library'
+
+    group = rootProject.group
+    version = rootProject.version
+
+    repositories {
+        mavenCentral()
+    }
+
+    dependencies {
+        compileOnly "org.projectlombok:lombok:${lombokVersion}"
+        annotationProcessor "org.projectlombok:lombok:${lombokVersion}"
+        implementation "com.fasterxml.jackson.core:jackson-databind:${jacksonVersion}"
+        implementation "com.fasterxml.jackson.datatype:jackson-datatype-jsr310:${jacksonVersion}"
+        implementation "com.rabbitmq:amqp-client:${rabbitmqVersion}"
+        implementation "com.google.inject:guice:${guiceVersion}"
+        implementation "org.slf4j:slf4j-api:${slf4jVersion}"
+        testImplementation "org.junit.jupiter:junit-jupiter:${junitVersion}"
+        testImplementation "org.mockito:mockito-core:${mockitoVersion}"
+        // Gradle 9 requires the JUnit Platform launcher on the test runtime classpath
+        testRuntimeOnly "org.junit.platform:junit-platform-launcher:${junitPlatformVersion}"
+        testRuntimeOnly "org.slf4j:slf4j-simple:${slf4jVersion}"
+    }
+
+    tasks.withType(Test) {
+        useJUnitPlatform()
+    }
+}

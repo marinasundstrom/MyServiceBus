@@ -482,3 +482,26 @@ $RECYCLE.BIN/
 
 # Vim temporary swap files
 *.swp
+
+# Gradle
+.gradle/
+**/build/
+
+## Java and Gradle
+# Java bytecode and runtime crash logs
+*.class
+hs_err_pid*
+replay_pid*
+
+# IDE/Eclipse
+.classpath
+.project
+.settings/
+bin/
+
+# IntelliJ
+*.iml
+out/
+
+# Maven (present in Java submodules)
+target/
