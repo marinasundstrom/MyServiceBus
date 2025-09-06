@@ -8,4 +8,5 @@ public class ReceiveEndpointTopology
     public string ExchangeType { get; init; } = "fanout";
     public bool Durable { get; init; } = true;
     public bool AutoDelete { get; init; } = false;
+    public ushort PrefetchCount { get; init; } = 0;
 }

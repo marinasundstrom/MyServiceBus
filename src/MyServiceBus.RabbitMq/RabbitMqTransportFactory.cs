@@ -12,13 +12,15 @@ public sealed class RabbitMqTransportFactory : ITransportFactory
     private readonly ConnectionProvider _connectionProvider;
     private readonly ConcurrentDictionary<string, ISendTransport> _sendTransports = new();
     private readonly ConcurrentDictionary<string, ISendTransport> _queueTransports = new();
+    private readonly ushort _prefetchCount;
 
-    public RabbitMqTransportFactory(ConnectionProvider connectionProvider)
+    public RabbitMqTransportFactory(ConnectionProvider connectionProvider, IRabbitMqFactoryConfigurator configurator)
     {
         _connectionProvider = connectionProvider;
+        _prefetchCount = configurator.PrefetchCount;
     }
 
-    [Throws(typeof(OverflowException), typeof(InvalidOperationException), typeof(ArgumentException), typeof(OperationCanceledException))]
+    [Throws(typeof(OverflowException), typeof(InvalidOperationException), typeof(OperationCanceledException))]
     public async Task<ISendTransport> GetSendTransport(Uri address, CancellationToken cancellationToken = default)
     {
         string? exchange = null;
@@ -142,6 +144,10 @@ public sealed class RabbitMqTransportFactory : ITransportFactory
         var connection = await _connectionProvider.GetOrCreateConnectionAsync(cancellationToken);
         var channel = await connection.CreateChannelAsync(cancellationToken: cancellationToken);
 
+        var prefetch = topology.PrefetchCount > 0 ? topology.PrefetchCount : _prefetchCount;
+        if (prefetch > 0)
+            await channel.BasicQosAsync(0, prefetch, false, cancellationToken);
+
         await channel.ExchangeDeclareAsync(
             exchange: topology.ExchangeName,
             type: topology.ExchangeType,
@@ -199,7 +205,7 @@ public sealed class RabbitMqTransportFactory : ITransportFactory
         return new RabbitMqReceiveTransport(channel, topology.QueueName, handler, hasErrorQueue);
     }
 
-    [Throws(typeof(OverflowException), typeof(ArgumentException))]
+    [Throws(typeof(OverflowException))]
     private static void ParseExchangeSettings(string? queryString, ref bool durable, ref bool autoDelete)
     {
         if (string.IsNullOrEmpty(queryString))

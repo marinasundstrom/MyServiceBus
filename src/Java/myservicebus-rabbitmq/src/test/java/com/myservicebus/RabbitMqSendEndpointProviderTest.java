@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
 
 import com.myservicebus.rabbitmq.RabbitMqSendEndpointProvider;
 import com.myservicebus.rabbitmq.RabbitMqTransportFactory;
+import com.myservicebus.rabbitmq.RabbitMqFactoryConfigurator;
 import com.myservicebus.serialization.EnvelopeMessageSerializer;
 import com.myservicebus.serialization.MessageSerializer;
 import com.myservicebus.SendPipe;
@@ -90,7 +91,7 @@ class RabbitMqSendEndpointProviderTest {
             }
         };
 
-        StubFactory() { super(null); }
+        StubFactory() { super(null, new RabbitMqFactoryConfigurator()); }
 
         @Override
         public SendTransport getSendTransport(String exchange, boolean durable, boolean autoDelete) {

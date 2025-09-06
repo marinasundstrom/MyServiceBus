@@ -29,7 +29,8 @@ public class RabbitMqTransport {
         services.addSingleton(URI.class, sp -> () -> URI.create("rabbitmq://" + factoryConfigurator.getClientHost() + "/"));
         services.addSingleton(RabbitMqTransportFactory.class, sp -> () -> {
             ConnectionProvider provider = sp.getService(ConnectionProvider.class);
-            return new RabbitMqTransportFactory(provider);
+            RabbitMqFactoryConfigurator cfgRef = sp.getService(RabbitMqFactoryConfigurator.class);
+            return new RabbitMqTransportFactory(provider, cfgRef);
         });
 
         services.addSingleton(com.myservicebus.TransportFactory.class,

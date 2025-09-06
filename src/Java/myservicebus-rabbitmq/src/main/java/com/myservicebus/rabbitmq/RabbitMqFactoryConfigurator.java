@@ -20,6 +20,7 @@ public class RabbitMqFactoryConfigurator {
     private final Map<Class<?>, String> exchangeNames = new HashMap<>();
     private EndpointNameFormatter endpointNameFormatter;
     private final java.util.List<HandlerRegistration<?>> handlerRegistrations = new java.util.ArrayList<>();
+    private int prefetchCount;
 
     public void host(String host) {
         this.clientHost = host;
@@ -67,7 +68,7 @@ public class RabbitMqFactoryConfigurator {
 
     @SuppressWarnings({"unchecked", "rawtypes"})
     private static <T> void applyHandler(com.myservicebus.MessageBusImpl bus, HandlerRegistration<T> reg) throws Exception {
-        bus.addHandler(reg.queueName, reg.messageType, reg.exchange, reg.handler, reg.retryCount, reg.retryDelay);
+        bus.addHandler(reg.queueName, reg.messageType, reg.exchange, reg.handler, reg.retryCount, reg.retryDelay, reg.prefetchCount);
     }
 
     public String getClientHost() {
@@ -84,6 +85,14 @@ public class RabbitMqFactoryConfigurator {
 
     public void setEndpointNameFormatter(EndpointNameFormatter formatter) {
         this.endpointNameFormatter = formatter;
+    }
+
+    public void setPrefetchCount(int prefetchCount) {
+        this.prefetchCount = prefetchCount;
+    }
+
+    public int getPrefetchCount() {
+        return prefetchCount;
     }
 
     private static class RabbitMqHostConfiguratorImpl implements RabbitMqHostConfigurator {
@@ -108,6 +117,7 @@ public class RabbitMqFactoryConfigurator {
         private Integer retryCount;
         private Duration retryDelay;
         private java.util.function.Consumer<RetryConfigurator> retry;
+        private Integer prefetchCount;
 
         ReceiveEndpointConfiguratorImpl(String queueName, Map<Class<?>, String> exchangeNames, java.util.List<HandlerRegistration<?>> handlers) {
             this.queueName = queueName;
@@ -124,6 +134,11 @@ public class RabbitMqFactoryConfigurator {
                 this.retryCount = rc.getRetryCount();
                 this.retryDelay = rc.getDelay();
             }
+        }
+
+        @Override
+        public void prefetchCount(int prefetchCount) {
+            this.prefetchCount = prefetchCount;
         }
 
         @Override
@@ -154,6 +169,8 @@ public class RabbitMqFactoryConfigurator {
                             existing.accept(pc);
                     });
                 }
+
+                def.setPrefetchCount(prefetchCount);
             } catch (Exception ex) {
                 throw new RuntimeException(
                         "Failed to configure consumer " + consumerClass.getSimpleName(), ex);
@@ -165,7 +182,7 @@ public class RabbitMqFactoryConfigurator {
             String exchange = exchangeNames.containsKey(messageType)
                     ? exchangeNames.get(messageType)
                     : NamingConventions.getExchangeName(messageType);
-            handlers.add(new HandlerRegistration<>(queueName, messageType, exchange, handler, retryCount, retryDelay));
+            handlers.add(new HandlerRegistration<>(queueName, messageType, exchange, handler, retryCount, retryDelay, prefetchCount));
         }
     }
 
@@ -176,16 +193,18 @@ public class RabbitMqFactoryConfigurator {
         final java.util.function.Function<ConsumeContext<T>, java.util.concurrent.CompletableFuture<Void>> handler;
         final Integer retryCount;
         final Duration retryDelay;
+        final Integer prefetchCount;
 
         HandlerRegistration(String queueName, Class<T> messageType, String exchange,
                 java.util.function.Function<ConsumeContext<T>, java.util.concurrent.CompletableFuture<Void>> handler,
-                Integer retryCount, Duration retryDelay) {
+                Integer retryCount, Duration retryDelay, Integer prefetchCount) {
             this.queueName = queueName;
             this.messageType = messageType;
             this.exchange = exchange;
             this.handler = handler;
             this.retryCount = retryCount;
             this.retryDelay = retryDelay;
+            this.prefetchCount = prefetchCount;
         }
     }
 }

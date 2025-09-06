@@ -35,7 +35,7 @@ public class RabbitMqFactoryConfiguratorTests
             where TConsumer : class, IConsumer<TMessage>
             where TMessage : class => Task.CompletedTask;
 
-        public Task AddHandler<TMessage>(string queueName, string exchangeName, Func<ConsumeContext<TMessage>, Task> handler, int? retryCount = null, TimeSpan? retryDelay = null, CancellationToken cancellationToken = default) where TMessage : class => Task.CompletedTask;
+        public Task AddHandler<TMessage>(string queueName, string exchangeName, Func<ConsumeContext<TMessage>, Task> handler, int? retryCount = null, TimeSpan? retryDelay = null, ushort? prefetchCount = null, CancellationToken cancellationToken = default) where TMessage : class => Task.CompletedTask;
 
         class StubSendEndpoint : ISendEndpoint
         {
@@ -55,6 +55,7 @@ public class RabbitMqFactoryConfiguratorTests
         private readonly Dictionary<Type, string> _exchangeNames = new();
         public IEndpointNameFormatter? EndpointNameFormatter { get; private set; }
         public string ClientHost => "localhost";
+        public ushort PrefetchCount { get; private set; }
 
         public void Message<T>(Action<MessageConfigurator> configure)
         {
@@ -73,6 +74,11 @@ public class RabbitMqFactoryConfiguratorTests
         public void SetEndpointNameFormatter(IEndpointNameFormatter formatter)
         {
             EndpointNameFormatter = formatter;
+        }
+
+        public void SetPrefetchCount(ushort prefetchCount)
+        {
+            PrefetchCount = prefetchCount;
         }
     }
 

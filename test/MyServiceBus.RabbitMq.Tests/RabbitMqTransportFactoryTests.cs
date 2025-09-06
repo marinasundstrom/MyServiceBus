@@ -13,6 +13,17 @@ namespace MyServiceBus.RabbitMq.Tests;
 
 public class RabbitMqTransportFactoryTests
 {
+    class TestRabbitMqFactoryConfigurator : IRabbitMqFactoryConfigurator
+    {
+        public IEndpointNameFormatter? EndpointNameFormatter => null;
+        public string ClientHost => "localhost";
+        public ushort PrefetchCount { get; private set; }
+        public void Message<T>(Action<MessageConfigurator> configure) { }
+        public void ReceiveEndpoint(string queueName, Action<ReceiveEndpointConfigurator> configure) { }
+        public void Host(string host, Action<IRabbitMqHostConfigurator>? configure = null) { }
+        public void SetEndpointNameFormatter(IEndpointNameFormatter formatter) { }
+        public void SetPrefetchCount(ushort prefetchCount) => PrefetchCount = prefetchCount;
+    }
     [Fact]
     [Throws(typeof(Exception))]
     public async Task Declares_error_exchange_and_queue()
@@ -69,7 +80,7 @@ public class RabbitMqTransportFactoryTests
             .Returns(Task.FromResult(connection));
 
         var provider = new ConnectionProvider(factory);
-        var transportFactory = new RabbitMqTransportFactory(provider);
+        var transportFactory = new RabbitMqTransportFactory(provider, new TestRabbitMqFactoryConfigurator());
 
         var topology = new ReceiveEndpointTopology
         {
@@ -139,7 +150,7 @@ public class RabbitMqTransportFactoryTests
             .Returns(Task.FromResult(connection));
 
         var provider = new ConnectionProvider(factory);
-        var transportFactory = new RabbitMqTransportFactory(provider);
+        var transportFactory = new RabbitMqTransportFactory(provider, new TestRabbitMqFactoryConfigurator());
 
         var topology = new ReceiveEndpointTopology
         {
@@ -164,7 +175,7 @@ public class RabbitMqTransportFactoryTests
     }
 
     [Fact]
-    [Throws(typeof(OverflowException), typeof(InvalidOperationException), typeof(ArgumentException), typeof(OperationCanceledException), typeof(UriFormatException))]
+    [Throws(typeof(OverflowException), typeof(InvalidOperationException), typeof(OperationCanceledException), typeof(UriFormatException))]
     public async Task Supports_exchange_scheme_uri()
     {
         var channel = Substitute.For<IChannel>();
@@ -189,7 +200,7 @@ public class RabbitMqTransportFactoryTests
             .Returns(Task.FromResult(connection));
 
         var provider = new ConnectionProvider(factory);
-        var transportFactory = new RabbitMqTransportFactory(provider);
+        var transportFactory = new RabbitMqTransportFactory(provider, new TestRabbitMqFactoryConfigurator());
 
         await transportFactory.GetSendTransport(new Uri("exchange:orders"));
 
@@ -205,7 +216,7 @@ public class RabbitMqTransportFactoryTests
     }
 
     [Fact]
-    [Throws(typeof(OverflowException), typeof(InvalidOperationException), typeof(ArgumentException), typeof(OperationCanceledException), typeof(UriFormatException))]
+    [Throws(typeof(OverflowException), typeof(InvalidOperationException), typeof(OperationCanceledException), typeof(UriFormatException))]
     public async Task Supports_queue_scheme_uri()
     {
         var channel = Substitute.For<IChannel>();
@@ -248,7 +259,7 @@ public class RabbitMqTransportFactoryTests
             .Returns(Task.FromResult(connection));
 
         var provider = new ConnectionProvider(factory);
-        var transportFactory = new RabbitMqTransportFactory(provider);
+        var transportFactory = new RabbitMqTransportFactory(provider, new TestRabbitMqFactoryConfigurator());
 
         await transportFactory.GetSendTransport(new Uri("queue:orders"));
 
@@ -261,5 +272,124 @@ public class RabbitMqTransportFactoryTests
             Arg.Any<bool>(),
             Arg.Any<bool>(),
             Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Uses_global_prefetch_count()
+    {
+        var channel = Substitute.For<IChannel>();
+        channel.ExchangeDeclareAsync(
+                Arg.Any<string>(),
+                Arg.Any<string>(),
+                Arg.Any<bool>(),
+                Arg.Any<bool>(),
+                Arg.Any<IDictionary<string, object?>?>(),
+                Arg.Any<bool>(),
+                Arg.Any<bool>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.CompletedTask);
+        channel.QueueDeclareAsync(
+                Arg.Any<string>(),
+                Arg.Any<bool>(),
+                Arg.Any<bool>(),
+                Arg.Any<bool>(),
+                Arg.Any<IDictionary<string, object?>?>(),
+                Arg.Any<bool>(),
+                Arg.Any<bool>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new QueueDeclareOk("ignored", 0, 0)));
+        channel.QueueBindAsync(
+                Arg.Any<string>(),
+                Arg.Any<string>(),
+                Arg.Any<string>(),
+                Arg.Any<IDictionary<string, object?>?>(),
+                Arg.Any<bool>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.CompletedTask);
+
+        var connection = Substitute.For<IConnection>();
+        connection.IsOpen.Returns(true);
+        connection.CreateChannelAsync(Arg.Any<CreateChannelOptions?>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(channel));
+
+        var factory = Substitute.For<IConnectionFactory>();
+        factory.CreateConnectionAsync(Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(connection));
+
+        var provider = new ConnectionProvider(factory);
+        var cfg = new TestRabbitMqFactoryConfigurator();
+        cfg.SetPrefetchCount(10);
+        var transportFactory = new RabbitMqTransportFactory(provider, cfg);
+
+        var topology = new ReceiveEndpointTopology
+        {
+            QueueName = "orders",
+            ExchangeName = "orders",
+            RoutingKey = string.Empty
+        };
+
+        await transportFactory.CreateReceiveTransport(topology, _ => Task.CompletedTask);
+
+        await channel.Received(1).BasicQosAsync(0, (ushort)10, false, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Endpoint_prefetch_overrides_global()
+    {
+        var channel = Substitute.For<IChannel>();
+        channel.ExchangeDeclareAsync(
+                Arg.Any<string>(),
+                Arg.Any<string>(),
+                Arg.Any<bool>(),
+                Arg.Any<bool>(),
+                Arg.Any<IDictionary<string, object?>?>(),
+                Arg.Any<bool>(),
+                Arg.Any<bool>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.CompletedTask);
+        channel.QueueDeclareAsync(
+                Arg.Any<string>(),
+                Arg.Any<bool>(),
+                Arg.Any<bool>(),
+                Arg.Any<bool>(),
+                Arg.Any<IDictionary<string, object?>?>(),
+                Arg.Any<bool>(),
+                Arg.Any<bool>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new QueueDeclareOk("ignored", 0, 0)));
+        channel.QueueBindAsync(
+                Arg.Any<string>(),
+                Arg.Any<string>(),
+                Arg.Any<string>(),
+                Arg.Any<IDictionary<string, object?>?>(),
+                Arg.Any<bool>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.CompletedTask);
+
+        var connection = Substitute.For<IConnection>();
+        connection.IsOpen.Returns(true);
+        connection.CreateChannelAsync(Arg.Any<CreateChannelOptions?>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(channel));
+
+        var factory = Substitute.For<IConnectionFactory>();
+        factory.CreateConnectionAsync(Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(connection));
+
+        var provider = new ConnectionProvider(factory);
+        var cfg = new TestRabbitMqFactoryConfigurator();
+        cfg.SetPrefetchCount(5);
+        var transportFactory = new RabbitMqTransportFactory(provider, cfg);
+
+        var topology = new ReceiveEndpointTopology
+        {
+            QueueName = "orders",
+            ExchangeName = "orders",
+            RoutingKey = string.Empty,
+            PrefetchCount = 20
+        };
+
+        await transportFactory.CreateReceiveTransport(topology, _ => Task.CompletedTask);
+
+        await channel.Received(1).BasicQosAsync(0, (ushort)20, false, Arg.Any<CancellationToken>());
     }
 }

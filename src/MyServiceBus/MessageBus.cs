@@ -77,7 +77,7 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
 
     [Throws(typeof(InvalidOperationException))]
     public async Task AddHandler<TMessage>(string queueName, string exchangeName, Func<ConsumeContext<TMessage>, Task> handler,
-        int? retryCount = null, TimeSpan? retryDelay = null, CancellationToken cancellationToken = default)
+        int? retryCount = null, TimeSpan? retryDelay = null, ushort? prefetchCount = null, CancellationToken cancellationToken = default)
         where TMessage : class
     {
         var topology = new ReceiveEndpointTopology
@@ -87,7 +87,8 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
             RoutingKey = string.Empty,
             ExchangeType = "fanout",
             Durable = true,
-            AutoDelete = false
+            AutoDelete = false,
+            PrefetchCount = prefetchCount ?? 0
         };
 
         var configurator = new PipeConfigurator<ConsumeContext<TMessage>>();
@@ -124,7 +125,8 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
             RoutingKey = "", // messageType.FullName!,
             ExchangeType = "fanout",
             Durable = true,
-            AutoDelete = false
+            AutoDelete = false,
+            PrefetchCount = consumer.PrefetchCount ?? 0
         };
 
         var receiveTransport = await _transportFactory.CreateReceiveTransport(topology, HandleMessageAsync, cancellationToken);

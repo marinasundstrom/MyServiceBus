@@ -19,6 +19,8 @@ public interface IRabbitMqFactoryConfigurator
     void SetEndpointNameFormatter(IEndpointNameFormatter formatter);
     IEndpointNameFormatter? EndpointNameFormatter { get; }
     string ClientHost { get; }
+    ushort PrefetchCount { get; }
+    void SetPrefetchCount(ushort prefetchCount);
 }
 
 public interface IRabbitMqHostConfigurator
@@ -52,6 +54,7 @@ public class ReceiveEndpointConfigurator
     private readonly IList<Action<IMessageBus>> _endpointActions;
     private int? _retryCount;
     private TimeSpan? _retryDelay;
+    private ushort? _prefetchCount;
 
     public ReceiveEndpointConfigurator(string queueName, IDictionary<Type, string> exchangeNames, IList<Action<IMessageBus>> endpointActions)
     {
@@ -95,6 +98,8 @@ public class ReceiveEndpointConfigurator
                     binding.EntityName = entity;
             }
 
+            consumer.PrefetchCount = _prefetchCount;
+
             if (_retryCount.HasValue)
             {
                 var retryMethod = typeof(ReceiveEndpointConfigurator)
@@ -122,14 +127,21 @@ public class ReceiveEndpointConfigurator
         }
     }
 
-    [Throws(typeof(NotSupportedException))]
     public void Handler<T>(Func<ConsumeContext<T>, Task> handler)
         where T : class
     {
         var exchangeName = _exchangeNames.TryGetValue(typeof(T), out var entity)
             ? entity
             : NamingConventions.GetExchangeName(typeof(T))!;
-        _endpointActions.Add([Throws(typeof(NullReferenceException))] (bus) => bus.AddHandler(_queueName, exchangeName, handler, _retryCount, _retryDelay, CancellationToken.None).GetAwaiter().GetResult());
+        _endpointActions.Add([Throws(typeof(Exception))] (bus) =>
+        {
+            bus.AddHandler(_queueName, exchangeName, handler, _retryCount, _retryDelay, _prefetchCount, CancellationToken.None).GetAwaiter().GetResult();
+        });
+    }
+
+    public void PrefetchCount(ushort prefetchCount)
+    {
+        _prefetchCount = prefetchCount;
     }
 
     static Delegate ApplyRetry<T>(int retryCount, TimeSpan? delay)
