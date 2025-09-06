@@ -4,7 +4,7 @@ using MyServiceBus.Serialization;
 
 namespace MyServiceBus;
 
-public class SendEndpointProvider : ISendEndpointProvider
+internal class SendEndpointProvider : ISendEndpointProvider
 {
     readonly ITransportFactory _transportFactory;
     readonly ISendPipe _sendPipe;

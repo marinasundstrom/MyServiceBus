@@ -5,7 +5,7 @@ using Microsoft.Extensions.Logging;
 
 namespace MyServiceBus;
 
-public class HandlerMessageFilter<TMessage> : IFilter<ConsumeContext<TMessage>>
+internal class HandlerMessageFilter<TMessage> : IFilter<ConsumeContext<TMessage>>
     where TMessage : class
 {
     readonly Func<ConsumeContext<TMessage>, Task> handler;
@@ -22,7 +22,7 @@ public class HandlerMessageFilter<TMessage> : IFilter<ConsumeContext<TMessage>>
     }
 }
 
-public class HandlerFaultFilter<TMessage> : IFilter<ConsumeContext<TMessage>>
+internal class HandlerFaultFilter<TMessage> : IFilter<ConsumeContext<TMessage>>
     where TMessage : class
 {
     readonly IServiceProvider provider;

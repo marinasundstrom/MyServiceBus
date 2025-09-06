@@ -1,10 +1,10 @@
 package com.myservicebus;
 
-public class PublishEndpointProviderImpl implements PublishEndpointProvider {
+class PublishEndpointProviderImpl implements PublishEndpointProvider {
     private final ConsumeContextProvider contextProvider;
     private final MessageBus bus;
 
-    public PublishEndpointProviderImpl(ConsumeContextProvider contextProvider, MessageBus bus) {
+    PublishEndpointProviderImpl(ConsumeContextProvider contextProvider, MessageBus bus) {
         this.contextProvider = contextProvider;
         this.bus = bus;
     }
