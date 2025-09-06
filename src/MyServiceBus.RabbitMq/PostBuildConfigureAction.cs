@@ -2,7 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace MyServiceBus;
 
-public class PostBuildConfigureAction : IPostBuildAction
+internal class PostBuildConfigureAction : IPostBuildAction
 {
     private readonly Action<IBusRegistrationContext, IRabbitMqFactoryConfigurator> _configure;
     private readonly IRabbitMqFactoryConfigurator _configurator;

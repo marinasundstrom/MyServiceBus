@@ -23,9 +23,10 @@ Keep implementation details hidden to maintain flexibility and prevent misuse:
 
 ## General Principles
 
-1. **Interfaces first** – Expose behavior via interfaces and keep concrete implementations internal.
+1. **Interfaces first** – Rely primarily on interfaces, not concrete types, and keep concrete implementations internal.
 2. **Minimal surface area** – Only expose what typical users need; advanced features can remain internal until stable.
 3. **Consistent naming and organization** – Align with MassTransit terminology to ease adoption.
 4. **Document differences** – When C# and Java diverge, document and justify the differences.
+5. **Prefer private by default** – It's easier to go from private to public without breaking consumers of the API.
 
 These rules help preserve a clear, maintainable API surface while providing the necessary extensibility points for consumers.
