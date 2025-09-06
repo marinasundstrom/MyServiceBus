@@ -49,7 +49,7 @@ Both implementations should map MyServiceBus addresses to the transport's constr
 
 - Write unit tests for send and receive operations.
 - Validate error handling and topology creation logic.
-- Update documentation and run all tests (`dotnet test` and `mvn test` for the Java project).
+- Update documentation and run all tests (`dotnet test` and `./gradlew test` for the Java project).
 
 ## Divergence Summary
 

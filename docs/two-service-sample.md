@@ -20,27 +20,25 @@ The service listens on `http://localhost:5112` and publishes `SubmitOrder` messa
 
 ## 3. Run two Java service replicas
 
-Run the Java test app twice on different ports. The Maven reactor will build only what’s needed (`-pl testapp -am`).
+Run the Java test app twice on different ports. Gradle will build only the requested module and its dependencies.
 
 In two separate terminals, from the repository root:
 
 ```bash
 # Build all Java modules (once)
-mvn -f src/Java/pom.xml -DskipTests install 
+./gradlew -p src/Java build -x test
 
-# Instance 1 (module POM; builds needed deps)
-RABBITMQ_HOST=localhost HTTP_PORT=5301 \
-  mvn -f src/Java/testapp/pom.xml -am -DskipTests exec:java
+# Instance 1
+RABBITMQ_HOST=localhost HTTP_PORT=5301 ./gradlew -p src/Java/testapp run
 
-# Instance 2 (module POM; builds needed deps)
-RABBITMQ_HOST=localhost HTTP_PORT=5302 \
-  mvn -f src/Java/testapp/pom.xml -am -DskipTests exec:java
+# Instance 2
+RABBITMQ_HOST=localhost HTTP_PORT=5302 ./gradlew -p src/Java/testapp run
 ```
 
 Notes:
 - `RABBITMQ_HOST` defaults to `localhost` if not set.
 - `HTTP_PORT` selects the HTTP port for each replica.
-- `-pl testapp -am` builds `testapp` and its dependencies only.
+- `-p` selects the project; Gradle builds the module and its dependencies automatically.
 - See `src/Java/README.md` for full Java build/run details and optional JDK 17 toolchain enforcement.
 
 Each instance consumes `SubmitOrder` messages from the same queue.
@@ -64,8 +62,8 @@ curl http://localhost:5301/publish
 The .NET service logs the received `SubmitOrder`.
 
 ## Troubleshooting
-- If Maven reports missing modules, run a full reactor build first:
+- If Gradle reports missing modules, run a full build first:
   ```bash
-  (cd src/Java && mvn -DskipTests install)
+  (cd src/Java && ./gradlew build -x test)
   ```
 - Ensure RabbitMQ is reachable at `RABBITMQ_HOST` and credentials are `guest/guest` (default in compose).
