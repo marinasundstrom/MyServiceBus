@@ -30,6 +30,10 @@ When overriding members, keep `[Throws]` declarations compatible with the base m
 
 The analyzer reports diagnostics such as `THROWS001` when an exception isn't declared or handled. Treat these diagnostics as warnings and resolve them in the code—avoid automatic fixes that add clutter.
 
+## Exception classification
+
+The analyzer mirrors Java's checked-vs.-runtime distinction. By default, all exceptions are treated as *Strict* (checked), requiring a `try`/`catch` or a `[Throws]` declaration. Exceptions that represent programming errors or cancellation are configured as unchecked in `CheckedExceptions.settings.json` using the `Ignored` or `Informational` classifications. Examples include `ArgumentException`, `InvalidOperationException`, `NullReferenceException`, `OperationCanceledException`, `TaskCanceledException`, and `NotImplementedException`.
+
 ## Aligning with Java
 
 The Java project in `src/Java` relies on Java's built-in checked exception system. Using `[Throws]` in C# keeps exception semantics aligned between the two codebases, making it easier to reason about cross-language behavior and port features between implementations.
