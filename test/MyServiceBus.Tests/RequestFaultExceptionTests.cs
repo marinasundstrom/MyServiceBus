@@ -1,6 +1,7 @@
 using System;
 using MyServiceBus;
 using Xunit;
+using Xunit.Sdk;
 
 public class RequestFaultExceptionTests
 {
