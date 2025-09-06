@@ -61,7 +61,7 @@ public class MediatorSendEndpoint implements SendEndpoint {
                 if (consumerTopology.getConfigure() != null)
                     consumerTopology.getConfigure().accept((PipeConfigurator) configurator);
 
-                Pipe<ConsumeContext<Object>> pipe = configurator.build();
+                Pipe<ConsumeContext<Object>> pipe = configurator.build(serviceProvider);
 
                 ConsumeContext<Object> ctx = new ConsumeContext<>(
                         message,

@@ -10,6 +10,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 
 import com.myservicebus.tasks.CancellationToken;
+import com.myservicebus.di.ServiceCollection;
+import com.myservicebus.di.ServiceProvider;
 
 class PipeConfiguratorTest {
     static class TestContext implements PipeContext {
@@ -18,6 +20,24 @@ class PipeConfiguratorTest {
         @Override
         public CancellationToken getCancellationToken() {
             return token;
+        }
+    }
+
+    static class Counter {
+        int count;
+    }
+
+    static class DiFilter implements Filter<TestContext> {
+        private final Counter counter;
+
+        DiFilter(Counter counter) {
+            this.counter = counter;
+        }
+
+        @Override
+        public CompletableFuture<Void> send(TestContext context, Pipe<TestContext> next) {
+            counter.count++;
+            return next.send(context);
         }
     }
 
@@ -78,5 +98,21 @@ class PipeConfiguratorTest {
         pipe.send(ctx).join();
         assertEquals(3, attempts.get());
         assertEquals(List.of("done"), ctx.calls);
+    }
+
+    @Test
+    void resolvesFilterFromServiceProvider() {
+        ServiceCollection services = new ServiceCollection();
+        services.addSingleton(Counter.class);
+        services.addSingleton(DiFilter.class);
+        ServiceProvider provider = services.buildServiceProvider();
+
+        PipeConfigurator<TestContext> configurator = new PipeConfigurator<>();
+        configurator.useFilter(DiFilter.class);
+        Pipe<TestContext> pipe = configurator.build(provider);
+        TestContext ctx = new TestContext();
+        pipe.send(ctx).join();
+        Counter counter = provider.getService(Counter.class);
+        assertEquals(1, counter.count);
     }
 }

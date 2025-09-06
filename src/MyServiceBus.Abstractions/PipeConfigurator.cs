@@ -2,17 +2,27 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace MyServiceBus;
 
 public class PipeConfigurator<TContext>
     where TContext : class, PipeContext
 {
-    readonly List<IFilter<TContext>> filters = new List<IFilter<TContext>>();
+    readonly List<Func<IServiceProvider?, IFilter<TContext>>> filters = new();
 
     public void UseFilter(IFilter<TContext> filter)
     {
-        filters.Add(filter);
+        filters.Add(_ => filter);
+    }
+
+    [Throws(typeof(MissingMethodException))]
+    public void UseFilter<TFilter>()
+        where TFilter : class, IFilter<TContext>
+    {
+        filters.Add([Throws(typeof(MissingMethodException))] (provider) => provider != null
+                ? (IFilter<TContext>)ActivatorUtilities.GetServiceOrCreateInstance(provider, typeof(TFilter))
+                : Activator.CreateInstance<TFilter>()!);
     }
 
     public void UseExecute(Func<TContext, Task> callback)
@@ -32,12 +42,14 @@ public class PipeConfigurator<TContext>
         UseRetry(rc.RetryCount, rc.Delay);
     }
 
-    [Throws(typeof(ArgumentOutOfRangeException))]
-    public IPipe<TContext> Build()
+    public IPipe<TContext> Build(IServiceProvider? provider = null)
     {
         IPipe<TContext> next = Pipe.Empty<TContext>();
         for (var i = filters.Count - 1; i >= 0; i--)
-            next = new FilterPipe(filters[i], next);
+        {
+            var filter = filters[i](provider);
+            next = new FilterPipe(filter, next);
+        }
 
         return next;
     }
