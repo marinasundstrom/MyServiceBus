@@ -35,7 +35,7 @@ See samples below.
 ## Getting Started
 ### Prerequisites
 - [.NET SDK](https://dotnet.microsoft.com/download)
-- Java Development Kit (for the Java prototype)
+- Java (for the Java modules): JDK 17 + Maven
 
 ### Building
 - .NET
@@ -43,10 +43,7 @@ See samples below.
   dotnet restore
   dotnet build
   ```
-- Java (Maven reactor in `src/Java`)
-  ```bash
-  (cd src/Java && mvn -DskipTests install)
-  ```
+- Java build/run instructions are documented in `src/Java/README.md`.
 
 ### Running tests
 - .NET
@@ -148,15 +145,7 @@ bus.publish(new SubmitOrder(UUID.randomUUID()), ctx -> ctx.getHeaders().put("tra
 - `docker-compose.yml` – Docker configuration for local infrastructure
 
 ## Java quickstart
-- Build and run the Java test app only (from repo root):
-  ```bash
-  RABBITMQ_HOST=localhost HTTP_PORT=5301 \
-    mvn -f src/Java/pom.xml -pl testapp -am -DskipTests exec:java
-  ```
-- Build all Java modules:
-  ```bash
-  (cd src/Java && mvn -DskipTests install)
-  ```
+- See `src/Java/README.md` for detailed Java build and run instructions, including JDK 17 toolchain setup and running the `testapp`.
 
 ## Contributing
 Contributions are welcome! Please run `dotnet test` before submitting a pull request and follow the coding conventions described in `AGENTS.md`.
