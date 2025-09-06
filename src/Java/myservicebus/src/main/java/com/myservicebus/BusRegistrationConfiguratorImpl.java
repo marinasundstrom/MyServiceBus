@@ -20,6 +20,8 @@ public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigura
 
     public BusRegistrationConfiguratorImpl(ServiceCollection serviceCollection) {
         this.serviceCollection = serviceCollection;
+        sendConfigurator.useFilter(new OpenTelemetrySendFilter());
+        publishConfigurator.useFilter(new OpenTelemetrySendFilter());
     }
 
     @Override

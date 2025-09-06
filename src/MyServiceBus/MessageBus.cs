@@ -91,6 +91,7 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
         };
 
         var configurator = new PipeConfigurator<ConsumeContext<TMessage>>();
+        configurator.UseFilter(new OpenTelemetryConsumeFilter<TMessage>());
         configurator.UseFilter(new ErrorTransportFilter<TMessage>());
         configurator.UseFilter(new HandlerFaultFilter<TMessage>(_serviceProvider));
         if (retryCount.HasValue)
@@ -129,6 +130,7 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
         var receiveTransport = await _transportFactory.CreateReceiveTransport(topology, HandleMessageAsync, cancellationToken);
 
         var configurator = new PipeConfigurator<ConsumeContext<TMessage>>();
+        configurator.UseFilter(new OpenTelemetryConsumeFilter<TMessage>());
         configurator.UseFilter(new ErrorTransportFilter<TMessage>());
         configurator.UseFilter(new ConsumerFaultFilter<TConsumer, TMessage>(_serviceProvider));
         if (configure is Action<PipeConfigurator<ConsumeContext<TMessage>>> cfg)

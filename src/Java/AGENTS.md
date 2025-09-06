@@ -7,5 +7,4 @@ This directory contains the Java implementation of MyServiceBus. See `../../docs
 - Format code using your IDE's auto-format.
 
 ## Testing
-- Run `gradle test` from this directory and ensure all tests pass before committing.
-- Use the system `gradle` rather than the checked-in Gradle wrapper.
+- Run `./gradlew test` from this directory and ensure all tests pass before committing.

@@ -13,6 +13,7 @@ ext {
     junitPlatformVersion = '1.10.0'
     mockitoVersion = '5.11.0'
     javalinVersion = '6.7.0'
+    opentelemetryVersion = '1.43.0'
 }
 
 subprojects {
@@ -40,8 +41,10 @@ subprojects {
         implementation "com.rabbitmq:amqp-client:${rabbitmqVersion}"
         implementation "com.google.inject:guice:${guiceVersion}"
         implementation "org.slf4j:slf4j-api:${slf4jVersion}"
+        implementation "io.opentelemetry:opentelemetry-api:${opentelemetryVersion}"
         testImplementation "org.junit.jupiter:junit-jupiter:${junitVersion}"
         testImplementation "org.mockito:mockito-core:${mockitoVersion}"
+        testImplementation "io.opentelemetry:opentelemetry-sdk:${opentelemetryVersion}"
         // Gradle 9 requires the JUnit Platform launcher on the test runtime classpath
         testRuntimeOnly "org.junit.platform:junit-platform-launcher:${junitPlatformVersion}"
         testRuntimeOnly "org.slf4j:slf4j-simple:${slf4jVersion}"

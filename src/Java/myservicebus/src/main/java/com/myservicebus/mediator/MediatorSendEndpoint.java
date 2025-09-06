@@ -6,6 +6,7 @@ import com.myservicebus.ConsumerFaultFilter;
 import com.myservicebus.ConsumerMessageFilter;
 import com.myservicebus.ErrorTransportFilter;
 import com.myservicebus.Filter;
+import com.myservicebus.OpenTelemetryConsumeFilter;
 import com.myservicebus.Pipe;
 import com.myservicebus.PipeConfigurator;
 import com.myservicebus.SendEndpoint;
@@ -46,6 +47,7 @@ public class MediatorSendEndpoint implements SendEndpoint {
                     .anyMatch(b -> b.getMessageType().isAssignableFrom(message.getClass()));
             if (match) {
                 PipeConfigurator<ConsumeContext<Object>> configurator = new PipeConfigurator<>();
+                configurator.useFilter(new OpenTelemetryConsumeFilter<>());
                 Filter<ConsumeContext<Object>> errorFilter = new ErrorTransportFilter<>();
                 configurator.useFilter(errorFilter);
                 Class<? extends Consumer<Object>> consumerType = (Class<? extends Consumer<Object>>) consumerTopology

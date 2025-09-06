@@ -67,6 +67,7 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
 
     public void addConsumer(ConsumerTopology consumerDef) throws Exception {
         PipeConfigurator<ConsumeContext<Object>> configurator = new PipeConfigurator<>();
+        configurator.useFilter(new OpenTelemetryConsumeFilter<>());
         @SuppressWarnings({ "unchecked", "rawtypes" })
         Filter<ConsumeContext<Object>> errorFilter = new ErrorTransportFilter();
         configurator.useFilter(errorFilter);
@@ -123,6 +124,7 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
             java.util.function.Function<ConsumeContext<T>, CompletableFuture<Void>> handler,
             Integer retryCount, java.time.Duration retryDelay) throws Exception {
         PipeConfigurator<ConsumeContext<T>> configurator = new PipeConfigurator<>();
+        configurator.useFilter(new OpenTelemetryConsumeFilter<>());
         @SuppressWarnings({ "unchecked", "rawtypes" })
         Filter<ConsumeContext<T>> errorFilter = new ErrorTransportFilter();
         configurator.useFilter(errorFilter);
