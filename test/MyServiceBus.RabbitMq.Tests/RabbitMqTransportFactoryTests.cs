@@ -13,6 +13,17 @@ namespace MyServiceBus.RabbitMq.Tests;
 
 public class RabbitMqTransportFactoryTests
 {
+    class TestRabbitMqFactoryConfigurator : IRabbitMqFactoryConfigurator
+    {
+        public IEndpointNameFormatter? EndpointNameFormatter => null;
+        public string ClientHost => "localhost";
+        public ushort PrefetchCount { get; private set; }
+        public void Message<T>(Action<MessageConfigurator> configure) { }
+        public void ReceiveEndpoint(string queueName, Action<ReceiveEndpointConfigurator> configure) { }
+        public void Host(string host, Action<IRabbitMqHostConfigurator>? configure = null) { }
+        public void SetEndpointNameFormatter(IEndpointNameFormatter formatter) { }
+        public void SetPrefetchCount(ushort prefetchCount) => PrefetchCount = prefetchCount;
+    }
     [Fact]
     [Throws(typeof(Exception))]
     public async Task Declares_error_exchange_and_queue()
@@ -69,7 +80,7 @@ public class RabbitMqTransportFactoryTests
             .Returns(Task.FromResult(connection));
 
         var provider = new ConnectionProvider(factory);
-        var transportFactory = new RabbitMqTransportFactory(provider, new RabbitMqFactoryConfigurator());
+        var transportFactory = new RabbitMqTransportFactory(provider, new TestRabbitMqFactoryConfigurator());
 
         var topology = new ReceiveEndpointTopology
         {
@@ -139,7 +150,7 @@ public class RabbitMqTransportFactoryTests
             .Returns(Task.FromResult(connection));
 
         var provider = new ConnectionProvider(factory);
-        var transportFactory = new RabbitMqTransportFactory(provider, new RabbitMqFactoryConfigurator());
+        var transportFactory = new RabbitMqTransportFactory(provider, new TestRabbitMqFactoryConfigurator());
 
         var topology = new ReceiveEndpointTopology
         {
@@ -189,7 +200,7 @@ public class RabbitMqTransportFactoryTests
             .Returns(Task.FromResult(connection));
 
         var provider = new ConnectionProvider(factory);
-        var transportFactory = new RabbitMqTransportFactory(provider, new RabbitMqFactoryConfigurator());
+        var transportFactory = new RabbitMqTransportFactory(provider, new TestRabbitMqFactoryConfigurator());
 
         await transportFactory.GetSendTransport(new Uri("exchange:orders"));
 
@@ -248,7 +259,7 @@ public class RabbitMqTransportFactoryTests
             .Returns(Task.FromResult(connection));
 
         var provider = new ConnectionProvider(factory);
-        var transportFactory = new RabbitMqTransportFactory(provider, new RabbitMqFactoryConfigurator());
+        var transportFactory = new RabbitMqTransportFactory(provider, new TestRabbitMqFactoryConfigurator());
 
         await transportFactory.GetSendTransport(new Uri("queue:orders"));
 
@@ -306,7 +317,7 @@ public class RabbitMqTransportFactoryTests
             .Returns(Task.FromResult(connection));
 
         var provider = new ConnectionProvider(factory);
-        var cfg = new RabbitMqFactoryConfigurator();
+        var cfg = new TestRabbitMqFactoryConfigurator();
         cfg.SetPrefetchCount(10);
         var transportFactory = new RabbitMqTransportFactory(provider, cfg);
 
@@ -365,7 +376,7 @@ public class RabbitMqTransportFactoryTests
             .Returns(Task.FromResult(connection));
 
         var provider = new ConnectionProvider(factory);
-        var cfg = new RabbitMqFactoryConfigurator();
+        var cfg = new TestRabbitMqFactoryConfigurator();
         cfg.SetPrefetchCount(5);
         var transportFactory = new RabbitMqTransportFactory(provider, cfg);
 

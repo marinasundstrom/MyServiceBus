@@ -55,6 +55,7 @@ public class RabbitMqFactoryConfiguratorTests
         private readonly Dictionary<Type, string> _exchangeNames = new();
         public IEndpointNameFormatter? EndpointNameFormatter { get; private set; }
         public string ClientHost => "localhost";
+        public ushort PrefetchCount { get; private set; }
 
         public void Message<T>(Action<MessageConfigurator> configure)
         {
@@ -73,6 +74,11 @@ public class RabbitMqFactoryConfiguratorTests
         public void SetEndpointNameFormatter(IEndpointNameFormatter formatter)
         {
             EndpointNameFormatter = formatter;
+        }
+
+        public void SetPrefetchCount(ushort prefetchCount)
+        {
+            PrefetchCount = prefetchCount;
         }
     }
 
