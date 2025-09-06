@@ -43,6 +43,10 @@ Notes:
 
 Each instance consumes `SubmitOrder` messages from the same queue.
 
+### Java consumer failures
+
+The Java `SubmitOrderConsumer` calls a service that randomly throws to simulate processing errors. Failed `SubmitOrder` messages land in the `submit-order_error` queue, where a handler forwards them back to `queue:submit-order` for another attempt.
+
 ## 4. Publish a message
 
 From another terminal call the .NET service:
