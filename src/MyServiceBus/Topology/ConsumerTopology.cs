@@ -9,4 +9,5 @@ public class ConsumerTopology
     public string QueueName { get; set; }
     public List<MessageBinding> Bindings { get; set; } = new();
     public Delegate? ConfigurePipe { get; set; }
+    public ushort? PrefetchCount { get; set; }
 }

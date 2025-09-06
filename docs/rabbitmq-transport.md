@@ -60,3 +60,26 @@ cfg.receiveEndpoint("submit-order-queue_error", e -> {
 });
 ```
 
+
+## Prefetch Count
+
+Both implementations allow tuning the number of unacknowledged messages a consumer can receive. A global prefetch count applies to all endpoints, while individual receive endpoints can override it.
+
+### C#
+```csharp
+cfg.SetPrefetchCount(16); // global
+
+cfg.ReceiveEndpoint("orders", e =>
+{
+    e.PrefetchCount(32); // endpoint specific
+});
+```
+
+### Java
+```java
+factoryConfigurator.setPrefetchCount(16); // global
+
+factoryConfigurator.receiveEndpoint("orders", e -> {
+    e.prefetchCount(32); // endpoint specific
+});
+```

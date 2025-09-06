@@ -19,9 +19,11 @@ public class RabbitMqTransportFactory implements TransportFactory {
     private final ConnectionProvider connectionProvider;
     private final ConcurrentHashMap<String, RabbitMqSendTransport> exchangeTransports = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, RabbitMqSendTransport> queueTransports = new ConcurrentHashMap<>();
+    private final int defaultPrefetchCount;
 
-    public RabbitMqTransportFactory(ConnectionProvider connectionProvider) {
+    public RabbitMqTransportFactory(ConnectionProvider connectionProvider, RabbitMqFactoryConfigurator configurator) {
         this.connectionProvider = connectionProvider;
+        this.defaultPrefetchCount = configurator.getPrefetchCount();
     }
 
     public SendTransport getSendTransport(String exchange, boolean durable, boolean autoDelete) {
@@ -81,8 +83,19 @@ public class RabbitMqTransportFactory implements TransportFactory {
     @Override
     public ReceiveTransport createReceiveTransport(String queueName, List<MessageBinding> bindings,
             Function<TransportMessage, CompletableFuture<Void>> handler) throws Exception {
+        return createReceiveTransport(queueName, bindings, handler, defaultPrefetchCount);
+    }
+
+    @Override
+    public ReceiveTransport createReceiveTransport(String queueName, List<MessageBinding> bindings,
+            Function<TransportMessage, CompletableFuture<Void>> handler, int prefetchCount) throws Exception {
         Connection connection = connectionProvider.getOrCreateConnection();
         Channel channel = connection.createChannel();
+
+        int count = prefetchCount > 0 ? prefetchCount : defaultPrefetchCount;
+        if (count > 0) {
+            channel.basicQos(count);
+        }
 
         for (MessageBinding binding : bindings) {
             String exchangeName = binding.getEntityName();

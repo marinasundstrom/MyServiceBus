@@ -35,7 +35,7 @@ public class RabbitMqFactoryConfiguratorTests
             where TConsumer : class, IConsumer<TMessage>
             where TMessage : class => Task.CompletedTask;
 
-        public Task AddHandler<TMessage>(string queueName, string exchangeName, Func<ConsumeContext<TMessage>, Task> handler, int? retryCount = null, TimeSpan? retryDelay = null, CancellationToken cancellationToken = default) where TMessage : class => Task.CompletedTask;
+        public Task AddHandler<TMessage>(string queueName, string exchangeName, Func<ConsumeContext<TMessage>, Task> handler, int? retryCount = null, TimeSpan? retryDelay = null, ushort? prefetchCount = null, CancellationToken cancellationToken = default) where TMessage : class => Task.CompletedTask;
 
         class StubSendEndpoint : ISendEndpoint
         {

@@ -8,6 +8,7 @@ internal sealed class RabbitMqFactoryConfigurator : IRabbitMqFactoryConfigurator
     private readonly Dictionary<Type, string> _exchangeNames = new();
     private readonly List<Action<IMessageBus>> _endpointActions = new();
     private IEndpointNameFormatter? _endpointNameFormatter;
+    public ushort PrefetchCount { get; private set; }
 
     public RabbitMqFactoryConfigurator()
     {
@@ -41,6 +42,11 @@ internal sealed class RabbitMqFactoryConfigurator : IRabbitMqFactoryConfigurator
     public void SetEndpointNameFormatter(IEndpointNameFormatter formatter)
     {
         _endpointNameFormatter = formatter;
+    }
+
+    public void SetPrefetchCount(ushort prefetchCount)
+    {
+        PrefetchCount = prefetchCount;
     }
 
     internal void Apply(IMessageBus bus)

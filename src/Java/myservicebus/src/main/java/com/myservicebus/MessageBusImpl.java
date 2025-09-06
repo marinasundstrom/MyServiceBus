@@ -116,13 +116,13 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
         };
 
         ReceiveTransport transport = transportFactory.createReceiveTransport(consumerDef.getQueueName(),
-                consumerDef.getBindings(), handler);
+                consumerDef.getBindings(), handler, consumerDef.getPrefetchCount() != null ? consumerDef.getPrefetchCount() : 0);
         receiveTransports.add(transport);
     }
 
     public <T> void addHandler(String queueName, Class<T> messageType, String exchange,
             java.util.function.Function<ConsumeContext<T>, CompletableFuture<Void>> handler,
-            Integer retryCount, java.time.Duration retryDelay) throws Exception {
+            Integer retryCount, java.time.Duration retryDelay, Integer prefetchCount) throws Exception {
         PipeConfigurator<ConsumeContext<T>> configurator = new PipeConfigurator<>();
         configurator.useFilter(new OpenTelemetryConsumeFilter<>());
         @SuppressWarnings({ "unchecked", "rawtypes" })
@@ -166,7 +166,8 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
         binding.setEntityName(exchange);
         bindings.add(binding);
 
-        ReceiveTransport transport = transportFactory.createReceiveTransport(queueName, bindings, transportHandler);
+        ReceiveTransport transport = transportFactory.createReceiveTransport(queueName, bindings, transportHandler,
+                prefetchCount != null ? prefetchCount : 0);
         receiveTransports.add(transport);
     }
 

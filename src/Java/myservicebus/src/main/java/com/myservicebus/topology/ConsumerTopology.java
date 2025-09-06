@@ -12,6 +12,7 @@ public class ConsumerTopology {
     private String queueName;
     private List<MessageBinding> bindings = new ArrayList<>();
     private Consumer<PipeConfigurator<ConsumeContext<Object>>> configure;
+    private Integer prefetchCount;
 
     public Class<?> getConsumerType() {
         return consumerType;
@@ -43,5 +44,13 @@ public class ConsumerTopology {
 
     public void setConfigure(Consumer<PipeConfigurator<ConsumeContext<Object>>> configure) {
         this.configure = configure;
+    }
+
+    public Integer getPrefetchCount() {
+        return prefetchCount;
+    }
+
+    public void setPrefetchCount(Integer prefetchCount) {
+        this.prefetchCount = prefetchCount;
     }
 }

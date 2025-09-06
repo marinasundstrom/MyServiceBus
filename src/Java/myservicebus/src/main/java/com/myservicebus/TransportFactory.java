@@ -13,6 +13,11 @@ public interface TransportFactory {
     ReceiveTransport createReceiveTransport(String queueName, List<MessageBinding> bindings,
             Function<TransportMessage, CompletableFuture<Void>> handler) throws Exception;
 
+    default ReceiveTransport createReceiveTransport(String queueName, List<MessageBinding> bindings,
+            Function<TransportMessage, CompletableFuture<Void>> handler, int prefetchCount) throws Exception {
+        return createReceiveTransport(queueName, bindings, handler);
+    }
+
     String getPublishAddress(String exchange);
 
     String getSendAddress(String queue);
