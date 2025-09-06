@@ -11,7 +11,7 @@ See samples below.
 - Provide a community-driven, open-source alternative to MassTransit and MediatR as they move toward commercial licensing.
 - Offer a familiar API for developers coming from MassTransit.
 - Ensure wire-level and API compatibility with MassTransit so any client can communicate with MassTransit services.
-- Maintain feature parity between the C# and Java clients with consistent behavior across languages. See the [design guidelines](docs/design-guidelines.md) for architectural and feature parity.
+- Maintain feature parity between the C# and Java clients with consistent behavior across languages. See the [design guidelines](docs/development/design-guidelines.md) for architectural and feature parity.
 
 ## Features
 - Fire-and-forget message sending
@@ -141,7 +141,7 @@ bus.publish(new SubmitOrder(UUID.randomUUID()), ctx -> ctx.getHeaders().put("tra
 ## Repository structure
 - `src/` – C# and Java source code
 - `test/` – Test projects
-- `docs/` – Additional documentation and design goals, including [emoji usage](docs/emoji-usage.md) guidelines
+- `docs/` – Documentation for using MyServiceBus, including [emoji usage](docs/emoji-usage.md) guidelines. Development documents live in `docs/development/`.
 - `docker-compose.yml` – Docker configuration for local infrastructure
 
 ## Java Quickstart
