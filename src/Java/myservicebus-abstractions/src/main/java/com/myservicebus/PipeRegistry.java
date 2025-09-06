@@ -10,7 +10,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class PipeRegistry {
     private final Map<Key, Pipe<?>> pipes = new ConcurrentHashMap<>();
 
-    public <T, C extends PipeContext> void register(Class<T> messageType, Class<C> contextType, Pipe<C> pipe) {
+    public void register(Class<?> messageType, Class<? extends PipeContext> contextType, Pipe<? extends PipeContext> pipe) {
         pipes.put(new Key(messageType, contextType), pipe);
     }
 
@@ -26,4 +26,3 @@ public class PipeRegistry {
     private record Key(Class<?> message, Class<?> context) {
     }
 }
-

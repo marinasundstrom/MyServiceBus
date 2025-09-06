@@ -9,7 +9,10 @@ import java.util.concurrent.CompletableFuture;
 
 import org.junit.jupiter.api.Test;
 
+import com.myservicebus.tasks.CancellationToken;
+
 class PipeRegistryTest {
+
     @Test
     void dispatchesPipelinePerMessageAndContext() {
         List<String> calls = new ArrayList<>();
@@ -24,10 +27,19 @@ class PipeRegistryTest {
         TypedPipe<ConsumeContext<String>> pipe = new TypedPipe<>(List.of(first, second));
         PipeRegistry registry = new PipeRegistry();
         registry.register(String.class, ConsumeContext.class, pipe);
-        SendEndpointProvider provider = uri -> (message, token) -> CompletableFuture.completedFuture(null);
+        SendEndpointProvider provider = new SendEndpointProvider() {
+            @Override
+            public SendEndpoint getSendEndpoint(String uri) {
+                return new SendEndpoint() {
+                    @Override
+                    public <T> CompletableFuture<Void> send(T message, CancellationToken token) {
+                        return CompletableFuture.completedFuture(null);
+                    }
+                };
+            }
+        };
         ConsumeContext<String> ctx = new ConsumeContext<>("hi", Map.of(), provider);
         registry.dispatch(ctx, String.class).join();
         assertEquals(List.of("A:hi", "B"), calls);
     }
 }
-
