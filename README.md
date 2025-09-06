@@ -55,7 +55,7 @@ See samples below.
   (cd src/Java && ./gradlew test)
   ```
 
-### Getting started
+### Quick start
 
 Minimal steps to configure MyServiceBus and publish a message. For a broader tour of the library, see the [feature walkthrough](docs/feature-walkthrough.md) divided into basics and advanced sections.
 
@@ -144,7 +144,7 @@ bus.publish(new SubmitOrder(UUID.randomUUID()), ctx -> ctx.getHeaders().put("tra
 - `docs/` – Additional documentation and design goals, including [emoji usage](docs/emoji-usage.md) guidelines
 - `docker-compose.yml` – Docker configuration for local infrastructure
 
-## Java quickstart
+## Java Quickstart
 - See `src/Java/README.md` for detailed Java build and run instructions, including JDK 17 toolchain setup and running the `testapp`.
 
 ## Contributing
