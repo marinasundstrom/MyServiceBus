@@ -30,7 +30,7 @@ public class Main {
 
         RabbitMqBusFactory.configure(services, cfg -> {
             cfg.addConsumer(SubmitOrderConsumer.class);
-            cfg.addConsumer(OrderSubmittedConsumer.class);
+            // cfg.addConsumer(OrderSubmittedConsumer.class);
             cfg.addConsumer(TestRequestConsumer.class);
         }, (context, cfg) -> {
             cfg.host(rabbitMqHost, h -> {
