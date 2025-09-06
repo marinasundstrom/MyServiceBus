@@ -1,4 +1,3 @@
-
 using MyServiceBus;
 using Microsoft.Extensions.Logging;
 
@@ -18,7 +17,7 @@ class OrderSubmittedConsumer :
     {
         var message = context.Message;
 
-        _logger.LogInformation("📨 Order submitted: {OrderId} ✅", message.OrderId);
+        _logger.LogInformation("📨 Order submitted: {OrderId} by {Replica} ✅", message.OrderId, message.Replica);
 
         return Task.CompletedTask;
     }

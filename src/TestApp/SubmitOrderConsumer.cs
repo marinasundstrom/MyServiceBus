@@ -1,4 +1,4 @@
-
+using System;
 using MyServiceBus;
 using Microsoft.Extensions.Logging;
 
@@ -18,9 +18,8 @@ class SubmitOrderConsumer :
     {
         _logger.LogInformation("📨 Received SubmitOrder {OrderId} from {Message} ✅", context.Message.OrderId, context.Message.Message);
 
-        await context.PublishAsync<OrderSubmitted>(new
-        {
-            context.Message.OrderId
-        });
+        var replica = Environment.GetEnvironmentVariable("HTTP_PORT") ?? Environment.MachineName;
+
+        await context.PublishAsync(new OrderSubmitted(context.Message.OrderId, replica));
     }
 }

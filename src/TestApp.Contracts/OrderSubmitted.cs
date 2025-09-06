@@ -1,3 +1,3 @@
-﻿namespace TestApp;
+namespace TestApp;
 
-public record OrderSubmitted(Guid OrderId);
+public record OrderSubmitted(Guid OrderId, string Replica);

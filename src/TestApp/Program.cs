@@ -1,3 +1,4 @@
+using System;
 using MyServiceBus;
 using TestApp;
 using System.Linq;
@@ -8,13 +9,15 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddServiceBus(x =>
 {
-    x.AddConsumer<SubmitOrderConsumer>();
+    //x.AddConsumer<SubmitOrderConsumer>();
     x.AddConsumer<OrderSubmittedConsumer>();
     x.AddConsumer<TestRequestConsumer>();
 
     x.UsingRabbitMq([Throws(typeof(InvalidOperationException))] (context, cfg) =>
     {
-        cfg.Host("localhost", h =>
+        var rabbitMqHost = Environment.GetEnvironmentVariable("RABBITMQ_HOST") ?? "localhost";
+
+        cfg.Host(rabbitMqHost, h =>
         {
             h.Username("guest");
             h.Password("guest");
@@ -91,7 +94,7 @@ app.MapGet("/weatherforecast", () =>
 /*
 app.MapPost("/publish", async (IPublishEndpoint publishEndpoint, CancellationToken cancellationToken = default) =>
 {
-    await publishEndpoint.Publish(new OrderSubmitted(), cancellationToken);
+    await publishEndpoint.Publish(new OrderSubmitted(Guid.NewGuid(), "replica-1"), cancellationToken);
 })
 .WithName("Test_Publish")
 .WithTags("Test");
