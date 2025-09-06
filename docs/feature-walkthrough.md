@@ -375,7 +375,7 @@ cfg.ReceiveEndpoint("submit-order_error", e =>
 
 ```java
 cfg.receiveEndpoint("submit-order_error", e ->
-    e.handle(SubmitOrder.class, ctx -> {
+    e.handler(SubmitOrder.class, ctx -> {
         // inspect, fix, or forward the failed message
         return ctx.forward("queue:submit-order", ctx.getMessage());
     })

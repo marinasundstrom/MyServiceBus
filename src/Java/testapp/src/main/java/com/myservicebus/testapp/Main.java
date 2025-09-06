@@ -1,9 +1,9 @@
 package com.myservicebus.testapp;
 
 import io.javalin.Javalin;
-import java.io.IOException;
 import java.util.UUID;
-import java.util.concurrent.TimeoutException;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 
 import com.myservicebus.ExceptionInfo;
 import com.myservicebus.Fault;
@@ -37,6 +37,18 @@ public class Main {
                 h.username("guest");
                 h.password("guest");
             });
+
+            cfg.receiveEndpoint("submit-order_error", e -> e.handler(SubmitOrder.class, ctx -> {
+                // inspect, fix, or forward the failed message
+                try {
+                    ctx.forward("queue:submit-order", ctx.getMessage()).get();
+                    System.out.println("➡️ Forwarded error message");
+                } catch (InterruptedException | ExecutionException e1) {
+                    // TODO Auto-generated catch block
+                    e1.printStackTrace();
+                }
+                return CompletableFuture.completedFuture(null);
+            }));
 
             cfg.configureEndpoints(context);
         });
