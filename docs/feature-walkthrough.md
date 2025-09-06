@@ -20,6 +20,7 @@ For Java build and run instructions, including optional JDK 17 toolchain setup a
   - [Configuration](#configuration)
   - [Dependency Injection](#dependency-injection)
   - [Logging](#logging)
+  - [OpenTelemetry](#opentelemetry)
   - [Filters](#filters)
   - [Unit Testing with the In-Memory Test Harness](#unit-testing-with-the-in-memory-test-harness)
 
@@ -613,6 +614,13 @@ try (ServiceScope scope = provider.createScope()) {
 }
 ```
 
+
+### OpenTelemetry
+
+MyServiceBus automatically creates spans for send and consume operations and propagates
+W3C `traceparent` headers. Any active span when publishing or sending is injected into the
+message headers, and consumers create child spans from those headers. This mirrors
+MassTransit's OpenTelemetry integration so traces flow across both C# and Java services.
 
 ### Filters
 

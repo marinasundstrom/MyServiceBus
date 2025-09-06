@@ -20,6 +20,8 @@ public class BusRegistrationConfigurator : IBusRegistrationConfigurator
     public BusRegistrationConfigurator(IServiceCollection services)
     {
         Services = services;
+        sendConfigurator.UseFilter(new OpenTelemetrySendFilter());
+        publishConfigurator.UseFilter(new OpenTelemetrySendFilter());
     }
 
     [Throws(typeof(InvalidOperationException), typeof(TargetInvocationException), typeof(NotSupportedException), typeof(RegexMatchTimeoutException))]
@@ -51,7 +53,7 @@ public class BusRegistrationConfigurator : IBusRegistrationConfigurator
             messageTypes: typeof(TMessage));
     }
 
-    [Throws(typeof(InvalidOperationException), typeof(TargetInvocationException), typeof(NotSupportedException), typeof(OverflowException), typeof(ReflectionTypeLoadException), typeof(TargetException), typeof(TargetParameterCountException))]
+    [Throws(typeof(InvalidOperationException), typeof(TargetInvocationException), typeof(NotSupportedException), typeof(OverflowException), typeof(ReflectionTypeLoadException), typeof(TargetException), typeof(TargetParameterCountException), typeof(MethodAccessException))]
     public void AddConsumers(params Assembly[] assemblies)
     {
         var consumerTypes = assemblies
