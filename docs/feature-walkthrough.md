@@ -660,6 +660,7 @@ builder.Services.AddServiceBus(x =>
     {
         cfg.UseMessageRetry(r => r.Immediate(3));
         cfg.UseFilter(new LoggingFilter<SubmitOrder>());
+        cfg.UseFilter<LoggingFilter<SubmitOrder>>();
         cfg.UseExecute(ctx =>
         {
             Console.WriteLine($"Processing {ctx.Message}");
@@ -681,6 +682,7 @@ RabbitMqBusFactory.configure(services, x -> {
     x.addConsumer(SubmitOrderConsumer.class, SubmitOrder.class, cfg -> {
         cfg.useMessageRetry(r -> r.immediate(3));
         cfg.useFilter(new LoggingFilter<>());
+        cfg.useFilter(LoggingFilter.class);
         cfg.useExecute(ctx -> {
             System.out.println("Processing " + ctx.getMessage());
             return CompletableFuture.completedFuture(null);

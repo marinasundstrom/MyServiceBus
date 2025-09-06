@@ -81,7 +81,7 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
         configurator.useFilter(consumerFilter);
         if (consumerDef.getConfigure() != null)
             consumerDef.getConfigure().accept(configurator);
-        Pipe<ConsumeContext<Object>> pipe = configurator.build();
+        Pipe<ConsumeContext<Object>> pipe = configurator.build(serviceProvider);
 
         Function<TransportMessage, CompletableFuture<Void>> handler = transportMessage -> {
             try {
@@ -134,7 +134,7 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
             configurator.useRetry(retryCount, retryDelay);
         }
         configurator.useFilter(new HandlerMessageFilter<>(handler));
-        Pipe<ConsumeContext<T>> pipe = configurator.build();
+        Pipe<ConsumeContext<T>> pipe = configurator.build(serviceProvider);
 
         java.util.function.Function<TransportMessage, CompletableFuture<Void>> transportHandler = tm -> {
             try {
