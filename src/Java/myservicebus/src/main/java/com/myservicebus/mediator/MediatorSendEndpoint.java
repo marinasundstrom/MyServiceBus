@@ -6,6 +6,7 @@ import com.myservicebus.ConsumerFaultFilter;
 import com.myservicebus.ConsumerMessageFilter;
 import com.myservicebus.ErrorTransportFilter;
 import com.myservicebus.Filter;
+import com.myservicebus.OpenTelemetryConsumeFilter;
 import com.myservicebus.Pipe;
 import com.myservicebus.PipeConfigurator;
 import com.myservicebus.SendEndpoint;
