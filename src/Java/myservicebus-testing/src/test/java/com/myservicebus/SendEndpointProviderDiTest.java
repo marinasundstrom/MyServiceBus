@@ -8,7 +8,7 @@ import com.myservicebus.di.ServiceCollection;
 import com.myservicebus.di.ServiceProvider;
 import com.myservicebus.di.ServiceScope;
 
-class SendEndpointProviderDiTest {
+public class SendEndpointProviderDiTest {
     @Test
     void resolves_send_endpoint_provider() {
         ServiceCollection services = new ServiceCollection();

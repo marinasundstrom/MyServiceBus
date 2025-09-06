@@ -13,7 +13,7 @@ import com.myservicebus.di.ServiceCollection;
 import com.myservicebus.di.ServiceProvider;
 import com.myservicebus.di.ServiceScope;
 
-class RequestClientFaultTest {
+public class RequestClientFaultTest {
 
     static class Ping {
         private final String value;

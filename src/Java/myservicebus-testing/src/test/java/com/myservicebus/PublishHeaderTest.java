@@ -6,7 +6,7 @@ import java.util.concurrent.CompletableFuture;
 
 import org.junit.jupiter.api.Test;
 
-class PublishHeaderTest {
+public class PublishHeaderTest {
     @Test
     void send_applies_message_headers() {
         InMemoryTestHarness harness = new InMemoryTestHarness();
