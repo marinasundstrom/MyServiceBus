@@ -2,7 +2,7 @@ using System;
 
 namespace MyServiceBus;
 
-public class PublishEndpointProvider : IPublishEndpointProvider
+internal class PublishEndpointProvider : IPublishEndpointProvider
 {
     readonly ConsumeContextProvider contextProvider;
     readonly IMessageBus bus;
