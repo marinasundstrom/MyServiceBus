@@ -11,7 +11,7 @@ MyServiceBus provides a cross-language message bus with design goals to feel fam
 - **Telemetry & host metadata**: Outgoing messages embed machine and process details for diagnostics.
 - **Cancellation propagation**: Pipe contexts carry cancellation tokens in both languages.
 - **Transport abstraction**: Pluggable factories resolve send and receive transports; RabbitMQ ensures exchanges exist.
-- **Retries**: Both clients support retry policies; the Java client applies a built-in retry mechanism.
+- **Retries**: Both clients support retry policies through filters; retries are opt-in for each consumer.
 
 ## Behavior
 Operations serialize messages into an envelope with a `content_type` of `application/vnd.masstransit+json`. Send, publish, and respond methods are asynchronous and honor cancellation tokens.
@@ -24,6 +24,6 @@ Operations serialize messages into an envelope with a `content_type` of `applica
 
 ### C# vs. Java Clients
 - The Java `ConsumeContext.getSendEndpoint` throws `UnsupportedOperationException` when a provider is unavailable; the C# client resolves endpoints directly.
-- Java retries consumer operations using a built-in policy.
+- Both clients require explicit retry configuration; no retry policy is applied by default.
 - .NET applications rely on `Microsoft.Extensions.DependencyInjection` and `ILogger` abstractions, while the Java client ships with a simple service provider and SLF4J logging because the Java platform lacks standard DI and logging APIs.
 - Aside from language conventions, the API surface and behaviors aim to remain aligned across both clients.

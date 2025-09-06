@@ -131,10 +131,9 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
         var configurator = new PipeConfigurator<ConsumeContext<TMessage>>();
         configurator.UseFilter(new ErrorTransportFilter<TMessage>());
         configurator.UseFilter(new ConsumerFaultFilter<TConsumer, TMessage>(_serviceProvider));
-        configurator.UseRetry(3);
-        configurator.UseFilter(new ConsumerMessageFilter<TConsumer, TMessage>(_serviceProvider));
         if (configure is Action<PipeConfigurator<ConsumeContext<TMessage>>> cfg)
             cfg(configurator);
+        configurator.UseFilter(new ConsumerMessageFilter<TConsumer, TMessage>(_serviceProvider));
         var pipe = new ConsumePipe<TMessage>(configurator.Build(_serviceProvider));
 
         var messageUrn = NamingConventions.GetMessageUrn(messageType);

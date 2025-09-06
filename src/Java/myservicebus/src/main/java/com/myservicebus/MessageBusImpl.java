@@ -74,13 +74,12 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
         Filter<ConsumeContext<Object>> faultFilter = new ConsumerFaultFilter(serviceProvider,
                 consumerDef.getConsumerType());
         configurator.useFilter(faultFilter);
-        configurator.useRetry(3);
+        if (consumerDef.getConfigure() != null)
+            consumerDef.getConfigure().accept(configurator);
         @SuppressWarnings({ "unchecked", "rawtypes" })
         Filter<ConsumeContext<Object>> consumerFilter = new ConsumerMessageFilter(serviceProvider,
                 consumerDef.getConsumerType());
         configurator.useFilter(consumerFilter);
-        if (consumerDef.getConfigure() != null)
-            consumerDef.getConfigure().accept(configurator);
         Pipe<ConsumeContext<Object>> pipe = configurator.build(serviceProvider);
 
         Function<TransportMessage, CompletableFuture<Void>> handler = transportMessage -> {

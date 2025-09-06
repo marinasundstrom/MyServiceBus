@@ -40,7 +40,7 @@ The ServiceBus Java client mirrors the C# design by providing an asynchronous me
 
 ### Retries
 - `RetryFilter` retries the downstream pipe a configured number of times, optionally delaying between attempts.
-- The in-memory mediator applies this filter with three attempts before faulting, mirroring the C# behavior.
+- The in-memory mediator supports this filter but does not enable retries unless configured.
 
 ## Behavior
 - Send and publish operations serialize messages into an envelope, encoding headers, host information, and message type.

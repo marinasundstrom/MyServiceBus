@@ -333,7 +333,7 @@ OrderStatus response = client.getResponse(
 
 ### Retries
 
-Transient issues like network hiccups or temporary I/O errors may succeed on a subsequent attempt. To handle these cases automatically, MyServiceBus retries each consumer three times before considering it failed. After the retry limit is reached, the message is faulted; see [Faults](#faults) for details.
+Transient issues like network hiccups or temporary I/O errors may succeed on a subsequent attempt. MyServiceBus lets you opt into retry policies using filters, similar to MassTransit. Configure a consumer's pipe with `UseRetry` to automatically re-invoke it before faulting. After the retry limit is reached, the message is faulted; see [Faults](#faults) for details.
 
 ### Error Handling
 
