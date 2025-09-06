@@ -11,7 +11,7 @@ import com.myservicebus.di.ServiceProvider;
 import com.myservicebus.di.ServiceScope;
 import com.myservicebus.tasks.CancellationToken;
 
-class InMemoryHarnessDiTest {
+public class InMemoryHarnessDiTest {
     static class Ping {
         private final String value;
 
