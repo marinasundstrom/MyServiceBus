@@ -17,6 +17,7 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
     private readonly IMessageSerializer _messageSerializer;
     private readonly Uri _address;
     private readonly IBusTopology _topology;
+    private readonly ILogger<MessageBus>? _logger;
 
     private readonly List<IReceiveTransport> _activeTransports = new();
 
@@ -33,6 +34,7 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
         _messageSerializer = messageSerializer;
         _topology = _serviceProvider.GetService<TopologyRegistry>() ?? new TopologyRegistry();
         _address = address;
+        _logger = _serviceProvider.GetService<ILogger<MessageBus>>();
     }
 
     public Uri Address => _address;
@@ -165,9 +167,12 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
     [Throws(typeof(InvalidOperationException), typeof(NotSupportedException), typeof(InvalidCastException), typeof(TargetInvocationException), typeof(MemberAccessException), typeof(InvalidComObjectException), typeof(COMException), typeof(TypeLoadException))]
     private async Task HandleMessageAsync(ReceiveContext context)
     {
-        var messageTypeName = context.MessageType.First();
+        var messageTypeName = context.MessageType.FirstOrDefault();
         if (messageTypeName == null || !_consumers.TryGetValue(messageTypeName, out var registration))
+        {
+            _logger?.LogWarning("Received message with unregistered type {MessageType}", messageTypeName ?? "<null>");
             return;
+        }
 
         var consumeContextType = typeof(ConsumeContextImpl<>).MakeGenericType(registration.MessageType);
         var consumeContext = (ConsumeContext)Activator.CreateInstance(consumeContextType, context, _transportFactory, _sendPipe, _publishPipe, _messageSerializer, _address)
