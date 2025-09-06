@@ -21,7 +21,7 @@ class PipeRegistryTest {
             calls.add("B");
             return next.send(ctx);
         };
-        TypedPipe<ConsumeContext<String>, String> pipe = new TypedPipe<>(List.of(first, second));
+        TypedPipe<ConsumeContext<String>> pipe = new TypedPipe<>(List.of(first, second));
         PipeRegistry registry = new PipeRegistry();
         registry.register(String.class, ConsumeContext.class, pipe);
         SendEndpointProvider provider = uri -> (message, token) -> CompletableFuture.completedFuture(null);

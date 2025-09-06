@@ -4,13 +4,13 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * Executes a list of filters sequentially for a specific context/message pair.
+ * Executes a list of filters sequentially for a specific context type.
  */
-public class TypedPipe<TContext extends PipeContext, T> implements Pipe<TContext> {
+public class TypedPipe<TContext extends PipeContext> implements Pipe<TContext> {
     private final List<Filter<TContext>> filters;
 
-    public TypedPipe(List<Filter<TContext>> filters) {
-        this.filters = filters;
+    public TypedPipe(List<? extends Filter<TContext>> filters) {
+        this.filters = List.copyOf(filters);
     }
 
     @Override

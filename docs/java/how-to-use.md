@@ -160,10 +160,10 @@ specific context types. Implement `ConsumeFilter<T>` for consumer pipelines or
 ```java
 class AuditFilter implements ConsumeFilter<SubmitOrder> {
     @Override
-    public void handle(ConsumeContext<SubmitOrder> ctx,
-                       Pipe<ConsumeContext<SubmitOrder>, SubmitOrder> next) {
+    public CompletableFuture<Void> send(ConsumeContext<SubmitOrder> ctx,
+                                        Pipe<ConsumeContext<SubmitOrder>> next) {
         System.out.println("Audit " + ctx.getMessage().getOrderId());
-        next.run(ctx);
+        return next.send(ctx);
     }
 }
 ```
@@ -173,8 +173,7 @@ keyed by message and context `Class` tokens:
 
 ```java
 ConsumeFilter<SubmitOrder> audit = new AuditFilter();
-TypedPipe<ConsumeContext<SubmitOrder>, SubmitOrder> pipe =
-    new TypedPipe<>(List.of(audit));
+TypedPipe<ConsumeContext<SubmitOrder>> pipe = new TypedPipe<>(List.of(audit));
 PipeRegistry registry = new PipeRegistry();
 registry.register(SubmitOrder.class, ConsumeContext.class, pipe);
 
