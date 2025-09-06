@@ -3,6 +3,7 @@
 This guide compares basic usage of MyServiceBus in C# and Java. It is split into basics and advanced sections so newcomers can focus on fundamental messaging patterns before exploring configuration and other features.
 
 For an explanation of why the C# and Java examples differ, see the [design decisions](design-decisions.md).
+For Java build and run instructions, including optional JDK 17 toolchain setup and how to run the test app, see `src/Java/README.md`.
 ## Contents
 
 - [Basics](#basics)

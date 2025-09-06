@@ -43,7 +43,7 @@ See samples below.
   dotnet restore
   dotnet build
   ```
-- Java build/run instructions are documented in `src/Java/README.md`.
+- Java build/run instructions are documented in [src/Java/README.md](src/Java/README.md).
 
 ### Running tests
 - .NET

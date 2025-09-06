@@ -49,6 +49,7 @@
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>exec-maven-plugin</artifactId>
                 <configuration>
+                    <skip>false</skip>
                     <mainClass>com.myservicebus.testapp.Main</mainClass>
                 </configuration>
             </plugin>

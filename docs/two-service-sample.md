@@ -25,23 +25,23 @@ Run the Java test app twice on different ports. The Maven reactor will build onl
 In two separate terminals, from the repository root:
 
 ```bash
-// Build all modules
- mvn -f src/Java/pom.xml -DskipTests install 
+# Build all Java modules (once)
+mvn -f src/Java/pom.xml -DskipTests install 
 
-# Instance 1
+# Instance 1 (module POM; builds needed deps)
 RABBITMQ_HOST=localhost HTTP_PORT=5301 \
-  mvn -f src/Java/pom.xml -pl testapp -am -DskipTests exec:java
+  mvn -f src/Java/testapp/pom.xml -am -DskipTests exec:java
 
-# Instance 2
+# Instance 2 (module POM; builds needed deps)
 RABBITMQ_HOST=localhost HTTP_PORT=5302 \
-  mvn -f src/Java/pom.xml -pl testapp -am -DskipTests exec:java
+  mvn -f src/Java/testapp/pom.xml -am -DskipTests exec:java
 ```
 
 Notes:
 - `RABBITMQ_HOST` defaults to `localhost` if not set.
 - `HTTP_PORT` selects the HTTP port for each replica.
 - `-pl testapp -am` builds `testapp` and its dependencies only.
-- `-Dexec.mainClass` is required since the exec plugin isn’t bound in the POM.
+- See `src/Java/README.md` for full Java build/run details and optional JDK 17 toolchain enforcement.
 
 Each instance consumes `SubmitOrder` messages from the same queue.
 
