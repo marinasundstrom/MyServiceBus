@@ -34,27 +34,26 @@ public sealed class RabbitMqReceiveTransport : IReceiveTransport
     {
         var consumer = new AsyncEventingBasicConsumer(_channel);
 
-        consumer.ReceivedAsync += [Throws(typeof(JsonException), typeof(UriFormatException))] async (model, ea) =>
+        consumer.ReceivedAsync += [Throws(typeof(IOException))] async (model, ea) =>
         {
-            var payload = ea.Body.ToArray();
-            var props = ea.BasicProperties;
-
-            var headers = props.Headers?.ToDictionary(x => x.Key, x => (object)x.Value!) ?? new Dictionary<string, object>();
-            if (!string.IsNullOrEmpty(props.ContentType))
-                headers["content_type"] = props.ContentType!;
-            else if (!headers.ContainsKey("content_type"))
-                headers["content_type"] = "application/vnd.masstransit+json";
-
-            var transportMessage = new RabbitMqTransportMessage(headers, props.Persistent, payload);
-            var messageContext = _contextFactory.CreateMessageContext(transportMessage);
-
-            var errorAddress = _hasErrorQueue
-                ? new Uri($"rabbitmq://localhost/exchange/{_queueName}_error")
-                : null;
-            var context = new RabbitMqReceiveContext(messageContext, props, ea.DeliveryTag, ea.Exchange, ea.RoutingKey, errorAddress);
-
             try
             {
+                var payload = ea.Body.ToArray();
+                var props = ea.BasicProperties;
+
+                var headers = props.Headers?.ToDictionary(x => x.Key, x => (object)x.Value!) ?? new Dictionary<string, object>();
+                if (!string.IsNullOrEmpty(props.ContentType))
+                    headers["content_type"] = props.ContentType!;
+                else if (!headers.ContainsKey("content_type"))
+                    headers["content_type"] = "application/vnd.masstransit+json";
+
+                var transportMessage = new RabbitMqTransportMessage(headers, props.Persistent, payload);
+                var messageContext = _contextFactory.CreateMessageContext(transportMessage);
+
+                var errorAddress = _hasErrorQueue
+                    ? new Uri($"rabbitmq://localhost/exchange/{_queueName}_error")
+                    : null;
+                var context = new RabbitMqReceiveContext(messageContext, props, ea.DeliveryTag, ea.Exchange, ea.RoutingKey, errorAddress);
                 var messageType = context.MessageType.FirstOrDefault();
                 if (_isMessageTypeRegistered != null && !_isMessageTypeRegistered(messageType))
                 {
@@ -78,7 +77,8 @@ public sealed class RabbitMqReceiveTransport : IReceiveTransport
             }
             catch (Exception exc)
             {
-                await _channel.BasicAckAsync(ea.DeliveryTag, multiple: false);
+                await _channel.BasicNackAsync(ea.DeliveryTag, multiple: false, requeue: true);
+
                 Console.WriteLine($"Message handling failed: {exc}");
             }
         };
