@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -20,7 +19,11 @@ public class RabbitMqEndpoint : IEndpoint
     public Task Send<T>(T message, CancellationToken cancellationToken = default)
         => _sendEndpoint.Send(message, null, cancellationToken);
 
-    public IAsyncEnumerable<Envelope<object>> ReadAsync(CancellationToken cancellationToken = default)
-        => AsyncEnumerable.Empty<Envelope<object>>();
+    public async IAsyncEnumerable<Envelope<object>> ReadAsync(
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        await Task.CompletedTask;
+        yield break;
+    }
 }
 
