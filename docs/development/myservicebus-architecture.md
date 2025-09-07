@@ -14,6 +14,8 @@ Send, receive, and consume operations flow through a pipe-and-filter pipeline bu
 
 Instead of queue- or exchange-centric transports, MyServiceBus exposes a minimal `IEndpoint` interface with `Send`, pull-based `ReadAsync`, an optional push-based `Subscribe`, and advertised `EndpointCapabilities`. RabbitMQ implements the interface today, and other technologies—HTTP callbacks, in-memory mediators, serverless triggers—can plug in the same way.
 
+Queue-based transports remain first-class and continue to operate through this contract for backward compatibility.
+
 The newly added `HttpEndpoint` demonstrates this by dispatching messages to a webhook via `HttpClient` without relying on broker queues.
 
 ## Differences from MassTransit
