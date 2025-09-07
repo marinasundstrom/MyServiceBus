@@ -161,6 +161,7 @@ public sealed class RabbitMqTransportFactory : ITransportFactory
     public async Task<IReceiveTransport> CreateReceiveTransport(
         ReceiveEndpointTopology topology,
         Func<ReceiveContext, Task> handler,
+        Func<string?, bool>? isMessageTypeRegistered = null,
         CancellationToken cancellationToken = default)
     {
         var connection = await _connectionProvider.GetOrCreateConnectionAsync(cancellationToken);
@@ -249,7 +250,7 @@ public sealed class RabbitMqTransportFactory : ITransportFactory
             cancellationToken: cancellationToken
         );
 
-        return new RabbitMqReceiveTransport(channel, topology.QueueName, handler, hasErrorQueue);
+        return new RabbitMqReceiveTransport(channel, topology.QueueName, handler, hasErrorQueue, isMessageTypeRegistered);
     }
 
     [Throws(typeof(OverflowException))]

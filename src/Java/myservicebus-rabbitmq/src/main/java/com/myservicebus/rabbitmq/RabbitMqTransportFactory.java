@@ -88,13 +88,8 @@ public class RabbitMqTransportFactory implements TransportFactory {
 
     @Override
     public ReceiveTransport createReceiveTransport(String queueName, List<MessageBinding> bindings,
-            Function<TransportMessage, CompletableFuture<Void>> handler) throws Exception {
-        return createReceiveTransport(queueName, bindings, handler, defaultPrefetchCount);
-    }
-
-    @Override
-    public ReceiveTransport createReceiveTransport(String queueName, List<MessageBinding> bindings,
-            Function<TransportMessage, CompletableFuture<Void>> handler, int prefetchCount) throws Exception {
+            Function<TransportMessage, CompletableFuture<Void>> handler,
+            Function<String, Boolean> isMessageTypeRegistered, int prefetchCount) throws Exception {
         Connection connection = connectionProvider.getOrCreateConnection();
         Channel channel = connection.createChannel();
 
@@ -123,7 +118,7 @@ public class RabbitMqTransportFactory implements TransportFactory {
         channel.queueBind(skippedQueue, skippedExchange, "");
 
         String faultAddress = getPublishAddress(queueName + "_error");
-        return new RabbitMqReceiveTransport(channel, queueName, handler, faultAddress);
+        return new RabbitMqReceiveTransport(channel, queueName, handler, faultAddress, isMessageTypeRegistered);
     }
 
     @Override

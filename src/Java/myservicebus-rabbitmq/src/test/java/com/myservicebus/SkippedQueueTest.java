@@ -12,7 +12,6 @@ import org.mockito.ArgumentCaptor;
 
 import com.myservicebus.rabbitmq.RabbitMqReceiveTransport;
 import com.myservicebus.TransportMessage;
-import com.myservicebus.UnknownMessageTypeException;
 import com.rabbitmq.client.AMQP;
 import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.DeliverCallback;
@@ -27,13 +26,9 @@ class SkippedQueueTest {
         ArgumentCaptor<DeliverCallback> captor = ArgumentCaptor.forClass(DeliverCallback.class);
         when(channel.basicConsume(eq("input"), eq(false), captor.capture(), any(CancelCallback.class))).thenReturn("tag");
 
-        Function<TransportMessage, CompletableFuture<Void>> handler = tm -> {
-            CompletableFuture<Void> f = new CompletableFuture<>();
-            f.completeExceptionally(new UnknownMessageTypeException(null));
-            return f;
-        };
+        Function<TransportMessage, CompletableFuture<Void>> handler = tm -> CompletableFuture.completedFuture(null);
 
-        RabbitMqReceiveTransport transport = new RabbitMqReceiveTransport(channel, "input", handler, "fault");
+        RabbitMqReceiveTransport transport = new RabbitMqReceiveTransport(channel, "input", handler, "fault", s -> false);
         transport.start();
 
         DeliverCallback callback = captor.getValue();

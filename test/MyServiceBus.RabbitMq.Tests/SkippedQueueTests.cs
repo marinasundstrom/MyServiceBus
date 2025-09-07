@@ -25,7 +25,7 @@ public class SkippedQueueTests
                 Arg.Any<CancellationToken>())
             .Returns(Task.FromResult("tag"));
 
-        var transport = new RabbitMqReceiveTransport(channel, "input", ctx => throw new UnknownMessageTypeException(ctx.MessageType.FirstOrDefault()), true);
+        var transport = new RabbitMqReceiveTransport(channel, "input", ctx => Task.CompletedTask, true, _ => false);
         await transport.Start();
 
         var props = new BasicProperties();

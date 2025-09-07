@@ -18,14 +18,16 @@ public sealed class RabbitMqReceiveTransport : IReceiveTransport
     private readonly Func<ReceiveContext, Task> _messageHandler;
     private readonly MessageContextFactory _contextFactory = new();
     private readonly bool _hasErrorQueue;
+    private readonly Func<string?, bool>? _isMessageTypeRegistered;
     private string _consumerTag;
 
-    public RabbitMqReceiveTransport(IChannel channel, string queueName, Func<ReceiveContext, Task> handler, bool hasErrorQueue)
+    public RabbitMqReceiveTransport(IChannel channel, string queueName, Func<ReceiveContext, Task> handler, bool hasErrorQueue, Func<string?, bool>? isMessageTypeRegistered)
     {
         _channel = channel;
         _queueName = queueName;
         _messageHandler = handler;
         _hasErrorQueue = hasErrorQueue;
+        _isMessageTypeRegistered = isMessageTypeRegistered;
     }
 
     public async Task Start(CancellationToken cancellationToken = default)
@@ -53,21 +55,24 @@ public sealed class RabbitMqReceiveTransport : IReceiveTransport
 
             try
             {
-                await _messageHandler.Invoke(context);
-
-                await _channel.BasicAckAsync(ea.DeliveryTag, multiple: false);
-            }
-            catch (UnknownMessageTypeException)
-            {
-                if (_hasErrorQueue)
+                var messageType = context.MessageType.FirstOrDefault();
+                if (_isMessageTypeRegistered != null && !_isMessageTypeRegistered(messageType))
                 {
-                    await _channel.BasicPublishAsync(
-                        exchange: _queueName + "_skipped",
-                        routingKey: string.Empty,
-                        mandatory: false,
-                        basicProperties: props,
-                        body: payload);
+                    if (_hasErrorQueue)
+                    {
+                        await _channel.BasicPublishAsync(
+                            exchange: _queueName + "_skipped",
+                            routingKey: string.Empty,
+                            mandatory: false,
+                            basicProperties: props,
+                            body: payload);
+                    }
+
+                    await _channel.BasicAckAsync(ea.DeliveryTag, multiple: false);
+                    return;
                 }
+
+                await _messageHandler.Invoke(context);
 
                 await _channel.BasicAckAsync(ea.DeliveryTag, multiple: false);
             }

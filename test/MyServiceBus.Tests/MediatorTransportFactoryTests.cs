@@ -124,7 +124,7 @@ public class MediatorTransportFactoryTests
             ctx.TryGetMessage<SampleMessage>(out var msg);
             tcs.SetResult(msg!);
             return Task.CompletedTask;
-        });
+        }, null);
 
         await receive.Start();
 

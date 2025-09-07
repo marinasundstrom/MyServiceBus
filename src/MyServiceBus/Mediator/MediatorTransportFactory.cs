@@ -22,6 +22,7 @@ public class MediatorTransportFactory : ITransportFactory
     public Task<IReceiveTransport> CreateReceiveTransport(
         ReceiveEndpointTopology topology,
         Func<ReceiveContext, Task> handler,
+        Func<string?, bool>? isMessageTypeRegistered = null,
         CancellationToken cancellationToken = default)
     {
         var transport = new MediatorReceiveTransport(this, topology.ExchangeName, handler);

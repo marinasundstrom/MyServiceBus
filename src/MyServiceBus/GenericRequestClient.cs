@@ -71,7 +71,7 @@ public sealed class GenericRequestClient<TRequest> : IRequestClient<TRequest>, I
             }
         };
 
-        responseReceiveTransport = await _transportFactory.CreateReceiveTransport(responseReceiveTopology, responseHandler, cancellationToken);
+        responseReceiveTransport = await _transportFactory.CreateReceiveTransport(responseReceiveTopology, responseHandler, null, cancellationToken);
 
         await responseReceiveTransport.Start(cancellationToken);
 
@@ -156,7 +156,7 @@ public sealed class GenericRequestClient<TRequest> : IRequestClient<TRequest>, I
             }
         };
 
-        responseReceiveTransport = await _transportFactory.CreateReceiveTransport(responseReceiveTopology, responseHandler, cancellationToken);
+        responseReceiveTransport = await _transportFactory.CreateReceiveTransport(responseReceiveTopology, responseHandler, null, cancellationToken);
 
         await responseReceiveTransport.Start(cancellationToken);
 
