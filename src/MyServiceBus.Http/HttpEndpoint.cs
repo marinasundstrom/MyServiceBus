@@ -28,13 +28,13 @@ public class HttpEndpoint : IEndpoint
         await _client.PostAsync(_uri, content, cancellationToken);
     }
 
-    public async IAsyncEnumerable<ConsumeContext> ReadAsync(
+    public async IAsyncEnumerable<ReceiveContext> ReadAsync(
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         await Task.CompletedTask;
         yield break;
     }
 
-    public IDisposable Subscribe(Func<ConsumeContext, Task> handler) =>
+    public IDisposable Subscribe(Func<ReceiveContext, Task> handler) =>
         throw new NotSupportedException("HTTP endpoint is send-only");
 }

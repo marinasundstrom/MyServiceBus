@@ -13,11 +13,11 @@ public interface Endpoint {
         return send(message, ctx -> {});
     }
 
-    default Iterable<ConsumeContext<Object>> readAsync() {
+    default Iterable<ReceiveContext<Object>> readAsync() {
         return Collections.emptyList();
     }
 
-    default AutoCloseable subscribe(Function<ConsumeContext<Object>, CompletableFuture<Void>> handler) {
+    default AutoCloseable subscribe(Function<ReceiveContext<Object>, CompletableFuture<Void>> handler) {
         return () -> {};
     }
 

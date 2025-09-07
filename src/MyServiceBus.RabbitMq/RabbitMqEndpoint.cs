@@ -1,9 +1,13 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using RabbitMQ.Client;
+using MyServiceBus.RabbitMq;
+using MyServiceBus.Serialization;
 
 namespace MyServiceBus;
 
@@ -26,11 +30,12 @@ public class RabbitMqEndpoint : IEndpoint
     public Task Send<T>(T message, Action<ISendContext>? configure = null, CancellationToken cancellationToken = default)
         => _sendEndpoint.Send(message, configure, cancellationToken);
 
-    public async IAsyncEnumerable<ConsumeContext> ReadAsync(
+    public async IAsyncEnumerable<ReceiveContext> ReadAsync(
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         var connection = await _connectionProvider.GetOrCreateConnectionAsync(cancellationToken);
         await using var channel = await connection.CreateChannelAsync(cancellationToken: cancellationToken);
+        var contextFactory = new MessageContextFactory();
 
         while (!cancellationToken.IsCancellationRequested)
         {
@@ -43,13 +48,18 @@ public class RabbitMqEndpoint : IEndpoint
 
             try
             {
-                var envelope = JsonSerializer.Deserialize<Envelope<object>>(result.Body.ToArray(), new JsonSerializerOptions
-                {
-                    PropertyNameCaseInsensitive = true
-                });
+                var props = result.BasicProperties;
+                var headers = props.Headers?.ToDictionary(x => x.Key, x => (object)(x.Value ?? string.Empty))
+                              ?? new Dictionary<string, object>();
 
-                if (envelope != null)
-                    yield return new DefaultConsumeContext<Envelope<object>>(envelope);
+                if (!string.IsNullOrEmpty(props.ContentType))
+                    headers["content_type"] = props.ContentType!;
+                else if (!headers.ContainsKey("content_type"))
+                    headers["content_type"] = "application/vnd.masstransit+json";
+
+                var transport = new RabbitMqTransportMessage(headers, props.Persistent, result.Body.ToArray());
+                var messageContext = contextFactory.CreateMessageContext(transport);
+                yield return new ReceiveContextImpl(messageContext, null, cancellationToken);
             }
             finally
             {
@@ -58,7 +68,7 @@ public class RabbitMqEndpoint : IEndpoint
         }
     }
 
-    public IDisposable Subscribe(Func<ConsumeContext, Task> handler)
+    public IDisposable Subscribe(Func<ReceiveContext, Task> handler)
     {
         var cts = new CancellationTokenSource();
         _ = Task.Run(async () =>

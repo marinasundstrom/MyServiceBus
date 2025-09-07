@@ -29,13 +29,13 @@ public class RabbitMqEndpointTests
         factory.CreateConnectionAsync(Arg.Any<CancellationToken>()).Returns(Task.FromResult(connection));
         var provider = new ConnectionProvider(factory);
 
-        var envelope = new Envelope<TestMessage>
+        var expected = new Envelope<TestMessage>
         {
             MessageId = Guid.Empty,
             MessageType = new(),
             Message = new TestMessage { Text = "hi" }
         };
-        var bytes = JsonSerializer.SerializeToUtf8Bytes(envelope, new JsonSerializerOptions
+        var bytes = JsonSerializer.SerializeToUtf8Bytes(expected, new JsonSerializerOptions
         {
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase
         });
@@ -51,8 +51,9 @@ public class RabbitMqEndpointTests
 
         var enumerator = endpoint.ReadAsync(cts.Token).GetAsyncEnumerator();
         (await enumerator.MoveNextAsync()).ShouldBeTrue();
-        var received = (ConsumeContext<Envelope<object>>)enumerator.Current;
-        ((JsonElement)received.Message.Message).GetProperty("text").GetString().ShouldBe("hi");
+        var received = enumerator.Current;
+        received.TryGetMessage<TestMessage>(out var got).ShouldBeTrue();
+        got!.Text.ShouldBe("hi");
 
         cts.Cancel();
         (await enumerator.MoveNextAsync()).ShouldBeFalse();

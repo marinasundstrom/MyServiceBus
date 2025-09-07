@@ -9,9 +9,9 @@ public interface IEndpoint
 {
     Task Send<T>(T message, Action<ISendContext>? configure = null, CancellationToken cancellationToken = default);
 
-    IAsyncEnumerable<ConsumeContext> ReadAsync(CancellationToken cancellationToken = default);
+    IAsyncEnumerable<ReceiveContext> ReadAsync(CancellationToken cancellationToken = default);
 
-    IDisposable Subscribe(Func<ConsumeContext, Task> handler);
+    IDisposable Subscribe(Func<ReceiveContext, Task> handler);
 
     EndpointCapabilities Capabilities { get; }
 }
