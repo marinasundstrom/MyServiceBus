@@ -438,7 +438,9 @@ The mediator dispatches messages in-memory, making it useful for lightweight sce
 ### HTTP Endpoint (Webhook)
 
 Post messages to an external HTTP consumer, such as a webhook or serverless
-function, using the `HttpEndpoint` transport.
+function, using the `HttpEndpoint` transport. Incoming requests can then be
+routed through the normal MyServiceBus pipeline so `IConsumer` implementations
+and filters still apply.
 
 #### C#
 
@@ -447,11 +449,32 @@ function, using the `HttpEndpoint` transport.
 var endpoint = new HttpEndpoint(new HttpClient(), new Uri("http://localhost:5000/webhook"));
 await endpoint.Send(new { Text = "hi" });
 
-// consumer
-var app = WebApplication.Create();
-app.MapPost("/webhook", (Message msg) =>
+// consumer wired to the MyServiceBus pipeline
+class WebhookConsumer : IConsumer<Message>
 {
-    Console.WriteLine($"Received {msg.Text}");
+    public Task Consume(ConsumeContext<Message> context)
+    {
+        Console.WriteLine($"Consumer received {context.Message.Text}");
+        return Task.CompletedTask;
+    }
+}
+
+var builder = WebApplication.CreateBuilder();
+builder.Services.AddServiceBus(x =>
+{
+    x.AddConsumer<WebhookConsumer, Message>(cfg =>
+        cfg.UseExecute(ctx =>
+        {
+            Console.WriteLine($"Filter saw {ctx.Message.Text}");
+            return Task.CompletedTask;
+        }));
+    x.UsingMediator();
+});
+
+var app = builder.Build();
+app.MapPost("/webhook", async (Message msg, IPublishEndpoint publish) =>
+{
+    await publish.Publish(msg);
     return Results.Ok();
 });
 await app.RunAsync();
@@ -466,15 +489,39 @@ record Message(string Text);
 HttpEndpoint endpoint = new HttpEndpoint(HttpClient.newHttpClient(), URI.create("http://localhost:8080/webhook"));
 endpoint.send(Map.of("text", "hi")).join();
 
-// consumer
+// consumer wired to the ServiceBus pipeline
+class WebhookConsumer implements Consumer<Message> {
+    @Override
+    public CompletableFuture<Void> consume(ConsumeContext<Message> ctx) {
+        System.out.println("Consumer received " + ctx.getMessage().text());
+        return CompletableFuture.completedFuture(null);
+    }
+}
+
+ServiceCollection services = new ServiceCollection();
+services.addServiceBus(x -> {
+    x.addConsumer(WebhookConsumer.class, Message.class, cfg ->
+        cfg.useExecute(ctx -> {
+            System.out.println("Filter saw " + ctx.getMessage().text());
+            return CompletableFuture.completedFuture(null);
+        }));
+    x.usingMediator();
+});
+
+ServiceProvider provider = services.buildServiceProvider();
+ServiceBus bus = provider.getService(ServiceBus.class);
+
 HttpServer server = HttpServer.create(new InetSocketAddress(8080), 0);
 server.createContext("/webhook", exchange -> {
     byte[] body = exchange.getRequestBody().readAllBytes();
-    System.out.println("Received " + new String(body, StandardCharsets.UTF_8));
+    Message msg = new ObjectMapper().readValue(body, Message.class);
+    bus.publish(msg).join();
     exchange.sendResponseHeaders(200, 0);
     exchange.getResponseBody().close();
 });
 server.start();
+
+record Message(String text) {}
 ```
 
 ## Advanced

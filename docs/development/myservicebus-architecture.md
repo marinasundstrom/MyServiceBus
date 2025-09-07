@@ -6,9 +6,9 @@ MyServiceBus shares the MassTransit heritage of serialization, pipes, and transp
 
 Messages travel inside an `Envelope<T>` that carries identifiers, addresses, and headers. `System.Text.Json` handles JSON serialization by default, though other serializers can be registered.
 
-## Pipes
+## Pipes and Consumers
 
-Send, receive, and consume operations flow through a pipe-and-filter pipeline built on `BasePipeContext`. Filters compose cross-cutting concerns such as logging, retries, and tracing.
+Send, receive, and consume operations flow through a pipe-and-filter pipeline built on `BasePipeContext`. Filters compose cross-cutting concerns such as logging, retries, and tracing. Message handlers implement `IConsumer<T>` and plug into the same consume pipe, giving every transport access to shared middleware.
 
 ## Endpoints
 
