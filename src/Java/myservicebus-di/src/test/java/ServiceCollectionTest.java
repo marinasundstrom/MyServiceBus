@@ -158,4 +158,21 @@ public class ServiceCollectionTest {
         assertEquals(2, scopedSet2.size());
         assertNotSame(scopedSet1.iterator().next(), scopedSet2.iterator().next());
     }
+
+    @Test
+    void testGetRequiredServiceReturnsService() {
+        ServiceCollection sc = new ServiceCollection();
+        sc.addSingleton(Processor.class, ProcessorImpl.class);
+        ServiceProvider sp = sc.buildServiceProvider();
+
+        Processor p = sp.getRequiredService(Processor.class);
+        assertEquals("processed", p.process());
+    }
+
+    @Test
+    void testGetRequiredServiceThrowsWhenMissing() {
+        ServiceProvider sp = new ServiceCollection().buildServiceProvider();
+
+        assertThrows(IllegalStateException.class, () -> sp.getRequiredService(Processor.class));
+    }
 }
