@@ -7,6 +7,8 @@ import java.util.Set;
 import java.util.HashSet;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
 
 import com.myservicebus.di.ServiceCollection;
 import com.myservicebus.di.ServiceProvider;
@@ -19,6 +21,7 @@ import com.myservicebus.topology.ConsumerTopology;
 import com.myservicebus.topology.MessageBinding;
 import com.myservicebus.topology.TopologyRegistry;
 import com.myservicebus.NamingConventions;
+import com.myservicebus.Consumer;
 
 public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
     private final ServiceProvider serviceProvider;
@@ -115,8 +118,9 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
                     return CompletableFuture.completedFuture(null);
                 }
 
+                Type messageType = resolveMessageType(consumerDef.getConsumerType(), binding.getMessageType());
                 Envelope<?> typedEnvelope = messageDeserializer.deserialize(transportMessage.getBody(),
-                        binding.getMessageType());
+                        messageType);
 
                 String faultAddress = typedEnvelope.getFaultAddress();
                 if (faultAddress == null && transportMessage.getHeaders() != null) {
@@ -213,6 +217,25 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
         ReceiveTransport transport = transportFactory.createReceiveTransport(queueName, bindings, transportHandler,
                 isRegisteredHandler, prefetchCount != null ? prefetchCount : 0);
         receiveTransports.add(transport);
+    }
+
+    private static Type resolveMessageType(Class<?> consumerType, Class<?> bindingType) {
+        for (Type iface : consumerType.getGenericInterfaces()) {
+            if (iface instanceof ParameterizedType pt) {
+                Type raw = pt.getRawType();
+                if (raw instanceof Class<?> rawClass && Consumer.class.isAssignableFrom(rawClass)) {
+                    Type actual = pt.getActualTypeArguments()[0];
+                    if (actual instanceof ParameterizedType p) {
+                        if (p.getRawType().equals(bindingType)) {
+                            return p;
+                        }
+                    } else if (actual.equals(bindingType)) {
+                        return actual;
+                    }
+                }
+            }
+        }
+        return bindingType;
     }
 
     public void stop() throws Exception {
