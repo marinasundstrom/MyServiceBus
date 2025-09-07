@@ -17,6 +17,7 @@ public class SendContext implements PipeContext {
     private final CancellationToken cancellationToken;
     private URI sourceAddress;
     private URI destinationAddress;
+    private UUID messageId;
 
     public SendContext(Object message, CancellationToken cancellationToken) {
         this.message = message;
@@ -53,7 +54,7 @@ public class SendContext implements PipeContext {
 
     public byte[] serialize(MessageSerializer serializer) throws Exception {
         MessageSerializationContext<Object> context = new MessageSerializationContext<>(message);
-        context.setMessageId(UUID.randomUUID());
+        context.setMessageId(messageId != null ? messageId : UUID.randomUUID());
         context.setCorrelationId(null);
         context.setMessageType(List.of(NamingConventions.getMessageUrn(message.getClass())));
         context.setResponseAddress(null);
@@ -66,6 +67,14 @@ public class SendContext implements PipeContext {
         context.setSentTime(OffsetDateTime.now());
         context.setHostInfo(HostInfoProvider.capture());
         return serializer.serialize(context);
+    }
+
+    public UUID getMessageId() {
+        return messageId;
+    }
+
+    public void setMessageId(UUID messageId) {
+        this.messageId = messageId;
     }
 
     @Override

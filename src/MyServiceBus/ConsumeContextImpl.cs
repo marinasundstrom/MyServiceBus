@@ -129,7 +129,13 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
     public async Task Forward<T>(Uri address, object message, CancellationToken cancellationToken = default) where T : class
     {
         var endpoint = await GetSendEndpoint(address).ConfigureAwait(false);
-        await endpoint.Send<T>(message, null, cancellationToken).ConfigureAwait(false);
+        var headers = ReceiveContext.Headers;
+        await endpoint.Send<T>(message, sendCtx =>
+        {
+            foreach (var header in headers)
+                sendCtx.Headers[header.Key] = header.Value;
+            sendCtx.MessageId = ReceiveContext.MessageId.ToString();
+        }, cancellationToken).ConfigureAwait(false);
     }
 
     [Throws(typeof(InvalidOperationException))]

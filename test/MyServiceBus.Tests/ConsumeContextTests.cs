@@ -106,6 +106,30 @@ public class ConsumeContextTests
         Assert.Equal(new Uri("queue:forward-queue"), factory.Address);
     }
 
+    [Fact]
+    [Throws(typeof(UriFormatException), typeof(EncoderFallbackException), typeof(JsonException), typeof(KeyNotFoundException))]
+    public async Task Forward_copies_headers()
+    {
+        var headers = new Dictionary<string, object> { { "test", "value" } };
+        var json = Encoding.UTF8.GetBytes("{\"messageId\":\"00000000-0000-0000-0000-000000000000\",\"messageType\":[],\"message\":{}}");
+        var envelope = new EnvelopeMessageContext(json, headers);
+        var receiveContext = new ReceiveContextImpl(envelope, null, CancellationToken.None);
+        var factory = new CapturingTransportFactory();
+
+        var ctx = new ConsumeContextImpl<FakeMessage>(receiveContext, factory,
+            new SendPipe(Pipe.Empty<SendContext>()),
+            new PublishPipe(Pipe.Empty<PublishContext>()),
+            new EnvelopeMessageSerializer(),
+            new Uri("rabbitmq://localhost/"),
+            new SendContextFactory(),
+            new PublishContextFactory());
+
+        await ctx.Forward(new Uri("queue:forward-queue"), new FakeMessage());
+
+        Assert.Equal("value", factory.Context!.Headers["test"]);
+        Assert.Equal(receiveContext.MessageId.ToString(), factory.Context!.MessageId);
+    }
+
     class FakeMessage { }
 
     class CapturingTransportFactory : ITransportFactory
@@ -113,7 +137,6 @@ public class ConsumeContextTests
         public Uri? Address { get; private set; }
         public SendContext? Context { get; private set; }
 
-        [Throws(typeof(InvalidOperationException))]
         public Task<ISendTransport> GetSendTransport(Uri address, CancellationToken cancellationToken = default)
         {
             Address = address;
@@ -147,7 +170,7 @@ public class ConsumeContextTests
 
     class StubTransportFactory : ITransportFactory
     {
-        [Throws(typeof(NotImplementedException), typeof(InvalidOperationException))]
+        [Throws(typeof(NotImplementedException))]
         public Task<ISendTransport> GetSendTransport(Uri address, CancellationToken cancellationToken = default)
             => throw new NotImplementedException();
 

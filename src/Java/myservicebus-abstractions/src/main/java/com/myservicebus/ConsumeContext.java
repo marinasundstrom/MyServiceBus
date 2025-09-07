@@ -122,7 +122,18 @@ public class ConsumeContext<T>
 
     public <TMessage> CompletableFuture<Void> forward(String destination, TMessage message, CancellationToken cancellationToken) {
         SendEndpoint endpoint = getSendEndpoint(destination);
-        return endpoint.send(message, cancellationToken);
+        return endpoint.send(message, sendCtx -> {
+            sendCtx.getHeaders().putAll(headers);
+            Object id = headers.get("messageId");
+            if (id instanceof UUID uuid) {
+                sendCtx.setMessageId(uuid);
+            } else if (id instanceof String s) {
+                try {
+                    sendCtx.setMessageId(UUID.fromString(s));
+                } catch (IllegalArgumentException ignored) {
+                }
+            }
+        }, cancellationToken);
     }
 
     public <TMessage> CompletableFuture<Void> forward(String destination, TMessage message) {

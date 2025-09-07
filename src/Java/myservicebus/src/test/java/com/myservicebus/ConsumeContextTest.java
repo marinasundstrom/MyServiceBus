@@ -3,6 +3,7 @@ package com.myservicebus;
 import com.myservicebus.tasks.CancellationToken;
 import com.myservicebus.tasks.CancellationTokenSource;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicReference;
 import java.net.URI;
@@ -81,6 +82,43 @@ public class ConsumeContextTest {
         ctx.forward("queue:forward-queue", new FakeMessage(), CancellationToken.none).join();
 
         Assertions.assertEquals("queue:forward-queue", provider.uri);
+    }
+
+    @Test
+    public void forwardCopiesHeaders() {
+        class CapturingEndpoint implements SendEndpoint {
+            SendContext ctx;
+            @Override
+            public CompletableFuture<Void> send(SendContext context) {
+                ctx = context;
+                return CompletableFuture.completedFuture(null);
+            }
+
+            @Override
+            public <T> CompletableFuture<Void> send(T message, CancellationToken cancellationToken) {
+                return send(new SendContext(message, cancellationToken));
+            }
+        }
+
+        class CapturingProvider implements SendEndpointProvider {
+            CapturingEndpoint endpoint = new CapturingEndpoint();
+            String uri;
+            @Override
+            public SendEndpoint getSendEndpoint(String uri) {
+                this.uri = uri;
+                return endpoint;
+            }
+        }
+
+        CapturingProvider provider = new CapturingProvider();
+        UUID id = UUID.randomUUID();
+        Map<String, Object> headers = Map.of("test", "value", "messageId", id);
+        ConsumeContext<FakeMessage> ctx = new ConsumeContext<>(new FakeMessage(), headers, provider);
+
+        ctx.forward("queue:forward-queue", new FakeMessage(), CancellationToken.none).join();
+
+        Assertions.assertEquals("value", provider.endpoint.ctx.getHeaders().get("test"));
+        Assertions.assertEquals(id, provider.endpoint.ctx.getMessageId());
     }
 
     @Test
