@@ -438,15 +438,25 @@ The mediator dispatches messages in-memory, making it useful for lightweight sce
 ### HTTP Endpoint (Webhook)
 
 Post messages to an external HTTP consumer, such as a webhook or serverless
-function, using the `HttpEndpoint` transport. Incoming requests can then be
-routed through the normal MyServiceBus pipeline so `IConsumer` implementations
-and filters still apply.
+function, using the `HttpEndpoint` transport. Register the HTTP transport with
+`UsingHttp` and resolve `ISendEndpoint` like any other endpoint. Incoming
+requests can then be routed through the normal MyServiceBus pipeline so
+`IConsumer` implementations and filters still apply. The HTTP transport is
+send-only; `RequestClient` requires a queue-based transport and cannot target
+HTTP endpoints yet.
 
 #### C#
 
 ```csharp
 // producer
-var endpoint = new HttpEndpoint(new HttpClient(), new Uri("http://localhost:5000/webhook"));
+builder.Services.AddServiceBus(x =>
+{
+    x.UsingHttp(new Uri("http://localhost:5000"));
+});
+
+var provider = builder.Services.BuildServiceProvider();
+var sendProvider = provider.GetRequiredService<ISendEndpointProvider>();
+var endpoint = await sendProvider.GetSendEndpoint(new Uri("http://localhost:5000/webhook"));
 await endpoint.Send(new { Text = "hi" });
 
 // consumer wired to the MyServiceBus pipeline
