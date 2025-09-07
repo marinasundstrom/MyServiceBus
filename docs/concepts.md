@@ -11,3 +11,6 @@ Represents an error that occurred while processing a message. A `Fault<T>` carri
 ## Batch
 A `Batch<T>` groups multiple messages so they can be delivered as a single payload. In the JSON envelope the `message` property contains the array of messages directly, matching MassTransit semantics. The Java implementation now mirrors the C# version by extending `ArrayList<T>` so batches serialize as plain JSON arrays.
 
+
+## Unknown Message Types
+Messages that arrive with a `messageType` not understood by the receiver are not delivered to consumers. Instead, the transport moves them to a companion queue named `<queue>_skipped` for inspection or reprocessing. This prevents unrelated messages from being lost while keeping the main queue clean.

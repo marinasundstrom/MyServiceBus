@@ -61,6 +61,9 @@ cfg.receiveEndpoint("submit-order-queue_error", e -> {
 ```
 
 
+## Skipped Queue for Unknown Messages
+Each receive endpoint also has a companion fanout exchange and queue named `<queue>_skipped`. When a message is delivered with a `messageType` that no consumer recognizes, the transport publishes it to this skipped queue instead of attempting delivery. Inspecting the skipped queue helps track down contract mismatches without losing data.
+
 ## Prefetch Count
 
 Both implementations allow tuning the number of unacknowledged messages a consumer can receive. A global prefetch count applies to all endpoints, while individual receive endpoints can override it.
