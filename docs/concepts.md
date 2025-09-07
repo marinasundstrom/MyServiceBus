@@ -16,3 +16,6 @@ Many operations in MyServiceBus pass a **context** object through the pipe-and-f
 
 ## Unknown Message Types
 Messages that arrive with a `messageType` not understood by the receiver are not delivered to consumers. Instead, the transport moves them to a companion queue named `<queue>_skipped` for inspection or reprocessing. This prevents unrelated messages from being lost while keeping the main queue clean.
+
+## Topology
+The bus records how messages and consumers map to queues and exchanges in a topology registry. See [topology](topology.md) for details.
