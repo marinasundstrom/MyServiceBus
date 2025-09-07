@@ -14,6 +14,7 @@ This repository contains a .NET solution for MyServiceBus and a Java project. Fo
 
 ## Testing
 - From the repository root, run `dotnet test` and ensure all tests pass before committing.
+- If your changes only affect documentation (e.g., Markdown files or other non-code assets), you may skip running build or test steps.
 - When adding features or changing API/behavior, implement them for both the C# and Java codebases.
 - Create or update tests for each language to cover new functionality.
 
