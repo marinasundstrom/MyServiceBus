@@ -6,6 +6,8 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.util.EnumSet;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.Consumer;
 
 public class HttpEndpoint implements Endpoint {
     private final HttpClient client;
@@ -20,13 +22,13 @@ public class HttpEndpoint implements Endpoint {
     }
 
     @Override
-    public <T> void send(T message) throws Exception {
+    public <T> CompletableFuture<Void> send(T message, Consumer<SendContext> configure) throws Exception {
         String json = mapper.writeValueAsString(message);
         HttpRequest request = HttpRequest.newBuilder(uri)
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(json))
                 .build();
-        client.send(request, HttpResponse.BodyHandlers.discarding());
+        return client.sendAsync(request, HttpResponse.BodyHandlers.discarding()).thenApply(r -> null);
     }
 
     @Override

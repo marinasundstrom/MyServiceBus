@@ -7,7 +7,7 @@ Accepted
 MyServiceBus originally mirrored MassTransit's queue-centric transport model. To support technologies beyond brokers, the platform needs an abstraction that does not assume queues or exchanges.
 
 ## Decision
-Introduce a minimal `IEndpoint` interface with capability discovery. Each transport implements `Send` and `ReadAsync` while advertising features such as acknowledgement or retry through `EndpointCapabilities`.
+Introduce a minimal `IEndpoint` interface with capability discovery. Each transport implements `Send`, asynchronous `ReadAsync` returning `ConsumeContext`, and optional event-driven `Subscribe`, while advertising features such as acknowledgement or retry through `EndpointCapabilities`.
 
 ## Consequences
 - Non-queue transports (HTTP callbacks, in-memory mediator, serverless triggers) become first-class participants.

@@ -18,6 +18,6 @@ internal sealed class EndpointSendTransport : ISendTransport
     {
         // Serialize message to ensure filters have run; body isn't used yet
         _ = await context.Serialize(message);
-        await _endpoint.Send(message, cancellationToken);
+        await _endpoint.Send(message, null, cancellationToken);
     }
 }

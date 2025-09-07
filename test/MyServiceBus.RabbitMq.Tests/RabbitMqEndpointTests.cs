@@ -51,8 +51,8 @@ public class RabbitMqEndpointTests
 
         var enumerator = endpoint.ReadAsync(cts.Token).GetAsyncEnumerator();
         (await enumerator.MoveNextAsync()).ShouldBeTrue();
-        var received = enumerator.Current;
-        ((JsonElement)received.Message).GetProperty("text").GetString().ShouldBe("hi");
+        var received = (ConsumeContext<Envelope<object>>)enumerator.Current;
+        ((JsonElement)received.Message.Message).GetProperty("text").GetString().ShouldBe("hi");
 
         cts.Cancel();
         (await enumerator.MoveNextAsync()).ShouldBeFalse();

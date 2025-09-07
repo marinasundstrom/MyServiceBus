@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Net.Http;
 using System.Text;
@@ -20,17 +21,20 @@ public class HttpEndpoint : IEndpoint
 
     public EndpointCapabilities Capabilities => EndpointCapabilities.None;
 
-    public async Task Send<T>(T message, CancellationToken cancellationToken = default)
+    public async Task Send<T>(T message, Action<ISendContext>? configure = null, CancellationToken cancellationToken = default)
     {
         var json = JsonSerializer.Serialize(message);
         using var content = new StringContent(json, Encoding.UTF8, "application/json");
         await _client.PostAsync(_uri, content, cancellationToken);
     }
 
-    public async IAsyncEnumerable<Envelope<object>> ReadAsync(
+    public async IAsyncEnumerable<ConsumeContext> ReadAsync(
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         await Task.CompletedTask;
         yield break;
     }
+
+    public IDisposable Subscribe(Func<ConsumeContext, Task> handler) =>
+        throw new NotSupportedException("HTTP endpoint is send-only");
 }

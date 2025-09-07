@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Text.Json;
 using System.Threading;
@@ -22,10 +23,10 @@ public class RabbitMqEndpoint : IEndpoint
     public EndpointCapabilities Capabilities =>
         EndpointCapabilities.Acknowledgement | EndpointCapabilities.Retry | EndpointCapabilities.BatchSend;
 
-    public Task Send<T>(T message, CancellationToken cancellationToken = default)
-        => _sendEndpoint.Send(message, null, cancellationToken);
+    public Task Send<T>(T message, Action<ISendContext>? configure = null, CancellationToken cancellationToken = default)
+        => _sendEndpoint.Send(message, configure, cancellationToken);
 
-    public async IAsyncEnumerable<Envelope<object>> ReadAsync(
+    public async IAsyncEnumerable<ConsumeContext> ReadAsync(
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         var connection = await _connectionProvider.GetOrCreateConnectionAsync(cancellationToken);
@@ -48,13 +49,24 @@ public class RabbitMqEndpoint : IEndpoint
                 });
 
                 if (envelope != null)
-                    yield return envelope;
+                    yield return new DefaultConsumeContext<Envelope<object>>(envelope);
             }
             finally
             {
                 await channel.BasicAckAsync(result.DeliveryTag, false, cancellationToken);
             }
         }
+    }
+
+    public IDisposable Subscribe(Func<ConsumeContext, Task> handler)
+    {
+        var cts = new CancellationTokenSource();
+        _ = Task.Run(async () =>
+        {
+            await foreach (var ctx in ReadAsync(cts.Token))
+                await handler(ctx);
+        }, cts.Token);
+        return cts;
     }
 }
 

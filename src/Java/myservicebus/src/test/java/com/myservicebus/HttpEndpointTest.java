@@ -11,7 +11,6 @@ import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.http.HttpClient;
-import java.util.EnumSet;
 import java.util.concurrent.Executors;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -42,7 +41,7 @@ public class HttpEndpointTest {
     public void send_posts_message() throws Exception {
         var client = HttpClient.newHttpClient();
         var endpoint = new HttpEndpoint(client, URI.create("http://localhost:" + server.getAddress().getPort() + "/hook"));
-        endpoint.send("hi");
+        endpoint.send("hi").join();
         assertNotNull(lastExchange);
         assertEquals("POST", lastExchange.getRequestMethod());
     }
