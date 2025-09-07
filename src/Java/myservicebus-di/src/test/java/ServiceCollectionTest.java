@@ -1,6 +1,9 @@
 import com.myservicebus.di.ServiceCollection;
 import com.myservicebus.di.ServiceProvider;
 import com.myservicebus.di.ServiceScope;
+import com.myservicebus.logging.LoggerFactory;
+import com.myservicebus.logging.LogLevel;
+import com.myservicebus.logging.Logger;
 
 import org.junit.jupiter.api.Test;
 
@@ -174,5 +177,17 @@ public class ServiceCollectionTest {
         ServiceProvider sp = new ServiceCollection().buildServiceProvider();
 
         assertThrows(IllegalStateException.class, () -> sp.getRequiredService(Processor.class));
+    }
+
+    @Test
+    void consoleLoggerCanBeConfigured() {
+        ServiceCollection sc = new ServiceCollection();
+        sc.addConsoleLogger(cfg -> cfg.setMinimumLevel(LogLevel.DEBUG));
+        ServiceProvider sp = sc.buildServiceProvider();
+
+        LoggerFactory factory = sp.getService(LoggerFactory.class);
+        Logger logger = factory.create("test");
+
+        assertTrue(logger.isDebugEnabled());
     }
 }
