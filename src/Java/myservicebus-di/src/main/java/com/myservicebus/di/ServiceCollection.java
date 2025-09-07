@@ -9,6 +9,8 @@ import java.util.function.Consumer;
 
 import com.myservicebus.logging.LoggerFactory;
 import com.myservicebus.logging.Slf4jLoggerFactory;
+import com.myservicebus.logging.ConsoleLoggerConfig;
+import com.myservicebus.logging.ConsoleLoggerFactory;
 
 public class ServiceCollection {
     private final List<Module> modules = new ArrayList<>();
@@ -16,6 +18,7 @@ public class ServiceCollection {
     private final List<Consumer<ServiceProvider>> deferredScopedProviders = new ArrayList<>();
     private final PerMessageScope perMessageScope = new PerMessageScope();
     private boolean built;
+    private boolean loggerFactoryRegistered;
 
     public <T> void addSingleton(Class<T> type, ServiceProviderBasedProvider<T> providerFactory) {
         if (built) {
@@ -127,6 +130,29 @@ public class ServiceCollection {
         });
     }
 
+    public void addConsoleLogger() {
+        addConsoleLogger(c -> {});
+    }
+
+    public void addConsoleLogger(Consumer<ConsoleLoggerConfig> configure) {
+        if (built) {
+            throw new IllegalStateException("Cannot add service to container that has been built.");
+        }
+
+        ConsoleLoggerConfig config = new ConsoleLoggerConfig();
+        configure.accept(config);
+
+        modules.add(new AbstractModule() {
+            @Override
+            protected void configure() {
+                bind(ConsoleLoggerConfig.class).toInstance(config);
+                bind(LoggerFactory.class).to(ConsoleLoggerFactory.class).in(Scopes.SINGLETON);
+            }
+        });
+
+        loggerFactoryRegistered = true;
+    }
+
     public ServiceProvider buildServiceProvider() {
         if (built) {
             throw new IllegalStateException("ServiceCollection.build() called more than once.");
@@ -144,12 +170,14 @@ public class ServiceCollection {
             }
         });
 
-        modules.add(new AbstractModule() {
-            @Override
-            protected void configure() {
-                bind(LoggerFactory.class).to(Slf4jLoggerFactory.class).in(Scopes.SINGLETON);
-            }
-        });
+        if (!loggerFactoryRegistered) {
+            modules.add(new AbstractModule() {
+                @Override
+                protected void configure() {
+                    bind(LoggerFactory.class).to(Slf4jLoggerFactory.class).in(Scopes.SINGLETON);
+                }
+            });
+        }
 
         modules.add(new AbstractModule() {
             @Override
@@ -191,12 +219,14 @@ public class ServiceCollection {
             }
         });
 
-        modules.add(new AbstractModule() {
-            @Override
-            protected void configure() {
-                bind(LoggerFactory.class).to(Slf4jLoggerFactory.class).in(Scopes.SINGLETON);
-            }
-        });
+        if (!loggerFactoryRegistered) {
+            modules.add(new AbstractModule() {
+                @Override
+                protected void configure() {
+                    bind(LoggerFactory.class).to(Slf4jLoggerFactory.class).in(Scopes.SINGLETON);
+                }
+            });
+        }
 
         modules.add(new AbstractModule() {
             @Override
