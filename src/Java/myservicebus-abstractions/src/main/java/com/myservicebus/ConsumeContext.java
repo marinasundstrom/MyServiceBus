@@ -120,6 +120,15 @@ public class ConsumeContext<T>
         return endpoint.send(context);
     }
 
+    public <TMessage> CompletableFuture<Void> send(String destination, TMessage message, CancellationToken cancellationToken) {
+        SendEndpoint endpoint = getSendEndpoint(destination);
+        return endpoint.send(message, cancellationToken);
+    }
+
+    public <TMessage> CompletableFuture<Void> send(String destination, TMessage message) {
+        return send(destination, message, CancellationToken.none);
+    }
+
     public <TMessage> CompletableFuture<Void> forward(String destination, TMessage message, CancellationToken cancellationToken) {
         SendEndpoint endpoint = getSendEndpoint(destination);
         return endpoint.send(message, ctx -> ctx.getHeaders().putAll(headers), cancellationToken);

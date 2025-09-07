@@ -374,8 +374,8 @@ cfg.ReceiveEndpoint("submit-order_error", e =>
 {
     e.Handler<SubmitOrder>(context =>
     {
-        // inspect, fix, or forward the failed message
-        return context.Forward(new Uri("queue:submit-order"), context.Message);
+        // inspect, fix, or resend the failed message
+        return context.Send(new Uri("queue:submit-order"), context.Message);
     });
 });
 ```
@@ -385,14 +385,17 @@ cfg.ReceiveEndpoint("submit-order_error", e =>
 ```java
 cfg.receiveEndpoint("submit-order_error", e ->
     e.handler(SubmitOrder.class, ctx -> {
-        // inspect, fix, or forward the failed message
-        return ctx.forward("queue:submit-order", ctx.getMessage());
+        // inspect, fix, or resend the failed message
+        return ctx.send("queue:submit-order", ctx.getMessage());
     })
 );
 ```
 
+> **Note**
+> `forward` copies the original headers and is intended only for republishes to an exchange. Forwarding to a queue leaves the error and destination headers intact, so the broker will route the message back to the error queue and consumers may see duplicates. Use `send` when moving a message to another queue.
+
 Inspect and process the error queue with a dedicated consumer or tool,
-then forward the message back to the original queue once the issue is
+then send the message back to the original queue once the issue is
 resolved.
 
 ### Mediator (In-Memory Transport)
