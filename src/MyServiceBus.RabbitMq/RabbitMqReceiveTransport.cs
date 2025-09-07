@@ -64,7 +64,7 @@ public sealed class RabbitMqReceiveTransport : IReceiveTransport
                             exchange: _queueName + "_skipped",
                             routingKey: string.Empty,
                             mandatory: false,
-                            basicProperties: props,
+                            basicProperties: new BasicProperties(props),
                             body: payload);
                     }
 
