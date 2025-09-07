@@ -84,6 +84,30 @@ public class ConsumeContextTest {
     }
 
     @Test
+    public void forwardCopiesHeaders() {
+        AtomicReference<SendContext> captured = new AtomicReference<>();
+        SendEndpointProvider provider = uri -> new SendEndpoint() {
+            @Override
+            public CompletableFuture<Void> send(SendContext ctx) {
+                captured.set(ctx);
+                return CompletableFuture.completedFuture(null);
+            }
+
+            @Override
+            public <T> CompletableFuture<Void> send(T message, CancellationToken cancellationToken) {
+                return send(new SendContext(message, cancellationToken));
+            }
+        };
+
+        Map<String, Object> headers = Map.of("foo", "bar");
+        ConsumeContext<FakeMessage> ctx = new ConsumeContext<>(new FakeMessage(), headers, provider);
+
+        ctx.forward("queue:forward-queue", new FakeMessage(), CancellationToken.none).join();
+
+        Assertions.assertEquals("bar", captured.get().getHeaders().get("foo"));
+    }
+
+    @Test
     public void publishSetsSourceAndDestinationAddresses() {
         AtomicReference<SendContext> captured = new AtomicReference<>();
         SendEndpointProvider provider = uri -> new SendEndpoint() {
