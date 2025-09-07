@@ -5,6 +5,8 @@ import com.myservicebus.RequestClientFactory;
 import com.myservicebus.ScopedClientFactory;
 import com.myservicebus.RequestClientTransport;
 import com.myservicebus.SendPipe;
+import com.myservicebus.SendContextFactory;
+import com.myservicebus.PublishContextFactory;
 import com.myservicebus.TransportSendEndpointProvider;
 import com.myservicebus.di.ServiceCollection;
 import com.rabbitmq.client.ConnectionFactory;
@@ -36,12 +38,16 @@ public class RabbitMqTransport {
         services.addSingleton(com.myservicebus.TransportFactory.class,
                 sp -> () -> sp.getService(RabbitMqTransportFactory.class));
 
+        services.addSingleton(SendContextFactory.class, sp -> () -> new RabbitMqSendContextFactory());
+        services.addSingleton(PublishContextFactory.class, sp -> () -> new RabbitMqPublishContextFactory());
+
         services.addSingleton(RabbitMqSendEndpointProvider.class, sp -> () -> {
             RabbitMqTransportFactory factory = sp.getService(RabbitMqTransportFactory.class);
             SendPipe sendPipe = sp.getService(SendPipe.class);
             com.myservicebus.serialization.MessageSerializer serializer = sp.getService(com.myservicebus.serialization.MessageSerializer.class);
             URI busAddress = sp.getService(URI.class);
-            return new RabbitMqSendEndpointProvider(factory, sendPipe, serializer, busAddress);
+            SendContextFactory sendContextFactory = sp.getService(SendContextFactory.class);
+            return new RabbitMqSendEndpointProvider(factory, sendPipe, serializer, busAddress, sendContextFactory);
         });
         services.addSingleton(TransportSendEndpointProvider.class,
                 sp -> () -> sp.getService(RabbitMqSendEndpointProvider.class));

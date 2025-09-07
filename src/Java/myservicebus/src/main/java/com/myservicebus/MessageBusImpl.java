@@ -23,6 +23,7 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
     private final TransportFactory transportFactory;
     private final TransportSendEndpointProvider transportSendEndpointProvider;
     private final PublishPipe publishPipe;
+    private final PublishContextFactory publishContextFactory;
     private final Logger logger;
     private final MessageDeserializer messageDeserializer;
     private final List<ReceiveTransport> receiveTransports = new ArrayList<>();
@@ -33,6 +34,7 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
         this.serviceProvider = serviceProvider;
         this.transportFactory = serviceProvider.getService(TransportFactory.class);
         this.transportSendEndpointProvider = serviceProvider.getService(TransportSendEndpointProvider.class);
+        this.publishContextFactory = serviceProvider.getService(PublishContextFactory.class);
         this.publishPipe = serviceProvider.getService(PublishPipe.class);
         this.logger = serviceProvider.getService(Logger.class);
         MessageDeserializer md = serviceProvider.getService(MessageDeserializer.class);
@@ -218,12 +220,20 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
     public <T> CompletableFuture<Void> publish(T message, CancellationToken cancellationToken) {
         if (message == null)
             return CompletableFuture.failedFuture(new IllegalArgumentException("Message cannot be null"));
-        SendContext ctx = new SendContext(message, cancellationToken);
+        PublishContext ctx = publishContextFactory.create(message, cancellationToken);
         return publish(ctx);
     }
 
     @Override
-    public CompletableFuture<Void> publish(SendContext context) {
+    public <T> CompletableFuture<Void> publish(T message, java.util.function.Consumer<PublishContext> contextCallback,
+            CancellationToken cancellationToken) {
+        PublishContext ctx = publishContextFactory.create(message, cancellationToken);
+        contextCallback.accept(ctx);
+        return publish(ctx);
+    }
+
+    @Override
+    public CompletableFuture<Void> publish(PublishContext context) {
         String exchange = NamingConventions.getExchangeName(context.getMessage().getClass());
         String address = transportFactory.getPublishAddress(exchange);
         context.setSourceAddress(this.address);

@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test;
 import com.myservicebus.rabbitmq.RabbitMqSendEndpointProvider;
 import com.myservicebus.rabbitmq.RabbitMqTransportFactory;
 import com.myservicebus.rabbitmq.RabbitMqFactoryConfigurator;
+import com.myservicebus.rabbitmq.RabbitMqSendContextFactory;
 import com.myservicebus.serialization.EnvelopeMessageSerializer;
 import com.myservicebus.serialization.MessageSerializer;
 import com.myservicebus.SendPipe;
@@ -22,7 +23,7 @@ class RabbitMqSendEndpointProviderTest {
         StubFactory factory = new StubFactory();
         SendPipe sendPipe = new SendPipe(ctx -> CompletableFuture.completedFuture(null));
         MessageSerializer serializer = new EnvelopeMessageSerializer();
-        RabbitMqSendEndpointProvider provider = new RabbitMqSendEndpointProvider(factory, sendPipe, serializer, URI.create("rabbitmq://localhost/"));
+        RabbitMqSendEndpointProvider provider = new RabbitMqSendEndpointProvider(factory, sendPipe, serializer, URI.create("rabbitmq://localhost/"), new RabbitMqSendContextFactory());
 
         provider.getSendEndpoint("rabbitmq://localhost/my-queue");
 
@@ -35,7 +36,7 @@ class RabbitMqSendEndpointProviderTest {
         StubFactory factory = new StubFactory();
         SendPipe sendPipe = new SendPipe(ctx -> CompletableFuture.completedFuture(null));
         MessageSerializer serializer = new EnvelopeMessageSerializer();
-        RabbitMqSendEndpointProvider provider = new RabbitMqSendEndpointProvider(factory, sendPipe, serializer, URI.create("rabbitmq://localhost/"));
+        RabbitMqSendEndpointProvider provider = new RabbitMqSendEndpointProvider(factory, sendPipe, serializer, URI.create("rabbitmq://localhost/"), new RabbitMqSendContextFactory());
 
         provider.getSendEndpoint("rabbitmq://localhost/my-exchange-queue");
 
@@ -48,7 +49,7 @@ class RabbitMqSendEndpointProviderTest {
         StubFactory factory = new StubFactory();
         SendPipe sendPipe = new SendPipe(ctx -> CompletableFuture.completedFuture(null));
         MessageSerializer serializer = new EnvelopeMessageSerializer();
-        RabbitMqSendEndpointProvider provider = new RabbitMqSendEndpointProvider(factory, sendPipe, serializer, URI.create("rabbitmq://localhost/"));
+        RabbitMqSendEndpointProvider provider = new RabbitMqSendEndpointProvider(factory, sendPipe, serializer, URI.create("rabbitmq://localhost/"), new RabbitMqSendContextFactory());
 
         provider.getSendEndpoint("rabbitmq://localhost/exchange/my-exchange");
 
@@ -61,7 +62,7 @@ class RabbitMqSendEndpointProviderTest {
         StubFactory factory = new StubFactory();
         SendPipe sendPipe = new SendPipe(ctx -> CompletableFuture.completedFuture(null));
         MessageSerializer serializer = new EnvelopeMessageSerializer();
-        RabbitMqSendEndpointProvider provider = new RabbitMqSendEndpointProvider(factory, sendPipe, serializer, URI.create("rabbitmq://localhost/"));
+        RabbitMqSendEndpointProvider provider = new RabbitMqSendEndpointProvider(factory, sendPipe, serializer, URI.create("rabbitmq://localhost/"), new RabbitMqSendContextFactory());
 
         provider.getSendEndpoint("exchange:my-exchange");
 
@@ -74,7 +75,7 @@ class RabbitMqSendEndpointProviderTest {
         StubFactory factory = new StubFactory();
         SendPipe sendPipe = new SendPipe(ctx -> CompletableFuture.completedFuture(null));
         MessageSerializer serializer = new EnvelopeMessageSerializer();
-        RabbitMqSendEndpointProvider provider = new RabbitMqSendEndpointProvider(factory, sendPipe, serializer, URI.create("rabbitmq://localhost/"));
+        RabbitMqSendEndpointProvider provider = new RabbitMqSendEndpointProvider(factory, sendPipe, serializer, URI.create("rabbitmq://localhost/"), new RabbitMqSendContextFactory());
 
         provider.getSendEndpoint("queue:my-queue");
 
