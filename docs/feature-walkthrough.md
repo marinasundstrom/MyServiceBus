@@ -16,6 +16,7 @@ For Java build and run instructions, including optional JDK 17 toolchain setup a
   - [Retries](#retries)
   - [Error Handling](#error-handling)
   - [Mediator (In-Memory Transport)](#mediator-in-memory-transport)
+  - [HTTP Endpoint (Webhook)](#http-endpoint-webhook)
 - [Advanced](#advanced)
   - [Configuration](#configuration)
   - [Dependency Injection](#dependency-injection)
@@ -433,6 +434,48 @@ bus.publish(new SubmitOrder(UUID.randomUUID()));
 
 The mediator dispatches messages in-memory, making it useful for lightweight scenarios and testing without a broker.
 
+
+### HTTP Endpoint (Webhook)
+
+Post messages to an external HTTP consumer, such as a webhook or serverless
+function, using the `HttpEndpoint` transport.
+
+#### C#
+
+```csharp
+// producer
+var endpoint = new HttpEndpoint(new HttpClient(), new Uri("http://localhost:5000/webhook"));
+await endpoint.Send(new { Text = "hi" });
+
+// consumer
+var app = WebApplication.Create();
+app.MapPost("/webhook", (Message msg) =>
+{
+    Console.WriteLine($"Received {msg.Text}");
+    return Results.Ok();
+});
+await app.RunAsync();
+
+record Message(string Text);
+```
+
+#### Java
+
+```java
+// producer
+HttpEndpoint endpoint = new HttpEndpoint(HttpClient.newHttpClient(), URI.create("http://localhost:8080/webhook"));
+endpoint.send(Map.of("text", "hi")).join();
+
+// consumer
+HttpServer server = HttpServer.create(new InetSocketAddress(8080), 0);
+server.createContext("/webhook", exchange -> {
+    byte[] body = exchange.getRequestBody().readAllBytes();
+    System.out.println("Received " + new String(body, StandardCharsets.UTF_8));
+    exchange.sendResponseHeaders(200, 0);
+    exchange.getResponseBody().close();
+});
+server.start();
+```
 
 ## Advanced
 
