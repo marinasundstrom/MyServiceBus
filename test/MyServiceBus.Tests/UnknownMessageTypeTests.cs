@@ -38,7 +38,6 @@ public class UnknownMessageTypeTests
 
     class StubTransportFactory : ITransportFactory
     {
-        [Throws(typeof(InvalidOperationException))]
         public Task<ISendTransport> GetSendTransport(Uri address, CancellationToken cancellationToken = default)
             => Task.FromResult<ISendTransport>(new StubSendTransport());
 
@@ -105,7 +104,7 @@ public class UnknownMessageTypeTests
         var method = typeof(MessageBus).GetMethod("HandleMessageAsync", BindingFlags.Instance | BindingFlags.NonPublic);
         await Should.NotThrowAsync(
             [Throws(typeof(TargetException), typeof(TargetInvocationException), typeof(TargetParameterCountException), typeof(MethodAccessException))]
-            () => (Task)method!.Invoke(bus, new object[] { context })!);
+        () => (Task)method!.Invoke(bus, new object[] { "test-queue", context })!);
 
         Assert.Contains(LogLevel.Warning, logger.Levels);
         Assert.Contains(logger.Messages, m => m.Contains("unregistered"));

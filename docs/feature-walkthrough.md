@@ -201,7 +201,9 @@ supporting scaling and resilience.
 
 Multiple consumer types can handle the same message. MyServiceBus invokes
 them one at a time; if any consumer throws, remaining consumers are skipped
-and the message is moved to the error queue.
+and the message is moved to the error queue. Consumers can also bind to
+different queues for the same message type, such as processing an
+`_error` queue alongside the primary endpoint.
 
 #### C#
 

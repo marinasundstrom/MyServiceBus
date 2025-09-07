@@ -24,7 +24,7 @@ The `RabbitMqTransportFactory` ensures the error exchange and queue exist when t
 
 ### Reprocessing Dead-letter Messages
 
-Messages that fault are moved to `<queue>_error`. To inspect or replay them, connect a consumer to the error queue like any other receive endpoint.
+Messages that fault are moved to `<queue>_error`. Bind a dedicated consumer to the error queue like any other receive endpoint without affecting handlers on the original queue.
 
 #### C#
 ```csharp

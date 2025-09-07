@@ -34,7 +34,8 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
     private final List<ReceiveTransport> receiveTransports = new ArrayList<>();
     private final URI address;
     private final BusTopology topology;
-    private final Set<String> consumers = new HashSet<>();
+    private final Set<String> consumerRegistrations = new HashSet<>();
+    private final Set<String> messageTypes = new HashSet<>();
 
     public MessageBusImpl(ServiceProvider serviceProvider) {
         this.serviceProvider = serviceProvider;
@@ -78,12 +79,15 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
 
     public void addConsumer(ConsumerTopology consumerDef) throws Exception {
         String messageUrn = NamingConventions.getMessageUrn(consumerDef.getBindings().get(0).getMessageType());
-        if (consumers.contains(messageUrn)) {
+        String key = consumerDef.getQueueName() + "|" + messageUrn;
+        if (consumerRegistrations.contains(key)) {
             if (logger != null) {
-                logger.debug("Consumer for '{}' already registered, skipping", messageUrn);
+                logger.debug("Consumer for '{}' on '{}' already registered, skipping", messageUrn,
+                        consumerDef.getQueueName());
             }
             return;
         }
+        messageTypes.add(messageUrn);
 
         PipeConfigurator<ConsumeContext<Object>> configurator = new PipeConfigurator<>();
         configurator.useFilter(new OpenTelemetryConsumeFilter<>());
@@ -101,7 +105,6 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
                 consumerDef.getConsumerType());
         configurator.useFilter(consumerFilter);
         Pipe<ConsumeContext<Object>> pipe = configurator.build(serviceProvider);
-        consumers.add(messageUrn);
 
         Function<TransportMessage, CompletableFuture<Void>> handler = transportMessage -> {
             try {
@@ -148,11 +151,12 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
             }
         };
 
-        java.util.function.Function<String, Boolean> isRegistered = urn -> consumers.contains(urn);
+        java.util.function.Function<String, Boolean> isRegistered = urn -> messageTypes.contains(urn);
         ReceiveTransport transport = transportFactory.createReceiveTransport(consumerDef.getQueueName(),
-                consumerDef.getBindings(), handler, isRegistered, consumerDef.getPrefetchCount() != null ? consumerDef.getPrefetchCount() : 0);
+                consumerDef.getBindings(), handler, isRegistered,
+                consumerDef.getPrefetchCount() != null ? consumerDef.getPrefetchCount() : 0);
         receiveTransports.add(transport);
-        consumers.add(messageUrn);
+        consumerRegistrations.add(key);
     }
 
     public <T> void addHandler(String queueName, Class<T> messageType, String exchange,

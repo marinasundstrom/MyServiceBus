@@ -6,7 +6,6 @@ import java.util.concurrent.ExecutionException;
 import com.google.inject.Inject;
 import com.myservicebus.ConsumeContext;
 import com.myservicebus.Consumer;
-import com.myservicebus.Fault;
 import com.myservicebus.logging.Logger;
 import com.myservicebus.logging.LoggerFactory;
 
@@ -15,7 +14,7 @@ class SubmitOrderErrorConsumer implements Consumer<SubmitOrder> {
 
     @Inject
     public SubmitOrderErrorConsumer(LoggerFactory loggerFactory) {
-        this.logger = loggerFactory.create(SubmitOrderConsumer.class);
+        this.logger = loggerFactory.create(SubmitOrderErrorConsumer.class);
     }
 
     @Override

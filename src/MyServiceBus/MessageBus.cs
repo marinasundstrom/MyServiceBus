@@ -3,6 +3,7 @@ using MyServiceBus.Serialization;
 using MyServiceBus.Topology;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using Microsoft.Extensions.Logging;
@@ -24,8 +25,8 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
 
     private readonly List<IReceiveTransport> _activeTransports = new();
 
-    // Key = message type URN, Value = list of registrations for that message type
-    private readonly Dictionary<string, List<(Type MessageType, IConsumePipe Pipe)>> _consumers = new();
+    // Key = queue name, Value = list of registrations for that queue
+    private readonly Dictionary<string, List<(string MessageUrn, Type MessageType, IConsumePipe Pipe)>> _consumers = new();
     private readonly HashSet<Type> _consumerTypes = new();
 
     public MessageBus(ITransportFactory transportFactory, IServiceProvider serviceProvider,
@@ -132,6 +133,7 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
     {
         var messageType = consumer.Bindings.First().MessageType;
         var messageUrn = NamingConventions.GetMessageUrn(messageType);
+        var queueName = consumer.QueueName;
         if (_consumerTypes.Contains(typeof(TConsumer)))
         {
             _logger?.LogDebug("Consumer {ConsumerType} already registered, skipping", typeof(TConsumer).Name);
@@ -140,7 +142,7 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
 
         var topology = new ReceiveEndpointTopology
         {
-            QueueName = consumer.QueueName,
+            QueueName = queueName,
             ExchangeName = NamingConventions.GetExchangeName(messageType)!, // standard MT routing
             RoutingKey = "", // messageType.FullName!,
             ExchangeType = "fanout",
@@ -149,8 +151,13 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
             PrefetchCount = consumer.PrefetchCount ?? 0
         };
 
-        Func<string?, bool> isRegistered = mt => _consumers.ContainsKey(mt!);
-        var receiveTransport = await _transportFactory.CreateReceiveTransport(topology, HandleMessageAsync, isRegistered, cancellationToken);
+        Func<string?, bool> isRegistered = mt =>
+            _consumers.TryGetValue(queueName, out var regs) && regs.Any(r => r.MessageUrn == mt);
+        var receiveTransport = await _transportFactory.CreateReceiveTransport(
+            topology,
+            [Throws(typeof(TargetInvocationException), typeof(InvalidComObjectException))] (ctx) => HandleMessageAsync(queueName, ctx),
+            isRegistered,
+            cancellationToken);
 
         var configurator = new PipeConfigurator<ConsumeContext<TMessage>>();
         configurator.UseFilter(new OpenTelemetryConsumeFilter<TMessage>());
@@ -162,9 +169,9 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
         configurator.UseFilter(new ConsumerMessageFilter<TConsumer, TMessage>(_serviceProvider));
         var pipe = new ConsumePipe<TMessage>(configurator.Build(_serviceProvider));
 
-        if (!_consumers.TryGetValue(messageUrn, out var registrations))
-            registrations = _consumers[messageUrn] = new List<(Type, IConsumePipe)>();
-        registrations.Add((messageType, pipe));
+        if (!_consumers.TryGetValue(queueName, out var registrations))
+            registrations = _consumers[queueName] = new List<(string, Type, IConsumePipe)>();
+        registrations.Add((messageUrn, messageType, pipe));
         _consumerTypes.Add(typeof(TConsumer));
         _activeTransports.Add(receiveTransport);
     }
@@ -180,19 +187,36 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
     }
 
     [Throws(typeof(InvalidOperationException), typeof(NotSupportedException), typeof(InvalidCastException), typeof(TargetInvocationException), typeof(MemberAccessException), typeof(InvalidComObjectException), typeof(COMException), typeof(TypeLoadException))]
-    private async Task HandleMessageAsync(ReceiveContext context)
+    private async Task HandleMessageAsync(string queueName, ReceiveContext context)
     {
         var messageTypeName = context.MessageType.FirstOrDefault();
-        if (messageTypeName == null || !_consumers.TryGetValue(messageTypeName, out var registrations))
+        if (messageTypeName == null || !_consumers.TryGetValue(queueName, out var registrations))
         {
             _logger?.LogWarning("Received message with unregistered type {MessageType}", messageTypeName ?? "<null>");
             return;
         }
 
-        foreach (var registration in registrations)
+        var matches = registrations.Where(r => r.MessageUrn == messageTypeName).ToList();
+        if (matches.Count == 0)
+        {
+            _logger?.LogWarning("Received message with unregistered type {MessageType}", messageTypeName);
+            return;
+        }
+
+        foreach (var registration in matches)
         {
             var consumeContextType = typeof(ConsumeContextImpl<>).MakeGenericType(registration.MessageType);
-            var consumeContext = (ConsumeContext)Activator.CreateInstance(consumeContextType, context, _transportFactory, _sendPipe, _publishPipe, _messageSerializer, _address, _sendContextFactory, _publishContextFactory, _serviceProvider.GetService<ILoggerFactory>())
+            var consumeContext = (ConsumeContext)Activator.CreateInstance(
+                consumeContextType,
+                context,
+                _transportFactory,
+                _sendPipe,
+                _publishPipe,
+                _messageSerializer,
+                _address,
+                _sendContextFactory,
+                _publishContextFactory,
+                _serviceProvider.GetService<ILoggerFactory>())
                 ?? throw new InvalidOperationException("Failed to create ConsumeContext");
 
             _logger?.LogDebug("Received {MessageType}", messageTypeName);
