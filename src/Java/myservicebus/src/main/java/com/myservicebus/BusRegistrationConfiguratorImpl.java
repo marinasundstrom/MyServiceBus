@@ -12,7 +12,7 @@ import com.myservicebus.di.ServiceCollection;
 import com.myservicebus.topology.TopologyRegistry;
 import com.myservicebus.logging.Logger;
 import com.myservicebus.logging.Slf4jLoggerFactory;
-import com.myservicebus.NamingConventions;
+import com.myservicebus.KebabCaseEndpointNameFormatter;
 
 public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigurator {
 
@@ -22,7 +22,7 @@ public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigura
     private PipeConfigurator<SendContext> publishConfigurator = new PipeConfigurator<>();
     private Class<? extends com.myservicebus.serialization.MessageSerializer> serializerClass = com.myservicebus.serialization.EnvelopeMessageSerializer.class;
     private Class<? extends com.myservicebus.serialization.MessageDeserializer> deserializerClass = com.myservicebus.serialization.EnvelopeMessageDeserializer.class;
-    private final Set<String> consumers = new HashSet<>();
+    private final Set<Class<?>> consumerTypes = new HashSet<>();
     private final Logger logger = new Slf4jLoggerFactory().create(BusRegistrationConfiguratorImpl.class);
 
     public BusRegistrationConfiguratorImpl(ServiceCollection serviceCollection) {
@@ -33,19 +33,9 @@ public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigura
 
     @Override
     public <T> void addConsumer(Class<T> consumerClass) {
-        for (Type iface : consumerClass.getGenericInterfaces()) {
-            if (iface instanceof ParameterizedType pt) {
-                Type raw = pt.getRawType();
-                if (raw instanceof Class<?> rawClass && com.myservicebus.Consumer.class.isAssignableFrom(rawClass)) {
-                    Type actualType = pt.getActualTypeArguments()[0];
-                    Class<?> messageType = getClassFromType(actualType);
-                    String messageUrn = NamingConventions.getMessageUrn(messageType);
-                    if (consumers.contains(messageUrn)) {
-                        logger.debug("Consumer for '{}' already registered, skipping", messageUrn);
-                        return;
-                    }
-                }
-            }
+        if (consumerTypes.contains(consumerClass)) {
+            logger.debug("Consumer '{}' already registered, skipping", consumerClass.getSimpleName());
+            return;
         }
 
         serviceCollection.addScoped(consumerClass);
@@ -56,8 +46,6 @@ public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigura
                 if (raw instanceof Class<?> rawClass && com.myservicebus.Consumer.class.isAssignableFrom(rawClass)) {
                     Type actualType = pt.getActualTypeArguments()[0];
                     Class<?> messageType = getClassFromType(actualType);
-                    String messageUrn = NamingConventions.getMessageUrn(messageType);
-                    consumers.add(messageUrn);
                     topology.registerConsumer(consumerClass,
                             KebabCaseEndpointNameFormatter.INSTANCE.format(messageType),
                             null,
@@ -65,20 +53,21 @@ public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigura
                 }
             }
         }
+
+        consumerTypes.add(consumerClass);
     }
 
     @Override
     public <TMessage, TConsumer extends com.myservicebus.Consumer<TMessage>> void addConsumer(Class<TConsumer> consumerClass, Class<TMessage> messageClass,
             Consumer<PipeConfigurator<ConsumeContext<TMessage>>> configure) {
-        String messageUrn = NamingConventions.getMessageUrn(messageClass);
-        if (consumers.contains(messageUrn)) {
-            logger.debug("Consumer for '{}' already registered, skipping", messageUrn);
+        if (consumerTypes.contains(consumerClass)) {
+            logger.debug("Consumer '{}' already registered, skipping", consumerClass.getSimpleName());
             return;
         }
 
         serviceCollection.addScoped(consumerClass);
         topology.registerConsumer(consumerClass, KebabCaseEndpointNameFormatter.INSTANCE.format(messageClass), (java.util.function.Consumer) configure, messageClass);
-        consumers.add(messageUrn);
+        consumerTypes.add(consumerClass);
     }
 
     @Override

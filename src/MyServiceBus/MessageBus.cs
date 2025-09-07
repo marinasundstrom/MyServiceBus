@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using MyServiceBus.Serialization;
 using MyServiceBus.Topology;
 using System;
+using System.Collections.Generic;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using Microsoft.Extensions.Logging;
@@ -23,8 +24,9 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
 
     private readonly List<IReceiveTransport> _activeTransports = new();
 
-    // Key = message type URN, Value = registration containing message type and pipeline
-    private readonly Dictionary<string, (Type MessageType, IConsumePipe Pipe)> _consumers = new();
+    // Key = message type URN, Value = list of registrations for that message type
+    private readonly Dictionary<string, List<(Type MessageType, IConsumePipe Pipe)>> _consumers = new();
+    private readonly HashSet<Type> _consumerTypes = new();
 
     public MessageBus(ITransportFactory transportFactory, IServiceProvider serviceProvider,
         ISendPipe sendPipe, IPublishPipe publishPipe, IMessageSerializer messageSerializer, Uri address,
@@ -130,9 +132,9 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
     {
         var messageType = consumer.Bindings.First().MessageType;
         var messageUrn = NamingConventions.GetMessageUrn(messageType);
-        if (_consumers.ContainsKey(messageUrn))
+        if (_consumerTypes.Contains(typeof(TConsumer)))
         {
-            _logger?.LogDebug("Consumer for '{MessageUrn}' already registered, skipping", messageUrn);
+            _logger?.LogDebug("Consumer {ConsumerType} already registered, skipping", typeof(TConsumer).Name);
             return;
         }
 
@@ -160,7 +162,10 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
         configurator.UseFilter(new ConsumerMessageFilter<TConsumer, TMessage>(_serviceProvider));
         var pipe = new ConsumePipe<TMessage>(configurator.Build(_serviceProvider));
 
-        _consumers.Add(messageUrn, (messageType, pipe));
+        if (!_consumers.TryGetValue(messageUrn, out var registrations))
+            registrations = _consumers[messageUrn] = new List<(Type, IConsumePipe)>();
+        registrations.Add((messageType, pipe));
+        _consumerTypes.Add(typeof(TConsumer));
         _activeTransports.Add(receiveTransport);
     }
 
@@ -178,17 +183,20 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
     private async Task HandleMessageAsync(ReceiveContext context)
     {
         var messageTypeName = context.MessageType.FirstOrDefault();
-        if (messageTypeName == null || !_consumers.TryGetValue(messageTypeName, out var registration))
+        if (messageTypeName == null || !_consumers.TryGetValue(messageTypeName, out var registrations))
         {
             _logger?.LogWarning("Received message with unregistered type {MessageType}", messageTypeName ?? "<null>");
             return;
         }
 
-        var consumeContextType = typeof(ConsumeContextImpl<>).MakeGenericType(registration.MessageType);
-        var consumeContext = (ConsumeContext)Activator.CreateInstance(consumeContextType, context, _transportFactory, _sendPipe, _publishPipe, _messageSerializer, _address, _sendContextFactory, _publishContextFactory, _serviceProvider.GetService<ILoggerFactory>())
-            ?? throw new InvalidOperationException("Failed to create ConsumeContext");
+        foreach (var registration in registrations)
+        {
+            var consumeContextType = typeof(ConsumeContextImpl<>).MakeGenericType(registration.MessageType);
+            var consumeContext = (ConsumeContext)Activator.CreateInstance(consumeContextType, context, _transportFactory, _sendPipe, _publishPipe, _messageSerializer, _address, _sendContextFactory, _publishContextFactory, _serviceProvider.GetService<ILoggerFactory>())
+                ?? throw new InvalidOperationException("Failed to create ConsumeContext");
 
-        _logger?.LogDebug("Received {MessageType}", messageTypeName);
-        await registration.Pipe.Send(consumeContext);
+            _logger?.LogDebug("Received {MessageType}", messageTypeName);
+            await registration.Pipe.Send(consumeContext);
+        }
     }
 }

@@ -14,6 +14,7 @@ public class InMemoryTestHarness : IMessageBus, ITransportFactory, IReceiveEndpo
     readonly Dictionary<Type, List<Func<ReceiveContext, Task>>> handlers = new();
     readonly List<Func<ReceiveContext, Task>> receiveHandlers = new();
     readonly List<object> consumed = new();
+    readonly HashSet<Type> consumerTypes = new();
     readonly IServiceProvider? provider;
     readonly IBusTopology topology;
     readonly ISendContextFactory _sendContextFactory;
@@ -107,7 +108,7 @@ public class InMemoryTestHarness : IMessageBus, ITransportFactory, IReceiveEndpo
         if (provider == null)
             throw new InvalidOperationException("Service provider is required to add consumers");
 
-        if (handlers.ContainsKey(typeof(TMessage)))
+        if (!consumerTypes.Add(typeof(TConsumer)))
             return Task.CompletedTask;
 
         RegisterHandler<TMessage>([Throws(typeof(InvalidOperationException))] async (context) =>
