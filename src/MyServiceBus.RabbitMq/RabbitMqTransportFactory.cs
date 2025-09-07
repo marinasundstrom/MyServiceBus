@@ -85,6 +85,8 @@ public sealed class RabbitMqTransportFactory : ITransportFactory
                 {
                     var errorExchange = queue + "_error";
                     var errorQueue = errorExchange;
+                    var skippedExchange = queue + "_skipped";
+                    var skippedQueue = skippedExchange;
 
                     await channel.ExchangeDeclareAsync(
                         exchange: errorExchange,
@@ -103,6 +105,26 @@ public sealed class RabbitMqTransportFactory : ITransportFactory
                     await channel.QueueBindAsync(
                         queue: errorQueue,
                         exchange: errorExchange,
+                        routingKey: string.Empty,
+                        cancellationToken: cancellationToken);
+
+                    await channel.ExchangeDeclareAsync(
+                        exchange: skippedExchange,
+                        type: ExchangeType.Fanout,
+                        durable: durable,
+                        autoDelete: autoDelete,
+                        cancellationToken: cancellationToken);
+
+                    await channel.QueueDeclareAsync(
+                        queue: skippedQueue,
+                        durable: durable,
+                        exclusive: false,
+                        autoDelete: autoDelete,
+                        cancellationToken: cancellationToken);
+
+                    await channel.QueueBindAsync(
+                        queue: skippedQueue,
+                        exchange: skippedExchange,
                         routingKey: string.Empty,
                         cancellationToken: cancellationToken);
                 }
@@ -162,6 +184,8 @@ public sealed class RabbitMqTransportFactory : ITransportFactory
         {
             var errorExchange = topology.QueueName + "_error";
             var errorQueue = errorExchange;
+            var skippedExchange = topology.QueueName + "_skipped";
+            var skippedQueue = skippedExchange;
 
             await channel.ExchangeDeclareAsync(
                 exchange: errorExchange,
@@ -182,6 +206,29 @@ public sealed class RabbitMqTransportFactory : ITransportFactory
             await channel.QueueBindAsync(
                 queue: errorQueue,
                 exchange: errorExchange,
+                routingKey: string.Empty,
+                cancellationToken: cancellationToken
+            );
+
+            await channel.ExchangeDeclareAsync(
+                exchange: skippedExchange,
+                type: ExchangeType.Fanout,
+                durable: topology.Durable,
+                autoDelete: topology.AutoDelete,
+                cancellationToken: cancellationToken
+            );
+
+            await channel.QueueDeclareAsync(
+                queue: skippedQueue,
+                durable: topology.Durable,
+                exclusive: false,
+                autoDelete: topology.AutoDelete,
+                cancellationToken: cancellationToken
+            );
+
+            await channel.QueueBindAsync(
+                queue: skippedQueue,
+                exchange: skippedExchange,
                 routingKey: string.Empty,
                 cancellationToken: cancellationToken
             );

@@ -8,6 +8,7 @@ using Microsoft.Extensions.Logging;
 using MyServiceBus;
 using MyServiceBus.Serialization;
 using MyServiceBus.Topology;
+using Shouldly;
 using Xunit;
 
 namespace MyServiceBus.Tests;
@@ -37,7 +38,6 @@ public class UnknownMessageTypeTests
 
     class StubTransportFactory : ITransportFactory
     {
-        [Throws(typeof(InvalidOperationException))]
         public Task<ISendTransport> GetSendTransport(Uri address, CancellationToken cancellationToken = default)
             => Task.FromResult<ISendTransport>(new StubSendTransport());
 
@@ -89,8 +89,8 @@ public class UnknownMessageTypeTests
     }
 
     [Fact]
-    [Throws(typeof(UriFormatException))]
-    public async Task Logs_warning_for_unregistered_message_type()
+    [Throws(typeof(UriFormatException), typeof(AmbiguousMatchException))]
+    public async Task Throws_for_unregistered_message_type()
     {
         var logger = new ListLogger<MessageBus>();
         var services = new ServiceCollection();
@@ -102,7 +102,7 @@ public class UnknownMessageTypeTests
 
         var context = new TestReceiveContext(new object(), "urn:message:Unknown");
         var method = typeof(MessageBus).GetMethod("HandleMessageAsync", BindingFlags.Instance | BindingFlags.NonPublic);
-        await (Task)method!.Invoke(bus, new object[] { context })!;
+        await Should.ThrowAsync<UnknownMessageTypeException>([Throws(typeof(TargetException), typeof(TargetInvocationException))] () => (Task)method!.Invoke(bus, new object[] { context })!);
 
         Assert.Contains(LogLevel.Warning, logger.Levels);
         Assert.Contains(logger.Messages, m => m.Contains("unregistered"));

@@ -54,10 +54,16 @@ public class RabbitMqTransportFactory implements TransportFactory {
                 if (!autoDelete) {
                     String errorExchange = queue + "_error";
                     String errorQueue = queue + "_error";
+                    String skippedExchange = queue + "_skipped";
+                    String skippedQueue = queue + "_skipped";
 
                     channel.exchangeDeclare(errorExchange, "fanout", durable, autoDelete, null);
                     channel.queueDeclare(errorQueue, durable, false, autoDelete, null);
                     channel.queueBind(errorQueue, errorExchange, "");
+
+                    channel.exchangeDeclare(skippedExchange, "fanout", durable, autoDelete, null);
+                    channel.queueDeclare(skippedQueue, durable, false, autoDelete, null);
+                    channel.queueBind(skippedQueue, skippedExchange, "");
                 }
 
                 channel.queueDeclare(queue, durable, false, autoDelete, null);
@@ -109,6 +115,12 @@ public class RabbitMqTransportFactory implements TransportFactory {
         channel.exchangeDeclare(errorExchange, BuiltinExchangeType.FANOUT, true);
         channel.queueDeclare(errorQueue, true, false, false, null);
         channel.queueBind(errorQueue, errorExchange, "");
+
+        String skippedExchange = queueName + "_skipped";
+        String skippedQueue = skippedExchange;
+        channel.exchangeDeclare(skippedExchange, BuiltinExchangeType.FANOUT, true);
+        channel.queueDeclare(skippedQueue, true, false, false, null);
+        channel.queueBind(skippedQueue, skippedExchange, "");
 
         String faultAddress = getPublishAddress(queueName + "_error");
         return new RabbitMqReceiveTransport(channel, queueName, handler, faultAddress);

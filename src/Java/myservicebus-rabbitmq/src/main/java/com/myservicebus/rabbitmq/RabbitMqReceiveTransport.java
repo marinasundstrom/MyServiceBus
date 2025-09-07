@@ -12,6 +12,8 @@ import org.slf4j.LoggerFactory;
 import com.myservicebus.MessageHeaders;
 import com.myservicebus.ReceiveTransport;
 import com.myservicebus.TransportMessage;
+import com.myservicebus.UnknownMessageTypeException;
+import com.rabbitmq.client.AMQP;
 import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.DeliverCallback;
 
@@ -33,15 +35,29 @@ public class RabbitMqReceiveTransport implements ReceiveTransport {
     @Override
     public void start() throws Exception {
         DeliverCallback callback = (tag, delivery) -> {
-            Map<String, Object> headers = delivery.getProperties().getHeaders();
-            if (headers == null) {
-                headers = new HashMap<>();
-            }
+            final Map<String, Object> headers = delivery.getProperties().getHeaders() != null
+                    ? new HashMap<>(delivery.getProperties().getHeaders())
+                    : new HashMap<>();
             headers.putIfAbsent(MessageHeaders.FAULT_ADDRESS, faultAddress);
 
             TransportMessage tm = new TransportMessage(delivery.getBody(), headers);
             handler.apply(tm).whenComplete((v, ex) -> {
                 try {
+                    if (ex != null) {
+                        Throwable cause = ex instanceof java.util.concurrent.CompletionException ? ex.getCause() : ex;
+                        if (cause instanceof UnknownMessageTypeException) {
+                            Map<String, Object> outHeaders = new HashMap<>(headers);
+                            outHeaders.put(MessageHeaders.REASON, "skip");
+                            AMQP.BasicProperties props = new AMQP.BasicProperties.Builder().headers(outHeaders).build();
+                            try {
+                                channel.basicPublish(queueName + "_skipped", "", props, delivery.getBody());
+                            } catch (IOException pubEx) {
+                                logger.error("Failed to move message to skipped queue", pubEx);
+                            }
+                        } else {
+                            logger.error("Message handling failed", cause);
+                        }
+                    }
                     channel.basicAck(delivery.getEnvelope().getDeliveryTag(), false);
                 } catch (IOException ioEx) {
                     logger.error("Failed to ack message", ioEx);
