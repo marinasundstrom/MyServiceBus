@@ -199,6 +199,10 @@ notifications or events. Multiple replicas of a service may bind to the
 same queue; the first instance to dequeue a message processes it,
 supporting scaling and resilience.
 
+Multiple consumer types can handle the same message. MyServiceBus invokes
+them one at a time; if any consumer throws, remaining consumers are skipped
+and the message is moved to the error queue.
+
 #### C#
 
 ```csharp
