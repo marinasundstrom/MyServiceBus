@@ -4,10 +4,15 @@ import java.lang.reflect.Array;
 import java.lang.reflect.GenericArrayType;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.function.Consumer;
 
 import com.myservicebus.di.ServiceCollection;
 import com.myservicebus.topology.TopologyRegistry;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import com.myservicebus.NamingConventions;
 
 public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigurator {
 
@@ -17,6 +22,8 @@ public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigura
     private PipeConfigurator<SendContext> publishConfigurator = new PipeConfigurator<>();
     private Class<? extends com.myservicebus.serialization.MessageSerializer> serializerClass = com.myservicebus.serialization.EnvelopeMessageSerializer.class;
     private Class<? extends com.myservicebus.serialization.MessageDeserializer> deserializerClass = com.myservicebus.serialization.EnvelopeMessageDeserializer.class;
+    private final Set<String> consumers = new HashSet<>();
+    private final Logger logger = LoggerFactory.getLogger(BusRegistrationConfiguratorImpl.class);
 
     public BusRegistrationConfiguratorImpl(ServiceCollection serviceCollection) {
         this.serviceCollection = serviceCollection;
@@ -26,15 +33,31 @@ public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigura
 
     @Override
     public <T> void addConsumer(Class<T> consumerClass) {
-        serviceCollection.addScoped(consumerClass);
-
-        // Loop through all implemented interfaces
         for (Type iface : consumerClass.getGenericInterfaces()) {
             if (iface instanceof ParameterizedType pt) {
                 Type raw = pt.getRawType();
                 if (raw instanceof Class<?> rawClass && com.myservicebus.Consumer.class.isAssignableFrom(rawClass)) {
                     Type actualType = pt.getActualTypeArguments()[0];
                     Class<?> messageType = getClassFromType(actualType);
+                    String messageUrn = NamingConventions.getMessageUrn(messageType);
+                    if (consumers.contains(messageUrn)) {
+                        logger.debug("Consumer for '{}' already registered, skipping", messageUrn);
+                        return;
+                    }
+                }
+            }
+        }
+
+        serviceCollection.addScoped(consumerClass);
+
+        for (Type iface : consumerClass.getGenericInterfaces()) {
+            if (iface instanceof ParameterizedType pt) {
+                Type raw = pt.getRawType();
+                if (raw instanceof Class<?> rawClass && com.myservicebus.Consumer.class.isAssignableFrom(rawClass)) {
+                    Type actualType = pt.getActualTypeArguments()[0];
+                    Class<?> messageType = getClassFromType(actualType);
+                    String messageUrn = NamingConventions.getMessageUrn(messageType);
+                    consumers.add(messageUrn);
                     topology.registerConsumer(consumerClass,
                             KebabCaseEndpointNameFormatter.INSTANCE.format(messageType),
                             null,
@@ -47,8 +70,15 @@ public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigura
     @Override
     public <TMessage, TConsumer extends com.myservicebus.Consumer<TMessage>> void addConsumer(Class<TConsumer> consumerClass, Class<TMessage> messageClass,
             Consumer<PipeConfigurator<ConsumeContext<TMessage>>> configure) {
+        String messageUrn = NamingConventions.getMessageUrn(messageClass);
+        if (consumers.contains(messageUrn)) {
+            logger.debug("Consumer for '{}' already registered, skipping", messageUrn);
+            return;
+        }
+
         serviceCollection.addScoped(consumerClass);
         topology.registerConsumer(consumerClass, KebabCaseEndpointNameFormatter.INSTANCE.format(messageClass), (java.util.function.Consumer) configure, messageClass);
+        consumers.add(messageUrn);
     }
 
     @Override

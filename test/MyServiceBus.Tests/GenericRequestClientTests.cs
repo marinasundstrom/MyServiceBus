@@ -55,7 +55,7 @@ public class GenericRequestClientTests
                 };
                 await send.Send(new OrderAccepted { Message = "ok" }, sendContext);
             }
-        });
+        }, null);
 
         await receive.Start();
 
@@ -103,7 +103,7 @@ public class GenericRequestClientTests
                 };
                 await send.Send(response, sendContext);
             }
-        });
+        }, null);
 
         await receive.Start();
 
@@ -154,7 +154,7 @@ public class GenericRequestClientTests
                 };
                 await send.Send(fault, sendContext);
             }
-        });
+        }, null);
 
         await receive.Start();
 
@@ -198,7 +198,7 @@ public class GenericRequestClientTests
                 };
                 await send.Send(fault, sendContext);
             }
-        });
+        }, null);
 
         await receive.Start();
 

@@ -3,6 +3,8 @@ package com.myservicebus;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+import java.util.HashSet;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 
@@ -29,6 +31,7 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
     private final List<ReceiveTransport> receiveTransports = new ArrayList<>();
     private final URI address;
     private final BusTopology topology;
+    private final Set<String> consumers = new HashSet<>();
 
     public MessageBusImpl(ServiceProvider serviceProvider) {
         this.serviceProvider = serviceProvider;
@@ -70,6 +73,14 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
     }
 
     public void addConsumer(ConsumerTopology consumerDef) throws Exception {
+        String messageUrn = NamingConventions.getMessageUrn(consumerDef.getBindings().get(0).getMessageType());
+        if (consumers.contains(messageUrn)) {
+            if (logger != null) {
+                logger.debug("Consumer for '{}' already registered, skipping", messageUrn);
+            }
+            return;
+        }
+
         PipeConfigurator<ConsumeContext<Object>> configurator = new PipeConfigurator<>();
         configurator.useFilter(new OpenTelemetryConsumeFilter<>());
         @SuppressWarnings({ "unchecked", "rawtypes" })
@@ -86,6 +97,7 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
                 consumerDef.getConsumerType());
         configurator.useFilter(consumerFilter);
         Pipe<ConsumeContext<Object>> pipe = configurator.build(serviceProvider);
+        consumers.add(messageUrn);
 
         Function<TransportMessage, CompletableFuture<Void>> handler = transportMessage -> {
             try {
@@ -99,9 +111,7 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
                         .orElse(null);
                 if (binding == null) {
                     logger.warn("Received message with unregistered type {}", messageTypeUrn);
-                    CompletableFuture<Void> f = new CompletableFuture<>();
-                    f.completeExceptionally(new UnknownMessageTypeException(messageTypeUrn));
-                    return f;
+                    return CompletableFuture.completedFuture(null);
                 }
 
                 Envelope<?> typedEnvelope = messageDeserializer.deserialize(transportMessage.getBody(),
@@ -133,9 +143,11 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
             }
         };
 
+        java.util.function.Function<String, Boolean> isRegistered = urn -> consumers.contains(urn);
         ReceiveTransport transport = transportFactory.createReceiveTransport(consumerDef.getQueueName(),
-                consumerDef.getBindings(), handler, consumerDef.getPrefetchCount() != null ? consumerDef.getPrefetchCount() : 0);
+                consumerDef.getBindings(), handler, isRegistered, consumerDef.getPrefetchCount() != null ? consumerDef.getPrefetchCount() : 0);
         receiveTransports.add(transport);
+        consumers.add(messageUrn);
     }
 
     public <T> void addHandler(String queueName, Class<T> messageType, String exchange,
@@ -164,9 +176,7 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
                 String expectedUrn = NamingConventions.getMessageUrn(messageType);
                 if (!expectedUrn.equals(messageTypeUrn)) {
                     logger.warn("Received message with unregistered type {}", messageTypeUrn);
-                    CompletableFuture<Void> f = new CompletableFuture<>();
-                    f.completeExceptionally(new UnknownMessageTypeException(messageTypeUrn));
-                    return f;
+                    return CompletableFuture.completedFuture(null);
                 }
 
                 Envelope<?> typedEnvelope = messageDeserializer.deserialize(tm.getBody(), messageType);
@@ -196,8 +206,11 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
         binding.setEntityName(exchange);
         bindings.add(binding);
 
+        String expectedUrn = NamingConventions.getMessageUrn(messageType);
+        java.util.function.Function<String, Boolean> isRegisteredHandler = urn -> expectedUrn.equals(urn);
+
         ReceiveTransport transport = transportFactory.createReceiveTransport(queueName, bindings, transportHandler,
-                prefetchCount != null ? prefetchCount : 0);
+                isRegisteredHandler, prefetchCount != null ? prefetchCount : 0);
         receiveTransports.add(transport);
     }
 

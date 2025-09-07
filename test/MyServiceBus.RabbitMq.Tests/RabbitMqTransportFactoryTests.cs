@@ -89,7 +89,7 @@ public class RabbitMqTransportFactoryTests
             RoutingKey = string.Empty
         };
 
-        await transportFactory.CreateReceiveTransport(topology, _ => Task.CompletedTask);
+        await transportFactory.CreateReceiveTransport(topology, _ => Task.CompletedTask, null);
 
         mainQueueArgs.ShouldBeNull();
         await channel.Received(1).QueueDeclareAsync(
@@ -170,7 +170,7 @@ public class RabbitMqTransportFactoryTests
             AutoDelete = true
         };
 
-        await transportFactory.CreateReceiveTransport(topology, _ => Task.CompletedTask);
+        await transportFactory.CreateReceiveTransport(topology, _ => Task.CompletedTask, null);
 
         await channel.DidNotReceive().QueueDeclareAsync(
             "resp-temp_error",
@@ -346,7 +346,7 @@ public class RabbitMqTransportFactoryTests
             RoutingKey = string.Empty
         };
 
-        await transportFactory.CreateReceiveTransport(topology, _ => Task.CompletedTask);
+        await transportFactory.CreateReceiveTransport(topology, _ => Task.CompletedTask, null);
 
         await channel.Received(1).BasicQosAsync(0, (ushort)10, false, Arg.Any<CancellationToken>());
     }
@@ -406,7 +406,7 @@ public class RabbitMqTransportFactoryTests
             PrefetchCount = 20
         };
 
-        await transportFactory.CreateReceiveTransport(topology, _ => Task.CompletedTask);
+        await transportFactory.CreateReceiveTransport(topology, _ => Task.CompletedTask, null);
 
         await channel.Received(1).BasicQosAsync(0, (ushort)20, false, Arg.Any<CancellationToken>());
     }

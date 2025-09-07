@@ -42,7 +42,7 @@ public class UnknownMessageTypeTests
         public Task<ISendTransport> GetSendTransport(Uri address, CancellationToken cancellationToken = default)
             => Task.FromResult<ISendTransport>(new StubSendTransport());
 
-        public Task<IReceiveTransport> CreateReceiveTransport(ReceiveEndpointTopology topology, Func<ReceiveContext, Task> handler, CancellationToken cancellationToken = default)
+        public Task<IReceiveTransport> CreateReceiveTransport(ReceiveEndpointTopology topology, Func<ReceiveContext, Task> handler, Func<string?, bool>? isMessageTypeRegistered = null, CancellationToken cancellationToken = default)
             => Task.FromResult<IReceiveTransport>(new StubReceiveTransport());
 
         class StubSendTransport : ISendTransport
@@ -91,7 +91,7 @@ public class UnknownMessageTypeTests
 
     [Fact]
     [Throws(typeof(UriFormatException), typeof(AmbiguousMatchException))]
-    public async Task Throws_for_unregistered_message_type()
+    public async Task Logs_warning_for_unregistered_message_type()
     {
         var logger = new ListLogger<MessageBus>();
         var services = new ServiceCollection();
@@ -103,7 +103,9 @@ public class UnknownMessageTypeTests
 
         var context = new TestReceiveContext(new object(), "urn:message:Unknown");
         var method = typeof(MessageBus).GetMethod("HandleMessageAsync", BindingFlags.Instance | BindingFlags.NonPublic);
-        await Should.ThrowAsync<UnknownMessageTypeException>([Throws(typeof(TargetException), typeof(TargetInvocationException), typeof(TargetParameterCountException), typeof(MethodAccessException))] () => (Task)method!.Invoke(bus, new object[] { context })!);
+        await Should.NotThrowAsync(
+            [Throws(typeof(TargetException), typeof(TargetInvocationException), typeof(TargetParameterCountException), typeof(MethodAccessException))]
+            () => (Task)method!.Invoke(bus, new object[] { context })!);
 
         Assert.Contains(LogLevel.Warning, logger.Levels);
         Assert.Contains(logger.Messages, m => m.Contains("unregistered"));

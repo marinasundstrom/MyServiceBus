@@ -10,5 +10,6 @@ public interface ITransportFactory
     Task<IReceiveTransport> CreateReceiveTransport(
         ReceiveEndpointTopology topology,
         Func<ReceiveContext, Task> handler,
+        Func<string?, bool>? isMessageTypeRegistered = null,
         CancellationToken cancellationToken = default);
 }

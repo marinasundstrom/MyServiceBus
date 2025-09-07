@@ -26,8 +26,15 @@ public class InMemoryTestHarness implements RequestClientTransport, TransportSen
 
     public InMemoryTestHarness(ServiceProvider serviceProvider) {
         this.serviceProvider = serviceProvider;
-        this.consumeContextProvider = serviceProvider != null ? serviceProvider.getService(ConsumeContextProvider.class)
-                : null;
+        ConsumeContextProvider provider = null;
+        if (serviceProvider != null) {
+            try {
+                provider = serviceProvider.getService(ConsumeContextProvider.class);
+            } catch (Exception ex) {
+                // Ignore missing scope during construction
+            }
+        }
+        this.consumeContextProvider = provider;
     }
 
     public CompletableFuture<Void> start() {
