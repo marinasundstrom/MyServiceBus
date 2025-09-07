@@ -9,7 +9,10 @@ import java.time.temporal.ChronoField;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.DeserializationContext;
 import com.fasterxml.jackson.databind.JsonDeserializer;
+import java.lang.reflect.Type;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.myservicebus.Envelope;
@@ -38,8 +41,9 @@ public class EnvelopeMessageDeserializer implements MessageDeserializer {
     }
 
     @Override
-    public <T> Envelope<T> deserialize(byte[] data, Class<T> clazz) throws IOException {
-        var type = mapper.getTypeFactory().constructParametricType(Envelope.class, clazz);
-        return mapper.readValue(data, type);
+    public <T> Envelope<T> deserialize(byte[] data, Type type) throws IOException {
+        JavaType messageType = mapper.getTypeFactory().constructType(type);
+        JavaType envelopeType = mapper.getTypeFactory().constructParametricType(Envelope.class, messageType);
+        return mapper.readValue(data, envelopeType);
     }
 }
