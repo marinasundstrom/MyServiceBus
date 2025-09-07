@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using MyServiceBus.RabbitMq;
 using MyServiceBus.Serialization;
 using RabbitMQ.Client;
@@ -19,22 +20,24 @@ public sealed class RabbitMqReceiveTransport : IReceiveTransport
     private readonly MessageContextFactory _contextFactory = new();
     private readonly bool _hasErrorQueue;
     private readonly Func<string?, bool>? _isMessageTypeRegistered;
+    private readonly ILogger<RabbitMqReceiveTransport>? _logger;
     private string _consumerTag;
 
-    public RabbitMqReceiveTransport(IChannel channel, string queueName, Func<ReceiveContext, Task> handler, bool hasErrorQueue, Func<string?, bool>? isMessageTypeRegistered)
+    public RabbitMqReceiveTransport(IChannel channel, string queueName, Func<ReceiveContext, Task> handler, bool hasErrorQueue, Func<string?, bool>? isMessageTypeRegistered, ILogger<RabbitMqReceiveTransport>? logger = null)
     {
         _channel = channel;
         _queueName = queueName;
         _messageHandler = handler;
         _hasErrorQueue = hasErrorQueue;
         _isMessageTypeRegistered = isMessageTypeRegistered;
+        _logger = logger;
     }
 
     public async Task Start(CancellationToken cancellationToken = default)
     {
         var consumer = new AsyncEventingBasicConsumer(_channel);
 
-        consumer.ReceivedAsync += [Throws(typeof(IOException))] async (model, ea) =>
+        consumer.ReceivedAsync += async (model, ea) =>
         {
             try
             {
@@ -79,7 +82,7 @@ public sealed class RabbitMqReceiveTransport : IReceiveTransport
             {
                 await _channel.BasicNackAsync(ea.DeliveryTag, multiple: false, requeue: true);
 
-                Console.WriteLine($"Message handling failed: {exc}");
+                _logger?.LogError(exc, "Message handling failed");
             }
         };
 
