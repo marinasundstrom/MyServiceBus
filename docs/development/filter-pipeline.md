@@ -7,7 +7,20 @@ MyServiceBus composes message handling using a pipe-and-filter architecture. The
 - **RetryFilter** – retries the downstream pipe a configured number of times.
 - **ConsumerMessageFilter** – resolves the scoped consumer and invokes its `Consume` method.
 
-For consumer pipelines, filters are applied in the following order:
+## Transport Integration
+
+The same pipeline model wraps every transport:
+
+### Send/Publish
+
+1. Framework filters (for example `OpenTelemetrySendFilter`) decorate the outbound context.
+2. A transport-specific filter delivers the serialized envelope.
+   - The in-memory mediator dispatches directly to the consumer pipeline.
+   - The RabbitMQ transport publishes to the broker.
+
+### Receive
+
+Transports feed incoming envelopes into a consumer pipeline where the built-in filters run in order:
 
 1. `ErrorTransportFilter`
 2. `ConsumerFaultFilter`
