@@ -19,7 +19,8 @@ import com.myservicebus.di.ServiceProvider;
 import com.myservicebus.di.ServiceScope;
 import com.myservicebus.rabbitmq.RabbitMqBusFactory;
 import com.myservicebus.tasks.CancellationToken;
-import org.slf4j.Logger;
+import com.myservicebus.logging.Logger;
+import com.myservicebus.logging.LoggerFactory;
 
 public class Main {
     public static void main(String[] args) {
@@ -54,7 +55,8 @@ public class Main {
         });
 
         ServiceProvider provider = services.buildServiceProvider();
-        final Logger logger = provider.getService(Logger.class);
+        LoggerFactory loggerFactory = provider.getService(LoggerFactory.class);
+        final Logger logger = loggerFactory != null ? loggerFactory.create(Main.class) : null;
         MessageBus serviceBus = provider.getService(MessageBus.class);
 
         try {
@@ -140,7 +142,7 @@ public class Main {
                         if (message == null) {
                             message = exception.toString();
                         }
-                        logger.error("❌ Fault received: {}", message);
+                        logger.error("❌ Fault received: " + message);
                         ctx.status(500).result(message);
                     });
                 } catch (Exception e) {

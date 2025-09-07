@@ -6,9 +6,6 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.myservicebus.MessageHeaders;
 import com.myservicebus.ReceiveTransport;
 import com.myservicebus.TransportMessage;
@@ -17,6 +14,8 @@ import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.DeliverCallback;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.myservicebus.logging.Logger;
+import com.myservicebus.logging.LoggerFactory;
 
 public class RabbitMqReceiveTransport implements ReceiveTransport {
     private final Channel channel;
@@ -24,16 +23,17 @@ public class RabbitMqReceiveTransport implements ReceiveTransport {
     private final Function<TransportMessage, CompletableFuture<Void>> handler;
     private final String faultAddress;
     private final Function<String, Boolean> isMessageTypeRegistered;
-    private final Logger logger = LoggerFactory.getLogger(RabbitMqReceiveTransport.class);
+    private final Logger logger;
 
     public RabbitMqReceiveTransport(Channel channel, String queueName,
             Function<TransportMessage, CompletableFuture<Void>> handler, String faultAddress,
-            Function<String, Boolean> isMessageTypeRegistered) {
+            Function<String, Boolean> isMessageTypeRegistered, LoggerFactory loggerFactory) {
         this.channel = channel;
         this.queueName = queueName;
         this.handler = handler;
         this.faultAddress = faultAddress;
         this.isMessageTypeRegistered = isMessageTypeRegistered;
+        this.logger = loggerFactory.create(RabbitMqReceiveTransport.class);
     }
 
     @Override
@@ -62,6 +62,7 @@ public class RabbitMqReceiveTransport implements ReceiveTransport {
                 return;
             }
 
+            logger.debug("Received message of type {}", messageTypeUrn);
             handler.apply(tm).whenComplete((v, ex) -> {
                 try {
                     if (ex != null) {

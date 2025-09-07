@@ -1,6 +1,7 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using MyServiceBus.Serialization;
 
 namespace MyServiceBus;
@@ -16,11 +17,12 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
     private readonly Uri _address;
     private readonly ISendContextFactory _sendContextFactory;
     private readonly IPublishContextFactory _publishContextFactory;
+    private readonly ILoggerFactory? _loggerFactory;
     private TMessage? message;
 
     public ConsumeContextImpl(ReceiveContext receiveContext, ITransportFactory transportFactory,
         ISendPipe sendPipe, IPublishPipe publishPipe, IMessageSerializer messageSerializer, Uri address,
-        ISendContextFactory sendContextFactory, IPublishContextFactory publishContextFactory)
+        ISendContextFactory sendContextFactory, IPublishContextFactory publishContextFactory, ILoggerFactory? loggerFactory = null)
         : base(receiveContext.CancellationToken)
     {
         this.receiveContext = receiveContext;
@@ -31,6 +33,7 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
         _address = address;
         _sendContextFactory = sendContextFactory;
         _publishContextFactory = publishContextFactory;
+        _loggerFactory = loggerFactory;
     }
 
     internal ReceiveContext ReceiveContext => receiveContext;
@@ -39,7 +42,8 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
 
     public Task<ISendEndpoint> GetSendEndpoint(Uri uri)
     {
-        ISendEndpoint endpoint = new TransportSendEndpoint(_transportFactory, _sendPipe, _messageSerializer, uri, _address, _sendContextFactory);
+        var logger = _loggerFactory?.CreateLogger<TransportSendEndpoint>();
+        ISendEndpoint endpoint = new TransportSendEndpoint(_transportFactory, _sendPipe, _messageSerializer, uri, _address, _sendContextFactory, logger);
         return Task.FromResult(endpoint);
     }
 

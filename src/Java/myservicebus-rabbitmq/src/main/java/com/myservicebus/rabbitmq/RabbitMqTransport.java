@@ -9,6 +9,7 @@ import com.myservicebus.SendContextFactory;
 import com.myservicebus.PublishContextFactory;
 import com.myservicebus.TransportSendEndpointProvider;
 import com.myservicebus.di.ServiceCollection;
+import com.myservicebus.logging.LoggerFactory;
 import com.rabbitmq.client.ConnectionFactory;
 import java.net.URI;
 
@@ -32,7 +33,8 @@ public class RabbitMqTransport {
         services.addSingleton(RabbitMqTransportFactory.class, sp -> () -> {
             ConnectionProvider provider = sp.getService(ConnectionProvider.class);
             RabbitMqFactoryConfigurator cfgRef = sp.getService(RabbitMqFactoryConfigurator.class);
-            return new RabbitMqTransportFactory(provider, cfgRef);
+            LoggerFactory loggerFactory = sp.getService(LoggerFactory.class);
+            return new RabbitMqTransportFactory(provider, cfgRef, loggerFactory);
         });
 
         services.addSingleton(com.myservicebus.TransportFactory.class,
@@ -47,7 +49,8 @@ public class RabbitMqTransport {
             com.myservicebus.serialization.MessageSerializer serializer = sp.getService(com.myservicebus.serialization.MessageSerializer.class);
             URI busAddress = sp.getService(URI.class);
             SendContextFactory sendContextFactory = sp.getService(SendContextFactory.class);
-            return new RabbitMqSendEndpointProvider(factory, sendPipe, serializer, busAddress, sendContextFactory);
+            LoggerFactory loggerFactory = sp.getService(LoggerFactory.class);
+            return new RabbitMqSendEndpointProvider(factory, sendPipe, serializer, busAddress, sendContextFactory, loggerFactory);
         });
         services.addSingleton(TransportSendEndpointProvider.class,
                 sp -> () -> sp.getService(RabbitMqSendEndpointProvider.class));
