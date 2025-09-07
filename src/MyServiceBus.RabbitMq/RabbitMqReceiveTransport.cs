@@ -50,6 +50,9 @@ public sealed class RabbitMqReceiveTransport : IReceiveTransport
                 else if (!headers.ContainsKey("content_type"))
                     headers["content_type"] = "application/vnd.masstransit+json";
 
+                if (_hasErrorQueue && !headers.ContainsKey(MessageHeaders.FaultAddress))
+                    headers[MessageHeaders.FaultAddress] = $"rabbitmq://localhost/exchange/{_queueName}_fault";
+
                 var transportMessage = new RabbitMqTransportMessage(headers, props.Persistent, payload);
                 var messageContext = _contextFactory.CreateMessageContext(transportMessage);
 

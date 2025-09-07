@@ -9,7 +9,7 @@ This document defines the contract for ServiceBus transports. It mirrors MassTra
 - Serialize and transmit envelopes with `content_type` defaulting to `application/vnd.masstransit+json` so they are compatible with MassTransit.
 - Map headers prefixed with `_` to native transport properties.
 - Propagate cancellation tokens so operations can observe shutdown or timeouts.
-- Move failed messages to `<queue>_error` and publish `Fault<T>` messages describing the exception, matching MassTransit's fault-handling behavior.
+- Move failed messages to `<queue>_error` and publish `Fault<T>` messages to `<queue>_fault` describing the exception, matching MassTransit's fault-handling behavior.
 
 ## Send Transport
 

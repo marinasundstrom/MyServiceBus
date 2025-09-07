@@ -110,6 +110,15 @@ public class RabbitMqTransportFactoryTests
             Arg.Is(false),
             Arg.Is(false),
             Arg.Any<CancellationToken>());
+        await channel.Received(1).QueueDeclareAsync(
+            "submit-order-queue_fault",
+            Arg.Is(true),
+            Arg.Is(false),
+            Arg.Is(false),
+            Arg.Any<IDictionary<string, object?>?>(),
+            Arg.Is(false),
+            Arg.Is(false),
+            Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -183,6 +192,15 @@ public class RabbitMqTransportFactoryTests
             Arg.Any<CancellationToken>());
         await channel.DidNotReceive().QueueDeclareAsync(
             "resp-temp_skipped",
+            Arg.Any<bool>(),
+            Arg.Any<bool>(),
+            Arg.Any<bool>(),
+            Arg.Any<IDictionary<string, object?>?>(),
+            Arg.Any<bool>(),
+            Arg.Any<bool>(),
+            Arg.Any<CancellationToken>());
+        await channel.DidNotReceive().QueueDeclareAsync(
+            "resp-temp_fault",
             Arg.Any<bool>(),
             Arg.Any<bool>(),
             Arg.Any<bool>(),

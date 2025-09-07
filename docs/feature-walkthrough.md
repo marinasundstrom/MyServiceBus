@@ -354,6 +354,8 @@ When a consumer throws an exception that isn't handled and any configured
 retries are exhausted, MyServiceBus publishes a `Fault<T>` message. This
 message contains the original payload and details about the captured
 exceptions so request clients or other observers can react to the failure.
+If the incoming message doesn't specify a fault address, the fault is
+published to a queue named `<queue>_fault`.
 
 #### Errors
 

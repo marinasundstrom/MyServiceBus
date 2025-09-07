@@ -60,6 +60,8 @@ public class RabbitMqTransportFactory implements TransportFactory {
                     String errorQueue = queue + "_error";
                     String skippedExchange = queue + "_skipped";
                     String skippedQueue = queue + "_skipped";
+                    String faultExchange = queue + "_fault";
+                    String faultQueue = queue + "_fault";
 
                     channel.exchangeDeclare(errorExchange, "fanout", durable, autoDelete, null);
                     channel.queueDeclare(errorQueue, durable, false, autoDelete, null);
@@ -68,6 +70,10 @@ public class RabbitMqTransportFactory implements TransportFactory {
                     channel.exchangeDeclare(skippedExchange, "fanout", durable, autoDelete, null);
                     channel.queueDeclare(skippedQueue, durable, false, autoDelete, null);
                     channel.queueBind(skippedQueue, skippedExchange, "");
+
+                    channel.exchangeDeclare(faultExchange, "fanout", durable, autoDelete, null);
+                    channel.queueDeclare(faultQueue, durable, false, autoDelete, null);
+                    channel.queueBind(faultQueue, faultExchange, "");
                 }
 
                 channel.queueDeclare(queue, durable, false, autoDelete, null);
@@ -120,8 +126,13 @@ public class RabbitMqTransportFactory implements TransportFactory {
         channel.exchangeDeclare(skippedExchange, BuiltinExchangeType.FANOUT, true);
         channel.queueDeclare(skippedQueue, true, false, false, null);
         channel.queueBind(skippedQueue, skippedExchange, "");
+        String faultExchange = queueName + "_fault";
+        String faultQueue = faultExchange;
+        channel.exchangeDeclare(faultExchange, BuiltinExchangeType.FANOUT, true);
+        channel.queueDeclare(faultQueue, true, false, false, null);
+        channel.queueBind(faultQueue, faultExchange, "");
 
-        String faultAddress = getPublishAddress(queueName + "_error");
+        String faultAddress = getPublishAddress(queueName + "_fault");
         return new RabbitMqReceiveTransport(channel, queueName, handler, faultAddress, isMessageTypeRegistered,
                 loggerFactory);
     }

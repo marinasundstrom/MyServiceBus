@@ -14,7 +14,7 @@ These safeguards allow application code to await a usable connection without imp
 
 ## Dead-letter Handling
 
-MyServiceBus declares an error exchange and queue for each receive endpoint. Following MassTransit conventions, both are named by appending `_error` to the original queue name. The `ErrorTransportFilter` catches unhandled exceptions and moves the message to the error transport, while the transport acknowledges the original delivery.
+MyServiceBus declares an error exchange and queue for each receive endpoint. Following MassTransit conventions, both are named by appending `_error` to the original queue name. The `ErrorTransportFilter` catches unhandled exceptions and moves the message to the error transport, while the transport acknowledges the original delivery. A companion fault exchange and queue named `<queue>_fault` is also created. When a consumer throws, the `ConsumerFaultFilter` publishes a `Fault<T>` message to this address unless a specific fault address is provided.
 
 ### C#
 The `RabbitMqTransportFactory` ensures the error exchange and queue exist when the receive endpoint is created.
@@ -24,7 +24,7 @@ The `RabbitMqTransportFactory` ensures the error exchange and queue exist when t
 
 ### Reprocessing Dead-letter Messages
 
-Messages that fault are moved to `<queue>_error`. Bind a dedicated consumer to the error queue like any other receive endpoint without affecting handlers on the original queue.
+Messages that fault are moved to `<queue>_error`. Bind a dedicated consumer to the error queue like any other receive endpoint without affecting handlers on the original queue. Fault details are published separately to `<queue>_fault`, allowing observers to inspect the exception without removing the original message from the error queue.
 
 #### C#
 ```csharp

@@ -127,6 +127,29 @@ public sealed class RabbitMqTransportFactory : ITransportFactory
                         exchange: skippedExchange,
                         routingKey: string.Empty,
                         cancellationToken: cancellationToken);
+
+                    var faultExchange = queue + "_fault";
+                    var faultQueue = faultExchange;
+
+                    await channel.ExchangeDeclareAsync(
+                        exchange: faultExchange,
+                        type: ExchangeType.Fanout,
+                        durable: durable,
+                        autoDelete: autoDelete,
+                        cancellationToken: cancellationToken);
+
+                    await channel.QueueDeclareAsync(
+                        queue: faultQueue,
+                        durable: durable,
+                        exclusive: false,
+                        autoDelete: autoDelete,
+                        cancellationToken: cancellationToken);
+
+                    await channel.QueueBindAsync(
+                        queue: faultQueue,
+                        exchange: faultExchange,
+                        routingKey: string.Empty,
+                        cancellationToken: cancellationToken);
                 }
 
                 await channel.QueueDeclareAsync(
@@ -230,6 +253,32 @@ public sealed class RabbitMqTransportFactory : ITransportFactory
             await channel.QueueBindAsync(
                 queue: skippedQueue,
                 exchange: skippedExchange,
+                routingKey: string.Empty,
+                cancellationToken: cancellationToken
+            );
+
+            var faultExchange = topology.QueueName + "_fault";
+            var faultQueue = faultExchange;
+
+            await channel.ExchangeDeclareAsync(
+                exchange: faultExchange,
+                type: ExchangeType.Fanout,
+                durable: topology.Durable,
+                autoDelete: topology.AutoDelete,
+                cancellationToken: cancellationToken
+            );
+
+            await channel.QueueDeclareAsync(
+                queue: faultQueue,
+                durable: topology.Durable,
+                exclusive: false,
+                autoDelete: topology.AutoDelete,
+                cancellationToken: cancellationToken
+            );
+
+            await channel.QueueBindAsync(
+                queue: faultQueue,
+                exchange: faultExchange,
                 routingKey: string.Empty,
                 cancellationToken: cancellationToken
             );
