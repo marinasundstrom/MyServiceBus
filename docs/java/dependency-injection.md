@@ -4,6 +4,10 @@ Custom wrapper around Guice. Made to look similar to .NET DI.
 
 Supporting lifetimes, scopes, and injecting `ServiceProvider`.
 
+Use `getService` when a missing binding is acceptable or `getRequiredService`
+to throw an exception if the service isn't registered, mirroring .NET's
+`GetRequiredService`.
+
 ```java
 package com.myservicebus;
 
@@ -23,8 +27,8 @@ public class Main {
         try (ServiceScope scope = provider.createScope()) {
             var scopedSp = scope.getServiceProvider();
 
-            MyService singleton = scopedSp.getService(MyService.class);
-            MyScopedService scoped = scopedSp.getService(MyScopedService.class);
+            MyService singleton = scopedSp.getRequiredService(MyService.class);
+            MyScopedService scoped = scopedSp.getRequiredService(MyScopedService.class);
 
             singleton.doWork();
             scoped.doSomething();
@@ -58,7 +62,7 @@ from the `ServiceProvider` before constructing itself:
 
 ```java
 services.addSingleton(WidgetFactory.class, sp -> () -> {
-    Dependency dep = sp.getService(Dependency.class);
+    Dependency dep = sp.getRequiredService(Dependency.class);
     return new WidgetFactory(dep);
 });
 
@@ -84,7 +88,7 @@ public class MyServiceImpl implements MyService {
     }
 
     public void doWork() {
-        var secondService = serviceProvider.getService(MySecondService.class);
+        var secondService = serviceProvider.getRequiredService(MySecondService.class);
         secondService.doSomething();
     }
 }
