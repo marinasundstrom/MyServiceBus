@@ -56,8 +56,7 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
         {
             MessageId = Guid.NewGuid().ToString(),
             SourceAddress = _address,
-            DestinationAddress = uri,
-            RoutingKey = exchangeName
+            DestinationAddress = uri
         };
 
         contextCallback?.Invoke(context);

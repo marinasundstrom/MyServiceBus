@@ -20,7 +20,6 @@ public class SendContext : BasePipeContext, ISendContext
     }
 
     public string MessageId { get; set; }
-    public string RoutingKey { get; set; } = ""; // Defaults to empty
     public IDictionary<string, object> Headers { get; } = new Dictionary<string, object>();
     public string? CorrelationId { get; set; }
     public Uri? ResponseAddress { get; set; }

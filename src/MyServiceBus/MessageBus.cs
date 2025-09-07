@@ -57,7 +57,6 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
 
         var context = new SendContext(MessageTypeCache.GetMessageTypes(typeof(T)), _messageSerializer, cancellationToken)
         {
-            RoutingKey = exchangeName,
             MessageId = Guid.NewGuid().ToString(),
             SourceAddress = _address,
             DestinationAddress = uri

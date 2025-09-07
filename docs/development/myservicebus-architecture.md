@@ -4,7 +4,7 @@ MyServiceBus shares the MassTransit heritage of serialization, pipes, and transp
 
 ## Serialization
 
-Messages travel inside an `Envelope<T>` that carries identifiers, addresses, and headers. `System.Text.Json` handles JSON serialization by default, though other serializers can be registered.
+Messages are serialized using `System.Text.Json` by default, though other serializers can be registered. The `SendContext` and `ReceiveContext` expose transport-agnostic headers and addresses while leaving the payload shape to the configured serializer.
 
 ## Pipes and Consumers
 
@@ -12,7 +12,7 @@ Send, receive, and consume operations flow through a pipe-and-filter pipeline bu
 
 ## Endpoints
 
-Instead of queue- or exchange-centric transports, MyServiceBus exposes a minimal `IEndpoint` interface with `Send`, pull-based `ReadAsync` returning `ReceiveContext`, an optional push-based `Subscribe`, and advertised `EndpointCapabilities`. RabbitMQ implements the interface today, and other technologies—HTTP callbacks, in-memory mediators, serverless triggers—can plug in the same way.
+Instead of queue- or exchange-centric transports, MyServiceBus exposes a minimal `IEndpoint` interface with `Send`, pull-based `ReadAsync` returning `ReceiveContext`, an optional push-based `Subscribe`, and advertised `EndpointCapabilities`. Producers configure metadata through `SendContext`, while consumers receive `ReceiveContext` instances. A `ConsumeContext` is created later in the pipeline when dispatching consumers. RabbitMQ implements the interface today, and other technologies—HTTP callbacks, in-memory mediators, serverless triggers—can plug in the same way.
 
 Queue-based transports remain first-class and continue to operate through this contract for backward compatibility.
 

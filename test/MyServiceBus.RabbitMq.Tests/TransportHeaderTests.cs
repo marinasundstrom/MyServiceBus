@@ -31,10 +31,7 @@ public class TransportHeaderTests
             .AndDoes(ci => captured = ci.Arg<BasicProperties>());
 
         var transport = new RabbitMqSendTransport(channel, "test");
-        var context = new SendContext(MessageTypeCache.GetMessageTypes(typeof(TestMessage)), new EnvelopeMessageSerializer())
-        {
-            RoutingKey = string.Empty
-        };
+        var context = new SendContext(MessageTypeCache.GetMessageTypes(typeof(TestMessage)), new EnvelopeMessageSerializer());
         context.Headers["_correlation_id"] = "123";
 
         await transport.Send(new TestMessage(), context);
