@@ -34,7 +34,8 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
         this.serviceProvider = serviceProvider;
         this.transportFactory = serviceProvider.getService(TransportFactory.class);
         this.transportSendEndpointProvider = serviceProvider.getService(TransportSendEndpointProvider.class);
-        this.publishContextFactory = serviceProvider.getService(PublishContextFactory.class);
+        PublishContextFactory factory = serviceProvider.getService(PublishContextFactory.class);
+        this.publishContextFactory = factory != null ? factory : new DefaultPublishContextFactory();
         this.publishPipe = serviceProvider.getService(PublishPipe.class);
         this.logger = serviceProvider.getService(Logger.class);
         MessageDeserializer md = serviceProvider.getService(MessageDeserializer.class);

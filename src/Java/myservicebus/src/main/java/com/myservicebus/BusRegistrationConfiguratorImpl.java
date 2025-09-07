@@ -104,8 +104,6 @@ public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigura
         serviceCollection.addSingleton(com.myservicebus.topology.BusTopology.class, sp -> () -> topology);
         serviceCollection.addSingleton(SendPipe.class, sp -> () -> new SendPipe(sendConfigurator.build(sp)));
         serviceCollection.addSingleton(PublishPipe.class, sp -> () -> new PublishPipe(publishConfigurator.build(sp)));
-        serviceCollection.addSingleton(SendContextFactory.class, sp -> () -> new DefaultSendContextFactory());
-        serviceCollection.addSingleton(PublishContextFactory.class, sp -> () -> new DefaultPublishContextFactory());
         serviceCollection.addSingleton(com.myservicebus.serialization.MessageSerializer.class, sp -> () -> {
             try {
                 return serializerClass.getDeclaredConstructor().newInstance();

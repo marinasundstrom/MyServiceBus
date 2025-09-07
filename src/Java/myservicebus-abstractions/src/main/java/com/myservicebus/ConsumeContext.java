@@ -82,12 +82,12 @@ public class ConsumeContext<T>
 
     @Override
     public <TMessage> CompletableFuture<Void> publish(TMessage message, CancellationToken cancellationToken) {
-        SendContext ctx = new SendContext(message, cancellationToken);
+        PublishContext ctx = new PublishContext(message, cancellationToken);
         return publish(ctx);
     }
 
     @Override
-    public CompletableFuture<Void> publish(SendContext context) {
+    public CompletableFuture<Void> publish(PublishContext context) {
         String exchange = NamingConventions.getExchangeName(context.getMessage().getClass());
         URI dest = busAddress.resolve("exchange/" + exchange);
         context.setSourceAddress(busAddress);
