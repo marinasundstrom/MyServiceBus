@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using MyServiceBus.RabbitMq;
 using MyServiceBus.Serialization;
 using RabbitMQ.Client;
@@ -19,42 +20,43 @@ public sealed class RabbitMqReceiveTransport : IReceiveTransport
     private readonly MessageContextFactory _contextFactory = new();
     private readonly bool _hasErrorQueue;
     private readonly Func<string?, bool>? _isMessageTypeRegistered;
+    private readonly ILogger<RabbitMqReceiveTransport>? _logger;
     private string _consumerTag;
 
-    public RabbitMqReceiveTransport(IChannel channel, string queueName, Func<ReceiveContext, Task> handler, bool hasErrorQueue, Func<string?, bool>? isMessageTypeRegistered)
+    public RabbitMqReceiveTransport(IChannel channel, string queueName, Func<ReceiveContext, Task> handler, bool hasErrorQueue, Func<string?, bool>? isMessageTypeRegistered, ILogger<RabbitMqReceiveTransport>? logger = null)
     {
         _channel = channel;
         _queueName = queueName;
         _messageHandler = handler;
         _hasErrorQueue = hasErrorQueue;
         _isMessageTypeRegistered = isMessageTypeRegistered;
+        _logger = logger;
     }
 
     public async Task Start(CancellationToken cancellationToken = default)
     {
         var consumer = new AsyncEventingBasicConsumer(_channel);
 
-        consumer.ReceivedAsync += [Throws(typeof(JsonException), typeof(UriFormatException))] async (model, ea) =>
+        consumer.ReceivedAsync += async (model, ea) =>
         {
-            var payload = ea.Body.ToArray();
-            var props = ea.BasicProperties;
-
-            var headers = props.Headers?.ToDictionary(x => x.Key, x => (object)x.Value!) ?? new Dictionary<string, object>();
-            if (!string.IsNullOrEmpty(props.ContentType))
-                headers["content_type"] = props.ContentType!;
-            else if (!headers.ContainsKey("content_type"))
-                headers["content_type"] = "application/vnd.masstransit+json";
-
-            var transportMessage = new RabbitMqTransportMessage(headers, props.Persistent, payload);
-            var messageContext = _contextFactory.CreateMessageContext(transportMessage);
-
-            var errorAddress = _hasErrorQueue
-                ? new Uri($"rabbitmq://localhost/exchange/{_queueName}_error")
-                : null;
-            var context = new RabbitMqReceiveContext(messageContext, props, ea.DeliveryTag, ea.Exchange, ea.RoutingKey, errorAddress);
-
             try
             {
+                var payload = ea.Body.ToArray();
+                var props = ea.BasicProperties;
+
+                var headers = props.Headers?.ToDictionary(x => x.Key, x => (object)x.Value!) ?? new Dictionary<string, object>();
+                if (!string.IsNullOrEmpty(props.ContentType))
+                    headers["content_type"] = props.ContentType!;
+                else if (!headers.ContainsKey("content_type"))
+                    headers["content_type"] = "application/vnd.masstransit+json";
+
+                var transportMessage = new RabbitMqTransportMessage(headers, props.Persistent, payload);
+                var messageContext = _contextFactory.CreateMessageContext(transportMessage);
+
+                var errorAddress = _hasErrorQueue
+                    ? new Uri($"rabbitmq://localhost/exchange/{_queueName}_error")
+                    : null;
+                var context = new RabbitMqReceiveContext(messageContext, props, ea.DeliveryTag, ea.Exchange, ea.RoutingKey, errorAddress);
                 var messageType = context.MessageType.FirstOrDefault();
                 if (_isMessageTypeRegistered != null && !_isMessageTypeRegistered(messageType))
                 {
@@ -78,8 +80,9 @@ public sealed class RabbitMqReceiveTransport : IReceiveTransport
             }
             catch (Exception exc)
             {
-                await _channel.BasicAckAsync(ea.DeliveryTag, multiple: false);
-                Console.WriteLine($"Message handling failed: {exc}");
+                await _channel.BasicNackAsync(ea.DeliveryTag, multiple: false, requeue: true);
+
+                _logger?.LogError(exc, "Message handling failed");
             }
         };
 

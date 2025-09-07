@@ -68,10 +68,12 @@ public class RabbitMqReceiveTransport implements ReceiveTransport {
                     if (ex != null) {
                         Throwable cause = ex instanceof java.util.concurrent.CompletionException ? ex.getCause() : ex;
                         logger.error("Message handling failed", cause);
+                        channel.basicNack(delivery.getEnvelope().getDeliveryTag(), false, true);
+                    } else {
+                        channel.basicAck(delivery.getEnvelope().getDeliveryTag(), false);
                     }
-                    channel.basicAck(delivery.getEnvelope().getDeliveryTag(), false);
                 } catch (IOException ioEx) {
-                    logger.error("Failed to ack message", ioEx);
+                    logger.error("Failed to (n)ack message", ioEx);
                 }
             });
         };
