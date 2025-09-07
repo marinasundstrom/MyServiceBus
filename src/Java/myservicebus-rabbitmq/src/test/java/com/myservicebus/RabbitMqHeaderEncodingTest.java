@@ -14,6 +14,8 @@ import com.myservicebus.serialization.EnvelopeMessageSerializer;
 import com.myservicebus.tasks.CancellationToken;
 import com.rabbitmq.client.AMQP;
 import com.rabbitmq.client.Channel;
+import com.myservicebus.logging.LoggerFactory;
+import com.myservicebus.logging.Slf4jLoggerFactory;
 
 public class RabbitMqHeaderEncodingTest {
     @Test
@@ -30,7 +32,8 @@ public class RabbitMqHeaderEncodingTest {
                 });
 
         RabbitMqSendTransport transport = new RabbitMqSendTransport(channel, "", "test");
-        RabbitMqSendEndpoint endpoint = new RabbitMqSendEndpoint(transport, new EnvelopeMessageSerializer());
+        LoggerFactory loggerFactory = new Slf4jLoggerFactory();
+        RabbitMqSendEndpoint endpoint = new RabbitMqSendEndpoint(transport, new EnvelopeMessageSerializer(), loggerFactory);
 
         class Dummy { public String text = "hi"; }
         SendContext ctx = new SendContext(new Dummy(), CancellationToken.none);

@@ -3,9 +3,9 @@ package com.myservicebus;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 
-import org.slf4j.Logger;
-
 import com.myservicebus.di.ServiceProvider;
+import com.myservicebus.logging.Logger;
+import com.myservicebus.logging.LoggerFactory;
 import com.myservicebus.tasks.CancellationToken;
 
 class HandlerFaultFilter<T> implements Filter<ConsumeContext<T>> {
@@ -17,7 +17,8 @@ class HandlerFaultFilter<T> implements Filter<ConsumeContext<T>> {
 
     @Override
     public CompletableFuture<Void> send(ConsumeContext<T> context, Pipe<ConsumeContext<T>> next) {
-        Logger logger = provider.getService(Logger.class);
+        LoggerFactory loggerFactory = provider.getService(LoggerFactory.class);
+        Logger logger = loggerFactory != null ? loggerFactory.create(HandlerFaultFilter.class) : null;
         CompletableFuture<Void> future;
         try {
             future = next.send(context);

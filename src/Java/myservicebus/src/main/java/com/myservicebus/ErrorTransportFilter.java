@@ -5,9 +5,9 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.stream.Collectors;
 
-import org.slf4j.Logger;
-
 import com.myservicebus.di.ServiceProvider;
+import com.myservicebus.logging.Logger;
+import com.myservicebus.logging.LoggerFactory;
 import com.myservicebus.tasks.CancellationToken;
 
 public class ErrorTransportFilter<T> implements Filter<ConsumeContext<T>> {
@@ -19,7 +19,8 @@ public class ErrorTransportFilter<T> implements Filter<ConsumeContext<T>> {
 
     @Override
     public CompletableFuture<Void> send(ConsumeContext<T> context, Pipe<ConsumeContext<T>> next) {
-        Logger logger = provider.getService(Logger.class);
+        LoggerFactory loggerFactory = provider.getService(LoggerFactory.class);
+        Logger logger = loggerFactory != null ? loggerFactory.create(ErrorTransportFilter.class) : null;
         return next.send(context).handle((v, ex) -> {
             if (ex != null) {
                 Throwable cause = ex instanceof CompletionException && ex.getCause() != null ? ex.getCause() : ex;

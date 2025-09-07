@@ -58,6 +58,7 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
         var exchangeName = NamingConventions.GetExchangeName(message.GetType());
 
         var uri = new Uri(_address, $"exchange/{exchangeName}");
+        _logger?.LogDebug("Publishing {MessageType} to {DestinationAddress}", typeof(T).Name, uri);
         var transport = await _transportFactory.GetSendTransport(uri, cancellationToken);
 
         var context = _publishContextFactory.Create(MessageTypeCache.GetMessageTypes(typeof(T)), _messageSerializer, cancellationToken);
@@ -77,7 +78,9 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
 
     public Task<ISendEndpoint> GetSendEndpoint(Uri uri)
     {
-        ISendEndpoint endpoint = new TransportSendEndpoint(_transportFactory, _sendPipe, _messageSerializer, uri, _address, _sendContextFactory);
+        var loggerFactory = _serviceProvider.GetService<ILoggerFactory>();
+        var logger = loggerFactory?.CreateLogger<TransportSendEndpoint>();
+        ISendEndpoint endpoint = new TransportSendEndpoint(_transportFactory, _sendPipe, _messageSerializer, uri, _address, _sendContextFactory, logger);
         return Task.FromResult(endpoint);
     }
 
@@ -110,7 +113,7 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
         [Throws(typeof(InvalidCastException))]
         async Task TransportHandler(ReceiveContext context)
         {
-            var consumeContext = new ConsumeContextImpl<TMessage>(context, _transportFactory, _sendPipe, _publishPipe, _messageSerializer, _address, _sendContextFactory, _publishContextFactory);
+            var consumeContext = new ConsumeContextImpl<TMessage>(context, _transportFactory, _sendPipe, _publishPipe, _messageSerializer, _address, _sendContextFactory, _publishContextFactory, _serviceProvider.GetService<ILoggerFactory>());
             await pipe.Send(consumeContext).ConfigureAwait(false);
         }
 
@@ -171,8 +174,8 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
         await Task.WhenAll(_activeTransports.Select(async transport => await transport.Stop(cancellationToken)));
     }
 
-      [Throws(typeof(InvalidOperationException), typeof(NotSupportedException), typeof(InvalidCastException), typeof(TargetInvocationException), typeof(MemberAccessException), typeof(InvalidComObjectException), typeof(COMException), typeof(TypeLoadException))]
-      private async Task HandleMessageAsync(ReceiveContext context)
+    [Throws(typeof(InvalidOperationException), typeof(NotSupportedException), typeof(InvalidCastException), typeof(TargetInvocationException), typeof(MemberAccessException), typeof(InvalidComObjectException), typeof(COMException), typeof(TypeLoadException))]
+    private async Task HandleMessageAsync(ReceiveContext context)
     {
         var messageTypeName = context.MessageType.FirstOrDefault();
         if (messageTypeName == null || !_consumers.TryGetValue(messageTypeName, out var registration))
@@ -182,9 +185,10 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
         }
 
         var consumeContextType = typeof(ConsumeContextImpl<>).MakeGenericType(registration.MessageType);
-        var consumeContext = (ConsumeContext)Activator.CreateInstance(consumeContextType, context, _transportFactory, _sendPipe, _publishPipe, _messageSerializer, _address, _sendContextFactory, _publishContextFactory)
+        var consumeContext = (ConsumeContext)Activator.CreateInstance(consumeContextType, context, _transportFactory, _sendPipe, _publishPipe, _messageSerializer, _address, _sendContextFactory, _publishContextFactory, _serviceProvider.GetService<ILoggerFactory>())
             ?? throw new InvalidOperationException("Failed to create ConsumeContext");
 
+        _logger?.LogDebug("Received {MessageType}", messageTypeName);
         await registration.Pipe.Send(consumeContext);
     }
 }

@@ -6,16 +6,17 @@ import com.google.inject.Inject;
 import com.myservicebus.ConsumeContext;
 import com.myservicebus.Consumer;
 import com.myservicebus.MyService;
-import org.slf4j.Logger;
+import com.myservicebus.logging.Logger;
+import com.myservicebus.logging.LoggerFactory;
 
 class SubmitOrderConsumer implements Consumer<SubmitOrder> {
     private final MyService service;
     private final Logger logger;
 
     @Inject
-    public SubmitOrderConsumer(MyService service, Logger logger) {
+    public SubmitOrderConsumer(MyService service, LoggerFactory loggerFactory) {
         this.service = service;
-        this.logger = logger;
+        this.logger = loggerFactory.create(SubmitOrderConsumer.class);
     }
 
     @Override

@@ -12,6 +12,8 @@ import com.myservicebus.TransportMessage;
 import com.myservicebus.topology.MessageBinding;
 import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.Connection;
+import com.myservicebus.logging.LoggerFactory;
+import com.myservicebus.logging.Slf4jLoggerFactory;
 
 class PrefetchCountTest {
     @Test
@@ -24,7 +26,8 @@ class PrefetchCountTest {
 
         RabbitMqFactoryConfigurator cfg = new RabbitMqFactoryConfigurator();
         cfg.setPrefetchCount(7);
-        RabbitMqTransportFactory factory = new RabbitMqTransportFactory(provider, cfg);
+        LoggerFactory loggerFactory = new Slf4jLoggerFactory();
+        RabbitMqTransportFactory factory = new RabbitMqTransportFactory(provider, cfg, loggerFactory);
 
         MessageBinding binding = new MessageBinding();
         binding.setEntityName("ex");
@@ -46,7 +49,8 @@ class PrefetchCountTest {
 
         RabbitMqFactoryConfigurator cfg = new RabbitMqFactoryConfigurator();
         cfg.setPrefetchCount(3);
-        RabbitMqTransportFactory factory = new RabbitMqTransportFactory(provider, cfg);
+        LoggerFactory loggerFactory = new Slf4jLoggerFactory();
+        RabbitMqTransportFactory factory = new RabbitMqTransportFactory(provider, cfg, loggerFactory);
 
         MessageBinding binding = new MessageBinding();
         binding.setEntityName("ex");

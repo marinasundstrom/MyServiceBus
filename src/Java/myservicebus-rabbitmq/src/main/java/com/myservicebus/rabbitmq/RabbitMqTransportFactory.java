@@ -14,16 +14,20 @@ import com.myservicebus.topology.MessageBinding;
 import com.rabbitmq.client.BuiltinExchangeType;
 import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.Connection;
+import com.myservicebus.logging.LoggerFactory;
 
 public class RabbitMqTransportFactory implements TransportFactory {
     private final ConnectionProvider connectionProvider;
     private final ConcurrentHashMap<String, RabbitMqSendTransport> exchangeTransports = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, RabbitMqSendTransport> queueTransports = new ConcurrentHashMap<>();
     private final int defaultPrefetchCount;
+    private final LoggerFactory loggerFactory;
 
-    public RabbitMqTransportFactory(ConnectionProvider connectionProvider, RabbitMqFactoryConfigurator configurator) {
+    public RabbitMqTransportFactory(ConnectionProvider connectionProvider, RabbitMqFactoryConfigurator configurator,
+            LoggerFactory loggerFactory) {
         this.connectionProvider = connectionProvider;
         this.defaultPrefetchCount = configurator.getPrefetchCount();
+        this.loggerFactory = loggerFactory;
     }
 
     public SendTransport getSendTransport(String exchange, boolean durable, boolean autoDelete) {
@@ -118,7 +122,8 @@ public class RabbitMqTransportFactory implements TransportFactory {
         channel.queueBind(skippedQueue, skippedExchange, "");
 
         String faultAddress = getPublishAddress(queueName + "_error");
-        return new RabbitMqReceiveTransport(channel, queueName, handler, faultAddress, isMessageTypeRegistered);
+        return new RabbitMqReceiveTransport(channel, queueName, handler, faultAddress, isMessageTypeRegistered,
+                loggerFactory);
     }
 
     @Override

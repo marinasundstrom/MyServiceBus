@@ -10,6 +10,7 @@ import com.myservicebus.serialization.MessageSerializer;
 import java.net.URI;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
+import com.myservicebus.logging.LoggerFactory;
 
 public class RabbitMqSendEndpointProvider implements TransportSendEndpointProvider {
     private final RabbitMqTransportFactory transportFactory;
@@ -17,14 +18,16 @@ public class RabbitMqSendEndpointProvider implements TransportSendEndpointProvid
     private final MessageSerializer serializer;
     private final URI busAddress;
     private final SendContextFactory sendContextFactory;
+    private final LoggerFactory loggerFactory;
 
     public RabbitMqSendEndpointProvider(RabbitMqTransportFactory transportFactory, SendPipe sendPipe,
-            MessageSerializer serializer, URI busAddress, SendContextFactory sendContextFactory) {
+            MessageSerializer serializer, URI busAddress, SendContextFactory sendContextFactory, LoggerFactory loggerFactory) {
         this.transportFactory = transportFactory;
         this.sendPipe = sendPipe;
         this.serializer = serializer;
         this.busAddress = busAddress;
         this.sendContextFactory = sendContextFactory;
+        this.loggerFactory = loggerFactory;
     }
 
     @Override
@@ -115,7 +118,7 @@ public class RabbitMqSendEndpointProvider implements TransportSendEndpointProvid
             }
             transport = transportFactory.getQueueTransport(queue, durable, autoDelete);
         }
-        RabbitMqSendEndpoint endpoint = new RabbitMqSendEndpoint(transport, serializer);
+        RabbitMqSendEndpoint endpoint = new RabbitMqSendEndpoint(transport, serializer, loggerFactory);
         return new SendEndpoint() {
             @Override
             public CompletableFuture<Void> send(SendContext ctx) {

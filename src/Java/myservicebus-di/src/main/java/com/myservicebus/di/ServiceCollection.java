@@ -3,11 +3,12 @@ package com.myservicebus.di;
 import com.google.inject.*;
 import com.google.inject.Module;
 import com.google.inject.multibindings.Multibinder;
-import org.slf4j.Logger;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
+
+import com.myservicebus.logging.LoggerFactory;
+import com.myservicebus.logging.Slf4jLoggerFactory;
 
 public class ServiceCollection {
     private final List<Module> modules = new ArrayList<>();
@@ -146,7 +147,7 @@ public class ServiceCollection {
         modules.add(new AbstractModule() {
             @Override
             protected void configure() {
-                bind(Logger.class).toProvider(Slf4jLoggerProvider.class);
+                bind(LoggerFactory.class).to(Slf4jLoggerFactory.class).in(Scopes.SINGLETON);
             }
         });
 
@@ -193,7 +194,7 @@ public class ServiceCollection {
         modules.add(new AbstractModule() {
             @Override
             protected void configure() {
-                bind(Logger.class).toProvider(Slf4jLoggerProvider.class);
+                bind(LoggerFactory.class).to(Slf4jLoggerFactory.class).in(Scopes.SINGLETON);
             }
         });
 

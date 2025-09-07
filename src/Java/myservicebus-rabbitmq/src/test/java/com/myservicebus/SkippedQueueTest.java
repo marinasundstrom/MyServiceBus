@@ -18,6 +18,8 @@ import com.rabbitmq.client.DeliverCallback;
 import com.rabbitmq.client.Delivery;
 import com.rabbitmq.client.Envelope;
 import com.rabbitmq.client.CancelCallback;
+import com.myservicebus.logging.LoggerFactory;
+import com.myservicebus.logging.Slf4jLoggerFactory;
 
 class SkippedQueueTest {
     @Test
@@ -28,7 +30,9 @@ class SkippedQueueTest {
 
         Function<TransportMessage, CompletableFuture<Void>> handler = tm -> CompletableFuture.completedFuture(null);
 
-        RabbitMqReceiveTransport transport = new RabbitMqReceiveTransport(channel, "input", handler, "fault", s -> false);
+        LoggerFactory loggerFactory = new Slf4jLoggerFactory();
+        RabbitMqReceiveTransport transport = new RabbitMqReceiveTransport(channel, "input", handler, "fault", s -> false,
+                loggerFactory);
         transport.start();
 
         DeliverCallback callback = captor.getValue();

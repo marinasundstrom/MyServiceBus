@@ -8,10 +8,10 @@ import java.util.HashSet;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 
-import org.slf4j.Logger;
-
 import com.myservicebus.di.ServiceCollection;
 import com.myservicebus.di.ServiceProvider;
+import com.myservicebus.logging.Logger;
+import com.myservicebus.logging.LoggerFactory;
 import com.myservicebus.serialization.MessageDeserializer;
 import com.myservicebus.tasks.CancellationToken;
 import com.myservicebus.topology.BusTopology;
@@ -40,7 +40,8 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
         PublishContextFactory factory = serviceProvider.getService(PublishContextFactory.class);
         this.publishContextFactory = factory != null ? factory : new DefaultPublishContextFactory();
         this.publishPipe = serviceProvider.getService(PublishPipe.class);
-        this.logger = serviceProvider.getService(Logger.class);
+        LoggerFactory loggerFactory = serviceProvider.getService(LoggerFactory.class);
+        this.logger = loggerFactory != null ? loggerFactory.create(MessageBusImpl.class) : null;
         MessageDeserializer md = serviceProvider.getService(MessageDeserializer.class);
         if (md == null) {
             md = new com.myservicebus.serialization.EnvelopeMessageDeserializer();
@@ -256,7 +257,9 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
             SendEndpointProvider provider = serviceProvider.getService(SendEndpointProvider.class);
             SendEndpoint endpoint = provider.getSendEndpoint(address);
             return endpoint.send(context).thenRun(() -> {
-                logger.info("📤 Published message of type {}", context.getMessage().getClass().getSimpleName());
+                if (logger != null) {
+                    logger.debug("Published message of type {}", context.getMessage().getClass().getSimpleName());
+                }
             });
         });
     }

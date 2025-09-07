@@ -10,8 +10,8 @@ import java.util.function.Consumer;
 
 import com.myservicebus.di.ServiceCollection;
 import com.myservicebus.topology.TopologyRegistry;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import com.myservicebus.logging.Logger;
+import com.myservicebus.logging.Slf4jLoggerFactory;
 import com.myservicebus.NamingConventions;
 
 public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigurator {
@@ -23,7 +23,7 @@ public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigura
     private Class<? extends com.myservicebus.serialization.MessageSerializer> serializerClass = com.myservicebus.serialization.EnvelopeMessageSerializer.class;
     private Class<? extends com.myservicebus.serialization.MessageDeserializer> deserializerClass = com.myservicebus.serialization.EnvelopeMessageDeserializer.class;
     private final Set<String> consumers = new HashSet<>();
-    private final Logger logger = LoggerFactory.getLogger(BusRegistrationConfiguratorImpl.class);
+    private final Logger logger = new Slf4jLoggerFactory().create(BusRegistrationConfiguratorImpl.class);
 
     public BusRegistrationConfiguratorImpl(ServiceCollection serviceCollection) {
         this.serviceCollection = serviceCollection;

@@ -5,14 +5,15 @@ import java.util.concurrent.CompletableFuture;
 import com.google.inject.Inject;
 import com.myservicebus.ConsumeContext;
 import com.myservicebus.Consumer;
-import org.slf4j.Logger;
+import com.myservicebus.logging.Logger;
+import com.myservicebus.logging.LoggerFactory;
 
 class TestRequestConsumer implements Consumer<TestRequest> {
     private final Logger logger;
 
     @Inject
-    public TestRequestConsumer(Logger logger) {
-        this.logger = logger;
+    public TestRequestConsumer(LoggerFactory loggerFactory) {
+        this.logger = loggerFactory.create(TestRequestConsumer.class);
     }
 
     @Override
