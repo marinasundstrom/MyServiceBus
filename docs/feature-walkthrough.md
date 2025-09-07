@@ -21,6 +21,7 @@ For Java build and run instructions, including optional JDK 17 toolchain setup a
   - [Dependency Injection](#dependency-injection)
   - [Logging](#logging)
   - [OpenTelemetry](#opentelemetry)
+  - [Health checks](#health-checks)
   - [Filters](#filters)
   - [Unit Testing with the In-Memory Test Harness](#unit-testing-with-the-in-memory-test-harness)
 
@@ -621,6 +622,10 @@ MyServiceBus automatically creates spans for send and consume operations and pro
 W3C `traceparent` headers. Any active span when publishing or sending is injected into the
 message headers, and consumers create child spans from those headers. This mirrors
 MassTransit's OpenTelemetry integration so traces flow across both C# and Java services.
+
+### Health checks
+
+MyServiceBus exposes a health check that verifies the underlying RabbitMQ connection. In ASP.NET Core, register it via `AddHealthChecks().AddMyServiceBus()` to surface bus connectivity on liveness or readiness endpoints. Java services can instantiate `RabbitMqHealthCheck` and integrate it with their preferred health check framework.
 
 ### Filters
 
