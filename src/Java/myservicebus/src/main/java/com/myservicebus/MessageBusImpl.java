@@ -97,6 +97,7 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
                 consumerDef.getConsumerType());
         configurator.useFilter(consumerFilter);
         Pipe<ConsumeContext<Object>> pipe = configurator.build(serviceProvider);
+        consumers.add(messageUrn);
 
         Function<TransportMessage, CompletableFuture<Void>> handler = transportMessage -> {
             try {
