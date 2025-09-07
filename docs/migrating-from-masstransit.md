@@ -15,4 +15,13 @@ The following checklist highlights common areas to evaluate when switching:
 - **Java parity** – if services mix C# and Java clients, ensure consumers and contracts are exercised in both runtimes
   during migration.
 
+## MassTransit features not yet available
+
+MyServiceBus currently targets a minimal feature set. When migrating you will lose some advanced MassTransit capabilities:
+
+- **Saga state machines** – long-running workflows and saga repositories are not included.
+- **Message scheduling** – no built-in delayed delivery or scheduling API.
+- **Outbox/inbox patterns** – transactional persistence helpers are omitted.
+- **Alternative transports** – only RabbitMQ and the in-memory mediator are implemented.
+
 Consult [docs/masstransit-differences.md](masstransit-differences.md) for a side-by-side comparison of behaviors.
