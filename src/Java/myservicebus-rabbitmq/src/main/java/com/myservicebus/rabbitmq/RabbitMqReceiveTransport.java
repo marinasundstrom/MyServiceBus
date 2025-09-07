@@ -12,7 +12,6 @@ import org.slf4j.LoggerFactory;
 import com.myservicebus.MessageHeaders;
 import com.myservicebus.ReceiveTransport;
 import com.myservicebus.TransportMessage;
-import com.myservicebus.UnknownMessageTypeException;
 import com.rabbitmq.client.AMQP;
 import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.DeliverCallback;
@@ -45,18 +44,7 @@ public class RabbitMqReceiveTransport implements ReceiveTransport {
                 try {
                     if (ex != null) {
                         Throwable cause = ex instanceof java.util.concurrent.CompletionException ? ex.getCause() : ex;
-                        if (cause instanceof UnknownMessageTypeException) {
-                            Map<String, Object> outHeaders = new HashMap<>(headers);
-                            outHeaders.put(MessageHeaders.REASON, "skip");
-                            AMQP.BasicProperties props = new AMQP.BasicProperties.Builder().headers(outHeaders).build();
-                            try {
-                                channel.basicPublish(queueName + "_skipped", "", props, delivery.getBody());
-                            } catch (IOException pubEx) {
-                                logger.error("Failed to move message to skipped queue", pubEx);
-                            }
-                        } else {
-                            logger.error("Message handling failed", cause);
-                        }
+                        logger.error("Message handling failed", cause);
                     }
                     channel.basicAck(delivery.getEnvelope().getDeliveryTag(), false);
                 } catch (IOException ioEx) {

@@ -103,7 +103,7 @@ public class UnknownMessageTypeTests
 
         var context = new TestReceiveContext(new object(), "urn:message:Unknown");
         var method = typeof(MessageBus).GetMethod("HandleMessageAsync", BindingFlags.Instance | BindingFlags.NonPublic);
-        await Should.ThrowAsync<UnknownMessageTypeException>([Throws(typeof(TargetException), typeof(TargetInvocationException), typeof(TargetParameterCountException), typeof(MethodAccessException))] () => (Task)method!.Invoke(bus, new object[] { context })!);
+        await Should.NotThrowAsync([Throws(typeof(TargetException), typeof(TargetInvocationException), typeof(TargetParameterCountException), typeof(MethodAccessException))] () => (Task)method!.Invoke(bus, new object[] { context })!);
 
         Assert.Contains(LogLevel.Warning, logger.Levels);
         Assert.Contains(logger.Messages, m => m.Contains("unregistered"));

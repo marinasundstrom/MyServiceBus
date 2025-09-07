@@ -1,7 +1,6 @@
 package com.myservicebus;
 
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 
 import java.net.URI;
 import java.util.List;
@@ -43,7 +42,7 @@ class UnknownMessageTypeTest {
     }
 
     @Test
-    void throwsForUnregisteredMessageType() throws Exception {
+    void skipsUnregisteredMessageType() throws Exception {
         StubTransportFactory transportFactory = new StubTransportFactory();
         ServiceCollection services = new ServiceCollection();
         services.addSingleton(TransportFactory.class, sp -> () -> transportFactory);
@@ -66,7 +65,6 @@ class UnknownMessageTypeTest {
         byte[] body = new EnvelopeMessageSerializer().serialize(ctx);
         TransportMessage tm = new TransportMessage(body, new java.util.HashMap<>());
 
-        Exception ex = assertThrows(Exception.class, () -> transportFactory.handler.apply(tm).join());
-        assertTrue(ex.getCause() instanceof UnknownMessageTypeException);
+        assertDoesNotThrow(() -> transportFactory.handler.apply(tm).join());
     }
 }

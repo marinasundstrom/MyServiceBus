@@ -168,14 +168,14 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
         await Task.WhenAll(_activeTransports.Select(async transport => await transport.Stop(cancellationToken)));
     }
 
-    [Throws(typeof(InvalidOperationException), typeof(NotSupportedException), typeof(InvalidCastException), typeof(TargetInvocationException), typeof(MemberAccessException), typeof(InvalidComObjectException), typeof(COMException), typeof(TypeLoadException), typeof(UnknownMessageTypeException))]
+    [Throws(typeof(InvalidOperationException), typeof(NotSupportedException), typeof(InvalidCastException), typeof(TargetInvocationException), typeof(MemberAccessException), typeof(InvalidComObjectException), typeof(COMException), typeof(TypeLoadException))]
     private async Task HandleMessageAsync(ReceiveContext context)
     {
         var messageTypeName = context.MessageType.FirstOrDefault();
         if (messageTypeName == null || !_consumers.TryGetValue(messageTypeName, out var registration))
         {
             _logger?.LogWarning("Received message with unregistered type {MessageType}", messageTypeName ?? "<null>");
-            throw new UnknownMessageTypeException(messageTypeName);
+            return;
         }
 
         var consumeContextType = typeof(ConsumeContextImpl<>).MakeGenericType(registration.MessageType);
