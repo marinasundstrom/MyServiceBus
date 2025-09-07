@@ -12,7 +12,7 @@ MassTransit routes work through a pipe-and-filter pipeline. MyServiceBus models 
 
 ## Transports
 
-Transports move serialized envelopes between endpoints. MyServiceBus exposes an `ITransportFactory` abstraction with a RabbitMQ implementation that creates exchanges on demand and caches send transports. This mirrors MassTransit's transport model where brokers such as RabbitMQ or in-memory harnesses can be selected per environment.
+Transports move serialized envelopes between endpoints. Rather than baking in queue semantics, MyServiceBus now exposes a minimal `IEndpoint` contract that provides `Send`, `ReadAsync`, and a set of advertised `EndpointCapabilities`. RabbitMQ implements this interface today, but other technologies—HTTP callbacks, in-memory mediators, or serverless triggers—can plug in the same way. An `ITransportFactory` remains to construct transport-specific endpoints when required.
 
 ## Message Pipeline
 
