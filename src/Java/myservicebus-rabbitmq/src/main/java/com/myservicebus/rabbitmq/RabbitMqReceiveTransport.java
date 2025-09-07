@@ -62,6 +62,7 @@ public class RabbitMqReceiveTransport implements ReceiveTransport {
                 return;
             }
 
+            logger.debug("Received message of type {}", messageTypeUrn);
             handler.apply(tm).whenComplete((v, ex) -> {
                 try {
                     if (ex != null) {

@@ -256,7 +256,9 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
             SendEndpointProvider provider = serviceProvider.getService(SendEndpointProvider.class);
             SendEndpoint endpoint = provider.getSendEndpoint(address);
             return endpoint.send(context).thenRun(() -> {
-                logger.info("📤 Published message of type {}", context.getMessage().getClass().getSimpleName());
+                if (logger != null) {
+                    logger.debug("Published message of type {}", context.getMessage().getClass().getSimpleName());
+                }
             });
         });
     }

@@ -1,6 +1,7 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using MyServiceBus.Serialization;
 
 namespace MyServiceBus;
@@ -13,8 +14,9 @@ internal class TransportSendEndpoint : ISendEndpoint
     readonly Uri _address;
     readonly Uri _sourceAddress;
     readonly ISendContextFactory _contextFactory;
+    readonly ILogger<TransportSendEndpoint>? _logger;
 
-    public TransportSendEndpoint(ITransportFactory transportFactory, ISendPipe sendPipe, IMessageSerializer serializer, Uri address, Uri sourceAddress, ISendContextFactory contextFactory)
+    public TransportSendEndpoint(ITransportFactory transportFactory, ISendPipe sendPipe, IMessageSerializer serializer, Uri address, Uri sourceAddress, ISendContextFactory contextFactory, ILogger<TransportSendEndpoint>? logger = null)
     {
         _transportFactory = transportFactory;
         _sendPipe = sendPipe;
@@ -22,6 +24,7 @@ internal class TransportSendEndpoint : ISendEndpoint
         _address = address;
         _sourceAddress = sourceAddress;
         _contextFactory = contextFactory;
+        _logger = logger;
     }
 
     [Throws(typeof(InvalidOperationException))]
@@ -31,6 +34,8 @@ internal class TransportSendEndpoint : ISendEndpoint
     [Throws(typeof(InvalidOperationException))]
     public async Task Send<T>(object message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default)
     {
+        _logger?.LogDebug("Sending {MessageType} to {DestinationAddress}", typeof(T).Name, _address);
+
         var transport = await _transportFactory.GetSendTransport(_address, cancellationToken);
         var context = _contextFactory.Create(MessageTypeCache.GetMessageTypes(typeof(T)), _serializer, cancellationToken);
         context.MessageId = Guid.NewGuid().ToString();
