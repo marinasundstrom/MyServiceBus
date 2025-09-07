@@ -4,23 +4,27 @@ import com.myservicebus.SendContext;
 import com.myservicebus.SendEndpoint;
 import com.myservicebus.SendPipe;
 import com.myservicebus.SendTransport;
+import com.myservicebus.SendContextFactory;
 import com.myservicebus.TransportSendEndpointProvider;
 import com.myservicebus.serialization.MessageSerializer;
 import java.net.URI;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Consumer;
 
 public class RabbitMqSendEndpointProvider implements TransportSendEndpointProvider {
     private final RabbitMqTransportFactory transportFactory;
     private final SendPipe sendPipe;
     private final MessageSerializer serializer;
     private final URI busAddress;
+    private final SendContextFactory sendContextFactory;
 
     public RabbitMqSendEndpointProvider(RabbitMqTransportFactory transportFactory, SendPipe sendPipe,
-            MessageSerializer serializer, URI busAddress) {
+            MessageSerializer serializer, URI busAddress, SendContextFactory sendContextFactory) {
         this.transportFactory = transportFactory;
         this.sendPipe = sendPipe;
         this.serializer = serializer;
         this.busAddress = busAddress;
+        this.sendContextFactory = sendContextFactory;
     }
 
     @Override
@@ -123,7 +127,15 @@ public class RabbitMqSendEndpointProvider implements TransportSendEndpointProvid
             @Override
             public <T> CompletableFuture<Void> send(T message,
                     com.myservicebus.tasks.CancellationToken cancellationToken) {
-                return send(new SendContext(message, cancellationToken));
+                return send(sendContextFactory.create(message, cancellationToken));
+            }
+
+            @Override
+            public <T> CompletableFuture<Void> send(T message, Consumer<SendContext> contextCallback,
+                    com.myservicebus.tasks.CancellationToken cancellationToken) {
+                SendContext ctx = sendContextFactory.create(message, cancellationToken);
+                contextCallback.accept(ctx);
+                return send(ctx);
             }
         };
     }

@@ -12,7 +12,7 @@ public class BusRegistrationConfigurator : IBusRegistrationConfigurator
 {
     private TopologyRegistry _topology = new TopologyRegistry();
     private readonly PipeConfigurator<SendContext> sendConfigurator = new();
-    private readonly PipeConfigurator<SendContext> publishConfigurator = new();
+    private readonly PipeConfigurator<PublishContext> publishConfigurator = new();
     private Type serializerType = typeof(EnvelopeMessageSerializer);
 
     public IServiceCollection Services { get; }
@@ -80,7 +80,7 @@ public class BusRegistrationConfigurator : IBusRegistrationConfigurator
         configure(sendConfigurator);
     }
 
-    public void ConfigurePublish(Action<PipeConfigurator<SendContext>> configure)
+    public void ConfigurePublish(Action<PipeConfigurator<PublishContext>> configure)
     {
         configure(publishConfigurator);
     }
@@ -108,6 +108,8 @@ public class BusRegistrationConfigurator : IBusRegistrationConfigurator
         Services.AddSingleton<ISendPipe>((sp) => new SendPipe(sendConfigurator.Build(sp)));
         Services.AddSingleton<IPublishPipe>((sp) => new PublishPipe(publishConfigurator.Build(sp)));
         Services.AddSingleton(typeof(IMessageSerializer), serializerType);
+        Services.AddSingleton<ISendContextFactory, SendContextFactory>();
+        Services.AddSingleton<IPublishContextFactory, PublishContextFactory>();
         Services.AddScoped<ConsumeContextProvider>();
         Services.AddScoped<ISendEndpointProvider, SendEndpointProvider>();
         Services.AddScoped<IPublishEndpointProvider, PublishEndpointProvider>();

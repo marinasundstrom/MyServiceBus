@@ -58,7 +58,7 @@ public class OpenTelemetryFilterTests
         var json = System.Text.Encoding.UTF8.GetBytes("{\"messageId\":\"00000000-0000-0000-0000-000000000000\",\"messageType\":[],\"message\":{}}");
         var envelope = new EnvelopeMessageContext(json, headers);
         var receive = new ReceiveContextImpl(envelope, null);
-        var ctx = new ConsumeContextImpl<TestMessage>(receive, new StubTransportFactory(), new SendPipe(Pipe.Empty<SendContext>()), new PublishPipe(Pipe.Empty<SendContext>()), new EnvelopeMessageSerializer(), new System.Uri("loopback://localhost/"));
+        var ctx = new ConsumeContextImpl<TestMessage>(receive, new StubTransportFactory(), new SendPipe(Pipe.Empty<SendContext>()), new PublishPipe(Pipe.Empty<PublishContext>()), new EnvelopeMessageSerializer(), new System.Uri("loopback://localhost/"), new SendContextFactory(), new PublishContextFactory());
 
         ActivityTraceId? captured = null;
         var filter = new OpenTelemetryConsumeFilter<TestMessage>();
@@ -79,6 +79,7 @@ public class OpenTelemetryFilterTests
 
     class StubTransportFactory : ITransportFactory
     {
+        [Throws(typeof(InvalidOperationException))]
         public Task<ISendTransport> GetSendTransport(System.Uri address, CancellationToken cancellationToken = default) => Task.FromResult<ISendTransport>(new StubSendTransport());
         public Task<IReceiveTransport> CreateReceiveTransport(ReceiveEndpointTopology topology, Func<ReceiveContext, Task> handler, CancellationToken cancellationToken = default) => Task.FromResult<IReceiveTransport>(new StubReceiveTransport());
 

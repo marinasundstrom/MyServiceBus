@@ -16,6 +16,8 @@ public class InMemoryTestHarness : IMessageBus, ITransportFactory, IReceiveEndpo
     readonly List<object> consumed = new();
     readonly IServiceProvider? provider;
     readonly IBusTopology topology;
+    readonly ISendContextFactory _sendContextFactory;
+    readonly IPublishContextFactory _publishContextFactory;
 
     [Throws(typeof(UriFormatException))]
     public Uri Address => new("loopback://localhost/");
@@ -26,12 +28,16 @@ public class InMemoryTestHarness : IMessageBus, ITransportFactory, IReceiveEndpo
     public InMemoryTestHarness()
     {
         topology = new TopologyRegistry();
+        _sendContextFactory = new SendContextFactory();
+        _publishContextFactory = new PublishContextFactory();
     }
 
     public InMemoryTestHarness(IServiceProvider provider)
     {
         this.provider = provider;
         topology = provider.GetService<TopologyRegistry>() ?? new TopologyRegistry();
+        _sendContextFactory = provider.GetService<ISendContextFactory>() ?? new SendContextFactory();
+        _publishContextFactory = provider.GetService<IPublishContextFactory>() ?? new PublishContextFactory();
     }
 
     public Task Start() => StartAsync(CancellationToken.None);
@@ -75,20 +81,18 @@ public class InMemoryTestHarness : IMessageBus, ITransportFactory, IReceiveEndpo
     public bool WasConsumed<T>() where T : class => consumed.OfType<T>().Any();
 
     [Throws(typeof(InvalidCastException))]
-    public Task PublishAsync<TMessage>(object message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default) where TMessage : class
+    public Task PublishAsync<TMessage>(object message, Action<IPublishContext>? contextCallback = null, CancellationToken cancellationToken = default) where TMessage : class
         => PublishAsync((TMessage)message, contextCallback, cancellationToken);
 
-    public Task PublishAsync<T>(T message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default) where T : class
+    public Task PublishAsync<T>(T message, Action<IPublishContext>? contextCallback = null, CancellationToken cancellationToken = default) where T : class
     {
         var serializer = provider?.GetService<IMessageSerializer>() ?? new EnvelopeMessageSerializer();
-        var sendContext = new SendContext(MessageTypeCache.GetMessageTypes(typeof(T)), serializer, cancellationToken)
-        {
-            MessageId = Guid.NewGuid().ToString()
-        };
+        var publishContext = _publishContextFactory.Create(MessageTypeCache.GetMessageTypes(typeof(T)), serializer, cancellationToken);
+        publishContext.MessageId = Guid.NewGuid().ToString();
 
-        contextCallback?.Invoke(sendContext);
+        contextCallback?.Invoke(publishContext);
 
-        return InternalSend(message, sendContext);
+        return InternalSend(message, publishContext);
     }
 
     public IPublishEndpoint GetPublishEndpoint() => this;
@@ -124,6 +128,7 @@ public class InMemoryTestHarness : IMessageBus, ITransportFactory, IReceiveEndpo
         return Task.CompletedTask;
     }
 
+    [Throws(typeof(InvalidOperationException))]
     public Task<ISendTransport> GetSendTransport(Uri address, CancellationToken cancellationToken = default)
         => Task.FromResult<ISendTransport>(new HarnessSendTransport(this));
 
@@ -189,12 +194,12 @@ public class InMemoryTestHarness : IMessageBus, ITransportFactory, IReceiveEndpo
 
         public Task<ISendEndpoint> GetSendEndpoint(Uri uri) => Task.FromResult<ISendEndpoint>(new HarnessSendEndpoint(harness));
         [Throws(typeof(InvalidCastException))]
-        public Task PublishAsync<TMessage>(object message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default) where TMessage : class
+        public Task PublishAsync<TMessage>(object message, Action<IPublishContext>? contextCallback = null, CancellationToken cancellationToken = default) where TMessage : class
             => harness.PublishAsync((TMessage)message, contextCallback, cancellationToken);
-        public Task PublishAsync<TMessage>(TMessage message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default) where TMessage : class
+        public Task PublishAsync<TMessage>(TMessage message, Action<IPublishContext>? contextCallback = null, CancellationToken cancellationToken = default) where TMessage : class
             => harness.PublishAsync(message, contextCallback, cancellationToken);
         public Task RespondAsync<TMessage>(TMessage message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default)
-            => harness.PublishAsync((dynamic)message!, contextCallback, cancellationToken);
+            => harness.PublishAsync((dynamic)message!, contextCallback != null ? new Action<IPublishContext>(ctx => contextCallback(ctx)) : null, cancellationToken);
         [Throws(typeof(InvalidCastException))]
         public Task Forward<T>(Uri address, T message, CancellationToken cancellationToken = default) where T : class
             => Forward<T>(address, (object)message!, cancellationToken);
@@ -212,9 +217,9 @@ public class InMemoryTestHarness : IMessageBus, ITransportFactory, IReceiveEndpo
         public HarnessSendEndpoint(InMemoryTestHarness harness) => this.harness = harness;
 
         public Task Send<T>(object message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default)
-            => harness.PublishAsync((dynamic)message!, contextCallback, cancellationToken);
+            => harness.PublishAsync((dynamic)message!, contextCallback != null ? new Action<IPublishContext>(ctx => contextCallback(ctx)) : null, cancellationToken);
         public Task Send<T>(T message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default)
-            => harness.PublishAsync((dynamic)message!, contextCallback, cancellationToken);
+            => harness.PublishAsync((dynamic)message!, contextCallback != null ? new Action<IPublishContext>(ctx => contextCallback(ctx)) : null, cancellationToken);
     }
 
     class HarnessReceiveTransport : IReceiveTransport
@@ -285,6 +290,7 @@ public class InMemoryTestHarness : IMessageBus, ITransportFactory, IReceiveEndpo
         public IDictionary<string, object> Headers { get; }
         public DateTimeOffset SentTime { get; }
 
+        [Throws(typeof(InvalidOperationException))]
         public bool TryGetMessage<T>(out T? msg) where T : class
         {
             if (message is T m)

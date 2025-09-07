@@ -11,15 +11,17 @@ internal class SendEndpointProvider : ISendEndpointProvider
     readonly IMessageSerializer _serializer;
     readonly ConsumeContextProvider _contextProvider;
     readonly IMessageBus _bus;
+    readonly ISendContextFactory _sendContextFactory;
 
     public SendEndpointProvider(ITransportFactory transportFactory, ISendPipe sendPipe, IMessageSerializer serializer,
-        ConsumeContextProvider contextProvider, IMessageBus bus)
+        ConsumeContextProvider contextProvider, IMessageBus bus, ISendContextFactory sendContextFactory)
     {
         _transportFactory = transportFactory;
         _sendPipe = sendPipe;
         _serializer = serializer;
         _contextProvider = contextProvider;
         _bus = bus;
+        _sendContextFactory = sendContextFactory;
     }
 
     public Task<ISendEndpoint> GetSendEndpoint(Uri uri)
@@ -27,7 +29,7 @@ internal class SendEndpointProvider : ISendEndpointProvider
         if (_contextProvider.Context != null)
             return _contextProvider.Context.GetSendEndpoint(uri);
 
-        ISendEndpoint endpoint = new TransportSendEndpoint(_transportFactory, _sendPipe, _serializer, uri, _bus.Address);
+        ISendEndpoint endpoint = new TransportSendEndpoint(_transportFactory, _sendPipe, _serializer, uri, _bus.Address, _sendContextFactory);
         return Task.FromResult(endpoint);
     }
 }

@@ -26,6 +26,8 @@ public class SendEndpointAddressTests
     class StubTransportFactory : ITransportFactory
     {
         public readonly CaptureSendTransport Transport = new();
+
+        [Throws(typeof(InvalidOperationException))]
         public Task<ISendTransport> GetSendTransport(Uri address, CancellationToken cancellationToken = default)
         {
             return Task.FromResult<ISendTransport>(Transport);
@@ -36,10 +38,11 @@ public class SendEndpointAddressTests
     }
 
     [Fact]
+    [Throws(typeof(UriFormatException))]
     public async Task SendEndpoint_sets_source_and_destination_addresses()
     {
         var factory = new StubTransportFactory();
-        var bus = new MessageBus(factory, new ServiceCollection().BuildServiceProvider(), new SendPipe(Pipe.Empty<SendContext>()), new PublishPipe(Pipe.Empty<SendContext>()), new EnvelopeMessageSerializer(), new Uri("rabbitmq://localhost/"));
+        var bus = new MessageBus(factory, new ServiceCollection().BuildServiceProvider(), new SendPipe(Pipe.Empty<SendContext>()), new PublishPipe(Pipe.Empty<PublishContext>()), new EnvelopeMessageSerializer(), new Uri("rabbitmq://localhost/"), new SendContextFactory(), new PublishContextFactory());
 
         var endpoint = await bus.GetSendEndpoint(new Uri(bus.Address, "queue/test"));
         await endpoint.Send(new TestMessage());

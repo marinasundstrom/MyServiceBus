@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
 using MyServiceBus.RabbitMq;
 using MyServiceBus.Serialization;
@@ -31,7 +32,7 @@ public sealed class RabbitMqReceiveTransport : IReceiveTransport
     {
         var consumer = new AsyncEventingBasicConsumer(_channel);
 
-        consumer.ReceivedAsync += async (model, ea) =>
+        consumer.ReceivedAsync += [Throws(typeof(JsonException), typeof(UriFormatException))] async (model, ea) =>
         {
             var payload = ea.Body.ToArray();
             var props = ea.BasicProperties;
@@ -48,31 +49,11 @@ public sealed class RabbitMqReceiveTransport : IReceiveTransport
             var errorAddress = _hasErrorQueue
                 ? new Uri($"rabbitmq://localhost/exchange/{_queueName}_error")
                 : null;
-            var context = new ReceiveContextImpl(messageContext, errorAddress);
+            var context = new RabbitMqReceiveContext(messageContext, props, ea.DeliveryTag, ea.Exchange, ea.RoutingKey, errorAddress);
 
             try
             {
                 await _messageHandler.Invoke(context);
-
-                await _channel.BasicAckAsync(ea.DeliveryTag, multiple: false);
-            }
-            catch (UnknownMessageTypeException)
-            {
-                if (_hasErrorQueue)
-                {
-                    var propsOut = new BasicProperties
-                    {
-                        Persistent = true,
-                        Headers = headers.ToDictionary(k => k.Key, v => v.Value is string s ? (object)Encoding.UTF8.GetBytes(s) : v.Value)
-                    };
-                    propsOut.Headers[MessageHeaders.Reason] = Encoding.UTF8.GetBytes("skip");
-                    await _channel.BasicPublishAsync(
-                        exchange: _queueName + "_skipped",
-                        routingKey: string.Empty,
-                        mandatory: false,
-                        basicProperties: propsOut,
-                        body: payload);
-                }
 
                 await _channel.BasicAckAsync(ea.DeliveryTag, multiple: false);
             }

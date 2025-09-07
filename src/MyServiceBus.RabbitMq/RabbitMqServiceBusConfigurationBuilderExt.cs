@@ -35,13 +35,17 @@ public static class RabbitMqServiceBusConfigurationBuilderExt
         });
 
         builder.Services.AddSingleton<ITransportFactory, RabbitMqTransportFactory>();
+        builder.Services.AddSingleton<ISendContextFactory, RabbitMqSendContextFactory>();
+        builder.Services.AddSingleton<IPublishContextFactory, RabbitMqPublishContextFactory>();
         builder.Services.AddSingleton<IMessageBus>([Throws(typeof(InvalidOperationException), typeof(UriFormatException))] (sp) => new MessageBus(
             sp.GetRequiredService<ITransportFactory>(),
             sp,
             sp.GetRequiredService<ISendPipe>(),
             sp.GetRequiredService<IPublishPipe>(),
             sp.GetRequiredService<IMessageSerializer>(),
-            new Uri($"rabbitmq://{rabbitConfigurator.ClientHost}/")));
+            new Uri($"rabbitmq://{rabbitConfigurator.ClientHost}/"),
+            sp.GetRequiredService<ISendContextFactory>(),
+            sp.GetRequiredService<IPublishContextFactory>()));
 
         return builder;
     }
@@ -65,45 +69,24 @@ public sealed class ConnectionProvider
             return connection;
 
         await connectionLock.WaitAsync(cancellationToken);
-        try
-        {
-            if (connection?.IsOpen == true)
-                return connection;
+        if (connection?.IsOpen == true)
+            return connection;
 
-            var delay = TimeSpan.FromMilliseconds(100);
-            while (!cancellationToken.IsCancellationRequested)
+        var delay = TimeSpan.FromMilliseconds(100);
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            var conn = await connectionFactory.CreateConnectionAsync(cancellationToken);
+            conn.ConnectionShutdownAsync += (_, _) =>
             {
-                try
-                {
-                    var conn = await connectionFactory.CreateConnectionAsync(cancellationToken);
-                    conn.ConnectionShutdownAsync += (_, _) =>
-                    {
-                        connection?.Dispose();
-                        connection = null;
-                        return Task.CompletedTask;
-                    };
+                connection?.Dispose();
+                connection = null;
+                return Task.CompletedTask;
+            };
 
-                    connection = conn;
-                    return conn;
-                }
-                catch when (!cancellationToken.IsCancellationRequested)
-                {
-                    await Task.Delay(delay, cancellationToken);
-                    delay *= 2;
-                    if (delay > TimeSpan.FromSeconds(5))
-                        delay = TimeSpan.FromSeconds(5);
-                }
-            }
+            connection = conn;
+            return conn;
+        }
 
-            throw new OperationCanceledException("Cancelled while attempting to connect");
-        }
-        catch (ArgumentOutOfRangeException argumentOutOfRangeException)
-        {
-            throw;
-        }
-        finally
-        {
-            connectionLock.Release();
-        }
+        throw new OperationCanceledException("Cancelled while attempting to connect");
     }
 }

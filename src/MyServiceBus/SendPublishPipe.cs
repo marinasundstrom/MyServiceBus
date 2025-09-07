@@ -4,7 +4,7 @@ namespace MyServiceBus;
 
 public interface ISendPipe : IPipe<SendContext> { }
 
-public interface IPublishPipe : IPipe<SendContext> { }
+public interface IPublishPipe : IPipe<PublishContext> { }
 
 public class SendPipe : ISendPipe
 {
@@ -15,7 +15,7 @@ public class SendPipe : ISendPipe
 
 public class PublishPipe : IPublishPipe
 {
-    readonly IPipe<SendContext> pipe;
-    public PublishPipe(IPipe<SendContext> pipe) => this.pipe = pipe;
-    public Task Send(SendContext context) => pipe.Send(context);
+    readonly IPipe<PublishContext> pipe;
+    public PublishPipe(IPipe<PublishContext> pipe) => this.pipe = pipe;
+    public Task Send(PublishContext context) => pipe.Send(context);
 }

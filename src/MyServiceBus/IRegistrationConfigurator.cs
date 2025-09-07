@@ -18,7 +18,7 @@ public interface IRegistrationConfigurator
 
     void ConfigureSend(Action<PipeConfigurator<SendContext>> configure);
 
-    void ConfigurePublish(Action<PipeConfigurator<SendContext>> configure);
+    void ConfigurePublish(Action<PipeConfigurator<PublishContext>> configure);
 
     void SetSerializer<TSerializer>() where TSerializer : class, IMessageSerializer;
 

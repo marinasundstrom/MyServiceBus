@@ -59,7 +59,7 @@ public class GenericRequestClientTests
 
         await receive.Start();
 
-        var client = new GenericRequestClient<OrderRequest>(transportFactory, serializer);
+        var client = new GenericRequestClient<OrderRequest>(transportFactory, serializer, new SendContextFactory());
         await client.GetResponseAsync<OrderAccepted>(new OrderRequest { Accept = true });
 
         var addresses = await captured.Task;
@@ -107,7 +107,7 @@ public class GenericRequestClientTests
 
         await receive.Start();
 
-        var client = new GenericRequestClient<OrderRequest>(transportFactory, serializer);
+        var client = new GenericRequestClient<OrderRequest>(transportFactory, serializer, new SendContextFactory());
 
         var response = await client.GetResponseAsync<OrderAccepted, OrderRejected>(new OrderRequest { Accept = true });
         Assert.True(response.Is(out Response<OrderAccepted> accepted));
@@ -158,8 +158,8 @@ public class GenericRequestClientTests
 
         await receive.Start();
 
-        var client = new GenericRequestClient<OrderRequest>(transportFactory, serializer);
-        await Assert.ThrowsAsync<RequestFaultException>([Throws(typeof(UriFormatException), typeof(RequestFaultException), typeof(ArgumentOutOfRangeException))] () => client.GetResponseAsync<OrderAccepted, OrderRejected>(new OrderRequest { Accept = true }));
+        var client = new GenericRequestClient<OrderRequest>(transportFactory, serializer, new SendContextFactory());
+        await Assert.ThrowsAsync<RequestFaultException>([Throws(typeof(UriFormatException), typeof(RequestFaultException))] () => client.GetResponseAsync<OrderAccepted, OrderRejected>(new OrderRequest { Accept = true }));
 
         await receive.Stop();
     }
@@ -202,7 +202,7 @@ public class GenericRequestClientTests
 
         await receive.Start();
 
-        var client = new GenericRequestClient<OrderRequest>(transportFactory, serializer);
+        var client = new GenericRequestClient<OrderRequest>(transportFactory, serializer, new SendContextFactory());
         var response = await client.GetResponseAsync<OrderAccepted, Fault<OrderRequest>>(new OrderRequest { Accept = true });
 
         Assert.True(response.Is(out Response<Fault<OrderRequest>> faultResponse));

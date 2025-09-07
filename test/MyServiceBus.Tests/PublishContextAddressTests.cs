@@ -27,19 +27,20 @@ public class PublishContextAddressTests
     {
         public readonly CaptureSendTransport Transport = new();
 
+        [Throws(typeof(InvalidOperationException))]
         public Task<ISendTransport> GetSendTransport(Uri address, CancellationToken cancellationToken = default) => Task.FromResult<ISendTransport>(Transport);
         [Throws(typeof(NotImplementedException))]
         public Task<IReceiveTransport> CreateReceiveTransport(ReceiveEndpointTopology topology, Func<ReceiveContext, Task> handler, CancellationToken cancellationToken = default) => throw new NotImplementedException();
     }
 
     [Fact]
-    [Throws(typeof(ArgumentOutOfRangeException), typeof(UriFormatException))]
+    [Throws(typeof(UriFormatException))]
     public async Task Sets_source_and_destination_addresses()
     {
         var factory = new StubTransportFactory();
         var sendCfg = new PipeConfigurator<SendContext>();
-        var publishCfg = new PipeConfigurator<SendContext>();
-        var bus = new MessageBus(factory, new ServiceCollection().BuildServiceProvider(), new SendPipe(sendCfg.Build()), new PublishPipe(publishCfg.Build()), new EnvelopeMessageSerializer(), new Uri("rabbitmq://localhost/"));
+        var publishCfg = new PipeConfigurator<PublishContext>();
+        var bus = new MessageBus(factory, new ServiceCollection().BuildServiceProvider(), new SendPipe(sendCfg.Build()), new PublishPipe(publishCfg.Build()), new EnvelopeMessageSerializer(), new Uri("rabbitmq://localhost/"), new SendContextFactory(), new PublishContextFactory());
 
         await bus.PublishAsync(new TestMessage());
 

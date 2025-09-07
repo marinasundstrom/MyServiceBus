@@ -10,9 +10,22 @@ public static class MyServiceBusDiagnostics
     public const string TraceState = "tracestate";
 }
 
-public class OpenTelemetrySendFilter : IFilter<SendContext>
+public class OpenTelemetrySendFilter : IFilter<SendContext>, IFilter<PublishContext>
 {
     public async Task Send(SendContext context, IPipe<SendContext> next)
+    {
+        using var activity = MyServiceBusDiagnostics.ActivitySource.StartActivity("send", ActivityKind.Producer);
+        if (activity != null)
+        {
+            context.Headers[MyServiceBusDiagnostics.TraceParent] = activity.Id;
+            if (!string.IsNullOrEmpty(activity.TraceStateString))
+                context.Headers[MyServiceBusDiagnostics.TraceState] = activity.TraceStateString;
+        }
+
+        await next.Send(context).ConfigureAwait(false);
+    }
+
+    public async Task Send(PublishContext context, IPipe<PublishContext> next)
     {
         using var activity = MyServiceBusDiagnostics.ActivitySource.StartActivity("send", ActivityKind.Producer);
         if (activity != null)
