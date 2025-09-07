@@ -19,7 +19,9 @@ public static class MediatorServiceBusConfigurationBuilderExt
             sp.GetRequiredService<ISendPipe>(),
             sp.GetRequiredService<IPublishPipe>(),
             sp.GetRequiredService<IMessageSerializer>(),
-            new Uri("loopback://localhost/")));
+            new Uri("loopback://localhost/"),
+            sp.GetRequiredService<ISendContextFactory>(),
+            sp.GetRequiredService<IPublishContextFactory>()));
         return builder;
     }
 }

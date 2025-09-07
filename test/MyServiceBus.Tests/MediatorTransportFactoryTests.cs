@@ -85,9 +85,9 @@ public class MediatorTransportFactoryTests
             return Task.CompletedTask;
         }
 
-        public Task PublishAsync<TMessage>(object message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default) where TMessage : class => Task.CompletedTask;
+        public Task PublishAsync<TMessage>(object message, Action<IPublishContext>? contextCallback = null, CancellationToken cancellationToken = default) where TMessage : class => Task.CompletedTask;
 
-        public Task PublishAsync<TMessage>(TMessage message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default) where TMessage : class => Task.CompletedTask;
+        public Task PublishAsync<TMessage>(TMessage message, Action<IPublishContext>? contextCallback = null, CancellationToken cancellationToken = default) where TMessage : class => Task.CompletedTask;
 
         public Task<ISendEndpoint> GetSendEndpoint(Uri uri) =>
             Task.FromResult<ISendEndpoint>(new StubSendEndpoint());

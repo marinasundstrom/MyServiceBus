@@ -14,10 +14,13 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
     private readonly IPublishPipe _publishPipe;
     private readonly IMessageSerializer _messageSerializer;
     private readonly Uri _address;
+    private readonly ISendContextFactory _sendContextFactory;
+    private readonly IPublishContextFactory _publishContextFactory;
     private TMessage? message;
 
     public ConsumeContextImpl(ReceiveContext receiveContext, ITransportFactory transportFactory,
-        ISendPipe sendPipe, IPublishPipe publishPipe, IMessageSerializer messageSerializer, Uri address)
+        ISendPipe sendPipe, IPublishPipe publishPipe, IMessageSerializer messageSerializer, Uri address,
+        ISendContextFactory sendContextFactory, IPublishContextFactory publishContextFactory)
         : base(receiveContext.CancellationToken)
     {
         this.receiveContext = receiveContext;
@@ -26,6 +29,8 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
         _publishPipe = publishPipe;
         _messageSerializer = messageSerializer;
         _address = address;
+        _sendContextFactory = sendContextFactory;
+        _publishContextFactory = publishContextFactory;
     }
 
     internal ReceiveContext ReceiveContext => receiveContext;
@@ -34,31 +39,29 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
 
     public Task<ISendEndpoint> GetSendEndpoint(Uri uri)
     {
-        ISendEndpoint endpoint = new TransportSendEndpoint(_transportFactory, _sendPipe, _messageSerializer, uri, _address);
+        ISendEndpoint endpoint = new TransportSendEndpoint(_transportFactory, _sendPipe, _messageSerializer, uri, _address, _sendContextFactory);
         return Task.FromResult(endpoint);
     }
 
     [Throws(typeof(UriFormatException), typeof(InvalidOperationException), typeof(InvalidCastException))]
-    public async Task PublishAsync<T>(T message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default) where T : class
+    public async Task PublishAsync<T>(T message, Action<IPublishContext>? contextCallback = null, CancellationToken cancellationToken = default) where T : class
     {
         await PublishAsync<T>((object)message!, contextCallback, cancellationToken);
     }
 
     [Throws(typeof(UriFormatException), typeof(InvalidOperationException))]
-    public async Task PublishAsync<T>(object message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default) where T : class
+    public async Task PublishAsync<T>(object message, Action<IPublishContext>? contextCallback = null, CancellationToken cancellationToken = default) where T : class
     {
         var exchangeName = NamingConventions.GetExchangeName(typeof(T));
 
         var uri = new Uri(_address, $"exchange/{exchangeName}");
         var transport = await _transportFactory.GetSendTransport(uri, cancellationToken);
 
-        var context = new SendContext(MessageTypeCache.GetMessageTypes(typeof(T)), _messageSerializer, cancellationToken)
-        {
-            MessageId = Guid.NewGuid().ToString(),
-            SourceAddress = _address,
-            DestinationAddress = uri,
-            RoutingKey = exchangeName
-        };
+        var context = _publishContextFactory.Create(MessageTypeCache.GetMessageTypes(typeof(T)), _messageSerializer, cancellationToken);
+        context.MessageId = Guid.NewGuid().ToString();
+        context.SourceAddress = _address;
+        context.DestinationAddress = uri;
+        context.RoutingKey = exchangeName;
 
         contextCallback?.Invoke(context);
 
@@ -81,12 +84,10 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
 
         var transport = await _transportFactory.GetSendTransport(address, cancellationToken);
 
-        var context = new SendContext(MessageTypeCache.GetMessageTypes(typeof(T)), _messageSerializer, cancellationToken)
-        {
-            MessageId = Guid.NewGuid().ToString(),
-            SourceAddress = _address,
-            DestinationAddress = address
-        };
+        var context = _sendContextFactory.Create(MessageTypeCache.GetMessageTypes(typeof(T)), _messageSerializer, cancellationToken);
+        context.MessageId = Guid.NewGuid().ToString();
+        context.SourceAddress = _address;
+        context.DestinationAddress = address;
 
         contextCallback?.Invoke(context);
 
@@ -112,12 +113,10 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
         };
 
         var transport = await _transportFactory.GetSendTransport(address, cancellationToken);
-        var context = new SendContext(MessageTypeCache.GetMessageTypes(typeof(Fault<TMessage>)), _messageSerializer, cancellationToken)
-        {
-            MessageId = Guid.NewGuid().ToString(),
-            SourceAddress = _address,
-            DestinationAddress = address
-        };
+        var context = _sendContextFactory.Create(MessageTypeCache.GetMessageTypes(typeof(Fault<TMessage>)), _messageSerializer, cancellationToken);
+        context.MessageId = Guid.NewGuid().ToString();
+        context.SourceAddress = _address;
+        context.DestinationAddress = address;
 
         await _sendPipe.Send(context);
         await transport.Send(fault, context, cancellationToken);

@@ -10,15 +10,18 @@ public sealed class GenericRequestClient<TRequest> : IRequestClient<TRequest>, I
     private readonly IMessageSerializer _serializer;
     private readonly Uri? _destinationAddress;
     private readonly RequestTimeout _timeout;
+    private readonly ISendContextFactory _sendContextFactory;
 
     public GenericRequestClient(
         ITransportFactory transportFactory,
         IMessageSerializer serializer,
+        ISendContextFactory sendContextFactory,
         Uri? destinationAddress = null,
         RequestTimeout timeout = default)
     {
         _transportFactory = transportFactory;
         _serializer = serializer;
+        _sendContextFactory = sendContextFactory;
         _destinationAddress = destinationAddress;
         _timeout = timeout.TimeSpan == default ? RequestTimeout.Default : timeout;
     }
@@ -28,7 +31,7 @@ public sealed class GenericRequestClient<TRequest> : IRequestClient<TRequest>, I
 
     }
 
-    [Throws(typeof(UriFormatException), typeof(ArgumentOutOfRangeException), typeof(InvalidOperationException))]
+    [Throws(typeof(UriFormatException), typeof(InvalidOperationException), typeof(RequestFaultException))]
     public async Task<Response<T>> GetResponseAsync<T>(TRequest request, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default, RequestTimeout timeout = default) where T : class
     {
         var taskCompletionSource = new TaskCompletionSource<Response<T>>();
@@ -76,12 +79,10 @@ public sealed class GenericRequestClient<TRequest> : IRequestClient<TRequest>, I
         var requestSendTransport = await _transportFactory.GetSendTransport(requestAddress, cancellationToken);
 
         var responseAddress = new Uri($"rabbitmq://localhost/exchange/{responseExchange}?durable=false&autodelete=true");
-        var sendContext = new SendContext(MessageTypeCache.GetMessageTypes(typeof(TRequest)), _serializer, cancellationToken)
-        {
-            ResponseAddress = responseAddress,
-            FaultAddress = responseAddress,
-            MessageId = Guid.NewGuid().ToString()
-        };
+        var sendContext = _sendContextFactory.Create(MessageTypeCache.GetMessageTypes(typeof(TRequest)), _serializer, cancellationToken);
+        sendContext.ResponseAddress = responseAddress;
+        sendContext.FaultAddress = responseAddress;
+        sendContext.MessageId = Guid.NewGuid().ToString();
 
         contextCallback?.Invoke(sendContext);
 
@@ -106,7 +107,7 @@ public sealed class GenericRequestClient<TRequest> : IRequestClient<TRequest>, I
         }
     }
 
-    [Throws(typeof(UriFormatException), typeof(ArgumentOutOfRangeException), typeof(InvalidOperationException))]
+    [Throws(typeof(UriFormatException), typeof(InvalidOperationException), typeof(RequestFaultException))]
     public async Task<Response<T1, T2>> GetResponseAsync<T1, T2>(TRequest request, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default, RequestTimeout timeout = default)
         where T1 : class
         where T2 : class
@@ -163,12 +164,10 @@ public sealed class GenericRequestClient<TRequest> : IRequestClient<TRequest>, I
         var requestSendTransport = await _transportFactory.GetSendTransport(requestAddress, cancellationToken);
 
         var responseAddress = new Uri($"rabbitmq://localhost/exchange/{responseExchange}?durable=false&autodelete=true");
-        var sendContext = new SendContext(MessageTypeCache.GetMessageTypes(typeof(TRequest)), _serializer, cancellationToken)
-        {
-            ResponseAddress = responseAddress,
-            FaultAddress = responseAddress,
-            MessageId = Guid.NewGuid().ToString()
-        };
+        var sendContext = _sendContextFactory.Create(MessageTypeCache.GetMessageTypes(typeof(TRequest)), _serializer, cancellationToken);
+        sendContext.ResponseAddress = responseAddress;
+        sendContext.FaultAddress = responseAddress;
+        sendContext.MessageId = Guid.NewGuid().ToString();
 
         contextCallback?.Invoke(sendContext);
 

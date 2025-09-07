@@ -38,6 +38,7 @@ public class UnknownMessageTypeTests
 
     class StubTransportFactory : ITransportFactory
     {
+        [Throws(typeof(InvalidOperationException))]
         public Task<ISendTransport> GetSendTransport(Uri address, CancellationToken cancellationToken = default)
             => Task.FromResult<ISendTransport>(new StubSendTransport());
 
@@ -98,11 +99,11 @@ public class UnknownMessageTypeTests
         var provider = services.BuildServiceProvider();
 
         var bus = new MessageBus(new StubTransportFactory(), provider, new SendPipe(Pipe.Empty<SendContext>()),
-            new PublishPipe(Pipe.Empty<SendContext>()), new EnvelopeMessageSerializer(), new Uri("loopback://localhost/"));
+            new PublishPipe(Pipe.Empty<PublishContext>()), new EnvelopeMessageSerializer(), new Uri("loopback://localhost/"), new SendContextFactory(), new PublishContextFactory());
 
         var context = new TestReceiveContext(new object(), "urn:message:Unknown");
         var method = typeof(MessageBus).GetMethod("HandleMessageAsync", BindingFlags.Instance | BindingFlags.NonPublic);
-        await Should.ThrowAsync<UnknownMessageTypeException>([Throws(typeof(TargetException), typeof(TargetInvocationException))] () => (Task)method!.Invoke(bus, new object[] { context })!);
+        await Should.ThrowAsync<UnknownMessageTypeException>([Throws(typeof(TargetException), typeof(TargetInvocationException), typeof(TargetParameterCountException), typeof(MethodAccessException))] () => (Task)method!.Invoke(bus, new object[] { context })!);
 
         Assert.Contains(LogLevel.Warning, logger.Levels);
         Assert.Contains(logger.Messages, m => m.Contains("unregistered"));

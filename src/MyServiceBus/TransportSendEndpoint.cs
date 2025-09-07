@@ -12,14 +12,16 @@ internal class TransportSendEndpoint : ISendEndpoint
     readonly IMessageSerializer _serializer;
     readonly Uri _address;
     readonly Uri _sourceAddress;
+    readonly ISendContextFactory _contextFactory;
 
-    public TransportSendEndpoint(ITransportFactory transportFactory, ISendPipe sendPipe, IMessageSerializer serializer, Uri address, Uri sourceAddress)
+    public TransportSendEndpoint(ITransportFactory transportFactory, ISendPipe sendPipe, IMessageSerializer serializer, Uri address, Uri sourceAddress, ISendContextFactory contextFactory)
     {
         _transportFactory = transportFactory;
         _sendPipe = sendPipe;
         _serializer = serializer;
         _address = address;
         _sourceAddress = sourceAddress;
+        _contextFactory = contextFactory;
     }
 
     [Throws(typeof(InvalidOperationException))]
@@ -30,12 +32,10 @@ internal class TransportSendEndpoint : ISendEndpoint
     public async Task Send<T>(object message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default)
     {
         var transport = await _transportFactory.GetSendTransport(_address, cancellationToken);
-        var context = new SendContext(MessageTypeCache.GetMessageTypes(typeof(T)), _serializer, cancellationToken)
-        {
-            MessageId = Guid.NewGuid().ToString(),
-            SourceAddress = _sourceAddress,
-            DestinationAddress = _address
-        };
+        var context = _contextFactory.Create(MessageTypeCache.GetMessageTypes(typeof(T)), _serializer, cancellationToken);
+        context.MessageId = Guid.NewGuid().ToString();
+        context.SourceAddress = _sourceAddress;
+        context.DestinationAddress = _address;
 
         contextCallback?.Invoke(context);
 

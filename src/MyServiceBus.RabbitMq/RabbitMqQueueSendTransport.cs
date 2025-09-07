@@ -17,15 +17,14 @@ public sealed class RabbitMqQueueSendTransport : ISendTransport
         _queue = queue;
     }
 
+    [Throws(typeof(IOException))]
     public async Task Send<T>(T message, SendContext context, CancellationToken cancellationToken = default)
         where T : class
     {
         var body = await context.Serialize(message);
 
-        var props = new BasicProperties
-        {
-            Persistent = true
-        };
+        var rabbitContext = context as RabbitMqSendContext;
+        var props = rabbitContext?.Properties ?? new BasicProperties { Persistent = true };
 
         if (context.Headers != null)
         {
