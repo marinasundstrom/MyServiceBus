@@ -124,6 +124,12 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
         where TMessage : class
     {
         var messageType = consumer.Bindings.First().MessageType;
+        var messageUrn = NamingConventions.GetMessageUrn(messageType);
+        if (_consumers.ContainsKey(messageUrn))
+        {
+            _logger?.LogDebug("Consumer for '{MessageUrn}' already registered, skipping", messageUrn);
+            return;
+        }
 
         var topology = new ReceiveEndpointTopology
         {
@@ -147,11 +153,6 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
             cfg(configurator);
         configurator.UseFilter(new ConsumerMessageFilter<TConsumer, TMessage>(_serviceProvider));
         var pipe = new ConsumePipe<TMessage>(configurator.Build(_serviceProvider));
-
-        var messageUrn = NamingConventions.GetMessageUrn(messageType);
-
-        if (_consumers.ContainsKey(messageUrn))
-            return;
 
         _consumers.Add(messageUrn, (messageType, pipe));
         _activeTransports.Add(receiveTransport);

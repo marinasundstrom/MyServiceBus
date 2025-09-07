@@ -3,6 +3,8 @@ package com.myservicebus;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+import java.util.HashSet;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 
@@ -29,6 +31,7 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
     private final List<ReceiveTransport> receiveTransports = new ArrayList<>();
     private final URI address;
     private final BusTopology topology;
+    private final Set<String> consumers = new HashSet<>();
 
     public MessageBusImpl(ServiceProvider serviceProvider) {
         this.serviceProvider = serviceProvider;
@@ -70,6 +73,14 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
     }
 
     public void addConsumer(ConsumerTopology consumerDef) throws Exception {
+        String messageUrn = NamingConventions.getMessageUrn(consumerDef.getBindings().get(0).getMessageType());
+        if (consumers.contains(messageUrn)) {
+            if (logger != null) {
+                logger.debug("Consumer for '{}' already registered, skipping", messageUrn);
+            }
+            return;
+        }
+
         PipeConfigurator<ConsumeContext<Object>> configurator = new PipeConfigurator<>();
         configurator.useFilter(new OpenTelemetryConsumeFilter<>());
         @SuppressWarnings({ "unchecked", "rawtypes" })
@@ -136,6 +147,7 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
         ReceiveTransport transport = transportFactory.createReceiveTransport(consumerDef.getQueueName(),
                 consumerDef.getBindings(), handler, consumerDef.getPrefetchCount() != null ? consumerDef.getPrefetchCount() : 0);
         receiveTransports.add(transport);
+        consumers.add(messageUrn);
     }
 
     public <T> void addHandler(String queueName, Class<T> messageType, String exchange,

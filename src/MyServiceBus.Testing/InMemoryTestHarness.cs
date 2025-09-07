@@ -107,6 +107,9 @@ public class InMemoryTestHarness : IMessageBus, ITransportFactory, IReceiveEndpo
         if (provider == null)
             throw new InvalidOperationException("Service provider is required to add consumers");
 
+        if (handlers.ContainsKey(typeof(TMessage)))
+            return Task.CompletedTask;
+
         RegisterHandler<TMessage>([Throws(typeof(InvalidOperationException))] async (context) =>
         {
             using var scope = provider.CreateScope();
