@@ -19,6 +19,7 @@
   <ItemGroup>
     <ProjectReference Include="../../src/MyServiceBus/MyServiceBus.csproj" />
     <ProjectReference Include="../../src/MyServiceBus.Testing/MyServiceBus.Testing.csproj" />
+    <ProjectReference Include="../../src/MyServiceBus.Http/MyServiceBus.Http.csproj" />
   </ItemGroup>
 
   <ItemGroup>
