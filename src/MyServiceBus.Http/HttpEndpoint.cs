@@ -5,6 +5,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using MyServiceBus.Serialization;
 
 namespace MyServiceBus;
 
@@ -23,9 +24,19 @@ public class HttpEndpoint : IEndpoint
 
     public async Task Send<T>(T message, Action<ISendContext>? configure = null, CancellationToken cancellationToken = default)
     {
+        var context = new HttpSendContext(MessageTypeCache.GetMessageTypes(typeof(T)), new EnvelopeMessageSerializer(), cancellationToken);
+        configure?.Invoke(context);
+
         var json = JsonSerializer.Serialize(message);
-        using var content = new StringContent(json, Encoding.UTF8, "application/json");
-        await _client.PostAsync(_uri, content, cancellationToken);
+        using var request = new HttpRequestMessage(HttpMethod.Post, _uri)
+        {
+            Content = new StringContent(json, Encoding.UTF8, context.ContentType)
+        };
+
+        foreach (var header in context.Headers)
+            request.Headers.TryAddWithoutValidation(header.Key, header.Value?.ToString());
+
+        await _client.SendAsync(request, cancellationToken);
     }
 
     public async IAsyncEnumerable<ReceiveContext> ReadAsync(

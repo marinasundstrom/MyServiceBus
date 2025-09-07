@@ -5,6 +5,7 @@ import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import com.myservicebus.HttpSendContext;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -44,5 +45,20 @@ public class HttpEndpointTest {
         endpoint.send("hi").join();
         assertNotNull(lastExchange);
         assertEquals("POST", lastExchange.getRequestMethod());
+    }
+
+    @Test
+    public void send_applies_context() throws Exception {
+        var client = HttpClient.newHttpClient();
+        var endpoint = new HttpEndpoint(client, URI.create("http://localhost:" + server.getAddress().getPort() + "/hook"));
+        endpoint.send("hi", ctx -> {
+            if (ctx instanceof HttpSendContext h)
+            {
+                h.setContentType("text/plain");
+                h.getHeaders().put("X-Test", "42");
+            }
+        }).join();
+        assertEquals("text/plain", lastExchange.getRequestHeaders().getFirst("Content-Type"));
+        assertEquals("42", lastExchange.getRequestHeaders().getFirst("X-Test"));
     }
 }

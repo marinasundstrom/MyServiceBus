@@ -4,6 +4,7 @@ using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using Shouldly;
+using System.Linq;
 
 namespace MyServiceBus;
 
@@ -20,6 +21,27 @@ public class HttpEndpointTests
 
         handler.LastRequest.ShouldNotBeNull();
         handler.LastRequest!.RequestUri.ShouldBe(new Uri("https://example.com/hook"));
+    }
+
+    [Fact]
+    public async Task Send_applies_context_headers()
+    {
+        var handler = new CaptureHandler();
+        var client = new HttpClient(handler);
+        var endpoint = new HttpEndpoint(client, new Uri("https://example.com/hook"));
+
+        await endpoint.Send(new { Text = "hi" }, ctx =>
+        {
+            if (ctx is HttpSendContext hctx)
+            {
+                hctx.ContentType = "text/plain";
+                hctx.Headers["X-Test"] = "42";
+            }
+        });
+
+        handler.LastRequest.ShouldNotBeNull();
+        handler.LastRequest!.Content!.Headers.ContentType!.MediaType.ShouldBe("text/plain");
+        handler.LastRequest!.Headers.GetValues("X-Test").ShouldContain("42");
     }
 
     [Fact]

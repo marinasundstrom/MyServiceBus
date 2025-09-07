@@ -85,8 +85,8 @@ public sealed class RabbitMqSendTransport : ISendTransport
             }
         }
 
-        var routingKey = string.Empty;
-        if (context.Headers != null && context.Headers.TryGetValue("_routing_key", out var rk))
+        var routingKey = (context as IQueueSendContext)?.RoutingKey ?? string.Empty;
+        if (string.IsNullOrEmpty(routingKey) && context.Headers != null && context.Headers.TryGetValue("_routing_key", out var rk))
             routingKey = rk?.ToString() ?? string.Empty;
 
         await _channel.BasicPublishAsync(

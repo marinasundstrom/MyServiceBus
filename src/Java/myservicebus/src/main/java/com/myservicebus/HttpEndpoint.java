@@ -8,6 +8,7 @@ import java.net.http.HttpResponse;
 import java.util.EnumSet;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
+import com.myservicebus.tasks.CancellationToken;
 
 public class HttpEndpoint implements Endpoint {
     private final HttpClient client;
@@ -23,11 +24,16 @@ public class HttpEndpoint implements Endpoint {
 
     @Override
     public <T> CompletableFuture<Void> send(T message, Consumer<SendContext> configure) throws Exception {
+        HttpSendContext context = new HttpSendContext(message, CancellationToken.none);
+        if (configure != null)
+            configure.accept(context);
         String json = mapper.writeValueAsString(message);
-        HttpRequest request = HttpRequest.newBuilder(uri)
-                .header("Content-Type", "application/json")
+        HttpRequest.Builder builder = HttpRequest.newBuilder(uri)
                 .POST(HttpRequest.BodyPublishers.ofString(json))
-                .build();
+                .header("Content-Type", context.getContentType());
+        for (var entry : context.getHeaders().entrySet())
+            builder.header(entry.getKey(), entry.getValue().toString());
+        HttpRequest request = builder.build();
         return client.sendAsync(request, HttpResponse.BodyHandlers.discarding()).thenApply(r -> null);
     }
 
