@@ -96,7 +96,9 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
                         .orElse(null);
                 if (binding == null) {
                     logger.warn("Received message with unregistered type {}", messageTypeUrn);
-                    return CompletableFuture.completedFuture(null);
+                    CompletableFuture<Void> f = new CompletableFuture<>();
+                    f.completeExceptionally(new UnknownMessageTypeException(messageTypeUrn));
+                    return f;
                 }
 
                 Envelope<?> typedEnvelope = messageDeserializer.deserialize(transportMessage.getBody(),
@@ -159,7 +161,9 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
                 String expectedUrn = NamingConventions.getMessageUrn(messageType);
                 if (!expectedUrn.equals(messageTypeUrn)) {
                     logger.warn("Received message with unregistered type {}", messageTypeUrn);
-                    return CompletableFuture.completedFuture(null);
+                    CompletableFuture<Void> f = new CompletableFuture<>();
+                    f.completeExceptionally(new UnknownMessageTypeException(messageTypeUrn));
+                    return f;
                 }
 
                 Envelope<?> typedEnvelope = messageDeserializer.deserialize(tm.getBody(), messageType);

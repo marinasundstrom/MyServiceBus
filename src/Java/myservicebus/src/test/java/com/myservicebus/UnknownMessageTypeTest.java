@@ -1,9 +1,8 @@
 package com.myservicebus;
 
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.io.ByteArrayOutputStream;
-import java.io.PrintStream;
 import java.net.URI;
 import java.util.List;
 import java.util.Map;
@@ -44,7 +43,7 @@ class UnknownMessageTypeTest {
     }
 
     @Test
-    void logsWarningForUnregisteredMessageType() throws Exception {
+    void throwsForUnregisteredMessageType() throws Exception {
         StubTransportFactory transportFactory = new StubTransportFactory();
         ServiceCollection services = new ServiceCollection();
         services.addSingleton(TransportFactory.class, sp -> () -> transportFactory);
@@ -67,16 +66,7 @@ class UnknownMessageTypeTest {
         byte[] body = new EnvelopeMessageSerializer().serialize(ctx);
         TransportMessage tm = new TransportMessage(body, new java.util.HashMap<>());
 
-        ByteArrayOutputStream err = new ByteArrayOutputStream();
-        PrintStream originalErr = System.err;
-        System.setErr(new PrintStream(err));
-        try {
-            transportFactory.handler.apply(tm).join();
-        } finally {
-            System.setErr(originalErr);
-        }
-
-        String output = err.toString();
-        assertTrue(output.contains("unregistered"));
+        Exception ex = assertThrows(Exception.class, () -> transportFactory.handler.apply(tm).join());
+        assertTrue(ex.getCause() instanceof UnknownMessageTypeException);
     }
 }
