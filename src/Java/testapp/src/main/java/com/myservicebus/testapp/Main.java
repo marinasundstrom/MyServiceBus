@@ -33,23 +33,32 @@ public class Main {
             cfg.addConsumer(SubmitOrderConsumer.class);
             // cfg.addConsumer(OrderSubmittedConsumer.class);
             cfg.addConsumer(TestRequestConsumer.class);
+            cfg.addConsumer(SubmitOrderErrorConsumer.class);
         }, (context, cfg) -> {
             cfg.host(rabbitMqHost, h -> {
                 h.username("guest");
                 h.password("guest");
             });
 
-            cfg.receiveEndpoint("submit-order_error", e -> e.handler(SubmitOrder.class, ctx -> {
-                // inspect, fix, or forward the failed message
-                try {
-                    ctx.forward("queue:submit-order", ctx.getMessage()).get();
-                    System.out.println("➡️ Forwarded error message");
-                } catch (InterruptedException | ExecutionException e1) {
-                    // TODO Auto-generated catch block
-                    e1.printStackTrace();
-                }
-                return CompletableFuture.completedFuture(null);
-            }));
+            cfg.receiveEndpoint("submit-order_error", e -> {
+                e.configureConsumer(context, SubmitOrderErrorConsumer.class);
+
+                /*
+                 * e.handler(SubmitOrder.class, ctx -> {
+                 * var msg = ctx.getMessage();
+                 * System.out.println(msg.getOrderId());
+                 * // inspect, fix, or forward the failed message
+                 * try {
+                 * ctx.forward("queue:submit-order", msg).get();
+                 * System.out.println("➡️ Forwarded error message. Order id: " +
+                 * msg.getOrderId());
+                 * } catch (InterruptedException | ExecutionException e1) {
+                 * 
+                 * }
+                 * return CompletableFuture.completedFuture(null);
+                 * });
+                 */
+            });
 
             cfg.configureEndpoints(context);
         });
@@ -57,7 +66,7 @@ public class Main {
         ServiceProvider provider = services.buildServiceProvider();
         LoggerFactory loggerFactory = provider.getService(LoggerFactory.class);
         final Logger logger = loggerFactory != null ? loggerFactory.create(Main.class) : null;
-        MessageBus serviceBus = provider.getService(MessageBus.class);
+        MessageBus serviceBus = provider.getRequiredService(MessageBus.class);
 
         try {
             serviceBus.start();
