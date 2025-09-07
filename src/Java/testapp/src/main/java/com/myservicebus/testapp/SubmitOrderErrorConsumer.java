@@ -22,12 +22,10 @@ class SubmitOrderErrorConsumer implements Consumer<SubmitOrder> {
         var msg = context.getMessage();
         System.out.println(msg.getOrderId());
         // inspect, fix, or forward the failed message
-        try {
-            context.forward("queue:submit-order", msg).get();
-            System.out.println("➡️ Forwarded error message. Order id: " + msg.getOrderId());
-        } catch (InterruptedException | ExecutionException e1) {
 
-        }
+        // context.forward("queue:submit-order", msg).get();
+        // logger.info("➡️ Forwarded error message. Order id: " + msg.getOrderId());
+
         return CompletableFuture.completedFuture(null);
     }
 }
