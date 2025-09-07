@@ -10,7 +10,7 @@ import com.myservicebus.Fault;
 import com.myservicebus.logging.Logger;
 import com.myservicebus.logging.LoggerFactory;
 
-class SubmitOrderErrorConsumer implements Consumer<Fault<SubmitOrder>> {
+class SubmitOrderErrorConsumer implements Consumer<SubmitOrder> {
     private final Logger logger;
 
     @Inject
@@ -19,8 +19,8 @@ class SubmitOrderErrorConsumer implements Consumer<Fault<SubmitOrder>> {
     }
 
     @Override
-    public CompletableFuture<Void> consume(ConsumeContext<Fault<SubmitOrder>> context) throws Exception {
-        var msg = context.getMessage().getMessage();
+    public CompletableFuture<Void> consume(ConsumeContext<SubmitOrder> context) throws Exception {
+        var msg = context.getMessage();
         System.out.println(msg.getOrderId());
         // inspect, fix, or forward the failed message
         try {
