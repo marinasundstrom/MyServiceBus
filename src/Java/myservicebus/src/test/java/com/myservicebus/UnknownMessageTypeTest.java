@@ -1,6 +1,7 @@
 package com.myservicebus;
 
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.net.URI;
 import java.util.List;
@@ -65,6 +66,7 @@ class UnknownMessageTypeTest {
         byte[] body = new EnvelopeMessageSerializer().serialize(ctx);
         TransportMessage tm = new TransportMessage(body, new java.util.HashMap<>());
 
-        assertDoesNotThrow(() -> transportFactory.handler.apply(tm).join());
+        var ex = assertThrows(java.util.concurrent.CompletionException.class, () -> transportFactory.handler.apply(tm).join());
+        assertTrue(ex.getCause() instanceof UnknownMessageTypeException);
     }
 }

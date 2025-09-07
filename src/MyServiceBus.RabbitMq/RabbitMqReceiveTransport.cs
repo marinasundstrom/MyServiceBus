@@ -57,6 +57,20 @@ public sealed class RabbitMqReceiveTransport : IReceiveTransport
 
                 await _channel.BasicAckAsync(ea.DeliveryTag, multiple: false);
             }
+            catch (UnknownMessageTypeException)
+            {
+                if (_hasErrorQueue)
+                {
+                    await _channel.BasicPublishAsync(
+                        exchange: _queueName + "_skipped",
+                        routingKey: string.Empty,
+                        mandatory: false,
+                        basicProperties: props,
+                        body: payload);
+                }
+
+                await _channel.BasicAckAsync(ea.DeliveryTag, multiple: false);
+            }
             catch (Exception exc)
             {
                 await _channel.BasicAckAsync(ea.DeliveryTag, multiple: false);

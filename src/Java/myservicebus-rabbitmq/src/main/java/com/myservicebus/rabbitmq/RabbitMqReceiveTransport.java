@@ -12,6 +12,7 @@ import org.slf4j.LoggerFactory;
 import com.myservicebus.MessageHeaders;
 import com.myservicebus.ReceiveTransport;
 import com.myservicebus.TransportMessage;
+import com.myservicebus.UnknownMessageTypeException;
 import com.rabbitmq.client.AMQP;
 import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.DeliverCallback;
@@ -44,7 +45,11 @@ public class RabbitMqReceiveTransport implements ReceiveTransport {
                 try {
                     if (ex != null) {
                         Throwable cause = ex instanceof java.util.concurrent.CompletionException ? ex.getCause() : ex;
-                        logger.error("Message handling failed", cause);
+                        if (cause instanceof UnknownMessageTypeException) {
+                            channel.basicPublish(queueName + "_skipped", "", delivery.getProperties(), delivery.getBody());
+                        } else {
+                            logger.error("Message handling failed", cause);
+                        }
                     }
                     channel.basicAck(delivery.getEnvelope().getDeliveryTag(), false);
                 } catch (IOException ioEx) {
