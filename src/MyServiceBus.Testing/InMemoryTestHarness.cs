@@ -14,6 +14,7 @@ public class InMemoryTestHarness : IMessageBus, ITransportFactory, IReceiveEndpo
     readonly Dictionary<Type, List<Func<ReceiveContext, Task>>> handlers = new();
     readonly List<Func<ReceiveContext, Task>> receiveHandlers = new();
     readonly List<object> consumed = new();
+    readonly HashSet<Type> consumerTypes = new();
     readonly IServiceProvider? provider;
     readonly IBusTopology topology;
     readonly ISendContextFactory _sendContextFactory;
@@ -107,7 +108,7 @@ public class InMemoryTestHarness : IMessageBus, ITransportFactory, IReceiveEndpo
         if (provider == null)
             throw new InvalidOperationException("Service provider is required to add consumers");
 
-        if (handlers.ContainsKey(typeof(TMessage)))
+        if (!consumerTypes.Add(typeof(TConsumer)))
             return Task.CompletedTask;
 
         RegisterHandler<TMessage>([Throws(typeof(InvalidOperationException))] async (context) =>
@@ -144,7 +145,7 @@ public class InMemoryTestHarness : IMessageBus, ITransportFactory, IReceiveEndpo
         return Task.FromResult<IReceiveTransport>(new HarnessReceiveTransport(this, handler));
     }
 
-    internal Task InternalSend<T>(T message, SendContext context) where T : class
+    internal async Task InternalSend<T>(T message, SendContext context) where T : class
     {
         var messageId = Guid.TryParse(context.MessageId, out var id) ? id : Guid.NewGuid();
         Guid? correlationId = context.CorrelationId != null && Guid.TryParse(context.CorrelationId, out var cId) ? cId : null;
@@ -172,12 +173,14 @@ public class InMemoryTestHarness : IMessageBus, ITransportFactory, IReceiveEndpo
         lock (receiveHandlers)
             snapshot = receiveHandlers.ToList();
 
-        var tasks = snapshot.Select(h => h(receiveContext)).ToList();
+        foreach (var handler in snapshot)
+            await handler(receiveContext).ConfigureAwait(false);
 
         if (handlers.TryGetValue(message!.GetType(), out var list))
-            tasks.AddRange(list.Select(h => h(receiveContext)));
-
-        return Task.WhenAll(tasks);
+        {
+            foreach (var h in list)
+                await h(receiveContext).ConfigureAwait(false);
+        }
     }
 
     class TestConsumeContext<T> : ConsumeContext<T> where T : class
