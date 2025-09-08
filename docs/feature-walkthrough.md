@@ -305,6 +305,27 @@ response.as(Fault.class)
     .ifPresent(r -> System.out.println(r.getMessage().getExceptions().get(0).getMessage()));
 ```
 
+### Anonymous Messages
+
+MassTransit lets you pass anonymous objects that are mapped to message interfaces. MyServiceBus mirrors this behavior for send, publish, and respond in both languages.
+
+#### C#
+
+```csharp
+await bus.Publish<IOrder>(new { Id = 42 });
+await endpoint.Send<IOrder>(new { Id = 42 });
+await context.RespondAsync<IOrder>(new { Id = 42 });
+```
+
+#### Java
+
+```java
+bus.publish(Order.class, Map.of("id", 42));
+endpoint.send(Order.class, Map.of("id", 42));
+context.respond(Order.class, Map.of("id", 42));
+```
+
+Anonymous payloads must include properties that match the message interface; any missing members are defaulted.
 
 ### Adding Headers
 

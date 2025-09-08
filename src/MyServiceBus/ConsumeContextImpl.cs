@@ -71,7 +71,8 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
 
         await _publishPipe.Send(context);
         await _sendPipe.Send(context);
-        await transport.Send(message, context, cancellationToken);
+        var typed = message is T t ? t : (T)MessageProxy.Create(typeof(T), message);
+        await transport.Send(typed, context, cancellationToken);
     }
 
     [Throws(typeof(InvalidOperationException))]
@@ -96,7 +97,8 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
         contextCallback?.Invoke(context);
 
         await _sendPipe.Send(context);
-        await transport.Send(message, context, cancellationToken);
+        var typed = message is T t ? t : (T)MessageProxy.Create(typeof(T), message);
+        await transport.Send(typed, context, cancellationToken);
     }
 
     [Throws(typeof(InvalidOperationException))]
@@ -131,12 +133,12 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
         CancellationToken cancellationToken = default) where T : class
         => Send<T>(address, (object)message!, contextCallback, cancellationToken);
 
-    [Throws(typeof(InvalidOperationException))]
     public async Task Send<T>(Uri address, object message, Action<ISendContext>? contextCallback = null,
         CancellationToken cancellationToken = default) where T : class
     {
         var endpoint = await GetSendEndpoint(address).ConfigureAwait(false);
-        await endpoint.Send<T>(message, contextCallback, cancellationToken).ConfigureAwait(false);
+        var typed = message is T t ? t : (T)MessageProxy.Create(typeof(T), message);
+        await endpoint.Send<T>(typed, contextCallback, cancellationToken).ConfigureAwait(false);
     }
 
     [Throws(typeof(InvalidCastException))]

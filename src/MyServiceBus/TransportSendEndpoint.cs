@@ -28,11 +28,11 @@ internal class TransportSendEndpoint : ISendEndpoint
     }
 
     [Throws(typeof(InvalidOperationException))]
-    public Task Send<T>(T message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default)
+    public Task Send<T>(T message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default) where T : class
         => Send<T>((object)message!, contextCallback, cancellationToken);
 
     [Throws(typeof(InvalidOperationException))]
-    public async Task Send<T>(object message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default)
+    public async Task Send<T>(object message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default) where T : class
     {
         _logger?.LogDebug("Sending {MessageType} to {DestinationAddress}", typeof(T).Name, _address);
 
@@ -45,6 +45,7 @@ internal class TransportSendEndpoint : ISendEndpoint
         contextCallback?.Invoke(context);
 
         await _sendPipe.Send(context);
-        await transport.Send(message, context, cancellationToken);
+        var typed = message is T t ? t : (T)MessageProxy.Create(typeof(T), message);
+        await transport.Send(typed, context, cancellationToken);
     }
 }
