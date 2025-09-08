@@ -78,6 +78,7 @@ public class FaultHandlingTests
         public readonly CaptureSendTransport SendTransport = new();
         public Uri? Address { get; private set; }
 
+        [Throws(typeof(InvalidOperationException))]
         public Task<ISendTransport> GetSendTransport(Uri address, CancellationToken cancellationToken = default)
         {
             Address = address;
@@ -85,7 +86,7 @@ public class FaultHandlingTests
         }
 
         [Throws(typeof(NotImplementedException))]
-        public Task<IReceiveTransport> CreateReceiveTransport(ReceiveEndpointTopology topology, Func<ReceiveContext, Task> handler, Func<string?, bool>? isMessageTypeRegistered = null, CancellationToken cancellationToken = default)
+        public Task<IReceiveTransport> CreateReceiveTransport(EndpointDefinition definition, Func<ReceiveContext, Task> handler, Func<string?, bool>? isMessageTypeRegistered = null, CancellationToken cancellationToken = default)
             => throw new NotImplementedException();
     }
 

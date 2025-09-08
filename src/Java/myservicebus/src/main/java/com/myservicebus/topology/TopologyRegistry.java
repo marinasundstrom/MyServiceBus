@@ -37,7 +37,7 @@ public class TopologyRegistry implements BusTopology {
         return topology;
     }
 
-    public <TConsumer> void registerConsumer(Class<TConsumer> consumerType, String queueName, Consumer<PipeConfigurator<ConsumeContext<Object>>> configure, Class<?>... messageTypes) {
+    public <TConsumer> void registerConsumer(Class<TConsumer> consumerType, String address, Consumer<PipeConfigurator<ConsumeContext<Object>>> configure, Class<?>... messageTypes) {
         List<MessageBinding> bindings = new ArrayList<>();
         for (Class<?> mt : messageTypes) {
             MessageTopology msg = messages.stream()
@@ -51,7 +51,7 @@ public class TopologyRegistry implements BusTopology {
         }
         ConsumerTopology consumer = new ConsumerTopology();
         consumer.setConsumerType(consumerType);
-        consumer.setQueueName(queueName);
+        consumer.setAddress(address);
         consumer.setBindings(bindings);
         consumer.setConfigure(configure);
         consumers.add(consumer);

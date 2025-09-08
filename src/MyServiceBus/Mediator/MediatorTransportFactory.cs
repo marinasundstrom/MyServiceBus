@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using MyServiceBus.Serialization;
 using MyServiceBus.Topology;
 
@@ -20,12 +21,17 @@ public class MediatorTransportFactory : ITransportFactory
     }
 
     public Task<IReceiveTransport> CreateReceiveTransport(
-        ReceiveEndpointTopology topology,
+        EndpointDefinition definition,
         Func<ReceiveContext, Task> handler,
         Func<string?, bool>? isMessageTypeRegistered = null,
         CancellationToken cancellationToken = default)
     {
-        var transport = new MediatorReceiveTransport(this, topology.ExchangeName, handler);
+        var exchange = definition.Address;
+        if (definition.TransportSettings is IDictionary<string, object?> dict &&
+            dict.TryGetValue("ExchangeName", out var ex) && ex is string exName)
+            exchange = exName;
+
+        var transport = new MediatorReceiveTransport(this, exchange, handler);
         return Task.FromResult<IReceiveTransport>(transport);
     }
 
@@ -182,6 +188,7 @@ public class MediatorTransportFactory : ITransportFactory
         public IDictionary<string, object> Headers { get; }
         public DateTimeOffset SentTime { get; }
 
+        [Throws(typeof(ObjectDisposedException))]
         public bool TryGetMessage<T>(out T? message) where T : class
         {
             if (_message is T msg)

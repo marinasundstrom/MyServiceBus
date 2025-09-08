@@ -38,10 +38,11 @@ public class UnknownMessageTypeTests
 
     class StubTransportFactory : ITransportFactory
     {
+        [Throws(typeof(InvalidOperationException))]
         public Task<ISendTransport> GetSendTransport(Uri address, CancellationToken cancellationToken = default)
             => Task.FromResult<ISendTransport>(new StubSendTransport());
 
-        public Task<IReceiveTransport> CreateReceiveTransport(ReceiveEndpointTopology topology, Func<ReceiveContext, Task> handler, Func<string?, bool>? isMessageTypeRegistered = null, CancellationToken cancellationToken = default)
+        public Task<IReceiveTransport> CreateReceiveTransport(EndpointDefinition definition, Func<ReceiveContext, Task> handler, Func<string?, bool>? isMessageTypeRegistered = null, CancellationToken cancellationToken = default)
             => Task.FromResult<IReceiveTransport>(new StubReceiveTransport());
 
         class StubSendTransport : ISendTransport

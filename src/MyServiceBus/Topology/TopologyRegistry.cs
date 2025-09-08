@@ -32,7 +32,7 @@ public class TopologyRegistry : IBusTopology
     }
 
     [Throws(typeof(AmbiguousMatchException))]
-    public void RegisterConsumer<TConsumer>(string queueName, Delegate? configurePipe, params Type[] messageTypes)
+    public void RegisterConsumer<TConsumer>(string address, Delegate? configurePipe, params Type[] messageTypes)
     {
         var bindings = messageTypes.Select(mt =>
         {
@@ -43,7 +43,7 @@ public class TopologyRegistry : IBusTopology
         Consumers.Add(new ConsumerTopology
         {
             ConsumerType = typeof(TConsumer),
-            QueueName = queueName,
+            Address = address,
             Bindings = bindings,
             ConfigurePipe = configurePipe
         });

@@ -24,7 +24,7 @@ public class BusRegistrationConfigurator : IBusRegistrationConfigurator
         publishConfigurator.UseFilter(new OpenTelemetrySendFilter());
     }
 
-    [Throws(typeof(InvalidOperationException), typeof(TargetInvocationException), typeof(NotSupportedException), typeof(RegexMatchTimeoutException))]
+    [Throws(typeof(InvalidOperationException), typeof(TargetInvocationException), typeof(NotSupportedException), typeof(RegexMatchTimeoutException), typeof(AmbiguousMatchException))]
     public void AddConsumer<TConsumer>() where TConsumer : class, IConsumer
     {
         Services.AddScoped<TConsumer>();
@@ -33,13 +33,13 @@ public class BusRegistrationConfigurator : IBusRegistrationConfigurator
         var messageType = GetHandledMessageTypes(typeof(TConsumer)).First();
 
         _topology.RegisterConsumer<TConsumer>(
-          queueName: KebabCaseEndpointNameFormatter.Instance.Format(messageType),
-          configurePipe: null,
-          messageTypes: messageType
-      );
+            address: KebabCaseEndpointNameFormatter.Instance.Format(messageType),
+            configurePipe: null,
+            messageTypes: messageType
+        );
     }
 
-    [Throws(typeof(InvalidOperationException), typeof(RegexMatchTimeoutException))]
+    [Throws(typeof(InvalidOperationException), typeof(RegexMatchTimeoutException), typeof(AmbiguousMatchException))]
     public void AddConsumer<TConsumer, TMessage>(Action<PipeConfigurator<ConsumeContext<TMessage>>>? configure = null)
         where TConsumer : class, IConsumer<TMessage>
         where TMessage : class
@@ -48,7 +48,7 @@ public class BusRegistrationConfigurator : IBusRegistrationConfigurator
         Services.AddScoped<IConsumer, TConsumer>([Throws(typeof(InvalidOperationException))] (sp) => sp.GetRequiredService<TConsumer>());
 
         _topology.RegisterConsumer<TConsumer>(
-            queueName: KebabCaseEndpointNameFormatter.Instance.Format(typeof(TMessage)),
+            address: KebabCaseEndpointNameFormatter.Instance.Format(typeof(TMessage)),
             configurePipe: configure,
             messageTypes: typeof(TMessage));
     }

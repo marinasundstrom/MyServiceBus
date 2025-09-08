@@ -1,5 +1,6 @@
 using MyServiceBus.Serialization;
 using MyServiceBus.Topology;
+using System.Collections.Generic;
 using System.Reflection;
 
 namespace MyServiceBus;
@@ -32,20 +33,25 @@ public sealed class GenericRequestClient<TRequest> : IRequestClient<TRequest>, I
 
     }
 
-    [Throws(typeof(UriFormatException), typeof(InvalidOperationException), typeof(AmbiguousMatchException), typeof(RequestFaultException), typeof(TypeLoadException))]
+    [Throws(typeof(UriFormatException), typeof(InvalidOperationException), typeof(AmbiguousMatchException), typeof(TypeLoadException), typeof(RequestFaultException))]
     public async Task<Response<T>> GetResponseAsync<T>(TRequest request, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default, RequestTimeout timeout = default) where T : class
     {
         var taskCompletionSource = new TaskCompletionSource<Response<T>>();
 
         var responseExchange = $"resp-{Guid.NewGuid():N}";
-        var responseReceiveTopology = new ReceiveEndpointTopology
+        var responseEndpoint = new EndpointDefinition
         {
-            QueueName = responseExchange,
-            ExchangeName = responseExchange,
-            RoutingKey = "",
-            ExchangeType = "fanout",
-            Durable = false,
-            AutoDelete = true
+            Address = responseExchange,
+            ConfigureErrorEndpoint = false,
+            TransportSettings = new Dictionary<string, object?>
+            {
+                ["QueueName"] = responseExchange,
+                ["ExchangeName"] = responseExchange,
+                ["RoutingKey"] = string.Empty,
+                ["ExchangeType"] = "fanout",
+                ["Durable"] = false,
+                ["AutoDelete"] = true
+            }
         };
 
         IReceiveTransport? responseReceiveTransport = null;
@@ -72,7 +78,7 @@ public sealed class GenericRequestClient<TRequest> : IRequestClient<TRequest>, I
             }
         };
 
-        responseReceiveTransport = await _transportFactory.CreateReceiveTransport(responseReceiveTopology, responseHandler, null, cancellationToken);
+        responseReceiveTransport = await _transportFactory.CreateReceiveTransport(responseEndpoint, responseHandler, null, cancellationToken);
 
         await responseReceiveTransport.Start(cancellationToken);
 
@@ -108,7 +114,7 @@ public sealed class GenericRequestClient<TRequest> : IRequestClient<TRequest>, I
         }
     }
 
-    [Throws(typeof(UriFormatException), typeof(InvalidOperationException), typeof(AmbiguousMatchException), typeof(RequestFaultException), typeof(TypeLoadException))]
+    [Throws(typeof(UriFormatException), typeof(InvalidOperationException), typeof(AmbiguousMatchException), typeof(TypeLoadException), typeof(RequestFaultException))]
     public async Task<Response<T1, T2>> GetResponseAsync<T1, T2>(TRequest request, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default, RequestTimeout timeout = default)
         where T1 : class
         where T2 : class
@@ -116,14 +122,19 @@ public sealed class GenericRequestClient<TRequest> : IRequestClient<TRequest>, I
         var taskCompletionSource = new TaskCompletionSource<Response<T1, T2>>();
 
         var responseExchange = $"resp-{Guid.NewGuid():N}";
-        var responseReceiveTopology = new ReceiveEndpointTopology
+        var responseReceiveTopology = new EndpointDefinition
         {
-            QueueName = responseExchange,
-            ExchangeName = responseExchange,
-            RoutingKey = "",
-            ExchangeType = "fanout",
-            Durable = false,
-            AutoDelete = true
+            Address = responseExchange,
+            ConfigureErrorEndpoint = false,
+            TransportSettings = new Dictionary<string, object?>
+            {
+                ["QueueName"] = responseExchange,
+                ["ExchangeName"] = responseExchange,
+                ["RoutingKey"] = string.Empty,
+                ["ExchangeType"] = "fanout",
+                ["Durable"] = false,
+                ["AutoDelete"] = true
+            }
         };
 
         IReceiveTransport? responseReceiveTransport = null;

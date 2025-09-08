@@ -119,6 +119,7 @@ public class FaultQueueTests
     {
         public readonly Dictionary<Uri, CaptureSendTransport> Transports = new();
 
+        [Throws(typeof(InvalidOperationException))]
         public Task<ISendTransport> GetSendTransport(Uri address, CancellationToken cancellationToken = default)
         {
             if (!Transports.TryGetValue(address, out var transport))
@@ -130,7 +131,7 @@ public class FaultQueueTests
         }
 
         [Throws(typeof(NotImplementedException))]
-        public Task<IReceiveTransport> CreateReceiveTransport(ReceiveEndpointTopology topology, Func<ReceiveContext, Task> handler, Func<string?, bool>? isMessageTypeRegistered = null, CancellationToken cancellationToken = default)
+        public Task<IReceiveTransport> CreateReceiveTransport(EndpointDefinition definition, Func<ReceiveContext, Task> handler, Func<string?, bool>? isMessageTypeRegistered = null, CancellationToken cancellationToken = default)
             => throw new NotImplementedException();
     }
 }
