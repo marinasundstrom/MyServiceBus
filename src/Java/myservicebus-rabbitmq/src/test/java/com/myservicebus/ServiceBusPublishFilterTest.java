@@ -16,6 +16,7 @@ import com.myservicebus.di.ServiceCollection;
 import com.myservicebus.rabbitmq.ConnectionProvider;
 import com.rabbitmq.client.ConnectionFactory;
 import com.myservicebus.topology.MessageBinding;
+import com.myservicebus.serialization.MessageSerializer;
 
 class ServiceBusPublishFilterTest {
     @Test
@@ -42,16 +43,26 @@ class ServiceBusPublishFilterTest {
                 sp -> () -> new SendEndpointProviderImpl(
                         sp.getService(ConsumeContextProvider.class),
                         sp.getService(TransportSendEndpointProvider.class)));
-        services.addSingleton(TransportSendEndpointProvider.class, sp -> () -> uri -> new SendEndpoint() {
+        services.addSingleton(TransportSendEndpointProvider.class, sp -> () -> new TransportSendEndpointProvider() {
             @Override
-            public CompletableFuture<Void> send(SendContext ctx) {
-                return sp.getService(SendPipe.class).send(ctx);
+            public SendEndpoint getSendEndpoint(String uri) {
+                return new SendEndpoint() {
+                    @Override
+                    public CompletableFuture<Void> send(SendContext ctx) {
+                        return sp.getService(SendPipe.class).send(ctx);
+                    }
+
+                    @Override
+                    public <T> CompletableFuture<Void> send(T message,
+                            com.myservicebus.tasks.CancellationToken cancellationToken) {
+                        return send(new SendContext(message, cancellationToken));
+                    }
+                };
             }
 
             @Override
-            public <T> CompletableFuture<Void> send(T message,
-                    com.myservicebus.tasks.CancellationToken cancellationToken) {
-                return send(new SendContext(message, cancellationToken));
+            public TransportSendEndpointProvider withSerializer(MessageSerializer serializer) {
+                return this;
             }
         });
         services.addSingleton(ConnectionProvider.class, sp -> () -> new ConnectionProvider(new ConnectionFactory()));

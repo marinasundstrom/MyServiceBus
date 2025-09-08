@@ -127,7 +127,7 @@ public class InMemoryTestHarness : IMessageBus, ITransportFactory, IReceiveEndpo
 
     public Task AddHandler<TMessage>(string queueName, string exchangeName, Func<ConsumeContext<TMessage>, Task> handler,
         int? retryCount = null, TimeSpan? retryDelay = null, ushort? prefetchCount = null,
-        IDictionary<string, object?>? queueArguments = null, CancellationToken cancellationToken = default) where TMessage : class
+        IDictionary<string, object?>? queueArguments = null, IMessageSerializer? serializer = null, CancellationToken cancellationToken = default) where TMessage : class
     {
         RegisterHandler(handler);
         return Task.CompletedTask;

@@ -19,6 +19,7 @@ import com.myservicebus.NamingConventions;
 import com.myservicebus.di.ServiceCollection;
 import com.myservicebus.di.ServiceProvider;
 import com.myservicebus.topology.MessageBinding;
+import com.myservicebus.serialization.MessageSerializer;
 
 class ErrorQueueTest {
     static class MyMessage { }
@@ -35,18 +36,28 @@ class ErrorQueueTest {
         services.addSingleton(SendEndpointProvider.class,
                 sp -> () -> new SendEndpointProviderImpl(sp.getService(ConsumeContextProvider.class),
                         sp.getService(TransportSendEndpointProvider.class)));
-        services.addSingleton(TransportSendEndpointProvider.class, sp -> () -> uri -> new SendEndpoint() {
+        services.addSingleton(TransportSendEndpointProvider.class, sp -> () -> new TransportSendEndpointProvider() {
             @Override
-            public CompletableFuture<Void> send(SendContext ctx) {
-                if (uri.equals(factory.errorAddress)) {
-                    errorMessages.add(ctx);
-                }
-                return CompletableFuture.completedFuture(null);
+            public SendEndpoint getSendEndpoint(String uri) {
+                return new SendEndpoint() {
+                    @Override
+                    public CompletableFuture<Void> send(SendContext ctx) {
+                        if (uri.equals(factory.errorAddress)) {
+                            errorMessages.add(ctx);
+                        }
+                        return CompletableFuture.completedFuture(null);
+                    }
+
+                    @Override
+                    public <T> CompletableFuture<Void> send(T message, com.myservicebus.tasks.CancellationToken cancellationToken) {
+                        return send(new SendContext(message, cancellationToken));
+                    }
+                };
             }
 
             @Override
-            public <T> CompletableFuture<Void> send(T message, com.myservicebus.tasks.CancellationToken cancellationToken) {
-                return send(new SendContext(message, cancellationToken));
+            public TransportSendEndpointProvider withSerializer(MessageSerializer serializer) {
+                return this;
             }
         });
         services.addSingleton(TransportFactory.class, sp -> () -> factory);
@@ -56,7 +67,7 @@ class ErrorQueueTest {
 
         bus.addHandler("input", MyMessage.class, "input", ctx -> {
             return CompletableFuture.failedFuture(new RuntimeException("boom"));
-        }, null, null, null, null);
+        }, null, null, null, null, null);
 
         // simulate message arrival
         Map<String, Object> headers = new HashMap<>();

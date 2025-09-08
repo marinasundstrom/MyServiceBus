@@ -23,7 +23,7 @@ internal class PostBuildConfigureAction : IPostBuildAction
         if (_configurator is RabbitMqFactoryConfigurator cfg)
         {
             var bus = provider.GetRequiredService<IMessageBus>();
-            cfg.Apply(bus);
+            cfg.Apply(bus, provider);
         }
     }
 }

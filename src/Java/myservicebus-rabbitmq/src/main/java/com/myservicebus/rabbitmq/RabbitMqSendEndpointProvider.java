@@ -31,6 +31,11 @@ public class RabbitMqSendEndpointProvider implements TransportSendEndpointProvid
     }
 
     @Override
+    public TransportSendEndpointProvider withSerializer(MessageSerializer serializer) {
+        return new RabbitMqSendEndpointProvider(transportFactory, sendPipe, serializer, busAddress, sendContextFactory, loggerFactory);
+    }
+
+    @Override
     public SendEndpoint getSendEndpoint(String uri) {
         URI target = URI.create(uri);
         String path = target.getPath();

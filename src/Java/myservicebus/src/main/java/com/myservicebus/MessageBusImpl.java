@@ -15,6 +15,7 @@ import com.myservicebus.di.ServiceProvider;
 import com.myservicebus.logging.Logger;
 import com.myservicebus.logging.LoggerFactory;
 import com.myservicebus.serialization.MessageDeserializer;
+import com.myservicebus.serialization.MessageSerializer;
 import com.myservicebus.tasks.CancellationToken;
 import com.myservicebus.topology.BusTopology;
 import com.myservicebus.topology.ConsumerTopology;
@@ -106,6 +107,13 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
         configurator.useFilter(consumerFilter);
         Pipe<ConsumeContext<Object>> pipe = configurator.build(serviceProvider);
 
+        MessageSerializer endpointSerializer = consumerDef.getSerializerClass() != null
+                ? consumerDef.getSerializerClass().getDeclaredConstructor().newInstance()
+                : null;
+        TransportSendEndpointProvider provider = endpointSerializer != null
+                ? transportSendEndpointProvider.withSerializer(endpointSerializer)
+                : transportSendEndpointProvider;
+
         Function<TransportMessage, CompletableFuture<Void>> handler = transportMessage -> {
             try {
                 Envelope<Object> envelope = messageDeserializer.deserialize(transportMessage.getBody(), Object.class);
@@ -141,7 +149,7 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
                         faultAddress,
                         errorAddress,
                         CancellationToken.none,
-                        transportSendEndpointProvider,
+                        provider,
                         this.address);
                 return pipe.send(ctx);
             } catch (Exception e) {
@@ -163,7 +171,7 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
     public <T> void addHandler(String queueName, Class<T> messageType, String exchange,
             java.util.function.Function<ConsumeContext<T>, CompletableFuture<Void>> handler,
             Integer retryCount, java.time.Duration retryDelay, Integer prefetchCount,
-            java.util.Map<String, Object> queueArguments) throws Exception {
+            java.util.Map<String, Object> queueArguments, MessageSerializer serializer) throws Exception {
         PipeConfigurator<ConsumeContext<T>> configurator = new PipeConfigurator<>();
         configurator.useFilter(new OpenTelemetryConsumeFilter<>());
         @SuppressWarnings({ "unchecked", "rawtypes" })
@@ -177,6 +185,10 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
         }
         configurator.useFilter(new HandlerMessageFilter<>(handler));
         Pipe<ConsumeContext<T>> pipe = configurator.build(serviceProvider);
+
+        TransportSendEndpointProvider provider = serializer != null
+                ? transportSendEndpointProvider.withSerializer(serializer)
+                : transportSendEndpointProvider;
 
         java.util.function.Function<TransportMessage, CompletableFuture<Void>> transportHandler = tm -> {
             try {
@@ -201,7 +213,7 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
                 String errorAddress = transportFactory.getPublishAddress(queueName + "_error");
                 ConsumeContext<T> ctx = new ConsumeContext<>((T) typedEnvelope.getMessage(), typedEnvelope.getHeaders(),
                         typedEnvelope.getResponseAddress(), faultAddress, errorAddress, CancellationToken.none,
-                        transportSendEndpointProvider,
+                        provider,
                         this.address);
                 return pipe.send(ctx);
             } catch (Exception e) {

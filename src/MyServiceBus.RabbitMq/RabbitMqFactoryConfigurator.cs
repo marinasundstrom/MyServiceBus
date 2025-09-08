@@ -6,7 +6,7 @@ using System.Collections.Generic;
 internal sealed class RabbitMqFactoryConfigurator : IRabbitMqFactoryConfigurator
 {
     private readonly Dictionary<Type, string> _exchangeNames = new();
-    private readonly List<Action<IMessageBus>> _endpointActions = new();
+    private readonly List<Action<IMessageBus, IServiceProvider>> _endpointActions = new();
     private IEndpointNameFormatter? _endpointNameFormatter;
     public ushort PrefetchCount { get; private set; }
 
@@ -49,10 +49,10 @@ internal sealed class RabbitMqFactoryConfigurator : IRabbitMqFactoryConfigurator
         PrefetchCount = prefetchCount;
     }
 
-    internal void Apply(IMessageBus bus)
+    internal void Apply(IMessageBus bus, IServiceProvider provider)
     {
         foreach (var action in _endpointActions)
-            action(bus);
+            action(bus, provider);
     }
 }
 
