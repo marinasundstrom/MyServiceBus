@@ -23,6 +23,7 @@ The transport factory creates and caches send and receive transports.
 - Create classes implementing `ISendTransport` and `IReceiveTransport`.
 - Use `Task`-based APIs to send and receive message payloads.
 - Apply `Throws` attributes for any exceptions that may escape the method boundary.
+- For queue-based brokers, implement a receive context that also implements `IQueueReceiveContext`, populating `DeliveryCount`, `Destination`, and `BrokerProperties` from the transport's delivery tag, queue or exchange name, and header metadata.
 
 ### Java
 - Implement the `SendTransport` and `ReceiveTransport` interfaces.
