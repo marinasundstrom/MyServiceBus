@@ -30,7 +30,7 @@ public class DuplicateConsumerRegistrationTests
         var harness = provider.GetRequiredService<InMemoryTestHarness>();
 
         await harness.Start();
-        await harness.PublishAsync(new SubmitOrder(Guid.NewGuid()));
+        await harness.Publish(new SubmitOrder(Guid.NewGuid()));
 
         Assert.True(harness.Consumed.OfType<SubmitOrder>().Count() == 1);
 

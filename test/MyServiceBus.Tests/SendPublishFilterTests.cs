@@ -45,7 +45,7 @@ public class SendPublishFilterTests
             new SendPipe(sendCfg.Build()), new PublishPipe(publishCfg.Build()), new EnvelopeMessageSerializer(),
             new Uri("loopback://localhost/"), new SendContextFactory(), new PublishContextFactory());
 
-        await bus.PublishAsync(new TestMessage());
+        await bus.Publish(new TestMessage());
 
         Assert.True(sendExecuted);
         Assert.True(publishExecuted);

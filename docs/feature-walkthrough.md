@@ -746,7 +746,7 @@ public async Task publishes_order_submitted()
 
     harness.RegisterHandler<SubmitOrder>(async context =>
     {
-        await context.PublishAsync(new OrderSubmitted(context.Message.OrderId));
+        await context.Publish(new OrderSubmitted(context.Message.OrderId));
     });
 
     await harness.Send(new SubmitOrder { OrderId = Guid.NewGuid() });

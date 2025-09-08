@@ -38,7 +38,7 @@ public class InMemoryHarnessDiTests
 
         await harness.Start();
 
-        await harness.PublishAsync(new SubmitOrder(Guid.NewGuid()));
+        await harness.Publish(new SubmitOrder(Guid.NewGuid()));
 
         Assert.True(harness.WasConsumed<SubmitOrder>());
 

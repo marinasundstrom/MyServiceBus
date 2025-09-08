@@ -20,6 +20,6 @@ class SubmitOrderConsumer :
 
         var replica = Environment.GetEnvironmentVariable("HTTP_PORT") ?? Environment.MachineName;
 
-        await context.PublishAsync(new OrderSubmitted(context.Message.OrderId, replica));
+        await context.Publish(new OrderSubmitted(context.Message.OrderId, replica));
     }
 }

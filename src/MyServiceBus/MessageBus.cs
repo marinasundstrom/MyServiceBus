@@ -50,13 +50,13 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
     public IBusTopology Topology => _topology;
 
     [Throws(typeof(UriFormatException), typeof(InvalidOperationException), typeof(InvalidCastException))]
-    public Task PublishAsync<TMessage>(object message, Action<IPublishContext>? contextCallback = null, CancellationToken cancellationToken = default) where TMessage : class
+    public Task Publish<TMessage>(object message, Action<IPublishContext>? contextCallback = null, CancellationToken cancellationToken = default) where TMessage : class
     {
-        return PublishAsync((TMessage)message, contextCallback, cancellationToken);
+        return Publish((TMessage)message, contextCallback, cancellationToken);
     }
 
     [Throws(typeof(UriFormatException), typeof(InvalidOperationException))]
-    public async Task PublishAsync<T>(T message, Action<IPublishContext>? contextCallback = null, CancellationToken cancellationToken = default) where T : class
+    public async Task Publish<T>(T message, Action<IPublishContext>? contextCallback = null, CancellationToken cancellationToken = default) where T : class
     {
         var exchangeName = NamingConventions.GetExchangeName(message.GetType());
 
