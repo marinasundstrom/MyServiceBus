@@ -43,7 +43,7 @@ public class PublishHeaderTests
             new SendPipe(Pipe.Empty<SendContext>()), new PublishPipe(Pipe.Empty<PublishContext>()), new EnvelopeMessageSerializer(),
             new Uri("loopback://localhost/"), new SendContextFactory(), new PublishContextFactory());
 
-        await bus.PublishAsync(new TestMessage(), [Throws(typeof(NotSupportedException))] (ctx) => ctx.Headers["foo"] = "bar");
+        await bus.Publish(new TestMessage(), [Throws(typeof(NotSupportedException))] (ctx) => ctx.Headers["foo"] = "bar");
 
         Assert.NotNull(factory.Transport.Captured);
         Assert.True(factory.Transport.Captured!.Headers.ContainsKey("foo"));

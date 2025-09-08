@@ -29,7 +29,7 @@ public class AddConsumersTests
 
         await harness.Start();
 
-        await harness.PublishAsync(new Ping(Guid.NewGuid()));
+        await harness.Publish(new Ping(Guid.NewGuid()));
 
         Assert.True(harness.WasConsumed<Ping>());
 

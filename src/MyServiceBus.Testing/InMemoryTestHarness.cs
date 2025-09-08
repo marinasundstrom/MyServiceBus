@@ -82,10 +82,10 @@ public class InMemoryTestHarness : IMessageBus, ITransportFactory, IReceiveEndpo
     public bool WasConsumed<T>() where T : class => consumed.OfType<T>().Any();
 
     [Throws(typeof(InvalidCastException))]
-    public Task PublishAsync<TMessage>(object message, Action<IPublishContext>? contextCallback = null, CancellationToken cancellationToken = default) where TMessage : class
-        => PublishAsync((TMessage)message, contextCallback, cancellationToken);
+    public Task Publish<TMessage>(object message, Action<IPublishContext>? contextCallback = null, CancellationToken cancellationToken = default) where TMessage : class
+        => Publish((TMessage)message, contextCallback, cancellationToken);
 
-    public Task PublishAsync<T>(T message, Action<IPublishContext>? contextCallback = null, CancellationToken cancellationToken = default) where T : class
+    public Task Publish<T>(T message, Action<IPublishContext>? contextCallback = null, CancellationToken cancellationToken = default) where T : class
     {
         var serializer = provider?.GetService<IMessageSerializer>() ?? new EnvelopeMessageSerializer();
         var publishContext = _publishContextFactory.Create(MessageTypeCache.GetMessageTypes(typeof(T)), serializer, cancellationToken);
@@ -201,15 +201,31 @@ public class InMemoryTestHarness : IMessageBus, ITransportFactory, IReceiveEndpo
 
         public Task<ISendEndpoint> GetSendEndpoint(Uri uri) => Task.FromResult<ISendEndpoint>(new HarnessSendEndpoint(harness));
         [Throws(typeof(InvalidCastException))]
-        public Task PublishAsync<TMessage>(object message, Action<IPublishContext>? contextCallback = null, CancellationToken cancellationToken = default) where TMessage : class
-            => harness.PublishAsync((TMessage)message, contextCallback, cancellationToken);
-        public Task PublishAsync<TMessage>(TMessage message, Action<IPublishContext>? contextCallback = null, CancellationToken cancellationToken = default) where TMessage : class
-            => harness.PublishAsync(message, contextCallback, cancellationToken);
-        public Task RespondAsync<TMessage>(TMessage message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default)
-            => harness.PublishAsync((dynamic)message!, contextCallback != null ? new Action<IPublishContext>(ctx => contextCallback(ctx)) : null, cancellationToken);
+        public Task Publish<TMessage>(object message, Action<IPublishContext>? contextCallback = null, CancellationToken cancellationToken = default) where TMessage : class
+            => harness.Publish((TMessage)message, contextCallback, cancellationToken);
+
+        public Task Publish<TMessage>(TMessage message, Action<IPublishContext>? contextCallback = null, CancellationToken cancellationToken = default) where TMessage : class
+            => harness.Publish(message, contextCallback, cancellationToken);
+
+        public Task RespondAsync<TMessage>(TMessage message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default) where TMessage : class
+            => harness.Publish((dynamic)message!, contextCallback != null ? new Action<IPublishContext>(ctx => contextCallback(ctx)) : null, cancellationToken);
+
+        public Task RespondAsync<TMessage>(object message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default) where TMessage : class
+            => harness.Publish((dynamic)message!, contextCallback != null ? new Action<IPublishContext>(ctx => contextCallback(ctx)) : null, cancellationToken);
+
+        public Task Send<TMessage>(Uri address, TMessage message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default) where TMessage : class
+            => Send<TMessage>(address, (object)message!, contextCallback, cancellationToken);
+
+        public async Task Send<TMessage>(Uri address, object message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default) where TMessage : class
+        {
+            var endpoint = await GetSendEndpoint(address).ConfigureAwait(false);
+            await endpoint.Send<TMessage>(message, contextCallback, cancellationToken).ConfigureAwait(false);
+        }
+
         [Throws(typeof(InvalidCastException))]
         public Task Forward<T>(Uri address, T message, CancellationToken cancellationToken = default) where T : class
             => Forward<T>(address, (object)message!, cancellationToken);
+
         public async Task Forward<T>(Uri address, object message, CancellationToken cancellationToken = default) where T : class
         {
             var endpoint = await GetSendEndpoint(address).ConfigureAwait(false);
@@ -224,9 +240,9 @@ public class InMemoryTestHarness : IMessageBus, ITransportFactory, IReceiveEndpo
         public HarnessSendEndpoint(InMemoryTestHarness harness) => this.harness = harness;
 
         public Task Send<T>(object message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default)
-            => harness.PublishAsync((dynamic)message!, contextCallback != null ? new Action<IPublishContext>(ctx => contextCallback(ctx)) : null, cancellationToken);
+            => harness.Publish((dynamic)message!, contextCallback != null ? new Action<IPublishContext>(ctx => contextCallback(ctx)) : null, cancellationToken);
         public Task Send<T>(T message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default)
-            => harness.PublishAsync((dynamic)message!, contextCallback != null ? new Action<IPublishContext>(ctx => contextCallback(ctx)) : null, cancellationToken);
+            => harness.Publish((dynamic)message!, contextCallback != null ? new Action<IPublishContext>(ctx => contextCallback(ctx)) : null, cancellationToken);
     }
 
     class HarnessReceiveTransport : IReceiveTransport

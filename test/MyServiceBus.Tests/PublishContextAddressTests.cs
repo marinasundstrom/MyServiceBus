@@ -42,7 +42,7 @@ public class PublishContextAddressTests
         var publishCfg = new PipeConfigurator<PublishContext>();
         var bus = new MessageBus(factory, new ServiceCollection().BuildServiceProvider(), new SendPipe(sendCfg.Build()), new PublishPipe(publishCfg.Build()), new EnvelopeMessageSerializer(), new Uri("rabbitmq://localhost/"), new SendContextFactory(), new PublishContextFactory());
 
-        await bus.PublishAsync(new TestMessage());
+        await bus.Publish(new TestMessage());
 
         Assert.Equal(bus.Address, factory.Transport.Captured!.SourceAddress);
         Assert.Equal(new Uri(bus.Address, $"exchange/{NamingConventions.GetExchangeName(typeof(TestMessage))}"), factory.Transport.Captured.DestinationAddress);

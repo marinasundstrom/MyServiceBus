@@ -46,7 +46,7 @@ class PublishingService
 
       public PublishingService(IPublishEndpoint publishEndpoint) => this.publishEndpoint = publishEndpoint;
 
-      public Task Submit(Guid value) => publishEndpoint.PublishAsync(new ValueSubmitted(value));
+      public Task Submit(Guid value) => publishEndpoint.Publish(new ValueSubmitted(value));
 }
 
 var services = new ServiceCollection();

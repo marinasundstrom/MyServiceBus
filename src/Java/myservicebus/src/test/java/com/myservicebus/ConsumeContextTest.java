@@ -84,6 +84,26 @@ public class ConsumeContextTest {
     }
 
     @Test
+    public void sendUsesQueueUri() {
+        class CapturingProvider implements SendEndpointProvider {
+            String uri;
+
+            @Override
+            public SendEndpoint getSendEndpoint(String uri) {
+                this.uri = uri;
+                return new StubSendEndpoint();
+            }
+        }
+
+        CapturingProvider provider = new CapturingProvider();
+        ConsumeContext<FakeMessage> ctx = new ConsumeContext<>(new FakeMessage(), Map.of(), provider);
+
+        ctx.send("queue:send-queue", new FakeMessage(), CancellationToken.none).join();
+
+        Assertions.assertEquals("queue:send-queue", provider.uri);
+    }
+
+    @Test
     public void forwardCopiesHeaders() {
         AtomicReference<SendContext> captured = new AtomicReference<>();
         SendEndpointProvider provider = uri -> new SendEndpoint() {
@@ -129,5 +149,28 @@ public class ConsumeContextTest {
 
         Assertions.assertEquals(URI.create("rabbitmq://localhost/"), captured.get().getSourceAddress());
         Assertions.assertEquals(URI.create("rabbitmq://localhost/exchange/TestApp:FakeMessage"), captured.get().getDestinationAddress());
+    }
+
+    @Test
+    public void respondUsesResponseAddress() {
+        AtomicReference<String> uriRef = new AtomicReference<>();
+        SendEndpointProvider provider = uri -> new SendEndpoint() {
+            @Override
+            public CompletableFuture<Void> send(SendContext ctx) {
+                uriRef.set(uri);
+                return CompletableFuture.completedFuture(null);
+            }
+
+            @Override
+            public <T> CompletableFuture<Void> send(T message, CancellationToken cancellationToken) {
+                return send(new SendContext(message, cancellationToken));
+            }
+        };
+
+        ConsumeContext<FakeMessage> ctx = new ConsumeContext<>(new FakeMessage(), Map.of(), "queue:response", null, CancellationToken.none, provider);
+
+        ctx.respond(new FakeMessage()).join();
+
+        Assertions.assertEquals("queue:response", uriRef.get());
     }
 }
