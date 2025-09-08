@@ -41,6 +41,8 @@ When overriding members, keep `[Throws]` declarations compatible with the base m
 
 The analyzer reports diagnostics such as `THROWS001` when an exception isn't declared or handled. Treat these diagnostics as warnings and resolve them in the code—avoid automatic fixes that add clutter.
 
+`dotnet format` applies analyzer code fixes by default. When run against files with unchecked `THROWS` diagnostics, it will sprinkle `[Throws]` attributes everywhere to satisfy the warnings. This creates noisy declarations that you then have to manually triage. To prevent this, run `dotnet format` with only style and whitespace fixes (for example, `dotnet format --fix-style --fix-whitespace`) or revert any auto-added `[Throws]` attributes.
+
 ## Exception classification
 
 The analyzer mirrors Java's checked-vs.-runtime distinction. By default, all exceptions are treated as *Strict* (checked), requiring a `try`/`catch` or a `[Throws]` declaration. Exceptions that represent programming errors or cancellation are configured as unchecked in `CheckedExceptions.settings.json` using the `Ignored` or `Informational` classifications. Examples include `ArgumentException`, `InvalidOperationException`, `NullReferenceException`, `OperationCanceledException`, `TaskCanceledException`, and `NotImplementedException`.
