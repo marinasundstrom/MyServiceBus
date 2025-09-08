@@ -5,6 +5,7 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Consumer;
 import java.net.URI;
 
 import com.myservicebus.tasks.CancellationToken;
@@ -109,6 +110,21 @@ public class ConsumeContext<T>
         return respond(ctx);
     }
 
+    public <TMessage> CompletableFuture<Void> respond(TMessage message) {
+        return respond(message, CancellationToken.none);
+    }
+
+    public <TMessage> CompletableFuture<Void> respond(TMessage message, Consumer<SendContext> contextCallback,
+            CancellationToken cancellationToken) {
+        SendContext ctx = new SendContext(message, cancellationToken);
+        contextCallback.accept(ctx);
+        return respond(ctx);
+    }
+
+    public <TMessage> CompletableFuture<Void> respond(TMessage message, Consumer<SendContext> contextCallback) {
+        return respond(message, contextCallback, CancellationToken.none);
+    }
+
     @Override
     public CompletableFuture<Void> respond(SendContext context) {
         if (responseAddress == null) {
@@ -123,6 +139,17 @@ public class ConsumeContext<T>
     public <TMessage> CompletableFuture<Void> send(String destination, TMessage message, CancellationToken cancellationToken) {
         SendEndpoint endpoint = getSendEndpoint(destination);
         return endpoint.send(message, cancellationToken);
+    }
+
+    public <TMessage> CompletableFuture<Void> send(String destination, TMessage message,
+            Consumer<SendContext> contextCallback, CancellationToken cancellationToken) {
+        SendEndpoint endpoint = getSendEndpoint(destination);
+        return endpoint.send(message, contextCallback, cancellationToken);
+    }
+
+    public <TMessage> CompletableFuture<Void> send(String destination, TMessage message,
+            Consumer<SendContext> contextCallback) {
+        return send(destination, message, contextCallback, CancellationToken.none);
     }
 
     public <TMessage> CompletableFuture<Void> send(String destination, TMessage message) {

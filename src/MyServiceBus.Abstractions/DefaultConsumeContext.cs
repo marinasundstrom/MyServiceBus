@@ -18,7 +18,13 @@ public class DefaultConsumeContext<TMessage> : BasePipeContext, ConsumeContext<T
 
     public TMessage Message { get; }
 
-    public Task RespondAsync<T>(T message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default)
+    public Task RespondAsync<T>(T message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default) where T : class
+    {
+        return Task.CompletedTask;
+    }
+
+    public Task RespondAsync<T>(object message, Action<ISendContext>? contextCallback = null,
+        CancellationToken cancellationToken = default) where T : class
     {
         return Task.CompletedTask;
     }
@@ -31,6 +37,22 @@ public class DefaultConsumeContext<TMessage> : BasePipeContext, ConsumeContext<T
     public Task PublishAsync<T>(T message, Action<IPublishContext>? contextCallback = null, CancellationToken cancellationToken = default) where T : class
     {
         return Task.CompletedTask;
+    }
+
+    [Throws(typeof(InvalidCastException))]
+    public Task Send<T>(Uri address, T message, Action<ISendContext>? contextCallback = null,
+        CancellationToken cancellationToken = default) where T : class
+        => Send<T>(address, (object)message!, contextCallback, cancellationToken);
+
+    [Throws(typeof(InvalidOperationException))]
+    public async Task Send<T>(Uri address, object message, Action<ISendContext>? contextCallback = null,
+        CancellationToken cancellationToken = default) where T : class
+    {
+        if (sendEndpointProvider == null)
+            throw new InvalidOperationException("SendEndpointProvider not configured");
+
+        var endpoint = await sendEndpointProvider.GetSendEndpoint(address).ConfigureAwait(false);
+        await endpoint.Send<T>(message, contextCallback, cancellationToken).ConfigureAwait(false);
     }
 
     [Throws(typeof(InvalidCastException))]

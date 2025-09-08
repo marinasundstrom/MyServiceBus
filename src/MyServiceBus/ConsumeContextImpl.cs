@@ -75,13 +75,13 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
     }
 
     [Throws(typeof(InvalidOperationException))]
-    public async Task RespondAsync<T>(T message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default)
+    public async Task RespondAsync<T>(T message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default) where T : class
     {
-        await RespondAsync<T>((object)message, contextCallback, cancellationToken);
+        await RespondAsync<T>((object)message!, contextCallback, cancellationToken);
     }
 
     [Throws(typeof(InvalidOperationException))]
-    public async Task RespondAsync<T>(object message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default)
+    public async Task RespondAsync<T>(object message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default) where T : class
     {
         var address = receiveContext.ResponseAddress ??
                       throw new InvalidOperationException("ResponseAddress not specified");
@@ -124,6 +124,19 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
 
         await _sendPipe.Send(context);
         await transport.Send(fault, context, cancellationToken);
+    }
+
+    [Throws(typeof(InvalidCastException))]
+    public Task Send<T>(Uri address, T message, Action<ISendContext>? contextCallback = null,
+        CancellationToken cancellationToken = default) where T : class
+        => Send<T>(address, (object)message!, contextCallback, cancellationToken);
+
+    [Throws(typeof(InvalidOperationException))]
+    public async Task Send<T>(Uri address, object message, Action<ISendContext>? contextCallback = null,
+        CancellationToken cancellationToken = default) where T : class
+    {
+        var endpoint = await GetSendEndpoint(address).ConfigureAwait(false);
+        await endpoint.Send<T>(message, contextCallback, cancellationToken).ConfigureAwait(false);
     }
 
     [Throws(typeof(InvalidCastException))]
