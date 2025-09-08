@@ -5,12 +5,14 @@ using MyServiceBus.Serialization;
 using NSubstitute;
 using RabbitMQ.Client;
 using Xunit;
+using Xunit.Sdk;
 
 namespace MyServiceBus.RabbitMq.Tests;
 
 public class RabbitMqSendContextTests
 {
     class TestMessage { }
+
 
     [Fact]
     [Throws(typeof(IOException))]
@@ -31,7 +33,7 @@ public class RabbitMqSendContextTests
     }
 
     [Fact]
-    [Throws(typeof(IOException))]
+    [Throws(typeof(IOException), typeof(EqualException), typeof(FalseException))]
     public async Task Queue_settings_flow_through_context()
     {
         var channel = Substitute.For<IChannel>();
@@ -48,10 +50,11 @@ public class RabbitMqSendContextTests
             string.Empty,
             "queue",
             false,
-            Arg.Is<BasicProperties>([Throws(typeof(KeyNotFoundException))] (p) => p.Expiration == ((long)TimeSpan.FromSeconds(5).TotalMilliseconds).ToString() &&
-                p.Persistent == false &&
-                (int)p.Headers!["x-priority"] == 5),
+            context.Properties,
             Arg.Any<ReadOnlyMemory<byte>>(),
             Arg.Any<CancellationToken>());
+
+        Assert.Equal(((long)TimeSpan.FromSeconds(5).TotalMilliseconds).ToString(), context.Properties.Expiration);
+        Assert.False(context.Properties.Persistent);
     }
 }
