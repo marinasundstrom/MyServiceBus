@@ -14,7 +14,7 @@ public class RabbitMqReceiveTransportTests
 {
     [Fact]
     [Throws(typeof(ArrayTypeMismatchException), typeof(EncoderFallbackException))]
-    public async Task Nacks_message_when_handler_fails()
+    public async Task Acks_message_when_handler_fails()
     {
         var channel = Substitute.For<IChannel>();
         AsyncEventingBasicConsumer? consumer = null;
@@ -50,8 +50,8 @@ public class RabbitMqReceiveTransportTests
         await consumer!.HandleBasicDeliverAsync("tag", 1, false, "ex", "rk", props, body, CancellationToken.None);
 
         await channel.Received()
-            .BasicNackAsync(1, false, true, Arg.Any<CancellationToken>());
+            .BasicAckAsync(1, false, Arg.Any<CancellationToken>());
         await channel.DidNotReceive()
-            .BasicAckAsync(Arg.Any<ulong>(), Arg.Any<bool>(), Arg.Any<CancellationToken>());
+            .BasicNackAsync(Arg.Any<ulong>(), Arg.Any<bool>(), Arg.Any<bool>(), Arg.Any<CancellationToken>());
     }
 }
