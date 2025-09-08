@@ -85,14 +85,21 @@ public class RabbitMqTransportFactoryTests
         var provider = new ConnectionProvider(factory);
         var transportFactory = new RabbitMqTransportFactory(provider, new TestRabbitMqFactoryConfigurator());
 
-        var topology = new ReceiveEndpointTopology
+        var endpoint = new EndpointDefinition
         {
-            QueueName = "submit-order-queue",
-            ExchangeName = "submit-order-exchange",
-            RoutingKey = string.Empty
+            Address = "submit-order-queue",
+            TransportSettings = new RabbitMqEndpointSettings
+            {
+                QueueName = "submit-order-queue",
+                ExchangeName = "submit-order-exchange",
+                RoutingKey = string.Empty,
+                ExchangeType = "fanout",
+                Durable = true,
+                AutoDelete = false
+            }
         };
 
-        await transportFactory.CreateReceiveTransport(topology, _ => Task.CompletedTask, null);
+        await transportFactory.CreateReceiveTransport(endpoint, _ => Task.CompletedTask, null);
 
         mainQueueArgs.ShouldBeNull();
         await channel.Received(1).QueueDeclareAsync(
@@ -182,15 +189,22 @@ public class RabbitMqTransportFactoryTests
         var provider = new ConnectionProvider(factory);
         var transportFactory = new RabbitMqTransportFactory(provider, new TestRabbitMqFactoryConfigurator());
 
-        var topology = new ReceiveEndpointTopology
+        var endpoint = new EndpointDefinition
         {
-            QueueName = "submit-order-queue",
-            ExchangeName = "submit-order-exchange",
-            RoutingKey = string.Empty,
-            QueueArguments = new Dictionary<string, object?> { ["x-queue-type"] = "quorum" }
+            Address = "submit-order-queue",
+            TransportSettings = new RabbitMqEndpointSettings
+            {
+                QueueName = "submit-order-queue",
+                ExchangeName = "submit-order-exchange",
+                RoutingKey = string.Empty,
+                ExchangeType = "fanout",
+                Durable = true,
+                AutoDelete = false,
+                QueueArguments = new Dictionary<string, object?> { ["x-queue-type"] = "quorum" }
+            }
         };
 
-        await transportFactory.CreateReceiveTransport(topology, _ => Task.CompletedTask, null);
+        await transportFactory.CreateReceiveTransport(endpoint, _ => Task.CompletedTask, null);
 
         mainQueueArgs.ShouldNotBeNull();
         mainQueueArgs!["x-queue-type"].ShouldBe("quorum");
@@ -245,16 +259,22 @@ public class RabbitMqTransportFactoryTests
         var provider = new ConnectionProvider(factory);
         var transportFactory = new RabbitMqTransportFactory(provider, new TestRabbitMqFactoryConfigurator());
 
-        var topology = new ReceiveEndpointTopology
+        var endpoint = new EndpointDefinition
         {
-            QueueName = "resp-temp",
-            ExchangeName = "resp-temp",
-            RoutingKey = string.Empty,
-            Durable = false,
-            AutoDelete = true
+            Address = "resp-temp",
+            ConfigureErrorEndpoint = false,
+            TransportSettings = new RabbitMqEndpointSettings
+            {
+                QueueName = "resp-temp",
+                ExchangeName = "resp-temp",
+                RoutingKey = string.Empty,
+                ExchangeType = "fanout",
+                Durable = false,
+                AutoDelete = true
+            }
         };
 
-        await transportFactory.CreateReceiveTransport(topology, _ => Task.CompletedTask, null);
+        await transportFactory.CreateReceiveTransport(endpoint, _ => Task.CompletedTask, null);
 
         await channel.DidNotReceive().QueueDeclareAsync(
             "resp-temp_error",
@@ -432,14 +452,21 @@ public class RabbitMqTransportFactoryTests
         cfg.SetPrefetchCount(10);
         var transportFactory = new RabbitMqTransportFactory(provider, cfg);
 
-        var topology = new ReceiveEndpointTopology
+        var endpoint = new EndpointDefinition
         {
-            QueueName = "orders",
-            ExchangeName = "orders",
-            RoutingKey = string.Empty
+            Address = "orders",
+            TransportSettings = new RabbitMqEndpointSettings
+            {
+                QueueName = "orders",
+                ExchangeName = "orders",
+                RoutingKey = string.Empty,
+                ExchangeType = "fanout",
+                Durable = true,
+                AutoDelete = false
+            }
         };
 
-        await transportFactory.CreateReceiveTransport(topology, _ => Task.CompletedTask, null);
+        await transportFactory.CreateReceiveTransport(endpoint, _ => Task.CompletedTask, null);
 
         await channel.Received(1).BasicQosAsync(0, (ushort)10, false, Arg.Any<CancellationToken>());
     }
@@ -491,15 +518,22 @@ public class RabbitMqTransportFactoryTests
         cfg.SetPrefetchCount(5);
         var transportFactory = new RabbitMqTransportFactory(provider, cfg);
 
-        var topology = new ReceiveEndpointTopology
+        var endpoint = new EndpointDefinition
         {
-            QueueName = "orders",
-            ExchangeName = "orders",
-            RoutingKey = string.Empty,
-            PrefetchCount = 20
+            Address = "orders",
+            ConcurrencyLimit = 20,
+            TransportSettings = new RabbitMqEndpointSettings
+            {
+                QueueName = "orders",
+                ExchangeName = "orders",
+                RoutingKey = string.Empty,
+                ExchangeType = "fanout",
+                Durable = true,
+                AutoDelete = false
+            }
         };
 
-        await transportFactory.CreateReceiveTransport(topology, _ => Task.CompletedTask, null);
+        await transportFactory.CreateReceiveTransport(endpoint, _ => Task.CompletedTask, null);
 
         await channel.Received(1).BasicQosAsync(0, (ushort)20, false, Arg.Any<CancellationToken>());
     }

@@ -57,7 +57,7 @@ public class RabbitMqFactoryConfigurator {
         for (ConsumerTopology def : registry.getConsumers()) {
             Class<?> messageType = def.getBindings().get(0).getMessageType();
             String queueName = endpointNameFormatter != null ? endpointNameFormatter.format(messageType)
-                    : def.getQueueName();
+                    : def.getAddress();
             Class<?> consumerClass = def.getConsumerType();
             receiveEndpoint(queueName, e -> e.configureConsumer(context, consumerClass));
         }
@@ -177,7 +177,7 @@ public class RabbitMqFactoryConfigurator {
                         .orElseThrow(() -> new IllegalStateException(
                                 "Consumer " + consumerClass.getSimpleName() + " not registered"));
 
-                def.setQueueName(queueName);
+                def.setAddress(queueName);
 
                 MessageBinding binding = def.getBindings().get(0);
                 String exchange = exchangeNames.get(binding.getMessageType());
@@ -196,8 +196,8 @@ public class RabbitMqFactoryConfigurator {
                     });
                 }
 
-                def.setPrefetchCount(prefetchCount);
-                def.setQueueArguments(queueArguments);
+                def.setConcurrencyLimit(prefetchCount);
+                def.setTransportSettings(queueArguments);
                 def.setSerializerClass(serializerClass);
             } catch (Exception ex) {
                 throw new RuntimeException(

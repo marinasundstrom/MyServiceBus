@@ -36,6 +36,7 @@ public class ConsumeContextAnonymousInterfaceTests
         public readonly CaptureSendTransport Transport = new();
         public Uri? Address;
 
+        [Throws(typeof(InvalidOperationException))]
         public Task<ISendTransport> GetSendTransport(Uri address, CancellationToken cancellationToken = default)
         {
             Address = address;
@@ -43,7 +44,7 @@ public class ConsumeContextAnonymousInterfaceTests
         }
 
         [Throws(typeof(NotImplementedException))]
-        public Task<IReceiveTransport> CreateReceiveTransport(ReceiveEndpointTopology topology, Func<ReceiveContext, Task> handler, Func<string?, bool>? isMessageTypeRegistered = null, CancellationToken cancellationToken = default)
+        public Task<IReceiveTransport> CreateReceiveTransport(EndpointDefinition definition, Func<ReceiveContext, Task> handler, Func<string?, bool>? isMessageTypeRegistered = null, CancellationToken cancellationToken = default)
             => throw new NotImplementedException();
     }
 

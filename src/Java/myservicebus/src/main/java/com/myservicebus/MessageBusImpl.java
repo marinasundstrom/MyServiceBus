@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 import java.lang.reflect.ParameterizedType;
@@ -81,11 +82,11 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
 
     public void addConsumer(ConsumerTopology consumerDef) throws Exception {
         String messageUrn = MessageUrn.forClass(consumerDef.getBindings().get(0).getMessageType());
-        String key = consumerDef.getQueueName() + "|" + messageUrn;
+        String key = consumerDef.getAddress() + "|" + messageUrn;
         if (consumerRegistrations.contains(key)) {
             if (logger != null) {
                 logger.debug("Consumer for '{}' on '{}' already registered, skipping", messageUrn,
-                        consumerDef.getQueueName());
+                        consumerDef.getAddress());
             }
             return;
         }
@@ -141,7 +142,7 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
                         faultAddress = s;
                     }
                 }
-                String errorAddress = transportFactory.getPublishAddress(consumerDef.getQueueName() + "_error");
+                String errorAddress = transportFactory.getPublishAddress(consumerDef.getAddress() + "_error");
 
                 ConsumeContext<Object> ctx = new ConsumeContext<>(
                         typedEnvelope.getMessage(),
@@ -161,10 +162,12 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
         };
 
         java.util.function.Function<String, Boolean> isRegistered = urn -> messageTypes.contains(urn);
-        ReceiveTransport transport = transportFactory.createReceiveTransport(consumerDef.getQueueName(),
+        @SuppressWarnings("unchecked")
+        Map<String, Object> settings = (Map<String, Object>) consumerDef.getTransportSettings();
+        ReceiveTransport transport = transportFactory.createReceiveTransport(consumerDef.getAddress(),
                 consumerDef.getBindings(), handler, isRegistered,
-                consumerDef.getPrefetchCount() != null ? consumerDef.getPrefetchCount() : 0,
-                consumerDef.getQueueArguments());
+                consumerDef.getConcurrencyLimit() != null ? consumerDef.getConcurrencyLimit() : 0,
+                settings);
         receiveTransports.add(transport);
         consumerRegistrations.add(key);
     }

@@ -166,7 +166,7 @@ public class ConsumeContextTests
 
         [Throws(typeof(NotImplementedException))]
         public Task<IReceiveTransport> CreateReceiveTransport(
-            ReceiveEndpointTopology topology,
+            EndpointDefinition definition,
             Func<ReceiveContext, Task> handler,
             Func<string?, bool>? isMessageTypeRegistered = null,
             CancellationToken cancellationToken = default)
@@ -197,7 +197,7 @@ public class ConsumeContextTests
 
         [Throws(typeof(NotImplementedException))]
         public Task<IReceiveTransport> CreateReceiveTransport(
-            ReceiveEndpointTopology topology,
+            EndpointDefinition definition,
             Func<ReceiveContext, Task> handler,
             Func<string?, bool>? isMessageTypeRegistered = null,
             CancellationToken cancellationToken = default)

@@ -25,7 +25,7 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
 
     private readonly List<IReceiveTransport> _activeTransports = new();
 
-    // Key = queue name, Value = list of registrations for that queue
+    // Key = endpoint address, Value = list of registrations for that endpoint
     private readonly Dictionary<string, List<(string MessageUrn, Type MessageType, IConsumePipe Pipe, IMessageSerializer Serializer)>> _consumers = new();
     private readonly HashSet<Type> _consumerTypes = new();
 
@@ -49,14 +49,14 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
 
     public IBusTopology Topology => _topology;
 
-    [Throws(typeof(UriFormatException), typeof(InvalidOperationException))]
+    [Throws(typeof(UriFormatException), typeof(InvalidOperationException), typeof(AmbiguousMatchException), typeof(TypeLoadException))]
     public Task Publish<TMessage>(object message, Action<IPublishContext>? contextCallback = null, CancellationToken cancellationToken = default) where TMessage : class
     {
         var typed = message as TMessage ?? MessageProxy.Create<TMessage>(message);
         return Publish(typed, contextCallback, cancellationToken);
     }
 
-    [Throws(typeof(UriFormatException), typeof(InvalidOperationException), typeof(AmbiguousMatchException))]
+    [Throws(typeof(UriFormatException), typeof(InvalidOperationException), typeof(AmbiguousMatchException), typeof(TypeLoadException))]
     public async Task Publish<T>(T message, Action<IPublishContext>? contextCallback = null, CancellationToken cancellationToken = default) where T : class
     {
         var exchangeName = EntityNameFormatter.Format(message.GetType());
@@ -94,16 +94,21 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
         IDictionary<string, object?>? queueArguments = null, IMessageSerializer? serializer = null, CancellationToken cancellationToken = default)
         where TMessage : class
     {
-        var topology = new ReceiveEndpointTopology
+        var endpoint = new EndpointDefinition
         {
-            QueueName = queueName,
-            ExchangeName = exchangeName,
-            RoutingKey = string.Empty,
-            ExchangeType = "fanout",
-            Durable = true,
-            AutoDelete = false,
-            PrefetchCount = prefetchCount ?? 0,
-            QueueArguments = queueArguments
+            Address = queueName,
+            ConcurrencyLimit = prefetchCount ?? 0,
+            ConfigureErrorEndpoint = true,
+            TransportSettings = new Dictionary<string, object?>
+            {
+                ["QueueName"] = queueName,
+                ["ExchangeName"] = exchangeName,
+                ["RoutingKey"] = string.Empty,
+                ["ExchangeType"] = "fanout",
+                ["Durable"] = true,
+                ["AutoDelete"] = false,
+                ["QueueArguments"] = queueArguments
+            }
         };
 
         var configurator = new PipeConfigurator<ConsumeContext<TMessage>>();
@@ -126,40 +131,54 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
 
         var expectedUrn = MessageUrn.For(typeof(TMessage));
         Func<string?, bool> isRegistered = mt => mt == expectedUrn;
-        var receiveTransport = await _transportFactory.CreateReceiveTransport(topology, TransportHandler, isRegistered, cancellationToken);
+        var receiveTransport = await _transportFactory.CreateReceiveTransport(endpoint, TransportHandler, isRegistered, cancellationToken);
         _activeTransports.Add(receiveTransport);
     }
 
-    [Throws(typeof(InvalidOperationException), typeof(AmbiguousMatchException))]
+    [Throws(typeof(InvalidOperationException), typeof(AmbiguousMatchException), typeof(TypeLoadException))]
     public async Task AddConsumer<TMessage, TConsumer>(ConsumerTopology consumer, Delegate? configure = null, CancellationToken cancellationToken = default)
         where TConsumer : class, IConsumer<TMessage>
         where TMessage : class
     {
         var messageType = consumer.Bindings.First().MessageType;
         var messageUrn = MessageUrn.For(messageType);
-        var queueName = consumer.QueueName;
+        var queueName = consumer.Address;
         if (_consumerTypes.Contains(typeof(TConsumer)))
         {
             _logger?.LogDebug("Consumer {ConsumerType} already registered, skipping", typeof(TConsumer).Name);
             return;
         }
 
-        var topology = new ReceiveEndpointTopology
+        IDictionary<string, object?> transportSettings;
+        if (consumer.TransportSettings is IDictionary<string, object?> dict)
+            transportSettings = new Dictionary<string, object?>(dict);
+        else if (consumer.TransportSettings != null)
         {
-            QueueName = queueName,
-            ExchangeName = EntityNameFormatter.Format(messageType)!, // standard MT routing
-            RoutingKey = "", // messageType.FullName!,
-            ExchangeType = "fanout",
-            Durable = true,
-            AutoDelete = false,
-            PrefetchCount = consumer.PrefetchCount ?? 0,
-            QueueArguments = consumer.QueueArguments
+            transportSettings = consumer.TransportSettings
+                .GetType()
+                .GetProperties()
+                .ToDictionary(p => p.Name, p => (object?)p.GetValue(consumer.TransportSettings));
+        }
+        else
+            transportSettings = new Dictionary<string, object?>();
+
+        transportSettings["QueueName"] = queueName;
+        transportSettings["ExchangeName"] = EntityNameFormatter.Format(messageType)!;
+        transportSettings["RoutingKey"] = string.Empty;
+        transportSettings["ExchangeType"] = "fanout";
+
+        var endpoint = new EndpointDefinition
+        {
+            Address = queueName,
+            ConcurrencyLimit = consumer.ConcurrencyLimit ?? 0,
+            ConfigureErrorEndpoint = true,
+            TransportSettings = transportSettings
         };
 
         Func<string?, bool> isRegistered = mt =>
             _consumers.TryGetValue(queueName, out var regs) && regs.Any(r => r.MessageUrn == mt);
         var receiveTransport = await _transportFactory.CreateReceiveTransport(
-            topology,
+            endpoint,
             [Throws(typeof(TargetInvocationException), typeof(InvalidComObjectException), typeof(COMException), typeof(TypeLoadException))] (ctx) => HandleMessageAsync(queueName, ctx),
             isRegistered,
             cancellationToken);

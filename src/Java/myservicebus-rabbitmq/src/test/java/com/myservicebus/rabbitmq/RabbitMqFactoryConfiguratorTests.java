@@ -48,7 +48,7 @@ public class RabbitMqFactoryConfiguratorTests {
                 .findFirst()
                 .orElseThrow();
 
-        assertEquals("custom-queue", def.getQueueName());
+        assertEquals("custom-queue", def.getAddress());
         assertEquals("custom-exchange", def.getBindings().get(0).getEntityName());
     }
 
@@ -135,7 +135,9 @@ public class RabbitMqFactoryConfiguratorTests {
                 .findFirst()
                 .orElseThrow();
 
-        assertEquals("quorum", def.getQueueArguments().get("x-queue-type"));
+        @SuppressWarnings("unchecked")
+        java.util.Map<String, Object> settings = (java.util.Map<String, Object>) def.getTransportSettings();
+        assertEquals("quorum", settings.get("x-queue-type"));
     }
 
     @Test
@@ -160,6 +162,6 @@ public class RabbitMqFactoryConfiguratorTests {
                 .findFirst()
                 .orElseThrow();
 
-        assertEquals("formatted-mymessage", def.getQueueName());
+        assertEquals("formatted-mymessage", def.getAddress());
     }
 }

@@ -138,7 +138,7 @@ public class InMemoryTestHarness : IMessageBus, ITransportFactory, IReceiveEndpo
         => Task.FromResult<ISendTransport>(new HarnessSendTransport(this));
 
     public Task<IReceiveTransport> CreateReceiveTransport(
-        ReceiveEndpointTopology topology,
+        EndpointDefinition definition,
         Func<ReceiveContext, Task> handler,
         Func<string?, bool>? isMessageTypeRegistered = null,
         CancellationToken cancellationToken = default)

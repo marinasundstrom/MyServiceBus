@@ -28,16 +28,17 @@ public class MultipleConsumerQueueTests
     {
         public readonly List<string> Queues = new();
 
+        [Throws(typeof(InvalidOperationException))]
         public Task<ISendTransport> GetSendTransport(Uri address, CancellationToken cancellationToken = default)
             => Task.FromResult<ISendTransport>(new NopSendTransport());
 
         public Task<IReceiveTransport> CreateReceiveTransport(
-            ReceiveEndpointTopology topology,
+            EndpointDefinition definition,
             Func<ReceiveContext, Task> handler,
             Func<string?, bool>? isMessageTypeRegistered = null,
             CancellationToken cancellationToken = default)
         {
-            Queues.Add(topology.QueueName);
+            Queues.Add(definition.Address);
             return Task.FromResult<IReceiveTransport>(new NopReceiveTransport());
         }
 
