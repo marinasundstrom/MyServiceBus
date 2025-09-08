@@ -1,5 +1,7 @@
 package com.myservicebus;
 
+import java.lang.reflect.Proxy;
+
 public class NamingConventions {
 
     public static String getMessageUrn(Class<?> messageType) {
@@ -11,6 +13,9 @@ public class NamingConventions {
     }
 
     public static String getMessageName(Class<?> messageType) {
+        if (Proxy.isProxyClass(messageType) && messageType.getInterfaces().length > 0) {
+            messageType = messageType.getInterfaces()[0];
+        }
         return String.format("TestApp:%s", messageType.getSimpleName());
     }
 

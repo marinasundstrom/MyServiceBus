@@ -114,6 +114,16 @@ public class ConsumeContext<T>
         return respond(message, CancellationToken.none);
     }
 
+    public <TMessage> CompletableFuture<Void> respond(Class<TMessage> messageType, Object message,
+            CancellationToken cancellationToken) {
+        TMessage proxy = MessageProxy.create(messageType, message);
+        return respond(proxy, cancellationToken);
+    }
+
+    public <TMessage> CompletableFuture<Void> respond(Class<TMessage> messageType, Object message) {
+        return respond(messageType, message, CancellationToken.none);
+    }
+
     public <TMessage> CompletableFuture<Void> respond(TMessage message, Consumer<SendContext> contextCallback,
             CancellationToken cancellationToken) {
         SendContext ctx = new SendContext(message, cancellationToken);
@@ -123,6 +133,17 @@ public class ConsumeContext<T>
 
     public <TMessage> CompletableFuture<Void> respond(TMessage message, Consumer<SendContext> contextCallback) {
         return respond(message, contextCallback, CancellationToken.none);
+    }
+
+    public <TMessage> CompletableFuture<Void> respond(Class<TMessage> messageType, Object message,
+            Consumer<SendContext> contextCallback, CancellationToken cancellationToken) {
+        TMessage proxy = MessageProxy.create(messageType, message);
+        return respond(proxy, contextCallback, cancellationToken);
+    }
+
+    public <TMessage> CompletableFuture<Void> respond(Class<TMessage> messageType, Object message,
+            Consumer<SendContext> contextCallback) {
+        return respond(messageType, message, contextCallback, CancellationToken.none);
     }
 
     @Override
@@ -154,6 +175,27 @@ public class ConsumeContext<T>
 
     public <TMessage> CompletableFuture<Void> send(String destination, TMessage message) {
         return send(destination, message, CancellationToken.none);
+    }
+
+    public <TMessage> CompletableFuture<Void> send(String destination, Class<TMessage> messageType, Object message,
+            CancellationToken cancellationToken) {
+        SendEndpoint endpoint = getSendEndpoint(destination);
+        return endpoint.send(messageType, message, cancellationToken);
+    }
+
+    public <TMessage> CompletableFuture<Void> send(String destination, Class<TMessage> messageType, Object message,
+            Consumer<SendContext> contextCallback, CancellationToken cancellationToken) {
+        SendEndpoint endpoint = getSendEndpoint(destination);
+        return endpoint.send(messageType, message, contextCallback, cancellationToken);
+    }
+
+    public <TMessage> CompletableFuture<Void> send(String destination, Class<TMessage> messageType, Object message,
+            Consumer<SendContext> contextCallback) {
+        return send(destination, messageType, message, contextCallback, CancellationToken.none);
+    }
+
+    public <TMessage> CompletableFuture<Void> send(String destination, Class<TMessage> messageType, Object message) {
+        return send(destination, messageType, message, CancellationToken.none);
     }
 
     public <TMessage> CompletableFuture<Void> forward(String destination, TMessage message, CancellationToken cancellationToken) {

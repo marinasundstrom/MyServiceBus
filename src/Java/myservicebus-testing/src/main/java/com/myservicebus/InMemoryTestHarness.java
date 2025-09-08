@@ -65,9 +65,14 @@ public class InMemoryTestHarness implements RequestClientTransport, TransportSen
 
     private CompletableFuture<Void> sendInternal(SendContext context, String responseAddress, String faultAddress) {
         Object message = context.getMessage();
+        Class<?> messageType = message.getClass();
+        if (java.lang.reflect.Proxy.isProxyClass(messageType) && messageType.getInterfaces().length > 0) {
+            messageType = messageType.getInterfaces()[0];
+        }
+        final Class<?> mt = messageType;
         CompletableFuture<Void> future = CompletableFuture.completedFuture(null);
 
-        List<com.myservicebus.Consumer<?>> list = handlers.getOrDefault(message.getClass(), List.of());
+        List<com.myservicebus.Consumer<?>> list = handlers.getOrDefault(mt, List.of());
         for (com.myservicebus.Consumer<?> raw : list) {
             @SuppressWarnings("unchecked")
             com.myservicebus.Consumer<Object> handler = (com.myservicebus.Consumer<Object>) raw;
@@ -99,7 +104,7 @@ public class InMemoryTestHarness implements RequestClientTransport, TransportSen
             if (registry != null) {
                 for (ConsumerTopology ct : registry.getConsumers()) {
                     boolean handles = ct.getBindings().stream()
-                            .anyMatch(b -> b.getMessageType().equals(message.getClass()));
+                            .anyMatch(b -> b.getMessageType().equals(mt));
                     if (!handles) {
                         continue;
                     }
