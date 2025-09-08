@@ -38,3 +38,16 @@ The analyzer mirrors Java's checked-vs.-runtime distinction. By default, all exc
 
 The Java project in `src/Java` relies on Java's built-in checked exception system. Using `[Throws]` in C# keeps exception semantics aligned between the two codebases, making it easier to reason about cross-language behavior and port features between implementations.
 
+## Auditing exception declarations
+
+When synchronizing the C# and Java codebases or introducing new operations, use this workflow to verify that exceptions are declared consistently:
+
+1. **Strip existing annotations** – temporarily remove `[Throws]` attributes so the analyzer reports every propagated exception.
+2. **Build the solution** – treat `THROWS001` diagnostics as warnings that highlight missing declarations.
+3. **Decide for each warning**
+   - Handle the exception locally when possible.
+   - Otherwise, determine the appropriate exception type by checking MassTransit APIs and comparing with the Java implementation's `throws` clauses.
+4. **Reintroduce `[Throws]` attributes** – add `[Throws(typeof(ExceptionType))]` for each exception that should surface, favoring domain-specific exceptions that wrap the original as `InnerException`.
+5. **Verify** – rebuild to ensure the warnings are resolved and run tests to confirm behavior.
+
+
