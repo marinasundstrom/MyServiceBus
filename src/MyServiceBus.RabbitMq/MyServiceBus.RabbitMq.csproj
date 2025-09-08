@@ -15,6 +15,7 @@
 
   <ItemGroup>
     <ProjectReference Include="../MyServiceBus/MyServiceBus.csproj" />
+    <ProjectReference Include="../MyServiceBus.Transport.Queues/MyServiceBus.Transport.Queues.csproj" />
   </ItemGroup>
 
 </Project>

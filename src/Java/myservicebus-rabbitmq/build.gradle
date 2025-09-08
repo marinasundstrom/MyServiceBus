@@ -1,3 +1,4 @@
 dependencies {
     api project(':myservicebus')
+    api project(':myservicebus-transport-queues')
 }
