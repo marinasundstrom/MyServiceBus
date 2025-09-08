@@ -54,7 +54,7 @@ class FaultQueueTest {
 
         bus.addHandler("input", MyMessage.class, "input", ctx -> {
             return CompletableFuture.failedFuture(new RuntimeException("boom"));
-        }, null, null, null);
+        }, null, null, null, null);
 
         Map<String, Object> headers = new HashMap<>();
         Envelope<MyMessage> envelope = new Envelope<>();

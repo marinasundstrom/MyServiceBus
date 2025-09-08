@@ -2,6 +2,7 @@ package com.myservicebus.rabbitmq;
 
 import java.net.URI;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
@@ -100,6 +101,14 @@ public class RabbitMqTransportFactory implements TransportFactory {
     public ReceiveTransport createReceiveTransport(String queueName, List<MessageBinding> bindings,
             Function<TransportMessage, CompletableFuture<Void>> handler,
             Function<String, Boolean> isMessageTypeRegistered, int prefetchCount) throws Exception {
+        return createReceiveTransport(queueName, bindings, handler, isMessageTypeRegistered, prefetchCount, null);
+    }
+
+    @Override
+    public ReceiveTransport createReceiveTransport(String queueName, List<MessageBinding> bindings,
+            Function<TransportMessage, CompletableFuture<Void>> handler,
+            Function<String, Boolean> isMessageTypeRegistered, int prefetchCount,
+            Map<String, Object> queueArguments) throws Exception {
         Connection connection = connectionProvider.getOrCreateConnection();
         Channel channel = connection.createChannel();
 
@@ -111,7 +120,7 @@ public class RabbitMqTransportFactory implements TransportFactory {
         for (MessageBinding binding : bindings) {
             String exchangeName = binding.getEntityName();
             channel.exchangeDeclare(exchangeName, BuiltinExchangeType.FANOUT, true);
-            channel.queueDeclare(queueName, true, false, false, null);
+            channel.queueDeclare(queueName, true, false, false, queueArguments);
             channel.queueBind(queueName, exchangeName, "");
         }
 

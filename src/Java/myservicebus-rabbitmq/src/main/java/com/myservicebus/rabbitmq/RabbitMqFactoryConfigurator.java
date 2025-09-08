@@ -68,7 +68,7 @@ public class RabbitMqFactoryConfigurator {
 
     @SuppressWarnings({"unchecked", "rawtypes"})
     private static <T> void applyHandler(com.myservicebus.MessageBusImpl bus, HandlerRegistration<T> reg) throws Exception {
-        bus.addHandler(reg.queueName, reg.messageType, reg.exchange, reg.handler, reg.retryCount, reg.retryDelay, reg.prefetchCount);
+        bus.addHandler(reg.queueName, reg.messageType, reg.exchange, reg.handler, reg.retryCount, reg.retryDelay, reg.prefetchCount, reg.queueArguments);
     }
 
     public String getClientHost() {
@@ -118,6 +118,7 @@ public class RabbitMqFactoryConfigurator {
         private Duration retryDelay;
         private java.util.function.Consumer<RetryConfigurator> retry;
         private Integer prefetchCount;
+        private Map<String, Object> queueArguments;
 
         ReceiveEndpointConfiguratorImpl(String queueName, Map<Class<?>, String> exchangeNames, java.util.List<HandlerRegistration<?>> handlers) {
             this.queueName = queueName;
@@ -139,6 +140,14 @@ public class RabbitMqFactoryConfigurator {
         @Override
         public void prefetchCount(int prefetchCount) {
             this.prefetchCount = prefetchCount;
+        }
+
+        @Override
+        public void setQueueArgument(String key, Object value) {
+            if (this.queueArguments == null) {
+                this.queueArguments = new java.util.HashMap<>();
+            }
+            this.queueArguments.put(key, value);
         }
 
         @Override
@@ -171,6 +180,7 @@ public class RabbitMqFactoryConfigurator {
                 }
 
                 def.setPrefetchCount(prefetchCount);
+                def.setQueueArguments(queueArguments);
             } catch (Exception ex) {
                 throw new RuntimeException(
                         "Failed to configure consumer " + consumerClass.getSimpleName(), ex);
@@ -182,7 +192,7 @@ public class RabbitMqFactoryConfigurator {
             String exchange = exchangeNames.containsKey(messageType)
                     ? exchangeNames.get(messageType)
                     : NamingConventions.getExchangeName(messageType);
-            handlers.add(new HandlerRegistration<>(queueName, messageType, exchange, handler, retryCount, retryDelay, prefetchCount));
+            handlers.add(new HandlerRegistration<>(queueName, messageType, exchange, handler, retryCount, retryDelay, prefetchCount, queueArguments));
         }
     }
 
@@ -194,10 +204,11 @@ public class RabbitMqFactoryConfigurator {
         final Integer retryCount;
         final Duration retryDelay;
         final Integer prefetchCount;
+        final Map<String, Object> queueArguments;
 
         HandlerRegistration(String queueName, Class<T> messageType, String exchange,
                 java.util.function.Function<ConsumeContext<T>, java.util.concurrent.CompletableFuture<Void>> handler,
-                Integer retryCount, Duration retryDelay, Integer prefetchCount) {
+                Integer retryCount, Duration retryDelay, Integer prefetchCount, Map<String, Object> queueArguments) {
             this.queueName = queueName;
             this.messageType = messageType;
             this.exchange = exchange;
@@ -205,6 +216,7 @@ public class RabbitMqFactoryConfigurator {
             this.retryCount = retryCount;
             this.retryDelay = retryDelay;
             this.prefetchCount = prefetchCount;
+            this.queueArguments = queueArguments;
         }
     }
 }

@@ -154,14 +154,16 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
         java.util.function.Function<String, Boolean> isRegistered = urn -> messageTypes.contains(urn);
         ReceiveTransport transport = transportFactory.createReceiveTransport(consumerDef.getQueueName(),
                 consumerDef.getBindings(), handler, isRegistered,
-                consumerDef.getPrefetchCount() != null ? consumerDef.getPrefetchCount() : 0);
+                consumerDef.getPrefetchCount() != null ? consumerDef.getPrefetchCount() : 0,
+                consumerDef.getQueueArguments());
         receiveTransports.add(transport);
         consumerRegistrations.add(key);
     }
 
     public <T> void addHandler(String queueName, Class<T> messageType, String exchange,
             java.util.function.Function<ConsumeContext<T>, CompletableFuture<Void>> handler,
-            Integer retryCount, java.time.Duration retryDelay, Integer prefetchCount) throws Exception {
+            Integer retryCount, java.time.Duration retryDelay, Integer prefetchCount,
+            java.util.Map<String, Object> queueArguments) throws Exception {
         PipeConfigurator<ConsumeContext<T>> configurator = new PipeConfigurator<>();
         configurator.useFilter(new OpenTelemetryConsumeFilter<>());
         @SuppressWarnings({ "unchecked", "rawtypes" })
@@ -219,7 +221,7 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
         java.util.function.Function<String, Boolean> isRegisteredHandler = urn -> expectedUrn.equals(urn);
 
         ReceiveTransport transport = transportFactory.createReceiveTransport(queueName, bindings, transportHandler,
-                isRegisteredHandler, prefetchCount != null ? prefetchCount : 0);
+                isRegisteredHandler, prefetchCount != null ? prefetchCount : 0, queueArguments);
         receiveTransports.add(transport);
     }
 

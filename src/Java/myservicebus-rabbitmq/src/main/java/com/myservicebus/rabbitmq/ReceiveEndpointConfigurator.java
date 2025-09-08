@@ -7,4 +7,5 @@ public interface ReceiveEndpointConfigurator {
     void configureConsumer(BusRegistrationContext context, Class<?> consumerClass);
     <T> void handler(Class<T> messageType, java.util.function.Function<com.myservicebus.ConsumeContext<T>, java.util.concurrent.CompletableFuture<Void>> handler);
     void prefetchCount(int prefetchCount);
+    void setQueueArgument(String key, Object value);
 }

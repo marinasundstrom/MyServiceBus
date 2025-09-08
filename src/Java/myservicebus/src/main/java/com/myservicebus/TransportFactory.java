@@ -2,6 +2,7 @@ package com.myservicebus;
 
 import java.net.URI;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 
@@ -9,6 +10,13 @@ import com.myservicebus.topology.MessageBinding;
 
 public interface TransportFactory {
     SendTransport getSendTransport(URI address);
+
+    default ReceiveTransport createReceiveTransport(String queueName, List<MessageBinding> bindings,
+            Function<TransportMessage, CompletableFuture<Void>> handler,
+            Function<String, Boolean> isMessageTypeRegistered, int prefetchCount,
+            Map<String, Object> queueArguments) throws Exception {
+        return createReceiveTransport(queueName, bindings, handler, isMessageTypeRegistered, prefetchCount);
+    }
 
     default ReceiveTransport createReceiveTransport(String queueName, List<MessageBinding> bindings,
             Function<TransportMessage, CompletableFuture<Void>> handler,

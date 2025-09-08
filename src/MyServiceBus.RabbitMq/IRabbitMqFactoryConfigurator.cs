@@ -55,6 +55,7 @@ public class ReceiveEndpointConfigurator
     private int? _retryCount;
     private TimeSpan? _retryDelay;
     private ushort? _prefetchCount;
+    private IDictionary<string, object?>? _queueArguments;
 
     public ReceiveEndpointConfigurator(string queueName, IDictionary<Type, string> exchangeNames, IList<Action<IMessageBus>> endpointActions)
     {
@@ -69,6 +70,12 @@ public class ReceiveEndpointConfigurator
         configure(rc);
         _retryCount = rc.RetryCount;
         _retryDelay = rc.Delay;
+    }
+
+    public void SetQueueArgument(string key, object value)
+    {
+        _queueArguments ??= new Dictionary<string, object?>();
+        _queueArguments[key] = value;
     }
 
     [Throws(typeof(InvalidOperationException))]
@@ -99,6 +106,7 @@ public class ReceiveEndpointConfigurator
             }
 
             consumer.PrefetchCount = _prefetchCount;
+            consumer.QueueArguments = _queueArguments;
 
             if (_retryCount.HasValue)
             {
@@ -135,7 +143,7 @@ public class ReceiveEndpointConfigurator
             : NamingConventions.GetExchangeName(typeof(T))!;
         _endpointActions.Add([Throws(typeof(Exception))] (bus) =>
         {
-            bus.AddHandler(_queueName, exchangeName, handler, _retryCount, _retryDelay, _prefetchCount, CancellationToken.None).GetAwaiter().GetResult();
+            bus.AddHandler(_queueName, exchangeName, handler, _retryCount, _retryDelay, _prefetchCount, _queueArguments, CancellationToken.None).GetAwaiter().GetResult();
         });
     }
 
