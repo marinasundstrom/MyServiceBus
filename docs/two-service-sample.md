@@ -45,7 +45,7 @@ Each instance consumes `SubmitOrder` messages from the same queue.
 
 ### Java consumer failures
 
-The Java `SubmitOrderConsumer` calls a service that randomly throws to simulate processing errors. Failed `SubmitOrder` messages land in the `submit-order_error` queue, where a handler forwards them back to `queue:submit-order` for another attempt.
+The Java `SubmitOrderConsumer` calls a service that randomly throws to simulate processing errors. Failed `SubmitOrder` messages land in the `submit-order_error` queue, where a handler sends them back to `queue:submit-order` for another attempt. Forwarding directly to the queue would keep the error headers and produce duplicates, so the handler uses `send` instead of `forward`.
 
 ## 4. Publish a message
 

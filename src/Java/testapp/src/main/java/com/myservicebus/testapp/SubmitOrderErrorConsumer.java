@@ -1,7 +1,6 @@
 package com.myservicebus.testapp;
 
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 
 import com.google.inject.Inject;
 import com.myservicebus.ConsumeContext;
@@ -23,8 +22,8 @@ class SubmitOrderErrorConsumer implements Consumer<SubmitOrder> {
         System.out.println(msg.getOrderId());
         // inspect, fix, or forward the failed message
 
-        // context.forward("queue:submit-order", msg).get();
-        // logger.info("➡️ Forwarded error message. Order id: " + msg.getOrderId());
+        context.send("queue:submit-order", msg).join();
+        logger.info("➡️ Sent error message. Order id: " + msg.getOrderId());
 
         return CompletableFuture.completedFuture(null);
     }
