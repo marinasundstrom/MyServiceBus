@@ -39,8 +39,8 @@ public class RabbitMqFactoryConfiguratorTests
 
         class StubSendEndpoint : ISendEndpoint
         {
-            public Task Send<T>(T message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default) => Task.CompletedTask;
-            public Task Send<T>(object message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default) => Task.CompletedTask;
+            public Task Send<T>(T message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default) where T : class => Task.CompletedTask;
+            public Task Send<T>(object message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default) where T : class => Task.CompletedTask;
         }
     }
 

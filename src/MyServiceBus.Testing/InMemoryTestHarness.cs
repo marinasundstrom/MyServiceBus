@@ -239,9 +239,9 @@ public class InMemoryTestHarness : IMessageBus, ITransportFactory, IReceiveEndpo
 
         public HarnessSendEndpoint(InMemoryTestHarness harness) => this.harness = harness;
 
-        public Task Send<T>(object message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default)
+        public Task Send<T>(object message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default) where T : class
             => harness.Publish((dynamic)message!, contextCallback != null ? new Action<IPublishContext>(ctx => contextCallback(ctx)) : null, cancellationToken);
-        public Task Send<T>(T message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default)
+        public Task Send<T>(T message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default) where T : class
             => harness.Publish((dynamic)message!, contextCallback != null ? new Action<IPublishContext>(ctx => contextCallback(ctx)) : null, cancellationToken);
     }
 
@@ -313,7 +313,7 @@ public class InMemoryTestHarness : IMessageBus, ITransportFactory, IReceiveEndpo
         public IDictionary<string, object> Headers { get; }
         public DateTimeOffset SentTime { get; }
 
-        [Throws(typeof(InvalidOperationException))]
+        [Throws(typeof(InvalidOperationException), typeof(ObjectDisposedException))]
         public bool TryGetMessage<T>(out T? msg) where T : class
         {
             if (message is T m)
