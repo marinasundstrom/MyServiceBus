@@ -79,6 +79,33 @@ public class RabbitMqFactoryConfiguratorTests {
     }
 
     @Test
+    public void receiveEndpointSetsQueueArguments() {
+        ServiceCollection services = new ServiceCollection();
+        BusRegistrationConfiguratorImpl cfg = new BusRegistrationConfiguratorImpl(services);
+        cfg.addConsumer(MyConsumer.class);
+
+        RabbitMqTransport.configure(cfg);
+        cfg.complete();
+
+        ServiceProvider provider = services.buildServiceProvider();
+        BusRegistrationContext context = new BusRegistrationContext(provider);
+        RabbitMqFactoryConfigurator factoryConfigurator = provider.getService(RabbitMqFactoryConfigurator.class);
+
+        factoryConfigurator.receiveEndpoint("custom-queue", e -> {
+            e.setQueueArgument("x-queue-type", "quorum");
+            e.configureConsumer(context, MyConsumer.class);
+        });
+
+        TopologyRegistry registry = provider.getService(TopologyRegistry.class);
+        ConsumerTopology def = registry.getConsumers().stream()
+                .filter(d -> d.getConsumerType().equals(MyConsumer.class))
+                .findFirst()
+                .orElseThrow();
+
+        assertEquals("quorum", def.getQueueArguments().get("x-queue-type"));
+    }
+
+    @Test
     public void configureEndpointsUsesFormatter() {
         ServiceCollection services = new ServiceCollection();
         BusRegistrationConfiguratorImpl cfg = new BusRegistrationConfiguratorImpl(services);

@@ -2,6 +2,7 @@ package com.myservicebus.topology;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Consumer;
 
 import com.myservicebus.ConsumeContext;
@@ -13,6 +14,7 @@ public class ConsumerTopology {
     private List<MessageBinding> bindings = new ArrayList<>();
     private Consumer<PipeConfigurator<ConsumeContext<Object>>> configure;
     private Integer prefetchCount;
+    private Map<String, Object> queueArguments;
 
     public Class<?> getConsumerType() {
         return consumerType;
@@ -52,5 +54,13 @@ public class ConsumerTopology {
 
     public void setPrefetchCount(Integer prefetchCount) {
         this.prefetchCount = prefetchCount;
+    }
+
+    public Map<String, Object> getQueueArguments() {
+        return queueArguments;
+    }
+
+    public void setQueueArguments(Map<String, Object> queueArguments) {
+        this.queueArguments = queueArguments;
     }
 }

@@ -527,6 +527,27 @@ try (ServiceScope scope = provider.createScope()) {
 
 Built-in endpoint name formatters include `DefaultEndpointNameFormatter`, `KebabCaseEndpointNameFormatter`, and `SnakeCaseEndpointNameFormatter`.
 
+#### Queue Arguments
+
+Customize RabbitMQ queues with broker-specific arguments.
+
+##### C#
+```csharp
+cfg.ReceiveEndpoint("submit-order-queue", e =>
+{
+    e.SetQueueArgument("x-queue-type", "quorum");
+    e.ConfigureConsumer<SubmitOrderConsumer>(context);
+});
+```
+
+##### Java
+```java
+cfg.receiveEndpoint("submit-order-queue", e -> {
+    e.setQueueArgument("x-queue-type", "quorum");
+    e.configureConsumer(context, SubmitOrderConsumer.class);
+});
+```
+
 
 ### Dependency Injection
 

@@ -35,7 +35,7 @@ public class RabbitMqFactoryConfiguratorTests
             where TConsumer : class, IConsumer<TMessage>
             where TMessage : class => Task.CompletedTask;
 
-        public Task AddHandler<TMessage>(string queueName, string exchangeName, Func<ConsumeContext<TMessage>, Task> handler, int? retryCount = null, TimeSpan? retryDelay = null, ushort? prefetchCount = null, CancellationToken cancellationToken = default) where TMessage : class => Task.CompletedTask;
+        public Task AddHandler<TMessage>(string queueName, string exchangeName, Func<ConsumeContext<TMessage>, Task> handler, int? retryCount = null, TimeSpan? retryDelay = null, ushort? prefetchCount = null, IDictionary<string, object?>? queueArguments = null, CancellationToken cancellationToken = default) where TMessage : class => Task.CompletedTask;
 
         class StubSendEndpoint : ISendEndpoint
         {
@@ -126,6 +126,30 @@ public class RabbitMqFactoryConfiguratorTests
 
         var def = registry.Consumers.First(c => c.ConsumerType == typeof(MyConsumer));
         Assert.NotNull(def.ConfigurePipe);
+    }
+
+    [Fact]
+    [Throws(typeof(EqualException), typeof(Exception))]
+    public void ReceiveEndpoint_sets_queue_arguments()
+    {
+        var registry = new TopologyRegistry();
+        registry.RegisterConsumer<MyConsumer>("original-queue", null, typeof(MyMessage));
+
+        var services = new ServiceCollection();
+        services.AddSingleton(registry);
+        services.AddSingleton<IMessageBus, TestMessageBus>();
+        var provider = services.BuildServiceProvider();
+        var context = new TestBusRegistrationContext(provider);
+
+        var configurator = new TestRabbitMqFactoryConfigurator();
+        configurator.ReceiveEndpoint("custom-queue", e =>
+        {
+            e.SetQueueArgument("x-queue-type", "quorum");
+            e.ConfigureConsumer<MyConsumer>(context);
+        });
+
+        var def = registry.Consumers.First(c => c.ConsumerType == typeof(MyConsumer));
+        Assert.Equal("quorum", def.QueueArguments!["x-queue-type"]);
     }
 
     class StaticFormatter : IEndpointNameFormatter
