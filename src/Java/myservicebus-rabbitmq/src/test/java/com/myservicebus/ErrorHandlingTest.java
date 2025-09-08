@@ -22,7 +22,7 @@ import com.rabbitmq.client.CancelCallback;
 
 class ErrorHandlingTest {
     @Test
-    void nacksWhenHandlerFails() throws Exception {
+    void acksWhenHandlerFails() throws Exception {
         Channel channel = mock(Channel.class);
         ArgumentCaptor<DeliverCallback> captor = ArgumentCaptor.forClass(DeliverCallback.class);
         when(channel.basicConsume(eq("input"), eq(false), captor.capture(), any(CancelCallback.class))).thenReturn("tag");
@@ -44,7 +44,7 @@ class ErrorHandlingTest {
         Delivery delivery = new Delivery(envelope, props, body);
         callback.handle("tag", delivery);
 
-        verify(channel, timeout(1000)).basicNack(1L, false, true);
-        verify(channel, never()).basicAck(anyLong(), anyBoolean());
+        verify(channel, timeout(1000)).basicAck(1L, false);
+        verify(channel, never()).basicNack(anyLong(), anyBoolean(), anyBoolean());
     }
 }
