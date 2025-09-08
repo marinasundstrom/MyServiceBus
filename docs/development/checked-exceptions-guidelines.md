@@ -32,7 +32,7 @@ The analyzer reports diagnostics such as `THROWS001` when an exception isn't dec
 
 ## Exception classification
 
-The analyzer mirrors Java's checked-vs.-runtime distinction. By default, all exceptions are treated as *Strict* (checked), requiring a `try`/`catch` or a `[Throws]` declaration. Exceptions that represent programming errors or cancellation are configured as unchecked in `CheckedExceptions.settings.json` using the `Ignored` or `Informational` classifications. Examples include `ArgumentException`, `InvalidOperationException`, `NullReferenceException`, `OperationCanceledException`, `TaskCanceledException`, and `NotImplementedException`.
+The analyzer mirrors Java's checked-vs.-runtime distinction. By default, all exceptions are treated as *Strict* (checked), requiring a `try`/`catch` or a `[Throws]` declaration. Exceptions that represent programming errors or cancellation are configured as unchecked in `CheckedExceptions.settings.json` using the `Ignored` or `Informational` classifications. Examples include `ArgumentException`, `InvalidOperationException`, `NullReferenceException`, `OperationCanceledException`, `TaskCanceledException`, `NotImplementedException`, `KeyNotFoundException`, and `SecurityException`.
 
 ## Aligning with Java
 

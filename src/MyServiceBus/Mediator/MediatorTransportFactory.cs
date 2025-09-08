@@ -12,7 +12,6 @@ public class MediatorTransportFactory : ITransportFactory
 {
     private readonly ConcurrentDictionary<string, List<Func<ReceiveContext, Task>>> _handlers = new();
 
-    [Throws(typeof(InvalidOperationException))]
     public Task<ISendTransport> GetSendTransport(Uri address, CancellationToken cancellationToken = default)
     {
         var exchange = ExtractExchange(address);
@@ -29,7 +28,6 @@ public class MediatorTransportFactory : ITransportFactory
         return Task.FromResult<IReceiveTransport>(transport);
     }
 
-    [Throws(typeof(ArgumentException))]
     internal Task Dispatch(string exchange, ReceiveContext context)
     {
         if (_handlers.TryGetValue(exchange, out var handlers))
@@ -123,7 +121,6 @@ public class MediatorTransportFactory : ITransportFactory
             _exchange = exchange;
         }
 
-        [Throws(typeof(ArgumentException))]
         public Task Send<T>(T message, SendContext context, CancellationToken cancellationToken = default)
             where T : class
         {
@@ -184,6 +181,7 @@ public class MediatorTransportFactory : ITransportFactory
         public IDictionary<string, object> Headers { get; }
         public DateTimeOffset SentTime { get; }
 
+        [Throws(typeof(ObjectDisposedException))]
         public bool TryGetMessage<T>(out T? message) where T : class
         {
             if (_message is T msg)

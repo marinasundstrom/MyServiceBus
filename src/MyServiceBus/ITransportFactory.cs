@@ -4,7 +4,6 @@ namespace MyServiceBus;
 
 public interface ITransportFactory
 {
-    [Throws(typeof(InvalidOperationException))]
     Task<ISendTransport> GetSendTransport(Uri address, CancellationToken cancellationToken = default);
 
     Task<IReceiveTransport> CreateReceiveTransport(

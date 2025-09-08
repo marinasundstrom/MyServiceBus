@@ -17,28 +17,26 @@ public class EnvelopeMessageContext : IMessageContext
     private Uri? _responseAddress;
     private Uri? _faultAddress;
 
-    [Throws(typeof(JsonException), typeof(ArgumentException))]
+    [Throws(typeof(JsonException))]
     public EnvelopeMessageContext(byte[] jsonBytes, IDictionary<string, object> transportHeaders)
     {
         _jsonDocument = JsonDocument.Parse(jsonBytes);
         _transportHeaders = transportHeaders;
     }
 
-    [Throws(typeof(InvalidOperationException), typeof(FormatException))]
     public Guid MessageId =>
         (_messageId ??= TryGetProperty("messageId")?.GetGuid()).GetValueOrDefault();
 
-    [Throws(typeof(InvalidOperationException), typeof(FormatException))]
     public Guid? CorrelationId =>
         _correlationId ??= TryGetProperty("correlationId")?.GetGuid();
 
-    [Throws(typeof(InvalidOperationException), typeof(JsonException))]
+    [Throws(typeof(JsonException))]
     public IList<string> MessageType =>
         _messageType ??= TryGetProperty("messageType")?.Deserialize<List<string>>() ?? new();
 
     public Uri? ResponseAddress
     {
-        [Throws(typeof(InvalidOperationException), typeof(UriFormatException))]
+        [Throws(typeof(UriFormatException))]
         get
         {
             if (_responseAddress is not null)
@@ -56,7 +54,7 @@ public class EnvelopeMessageContext : IMessageContext
 
     public Uri? FaultAddress
     {
-        [Throws(typeof(InvalidOperationException), typeof(UriFormatException))]
+        [Throws(typeof(UriFormatException))]
         get
         {
             if (_faultAddress is not null)
@@ -79,14 +77,12 @@ public class EnvelopeMessageContext : IMessageContext
         }
     }
 
-    [Throws(typeof(InvalidOperationException))]
     public IDictionary<string, object> Headers => _headers ??= MergeHeaders();
 
-    [Throws(typeof(InvalidOperationException), typeof(FormatException))]
     public DateTimeOffset SentTime =>
         _sentTime ??= TryGetProperty("sentTime")?.GetDateTimeOffset() ?? default;
 
-    [Throws(typeof(InvalidOperationException), typeof(ObjectDisposedException))]
+    [Throws(typeof(ObjectDisposedException))]
     public bool TryGetMessage<T>(out T? message) where T : class
     {
         if (_messageCache.TryGetValue(typeof(T), out var cached))
