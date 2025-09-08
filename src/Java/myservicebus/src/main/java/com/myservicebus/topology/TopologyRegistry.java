@@ -5,7 +5,7 @@ import java.util.List;
 import java.util.function.Consumer;
 
 import com.myservicebus.ConsumeContext;
-import com.myservicebus.NamingConventions;
+import com.myservicebus.EntityNameFormatter;
 import com.myservicebus.PipeConfigurator;
 
 public class TopologyRegistry implements BusTopology {
@@ -32,7 +32,7 @@ public class TopologyRegistry implements BusTopology {
     private MessageTopology registerMessage(Class<?> messageType) {
         MessageTopology topology = new MessageTopology();
         topology.setMessageType(messageType);
-        topology.setEntityName(NamingConventions.getExchangeName(messageType));
+        topology.setEntityName(EntityNameFormatter.format(messageType));
         messages.add(topology);
         return topology;
     }

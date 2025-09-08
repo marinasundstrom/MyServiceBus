@@ -39,8 +39,8 @@ public class BatchHandlingTest {
         Envelope<Batch<SampleMessage>> envelope = new Envelope<>();
         envelope.setMessageId(UUID.randomUUID());
         envelope.setMessageType(List.of(
-                NamingConventions.getMessageUrn(Batch.class),
-                NamingConventions.getMessageUrn(SampleMessage.class)));
+                MessageUrn.forClass(Batch.class),
+                MessageUrn.forClass(SampleMessage.class)));
         envelope.setHeaders(new HashMap<>());
         envelope.setSentTime(OffsetDateTime.now());
         envelope.setHost(HostInfoProvider.capture());
@@ -60,8 +60,8 @@ public class BatchHandlingTest {
         Assertions.assertEquals(2, typeNode.size());
         List<String> types = new ArrayList<>();
         typeNode.forEach(n -> types.add(n.asText()));
-        Assertions.assertTrue(types.contains(NamingConventions.getMessageUrn(Batch.class)));
-        Assertions.assertTrue(types.contains(NamingConventions.getMessageUrn(SampleMessage.class)));
+        Assertions.assertTrue(types.contains(MessageUrn.forClass(Batch.class)));
+        Assertions.assertTrue(types.contains(MessageUrn.forClass(SampleMessage.class)));
 
         JavaType batchType = mapper.getTypeFactory().constructParametricType(Batch.class, SampleMessage.class);
         JavaType envelopeType = mapper.getTypeFactory().constructParametricType(Envelope.class, batchType);

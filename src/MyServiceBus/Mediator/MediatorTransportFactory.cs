@@ -29,7 +29,6 @@ public class MediatorTransportFactory : ITransportFactory
         return Task.FromResult<IReceiveTransport>(transport);
     }
 
-    [Throws(typeof(ArgumentException))]
     internal Task Dispatch(string exchange, ReceiveContext context)
     {
         if (_handlers.TryGetValue(exchange, out var handlers))
@@ -123,7 +122,6 @@ public class MediatorTransportFactory : ITransportFactory
             _exchange = exchange;
         }
 
-        [Throws(typeof(ArgumentException))]
         public Task Send<T>(T message, SendContext context, CancellationToken cancellationToken = default)
             where T : class
         {
@@ -132,7 +130,7 @@ public class MediatorTransportFactory : ITransportFactory
 
             var messageTypes = MessageTypeCache
                 .GetMessageTypes(typeof(T))
-                .Select(t => NamingConventions.GetMessageUrn(t))
+                .Select(t => MessageUrn.For(t))
                 .ToList();
 
             var headers = new Dictionary<string, object>(context.Headers);

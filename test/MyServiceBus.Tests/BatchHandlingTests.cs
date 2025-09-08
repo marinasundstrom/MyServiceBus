@@ -29,8 +29,8 @@ public class BatchHandlingTests
             MessageId = Guid.NewGuid(),
             CorrelationId = null,
             MessageType = [
-                NamingConventions.GetMessageUrn(typeof(Batch<SampleMessage>)),
-                NamingConventions.GetMessageUrn(typeof(SampleMessage))
+                MessageUrn.For(typeof(Batch<SampleMessage>)),
+                MessageUrn.For(typeof(SampleMessage))
             ],
             Headers = new Dictionary<string, object>(),
             SentTime = DateTimeOffset.UtcNow,
@@ -56,8 +56,8 @@ public class BatchHandlingTests
         var typeElement = doc.RootElement.GetProperty("messageType");
         Assert.Equal(2, typeElement.GetArrayLength());
         var types = typeElement.EnumerateArray().Select(x => x.GetString()).ToArray();
-        Assert.Contains(NamingConventions.GetMessageUrn(typeof(Batch<SampleMessage>)), types);
-        Assert.Contains(NamingConventions.GetMessageUrn(typeof(SampleMessage)), types);
+        Assert.Contains(MessageUrn.For(typeof(Batch<SampleMessage>)), types);
+        Assert.Contains(MessageUrn.For(typeof(SampleMessage)), types);
 
         var envelopeContext = new EnvelopeMessageContext(bytes, new Dictionary<string, object>());
 

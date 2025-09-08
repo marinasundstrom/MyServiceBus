@@ -1,4 +1,5 @@
 using System;
+using System.Reflection;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using MyServiceBus;
@@ -24,7 +25,7 @@ public class InMemoryHarnessDiTests
     }
 
     [Fact]
-    [Throws(typeof(InvalidOperationException), typeof(ArgumentException), typeof(TrueException))]
+    [Throws(typeof(InvalidOperationException), typeof(TrueException))]
     public async Task Should_resolve_consumer_from_di()
     {
         var services = new ServiceCollection();
@@ -70,7 +71,7 @@ public class InMemoryHarnessDiTests
     }
 
     [Fact]
-    [Throws(typeof(InvalidOperationException), typeof(RequestFaultException), typeof(UriFormatException))]
+    [Throws(typeof(InvalidOperationException), typeof(RequestFaultException), typeof(UriFormatException), typeof(AmbiguousMatchException), typeof(TypeLoadException))]
     public async Task Should_create_request_client_from_factory()
     {
         var services = new ServiceCollection();
@@ -85,7 +86,7 @@ public class InMemoryHarnessDiTests
         await harness.Start();
 
         var factory = provider.GetRequiredService<IScopedClientFactory>();
-        var address = new Uri($"rabbitmq://localhost/exchange/{NamingConventions.GetExchangeName(typeof(CheckOrder))}");
+        var address = new Uri($"rabbitmq://localhost/exchange/{EntityNameFormatter.Format(typeof(CheckOrder))}");
         var client = factory.CreateRequestClient<CheckOrder>(address);
         var orderId = Guid.NewGuid();
         var response = await client.GetResponseAsync<OrderStatus>(new CheckOrder(orderId));

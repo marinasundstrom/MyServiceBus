@@ -3,7 +3,7 @@ package com.myservicebus;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
-public class NamingConventionsTest {
+public class FormatterTest {
     static class SampleUrnMessage { }
 
     @EntityName("custom-entity")
@@ -18,25 +18,25 @@ public class NamingConventionsTest {
 
     @Test
     void getMessageUrnReturnsExpected() {
-        String urn = NamingConventions.getMessageUrn(SampleUrnMessage.class);
+        String urn = MessageUrn.forClass(SampleUrnMessage.class);
         assertEquals("urn:message:TestApp:SampleUrnMessage", urn);
     }
 
     @Test
     void getExchangeNameUsesAttribute() {
-        String name = NamingConventions.getExchangeName(AttributeMessage.class);
+        String name = EntityNameFormatter.format(AttributeMessage.class);
         assertEquals("custom-entity", name);
     }
 
     @Test
     void getExchangeNameUsesFormatter() {
-        MessageEntityNameFormatter original = NamingConventions.getEntityNameFormatter();
+        MessageEntityNameFormatter original = EntityNameFormatter.getFormatter();
         try {
-            NamingConventions.setEntityNameFormatter(new StaticFormatter());
-            String name = NamingConventions.getExchangeName(SampleUrnMessage.class);
+            EntityNameFormatter.setFormatter(new StaticFormatter());
+            String name = EntityNameFormatter.format(SampleUrnMessage.class);
             assertEquals("fmt-sampleurnmessage", name);
         } finally {
-            NamingConventions.setEntityNameFormatter(original);
+            EntityNameFormatter.setFormatter(original);
         }
     }
 }

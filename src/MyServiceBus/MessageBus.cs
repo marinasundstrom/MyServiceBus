@@ -56,10 +56,10 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
         return Publish(typed, contextCallback, cancellationToken);
     }
 
-    [Throws(typeof(UriFormatException), typeof(InvalidOperationException))]
+    [Throws(typeof(UriFormatException), typeof(InvalidOperationException), typeof(AmbiguousMatchException))]
     public async Task Publish<T>(T message, Action<IPublishContext>? contextCallback = null, CancellationToken cancellationToken = default) where T : class
     {
-        var exchangeName = NamingConventions.GetExchangeName(message.GetType());
+        var exchangeName = EntityNameFormatter.Format(message.GetType());
 
         var uri = new Uri(_address, $"exchange/{exchangeName}");
         _logger?.LogDebug("Publishing {MessageType} to {DestinationAddress}", typeof(T).Name, uri);
@@ -124,19 +124,19 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
             await pipe.Send(consumeContext).ConfigureAwait(false);
         }
 
-        var expectedUrn = NamingConventions.GetMessageUrn(typeof(TMessage));
+        var expectedUrn = MessageUrn.For(typeof(TMessage));
         Func<string?, bool> isRegistered = mt => mt == expectedUrn;
         var receiveTransport = await _transportFactory.CreateReceiveTransport(topology, TransportHandler, isRegistered, cancellationToken);
         _activeTransports.Add(receiveTransport);
     }
 
-    [Throws(typeof(InvalidOperationException))]
+    [Throws(typeof(InvalidOperationException), typeof(AmbiguousMatchException))]
     public async Task AddConsumer<TMessage, TConsumer>(ConsumerTopology consumer, Delegate? configure = null, CancellationToken cancellationToken = default)
         where TConsumer : class, IConsumer<TMessage>
         where TMessage : class
     {
         var messageType = consumer.Bindings.First().MessageType;
-        var messageUrn = NamingConventions.GetMessageUrn(messageType);
+        var messageUrn = MessageUrn.For(messageType);
         var queueName = consumer.QueueName;
         if (_consumerTypes.Contains(typeof(TConsumer)))
         {
@@ -147,7 +147,7 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
         var topology = new ReceiveEndpointTopology
         {
             QueueName = queueName,
-            ExchangeName = NamingConventions.GetExchangeName(messageType)!, // standard MT routing
+            ExchangeName = EntityNameFormatter.Format(messageType)!, // standard MT routing
             RoutingKey = "", // messageType.FullName!,
             ExchangeType = "fanout",
             Durable = true,

@@ -27,7 +27,6 @@ public class PublishContextAddressTests
     {
         public readonly CaptureSendTransport Transport = new();
 
-        [Throws(typeof(InvalidOperationException))]
         public Task<ISendTransport> GetSendTransport(Uri address, CancellationToken cancellationToken = default) => Task.FromResult<ISendTransport>(Transport);
         [Throws(typeof(NotImplementedException))]
         public Task<IReceiveTransport> CreateReceiveTransport(ReceiveEndpointTopology topology, Func<ReceiveContext, Task> handler, Func<string?, bool>? isMessageTypeRegistered = null, CancellationToken cancellationToken = default) => throw new NotImplementedException();
@@ -45,6 +44,6 @@ public class PublishContextAddressTests
         await bus.Publish(new TestMessage());
 
         Assert.Equal(bus.Address, factory.Transport.Captured!.SourceAddress);
-        Assert.Equal(new Uri(bus.Address, $"exchange/{NamingConventions.GetExchangeName(typeof(TestMessage))}"), factory.Transport.Captured.DestinationAddress);
+        Assert.Equal(new Uri(bus.Address, $"exchange/{EntityNameFormatter.Format(typeof(TestMessage))}"), factory.Transport.Captured.DestinationAddress);
     }
 }

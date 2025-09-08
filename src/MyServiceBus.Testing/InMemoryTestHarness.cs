@@ -153,7 +153,7 @@ public class InMemoryTestHarness : IMessageBus, ITransportFactory, IReceiveEndpo
 
         var messageTypes = MessageTypeCache
             .GetMessageTypes(message!.GetType())
-            .Select(t => NamingConventions.GetMessageUrn(t))
+            .Select(t => MessageUrn.For(t))
             .ToList();
 
         var headers = new Dictionary<string, object>(context.Headers);

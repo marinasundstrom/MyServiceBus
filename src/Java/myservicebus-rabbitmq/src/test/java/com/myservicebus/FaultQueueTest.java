@@ -71,7 +71,7 @@ class FaultQueueTest {
         Envelope<MyMessage> envelope = new Envelope<>();
         envelope.setMessage(new MyMessage());
         envelope.setHeaders(new HashMap<>());
-        envelope.setMessageType(List.of(NamingConventions.getMessageUrn(MyMessage.class)));
+        envelope.setMessageType(List.of(MessageUrn.forClass(MyMessage.class)));
         ObjectMapper mapper = new ObjectMapper();
         mapper.disable(SerializationFeature.FAIL_ON_EMPTY_BEANS);
         byte[] body = mapper.writeValueAsBytes(envelope);

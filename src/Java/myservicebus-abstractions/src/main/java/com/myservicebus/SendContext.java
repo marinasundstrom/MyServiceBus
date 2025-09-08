@@ -55,7 +55,7 @@ public class SendContext implements PipeContext {
         MessageSerializationContext<Object> context = new MessageSerializationContext<>(message);
         context.setMessageId(UUID.randomUUID());
         context.setCorrelationId(null);
-        context.setMessageType(List.of(NamingConventions.getMessageUrn(message.getClass())));
+        context.setMessageType(List.of(MessageUrn.forClass(message.getClass())));
         context.setResponseAddress(null);
         context.setFaultAddress(null);
         context.setSourceAddress(sourceAddress != null ? sourceAddress : URI.create("loopback://localhost/source"));

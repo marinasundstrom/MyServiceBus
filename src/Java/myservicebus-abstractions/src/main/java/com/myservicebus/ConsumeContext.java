@@ -89,7 +89,7 @@ public class ConsumeContext<T>
 
     @Override
     public CompletableFuture<Void> publish(PublishContext context) {
-        String exchange = NamingConventions.getExchangeName(context.getMessage().getClass());
+        String exchange = EntityNameFormatter.format(context.getMessage().getClass());
         URI dest = busAddress.resolve("exchange/" + exchange);
         context.setSourceAddress(busAddress);
         context.setDestinationAddress(dest);

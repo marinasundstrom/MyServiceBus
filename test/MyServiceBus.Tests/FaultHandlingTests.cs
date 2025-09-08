@@ -78,7 +78,6 @@ public class FaultHandlingTests
         public readonly CaptureSendTransport SendTransport = new();
         public Uri? Address { get; private set; }
 
-        [Throws(typeof(InvalidOperationException))]
         public Task<ISendTransport> GetSendTransport(Uri address, CancellationToken cancellationToken = default)
         {
             Address = address;
@@ -94,7 +93,7 @@ public class FaultHandlingTests
     {
         public TestMessage Message { get; set; } = new();
         public Guid MessageId { get; set; }
-        public IList<string> MessageType { get; set; } = [NamingConventions.GetMessageUrn(typeof(TestMessage))];
+        public IList<string> MessageType { get; set; } = [MessageUrn.For(typeof(TestMessage))];
         public Uri? ResponseAddress { get; set; }
         public Uri? FaultAddress { get; set; }
         public Uri? ErrorAddress { get; set; }

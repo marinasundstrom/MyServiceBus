@@ -1,4 +1,5 @@
 using System;
+using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -47,16 +48,16 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
         return Task.FromResult(endpoint);
     }
 
-    [Throws(typeof(UriFormatException), typeof(InvalidOperationException), typeof(InvalidCastException))]
+    [Throws(typeof(UriFormatException), typeof(InvalidOperationException), typeof(InvalidCastException), typeof(AmbiguousMatchException))]
     public async Task Publish<T>(T message, Action<IPublishContext>? contextCallback = null, CancellationToken cancellationToken = default) where T : class
     {
         await Publish<T>((object)message!, contextCallback, cancellationToken);
     }
 
-    [Throws(typeof(UriFormatException), typeof(InvalidOperationException))]
+    [Throws(typeof(UriFormatException), typeof(InvalidOperationException), typeof(AmbiguousMatchException), typeof(TypeLoadException))]
     public async Task Publish<T>(object message, Action<IPublishContext>? contextCallback = null, CancellationToken cancellationToken = default) where T : class
     {
-        var exchangeName = NamingConventions.GetExchangeName(typeof(T));
+        var exchangeName = EntityNameFormatter.Format(typeof(T));
 
         var uri = new Uri(_address, $"exchange/{exchangeName}");
         var transport = await _transportFactory.GetSendTransport(uri, cancellationToken);
