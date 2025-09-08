@@ -27,12 +27,19 @@ internal class TransportSendEndpoint : ISendEndpoint
         _logger = logger;
     }
 
-    [Throws(typeof(InvalidOperationException))]
-    public Task Send<T>(T message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default)
-        => Send<T>((object)message!, contextCallback, cancellationToken);
+    public Task Send<T>(T message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default) where T : class
+        => SendInternal(message, contextCallback, cancellationToken);
 
-    [Throws(typeof(InvalidOperationException))]
-    public async Task Send<T>(object message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default)
+    public Task Send<T>(object message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default) where T : class
+        => SendInternal(AnonymousMessageFactory.Create<T>(message), contextCallback, cancellationToken);
+
+    Task ISendEndpoint.Send<T>(T message, Action<ISendContext>? contextCallback, CancellationToken cancellationToken)
+        => SendInternal(message, contextCallback, cancellationToken);
+
+    Task ISendEndpoint.Send<T>(object message, Action<ISendContext>? contextCallback, CancellationToken cancellationToken)
+        => SendInternal(AnonymousMessageFactory.Create<T>(message), contextCallback, cancellationToken);
+
+    async Task SendInternal<T>(T message, Action<ISendContext>? contextCallback, CancellationToken cancellationToken) where T : class
     {
         _logger?.LogDebug("Sending {MessageType} to {DestinationAddress}", typeof(T).Name, _address);
 

@@ -52,7 +52,7 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
     [Throws(typeof(UriFormatException), typeof(InvalidOperationException))]
     public Task Publish<TMessage>(object message, Action<IPublishContext>? contextCallback = null, CancellationToken cancellationToken = default) where TMessage : class
     {
-        var typed = message as TMessage ?? InterfaceProxy.Create<TMessage>(message);
+        var typed = AnonymousMessageFactory.Create<TMessage>(message);
         return Publish(typed, contextCallback, cancellationToken);
     }
 
@@ -225,42 +225,4 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
         }
     }
 
-    private class PropertyMappingDispatchProxy : DispatchProxy
-    {
-        private object _source = null!;
-        private Dictionary<string, PropertyInfo> _properties = null!;
-
-        protected override object? Invoke(MethodInfo targetMethod, object?[]? args)
-        {
-            if (targetMethod.IsSpecialName && targetMethod.Name.StartsWith("get_"))
-            {
-                var name = targetMethod.Name[4..];
-                if (_properties.TryGetValue(name, out var prop))
-                    return prop.GetValue(_source);
-
-                return targetMethod.ReturnType.IsValueType
-                    ? Activator.CreateInstance(targetMethod.ReturnType)
-                    : null;
-            }
-
-            throw new NotImplementedException(targetMethod.Name);
-        }
-
-        public void Initialize(object source)
-        {
-            _source = source;
-            _properties = source.GetType().GetProperties(BindingFlags.Instance | BindingFlags.Public)
-                .ToDictionary(p => p.Name);
-        }
-    }
-
-    private static class InterfaceProxy
-    {
-        public static T Create<T>(object source) where T : class
-        {
-            var proxy = DispatchProxy.Create<T, PropertyMappingDispatchProxy>();
-            ((PropertyMappingDispatchProxy)(object)proxy).Initialize(source);
-            return proxy;
-        }
-    }
 }

@@ -25,4 +25,21 @@ public interface SendEndpoint {
     default <T> CompletableFuture<Void> send(T message) {
         return send(message, CancellationToken.none);
     }
+
+    default <T> CompletableFuture<Void> send(Class<T> type, Object values, CancellationToken cancellationToken) {
+        return send(AnonymousMessageFactory.create(type, values), cancellationToken);
+    }
+
+    default <T> CompletableFuture<Void> send(Class<T> type, Object values) {
+        return send(type, values, CancellationToken.none);
+    }
+
+    default <T> CompletableFuture<Void> send(Class<T> type, Object values, Consumer<SendContext> contextCallback, CancellationToken cancellationToken) {
+        T message = AnonymousMessageFactory.create(type, values);
+        return send(message, contextCallback, cancellationToken);
+    }
+
+    default <T> CompletableFuture<Void> send(Class<T> type, Object values, Consumer<SendContext> contextCallback) {
+        return send(type, values, contextCallback, CancellationToken.none);
+    }
 }

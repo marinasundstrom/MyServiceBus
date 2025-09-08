@@ -156,6 +156,24 @@ public class ConsumeContext<T>
         return send(destination, message, CancellationToken.none);
     }
 
+    public <TMessage> CompletableFuture<Void> send(String destination, Class<TMessage> type, Object values, CancellationToken cancellationToken) {
+        TMessage msg = AnonymousMessageFactory.create(type, values);
+        return send(destination, msg, cancellationToken);
+    }
+
+    public <TMessage> CompletableFuture<Void> send(String destination, Class<TMessage> type, Object values) {
+        return send(destination, type, values, CancellationToken.none);
+    }
+
+    public <TMessage> CompletableFuture<Void> send(String destination, Class<TMessage> type, Object values, Consumer<SendContext> contextCallback, CancellationToken cancellationToken) {
+        TMessage msg = AnonymousMessageFactory.create(type, values);
+        return send(destination, msg, contextCallback, cancellationToken);
+    }
+
+    public <TMessage> CompletableFuture<Void> send(String destination, Class<TMessage> type, Object values, Consumer<SendContext> contextCallback) {
+        return send(destination, type, values, contextCallback, CancellationToken.none);
+    }
+
     public <TMessage> CompletableFuture<Void> forward(String destination, TMessage message, CancellationToken cancellationToken) {
         SendEndpoint endpoint = getSendEndpoint(destination);
         return endpoint.send(message, ctx -> ctx.getHeaders().putAll(headers), cancellationToken);
