@@ -83,7 +83,7 @@ public sealed class RabbitMqReceiveTransport : IReceiveTransport
             }
             catch (Exception exc)
             {
-                await _channel.BasicNackAsync(ea.DeliveryTag, multiple: false, requeue: true);
+                await _channel.BasicAckAsync(ea.DeliveryTag, multiple: false);
 
                 _logger?.LogError(exc, "Message handling failed");
             }
