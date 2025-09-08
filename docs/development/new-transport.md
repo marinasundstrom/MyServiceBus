@@ -24,6 +24,23 @@ The transport factory creates and caches send and receive transports.
 - Use `Task`-based APIs to send and receive message payloads.
 - Apply `Throws` attributes for any exceptions that may escape the method boundary.
 - For queue-based brokers, implement a receive context that also implements `IQueueReceiveContext`, populating `DeliveryCount`, `Destination`, and `BrokerProperties` from the transport's delivery tag, queue or exchange name, and header metadata.
+- For queue-based brokers, implement both a receive context and a send context that also implement `IQueueReceiveContext` and `IQueueSendContext` (`QueueSendContext` in Java). The send context exposes queue features such as time-to-live, persistence, and arbitrary broker properties.
+
+```csharp
+var ctx = new RabbitMqSendContext(MessageTypeCache.GetMessageTypes(typeof(MyMessage)), serializer)
+{
+    TimeToLive = TimeSpan.FromSeconds(30),
+    Persistent = false,
+};
+ctx.BrokerProperties["x-priority"] = 5;
+```
+
+```java
+RabbitMqSendContext ctx = new RabbitMqSendContext(new MyMessage(), CancellationToken.none());
+ctx.setTimeToLive(Duration.ofSeconds(30));
+ctx.setPersistent(false);
+ctx.getBrokerProperties().put("x-priority", 5);
+```
 
 ### Java
 - Implement the `SendTransport` and `ReceiveTransport` interfaces.
