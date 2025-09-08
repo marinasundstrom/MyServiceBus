@@ -181,6 +181,25 @@ SendEndpoint endpoint = provider.getSendEndpoint("rabbitmq://localhost/submit-or
 endpoint.send(new SubmitOrder(UUID.randomUUID())).join();
 ```
 
+##### Hosting consumers over HTTP
+
+Configure the HTTP transport with extension methods similar to RabbitMQ:
+
+```csharp
+var services = new ServiceCollection();
+services.AddServiceBus(x =>
+{
+    x.AddConsumer<SubmitOrderConsumer>();
+    x.UsingHttp(new Uri("http://localhost:5000/"), (context, cfg) =>
+    {
+        cfg.ReceiveEndpoint("submit-order", e =>
+            e.ConfigureConsumer<SubmitOrderConsumer>(context));
+    });
+});
+```
+
+Consumers added this way handle POST requests to `http://localhost:5000/submit-order`. Alternatively, a consumer can be added at runtime via `IMessageBus.AddConsumer` and a `ConsumerTopology` with an explicit URI.
+
 ##### Sending with `HttpClient`
 
 When using the HTTP transport, any client can post an `Envelope<T>` directly

@@ -17,6 +17,24 @@ services.AddServiceBus(cfg =>
 });
 ```
 
+### Consumers
+
+Map consumers to HTTP endpoints using extension methods that mirror the RabbitMQ configuration style:
+
+```csharp
+services.AddServiceBus(cfg =>
+{
+    cfg.AddConsumer<SubmitOrderConsumer>();
+    cfg.UsingHttp(new Uri("http://localhost:5000/"), (context, http) =>
+    {
+        http.ReceiveEndpoint("submit-order", e =>
+            e.ConfigureConsumer<SubmitOrderConsumer>(context));
+    });
+});
+```
+
+As an alternative, consumers can be added at runtime by calling `IMessageBus.AddConsumer` with a `ConsumerTopology` and explicit URI.
+
 ## Sending with `HttpClient`
 
 Because the transport exchanges plain HTTP requests, any client can post a
