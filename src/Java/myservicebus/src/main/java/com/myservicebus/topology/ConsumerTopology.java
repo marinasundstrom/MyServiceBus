@@ -7,6 +7,7 @@ import java.util.function.Consumer;
 
 import com.myservicebus.ConsumeContext;
 import com.myservicebus.PipeConfigurator;
+import com.myservicebus.serialization.MessageSerializer;
 
 public class ConsumerTopology {
     private Class<?> consumerType;
@@ -15,6 +16,7 @@ public class ConsumerTopology {
     private Consumer<PipeConfigurator<ConsumeContext<Object>>> configure;
     private Integer prefetchCount;
     private Map<String, Object> queueArguments;
+    private Class<? extends MessageSerializer> serializerClass;
 
     public Class<?> getConsumerType() {
         return consumerType;
@@ -62,5 +64,13 @@ public class ConsumerTopology {
 
     public void setQueueArguments(Map<String, Object> queueArguments) {
         this.queueArguments = queueArguments;
+    }
+
+    public Class<? extends MessageSerializer> getSerializerClass() {
+        return serializerClass;
+    }
+
+    public void setSerializerClass(Class<? extends MessageSerializer> serializerClass) {
+        this.serializerClass = serializerClass;
     }
 }

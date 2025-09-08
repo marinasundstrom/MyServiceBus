@@ -8,6 +8,7 @@ import com.myservicebus.NamingConventions;
 import com.myservicebus.topology.ConsumerTopology;
 import com.myservicebus.topology.MessageBinding;
 import com.myservicebus.topology.TopologyRegistry;
+import com.myservicebus.serialization.MessageSerializer;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
@@ -68,7 +69,10 @@ public class RabbitMqFactoryConfigurator {
 
     @SuppressWarnings({"unchecked", "rawtypes"})
     private static <T> void applyHandler(com.myservicebus.MessageBusImpl bus, HandlerRegistration<T> reg) throws Exception {
-        bus.addHandler(reg.queueName, reg.messageType, reg.exchange, reg.handler, reg.retryCount, reg.retryDelay, reg.prefetchCount, reg.queueArguments);
+        MessageSerializer serializer = reg.serializerClass != null
+                ? reg.serializerClass.getDeclaredConstructor().newInstance()
+                : null;
+        bus.addHandler(reg.queueName, reg.messageType, reg.exchange, reg.handler, reg.retryCount, reg.retryDelay, reg.prefetchCount, reg.queueArguments, serializer);
     }
 
     public String getClientHost() {
@@ -119,6 +123,7 @@ public class RabbitMqFactoryConfigurator {
         private java.util.function.Consumer<RetryConfigurator> retry;
         private Integer prefetchCount;
         private Map<String, Object> queueArguments;
+        private Class<? extends MessageSerializer> serializerClass;
 
         ReceiveEndpointConfiguratorImpl(String queueName, Map<Class<?>, String> exchangeNames, java.util.List<HandlerRegistration<?>> handlers) {
             this.queueName = queueName;
@@ -148,6 +153,11 @@ public class RabbitMqFactoryConfigurator {
                 this.queueArguments = new java.util.HashMap<>();
             }
             this.queueArguments.put(key, value);
+        }
+
+        @Override
+        public void setSerializer(Class<? extends MessageSerializer> serializerClass) {
+            this.serializerClass = serializerClass;
         }
 
         @Override
@@ -181,6 +191,7 @@ public class RabbitMqFactoryConfigurator {
 
                 def.setPrefetchCount(prefetchCount);
                 def.setQueueArguments(queueArguments);
+                def.setSerializerClass(serializerClass);
             } catch (Exception ex) {
                 throw new RuntimeException(
                         "Failed to configure consumer " + consumerClass.getSimpleName(), ex);
@@ -192,7 +203,7 @@ public class RabbitMqFactoryConfigurator {
             String exchange = exchangeNames.containsKey(messageType)
                     ? exchangeNames.get(messageType)
                     : NamingConventions.getExchangeName(messageType);
-            handlers.add(new HandlerRegistration<>(queueName, messageType, exchange, handler, retryCount, retryDelay, prefetchCount, queueArguments));
+            handlers.add(new HandlerRegistration<>(queueName, messageType, exchange, handler, retryCount, retryDelay, prefetchCount, queueArguments, serializerClass));
         }
     }
 
@@ -205,10 +216,12 @@ public class RabbitMqFactoryConfigurator {
         final Duration retryDelay;
         final Integer prefetchCount;
         final Map<String, Object> queueArguments;
+        final Class<? extends MessageSerializer> serializerClass;
 
         HandlerRegistration(String queueName, Class<T> messageType, String exchange,
                 java.util.function.Function<ConsumeContext<T>, java.util.concurrent.CompletableFuture<Void>> handler,
-                Integer retryCount, Duration retryDelay, Integer prefetchCount, Map<String, Object> queueArguments) {
+                Integer retryCount, Duration retryDelay, Integer prefetchCount, Map<String, Object> queueArguments,
+                Class<? extends MessageSerializer> serializerClass) {
             this.queueName = queueName;
             this.messageType = messageType;
             this.exchange = exchange;
@@ -217,6 +230,7 @@ public class RabbitMqFactoryConfigurator {
             this.retryDelay = retryDelay;
             this.prefetchCount = prefetchCount;
             this.queueArguments = queueArguments;
+            this.serializerClass = serializerClass;
         }
     }
 }

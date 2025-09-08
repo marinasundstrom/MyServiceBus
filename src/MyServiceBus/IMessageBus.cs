@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using MyServiceBus.Topology;
+using MyServiceBus.Serialization;
 
 namespace MyServiceBus;
 
@@ -31,6 +32,6 @@ public interface IMessageBus :
 
     Task AddHandler<TMessage>(string queueName, string exchangeName, Func<ConsumeContext<TMessage>, Task> handler,
         int? retryCount = null, TimeSpan? retryDelay = null, ushort? prefetchCount = null,
-        IDictionary<string, object?>? queueArguments = null, CancellationToken cancellationToken = default)
+        IDictionary<string, object?>? queueArguments = null, IMessageSerializer? serializer = null, CancellationToken cancellationToken = default)
         where TMessage : class;
 }

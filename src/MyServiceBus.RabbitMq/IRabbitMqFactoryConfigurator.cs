@@ -2,6 +2,7 @@
 
 using Microsoft.Extensions.DependencyInjection;
 using MyServiceBus.Topology;
+using MyServiceBus.Serialization;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -51,13 +52,14 @@ public class ReceiveEndpointConfigurator
 {
     private readonly string _queueName;
     private readonly IDictionary<Type, string> _exchangeNames;
-    private readonly IList<Action<IMessageBus>> _endpointActions;
+    private readonly IList<Action<IMessageBus, IServiceProvider>> _endpointActions;
     private int? _retryCount;
     private TimeSpan? _retryDelay;
     private ushort? _prefetchCount;
     private IDictionary<string, object?>? _queueArguments;
+    private Type? _serializerType;
 
-    public ReceiveEndpointConfigurator(string queueName, IDictionary<Type, string> exchangeNames, IList<Action<IMessageBus>> endpointActions)
+    public ReceiveEndpointConfigurator(string queueName, IDictionary<Type, string> exchangeNames, IList<Action<IMessageBus, IServiceProvider>> endpointActions)
     {
         _queueName = queueName;
         _exchangeNames = exchangeNames;
@@ -76,6 +78,11 @@ public class ReceiveEndpointConfigurator
     {
         _queueArguments ??= new Dictionary<string, object?>();
         _queueArguments[key] = value;
+    }
+
+    public void SetSerializer<TSerializer>() where TSerializer : class, IMessageSerializer
+    {
+        _serializerType = typeof(TSerializer);
     }
 
     [Throws(typeof(InvalidOperationException))]
@@ -107,6 +114,7 @@ public class ReceiveEndpointConfigurator
 
             consumer.PrefetchCount = _prefetchCount;
             consumer.QueueArguments = _queueArguments;
+            consumer.SerializerType = _serializerType;
 
             if (_retryCount.HasValue)
             {
@@ -141,9 +149,12 @@ public class ReceiveEndpointConfigurator
         var exchangeName = _exchangeNames.TryGetValue(typeof(T), out var entity)
             ? entity
             : NamingConventions.GetExchangeName(typeof(T))!;
-        _endpointActions.Add([Throws(typeof(Exception))] (bus) =>
+        _endpointActions.Add([Throws(typeof(Exception))] (bus, provider) =>
         {
-            bus.AddHandler(_queueName, exchangeName, handler, _retryCount, _retryDelay, _prefetchCount, _queueArguments, CancellationToken.None).GetAwaiter().GetResult();
+            IMessageSerializer? serializer = _serializerType != null
+                ? (IMessageSerializer)ActivatorUtilities.CreateInstance(provider, _serializerType)
+                : null;
+            bus.AddHandler(_queueName, exchangeName, handler, _retryCount, _retryDelay, _prefetchCount, _queueArguments, serializer, CancellationToken.None).GetAwaiter().GetResult();
         });
     }
 

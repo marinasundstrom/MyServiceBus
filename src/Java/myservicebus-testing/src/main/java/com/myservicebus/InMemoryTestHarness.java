@@ -13,6 +13,7 @@ import com.myservicebus.di.ServiceScope;
 import com.myservicebus.tasks.CancellationToken;
 import com.myservicebus.topology.ConsumerTopology;
 import com.myservicebus.topology.TopologyRegistry;
+import com.myservicebus.serialization.MessageSerializer;
 
 public class InMemoryTestHarness implements RequestClientTransport, TransportSendEndpointProvider {
     private final Map<Class<?>, List<com.myservicebus.Consumer<?>>> handlers = new ConcurrentHashMap<>();
@@ -230,6 +231,11 @@ public class InMemoryTestHarness implements RequestClientTransport, TransportSen
     @Override
     public SendEndpoint getSendEndpoint(String uri) {
         return new HarnessSendEndpoint();
+    }
+
+    @Override
+    public TransportSendEndpointProvider withSerializer(MessageSerializer serializer) {
+        return this;
     }
 
     class HarnessSendEndpoint implements SendEndpoint {

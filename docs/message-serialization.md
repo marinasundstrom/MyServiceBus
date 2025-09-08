@@ -30,3 +30,26 @@ ServiceBus.configure(services, cfg -> {
 ```
 
 `EnvelopeMessageSerializer` remains the default and wraps the message with metadata. Use `RawJsonMessageSerializer` to send the payload as raw JSON.
+
+### Per-endpoint serializer
+
+You can override the serializer for a specific receive endpoint.
+
+**C#**
+
+```csharp
+cfg.ReceiveEndpoint("input", e =>
+{
+    e.SetSerializer<RawJsonMessageSerializer>();
+    e.Handler<MyMessage>(context => Task.CompletedTask);
+});
+```
+
+**Java**
+
+```java
+cfg.receiveEndpoint("input", e -> {
+    e.setSerializer(RawJsonMessageSerializer.class);
+    e.handler(MyMessage.class, ctx -> CompletableFuture.completedFuture(null));
+});
+```

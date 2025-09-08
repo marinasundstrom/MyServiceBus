@@ -1,6 +1,7 @@
 package com.myservicebus.rabbitmq;
 
 import com.myservicebus.RetryConfigurator;
+import com.myservicebus.serialization.MessageSerializer;
 
 public interface ReceiveEndpointConfigurator {
     void useMessageRetry(java.util.function.Consumer<RetryConfigurator> configure);
@@ -8,4 +9,5 @@ public interface ReceiveEndpointConfigurator {
     <T> void handler(Class<T> messageType, java.util.function.Function<com.myservicebus.ConsumeContext<T>, java.util.concurrent.CompletableFuture<Void>> handler);
     void prefetchCount(int prefetchCount);
     void setQueueArgument(String key, Object value);
+    void setSerializer(Class<? extends MessageSerializer> serializerClass);
 }

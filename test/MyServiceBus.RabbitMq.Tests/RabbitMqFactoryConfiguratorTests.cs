@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using MyServiceBus;
 using MyServiceBus.Topology;
+using MyServiceBus.Serialization;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -35,7 +36,7 @@ public class RabbitMqFactoryConfiguratorTests
             where TConsumer : class, IConsumer<TMessage>
             where TMessage : class => Task.CompletedTask;
 
-        public Task AddHandler<TMessage>(string queueName, string exchangeName, Func<ConsumeContext<TMessage>, Task> handler, int? retryCount = null, TimeSpan? retryDelay = null, ushort? prefetchCount = null, IDictionary<string, object?>? queueArguments = null, CancellationToken cancellationToken = default) where TMessage : class => Task.CompletedTask;
+        public Task AddHandler<TMessage>(string queueName, string exchangeName, Func<ConsumeContext<TMessage>, Task> handler, int? retryCount = null, TimeSpan? retryDelay = null, ushort? prefetchCount = null, IDictionary<string, object?>? queueArguments = null, IMessageSerializer? serializer = null, CancellationToken cancellationToken = default) where TMessage : class => Task.CompletedTask;
 
         class StubSendEndpoint : ISendEndpoint
         {
@@ -64,7 +65,7 @@ public class RabbitMqFactoryConfiguratorTests
 
         public void ReceiveEndpoint(string queueName, Action<ReceiveEndpointConfigurator> configure)
         {
-            configure(new ReceiveEndpointConfigurator(queueName, _exchangeNames, new List<Action<IMessageBus>>()));
+            configure(new ReceiveEndpointConfigurator(queueName, _exchangeNames, new List<Action<IMessageBus, IServiceProvider>>()));
         }
 
         public void Host(string host, Action<IRabbitMqHostConfigurator>? configure = null)

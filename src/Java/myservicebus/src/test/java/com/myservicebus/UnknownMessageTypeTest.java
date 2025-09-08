@@ -17,6 +17,9 @@ import com.myservicebus.serialization.EnvelopeMessageSerializer;
 import com.myservicebus.serialization.MessageSerializationContext;
 import com.myservicebus.tasks.CancellationToken;
 import com.myservicebus.topology.MessageBinding;
+import com.myservicebus.serialization.MessageSerializer;
+import com.myservicebus.SendContext;
+import com.myservicebus.SendEndpoint;
 
 class UnknownMessageTypeTest {
     static class StubTransportFactory implements TransportFactory {
@@ -47,9 +50,25 @@ class UnknownMessageTypeTest {
         StubTransportFactory transportFactory = new StubTransportFactory();
         ServiceCollection services = new ServiceCollection();
         services.addSingleton(TransportFactory.class, sp -> () -> transportFactory);
-        services.addSingleton(TransportSendEndpointProvider.class, sp -> () -> uri -> new SendEndpoint() {
-            @Override public <T> CompletableFuture<Void> send(T message, CancellationToken cancellationToken) {
-                return CompletableFuture.completedFuture(null);
+        services.addSingleton(TransportSendEndpointProvider.class, sp -> () -> new TransportSendEndpointProvider() {
+            @Override
+            public SendEndpoint getSendEndpoint(String uri) {
+                return new SendEndpoint() {
+                    @Override
+                    public <T> CompletableFuture<Void> send(T message, CancellationToken cancellationToken) {
+                        return CompletableFuture.completedFuture(null);
+                    }
+
+                    @Override
+                    public CompletableFuture<Void> send(SendContext ctx) {
+                        return CompletableFuture.completedFuture(null);
+                    }
+                };
+            }
+
+            @Override
+            public TransportSendEndpointProvider withSerializer(MessageSerializer serializer) {
+                return this;
             }
         });
         services.addSingleton(PublishPipe.class, sp -> () -> new PublishPipe(ctx -> CompletableFuture.completedFuture(null)));
@@ -57,7 +76,7 @@ class UnknownMessageTypeTest {
 
         MessageBusImpl bus = new MessageBusImpl(provider);
         class SampleMessage { }
-        bus.addHandler("queue", SampleMessage.class, "exchange", ctx -> CompletableFuture.completedFuture(null), null, null, null, null);
+        bus.addHandler("queue", SampleMessage.class, "exchange", ctx -> CompletableFuture.completedFuture(null), null, null, null, null, null);
 
         MessageSerializationContext<Object> ctx = new MessageSerializationContext<>(Map.of("value", 1));
         ctx.setMessageId(UUID.randomUUID());

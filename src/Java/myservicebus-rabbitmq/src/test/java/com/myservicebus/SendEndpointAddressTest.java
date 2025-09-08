@@ -23,6 +23,7 @@ import com.myservicebus.SendTransport;
 import com.myservicebus.ReceiveTransport;
 import com.myservicebus.topology.MessageBinding;
 import com.myservicebus.TransportMessage;
+import com.myservicebus.serialization.MessageSerializer;
 import com.rabbitmq.client.ConnectionFactory;
 
 class SendEndpointAddressTest {
@@ -36,18 +37,28 @@ class SendEndpointAddressTest {
         services.addSingleton(SendPipe.class, sp -> () -> new SendPipe(new PipeConfigurator<SendContext>().build()));
         services.addSingleton(PublishPipe.class, sp -> () -> new PublishPipe(new PipeConfigurator<SendContext>().build()));
         services.addSingleton(ConsumeContextProvider.class, sp -> () -> new ConsumeContextProvider());
-        services.addSingleton(TransportSendEndpointProvider.class, sp -> () -> uri -> new SendEndpoint() {
+        services.addSingleton(TransportSendEndpointProvider.class, sp -> () -> new TransportSendEndpointProvider() {
             @Override
-            public CompletableFuture<Void> send(SendContext ctx) {
-                ctx.setSourceAddress(sp.getService(URI.class));
-                ctx.setDestinationAddress(URI.create(uri));
-                captured.set(ctx);
-                return sp.getService(SendPipe.class).send(ctx);
+            public SendEndpoint getSendEndpoint(String uri) {
+                return new SendEndpoint() {
+                    @Override
+                    public CompletableFuture<Void> send(SendContext ctx) {
+                        ctx.setSourceAddress(sp.getService(URI.class));
+                        ctx.setDestinationAddress(URI.create(uri));
+                        captured.set(ctx);
+                        return sp.getService(SendPipe.class).send(ctx);
+                    }
+
+                    @Override
+                    public <T> CompletableFuture<Void> send(T message, CancellationToken cancellationToken) {
+                        return send(new SendContext(message, cancellationToken));
+                    }
+                };
             }
 
             @Override
-            public <T> CompletableFuture<Void> send(T message, CancellationToken cancellationToken) {
-                return send(new SendContext(message, cancellationToken));
+            public TransportSendEndpointProvider withSerializer(MessageSerializer serializer) {
+                return this;
             }
         });
         services.addSingleton(SendEndpointProvider.class, sp -> () -> new SendEndpointProviderImpl(

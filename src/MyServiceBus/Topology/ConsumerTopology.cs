@@ -11,4 +11,5 @@ public class ConsumerTopology
     public Delegate? ConfigurePipe { get; set; }
     public ushort? PrefetchCount { get; set; }
     public IDictionary<string, object?>? QueueArguments { get; set; }
+    public Type? SerializerType { get; set; }
 }

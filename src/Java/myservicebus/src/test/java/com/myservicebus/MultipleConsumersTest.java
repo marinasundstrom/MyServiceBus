@@ -15,6 +15,9 @@ import com.myservicebus.di.ServiceProvider;
 import com.myservicebus.tasks.CancellationToken;
 import com.myservicebus.topology.MessageBinding;
 import com.myservicebus.topology.TopologyRegistry;
+import com.myservicebus.serialization.MessageSerializer;
+import com.myservicebus.SendContext;
+import com.myservicebus.SendEndpoint;
 
 class MultipleConsumersTest {
     static class MyMessage { }
@@ -72,10 +75,25 @@ class MultipleConsumersTest {
         services.addSingleton(SendEndpointProvider.class,
                 sp -> () -> new SendEndpointProviderImpl(sp.getService(ConsumeContextProvider.class),
                         sp.getService(TransportSendEndpointProvider.class)));
-        services.addSingleton(TransportSendEndpointProvider.class, sp -> () -> uri -> new SendEndpoint() {
+        services.addSingleton(TransportSendEndpointProvider.class, sp -> () -> new TransportSendEndpointProvider() {
             @Override
-            public <T> CompletableFuture<Void> send(T message, CancellationToken cancellationToken) {
-                return CompletableFuture.completedFuture(null);
+            public SendEndpoint getSendEndpoint(String uri) {
+                return new SendEndpoint() {
+                    @Override
+                    public <T> CompletableFuture<Void> send(T message, CancellationToken cancellationToken) {
+                        return CompletableFuture.completedFuture(null);
+                    }
+
+                    @Override
+                    public CompletableFuture<Void> send(SendContext ctx) {
+                        return CompletableFuture.completedFuture(null);
+                    }
+                };
+            }
+
+            @Override
+            public TransportSendEndpointProvider withSerializer(MessageSerializer serializer) {
+                return this;
             }
         });
         services.addSingleton(TransportFactory.class, sp -> () -> factory);
