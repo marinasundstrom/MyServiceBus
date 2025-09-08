@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 using MyServiceBus.Serialization;
 using MyServiceBus.Topology;
 using Xunit;
+using Xunit.Sdk;
 
 namespace MyServiceBus.Tests;
 
@@ -26,10 +27,10 @@ public class ReceiveEndpointSerializerTests
     class StubSendTransport : ISendTransport
     {
         public string? ContentType;
-        public Task Send<T>(T message, SendContext context, CancellationToken cancellationToken) where T : class
+        public async Task Send<T>(T message, SendContext context, CancellationToken cancellationToken) where T : class
         {
+            await context.Serialize(message);
             ContentType = context.Headers.TryGetValue("content_type", out var ct) ? ct?.ToString() : null;
-            return Task.CompletedTask;
         }
     }
 
@@ -37,7 +38,7 @@ public class ReceiveEndpointSerializerTests
     {
         public Func<ReceiveContext, Task>? Handler;
         public readonly StubSendTransport SendTransport = new();
-        [Throws(typeof(InvalidOperationException))]
+
         public Task<ISendTransport> GetSendTransport(Uri address, CancellationToken cancellationToken = default)
             => Task.FromResult<ISendTransport>(SendTransport);
         public Task<IReceiveTransport> CreateReceiveTransport(ReceiveEndpointTopology topology, Func<ReceiveContext, Task> handler, Func<string?, bool>? isMessageTypeRegistered = null, CancellationToken cancellationToken = default)
@@ -57,7 +58,7 @@ public class ReceiveEndpointSerializerTests
     class ResponseMessage { }
 
     [Fact]
-    [Throws(typeof(UriFormatException), typeof(NotNullException))]
+    [Throws(typeof(UriFormatException), typeof(NotNullException), typeof(EqualException))]
     public async Task Handler_uses_custom_serializer_for_publish()
     {
         var services = new ServiceCollection();
@@ -108,7 +109,7 @@ public class ReceiveEndpointSerializerTests
         public Uri? FaultAddress { get; }
         public IDictionary<string, object> Headers { get; }
         public DateTimeOffset SentTime { get; }
-        [Throws(typeof(InvalidOperationException), typeof(ObjectDisposedException))]
+
         public bool TryGetMessage<T>(out T? message) where T : class
         {
             if (_message is T t)
