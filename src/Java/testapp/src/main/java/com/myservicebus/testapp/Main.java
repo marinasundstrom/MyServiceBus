@@ -40,6 +40,9 @@ public class Main {
                 h.password("guest");
             });
 
+            // Fault<T> consumers don't auto-bind; listen on the queue suffixed with `_fault`
+            // for the original endpoint. SubmitOrderFaultConsumer handles Fault<OrderSubmitted>
+            // messages published to `submit-order_fault`.
             cfg.receiveEndpoint("submit-order_fault", e -> {
                 e.configureConsumer(context, SubmitOrderFaultConsumer.class);
 
