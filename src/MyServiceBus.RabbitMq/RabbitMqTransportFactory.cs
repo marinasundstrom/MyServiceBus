@@ -357,6 +357,16 @@ public sealed class RabbitMqTransportFactory : ITransportFactory
                 autoDelete = adb;
             if (dict.TryGetValue("QueueArguments", out var qa) && qa is IDictionary<string, object?> qd)
                 arguments = qd;
+
+            foreach (var kv in dict)
+            {
+                if (kv.Key == "QueueName" || kv.Key == "ExchangeName" || kv.Key == "RoutingKey" ||
+                    kv.Key == "ExchangeType" || kv.Key == "Durable" || kv.Key == "AutoDelete" ||
+                    kv.Key == "QueueArguments")
+                    continue;
+                arguments ??= new Dictionary<string, object?>();
+                arguments[kv.Key] = kv.Value;
+            }
         }
 
         return new RabbitMqEndpointSettings

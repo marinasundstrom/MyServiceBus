@@ -123,7 +123,8 @@ public class ReceiveEndpointConfigurator
             if (_queueArguments != null)
             {
                 var settings = consumer.TransportSettings as IDictionary<string, object?> ?? new Dictionary<string, object?>();
-                settings["QueueArguments"] = _queueArguments;
+                foreach (var kv in _queueArguments)
+                    settings[kv.Key] = kv.Value;
                 consumer.TransportSettings = settings;
             }
             consumer.SerializerType = _serializerType;
