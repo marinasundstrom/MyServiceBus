@@ -12,7 +12,7 @@ The ServiceBus Java client mirrors the C# design by providing an asynchronous me
 - `forward` redirects the consumed message to another destination using the original headers; it is intended only for exchanges since forwarding to a queue propagates error headers and can lead to duplicate deliveries.
 
 ### Publishing
-- `publish` uses `NamingConventions.getExchangeName` to derive an exchange name and sends the message via a resolved endpoint backed by the RabbitMQ transport.
+- `publish` uses `EntityNameFormatter.format` to derive an exchange name and sends the message via a resolved endpoint backed by the RabbitMQ transport.
 
 ### Responding
 - `respond` forwards messages to the `responseAddress` when available; otherwise it completes immediately.

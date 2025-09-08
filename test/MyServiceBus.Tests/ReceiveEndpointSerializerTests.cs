@@ -27,6 +27,7 @@ public class ReceiveEndpointSerializerTests
     class StubSendTransport : ISendTransport
     {
         public string? ContentType;
+        [Throws(typeof(UriFormatException))]
         public async Task Send<T>(T message, SendContext context, CancellationToken cancellationToken) where T : class
         {
             await context.Serialize(message);
@@ -39,6 +40,7 @@ public class ReceiveEndpointSerializerTests
         public Func<ReceiveContext, Task>? Handler;
         public readonly StubSendTransport SendTransport = new();
 
+        [Throws(typeof(InvalidOperationException))]
         public Task<ISendTransport> GetSendTransport(Uri address, CancellationToken cancellationToken = default)
             => Task.FromResult<ISendTransport>(SendTransport);
         public Task<IReceiveTransport> CreateReceiveTransport(ReceiveEndpointTopology topology, Func<ReceiveContext, Task> handler, Func<string?, bool>? isMessageTypeRegistered = null, CancellationToken cancellationToken = default)
@@ -79,7 +81,7 @@ public class ReceiveEndpointSerializerTests
         }, serializer: serializer);
 
         var msgContext = new InMemoryMessageContext(new TestMessage(), Guid.NewGuid(), null,
-            new List<string> { NamingConventions.GetMessageUrn(typeof(TestMessage)) }, new Dictionary<string, object>(), null, null, DateTimeOffset.UtcNow);
+            new List<string> { MessageUrn.For(typeof(TestMessage)) }, new Dictionary<string, object>(), null, null, DateTimeOffset.UtcNow);
         var receiveContext = new ReceiveContextImpl(msgContext, null);
         Assert.NotNull(factory.Handler);
         await factory.Handler!(receiveContext);
@@ -110,6 +112,7 @@ public class ReceiveEndpointSerializerTests
         public IDictionary<string, object> Headers { get; }
         public DateTimeOffset SentTime { get; }
 
+        [Throws(typeof(InvalidOperationException))]
         public bool TryGetMessage<T>(out T? message) where T : class
         {
             if (_message is T t)

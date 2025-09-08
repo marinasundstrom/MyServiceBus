@@ -19,13 +19,13 @@ public class TopologyRegistry : IBusTopology
         });
     }
 
-    [Throws(typeof(AmbiguousMatchException))]
+    [Throws(typeof(AmbiguousMatchException), typeof(TypeLoadException))]
     private MessageTopology RegisterMessage(Type messageType, string? entityName = null)
     {
         var messageTopology = new MessageTopology
         {
             MessageType = messageType,
-            EntityName = entityName ?? NamingConventions.GetExchangeName(messageType)
+            EntityName = entityName ?? EntityNameFormatter.Format(messageType)
         };
         Messages.Add(messageTopology);
         return messageTopology;

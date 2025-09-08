@@ -95,7 +95,7 @@ class ReceiveEndpointSerializerTest {
 
         MessageSerializationContext<Object> mctx = new MessageSerializationContext<>(new InputMessage());
         mctx.setMessageId(java.util.UUID.randomUUID());
-        mctx.setMessageType(List.of(NamingConventions.getMessageUrn(InputMessage.class)));
+        mctx.setMessageType(List.of(MessageUrn.forClass(InputMessage.class)));
         mctx.setHeaders(new HashMap<>());
         byte[] body = new EnvelopeMessageSerializer().serialize(mctx);
         factory.handler.apply(new TransportMessage(body, new HashMap<>())).join();

@@ -10,7 +10,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.myservicebus.Envelope;
 import com.myservicebus.Fault;
 import com.myservicebus.HostInfoProvider;
-import com.myservicebus.NamingConventions;
+import com.myservicebus.EntityNameFormatter;
+import com.myservicebus.MessageUrn;
 import com.myservicebus.RequestFaultException;
 import com.myservicebus.Response2;
 import com.myservicebus.RequestClientTransport;
@@ -79,7 +80,7 @@ public class RabbitMqRequestClientTransport implements RequestClientTransport {
             channel.basicConsume(responseQueue, true, callback, consumerTag -> {
             });
 
-            String exchange = NamingConventions.getExchangeName(requestType);
+            String exchange = EntityNameFormatter.format(requestType);
             channel.exchangeDeclare(exchange, BuiltinExchangeType.FANOUT, true);
 
             Envelope<TRequest> envelope = new Envelope<>();
@@ -89,7 +90,7 @@ public class RabbitMqRequestClientTransport implements RequestClientTransport {
             envelope.setDestinationAddress("rabbitmq://localhost/exchange/" + exchange);
             envelope.setResponseAddress(address);
             envelope.setFaultAddress(address);
-            envelope.setMessageType(List.of(NamingConventions.getMessageUrn(requestType)));
+            envelope.setMessageType(List.of(MessageUrn.forClass(requestType)));
             @SuppressWarnings("unchecked")
             TRequest request = (TRequest) context.getMessage();
             envelope.setMessage(request);
@@ -159,7 +160,7 @@ public class RabbitMqRequestClientTransport implements RequestClientTransport {
             channel.basicConsume(responseQueue, true, callback, consumerTag -> {
             });
 
-            String exchange = NamingConventions.getExchangeName(requestType);
+            String exchange = EntityNameFormatter.format(requestType);
             channel.exchangeDeclare(exchange, BuiltinExchangeType.FANOUT, true);
 
             Envelope<TRequest> envelope = new Envelope<>();
@@ -169,7 +170,7 @@ public class RabbitMqRequestClientTransport implements RequestClientTransport {
             envelope.setDestinationAddress("rabbitmq://localhost/exchange/" + exchange);
             envelope.setResponseAddress(address);
             envelope.setFaultAddress(address);
-            envelope.setMessageType(List.of(NamingConventions.getMessageUrn(requestType)));
+            envelope.setMessageType(List.of(MessageUrn.forClass(requestType)));
             @SuppressWarnings("unchecked")
             TRequest request = (TRequest) context.getMessage();
             envelope.setMessage(request);

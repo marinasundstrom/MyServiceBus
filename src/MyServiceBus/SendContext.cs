@@ -28,6 +28,7 @@ public class SendContext : BasePipeContext, ISendContext
     public Uri? SourceAddress { get; set; }
     public Uri? DestinationAddress { get; set; }
 
+    [Throws(typeof(UriFormatException))]
     public async Task<ReadOnlyMemory<byte>> Serialize<T>(T message)
         where T : class
     {
@@ -35,7 +36,7 @@ public class SendContext : BasePipeContext, ISendContext
         {
             MessageId = Guid.NewGuid(),
             CorrelationId = null,
-            MessageType = [..messageTypes.Select(x => NamingConventions.GetMessageUrn(x))],
+            MessageType = [.. messageTypes.Select(x => MessageUrn.For(x))],
             ResponseAddress = ResponseAddress,
             FaultAddress = FaultAddress,
             SourceAddress = SourceAddress ?? new Uri("loopback://localhost/source"),

@@ -4,7 +4,7 @@ import com.myservicebus.ConsumeContext;
 import com.myservicebus.EndpointNameFormatter;
 import com.myservicebus.PipeConfigurator;
 import com.myservicebus.RetryConfigurator;
-import com.myservicebus.NamingConventions;
+import com.myservicebus.EntityNameFormatter;
 import com.myservicebus.MessageEntityNameFormatter;
 import com.myservicebus.topology.ConsumerTopology;
 import com.myservicebus.topology.MessageBinding;
@@ -95,7 +95,7 @@ public class RabbitMqFactoryConfigurator {
 
     public void setEntityNameFormatter(MessageEntityNameFormatter formatter) {
         this.entityNameFormatter = formatter;
-        NamingConventions.setEntityNameFormatter(formatter);
+        EntityNameFormatter.setFormatter(formatter);
     }
 
     public void setPrefetchCount(int prefetchCount) {
@@ -209,7 +209,7 @@ public class RabbitMqFactoryConfigurator {
         public <T> void handler(Class<T> messageType, java.util.function.Function<ConsumeContext<T>, java.util.concurrent.CompletableFuture<Void>> handler) {
             String exchange = exchangeNames.containsKey(messageType)
                     ? exchangeNames.get(messageType)
-                    : NamingConventions.getExchangeName(messageType);
+                    : EntityNameFormatter.format(messageType);
             handlers.add(new HandlerRegistration<>(queueName, messageType, exchange, handler, retryCount, retryDelay, prefetchCount, queueArguments, serializerClass));
         }
     }

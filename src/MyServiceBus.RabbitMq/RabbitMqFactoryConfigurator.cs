@@ -49,7 +49,7 @@ internal sealed class RabbitMqFactoryConfigurator : IRabbitMqFactoryConfigurator
     public void SetEntityNameFormatter(IMessageEntityNameFormatter formatter)
     {
         _entityNameFormatter = formatter;
-        NamingConventions.SetEntityNameFormatter(formatter);
+        MyServiceBus.EntityNameFormatter.SetFormatter(formatter);
     }
 
     public void SetPrefetchCount(ushort prefetchCount)

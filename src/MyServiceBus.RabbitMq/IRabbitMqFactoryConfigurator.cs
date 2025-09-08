@@ -150,13 +150,13 @@ public class ReceiveEndpointConfigurator
         }
     }
 
-    [Throws(typeof(AmbiguousMatchException))]
+    [Throws(typeof(AmbiguousMatchException), typeof(TypeLoadException))]
     public void Handler<T>(Func<ConsumeContext<T>, Task> handler)
         where T : class
     {
         var exchangeName = _exchangeNames.TryGetValue(typeof(T), out var entity)
             ? entity
-            : NamingConventions.GetExchangeName(typeof(T))!;
+            : EntityNameFormatter.Format(typeof(T))!;
         _endpointActions.Add([Throws(typeof(Exception))] (bus, provider) =>
         {
             IMessageSerializer? serializer = _serializerType != null

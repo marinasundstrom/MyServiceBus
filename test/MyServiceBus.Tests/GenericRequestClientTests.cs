@@ -1,4 +1,5 @@
 using System;
+using System.Reflection;
 using System.Threading.Tasks;
 using MyServiceBus;
 using MyServiceBus.Serialization;
@@ -23,7 +24,7 @@ public class GenericRequestClientTests
     }
 
     [Fact]
-    [Throws(typeof(Exception))]
+    [Throws(typeof(Exception), typeof(AmbiguousMatchException))]
     public async Task Sets_temporary_response_exchange_options()
     {
         var transportFactory = new MediatorTransportFactory();
@@ -32,7 +33,7 @@ public class GenericRequestClientTests
         var topology = new ReceiveEndpointTopology
         {
             QueueName = "order-response-options",
-            ExchangeName = NamingConventions.GetExchangeName(typeof(OrderRequest))!,
+            ExchangeName = EntityNameFormatter.Format(typeof(OrderRequest))!,
             RoutingKey = "",
             ExchangeType = "fanout",
             Durable = true,
@@ -71,7 +72,7 @@ public class GenericRequestClientTests
     }
 
     [Fact]
-    [Throws(typeof(Exception))]
+    [Throws(typeof(Exception), typeof(AmbiguousMatchException))]
     public async Task Returns_expected_response_for_multiple_types()
     {
         var transportFactory = new MediatorTransportFactory();
@@ -80,7 +81,7 @@ public class GenericRequestClientTests
         var topology = new ReceiveEndpointTopology
         {
             QueueName = "order-request",
-            ExchangeName = NamingConventions.GetExchangeName(typeof(OrderRequest))!,
+            ExchangeName = EntityNameFormatter.Format(typeof(OrderRequest))!,
             RoutingKey = "",
             ExchangeType = "fanout",
             Durable = true,
@@ -121,7 +122,7 @@ public class GenericRequestClientTests
     }
 
     [Fact]
-    [Throws(typeof(RequestFaultException))]
+    [Throws(typeof(AmbiguousMatchException), typeof(TypeLoadException))]
     public async Task Throws_when_fault_received()
     {
         var transportFactory = new MediatorTransportFactory();
@@ -130,7 +131,7 @@ public class GenericRequestClientTests
         var topology = new ReceiveEndpointTopology
         {
             QueueName = "order-fault",
-            ExchangeName = NamingConventions.GetExchangeName(typeof(OrderRequest))!,
+            ExchangeName = EntityNameFormatter.Format(typeof(OrderRequest))!,
             RoutingKey = "",
             ExchangeType = "fanout",
             Durable = true,
@@ -159,13 +160,13 @@ public class GenericRequestClientTests
         await receive.Start();
 
         var client = new GenericRequestClient<OrderRequest>(transportFactory, serializer, new SendContextFactory());
-        await Assert.ThrowsAsync<RequestFaultException>([Throws(typeof(UriFormatException), typeof(RequestFaultException))] () => client.GetResponseAsync<OrderAccepted, OrderRejected>(new OrderRequest { Accept = true }));
+        await Assert.ThrowsAsync<RequestFaultException>([Throws(typeof(UriFormatException), typeof(AmbiguousMatchException), typeof(RequestFaultException))] () => client.GetResponseAsync<OrderAccepted, OrderRejected>(new OrderRequest { Accept = true }));
 
         await receive.Stop();
     }
 
     [Fact]
-    [Throws(typeof(Exception))]
+    [Throws(typeof(Exception), typeof(AmbiguousMatchException))]
     public async Task Returns_fault_response_when_fault_type_expected()
     {
         var transportFactory = new MediatorTransportFactory();
@@ -174,7 +175,7 @@ public class GenericRequestClientTests
         var topology = new ReceiveEndpointTopology
         {
             QueueName = "order-fault-response",
-            ExchangeName = NamingConventions.GetExchangeName(typeof(OrderRequest))!,
+            ExchangeName = EntityNameFormatter.Format(typeof(OrderRequest))!,
             RoutingKey = "",
             ExchangeType = "fanout",
             Durable = true,

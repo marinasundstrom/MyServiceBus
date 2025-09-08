@@ -21,7 +21,8 @@ import com.myservicebus.topology.BusTopology;
 import com.myservicebus.topology.ConsumerTopology;
 import com.myservicebus.topology.MessageBinding;
 import com.myservicebus.topology.TopologyRegistry;
-import com.myservicebus.NamingConventions;
+import com.myservicebus.EntityNameFormatter;
+import com.myservicebus.MessageUrn;
 import com.myservicebus.Consumer;
 
 public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
@@ -79,7 +80,7 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
     }
 
     public void addConsumer(ConsumerTopology consumerDef) throws Exception {
-        String messageUrn = NamingConventions.getMessageUrn(consumerDef.getBindings().get(0).getMessageType());
+        String messageUrn = MessageUrn.forClass(consumerDef.getBindings().get(0).getMessageType());
         String key = consumerDef.getQueueName() + "|" + messageUrn;
         if (consumerRegistrations.contains(key)) {
             if (logger != null) {
@@ -121,7 +122,7 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
                         ? envelope.getMessageType().get(0)
                         : null;
                 MessageBinding binding = consumerDef.getBindings().stream()
-                        .filter(b -> NamingConventions.getMessageUrn(b.getMessageType()).equals(messageTypeUrn))
+                        .filter(b -> MessageUrn.forClass(b.getMessageType()).equals(messageTypeUrn))
                         .findFirst()
                         .orElse(null);
                 if (binding == null) {
@@ -196,7 +197,7 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
                 String messageTypeUrn = envelope.getMessageType() != null && !envelope.getMessageType().isEmpty()
                         ? envelope.getMessageType().get(0)
                         : null;
-                String expectedUrn = NamingConventions.getMessageUrn(messageType);
+                String expectedUrn = MessageUrn.forClass(messageType);
                 if (!expectedUrn.equals(messageTypeUrn)) {
                     logger.warn("Received message with unregistered type {}", messageTypeUrn);
                     return CompletableFuture.completedFuture(null);
@@ -229,7 +230,7 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
         binding.setEntityName(exchange);
         bindings.add(binding);
 
-        String expectedUrn = NamingConventions.getMessageUrn(messageType);
+        String expectedUrn = MessageUrn.forClass(messageType);
         java.util.function.Function<String, Boolean> isRegisteredHandler = urn -> expectedUrn.equals(urn);
 
         ReceiveTransport transport = transportFactory.createReceiveTransport(queueName, bindings, transportHandler,
@@ -290,7 +291,7 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
 
     @Override
     public CompletableFuture<Void> publish(PublishContext context) {
-        String exchange = NamingConventions.getExchangeName(context.getMessage().getClass());
+        String exchange = EntityNameFormatter.format(context.getMessage().getClass());
         String address = transportFactory.getPublishAddress(exchange);
         context.setSourceAddress(this.address);
         context.setDestinationAddress(URI.create(address));

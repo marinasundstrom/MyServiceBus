@@ -2,7 +2,7 @@ package com.myservicebus.mediator;
 
 import com.myservicebus.BusRegistrationConfigurator;
 import com.myservicebus.BusRegistrationConfiguratorImpl;
-import com.myservicebus.NamingConventions;
+import com.myservicebus.EntityNameFormatter;
 import com.myservicebus.SendEndpointProvider;
 import com.myservicebus.di.ServiceCollection;
 import com.myservicebus.di.ServiceProvider;
@@ -26,7 +26,7 @@ public class MediatorBus {
     }
 
     public void publish(Object message) {
-        String exchange = NamingConventions.getExchangeName(message.getClass());
+        String exchange = EntityNameFormatter.format(message.getClass());
         SendEndpointProvider provider = serviceProvider.getService(SendEndpointProvider.class);
         provider.getSendEndpoint("loopback://" + exchange)
                 .send(message, CancellationToken.none).join();

@@ -31,7 +31,7 @@ public class EnvelopeDeserializerTest {
         Envelope<Fault<InnerMessage>> envelope = new Envelope<>();
         envelope.setMessageId(UUID.randomUUID());
         String faultUrn = "urn:message:Fault`1[[" + InnerMessage.class.getName() + ", assembly]]";
-        envelope.setMessageType(List.of(faultUrn, NamingConventions.getMessageUrn(InnerMessage.class)));
+        envelope.setMessageType(List.of(faultUrn, MessageUrn.forClass(InnerMessage.class)));
         envelope.setMessage(fault);
 
         ObjectMapper mapper = new ObjectMapper();

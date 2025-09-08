@@ -15,38 +15,38 @@ class StaticFormatter : IMessageEntityNameFormatter
     public string FormatEntityName(Type messageType) => $"fmt-{messageType.Name.ToLowerInvariant()}";
 }
 
-public class NamingConventionsTests
+public class FormatterTests
 {
     [Fact]
     [Throws(typeof(EqualException))]
     public void GetMessageUrn_ReturnsExpected()
     {
-        var urn = NamingConventions.GetMessageUrn(typeof(SampleUrnMessage));
+        var urn = MessageUrn.For(typeof(SampleUrnMessage));
         Assert.Equal("urn:message:MyServiceBus.Tests:SampleUrnMessage", urn);
     }
 
     [Fact]
-    [Throws(typeof(EqualException), typeof(AmbiguousMatchException))]
+    [Throws(typeof(EqualException), typeof(AmbiguousMatchException), typeof(TypeLoadException))]
     public void GetExchangeName_UsesAttribute()
     {
-        var name = NamingConventions.GetExchangeName(typeof(AttributeMessage));
+        var name = EntityNameFormatter.Format(typeof(AttributeMessage));
         Assert.Equal("custom-entity", name);
     }
 
     [Fact]
-    [Throws(typeof(EqualException), typeof(AmbiguousMatchException))]
+    [Throws(typeof(EqualException), typeof(AmbiguousMatchException), typeof(TypeLoadException))]
     public void GetExchangeName_UsesFormatter()
     {
-        var previous = NamingConventions.EntityNameFormatter;
+        var previous = EntityNameFormatter.Formatter;
         try
         {
-            NamingConventions.SetEntityNameFormatter(new StaticFormatter());
-            var name = NamingConventions.GetExchangeName(typeof(SampleUrnMessage));
+            EntityNameFormatter.SetFormatter(new StaticFormatter());
+            var name = EntityNameFormatter.Format(typeof(SampleUrnMessage));
             Assert.Equal("fmt-sampleurnmessage", name);
         }
         finally
         {
-            NamingConventions.SetEntityNameFormatter(previous);
+            EntityNameFormatter.SetFormatter(previous);
         }
     }
 }
