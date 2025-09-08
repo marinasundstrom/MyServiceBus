@@ -7,6 +7,7 @@ import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.Test;
 
 import com.myservicebus.*;
+import com.myservicebus.MessageEntityNameFormatterSpecific;
 import com.myservicebus.topology.*;
 import com.myservicebus.di.ServiceCollection;
 import com.myservicebus.di.ServiceProvider;
@@ -49,6 +50,38 @@ public class RabbitMqFactoryConfiguratorTests {
 
         assertEquals("custom-queue", def.getQueueName());
         assertEquals("custom-exchange", def.getBindings().get(0).getEntityName());
+    }
+
+    static class StaticFormatter<T> implements MessageEntityNameFormatterSpecific<T> {
+        @Override
+        public String formatEntityName() {
+            return "formatted-" + MyMessage.class.getSimpleName().toLowerCase();
+        }
+    }
+
+    @Test
+    public void messageUsesEntityNameFormatter() {
+        ServiceCollection services = new ServiceCollection();
+        BusRegistrationConfiguratorImpl cfg = new BusRegistrationConfiguratorImpl(services);
+        cfg.addConsumer(MyConsumer.class);
+
+        RabbitMqTransport.configure(cfg);
+        cfg.complete();
+
+        ServiceProvider provider = services.buildServiceProvider();
+        BusRegistrationContext context = new BusRegistrationContext(provider);
+        RabbitMqFactoryConfigurator factoryConfigurator = provider.getService(RabbitMqFactoryConfigurator.class);
+
+        factoryConfigurator.message(MyMessage.class, m -> m.setEntityNameFormatter(new StaticFormatter<>()));
+        factoryConfigurator.receiveEndpoint("custom-queue", e -> e.configureConsumer(context, MyConsumer.class));
+
+        TopologyRegistry registry = provider.getService(TopologyRegistry.class);
+        ConsumerTopology def = registry.getConsumers().stream()
+                .filter(d -> d.getConsumerType().equals(MyConsumer.class))
+                .findFirst()
+                .orElseThrow();
+
+        assertEquals("formatted-mymessage", def.getBindings().get(0).getEntityName());
     }
 
     @Test

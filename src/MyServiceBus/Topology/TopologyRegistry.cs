@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 
 namespace MyServiceBus.Topology;
 
@@ -18,17 +19,19 @@ public class TopologyRegistry : IBusTopology
         });
     }
 
+    [Throws(typeof(AmbiguousMatchException))]
     private MessageTopology RegisterMessage(Type messageType, string? entityName = null)
     {
         var messageTopology = new MessageTopology
         {
             MessageType = messageType,
-            EntityName = entityName ?? messageType.FullName
+            EntityName = entityName ?? NamingConventions.GetExchangeName(messageType)
         };
         Messages.Add(messageTopology);
         return messageTopology;
     }
 
+    [Throws(typeof(AmbiguousMatchException))]
     public void RegisterConsumer<TConsumer>(string queueName, Delegate? configurePipe, params Type[] messageTypes)
     {
         var bindings = messageTypes.Select(mt =>

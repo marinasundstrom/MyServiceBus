@@ -489,12 +489,18 @@ builder.Services.AddServiceBus(x =>
             h.Username("guest");
             h.Password("guest");
         });
-        cfg.Message<SubmitOrder>(m => m.SetEntityName("submit-order-exchange"));
+        cfg.Message<SubmitOrder>(m =>
+        {
+            m.SetEntityName("submit-order-exchange");
+            // or
+            m.SetEntityNameFormatter(new KebabCaseEntityNameFormatter<SubmitOrder>());
+        });
         cfg.ReceiveEndpoint("submit-order-queue", e =>
         {
             e.ConfigureConsumer<SubmitOrderConsumer>(context);
         });
         cfg.SetEndpointNameFormatter(KebabCaseEndpointNameFormatter.Instance);
+        cfg.SetEntityNameFormatter(new KebabCaseEntityNameFormatter());
         cfg.ConfigureEndpoints(context); // auto-configure remaining consumers
     });
 });
@@ -509,11 +515,16 @@ RabbitMqBusFactory.configure(services, x -> {
     x.addConsumer(SubmitOrderConsumer.class);
 }, (context, cfg) -> {
     cfg.host("rabbitmq://localhost");
-    cfg.message(SubmitOrder.class, m -> m.setEntityName("submit-order-exchange"));
+    cfg.message(SubmitOrder.class, m -> {
+        m.setEntityName("submit-order-exchange");
+        // or
+        m.setEntityNameFormatter(new KebabCaseEntityNameFormatter<>());
+    });
     cfg.receiveEndpoint("submit-order-queue", e -> {
         e.configureConsumer(context, SubmitOrderConsumer.class);
     });
     cfg.setEndpointNameFormatter(KebabCaseEndpointNameFormatter.INSTANCE);
+    cfg.setEntityNameFormatter(new KebabCaseEntityNameFormatter());
     cfg.configureEndpoints(context); // auto-configure remaining consumers
 });
 
@@ -523,6 +534,18 @@ try (ServiceScope scope = provider.createScope()) {
     ServiceBus bus = sp.getService(ServiceBus.class);
     bus.start();
 }
+```
+
+Messages can also specify a fixed entity name:
+
+```csharp
+[EntityName("order-submitted")]
+public record OrderSubmitted;
+```
+
+```java
+@EntityName("order-submitted")
+public record OrderSubmitted() { }
 ```
 
 Built-in endpoint name formatters include `DefaultEndpointNameFormatter`, `KebabCaseEndpointNameFormatter`, and `SnakeCaseEndpointNameFormatter`.

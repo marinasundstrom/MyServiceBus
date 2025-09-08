@@ -8,6 +8,7 @@ internal sealed class RabbitMqFactoryConfigurator : IRabbitMqFactoryConfigurator
     private readonly Dictionary<Type, string> _exchangeNames = new();
     private readonly List<Action<IMessageBus, IServiceProvider>> _endpointActions = new();
     private IEndpointNameFormatter? _endpointNameFormatter;
+    private IMessageEntityNameFormatter? _entityNameFormatter;
     public ushort PrefetchCount { get; private set; }
 
     public RabbitMqFactoryConfigurator()
@@ -18,6 +19,7 @@ internal sealed class RabbitMqFactoryConfigurator : IRabbitMqFactoryConfigurator
     public string Password { get; internal set; }
     public string Username { get; internal set; }
     public IEndpointNameFormatter? EndpointNameFormatter => _endpointNameFormatter;
+    public IMessageEntityNameFormatter? EntityNameFormatter => _entityNameFormatter;
 
     public void Message<T>(Action<MessageConfigurator> configure)
     {
@@ -42,6 +44,12 @@ internal sealed class RabbitMqFactoryConfigurator : IRabbitMqFactoryConfigurator
     public void SetEndpointNameFormatter(IEndpointNameFormatter formatter)
     {
         _endpointNameFormatter = formatter;
+    }
+
+    public void SetEntityNameFormatter(IMessageEntityNameFormatter formatter)
+    {
+        _entityNameFormatter = formatter;
+        NamingConventions.SetEntityNameFormatter(formatter);
     }
 
     public void SetPrefetchCount(ushort prefetchCount)
