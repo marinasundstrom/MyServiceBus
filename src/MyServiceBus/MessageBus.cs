@@ -49,10 +49,11 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
 
     public IBusTopology Topology => _topology;
 
-    [Throws(typeof(UriFormatException), typeof(InvalidOperationException), typeof(InvalidCastException))]
+    [Throws(typeof(UriFormatException), typeof(InvalidOperationException))]
     public Task Publish<TMessage>(object message, Action<IPublishContext>? contextCallback = null, CancellationToken cancellationToken = default) where TMessage : class
     {
-        return Publish((TMessage)message, contextCallback, cancellationToken);
+        var typed = message as TMessage ?? InterfaceProxy.Create<TMessage>(message);
+        return Publish(typed, contextCallback, cancellationToken);
     }
 
     [Throws(typeof(UriFormatException), typeof(InvalidOperationException))]
@@ -155,7 +156,7 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
             _consumers.TryGetValue(queueName, out var regs) && regs.Any(r => r.MessageUrn == mt);
         var receiveTransport = await _transportFactory.CreateReceiveTransport(
             topology,
-            [Throws(typeof(TargetInvocationException), typeof(InvalidComObjectException))] (ctx) => HandleMessageAsync(queueName, ctx),
+            [Throws(typeof(TargetInvocationException), typeof(InvalidComObjectException), typeof(COMException), typeof(TypeLoadException))] (ctx) => HandleMessageAsync(queueName, ctx),
             isRegistered,
             cancellationToken);
 
@@ -221,6 +222,45 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
 
             _logger?.LogDebug("Received {MessageType}", messageTypeName);
             await registration.Pipe.Send(consumeContext);
+        }
+    }
+
+    private class PropertyMappingDispatchProxy : DispatchProxy
+    {
+        private object _source = null!;
+        private Dictionary<string, PropertyInfo> _properties = null!;
+
+        protected override object? Invoke(MethodInfo targetMethod, object?[]? args)
+        {
+            if (targetMethod.IsSpecialName && targetMethod.Name.StartsWith("get_"))
+            {
+                var name = targetMethod.Name[4..];
+                if (_properties.TryGetValue(name, out var prop))
+                    return prop.GetValue(_source);
+
+                return targetMethod.ReturnType.IsValueType
+                    ? Activator.CreateInstance(targetMethod.ReturnType)
+                    : null;
+            }
+
+            throw new NotImplementedException(targetMethod.Name);
+        }
+
+        public void Initialize(object source)
+        {
+            _source = source;
+            _properties = source.GetType().GetProperties(BindingFlags.Instance | BindingFlags.Public)
+                .ToDictionary(p => p.Name);
+        }
+    }
+
+    private static class InterfaceProxy
+    {
+        public static T Create<T>(object source) where T : class
+        {
+            var proxy = DispatchProxy.Create<T, PropertyMappingDispatchProxy>();
+            ((PropertyMappingDispatchProxy)(object)proxy).Initialize(source);
+            return proxy;
         }
     }
 }
