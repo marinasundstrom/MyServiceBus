@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using MyServiceBus.Topology;
@@ -29,6 +30,7 @@ public interface IMessageBus :
         where TMessage : class;
 
     Task AddHandler<TMessage>(string queueName, string exchangeName, Func<ConsumeContext<TMessage>, Task> handler,
-        int? retryCount = null, TimeSpan? retryDelay = null, ushort? prefetchCount = null, CancellationToken cancellationToken = default)
+        int? retryCount = null, TimeSpan? retryDelay = null, ushort? prefetchCount = null,
+        IDictionary<string, object?>? queueArguments = null, CancellationToken cancellationToken = default)
         where TMessage : class;
 }

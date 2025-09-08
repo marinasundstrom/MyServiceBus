@@ -57,7 +57,7 @@ class UnknownMessageTypeTest {
 
         MessageBusImpl bus = new MessageBusImpl(provider);
         class SampleMessage { }
-        bus.addHandler("queue", SampleMessage.class, "exchange", ctx -> CompletableFuture.completedFuture(null), null, null, null);
+        bus.addHandler("queue", SampleMessage.class, "exchange", ctx -> CompletableFuture.completedFuture(null), null, null, null, null);
 
         MessageSerializationContext<Object> ctx = new MessageSerializationContext<>(Map.of("value", 1));
         ctx.setMessageId(UUID.randomUUID());

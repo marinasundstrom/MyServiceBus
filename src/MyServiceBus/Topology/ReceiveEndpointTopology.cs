@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace MyServiceBus.Topology;
 
 public class ReceiveEndpointTopology
@@ -9,4 +11,5 @@ public class ReceiveEndpointTopology
     public bool Durable { get; init; } = true;
     public bool AutoDelete { get; init; } = false;
     public ushort PrefetchCount { get; init; } = 0;
+    public IDictionary<string, object?>? QueueArguments { get; init; }
 }

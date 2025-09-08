@@ -86,3 +86,22 @@ factoryConfigurator.receiveEndpoint("orders", e -> {
     e.prefetchCount(32); // endpoint specific
 });
 ```
+
+## Queue Arguments
+
+Queue arguments allow customizing RabbitMQ queues with broker-specific options. These arguments are passed directly to `queueDeclare` when the queue is created.
+
+### C#
+```csharp
+cfg.ReceiveEndpoint("orders", e =>
+{
+    e.SetQueueArgument("x-queue-type", "quorum");
+});
+```
+
+### Java
+```java
+factoryConfigurator.receiveEndpoint("orders", e -> {
+    e.setQueueArgument("x-queue-type", "quorum");
+});
+```

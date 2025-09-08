@@ -5,6 +5,7 @@ using MyServiceBus.Topology;
 using System;
 using System.Collections.Generic;
 using System.Threading;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using Shouldly;
 using Xunit;
@@ -119,6 +120,78 @@ public class RabbitMqTransportFactoryTests
             Arg.Is(false),
             Arg.Is(false),
             Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    [Throws(typeof(Exception))]
+    public async Task Passes_queue_arguments_to_queue_declare()
+    {
+        var channel = Substitute.For<IChannel>();
+        IDictionary<string, object?>? mainQueueArgs = null;
+
+        channel.ExchangeDeclareAsync(
+                Arg.Any<string>(),
+                Arg.Any<string>(),
+                Arg.Any<bool>(),
+                Arg.Any<bool>(),
+                Arg.Any<IDictionary<string, object?>?>(),
+                Arg.Any<bool>(),
+                Arg.Any<bool>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.CompletedTask);
+
+        channel.QueueDeclareAsync(
+                Arg.Any<string>(),
+                Arg.Any<bool>(),
+                Arg.Any<bool>(),
+                Arg.Any<bool>(),
+                Arg.Any<IDictionary<string, object?>?>(),
+                Arg.Any<bool>(),
+                Arg.Any<bool>(),
+                Arg.Any<CancellationToken>())
+            .Returns(callInfo =>
+            {
+                var queue = callInfo.ArgAt<string>(0);
+                var arguments = callInfo.ArgAt<IDictionary<string, object?>?>(4);
+                if (queue == "submit-order-queue")
+                    mainQueueArgs = arguments;
+
+                return Task.FromResult(new QueueDeclareOk("ignored", 0, 0));
+            });
+
+        channel.QueueBindAsync(
+                Arg.Any<string>(),
+                Arg.Any<string>(),
+                Arg.Any<string>(),
+                Arg.Any<IDictionary<string, object?>?>(),
+                Arg.Any<bool>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.CompletedTask);
+
+        var connection = Substitute.For<IConnection>();
+        connection.IsOpen.Returns(true);
+        connection.CreateChannelAsync(Arg.Any<CreateChannelOptions?>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(channel));
+
+        var factory = Substitute.For<IConnectionFactory>();
+        factory.CreateConnectionAsync(Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(connection));
+
+        var provider = new ConnectionProvider(factory);
+        var transportFactory = new RabbitMqTransportFactory(provider, new TestRabbitMqFactoryConfigurator());
+
+        var topology = new ReceiveEndpointTopology
+        {
+            QueueName = "submit-order-queue",
+            ExchangeName = "submit-order-exchange",
+            RoutingKey = string.Empty,
+            QueueArguments = new Dictionary<string, object?> { ["x-queue-type"] = "quorum" }
+        };
+
+        await transportFactory.CreateReceiveTransport(topology, _ => Task.CompletedTask, null);
+
+        mainQueueArgs.ShouldNotBeNull();
+        mainQueueArgs!["x-queue-type"].ShouldBe("quorum");
     }
 
     [Fact]

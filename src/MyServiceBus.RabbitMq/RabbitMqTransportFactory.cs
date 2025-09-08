@@ -289,6 +289,7 @@ public sealed class RabbitMqTransportFactory : ITransportFactory
             durable: topology.Durable,
             exclusive: false,
             autoDelete: topology.AutoDelete,
+            arguments: topology.QueueArguments,
             cancellationToken: cancellationToken
         );
 
