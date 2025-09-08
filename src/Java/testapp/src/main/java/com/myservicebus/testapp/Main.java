@@ -33,28 +33,25 @@ public class Main {
             cfg.addConsumer(SubmitOrderConsumer.class);
             // cfg.addConsumer(OrderSubmittedConsumer.class);
             cfg.addConsumer(TestRequestConsumer.class);
-            cfg.addConsumer(SubmitOrderErrorConsumer.class);
+            cfg.addConsumer(SubmitOrderFaultConsumer.class);
         }, (context, cfg) -> {
             cfg.host(rabbitMqHost, h -> {
                 h.username("guest");
                 h.password("guest");
             });
 
-            cfg.receiveEndpoint("submit-order_error", e -> {
-                e.configureConsumer(context, SubmitOrderErrorConsumer.class);
+            // Fault<T> consumers don't auto-bind; listen on the queue suffixed with `_fault`
+            // for the original endpoint. SubmitOrderFaultConsumer handles Fault<OrderSubmitted>
+            // messages published to `submit-order_fault`.
+            cfg.receiveEndpoint("submit-order_fault", e -> {
+                e.configureConsumer(context, SubmitOrderFaultConsumer.class);
 
                 /*
-                 * e.handler(SubmitOrder.class, ctx -> {
-                 * var msg = ctx.getMessage();
+                 * e.handler(Fault<OrderSubmitted>.class, ctx -> {
+                 * var fault = ctx.getMessage();
+                 * var msg = fault.getMessage();
                  * System.out.println(msg.getOrderId());
-                 * // inspect, fix, or forward the failed message
-                 * try {
-                 * ctx.forward("queue:submit-order", msg).get();
-                 * System.out.println("➡️ Forwarded error message. Order id: " +
-                 * msg.getOrderId());
-                 * } catch (InterruptedException | ExecutionException e1) {
-                 * 
-                 * }
+                 * // inspect or process the fault
                  * return CompletableFuture.completedFuture(null);
                  * });
                  */

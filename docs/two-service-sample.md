@@ -45,7 +45,7 @@ Each instance consumes `SubmitOrder` messages from the same queue.
 
 ### Java consumer failures
 
-The Java `SubmitOrderConsumer` calls a service that randomly throws to simulate processing errors. Failed `SubmitOrder` messages land in the `submit-order_error` queue, where a handler sends them back to `queue:submit-order` for another attempt. Forwarding directly to the queue would keep the error headers and produce duplicates, so the handler uses `send` instead of `forward`.
+The Java `SubmitOrderConsumer` calls a service that randomly throws to simulate processing errors. If the .NET service fails to handle the resulting `OrderSubmitted` event, MyServiceBus publishes a `Fault<OrderSubmitted>` to the `submit-order_fault` queue, where `SubmitOrderFaultConsumer` records the failure details. Consumers of `Fault<OrderSubmitted>` must explicitly subscribe to this fault queue to observe exceptions; it is separate from the `submit-order_error` queue, which holds failed messages that should not be re-published as-is.
 
 ## 4. Publish a message
 
