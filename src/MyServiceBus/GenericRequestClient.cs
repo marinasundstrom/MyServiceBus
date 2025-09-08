@@ -1,5 +1,6 @@
 using MyServiceBus.Serialization;
 using MyServiceBus.Topology;
+using System.Collections.Generic;
 using System.Reflection;
 
 namespace MyServiceBus;
@@ -32,7 +33,7 @@ public sealed class GenericRequestClient<TRequest> : IRequestClient<TRequest>, I
 
     }
 
-    [Throws(typeof(UriFormatException), typeof(InvalidOperationException), typeof(AmbiguousMatchException), typeof(RequestFaultException), typeof(TypeLoadException))]
+    [Throws(typeof(UriFormatException), typeof(InvalidOperationException), typeof(AmbiguousMatchException), typeof(TypeLoadException), typeof(RequestFaultException))]
     public async Task<Response<T>> GetResponseAsync<T>(TRequest request, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default, RequestTimeout timeout = default) where T : class
     {
         var taskCompletionSource = new TaskCompletionSource<Response<T>>();
@@ -42,14 +43,14 @@ public sealed class GenericRequestClient<TRequest> : IRequestClient<TRequest>, I
         {
             Address = responseExchange,
             ConfigureErrorEndpoint = false,
-            TransportSettings = new RabbitMqEndpointSettings
+            TransportSettings = new Dictionary<string, object?>
             {
-                QueueName = responseExchange,
-                ExchangeName = responseExchange,
-                RoutingKey = "",
-                ExchangeType = "fanout",
-                Durable = false,
-                AutoDelete = true
+                ["QueueName"] = responseExchange,
+                ["ExchangeName"] = responseExchange,
+                ["RoutingKey"] = string.Empty,
+                ["ExchangeType"] = "fanout",
+                ["Durable"] = false,
+                ["AutoDelete"] = true
             }
         };
 
@@ -113,7 +114,7 @@ public sealed class GenericRequestClient<TRequest> : IRequestClient<TRequest>, I
         }
     }
 
-    [Throws(typeof(UriFormatException), typeof(InvalidOperationException), typeof(AmbiguousMatchException), typeof(RequestFaultException), typeof(TypeLoadException))]
+    [Throws(typeof(UriFormatException), typeof(InvalidOperationException), typeof(AmbiguousMatchException), typeof(TypeLoadException), typeof(RequestFaultException))]
     public async Task<Response<T1, T2>> GetResponseAsync<T1, T2>(TRequest request, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default, RequestTimeout timeout = default)
         where T1 : class
         where T2 : class
@@ -125,14 +126,14 @@ public sealed class GenericRequestClient<TRequest> : IRequestClient<TRequest>, I
         {
             Address = responseExchange,
             ConfigureErrorEndpoint = false,
-            TransportSettings = new RabbitMqEndpointSettings
+            TransportSettings = new Dictionary<string, object?>
             {
-                QueueName = responseExchange,
-                ExchangeName = responseExchange,
-                RoutingKey = "",
-                ExchangeType = "fanout",
-                Durable = false,
-                AutoDelete = true
+                ["QueueName"] = responseExchange,
+                ["ExchangeName"] = responseExchange,
+                ["RoutingKey"] = string.Empty,
+                ["ExchangeType"] = "fanout",
+                ["Durable"] = false,
+                ["AutoDelete"] = true
             }
         };
 

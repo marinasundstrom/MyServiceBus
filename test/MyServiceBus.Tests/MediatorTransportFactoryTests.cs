@@ -124,13 +124,7 @@ public class MediatorTransportFactoryTests
         var tcs = new TaskCompletionSource<SampleMessage>();
         var endpoint = new EndpointDefinition
         {
-            Address = "queue",
-            TransportSettings = new RabbitMqEndpointSettings
-            {
-                QueueName = "queue",
-                ExchangeName = "test",
-                RoutingKey = ""
-            }
+            Address = "queue"
         };
 
         var receive = await factory.CreateReceiveTransport(endpoint, [Throws(typeof(InvalidOperationException))] (ctx) =>

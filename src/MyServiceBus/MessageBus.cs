@@ -49,14 +49,14 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
 
     public IBusTopology Topology => _topology;
 
-    [Throws(typeof(UriFormatException), typeof(InvalidOperationException))]
+    [Throws(typeof(UriFormatException), typeof(InvalidOperationException), typeof(AmbiguousMatchException), typeof(TypeLoadException))]
     public Task Publish<TMessage>(object message, Action<IPublishContext>? contextCallback = null, CancellationToken cancellationToken = default) where TMessage : class
     {
         var typed = message as TMessage ?? MessageProxy.Create<TMessage>(message);
         return Publish(typed, contextCallback, cancellationToken);
     }
 
-    [Throws(typeof(UriFormatException), typeof(InvalidOperationException), typeof(AmbiguousMatchException))]
+    [Throws(typeof(UriFormatException), typeof(InvalidOperationException), typeof(AmbiguousMatchException), typeof(TypeLoadException))]
     public async Task Publish<T>(T message, Action<IPublishContext>? contextCallback = null, CancellationToken cancellationToken = default) where T : class
     {
         var exchangeName = EntityNameFormatter.Format(message.GetType());
@@ -99,15 +99,15 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
             Address = queueName,
             ConcurrencyLimit = prefetchCount ?? 0,
             ConfigureErrorEndpoint = true,
-            TransportSettings = new RabbitMqEndpointSettings
+            TransportSettings = new Dictionary<string, object?>
             {
-                QueueName = queueName,
-                ExchangeName = exchangeName,
-                RoutingKey = string.Empty,
-                ExchangeType = "fanout",
-                Durable = true,
-                AutoDelete = false,
-                QueueArguments = queueArguments
+                ["QueueName"] = queueName,
+                ["ExchangeName"] = exchangeName,
+                ["RoutingKey"] = string.Empty,
+                ["ExchangeType"] = "fanout",
+                ["Durable"] = true,
+                ["AutoDelete"] = false,
+                ["QueueArguments"] = queueArguments
             }
         };
 
@@ -135,7 +135,7 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
         _activeTransports.Add(receiveTransport);
     }
 
-    [Throws(typeof(InvalidOperationException), typeof(AmbiguousMatchException))]
+    [Throws(typeof(InvalidOperationException), typeof(AmbiguousMatchException), typeof(TypeLoadException))]
     public async Task AddConsumer<TMessage, TConsumer>(ConsumerTopology consumer, Delegate? configure = null, CancellationToken cancellationToken = default)
         where TConsumer : class, IConsumer<TMessage>
         where TMessage : class
@@ -149,17 +149,30 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
             return;
         }
 
-        var settings = consumer.TransportSettings as RabbitMqEndpointSettings ?? new RabbitMqEndpointSettings();
-        settings.QueueName = queueName;
-        settings.ExchangeName = EntityNameFormatter.Format(messageType)!; // standard MT routing
-        settings.RoutingKey = "";
-        settings.ExchangeType = "fanout";
+        IDictionary<string, object?> transportSettings;
+        if (consumer.TransportSettings is IDictionary<string, object?> dict)
+            transportSettings = new Dictionary<string, object?>(dict);
+        else if (consumer.TransportSettings != null)
+        {
+            transportSettings = consumer.TransportSettings
+                .GetType()
+                .GetProperties()
+                .ToDictionary(p => p.Name, p => (object?)p.GetValue(consumer.TransportSettings));
+        }
+        else
+            transportSettings = new Dictionary<string, object?>();
+
+        transportSettings["QueueName"] = queueName;
+        transportSettings["ExchangeName"] = EntityNameFormatter.Format(messageType)!;
+        transportSettings["RoutingKey"] = string.Empty;
+        transportSettings["ExchangeType"] = "fanout";
+
         var endpoint = new EndpointDefinition
         {
             Address = queueName,
             ConcurrencyLimit = consumer.ConcurrencyLimit ?? 0,
             ConfigureErrorEndpoint = true,
-            TransportSettings = settings
+            TransportSettings = transportSettings
         };
 
         Func<string?, bool> isRegistered = mt =>

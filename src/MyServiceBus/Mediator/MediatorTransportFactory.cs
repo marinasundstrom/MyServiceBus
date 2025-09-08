@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using MyServiceBus.Serialization;
 using MyServiceBus.Topology;
 
@@ -25,7 +26,11 @@ public class MediatorTransportFactory : ITransportFactory
         Func<string?, bool>? isMessageTypeRegistered = null,
         CancellationToken cancellationToken = default)
     {
-        var exchange = (definition.TransportSettings as RabbitMqEndpointSettings)?.ExchangeName ?? definition.Address;
+        var exchange = definition.Address;
+        if (definition.TransportSettings is IDictionary<string, object?> dict &&
+            dict.TryGetValue("ExchangeName", out var ex) && ex is string exName)
+            exchange = exName;
+
         var transport = new MediatorReceiveTransport(this, exchange, handler);
         return Task.FromResult<IReceiveTransport>(transport);
     }

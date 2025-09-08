@@ -122,8 +122,8 @@ public class ReceiveEndpointConfigurator
             consumer.ConcurrencyLimit = _prefetchCount;
             if (_queueArguments != null)
             {
-                var settings = consumer.TransportSettings as RabbitMqEndpointSettings ?? new RabbitMqEndpointSettings();
-                settings.QueueArguments = _queueArguments;
+                var settings = consumer.TransportSettings as IDictionary<string, object?> ?? new Dictionary<string, object?>();
+                settings["QueueArguments"] = _queueArguments;
                 consumer.TransportSettings = settings;
             }
             consumer.SerializerType = _serializerType;

@@ -32,16 +32,7 @@ public class GenericRequestClientTests
 
         var endpoint = new EndpointDefinition
         {
-            Address = "order-response-options",
-            TransportSettings = new RabbitMqEndpointSettings
-            {
-                QueueName = "order-response-options",
-                ExchangeName = EntityNameFormatter.Format(typeof(OrderRequest))!,
-                RoutingKey = "",
-                ExchangeType = "fanout",
-                Durable = true,
-                AutoDelete = false
-            }
+            Address = EntityNameFormatter.Format(typeof(OrderRequest))!
         };
 
         var captured = new TaskCompletionSource<(Uri Response, Uri Fault)>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -84,16 +75,7 @@ public class GenericRequestClientTests
 
         var endpoint = new EndpointDefinition
         {
-            Address = "order-request",
-            TransportSettings = new RabbitMqEndpointSettings
-            {
-                QueueName = "order-request",
-                ExchangeName = EntityNameFormatter.Format(typeof(OrderRequest))!,
-                RoutingKey = "",
-                ExchangeType = "fanout",
-                Durable = true,
-                AutoDelete = false
-            }
+            Address = EntityNameFormatter.Format(typeof(OrderRequest))!
         };
 
         var receive = await transportFactory.CreateReceiveTransport(endpoint, [Throws(typeof(InvalidOperationException))] async (ctx) =>
@@ -138,16 +120,7 @@ public class GenericRequestClientTests
 
         var endpoint = new EndpointDefinition
         {
-            Address = "order-fault",
-            TransportSettings = new RabbitMqEndpointSettings
-            {
-                QueueName = "order-fault",
-                ExchangeName = EntityNameFormatter.Format(typeof(OrderRequest))!,
-                RoutingKey = "",
-                ExchangeType = "fanout",
-                Durable = true,
-                AutoDelete = false
-            }
+            Address = EntityNameFormatter.Format(typeof(OrderRequest))!
         };
 
         var receive = await transportFactory.CreateReceiveTransport(endpoint, [Throws(typeof(InvalidOperationException))] async (ctx) =>
@@ -172,7 +145,7 @@ public class GenericRequestClientTests
         await receive.Start();
 
         var client = new GenericRequestClient<OrderRequest>(transportFactory, serializer, new SendContextFactory());
-        await Assert.ThrowsAsync<RequestFaultException>([Throws(typeof(UriFormatException), typeof(AmbiguousMatchException), typeof(RequestFaultException))] () => client.GetResponseAsync<OrderAccepted, OrderRejected>(new OrderRequest { Accept = true }));
+        await Assert.ThrowsAsync<RequestFaultException>([Throws(typeof(UriFormatException), typeof(AmbiguousMatchException), typeof(RequestFaultException), typeof(TypeLoadException))] () => client.GetResponseAsync<OrderAccepted, OrderRejected>(new OrderRequest { Accept = true }));
 
         await receive.Stop();
     }
@@ -186,16 +159,7 @@ public class GenericRequestClientTests
 
         var endpoint = new EndpointDefinition
         {
-            Address = "order-fault-response",
-            TransportSettings = new RabbitMqEndpointSettings
-            {
-                QueueName = "order-fault-response",
-                ExchangeName = EntityNameFormatter.Format(typeof(OrderRequest))!,
-                RoutingKey = "",
-                ExchangeType = "fanout",
-                Durable = true,
-                AutoDelete = false
-            }
+            Address = EntityNameFormatter.Format(typeof(OrderRequest))!
         };
 
         var receive = await transportFactory.CreateReceiveTransport(endpoint, [Throws(typeof(InvalidOperationException))] async (ctx) =>

@@ -187,7 +187,7 @@ public sealed class RabbitMqTransportFactory : ITransportFactory
         Func<string?, bool>? isMessageTypeRegistered = null,
         CancellationToken cancellationToken = default)
     {
-        var settings = definition.TransportSettings as RabbitMqEndpointSettings ?? throw new InvalidOperationException("RabbitMqEndpointSettings required");
+        var settings = BuildSettings(definition);
 
         var connection = await _connectionProvider.GetOrCreateConnectionAsync(cancellationToken);
         var channel = await connection.CreateChannelAsync(cancellationToken: cancellationToken);
@@ -326,5 +326,48 @@ public sealed class RabbitMqTransportFactory : ITransportFactory
             else if (key.Equals("autodelete", StringComparison.OrdinalIgnoreCase) && bool.TryParse(value, out var ad))
                 autoDelete = ad;
         }
+    }
+
+    private static RabbitMqEndpointSettings BuildSettings(EndpointDefinition definition)
+    {
+        if (definition.TransportSettings is RabbitMqEndpointSettings r)
+            return r;
+
+        string queueName = definition.Address;
+        string exchangeName = definition.Address;
+        string routingKey = string.Empty;
+        string exchangeType = ExchangeType.Fanout;
+        bool durable = true;
+        bool autoDelete = false;
+        IDictionary<string, object?>? arguments = null;
+
+        if (definition.TransportSettings is IDictionary<string, object?> dict)
+        {
+            if (dict.TryGetValue("QueueName", out var q) && q is string qs)
+                queueName = qs;
+            if (dict.TryGetValue("ExchangeName", out var e) && e is string es)
+                exchangeName = es;
+            if (dict.TryGetValue("RoutingKey", out var rk) && rk is string rks)
+                routingKey = rks;
+            if (dict.TryGetValue("ExchangeType", out var et) && et is string ets)
+                exchangeType = ets;
+            if (dict.TryGetValue("Durable", out var d) && d is bool db)
+                durable = db;
+            if (dict.TryGetValue("AutoDelete", out var ad) && ad is bool adb)
+                autoDelete = adb;
+            if (dict.TryGetValue("QueueArguments", out var qa) && qa is IDictionary<string, object?> qd)
+                arguments = qd;
+        }
+
+        return new RabbitMqEndpointSettings
+        {
+            QueueName = queueName,
+            ExchangeName = exchangeName,
+            RoutingKey = routingKey,
+            ExchangeType = exchangeType,
+            Durable = durable,
+            AutoDelete = autoDelete,
+            QueueArguments = arguments
+        };
     }
 }
