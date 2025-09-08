@@ -45,6 +45,7 @@ internal class TransportSendEndpoint : ISendEndpoint
         contextCallback?.Invoke(context);
 
         await _sendPipe.Send(context);
-        await transport.Send(message, context, cancellationToken);
+        var typedMessage = message is T tm ? tm : AnonymousMessageFactory.Create<T>(message);
+        await transport.Send(typedMessage, context, cancellationToken);
     }
 }

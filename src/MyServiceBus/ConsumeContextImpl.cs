@@ -71,7 +71,8 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
 
         await _publishPipe.Send(context);
         await _sendPipe.Send(context);
-        await transport.Send(message, context, cancellationToken);
+        var typedMessage = message is T tm ? tm : AnonymousMessageFactory.Create<T>(message);
+        await transport.Send(typedMessage, context, cancellationToken);
     }
 
     [Throws(typeof(InvalidOperationException))]
@@ -96,7 +97,8 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
         contextCallback?.Invoke(context);
 
         await _sendPipe.Send(context);
-        await transport.Send(message, context, cancellationToken);
+        var typedMessage = message is T tm ? tm : AnonymousMessageFactory.Create<T>(message);
+        await transport.Send(typedMessage, context, cancellationToken);
     }
 
     [Throws(typeof(InvalidOperationException))]
@@ -131,7 +133,6 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
         CancellationToken cancellationToken = default) where T : class
         => Send<T>(address, (object)message!, contextCallback, cancellationToken);
 
-    [Throws(typeof(InvalidOperationException))]
     public async Task Send<T>(Uri address, object message, Action<ISendContext>? contextCallback = null,
         CancellationToken cancellationToken = default) where T : class
     {

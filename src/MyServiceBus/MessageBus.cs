@@ -49,10 +49,11 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
 
     public IBusTopology Topology => _topology;
 
-    [Throws(typeof(UriFormatException), typeof(InvalidOperationException), typeof(InvalidCastException))]
+    [Throws(typeof(UriFormatException), typeof(InvalidOperationException))]
     public Task Publish<TMessage>(object message, Action<IPublishContext>? contextCallback = null, CancellationToken cancellationToken = default) where TMessage : class
     {
-        return Publish((TMessage)message, contextCallback, cancellationToken);
+        var typed = message is TMessage tm ? tm : AnonymousMessageFactory.Create<TMessage>(message);
+        return Publish(typed, contextCallback, cancellationToken);
     }
 
     [Throws(typeof(UriFormatException), typeof(InvalidOperationException))]
@@ -155,7 +156,7 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
             _consumers.TryGetValue(queueName, out var regs) && regs.Any(r => r.MessageUrn == mt);
         var receiveTransport = await _transportFactory.CreateReceiveTransport(
             topology,
-            [Throws(typeof(TargetInvocationException), typeof(InvalidComObjectException))] (ctx) => HandleMessageAsync(queueName, ctx),
+            [Throws(typeof(TargetInvocationException), typeof(InvalidComObjectException), typeof(COMException), typeof(TypeLoadException))] (ctx) => HandleMessageAsync(queueName, ctx),
             isRegistered,
             cancellationToken);
 
