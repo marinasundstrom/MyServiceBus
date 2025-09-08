@@ -11,11 +11,11 @@ import com.myservicebus.serialization.MessageSerializer;
 
 public class ConsumerTopology {
     private Class<?> consumerType;
-    private String queueName;
+    private String address;
     private List<MessageBinding> bindings = new ArrayList<>();
     private Consumer<PipeConfigurator<ConsumeContext<Object>>> configure;
-    private Integer prefetchCount;
-    private Map<String, Object> queueArguments;
+    private Integer concurrencyLimit;
+    private Object transportSettings;
     private Class<? extends MessageSerializer> serializerClass;
 
     public Class<?> getConsumerType() {
@@ -26,12 +26,12 @@ public class ConsumerTopology {
         this.consumerType = consumerType;
     }
 
-    public String getQueueName() {
-        return queueName;
+    public String getAddress() {
+        return address;
     }
 
-    public void setQueueName(String queueName) {
-        this.queueName = queueName;
+    public void setAddress(String address) {
+        this.address = address;
     }
 
     public List<MessageBinding> getBindings() {
@@ -50,20 +50,20 @@ public class ConsumerTopology {
         this.configure = configure;
     }
 
-    public Integer getPrefetchCount() {
-        return prefetchCount;
+    public Integer getConcurrencyLimit() {
+        return concurrencyLimit;
     }
 
-    public void setPrefetchCount(Integer prefetchCount) {
-        this.prefetchCount = prefetchCount;
+    public void setConcurrencyLimit(Integer concurrencyLimit) {
+        this.concurrencyLimit = concurrencyLimit;
     }
 
-    public Map<String, Object> getQueueArguments() {
-        return queueArguments;
+    public Object getTransportSettings() {
+        return transportSettings;
     }
 
-    public void setQueueArguments(Map<String, Object> queueArguments) {
-        this.queueArguments = queueArguments;
+    public void setTransportSettings(Object transportSettings) {
+        this.transportSettings = transportSettings;
     }
 
     public Class<? extends MessageSerializer> getSerializerClass() {

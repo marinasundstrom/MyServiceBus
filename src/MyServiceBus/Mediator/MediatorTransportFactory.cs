@@ -20,12 +20,13 @@ public class MediatorTransportFactory : ITransportFactory
     }
 
     public Task<IReceiveTransport> CreateReceiveTransport(
-        ReceiveEndpointTopology topology,
+        EndpointDefinition definition,
         Func<ReceiveContext, Task> handler,
         Func<string?, bool>? isMessageTypeRegistered = null,
         CancellationToken cancellationToken = default)
     {
-        var transport = new MediatorReceiveTransport(this, topology.ExchangeName, handler);
+        var exchange = (definition.TransportSettings as RabbitMqEndpointSettings)?.ExchangeName ?? definition.Address;
+        var transport = new MediatorReceiveTransport(this, exchange, handler);
         return Task.FromResult<IReceiveTransport>(transport);
     }
 
@@ -182,6 +183,7 @@ public class MediatorTransportFactory : ITransportFactory
         public IDictionary<string, object> Headers { get; }
         public DateTimeOffset SentTime { get; }
 
+        [Throws(typeof(ObjectDisposedException))]
         public bool TryGetMessage<T>(out T? message) where T : class
         {
             if (_message is T msg)

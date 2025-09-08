@@ -17,7 +17,7 @@ public static class RabbitMqConfiguratorExtensions
         {
             var consumerType = consumer.ConsumerType;
             var messageType = consumer.Bindings.First().MessageType;
-            var queueName = formatter?.Format(messageType) ?? consumer.QueueName;
+            var queueName = formatter?.Format(messageType) ?? consumer.Address;
 
             try
             {

@@ -107,7 +107,7 @@ public class RabbitMqFactoryConfiguratorTests
         configurator.ReceiveEndpoint("custom-queue", [Throws(typeof(InvalidOperationException))] (e) => e.ConfigureConsumer<MyConsumer>(context));
 
         var def = registry.Consumers.First(c => c.ConsumerType == typeof(MyConsumer));
-        Assert.Equal("custom-queue", def.QueueName);
+        Assert.Equal("custom-queue", def.Address);
         Assert.Equal("custom-exchange", def.Bindings[0].EntityName);
     }
 
@@ -182,7 +182,8 @@ public class RabbitMqFactoryConfiguratorTests
         });
 
         var def = registry.Consumers.First(c => c.ConsumerType == typeof(MyConsumer));
-        Assert.Equal("quorum", def.QueueArguments!["x-queue-type"]);
+        var settings = def.TransportSettings as RabbitMqEndpointSettings;
+        Assert.Equal("quorum", settings!.QueueArguments!["x-queue-type"]);
     }
 
     class StaticFormatter : IEndpointNameFormatter
@@ -208,6 +209,6 @@ public class RabbitMqFactoryConfiguratorTests
         configurator.ConfigureEndpoints(context);
 
         var def = registry.Consumers.First(c => c.ConsumerType == typeof(MyConsumer));
-        Assert.Equal("formatted-mymessage", def.QueueName);
+        Assert.Equal("formatted-mymessage", def.Address);
     }
 }

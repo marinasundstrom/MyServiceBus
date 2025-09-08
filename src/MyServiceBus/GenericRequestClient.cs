@@ -38,14 +38,19 @@ public sealed class GenericRequestClient<TRequest> : IRequestClient<TRequest>, I
         var taskCompletionSource = new TaskCompletionSource<Response<T>>();
 
         var responseExchange = $"resp-{Guid.NewGuid():N}";
-        var responseReceiveTopology = new ReceiveEndpointTopology
+        var responseEndpoint = new EndpointDefinition
         {
-            QueueName = responseExchange,
-            ExchangeName = responseExchange,
-            RoutingKey = "",
-            ExchangeType = "fanout",
-            Durable = false,
-            AutoDelete = true
+            Address = responseExchange,
+            ConfigureErrorEndpoint = false,
+            TransportSettings = new RabbitMqEndpointSettings
+            {
+                QueueName = responseExchange,
+                ExchangeName = responseExchange,
+                RoutingKey = "",
+                ExchangeType = "fanout",
+                Durable = false,
+                AutoDelete = true
+            }
         };
 
         IReceiveTransport? responseReceiveTransport = null;
@@ -72,7 +77,7 @@ public sealed class GenericRequestClient<TRequest> : IRequestClient<TRequest>, I
             }
         };
 
-        responseReceiveTransport = await _transportFactory.CreateReceiveTransport(responseReceiveTopology, responseHandler, null, cancellationToken);
+        responseReceiveTransport = await _transportFactory.CreateReceiveTransport(responseEndpoint, responseHandler, null, cancellationToken);
 
         await responseReceiveTransport.Start(cancellationToken);
 
@@ -116,14 +121,19 @@ public sealed class GenericRequestClient<TRequest> : IRequestClient<TRequest>, I
         var taskCompletionSource = new TaskCompletionSource<Response<T1, T2>>();
 
         var responseExchange = $"resp-{Guid.NewGuid():N}";
-        var responseReceiveTopology = new ReceiveEndpointTopology
+        var responseReceiveTopology = new EndpointDefinition
         {
-            QueueName = responseExchange,
-            ExchangeName = responseExchange,
-            RoutingKey = "",
-            ExchangeType = "fanout",
-            Durable = false,
-            AutoDelete = true
+            Address = responseExchange,
+            ConfigureErrorEndpoint = false,
+            TransportSettings = new RabbitMqEndpointSettings
+            {
+                QueueName = responseExchange,
+                ExchangeName = responseExchange,
+                RoutingKey = "",
+                ExchangeType = "fanout",
+                Durable = false,
+                AutoDelete = true
+            }
         };
 
         IReceiveTransport? responseReceiveTransport = null;

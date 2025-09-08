@@ -9,13 +9,13 @@ The transport factory creates and caches send and receive transports.
 ### C#
 - Implement `ITransportFactory`.
 - Resolve connections (e.g., `ServiceBusClient`) in the constructor.
-- Implement `GetSendTransport` and `CreateReceiveTransport` using asynchronous `Task` methods.
+- Implement `GetSendTransport` and `CreateReceiveTransport` using asynchronous `Task` methods. `CreateReceiveTransport` now accepts an `EndpointDefinition` describing the logical address, desired concurrency and error behavior.
 - Use dependency injection via a configuration builder extension similar to `RabbitMqServiceBusConfigurationBuilderExt`.
 
 ### Java
 - Create a `TransportFactory` class analogous to `RabbitMqTransportFactory`.
 - Manage connections (e.g., `ServiceBusClient`) and maintain a map of `SendTransport` instances.
-- Provide synchronous `getSendTransport` methods and hook into configuration through a `configure` helper.
+- Provide synchronous `getSendTransport` methods and hook into configuration through a `configure` helper. `createReceiveTransport` should map an endpoint address and optional settings to the transport's subscription mechanism.
 
 ## 2. Implement Send and Receive Transports
 
@@ -32,8 +32,9 @@ The transport factory creates and caches send and receive transports.
 ## 3. Topology and Addressing
 
 Both implementations should map MyServiceBus addresses to the transport's constructs.
-- For Azure Service Bus, map exchanges to topics and queues as needed.
-- Ensure exchanges or topics are created if they do not exist.
+- For queue-based systems like Azure Service Bus, map exchanges to topics and queues as needed.
+- For non-queue protocols such as webhooks or gRPC streams, interpret the endpoint address as a URI or channel name and bind handlers accordingly.
+- Ensure transport resources are created if they do not exist.
 
 ## 4. Registration and Configuration
 

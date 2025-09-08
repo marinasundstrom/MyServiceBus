@@ -111,7 +111,7 @@ public class ReceiveEndpointConfigurator
             var registry = context.ServiceProvider.GetRequiredService<TopologyRegistry>();
             var consumer = registry.Consumers.First(c => c.ConsumerType == consumerType);
 
-            consumer.QueueName = _queueName;
+            consumer.Address = _queueName;
 
             foreach (var binding in consumer.Bindings)
             {
@@ -119,8 +119,13 @@ public class ReceiveEndpointConfigurator
                     binding.EntityName = entity;
             }
 
-            consumer.PrefetchCount = _prefetchCount;
-            consumer.QueueArguments = _queueArguments;
+            consumer.ConcurrencyLimit = _prefetchCount;
+            if (_queueArguments != null)
+            {
+                var settings = consumer.TransportSettings as RabbitMqEndpointSettings ?? new RabbitMqEndpointSettings();
+                settings.QueueArguments = _queueArguments;
+                consumer.TransportSettings = settings;
+            }
             consumer.SerializerType = _serializerType;
 
             if (_retryCount.HasValue)

@@ -30,19 +30,23 @@ public class GenericRequestClientTests
         var transportFactory = new MediatorTransportFactory();
         var serializer = new EnvelopeMessageSerializer();
 
-        var topology = new ReceiveEndpointTopology
+        var endpoint = new EndpointDefinition
         {
-            QueueName = "order-response-options",
-            ExchangeName = EntityNameFormatter.Format(typeof(OrderRequest))!,
-            RoutingKey = "",
-            ExchangeType = "fanout",
-            Durable = true,
-            AutoDelete = false
+            Address = "order-response-options",
+            TransportSettings = new RabbitMqEndpointSettings
+            {
+                QueueName = "order-response-options",
+                ExchangeName = EntityNameFormatter.Format(typeof(OrderRequest))!,
+                RoutingKey = "",
+                ExchangeType = "fanout",
+                Durable = true,
+                AutoDelete = false
+            }
         };
 
         var captured = new TaskCompletionSource<(Uri Response, Uri Fault)>(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        var receive = await transportFactory.CreateReceiveTransport(topology, [Throws(typeof(InvalidOperationException))] async (ctx) =>
+        var receive = await transportFactory.CreateReceiveTransport(endpoint, [Throws(typeof(InvalidOperationException))] async (ctx) =>
         {
             captured.TrySetResult((ctx.ResponseAddress!, ctx.FaultAddress!));
 
@@ -78,17 +82,21 @@ public class GenericRequestClientTests
         var transportFactory = new MediatorTransportFactory();
         var serializer = new EnvelopeMessageSerializer();
 
-        var topology = new ReceiveEndpointTopology
+        var endpoint = new EndpointDefinition
         {
-            QueueName = "order-request",
-            ExchangeName = EntityNameFormatter.Format(typeof(OrderRequest))!,
-            RoutingKey = "",
-            ExchangeType = "fanout",
-            Durable = true,
-            AutoDelete = false
+            Address = "order-request",
+            TransportSettings = new RabbitMqEndpointSettings
+            {
+                QueueName = "order-request",
+                ExchangeName = EntityNameFormatter.Format(typeof(OrderRequest))!,
+                RoutingKey = "",
+                ExchangeType = "fanout",
+                Durable = true,
+                AutoDelete = false
+            }
         };
 
-        var receive = await transportFactory.CreateReceiveTransport(topology, [Throws(typeof(InvalidOperationException))] async (ctx) =>
+        var receive = await transportFactory.CreateReceiveTransport(endpoint, [Throws(typeof(InvalidOperationException))] async (ctx) =>
         {
             if (ctx.TryGetMessage<OrderRequest>(out var request))
             {
@@ -128,17 +136,21 @@ public class GenericRequestClientTests
         var transportFactory = new MediatorTransportFactory();
         var serializer = new EnvelopeMessageSerializer();
 
-        var topology = new ReceiveEndpointTopology
+        var endpoint = new EndpointDefinition
         {
-            QueueName = "order-fault",
-            ExchangeName = EntityNameFormatter.Format(typeof(OrderRequest))!,
-            RoutingKey = "",
-            ExchangeType = "fanout",
-            Durable = true,
-            AutoDelete = false
+            Address = "order-fault",
+            TransportSettings = new RabbitMqEndpointSettings
+            {
+                QueueName = "order-fault",
+                ExchangeName = EntityNameFormatter.Format(typeof(OrderRequest))!,
+                RoutingKey = "",
+                ExchangeType = "fanout",
+                Durable = true,
+                AutoDelete = false
+            }
         };
 
-        var receive = await transportFactory.CreateReceiveTransport(topology, [Throws(typeof(InvalidOperationException))] async (ctx) =>
+        var receive = await transportFactory.CreateReceiveTransport(endpoint, [Throws(typeof(InvalidOperationException))] async (ctx) =>
         {
             if (ctx.TryGetMessage<OrderRequest>(out var request))
             {
@@ -172,17 +184,21 @@ public class GenericRequestClientTests
         var transportFactory = new MediatorTransportFactory();
         var serializer = new EnvelopeMessageSerializer();
 
-        var topology = new ReceiveEndpointTopology
+        var endpoint = new EndpointDefinition
         {
-            QueueName = "order-fault-response",
-            ExchangeName = EntityNameFormatter.Format(typeof(OrderRequest))!,
-            RoutingKey = "",
-            ExchangeType = "fanout",
-            Durable = true,
-            AutoDelete = false
+            Address = "order-fault-response",
+            TransportSettings = new RabbitMqEndpointSettings
+            {
+                QueueName = "order-fault-response",
+                ExchangeName = EntityNameFormatter.Format(typeof(OrderRequest))!,
+                RoutingKey = "",
+                ExchangeType = "fanout",
+                Durable = true,
+                AutoDelete = false
+            }
         };
 
-        var receive = await transportFactory.CreateReceiveTransport(topology, [Throws(typeof(InvalidOperationException))] async (ctx) =>
+        var receive = await transportFactory.CreateReceiveTransport(endpoint, [Throws(typeof(InvalidOperationException))] async (ctx) =>
         {
             if (ctx.TryGetMessage<OrderRequest>(out var request))
             {

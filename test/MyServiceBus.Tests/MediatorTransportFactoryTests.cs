@@ -122,14 +122,18 @@ public class MediatorTransportFactoryTests
     {
         var factory = new MediatorTransportFactory();
         var tcs = new TaskCompletionSource<SampleMessage>();
-        var topology = new ReceiveEndpointTopology
+        var endpoint = new EndpointDefinition
         {
-            ExchangeName = "test",
-            QueueName = "queue",
-            RoutingKey = ""
+            Address = "queue",
+            TransportSettings = new RabbitMqEndpointSettings
+            {
+                QueueName = "queue",
+                ExchangeName = "test",
+                RoutingKey = ""
+            }
         };
 
-        var receive = await factory.CreateReceiveTransport(topology, [Throws(typeof(InvalidOperationException))] (ctx) =>
+        var receive = await factory.CreateReceiveTransport(endpoint, [Throws(typeof(InvalidOperationException))] (ctx) =>
         {
             ctx.TryGetMessage<SampleMessage>(out var msg);
             tcs.SetResult(msg!);
