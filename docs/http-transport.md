@@ -16,3 +16,31 @@ services.AddServiceBus(cfg =>
     cfg.UsingHttp(new Uri("http://localhost:5000/"));
 });
 ```
+
+## Sending with `HttpClient`
+
+Because the transport exchanges plain HTTP requests, any client can post a
+serialized `Envelope<T>` directly. For example, using `System.Net.Http.Json`
+to send a command to a receive endpoint:
+
+```csharp
+var client = new HttpClient { BaseAddress = new Uri("http://localhost:5000/") };
+
+var envelope = new Envelope<SubmitOrder>
+{
+    MessageId = Guid.NewGuid(),
+    MessageType = { "urn:message:Contracts:SubmitOrder" },
+    Message = new SubmitOrder { OrderId = Guid.NewGuid() }
+};
+
+var request = new HttpRequestMessage(HttpMethod.Post, "submit-order")
+{
+    Content = JsonContent.Create(envelope)
+};
+request.Headers.Add("source", "sample");
+
+await client.SendAsync(request);
+```
+
+Any HTTP headers on the request are forwarded to the consume context's
+headers.

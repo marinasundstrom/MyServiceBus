@@ -181,6 +181,33 @@ SendEndpoint endpoint = provider.getSendEndpoint("rabbitmq://localhost/submit-or
 endpoint.send(new SubmitOrder(UUID.randomUUID())).join();
 ```
 
+##### Sending with `HttpClient`
+
+When using the HTTP transport, any client can post an `Envelope<T>` directly
+to a receive endpoint. For example, to send a command with `HttpClient`:
+
+```csharp
+var client = new HttpClient { BaseAddress = new Uri("http://localhost:5000/") };
+
+var envelope = new Envelope<SubmitOrder>
+{
+    MessageId = Guid.NewGuid(),
+    MessageType = { "urn:message:Contracts:SubmitOrder" },
+    Message = new SubmitOrder { OrderId = Guid.NewGuid() }
+};
+
+var request = new HttpRequestMessage(HttpMethod.Post, "submit-order")
+{
+    Content = JsonContent.Create(envelope)
+};
+request.Headers.Add("source", "sample");
+
+await client.SendAsync(request);
+```
+
+Any headers added to the `HttpRequestMessage` flow into the receive context's
+headers.
+
 | Target | URI format | Example | Notes |
 |--------|------------|---------|-------|
 | Queue (logical) | `queue:<name>` | `queue:submit-order` | Transport shortcut that resolves against the configured transport |
