@@ -41,13 +41,13 @@ public class Main {
             });
 
             // Fault<T> consumers don't auto-bind; listen on the queue suffixed with `_fault`
-            // for the original endpoint. SubmitOrderFaultConsumer handles Fault<OrderSubmitted>
+            // for the original endpoint. SubmitOrderFaultConsumer handles Fault<SubmitOrder>
             // messages published to `submit-order_fault`.
             cfg.receiveEndpoint("submit-order_fault", e -> {
                 e.configureConsumer(context, SubmitOrderFaultConsumer.class);
 
                 /*
-                 * e.handler(Fault<OrderSubmitted>.class, ctx -> {
+                 * e.handler(Fault<SubmitOrder>.class, ctx -> {
                  * var fault = ctx.getMessage();
                  * var msg = fault.getMessage();
                  * System.out.println(msg.getOrderId());
