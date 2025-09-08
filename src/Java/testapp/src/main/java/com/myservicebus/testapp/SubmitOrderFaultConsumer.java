@@ -9,7 +9,7 @@ import com.myservicebus.Fault;
 import com.myservicebus.logging.Logger;
 import com.myservicebus.logging.LoggerFactory;
 
-class SubmitOrderFaultConsumer implements Consumer<Fault<OrderSubmitted>> {
+class SubmitOrderFaultConsumer implements Consumer<Fault<SubmitOrder>> {
     private final Logger logger;
 
     @Inject
@@ -18,11 +18,11 @@ class SubmitOrderFaultConsumer implements Consumer<Fault<OrderSubmitted>> {
     }
 
     @Override
-    public CompletableFuture<Void> consume(ConsumeContext<Fault<OrderSubmitted>> context) throws Exception {
+    public CompletableFuture<Void> consume(ConsumeContext<Fault<SubmitOrder>> context) throws Exception {
         var fault = context.getMessage();
         var msg = fault.getMessage();
         String error = fault.getExceptions().isEmpty() ? "" : fault.getExceptions().get(0).getMessage();
-        logger.warn("⚠️ OrderSubmitted fault for {}: {}", msg.getOrderId(), error);
+        logger.warn("⚠️ SubmitOrder fault for {}: {}", msg.getOrderId(), error);
         return CompletableFuture.completedFuture(null);
     }
 }
