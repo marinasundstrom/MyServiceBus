@@ -1,6 +1,7 @@
 package com.myservicebus.rabbitmq;
 
 import java.util.Map;
+import com.myservicebus.MessageEntityNameFormatterSpecific;
 
 public class MessageConfigurator<T> {
     private final Class<T> clz;
@@ -13,5 +14,9 @@ public class MessageConfigurator<T> {
 
     public void setEntityName(String name) {
         exchangeNames.put(clz, name);
+    }
+
+    public void setEntityNameFormatter(MessageEntityNameFormatterSpecific<T> formatter) {
+        exchangeNames.put(clz, formatter.formatEntityName());
     }
 }

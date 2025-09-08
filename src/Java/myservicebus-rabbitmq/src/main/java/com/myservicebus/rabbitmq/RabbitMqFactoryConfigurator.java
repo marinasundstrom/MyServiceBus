@@ -5,6 +5,7 @@ import com.myservicebus.EndpointNameFormatter;
 import com.myservicebus.PipeConfigurator;
 import com.myservicebus.RetryConfigurator;
 import com.myservicebus.NamingConventions;
+import com.myservicebus.MessageEntityNameFormatter;
 import com.myservicebus.topology.ConsumerTopology;
 import com.myservicebus.topology.MessageBinding;
 import com.myservicebus.topology.TopologyRegistry;
@@ -20,6 +21,7 @@ public class RabbitMqFactoryConfigurator {
     private String password = "guest";
     private final Map<Class<?>, String> exchangeNames = new HashMap<>();
     private EndpointNameFormatter endpointNameFormatter;
+    private MessageEntityNameFormatter entityNameFormatter;
     private final java.util.List<HandlerRegistration<?>> handlerRegistrations = new java.util.ArrayList<>();
     private int prefetchCount;
 
@@ -89,6 +91,11 @@ public class RabbitMqFactoryConfigurator {
 
     public void setEndpointNameFormatter(EndpointNameFormatter formatter) {
         this.endpointNameFormatter = formatter;
+    }
+
+    public void setEntityNameFormatter(MessageEntityNameFormatter formatter) {
+        this.entityNameFormatter = formatter;
+        NamingConventions.setEntityNameFormatter(formatter);
     }
 
     public void setPrefetchCount(int prefetchCount) {

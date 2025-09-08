@@ -18,7 +18,9 @@ public interface IRabbitMqFactoryConfigurator
     void ReceiveEndpoint(string queueName, Action<ReceiveEndpointConfigurator> configure);
     void Host(string host, Action<IRabbitMqHostConfigurator>? configure = null);
     void SetEndpointNameFormatter(IEndpointNameFormatter formatter);
+    void SetEntityNameFormatter(IMessageEntityNameFormatter formatter);
     IEndpointNameFormatter? EndpointNameFormatter { get; }
+    IMessageEntityNameFormatter? EntityNameFormatter { get; }
     string ClientHost { get; }
     ushort PrefetchCount { get; }
     void SetPrefetchCount(ushort prefetchCount);
@@ -45,6 +47,11 @@ public class MessageConfigurator
     public void SetEntityName(string name)
     {
         _exchangeNames[_messageType] = name;
+    }
+
+    public void SetEntityNameFormatter<T>(IMessageEntityNameFormatter<T> formatter)
+    {
+        _exchangeNames[_messageType] = formatter.FormatEntityName();
     }
 }
 
@@ -143,6 +150,7 @@ public class ReceiveEndpointConfigurator
         }
     }
 
+    [Throws(typeof(AmbiguousMatchException))]
     public void Handler<T>(Func<ConsumeContext<T>, Task> handler)
         where T : class
     {

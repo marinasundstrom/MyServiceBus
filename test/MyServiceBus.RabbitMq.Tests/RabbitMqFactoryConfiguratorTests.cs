@@ -55,6 +55,7 @@ public class RabbitMqFactoryConfiguratorTests
     {
         private readonly Dictionary<Type, string> _exchangeNames = new();
         public IEndpointNameFormatter? EndpointNameFormatter { get; private set; }
+        public IMessageEntityNameFormatter? EntityNameFormatter { get; private set; }
         public string ClientHost => "localhost";
         public ushort PrefetchCount { get; private set; }
 
@@ -75,6 +76,11 @@ public class RabbitMqFactoryConfiguratorTests
         public void SetEndpointNameFormatter(IEndpointNameFormatter formatter)
         {
             EndpointNameFormatter = formatter;
+        }
+
+        public void SetEntityNameFormatter(IMessageEntityNameFormatter formatter)
+        {
+            EntityNameFormatter = formatter;
         }
 
         public void SetPrefetchCount(ushort prefetchCount)
@@ -103,6 +109,32 @@ public class RabbitMqFactoryConfiguratorTests
         var def = registry.Consumers.First(c => c.ConsumerType == typeof(MyConsumer));
         Assert.Equal("custom-queue", def.QueueName);
         Assert.Equal("custom-exchange", def.Bindings[0].EntityName);
+    }
+
+    class StaticEntityFormatter<T> : IMessageEntityNameFormatter<T>
+    {
+        public string FormatEntityName() => $"formatted-{typeof(T).Name.ToLowerInvariant()}";
+    }
+
+    [Fact]
+    [Throws(typeof(EqualException), typeof(Exception))]
+    public void Message_uses_entity_name_formatter()
+    {
+        var registry = new TopologyRegistry();
+        registry.RegisterConsumer<MyConsumer>("original-queue", null, typeof(MyMessage));
+
+        var services = new ServiceCollection();
+        services.AddSingleton(registry);
+        services.AddSingleton<IMessageBus, TestMessageBus>();
+        var provider = services.BuildServiceProvider();
+        var context = new TestBusRegistrationContext(provider);
+
+        var configurator = new TestRabbitMqFactoryConfigurator();
+        configurator.Message<MyMessage>(m => m.SetEntityNameFormatter(new StaticEntityFormatter<MyMessage>()));
+        configurator.ReceiveEndpoint("custom-queue", e => e.ConfigureConsumer<MyConsumer>(context));
+
+        var def = registry.Consumers.First(c => c.ConsumerType == typeof(MyConsumer));
+        Assert.Equal("formatted-mymessage", def.Bindings[0].EntityName);
     }
 
     [Fact]
