@@ -2,7 +2,7 @@
 
 Running the app will produce `SubmitOrder` that will be consumed by `SubmitOrderConsumer`.
 
-The consumer uses `MyServiceImpl`, which randomly throws to simulate failures. When that happens, the message is moved to the `submit-order_error` queue, and a handler forwards it back to `queue:submit-order` for another attempt.
+The consumer uses `MyServiceImpl`, which randomly throws to simulate failures. When that happens, MyServiceBus publishes a `Fault<OrderSubmitted>` to the `submit-order_fault` queue, where `SubmitOrderFaultConsumer` logs the fault details.
 
 ## Running
 
