@@ -5,6 +5,7 @@ using MyServiceBus.Serialization;
 using MyServiceBus.Topology;
 using Xunit;
 using Xunit.Sdk;
+using System.Collections.Generic;
 
 namespace MyServiceBus.Tests;
 
@@ -124,7 +125,11 @@ public class MediatorTransportFactoryTests
         var tcs = new TaskCompletionSource<SampleMessage>();
         var endpoint = new EndpointDefinition
         {
-            Address = "queue"
+            Address = "queue",
+            TransportSettings = new Dictionary<string, object>
+            {
+                ["ExchangeName"] = "test",
+            }
         };
 
         var receive = await factory.CreateReceiveTransport(endpoint, [Throws(typeof(InvalidOperationException))] (ctx) =>
