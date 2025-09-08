@@ -13,7 +13,7 @@ The ServiceBus C# client provides a lightweight messaging abstraction for buildi
 - Headers prefixed with `_` are applied to the underlying transport properties (for example, `_correlation_id` sets the AMQP `correlation-id`).
 
 ### Publishing
-- `PublishAsync` uses message type conventions to determine the exchange and send published messages through the configured transport.
+- `Publish` uses message type conventions to determine the exchange and send published messages through the configured transport.
 
 ### Request–Response
 - `GenericRequestClient` sends requests and awaits responses or faults using per-request temporary exchanges, mirroring the Java client.

@@ -29,12 +29,12 @@ public class DefaultConsumeContext<TMessage> : BasePipeContext, ConsumeContext<T
         return Task.CompletedTask;
     }
 
-    public Task PublishAsync<T>(object message, Action<IPublishContext>? contextCallback = null, CancellationToken cancellationToken = default) where T : class
+    public Task Publish<T>(object message, Action<IPublishContext>? contextCallback = null, CancellationToken cancellationToken = default) where T : class
     {
         return Task.CompletedTask;
     }
 
-    public Task PublishAsync<T>(T message, Action<IPublishContext>? contextCallback = null, CancellationToken cancellationToken = default) where T : class
+    public Task Publish<T>(T message, Action<IPublishContext>? contextCallback = null, CancellationToken cancellationToken = default) where T : class
     {
         return Task.CompletedTask;
     }

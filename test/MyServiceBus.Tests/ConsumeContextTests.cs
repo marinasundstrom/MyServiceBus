@@ -77,7 +77,7 @@ public class ConsumeContextTests
             new SendContextFactory(),
             new PublishContextFactory());
 
-        await ctx.PublishAsync(new FakeMessage());
+        await ctx.Publish(new FakeMessage());
 
         Assert.Equal(new Uri("rabbitmq://localhost/exchange/MyServiceBus.Tests:FakeMessage"), factory.Address);
         Assert.Equal(new Uri("rabbitmq://localhost/"), factory.Context!.SourceAddress);

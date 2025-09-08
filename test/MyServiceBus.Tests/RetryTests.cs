@@ -40,7 +40,7 @@ public class RetryTests
 
         FailingConsumer.Attempts = 0;
         var bus = provider.GetRequiredService<IMessageBus>();
-        await Assert.ThrowsAsync<InvalidOperationException>(() => bus.PublishAsync(new TestMessage()));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => bus.Publish(new TestMessage()));
         Assert.Equal(1, FailingConsumer.Attempts);
 
         await hosted.StopAsync(CancellationToken.None);
@@ -63,7 +63,7 @@ public class RetryTests
 
         FailingConsumer.Attempts = 0;
         var bus = provider.GetRequiredService<IMessageBus>();
-        await bus.PublishAsync(new TestMessage());
+        await bus.Publish(new TestMessage());
         Assert.Equal(2, FailingConsumer.Attempts);
 
         await hosted.StopAsync(CancellationToken.None);

@@ -46,7 +46,7 @@ public class MultipleConsumersFaultTests
         var harness = provider.GetRequiredService<InMemoryTestHarness>();
 
         await harness.Start();
-        await Assert.ThrowsAsync<InvalidOperationException>(() => harness.PublishAsync(new SubmitOrder(Guid.NewGuid())));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => harness.Publish(new SubmitOrder(Guid.NewGuid())));
 
         Assert.Equal(1, FirstConsumer.Calls);
         Assert.Equal(0, SecondConsumer.Calls);
