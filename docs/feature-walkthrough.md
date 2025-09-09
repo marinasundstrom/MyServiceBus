@@ -110,6 +110,22 @@ MessageBus bus = MessageBus.factory.create(RabbitMqFactoryConfigurator.class, cf
 });
 ```
 
+You can also decorate the factory with additional services or a logger factory before creating the bus:
+
+```csharp
+var bus = MessageBus.Factory
+    .WithLoggerFactory(LoggerFactory.Create(b => b.AddConsole()))
+    .ConfigureServices(s => s.AddSingleton(new MyDependency()))
+    .Create<RabbitMqFactoryConfigurator>(cfg => cfg.Host("localhost"));
+```
+
+```java
+MessageBus bus = MessageBus.factory
+    .withLoggerFactory(LoggerFactoryBuilder.create(b -> b.addConsole()))
+    .configureServices(s -> s.addSingleton(MyDependency.class, sp -> MyDependency::new))
+    .create(RabbitMqFactoryConfigurator.class, cfg -> cfg.host("localhost"));
+```
+
 #### Java
 
 Using the fluent configuration pattern:
