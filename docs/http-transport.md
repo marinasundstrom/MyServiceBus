@@ -10,12 +10,12 @@ This **experimental** transport maps basic messaging semantics onto HTTP and beh
 
 ## Configuration
 
-Register the transport using the `UsingHttp` extension. The base address becomes the bus's host URI for send endpoints.
+Register the transport using the `UsingHttp` extension and set the base address using the configurator's `Host` method.
 
 ```csharp
 services.AddServiceBus(cfg =>
 {
-    cfg.UsingHttp(new Uri("http://localhost:5000/"));
+    cfg.UsingHttp((_, http) => http.Host(new Uri("http://localhost:5000/")));
 });
 ```
 
@@ -45,8 +45,9 @@ Map consumers to HTTP endpoints using extension methods that mirror the RabbitMQ
 services.AddServiceBus(cfg =>
 {
     cfg.AddConsumer<SubmitOrderConsumer>();
-    cfg.UsingHttp(new Uri("http://localhost:5000/"), (context, http) =>
+    cfg.UsingHttp((context, http) =>
     {
+        http.Host(new Uri("http://localhost:5000/"));
         http.ReceiveEndpoint("submit-order", e =>
             e.ConfigureConsumer<SubmitOrderConsumer>(context));
     });

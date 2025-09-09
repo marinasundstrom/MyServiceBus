@@ -17,8 +17,7 @@ public final class HttpTransport {
     private HttpTransport() {
     }
 
-    public static void configure(BusRegistrationConfigurator cfg) {
-        HttpFactoryConfigurator factoryConfigurator = new HttpFactoryConfigurator(cfg);
+    public static void configure(BusRegistrationConfigurator cfg, HttpFactoryConfigurator factoryConfigurator) {
         ServiceCollection services = cfg.getServiceCollection();
         services.addSingleton(HttpFactoryConfigurator.class, sp -> () -> factoryConfigurator);
         services.addSingleton(HttpTransportFactory.class, sp -> () -> new HttpTransportFactory());
@@ -39,5 +38,9 @@ public final class HttpTransport {
         });
         services.addSingleton(TransportSendEndpointProvider.class,
                 sp -> () -> sp.getService(HttpSendEndpointProvider.class));
+    }
+
+    public static void configure(BusRegistrationConfigurator cfg) {
+        configure(cfg, new HttpFactoryConfigurator(cfg));
     }
 }

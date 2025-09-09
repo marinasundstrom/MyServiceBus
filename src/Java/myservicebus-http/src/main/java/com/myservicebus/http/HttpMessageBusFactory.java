@@ -20,10 +20,10 @@ public final class HttpMessageBusFactory {
         if (configureBus != null) {
             configureBus.accept(cfg);
         }
-        HttpTransport.configure(cfg);
+        HttpFactoryConfigurator factoryConfigurator = new HttpFactoryConfigurator(cfg);
+        HttpTransport.configure(cfg, factoryConfigurator);
         cfg.complete();
         services.addSingleton(MessageBus.class, sp -> () -> {
-            HttpFactoryConfigurator factoryConfigurator = sp.getService(HttpFactoryConfigurator.class);
             if (configure != null) {
                 BusRegistrationContext context = new BusRegistrationContext(sp);
                 configure.accept(context, factoryConfigurator);
