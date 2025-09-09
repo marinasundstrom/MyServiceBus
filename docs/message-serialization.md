@@ -53,3 +53,14 @@ cfg.receiveEndpoint("input", e -> {
     e.handler(MyMessage.class, ctx -> CompletableFuture.completedFuture(null));
 });
 ```
+
+### Raw JSON example
+
+When using `RawJsonMessageSerializer`, the HTTP body contains just the message
+without the envelope metadata:
+
+```json
+{
+  "orderId": "559f9d18-1ee6-4b17-9375-1e5bc9b87222"
+}
+```

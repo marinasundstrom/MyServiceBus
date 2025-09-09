@@ -109,3 +109,30 @@ client.sendAsync(request, HttpResponse.BodyHandlers.discarding());
 ```
 
 Any HTTP headers on the request are forwarded to the consume context's headers.
+
+## Example JSON payloads
+
+A typical POST body serialized with the default envelope serializer looks like:
+
+```json
+{
+  "messageId": "559f9d18-1ee6-4b17-9375-1e5bc9b87222",
+  "messageType": [
+    "urn:message:Contracts:SubmitOrder"
+  ],
+  "message": {
+    "orderId": "559f9d18-1ee6-4b17-9375-1e5bc9b87222"
+  }
+}
+```
+
+To send a raw JSON body without the envelope, configure `RawJsonMessageSerializer`
+and post the message with `Content-Type: application/json`:
+
+```json
+{
+  "orderId": "559f9d18-1ee6-4b17-9375-1e5bc9b87222"
+}
+```
+
+See [message serialization](message-serialization.md) for serializer options.
