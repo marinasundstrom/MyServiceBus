@@ -82,9 +82,9 @@ await bus.StartAsync();
 ServiceCollection services = new ServiceCollection();
 
 services.from(MessageBusServices.class)
-        .addServiceBus(RabbitMqFactoryConfigurator.class, cfg -> {
+        .addServiceBus(cfg -> {
             cfg.addConsumer(SubmitOrderConsumer.class);
-            cfg.usingRabbitMq((context, rbCfg) -> rbCfg.configureEndpoints(context));
+            cfg.using(RabbitMqTransport.class, (context, rbCfg) -> rbCfg.configureEndpoints(context));
         });
 
 ServiceProvider serviceProvider = services.buildServiceProvider();
@@ -166,9 +166,9 @@ await endpoint.Send(new SubmitOrder { OrderId = Guid.NewGuid() });
 ServiceCollection services = new ServiceCollection();
 
 services.from(MessageBusServices.class)
-        .addServiceBus(RabbitMqFactoryConfigurator.class, cfg -> {
+        .addServiceBus(cfg -> {
             cfg.addConsumer(SubmitOrderConsumer.class);
-            cfg.usingRabbitMq((context, rbCfg) -> rbCfg.receiveEndpoint("submit-order",
+            cfg.using(RabbitMqTransport.class, (context, rbCfg) -> rbCfg.receiveEndpoint("submit-order",
                     e -> e.configureConsumer(SubmitOrderConsumer.class, context)));
         });
 
@@ -511,9 +511,9 @@ builder.Services.AddServiceBus(x =>
 ServiceCollection services = new ServiceCollection();
 
 services.from(MessageBusServices.class)
-        .addServiceBus(RabbitMqFactoryConfigurator.class, cfg -> {
+        .addServiceBus(cfg -> {
             cfg.addConsumer(SubmitOrderConsumer.class);
-            cfg.usingRabbitMq((context, rbCfg) -> {
+            cfg.using(RabbitMqTransport.class, (context, rbCfg) -> {
                 rbCfg.host("rabbitmq://localhost");
                 rbCfg.message(SubmitOrder.class, m -> {
                     m.setEntityName("submit-order-exchange");
@@ -615,8 +615,8 @@ public class MyService
 
 #### Java
 
-`services.from(MessageBusServices.class).addServiceBus(RabbitMqFactoryConfigurator.class, ...)` populates a `ServiceCollection` with analogous
-types:
+`services.from(MessageBusServices.class).addServiceBus(cfg -> ...)` populates a `ServiceCollection`
+with analogous
 
 - `MessageBus` – **singleton** providing `start`, `publish`, and transport
   management.
@@ -679,9 +679,9 @@ System.setProperty("org.slf4j.simpleLogger.defaultLogLevel", "info");
 ServiceCollection services = new ServiceCollection();
 
 services.from(MessageBusServices.class)
-        .addServiceBus(RabbitMqFactoryConfigurator.class, cfg -> {
+        .addServiceBus(cfg -> {
             // consumers and other options
-            cfg.usingRabbitMq((context, rbCfg) -> rbCfg.host("rabbitmq://localhost"));
+            cfg.using(RabbitMqTransport.class, (context, rbCfg) -> rbCfg.host("rabbitmq://localhost"));
         });
 
 ServiceProvider provider = services.buildServiceProvider();
@@ -769,7 +769,7 @@ builder.Services.AddServiceBus(x =>
 ServiceCollection services = new ServiceCollection();
 
 services.from(MessageBusServices.class)
-        .addServiceBus(RabbitMqFactoryConfigurator.class, cfg -> {
+        .addServiceBus(cfg -> {
             cfg.addConsumer(SubmitOrderConsumer.class, SubmitOrder.class, c -> {
                 c.useMessageRetry(r -> r.immediate(3));
                 c.useFilter(new LoggingFilter<>());
@@ -787,7 +787,7 @@ services.from(MessageBusServices.class)
                 ctx.getHeaders().put("published", true);
                 return CompletableFuture.completedFuture(null);
             }));
-            cfg.usingRabbitMq((context, rbCfg) -> rbCfg.host("rabbitmq://localhost"));
+            cfg.using(RabbitMqTransport.class, (context, rbCfg) -> rbCfg.host("rabbitmq://localhost"));
         });
 
 ServiceProvider provider = services.buildServiceProvider();

@@ -18,7 +18,7 @@ import com.myservicebus.MessageBusServices;
 import com.myservicebus.di.ServiceCollection;
 import com.myservicebus.di.ServiceProvider;
 import com.myservicebus.di.ServiceScope;
-import com.myservicebus.rabbitmq.RabbitMqFactoryConfigurator;
+import com.myservicebus.rabbitmq.RabbitMqTransport;
 
 public class Main {
     public static void main(String[] args) throws Exception {
@@ -26,9 +26,9 @@ public class Main {
         services.addScoped(MyService.class, MyServiceImpl.class);
 
         services.from(MessageBusServices.class)
-                .addServiceBus(RabbitMqFactoryConfigurator.class, cfg -> {
+                .addServiceBus(cfg -> {
                     cfg.addConsumer(SubmitOrderConsumer.class);
-                    cfg.usingRabbitMq((context, rbCfg) -> {
+                    cfg.using(RabbitMqTransport.class, (context, rbCfg) -> {
                         rbCfg.host("rabbitmq://localhost");
                         rbCfg.receiveEndpoint("submit-order-queue", e -> {
                             e.configureConsumer(context, SubmitOrderConsumer.class);

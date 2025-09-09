@@ -24,6 +24,8 @@ public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigura
     private Class<? extends com.myservicebus.serialization.MessageDeserializer> deserializerClass = com.myservicebus.serialization.EnvelopeMessageDeserializer.class;
     private final Set<Class<?>> consumerTypes = new HashSet<>();
     private final Logger logger = new Slf4jLoggerFactory().create(BusRegistrationConfiguratorImpl.class);
+    private java.util.function.BiConsumer<BusRegistrationContext, Object> transportConfigure;
+    private Class<?> factoryConfiguratorClass;
 
     public BusRegistrationConfiguratorImpl(ServiceCollection serviceCollection) {
         this.serviceCollection = serviceCollection;
@@ -89,6 +91,36 @@ public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigura
         this.deserializerClass = deserializerClass;
     }
 
+    @Override
+    @SuppressWarnings({ "unchecked", "rawtypes" })
+    public <TConfigurator> BusRegistrationConfigurator using(Class<?> transportClass,
+            java.util.function.BiConsumer<BusRegistrationContext, TConfigurator> configure) {
+        try {
+            java.lang.reflect.Method method = null;
+            for (java.lang.reflect.Method m : transportClass.getDeclaredMethods()) {
+                Class<?>[] params = m.getParameterTypes();
+                if (m.getName().equals("configure") && params.length == 2
+                        && BusRegistrationConfigurator.class.isAssignableFrom(params[0])) {
+                    method = m;
+                    factoryConfiguratorClass = params[1];
+                    break;
+                }
+            }
+            if (method == null) {
+                throw new RuntimeException("Transport configuration method not found");
+            }
+            Object factoryConfigurator = factoryConfiguratorClass.getDeclaredConstructor().newInstance();
+            method.setAccessible(true);
+            method.invoke(null, this, factoryConfigurator);
+            if (configure != null) {
+                transportConfigure = (java.util.function.BiConsumer) configure;
+            }
+        } catch (ReflectiveOperationException ex) {
+            throw new RuntimeException("Failed to configure transport", ex);
+        }
+        return this;
+    }
+
     public static Class<?> getClassFromType(Type type) {
         if (type instanceof Class<?>) {
             return (Class<?>) type;
@@ -142,5 +174,13 @@ public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigura
     @Override
     public ServiceCollection getServiceCollection() {
         return serviceCollection;
+    }
+
+    java.util.function.BiConsumer<BusRegistrationContext, Object> getTransportConfigure() {
+        return transportConfigure;
+    }
+
+    Class<?> getFactoryConfiguratorClass() {
+        return factoryConfiguratorClass;
     }
 }

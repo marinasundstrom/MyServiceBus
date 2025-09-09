@@ -12,37 +12,32 @@ public class MessageBusServices extends ServiceCollectionDecorator {
         super(inner);
     }
 
-    public <T extends BusFactoryConfigurator> ServiceCollection addServiceBus(
-            Class<T> factoryType,
-            Consumer<BusRegistrationConfigurator> configure) {
+    public ServiceCollection addServiceBus(Consumer<BusRegistrationConfigurator> configure) {
 
         BusRegistrationConfiguratorImpl cfg = new BusRegistrationConfiguratorImpl(inner);
-        T factoryConfigurator;
-        try {
-            factoryConfigurator = factoryType.getDeclaredConstructor().newInstance();
-        } catch (ReflectiveOperationException ex) {
-            throw new RuntimeException("Failed to create factory configurator", ex);
-        }
-
-        BusRegistrationServices services = new BusRegistrationServices(cfg, factoryConfigurator);
         if (configure != null) {
-            configure.accept(services);
+            configure.accept(cfg);
         }
         cfg.complete();
 
         inner.addSingleton(MessageBus.class, sp -> () -> {
-            if (services.getTransportConfigure() != null) {
-                BusRegistrationContext context = new BusRegistrationContext(sp);
-                services.getTransportConfigure().accept(context, services.getFactoryConfigurator());
+            Object factoryConfigurator = null;
+            if (cfg.getFactoryConfiguratorClass() != null) {
+                factoryConfigurator = sp.getService(cfg.getFactoryConfiguratorClass());
+                if (cfg.getTransportConfigure() != null) {
+                    BusRegistrationContext context = new BusRegistrationContext(sp);
+                    cfg.getTransportConfigure().accept(context, factoryConfigurator);
+                }
             }
             MessageBusImpl bus = new MessageBusImpl(sp);
-            try {
-                Method m = services.getFactoryConfigurator().getClass().getDeclaredMethod("applyHandlers",
-                        MessageBusImpl.class);
-                m.setAccessible(true);
-                m.invoke(services.getFactoryConfigurator(), bus);
-            } catch (ReflectiveOperationException ex) {
-                throw new RuntimeException("Failed to apply handlers", ex);
+            if (factoryConfigurator != null) {
+                try {
+                    Method m = factoryConfigurator.getClass().getDeclaredMethod("applyHandlers", MessageBusImpl.class);
+                    m.setAccessible(true);
+                    m.invoke(factoryConfigurator, bus);
+                } catch (ReflectiveOperationException ex) {
+                    throw new RuntimeException("Failed to apply handlers", ex);
+                }
             }
             return bus;
         });

@@ -27,9 +27,9 @@ services.AddServiceBus(x =>
 ServiceCollection services = new ServiceCollection();
 
 services.from(MessageBusServices.class)
-        .addServiceBus(RabbitMqFactoryConfigurator.class, cfg -> {
+        .addServiceBus(cfg -> {
             cfg.setSerializer(RawJsonMessageSerializer.class);
-            cfg.usingRabbitMq((context, rbCfg) -> {});
+            cfg.using(RabbitMqTransport.class, (context, rbCfg) -> {});
         });
 ```
 

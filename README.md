@@ -107,9 +107,9 @@ Register the bus:
 ServiceCollection services = new ServiceCollection();
 
 services.from(MessageBusServices.class)
-        .addServiceBus(RabbitMqFactoryConfigurator.class, cfg -> {
+        .addServiceBus(cfg -> {
             cfg.addConsumer(SubmitOrderConsumer.class);
-            cfg.usingRabbitMq((context, rbCfg) -> rbCfg.configureEndpoints(context));
+            cfg.using(RabbitMqTransport.class, (context, rbCfg) -> rbCfg.configureEndpoints(context));
         });
 
 ServiceProvider provider = services.buildServiceProvider();
