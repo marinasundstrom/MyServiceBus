@@ -5,6 +5,7 @@ import java.util.function.Consumer;
 
 import com.myservicebus.di.ServiceCollection;
 import com.myservicebus.di.ServiceCollectionDecorator;
+import com.myservicebus.ScopeConsumerFactory;
 
 public class MessageBusServices extends ServiceCollectionDecorator {
 
@@ -29,7 +30,7 @@ public class MessageBusServices extends ServiceCollectionDecorator {
                     cfg.getTransportConfigure().accept(context, factoryConfigurator);
                 }
             }
-            MessageBusImpl bus = new MessageBusImpl(sp);
+            MessageBusImpl bus = new MessageBusImpl(sp, type -> new ScopeConsumerFactory(sp));
             if (factoryConfigurator != null) {
                 try {
                     Method m = factoryConfigurator.getClass().getDeclaredMethod("applyHandlers", MessageBusImpl.class);

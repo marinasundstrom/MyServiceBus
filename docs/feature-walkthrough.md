@@ -124,6 +124,9 @@ MessageBus bus = serviceProvider.getService(MessageBus.class);
 bus.start();
 ```
 
+`addServiceBus` activates consumers using `ScopeConsumerFactory`, so they
+can resolve dependencies from the `ServiceProvider`.
+
 Java accepts this self-contained model because the runtime lacks a
 standard dependency injection library; consumers typically provide their
 own dependencies directly.

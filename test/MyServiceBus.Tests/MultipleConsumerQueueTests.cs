@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using MyServiceBus;
 using MyServiceBus.Serialization;
@@ -56,7 +57,7 @@ public class MultipleConsumerQueueTests
     }
 
     [Fact]
-    [Throws(typeof(UriFormatException), typeof(AmbiguousMatchException))]
+    [Throws(typeof(UriFormatException), typeof(AmbiguousMatchException), typeof(TypeLoadException))]
     public async Task Allows_multiple_consumers_on_distinct_queues()
     {
         var factory = new CapturingTransportFactory();
