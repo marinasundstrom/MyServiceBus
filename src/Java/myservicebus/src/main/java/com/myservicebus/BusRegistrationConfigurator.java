@@ -3,6 +3,7 @@ package com.myservicebus;
 import com.myservicebus.di.ServiceCollection;
 import com.myservicebus.serialization.MessageSerializer;
 import com.myservicebus.serialization.MessageDeserializer;
+import com.myservicebus.BusFactoryConfigurator;
 
 public interface BusRegistrationConfigurator {
     <T> void addConsumer(Class<T> consumerClass);
@@ -12,4 +13,10 @@ public interface BusRegistrationConfigurator {
     void setSerializer(Class<? extends MessageSerializer> serializerClass);
     void setDeserializer(Class<? extends MessageDeserializer> deserializerClass);
     ServiceCollection getServiceCollection();
+
+    default <TConfigurator extends BusFactoryConfigurator> BusRegistrationConfigurator using(
+            Class<TConfigurator> configuratorClass,
+            java.util.function.BiConsumer<BusRegistrationContext, TConfigurator> configure) {
+        throw new UnsupportedOperationException("Transport registration not supported");
+    }
 }

@@ -20,6 +20,15 @@ public class ServiceCollection {
     private boolean built;
     private boolean loggerFactoryRegistered;
 
+    public <T extends ServiceCollection> T from(Class<T> decoratorType) {
+        try {
+            return decoratorType.getConstructor(ServiceCollection.class).newInstance(this);
+        } catch (ReflectiveOperationException ex) {
+            throw new IllegalArgumentException(
+                    "Decorator must have a constructor(ServiceCollection)", ex);
+        }
+    }
+
     public <T> void addSingleton(Class<T> type, ServiceProviderBasedProvider<T> providerFactory) {
         if (built) {
             throw new IllegalStateException("Cannot add service to container that has been built.");

@@ -1,6 +1,7 @@
 package com.myservicebus.rabbitmq;
 
 import com.myservicebus.RetryConfigurator;
+import com.myservicebus.BusRegistrationContext;
 import com.myservicebus.serialization.MessageSerializer;
 
 public interface ReceiveEndpointConfigurator {

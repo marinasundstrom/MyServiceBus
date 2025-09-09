@@ -81,14 +81,14 @@ await bus.StartAsync();
 ```java
 ServiceCollection services = new ServiceCollection();
 
-RabbitMqBusFactory.configure(services, x -> {
-    x.addConsumer(SubmitOrderConsumer.class);
-}, (context, cfg) -> {
-    cfg.configureEndpoints(context);
-});
+services.from(MessageBusServices.class)
+        .addServiceBus(cfg -> {
+            cfg.addConsumer(SubmitOrderConsumer.class);
+            cfg.using(RabbitMqFactoryConfigurator.class, (context, rbCfg) -> rbCfg.configureEndpoints(context));
+        });
 
 ServiceProvider serviceProvider = services.buildServiceProvider();
-ServiceBus bus = serviceProvider.getService(ServiceBus.class);
+MessageBus bus = serviceProvider.getService(MessageBus.class);
 bus.start().join();
 ```
 
@@ -117,7 +117,7 @@ await bus.Publish(new SubmitOrder { OrderId = Guid.NewGuid() });
 #### Java
 
 ```java
-ServiceBus bus = serviceProvider.getService(ServiceBus.class);
+MessageBus bus = serviceProvider.getService(MessageBus.class);
 bus.publish(new SubmitOrder(UUID.randomUUID())); // 🚀 publish event
 ```
 
@@ -165,13 +165,12 @@ await endpoint.Send(new SubmitOrder { OrderId = Guid.NewGuid() });
 // register the consumer and its endpoint
 ServiceCollection services = new ServiceCollection();
 
-RabbitMqBusFactory.configure(services, x -> {
-    x.addConsumer(SubmitOrderConsumer.class);
-}, (context, cfg) -> {
-    cfg.receiveEndpoint("submit-order", e ->
-        e.configureConsumer(SubmitOrderConsumer.class, context)
-    );
-});
+services.from(MessageBusServices.class)
+        .addServiceBus(cfg -> {
+            cfg.addConsumer(SubmitOrderConsumer.class);
+            cfg.using(RabbitMqFactoryConfigurator.class, (context, rbCfg) -> rbCfg.receiveEndpoint("submit-order",
+                    e -> e.configureConsumer(SubmitOrderConsumer.class, context)));
+        });
 
 ServiceProvider serviceProvider = services.buildServiceProvider();
 
@@ -348,7 +347,7 @@ Response<OrderStatus> response = await client.GetResponseAsync<OrderStatus>(
 #### Java
 
 ```java
-ServiceBus bus = serviceProvider.getService(ServiceBus.class);
+MessageBus bus = serviceProvider.getService(MessageBus.class);
 bus.publish(new SubmitOrder(UUID.randomUUID()), ctx -> ctx.getHeaders().put("trace-id", UUID.randomUUID()));
 
 RequestClientFactory factory = serviceProvider.getService(RequestClientFactory.class);
@@ -511,27 +510,29 @@ builder.Services.AddServiceBus(x =>
 ```java
 ServiceCollection services = new ServiceCollection();
 
-RabbitMqBusFactory.configure(services, x -> {
-    x.addConsumer(SubmitOrderConsumer.class);
-}, (context, cfg) -> {
-    cfg.host("rabbitmq://localhost");
-    cfg.message(SubmitOrder.class, m -> {
-        m.setEntityName("submit-order-exchange");
-        // or
-        m.setEntityNameFormatter(new KebabCaseEntityNameFormatter<>());
-    });
-    cfg.receiveEndpoint("submit-order-queue", e -> {
-        e.configureConsumer(context, SubmitOrderConsumer.class);
-    });
-    cfg.setEndpointNameFormatter(KebabCaseEndpointNameFormatter.INSTANCE);
-    cfg.setEntityNameFormatter(new KebabCaseEntityNameFormatter());
-    cfg.configureEndpoints(context); // auto-configure remaining consumers
-});
+services.from(MessageBusServices.class)
+        .addServiceBus(cfg -> {
+            cfg.addConsumer(SubmitOrderConsumer.class);
+            cfg.using(RabbitMqFactoryConfigurator.class, (context, rbCfg) -> {
+                rbCfg.host("rabbitmq://localhost");
+                rbCfg.message(SubmitOrder.class, m -> {
+                    m.setEntityName("submit-order-exchange");
+                    // or
+                    m.setEntityNameFormatter(new KebabCaseEntityNameFormatter<>());
+                });
+                rbCfg.receiveEndpoint("submit-order-queue", e -> {
+                    e.configureConsumer(context, SubmitOrderConsumer.class);
+                });
+                rbCfg.setEndpointNameFormatter(KebabCaseEndpointNameFormatter.INSTANCE);
+                rbCfg.setEntityNameFormatter(new KebabCaseEntityNameFormatter());
+                rbCfg.configureEndpoints(context); // auto-configure remaining consumers
+            });
+        });
 
 ServiceProvider provider = services.buildServiceProvider();
 try (ServiceScope scope = provider.createScope()) {
     ServiceProvider sp = scope.getServiceProvider();
-    ServiceBus bus = sp.getService(ServiceBus.class);
+    MessageBus bus = sp.getService(MessageBus.class);
     bus.start();
 }
 ```
@@ -614,10 +615,10 @@ public class MyService
 
 #### Java
 
-`RabbitMqBusFactory.configure` populates a `ServiceCollection` with analogous
-types:
+`services.from(MessageBusServices.class).addServiceBus(cfg -> ...)` populates a `ServiceCollection`
+with analogous
 
-- `ServiceBus` – **singleton** providing `start`, `publish`, and transport
+- `MessageBus` – **singleton** providing `start`, `publish`, and transport
   management.
 - `PublishEndpoint` – **scoped** facade for publishing events.
 - `SendEndpoint` – **scoped** handle for sending to queues derived from
@@ -628,7 +629,7 @@ types:
   `RequestClient<T>` instances for request/response.
 
 In scoped handlers or web requests, depend on these interfaces instead of
-`ServiceBus` so that headers and cancellation tokens flow as expected,
+`MessageBus` so that headers and cancellation tokens flow as expected,
 mirroring MassTransit's guidance.
 
 Consumers are registered as scoped services. Because Java's container cannot
@@ -677,16 +678,16 @@ MyServiceBus uses SLF4J. Include a binding such as `slf4j-simple` and configure 
 System.setProperty("org.slf4j.simpleLogger.defaultLogLevel", "info");
 ServiceCollection services = new ServiceCollection();
 
-RabbitMqBusFactory.configure(services, x -> {
-    // consumers and other options
-}, (context, cfg) -> {
-    cfg.host("rabbitmq://localhost");
-});
+services.from(MessageBusServices.class)
+        .addServiceBus(cfg -> {
+            // consumers and other options
+            cfg.using(RabbitMqFactoryConfigurator.class, (context, rbCfg) -> rbCfg.host("rabbitmq://localhost"));
+        });
 
 ServiceProvider provider = services.buildServiceProvider();
 try (ServiceScope scope = provider.createScope()) {
     ServiceProvider sp = scope.getServiceProvider();
-    ServiceBus bus = sp.getService(ServiceBus.class);
+    MessageBus bus = sp.getService(MessageBus.class);
     bus.start();
 }
 ```
@@ -767,32 +768,32 @@ builder.Services.AddServiceBus(x =>
 ```java
 ServiceCollection services = new ServiceCollection();
 
-RabbitMqBusFactory.configure(services, x -> {
-    x.addConsumer(SubmitOrderConsumer.class, SubmitOrder.class, cfg -> {
-        cfg.useMessageRetry(r -> r.immediate(3));
-        cfg.useFilter(new LoggingFilter<>());
-        cfg.useFilter(LoggingFilter.class);
-        cfg.useExecute(ctx -> {
-            System.out.println("Processing " + ctx.getMessage());
-            return CompletableFuture.completedFuture(null);
+services.from(MessageBusServices.class)
+        .addServiceBus(cfg -> {
+            cfg.addConsumer(SubmitOrderConsumer.class, SubmitOrder.class, c -> {
+                c.useMessageRetry(r -> r.immediate(3));
+                c.useFilter(new LoggingFilter<>());
+                c.useFilter(LoggingFilter.class);
+                c.useExecute(ctx -> {
+                    System.out.println("Processing " + ctx.getMessage());
+                    return CompletableFuture.completedFuture(null);
+                });
+            });
+            cfg.configureSend(c -> c.useExecute(ctx -> {
+                ctx.getHeaders().put("source", "api");
+                return CompletableFuture.completedFuture(null);
+            }));
+            cfg.configurePublish(c -> c.useExecute(ctx -> {
+                ctx.getHeaders().put("published", true);
+                return CompletableFuture.completedFuture(null);
+            }));
+            cfg.using(RabbitMqFactoryConfigurator.class, (context, rbCfg) -> rbCfg.host("rabbitmq://localhost"));
         });
-    });
-    x.configureSend(cfg -> cfg.useExecute(ctx -> {
-        ctx.getHeaders().put("source", "api");
-        return CompletableFuture.completedFuture(null);
-    }));
-    x.configurePublish(cfg -> cfg.useExecute(ctx -> {
-        ctx.getHeaders().put("published", true);
-        return CompletableFuture.completedFuture(null);
-    }));
-}, (context, cfg) -> {
-    cfg.host("rabbitmq://localhost");
-});
 
 ServiceProvider provider = services.buildServiceProvider();
 try (ServiceScope scope = provider.createScope()) {
     ServiceProvider sp = scope.getServiceProvider();
-    ServiceBus bus = sp.getService(ServiceBus.class);
+    MessageBus bus = sp.getService(MessageBus.class);
     bus.start();
 }
 ```

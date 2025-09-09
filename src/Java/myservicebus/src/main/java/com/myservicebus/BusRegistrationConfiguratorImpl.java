@@ -9,6 +9,7 @@ import java.util.Set;
 import java.util.function.Consumer;
 
 import com.myservicebus.di.ServiceCollection;
+import com.myservicebus.BusFactoryConfigurator;
 import com.myservicebus.topology.TopologyRegistry;
 import com.myservicebus.logging.Logger;
 import com.myservicebus.logging.Slf4jLoggerFactory;
@@ -24,6 +25,8 @@ public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigura
     private Class<? extends com.myservicebus.serialization.MessageDeserializer> deserializerClass = com.myservicebus.serialization.EnvelopeMessageDeserializer.class;
     private final Set<Class<?>> consumerTypes = new HashSet<>();
     private final Logger logger = new Slf4jLoggerFactory().create(BusRegistrationConfiguratorImpl.class);
+    private java.util.function.BiConsumer<BusRegistrationContext, Object> transportConfigure;
+    private Class<?> factoryConfiguratorClass;
 
     public BusRegistrationConfiguratorImpl(ServiceCollection serviceCollection) {
         this.serviceCollection = serviceCollection;
@@ -89,6 +92,36 @@ public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigura
         this.deserializerClass = deserializerClass;
     }
 
+    @Override
+    @SuppressWarnings({ "unchecked", "rawtypes" })
+    public <TConfigurator extends BusFactoryConfigurator> BusRegistrationConfigurator using(
+            Class<TConfigurator> configuratorClass,
+            java.util.function.BiConsumer<BusRegistrationContext, TConfigurator> configure) {
+        try {
+            TConfigurator factoryConfigurator = configuratorClass.getDeclaredConstructor().newInstance();
+
+            String simpleName = configuratorClass.getSimpleName();
+            String transportName = simpleName.endsWith("FactoryConfigurator")
+                    ? simpleName.substring(0, simpleName.length() - "FactoryConfigurator".length()) + "Transport"
+                    : simpleName + "Transport";
+            String transportClassName = configuratorClass.getPackageName() + "." + transportName;
+            Class<?> transportClass = Class.forName(transportClassName);
+
+            java.lang.reflect.Method method = transportClass.getDeclaredMethod("configure",
+                    BusRegistrationConfigurator.class, configuratorClass);
+            method.setAccessible(true);
+            method.invoke(null, this, factoryConfigurator);
+
+            if (configure != null) {
+                transportConfigure = (java.util.function.BiConsumer) configure;
+            }
+            factoryConfiguratorClass = configuratorClass;
+        } catch (ReflectiveOperationException ex) {
+            throw new RuntimeException("Failed to configure transport", ex);
+        }
+        return this;
+    }
+
     public static Class<?> getClassFromType(Type type) {
         if (type instanceof Class<?>) {
             return (Class<?>) type;
@@ -142,5 +175,13 @@ public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigura
     @Override
     public ServiceCollection getServiceCollection() {
         return serviceCollection;
+    }
+
+    java.util.function.BiConsumer<BusRegistrationContext, Object> getTransportConfigure() {
+        return transportConfigure;
+    }
+
+    Class<?> getFactoryConfiguratorClass() {
+        return factoryConfiguratorClass;
     }
 }

@@ -20,7 +20,7 @@ MyServiceBus declares an error exchange and queue for each receive endpoint. Fol
 The `RabbitMqTransportFactory` ensures the error exchange and queue exist when the receive endpoint is created.
 
 ### Java
-`ServiceBus` performs the same declarations and registers the `ErrorTransportFilter` so failed messages are forwarded to the error queue.
+`MessageBus` performs the same declarations and registers the `ErrorTransportFilter` so failed messages are forwarded to the error queue.
 
 ### Reprocessing Dead-letter Messages
 

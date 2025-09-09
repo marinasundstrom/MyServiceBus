@@ -13,31 +13,33 @@ import java.util.UUID;
 
 import com.myservicebus.MyService;
 import com.myservicebus.MyServiceImpl;
-import com.myservicebus.ServiceBus;
+import com.myservicebus.MessageBus;
+import com.myservicebus.MessageBusServices;
 import com.myservicebus.di.ServiceCollection;
 import com.myservicebus.di.ServiceProvider;
 import com.myservicebus.di.ServiceScope;
-import com.myservicebus.rabbitmq.RabbitMqBusFactory;
+import com.myservicebus.rabbitmq.RabbitMqFactoryConfigurator;
 
 public class Main {
     public static void main(String[] args) throws Exception {
         ServiceCollection services = new ServiceCollection();
         services.addScoped(MyService.class, MyServiceImpl.class);
 
-        RabbitMqBusFactory.configure(services, x -> {
-            x.addConsumer(SubmitOrderConsumer.class);
-        }, (context, cfg) -> {
-            cfg.host("rabbitmq://localhost");
-
-            cfg.receiveEndpoint("submit-order-queue", e -> {
-                e.configureConsumer(context, SubmitOrderConsumer.class);
-            });
-        });
+        services.from(MessageBusServices.class)
+                .addServiceBus(cfg -> {
+                    cfg.addConsumer(SubmitOrderConsumer.class);
+                    cfg.using(RabbitMqFactoryConfigurator.class, (context, rbCfg) -> {
+                        rbCfg.host("rabbitmq://localhost");
+                        rbCfg.receiveEndpoint("submit-order-queue", e -> {
+                            e.configureConsumer(context, SubmitOrderConsumer.class);
+                        });
+                    });
+                });
 
         ServiceProvider provider = services.buildServiceProvider();
         try (ServiceScope scope = provider.createScope()) {
             ServiceProvider sp = scope.getServiceProvider();
-            ServiceBus bus = sp.getService(ServiceBus.class);
+            MessageBus bus = sp.getService(MessageBus.class);
 
             bus.start();
 
