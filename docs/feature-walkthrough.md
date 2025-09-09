@@ -75,6 +75,23 @@ var bus = serviceProvider.GetRequiredService<IMessageBus>();
 await bus.StartAsync();
 ```
 
+**Factory-created bus**
+
+`MessageBus.Factory` exposes a `DefaultBusFactory` that can create a
+self-contained bus without building an `IServiceCollection`. The factory
+spins up its own service provider, so consumers must have parameterless
+constructors and cannot rely on application dependencies. This mirrors
+the Java pattern but in .NET the standard practice is to use dependency
+injection via `AddServiceBus`.
+
+```csharp
+IMessageBus bus = MessageBus.Factory.Create<RabbitMqFactoryConfigurator>(cfg =>
+{
+    cfg.ReceiveEndpoint("orders", e => e.Consumer<SubmitOrderConsumer>());
+});
+await bus.StartAsync();
+```
+
 #### Java
 
 
@@ -91,6 +108,10 @@ ServiceProvider serviceProvider = services.buildServiceProvider();
 MessageBus bus = serviceProvider.getService(MessageBus.class);
 bus.start().join();
 ```
+
+Java accepts this self-contained model because the runtime lacks a
+standard dependency injection library; consumers typically provide their
+own dependencies directly.
 
 
 ### Publishing
