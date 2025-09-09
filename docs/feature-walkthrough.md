@@ -57,17 +57,17 @@ var bus = app.Services.GetRequiredService<IMessageBus>();
 Outside of an ASP.NET host (or generic host), a factory can populate an
 `IServiceCollection` directly.
 
-To mirror the Java initialization using `ServiceCollection`:
-
 ```csharp
 var services = new ServiceCollection();
 
-RabbitMqBusFactory.Configure(services, x =>
+services.AddServiceBus(x =>
 {
     x.AddConsumer<SubmitOrderConsumer>();
-}, (context, cfg) =>
-{
-    cfg.ConfigureEndpoints(context);
+
+    x.UsingRabbitMq((context, cfg) =>
+    {
+        cfg.ConfigureEndpoints(context);
+    });
 });
 
 IServiceProvider serviceProvider = services.BuildServiceProvider();
