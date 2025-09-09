@@ -91,6 +91,17 @@ public class ServiceCollection implements Iterable<ServiceDescriptor> {
         loggerFactoryRegistered = true;
     }
 
+    public void addSlf4jLogger() {
+        if (built) {
+            throw new IllegalStateException("Cannot add service to container that has been built.");
+        }
+
+        descriptors.add(new ServiceDescriptor(LoggerFactory.class, Slf4jLoggerFactory.class, null, null,
+                ServiceLifetime.SINGLETON, false));
+
+        loggerFactoryRegistered = true;
+    }
+
     public <T> void remove(Class<T> type) {
         if (built) {
             throw new IllegalStateException("Cannot remove service from container that has been built.");

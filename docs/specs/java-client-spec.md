@@ -37,6 +37,7 @@ The ServiceBus Java client mirrors the C# design by providing an asynchronous me
 
 ### Dependency Injection and Logging
 - Services such as consumers and loggers are resolved via a lightweight `ServiceProvider`.
+- Logging providers are configured through a `Logging` decorator that registers a `LoggerFactory`.
 - SLF4J `Logger` instances are registered with the container so components can inject them and record messages instead of writing to standard output.
 
 ### Retries

@@ -63,6 +63,11 @@ public abstract class ServiceCollectionDecorator extends ServiceCollection {
     }
 
     @Override
+    public void addSlf4jLogger() {
+        inner.addSlf4jLogger();
+    }
+
+    @Override
     public ServiceProvider buildServiceProvider() {
         return inner.buildServiceProvider();
     }
