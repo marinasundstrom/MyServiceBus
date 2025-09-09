@@ -1,9 +1,11 @@
 # HTTP Transport
 
-The HTTP transport uses simple HTTP POST requests to exchange serialized message envelopes between services.
+The HTTP transport uses simple HTTP POST requests to exchange serialized message envelopes between services. It is available in both the C# and Java implementations.
+
+This transport maps basic messaging semantics onto HTTP and is intentionally minimal. It does not aim to replace a full-featured web application framework such as ASP.NET Core and lacks capabilities like authentication or authorization.
 
 - Each send endpoint performs a POST to the configured URI. Message headers are copied to HTTP headers.
-- Receive endpoints host an `HttpListener` that accepts POSTed envelopes and dispatches them through the consume pipeline.
+- Receive endpoints host an `HttpListener` (C#) or lightweight `HttpServer` (Java) that accepts POSTed envelopes and dispatches them through the consume pipeline.
 - When `ConfigureErrorEndpoint` is enabled, the receive transport populates a default fault address of `<endpoint>_fault` and exposes an error address of `<endpoint>_error`.
 
 ## Configuration
@@ -15,6 +17,21 @@ services.AddServiceBus(cfg =>
 {
     cfg.UsingHttp(new Uri("http://localhost:5000/"));
 });
+```
+
+### Java
+
+Configure the transport during bus registration using `HttpTransport`:
+
+```java
+ServiceCollection services = new ServiceCollection();
+
+MessageBus bus = MessageBusImpl.configure(services, cfg -> {
+    cfg.addConsumer(SubmitOrderConsumer.class);
+    HttpTransport.configure(cfg, URI.create("http://localhost:5000/"));
+});
+
+bus.start();
 ```
 
 ### Consumers
@@ -31,6 +48,16 @@ services.AddServiceBus(cfg =>
             e.ConfigureConsumer<SubmitOrderConsumer>(context));
     });
 });
+```
+
+In Java, consumers added during registration handle POST requests whose paths match the kebab-case message type:
+
+```java
+MessageBus bus = MessageBusImpl.configure(services, cfg -> {
+    cfg.addConsumer(SubmitOrderConsumer.class);
+    HttpTransport.configure(cfg, URI.create("http://localhost:5000/"));
+});
+// POST to http://localhost:5000/submit-order reaches SubmitOrderConsumer
 ```
 
 As an alternative, consumers can be added at runtime by calling `IMessageBus.AddConsumer` with a `ConsumerTopology` and explicit URI.
@@ -60,5 +87,25 @@ request.Headers.Add("source", "sample");
 await client.SendAsync(request);
 ```
 
-Any HTTP headers on the request are forwarded to the consume context's
-headers.
+### Java
+
+```java
+HttpClient client = HttpClient.newHttpClient();
+
+Envelope<SubmitOrder> envelope = new Envelope<>();
+envelope.setMessageId(UUID.randomUUID());
+envelope.setMessageType(List.of("urn:message:Contracts:SubmitOrder"));
+envelope.setMessage(new SubmitOrder(UUID.randomUUID()));
+
+ObjectMapper mapper = new ObjectMapper();
+String body = mapper.writeValueAsString(envelope);
+
+HttpRequest request = HttpRequest.newBuilder(URI.create("http://localhost:5000/submit-order"))
+        .header("source", "sample")
+        .POST(HttpRequest.BodyPublishers.ofString(body))
+        .build();
+
+client.sendAsync(request, HttpResponse.BodyHandlers.discarding());
+```
+
+Any HTTP headers on the request are forwarded to the consume context's headers.
