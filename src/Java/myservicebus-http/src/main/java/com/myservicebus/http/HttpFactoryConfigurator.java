@@ -4,15 +4,30 @@ import java.net.URI;
 import java.util.function.Consumer;
 
 import com.myservicebus.BusRegistrationConfigurator;
+import com.myservicebus.topology.ConsumerTopology;
 import com.myservicebus.topology.TopologyRegistry;
 
 public class HttpFactoryConfigurator {
     private final TopologyRegistry topology;
-    private final URI baseAddress;
+    private URI baseAddress = URI.create("http://localhost/");
 
-    public HttpFactoryConfigurator(BusRegistrationConfigurator cfg, URI baseAddress) {
+    public HttpFactoryConfigurator(BusRegistrationConfigurator cfg) {
         this.topology = cfg.getTopologyRegistry();
-        this.baseAddress = baseAddress;
+    }
+
+    public void host(URI address) {
+        this.baseAddress = address;
+        for (ConsumerTopology consumer : topology.getConsumers()) {
+            String addr = consumer.getAddress();
+            if (addr != null && !addr.contains("://")) {
+                URI uri = baseAddress.resolve(addr);
+                consumer.setAddress(uri.toString());
+            }
+        }
+    }
+
+    public URI getBaseAddress() {
+        return baseAddress;
     }
 
     public void receiveEndpoint(String path, Consumer<HttpReceiveEndpointConfigurator> configure) {
@@ -23,4 +38,3 @@ public class HttpFactoryConfigurator {
         }
     }
 }
-

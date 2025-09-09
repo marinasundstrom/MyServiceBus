@@ -204,10 +204,13 @@ services.AddServiceBus(x =>
 
 ```java
 ServiceCollection services = new ServiceCollection();
-MessageBus bus = MessageBusImpl.configure(services, cfg -> {
+HttpMessageBusFactory.configure(services, cfg -> {
     cfg.addConsumer(SubmitOrderConsumer.class);
-    HttpTransport.configure(cfg, URI.create("http://localhost:5000/"));
+}, (context, http) -> {
+    http.host(URI.create("http://localhost:5000/"));
 });
+ServiceProvider provider = services.buildServiceProvider();
+MessageBus bus = provider.getService(MessageBus.class);
 bus.start();
 ```
 

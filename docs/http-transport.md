@@ -21,16 +21,19 @@ services.AddServiceBus(cfg =>
 
 ### Java
 
-Configure the transport during bus registration using `HttpTransport`:
+Configure the transport during bus registration using `HttpMessageBusFactory`:
 
 ```java
 ServiceCollection services = new ServiceCollection();
 
-MessageBus bus = MessageBusImpl.configure(services, cfg -> {
+HttpMessageBusFactory.configure(services, cfg -> {
     cfg.addConsumer(SubmitOrderConsumer.class);
-    HttpTransport.configure(cfg, URI.create("http://localhost:5000/"));
+}, (context, http) -> {
+    http.host(URI.create("http://localhost:5000/"));
 });
 
+ServiceProvider provider = services.buildServiceProvider();
+MessageBus bus = provider.getService(MessageBus.class);
 bus.start();
 ```
 
@@ -53,21 +56,24 @@ services.AddServiceBus(cfg =>
 In Java, consumers added during registration handle POST requests whose paths match the kebab-case message type:
 
 ```java
-MessageBus bus = MessageBusImpl.configure(services, cfg -> {
+HttpMessageBusFactory.configure(services, cfg -> {
     cfg.addConsumer(SubmitOrderConsumer.class);
-    HttpTransport.configure(cfg, URI.create("http://localhost:5000/"));
+}, (context, http) -> {
+    http.host(URI.create("http://localhost:5000/"));
 });
+ServiceProvider provider = services.buildServiceProvider();
+MessageBus bus = provider.getService(MessageBus.class);
 // POST to http://localhost:5000/submit-order reaches SubmitOrderConsumer
 ```
 
 Explicit endpoints can also be configured:
 
 ```java
-MessageBus bus = MessageBusImpl.configure(services, cfg -> {
+HttpMessageBusFactory.configure(services, cfg -> {
     cfg.addConsumer(SubmitOrderConsumer.class);
-    HttpTransport.configure(cfg, URI.create("http://localhost:5000/"), http -> {
-        http.receiveEndpoint("submit-order", e -> e.configureConsumer(SubmitOrderConsumer.class));
-    });
+}, (context, http) -> {
+    http.host(URI.create("http://localhost:5000/"));
+    http.receiveEndpoint("submit-order", e -> e.configureConsumer(SubmitOrderConsumer.class));
 });
 ```
 

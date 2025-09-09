@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 
 import com.myservicebus.*;
 import com.myservicebus.di.ServiceCollection;
+import com.myservicebus.di.ServiceProvider;
 import com.myservicebus.topology.ConsumerTopology;
 import com.myservicebus.topology.TopologyRegistry;
 
@@ -29,13 +30,16 @@ public class HttpFactoryConfiguratorTests {
         BusRegistrationConfiguratorImpl cfg = new BusRegistrationConfiguratorImpl(services);
         cfg.addConsumer(MyConsumer.class);
 
-        URI base = URI.create("http://localhost:5000/");
-        HttpTransport.configure(cfg, base, http -> {
-            http.receiveEndpoint("submit-order", e -> e.configureConsumer(MyConsumer.class));
-        });
+        HttpTransport.configure(cfg);
         cfg.complete();
 
-        TopologyRegistry registry = services.buildServiceProvider().getService(TopologyRegistry.class);
+        ServiceProvider provider = services.buildServiceProvider();
+        HttpFactoryConfigurator http = provider.getService(HttpFactoryConfigurator.class);
+        URI base = URI.create("http://localhost:5000/");
+        http.host(base);
+        http.receiveEndpoint("submit-order", e -> e.configureConsumer(MyConsumer.class));
+
+        TopologyRegistry registry = provider.getService(TopologyRegistry.class);
         ConsumerTopology def = registry.getConsumers().stream()
                 .filter(d -> d.getConsumerType().equals(MyConsumer.class))
                 .findFirst()
@@ -45,4 +49,3 @@ public class HttpFactoryConfiguratorTests {
         assertEquals(EntityNameFormatter.format(MyMessage.class), def.getBindings().get(0).getEntityName());
     }
 }
-
