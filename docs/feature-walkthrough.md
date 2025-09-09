@@ -232,8 +232,9 @@ var services = new ServiceCollection();
 services.AddServiceBus(x =>
 {
     x.AddConsumer<SubmitOrderConsumer>();
-    x.UsingHttp(new Uri("http://localhost:5000/"), (context, cfg) =>
+    x.UsingHttp((context, cfg) =>
     {
+        cfg.Host(new Uri("http://localhost:5000/"));
         cfg.ReceiveEndpoint("submit-order", e =>
             e.ConfigureConsumer<SubmitOrderConsumer>(context));
     });

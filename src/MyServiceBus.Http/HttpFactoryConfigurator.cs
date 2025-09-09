@@ -14,6 +14,7 @@ public interface IHttpFactoryConfigurator
     Uri BaseAddress { get; }
     IEndpointNameFormatter? EndpointNameFormatter { get; }
     void SetEndpointNameFormatter(IEndpointNameFormatter formatter);
+    void Host(Uri baseAddress);
     void ReceiveEndpoint(string path, Action<HttpReceiveEndpointConfigurator> configure);
 }
 
@@ -21,13 +22,9 @@ internal sealed class HttpFactoryConfigurator : IHttpFactoryConfigurator
 {
     private readonly IList<Action<IMessageBus, IServiceProvider>> _endpointActions = new List<Action<IMessageBus, IServiceProvider>>();
     private IEndpointNameFormatter? _endpointNameFormatter;
+    private Uri _baseAddress = new("http://localhost/");
 
-    public HttpFactoryConfigurator(Uri baseAddress)
-    {
-        BaseAddress = baseAddress;
-    }
-
-    public Uri BaseAddress { get; }
+    public Uri BaseAddress => _baseAddress;
     public IEndpointNameFormatter? EndpointNameFormatter => _endpointNameFormatter;
 
     public void SetEndpointNameFormatter(IEndpointNameFormatter formatter)
@@ -35,9 +32,14 @@ internal sealed class HttpFactoryConfigurator : IHttpFactoryConfigurator
         _endpointNameFormatter = formatter;
     }
 
+    public void Host(Uri baseAddress)
+    {
+        _baseAddress = baseAddress;
+    }
+
     public void ReceiveEndpoint(string path, Action<HttpReceiveEndpointConfigurator> configure)
     {
-        var configurator = new HttpReceiveEndpointConfigurator(BaseAddress, path, _endpointActions);
+        var configurator = new HttpReceiveEndpointConfigurator(_baseAddress, path, _endpointActions);
         configure(configurator);
     }
 
