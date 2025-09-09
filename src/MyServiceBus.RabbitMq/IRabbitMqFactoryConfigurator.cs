@@ -24,6 +24,7 @@ public interface IRabbitMqFactoryConfigurator
     string ClientHost { get; }
     ushort PrefetchCount { get; }
     void SetPrefetchCount(ushort prefetchCount);
+    void SetConsumerFactory(Type consumerFactoryType);
 }
 
 public interface IRabbitMqHostConfigurator

@@ -13,52 +13,60 @@ import com.myservicebus.ScopedClientFactory;
 import com.myservicebus.Response;
 import com.myservicebus.SendEndpointProvider;
 import com.myservicebus.MessageBus;
+import com.myservicebus.MessageBusServices;
 import com.myservicebus.PublishEndpoint;
 import com.myservicebus.di.ServiceCollection;
 import com.myservicebus.di.ServiceProvider;
 import com.myservicebus.di.ServiceScope;
-import com.myservicebus.rabbitmq.RabbitMqBusFactory;
+import com.myservicebus.rabbitmq.RabbitMqFactoryConfigurator;
+import com.myservicebus.rabbitmq.RabbitMqTransport;
 import com.myservicebus.tasks.CancellationToken;
 import com.myservicebus.logging.Logger;
 import com.myservicebus.logging.LoggerFactory;
 
 public class Main {
     public static void main(String[] args) {
+
         ServiceCollection services = new ServiceCollection();
         services.addScoped(MyService.class, MyServiceImpl.class);
 
         String rabbitMqHost = System.getenv().getOrDefault("RABBITMQ_HOST", "localhost");
 
-        RabbitMqBusFactory.configure(services, cfg -> {
-            cfg.addConsumer(SubmitOrderConsumer.class);
-            // cfg.addConsumer(OrderSubmittedConsumer.class);
-            cfg.addConsumer(TestRequestConsumer.class);
-            cfg.addConsumer(SubmitOrderFaultConsumer.class);
-        }, (context, cfg) -> {
-            cfg.host(rabbitMqHost, h -> {
-                h.username("guest");
-                h.password("guest");
-            });
+        services.from(MessageBusServices.class)
+                .addServiceBus(c -> {
+                    c.addConsumer(SubmitOrderConsumer.class);
+                    // c.addConsumer(OrderSubmittedConsumer.class);
+                    c.addConsumer(TestRequestConsumer.class);
+                    c.addConsumer(SubmitOrderFaultConsumer.class);
 
-            // Fault<T> consumers don't auto-bind; listen on the queue suffixed with `_fault`
-            // for the original endpoint. SubmitOrderFaultConsumer handles Fault<SubmitOrder>
-            // messages published to `submit-order_fault`.
-            cfg.receiveEndpoint("submit-order_fault", e -> {
-                e.configureConsumer(context, SubmitOrderFaultConsumer.class);
+                    c.using(RabbitMqFactoryConfigurator.class, (context, cfg) -> {
+                        cfg.host(rabbitMqHost, h -> {
+                            h.username("guest");
+                            h.password("guest");
+                        });
 
-                /*
-                 * e.handler(Fault<SubmitOrder>.class, ctx -> {
-                 * var fault = ctx.getMessage();
-                 * var msg = fault.getMessage();
-                 * System.out.println(msg.getOrderId());
-                 * // inspect or process the fault
-                 * return CompletableFuture.completedFuture(null);
-                 * });
-                 */
-            });
+                        // Fault<T> consumers don't auto-bind; listen on the queue suffixed with
+                        // `_fault`
+                        // for the original endpoint. SubmitOrderFaultConsumer handles
+                        // Fault<SubmitOrder>
+                        // messages published to `submit-order_fault`.
+                        cfg.receiveEndpoint("submit-order_fault", e -> {
+                            e.configureConsumer(context, SubmitOrderFaultConsumer.class);
 
-            cfg.configureEndpoints(context);
-        });
+                            /*
+                             * e.handler(Fault<SubmitOrder>.class, ctx -> {
+                             * var fault = ctx.getMessage();
+                             * var msg = fault.getMessage();
+                             * System.out.println(msg.getOrderId());
+                             * // inspect or process the fault
+                             * return CompletableFuture.completedFuture(null);
+                             * });
+                             */
+                        });
+
+                        cfg.configureEndpoints(context);
+                    });
+                });
 
         ServiceProvider provider = services.buildServiceProvider();
         LoggerFactory loggerFactory = provider.getService(LoggerFactory.class);

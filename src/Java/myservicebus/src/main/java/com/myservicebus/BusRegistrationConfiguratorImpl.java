@@ -9,9 +9,14 @@ import java.util.Set;
 import java.util.function.Consumer;
 
 import com.myservicebus.di.ServiceCollection;
+import com.myservicebus.BusFactoryConfigurator;
 import com.myservicebus.topology.TopologyRegistry;
 import com.myservicebus.logging.Logger;
-import com.myservicebus.logging.Slf4jLoggerFactory;
+import com.myservicebus.logging.LoggerFactory;
+import com.myservicebus.serialization.MessageDeserializer;
+import com.myservicebus.serialization.MessageSerializer;
+import com.myservicebus.logging.ConsoleLoggerFactory;
+import com.myservicebus.logging.ConsoleLoggerConfig;
 import com.myservicebus.KebabCaseEndpointNameFormatter;
 
 public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigurator {
@@ -23,7 +28,10 @@ public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigura
     private Class<? extends com.myservicebus.serialization.MessageSerializer> serializerClass = com.myservicebus.serialization.EnvelopeMessageSerializer.class;
     private Class<? extends com.myservicebus.serialization.MessageDeserializer> deserializerClass = com.myservicebus.serialization.EnvelopeMessageDeserializer.class;
     private final Set<Class<?>> consumerTypes = new HashSet<>();
-    private final Logger logger = new Slf4jLoggerFactory().create(BusRegistrationConfiguratorImpl.class);
+    private final Logger logger = new ConsoleLoggerFactory(new ConsoleLoggerConfig())
+            .create(BusRegistrationConfiguratorImpl.class);
+    private java.util.function.BiConsumer<BusRegistrationContext, Object> transportConfigure;
+    private Class<?> factoryConfiguratorClass;
 
     public BusRegistrationConfiguratorImpl(ServiceCollection serviceCollection) {
         this.serviceCollection = serviceCollection;
@@ -58,7 +66,8 @@ public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigura
     }
 
     @Override
-    public <TMessage, TConsumer extends com.myservicebus.Consumer<TMessage>> void addConsumer(Class<TConsumer> consumerClass, Class<TMessage> messageClass,
+    public <TMessage, TConsumer extends com.myservicebus.Consumer<TMessage>> void addConsumer(
+            Class<TConsumer> consumerClass, Class<TMessage> messageClass,
             Consumer<PipeConfigurator<ConsumeContext<TMessage>>> configure) {
         if (consumerTypes.contains(consumerClass)) {
             logger.debug("Consumer '{}' already registered, skipping", consumerClass.getSimpleName());
@@ -66,7 +75,8 @@ public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigura
         }
 
         serviceCollection.addScoped(consumerClass);
-        topology.registerConsumer(consumerClass, KebabCaseEndpointNameFormatter.INSTANCE.format(messageClass), (java.util.function.Consumer) configure, messageClass);
+        topology.registerConsumer(consumerClass, KebabCaseEndpointNameFormatter.INSTANCE.format(messageClass),
+                (java.util.function.Consumer) configure, messageClass);
         consumerTypes.add(consumerClass);
     }
 
@@ -81,12 +91,42 @@ public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigura
     }
 
     @Override
-    public void setSerializer(Class<? extends com.myservicebus.serialization.MessageSerializer> serializerClass) {
+    public void setSerializer(Class<? extends MessageSerializer> serializerClass) {
         this.serializerClass = serializerClass;
     }
 
-    public void setDeserializer(Class<? extends com.myservicebus.serialization.MessageDeserializer> deserializerClass) {
+    public void setDeserializer(Class<? extends MessageDeserializer> deserializerClass) {
         this.deserializerClass = deserializerClass;
+    }
+
+    @Override
+    @SuppressWarnings({ "unchecked", "rawtypes" })
+    public <TConfigurator extends BusFactoryConfigurator> BusRegistrationConfigurator using(
+            Class<TConfigurator> configuratorClass,
+            java.util.function.BiConsumer<BusRegistrationContext, TConfigurator> configure) {
+        try {
+            TConfigurator factoryConfigurator = configuratorClass.getDeclaredConstructor().newInstance();
+
+            String simpleName = configuratorClass.getSimpleName();
+            String transportName = simpleName.endsWith("FactoryConfigurator")
+                    ? simpleName.substring(0, simpleName.length() - "FactoryConfigurator".length()) + "Transport"
+                    : simpleName + "Transport";
+            String transportClassName = configuratorClass.getPackageName() + "." + transportName;
+            Class<?> transportClass = Class.forName(transportClassName);
+
+            java.lang.reflect.Method method = transportClass.getDeclaredMethod("configure",
+                    BusRegistrationConfigurator.class, configuratorClass);
+            method.setAccessible(true);
+            method.invoke(null, this, factoryConfigurator);
+
+            if (configure != null) {
+                transportConfigure = (java.util.function.BiConsumer) configure;
+            }
+            factoryConfiguratorClass = configuratorClass;
+        } catch (ReflectiveOperationException ex) {
+            throw new RuntimeException("Failed to configure transport", ex);
+        }
+        return this;
     }
 
     public static Class<?> getClassFromType(Type type) {
@@ -108,6 +148,12 @@ public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigura
     }
 
     public void complete() {
+        boolean hasLogger = serviceCollection.getDescriptors().stream()
+                .anyMatch(d -> d.getServiceType().equals(LoggerFactory.class));
+        if (!hasLogger) {
+            serviceCollection.addConsoleLogger();
+        }
+
         serviceCollection.addScoped(ConsumeContextProvider.class, sp -> () -> new ConsumeContextProvider());
         serviceCollection.addScoped(SendEndpointProvider.class,
                 sp -> () -> new SendEndpointProviderImpl(
@@ -147,5 +193,13 @@ public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigura
     @Override
     public TopologyRegistry getTopologyRegistry() {
         return topology;
+    }
+
+    java.util.function.BiConsumer<BusRegistrationContext, Object> getTransportConfigure() {
+        return transportConfigure;
+    }
+
+    Class<?> getFactoryConfiguratorClass() {
+        return factoryConfiguratorClass;
     }
 }

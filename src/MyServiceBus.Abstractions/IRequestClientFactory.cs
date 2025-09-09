@@ -1,6 +1,6 @@
 namespace MyServiceBus;
 
-public interface IScopedClientFactory
+public interface IRequestClientFactory
 {
     IRequestClient<T> CreateRequestClient<T>(RequestTimeout timeout = default)
         where T : class;

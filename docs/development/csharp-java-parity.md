@@ -6,7 +6,7 @@ This matrix tracks behavioral parity across the two client implementations. The 
 | --- | --- | --- | --- |
 | Message sending | Implemented | Implemented | `ConsumeContext` resolves send endpoints in both clients. |
 | Publishing | Implemented | Implemented | Messages are routed to exchanges derived from message type conventions. |
-| Request–response helpers | Implemented | Implemented | Both clients provide `GenericRequestClient` and scoped client factories (`IScopedClientFactory` in C#, `RequestClientFactory` in Java). |
+| Request–response helpers | Implemented | Implemented | Both clients provide `GenericRequestClient` and scoped client factories (`IRequestClientFactory` in C#, `RequestClientFactory` in Java). |
 | Fault handling | Implemented | Implemented | Java mediator dispatches faults when consumers throw. |
 | Telemetry & host metadata | Implemented | Implemented | Both clients capture detailed host metadata for diagnostics. |
 | Header mapping | Implemented | Implemented | Headers beginning with `_` map to native transport properties. |

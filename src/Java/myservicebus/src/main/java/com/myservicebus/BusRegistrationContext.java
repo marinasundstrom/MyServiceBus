@@ -1,4 +1,4 @@
-package com.myservicebus.rabbitmq;
+package com.myservicebus;
 
 import com.myservicebus.di.ServiceProvider;
 
@@ -13,3 +13,4 @@ public class BusRegistrationContext {
         return serviceProvider;
     }
 }
+

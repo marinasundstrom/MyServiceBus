@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using MyServiceBus.Topology;
 using MyServiceBus.Serialization;
 using System;
@@ -102,6 +103,9 @@ public class BusRegistrationConfigurator : IBusRegistrationConfigurator
 
     public void Build()
     {
+        if (!Services.Any(d => d.ServiceType == typeof(ILoggerFactory)))
+            Services.AddLogging(b => b.AddSimpleConsole());
+
         Services.AddSingleton(_topology);
         Services.AddSingleton<IBusTopology>(_ => _topology);
         Services.AddSingleton<IPostBuildAction>(_ => new ConsumerRegistrationAction(_topology));

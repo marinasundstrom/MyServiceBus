@@ -87,6 +87,9 @@ public class RabbitMqFactoryConfiguratorTests
         {
             PrefetchCount = prefetchCount;
         }
+        public void SetConsumerFactory(Type consumerFactoryType)
+        {
+        }
     }
 
     [Fact]

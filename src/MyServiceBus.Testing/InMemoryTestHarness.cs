@@ -111,16 +111,10 @@ public class InMemoryTestHarness : IMessageBus, ITransportFactory, IReceiveEndpo
         if (!consumerTypes.Add(typeof(TConsumer)))
             return Task.CompletedTask;
 
-        RegisterHandler<TMessage>([Throws(typeof(InvalidOperationException))] async (context) =>
-        {
-            using var scope = provider.CreateScope();
-            var contextProvider = scope.ServiceProvider.GetService<ConsumeContextProvider>();
-            if (contextProvider != null)
-                contextProvider.Context = context;
-
-            var instance = scope.ServiceProvider.GetRequiredService<TConsumer>();
-            await instance.Consume(context).ConfigureAwait(false);
-        });
+        var factory = provider.GetRequiredService<IConsumerFactory<TConsumer>>();
+        RegisterHandler<TMessage>(context =>
+            factory.Send(context,
+                Pipe.Execute<ConsumerConsumeContext<TConsumer, TMessage>>(x => x.Consumer.Consume(x))));
 
         return Task.CompletedTask;
     }

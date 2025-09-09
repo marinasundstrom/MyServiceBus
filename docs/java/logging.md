@@ -1,34 +1,50 @@
 # Logging
 
-The Java project defines its own minimal logging abstraction so applications
-can choose their preferred backend.
+The Java project defines its own minimal logging abstraction so applications can choose their preferred backend.
 
 ## Interfaces
 
-- `Logger` – provides `debug`, `info`, `warn`, and `error` methods along with
-  `isDebugEnabled` for conditional logging.
+- `Logger` – provides `debug`, `info`, `warn`, and `error` methods along with `isDebugEnabled` for conditional logging.
 - `LoggerFactory` – creates loggers either by class or by name.
 
-## Default provider
+## Configuration
 
-By default, MyServiceBus supplies `Slf4jLoggerFactory`, which delegates to
-SLF4J and produces `Slf4jLogger` instances that wrap `org.slf4j.Logger`.
-This allows any SLF4J-compatible implementation (Logback, Log4j, etc.) to
-serve as the logging backend.
-
-## Console logger
-
-For simple scenarios, the `ConsoleLoggerFactory` writes log messages directly
-to `System.out`/`System.err`. Logging can be filtered globally or per
-category using `ConsoleLoggerConfig`:
+Logging providers are registered through a `Logging` decorator that exposes a `LoggingBuilder`:
 
 ```java
 ServiceCollection services = new ServiceCollection();
-services.addConsoleLogger(cfg -> {
-    cfg.setMinimumLevel(LogLevel.WARN);
-    cfg.setLevel("com.myservicebus", LogLevel.DEBUG);
-});
+services.for(Logging.class)
+        .addLogging(builder -> builder.addConsole());
 ```
 
-With the above configuration, only warnings and errors are logged by default,
-while classes under the `com.myservicebus` package log at the debug level.
+If no provider is configured, a console logger is added automatically.
+
+The console logger can be tuned with `ConsoleLoggerConfig`:
+
+```java
+services.for(Logging.class)
+        .addLogging(builder -> builder.addConsole(cfg -> {
+            cfg.setMinimumLevel(LogLevel.WARN);
+            cfg.setLevel("com.myservicebus", LogLevel.DEBUG);
+        }));
+```
+
+SLF4J can also be configured via `Slf4jLoggerConfig`:
+
+```java
+services.for(Logging.class)
+        .addLogging(builder -> builder.addSlf4j(cfg -> {
+            cfg.setMinimumLevel(LogLevel.WARN);
+            cfg.setLevel("com.myservicebus", LogLevel.DEBUG);
+        }));
+```
+
+If no providers are registered, `ConsoleLoggerFactory` is added automatically.
+
+## Factory creation
+
+A `LoggerFactory` can be created outside dependency injection:
+
+```java
+LoggerFactory factory = LoggerFactoryBuilder.create(b -> b.addConsole());
+```

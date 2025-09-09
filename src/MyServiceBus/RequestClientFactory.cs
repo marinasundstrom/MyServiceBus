@@ -2,7 +2,7 @@ using MyServiceBus.Serialization;
 
 namespace MyServiceBus;
 
-public sealed class RequestClientFactory : IScopedClientFactory
+public sealed class RequestClientFactory : IRequestClientFactory
 {
     private readonly ITransportFactory _transportFactory;
     private readonly IMessageSerializer _serializer;

@@ -52,7 +52,8 @@ public class FaultHandlingTests
         var configurator = new PipeConfigurator<ConsumeContext<TestMessage>>();
         configurator.UseFilter(new ConsumerFaultFilter<FaultingConsumer, TestMessage>(provider));
         configurator.UseRetry(1);
-        configurator.UseFilter(new ConsumerMessageFilter<FaultingConsumer, TestMessage>(provider));
+        var factory = new ScopeConsumerFactory<FaultingConsumer>(provider);
+        configurator.UseFilter(new ConsumerMessageFilter<FaultingConsumer, TestMessage>(factory));
         var pipe = new ConsumePipe<TestMessage>(configurator.Build());
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => pipe.Send(context));
