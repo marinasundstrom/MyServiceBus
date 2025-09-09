@@ -29,8 +29,11 @@ For Java build and run instructions, including optional JDK 17 toolchain setup a
 
 ### Setup
 
+The examples below use the fluent configuration pattern unless noted. The
+factory pattern is demonstrated as well.
+
 #### C#
-Using the ASP.NET Core host builder:
+Using the ASP.NET Core host builder (fluent configuration pattern):
 
 ```csharp
 var builder = WebApplication.CreateBuilder(args);
@@ -52,10 +55,10 @@ await app.StartAsync();
 var bus = app.Services.GetRequiredService<IMessageBus>();
 ```
 
-**Without host**
+**Without host (fluent configuration pattern)**
 
-Outside of an ASP.NET host (or generic host), a factory can populate an
-`IServiceCollection` directly.
+Outside of an ASP.NET host (or generic host), the fluent configuration
+pattern can populate an `IServiceCollection` directly.
 
 ```csharp
 var services = new ServiceCollection();
@@ -75,14 +78,14 @@ var bus = serviceProvider.GetRequiredService<IMessageBus>();
 await bus.StartAsync();
 ```
 
-**Factory-created bus**
+**Factory pattern**
 
-`MessageBus.Factory` exposes a `DefaultBusFactory` that can create a
-self-contained bus without building an `IServiceCollection`. The factory
-spins up its own service provider, so consumers must have parameterless
-constructors and cannot rely on application dependencies. This mirrors
-the Java pattern but in .NET the standard practice is to use dependency
-injection via `AddServiceBus`.
+The factory pattern uses `MessageBus.Factory` to create a self-contained
+bus without building an `IServiceCollection`. The factory spins up its
+own service provider, so consumers must have parameterless constructors
+and cannot rely on application dependencies. This mirrors the Java
+pattern but in .NET the standard practice is to use dependency injection
+via `AddServiceBus`.
 
 The factory uses `DefaultConstructorConsumerFactory` by default to
 instantiate consumers. A different factory can be supplied if your
@@ -109,6 +112,7 @@ MessageBus bus = MessageBus.factory.create(RabbitMqFactoryConfigurator.class, cf
 
 #### Java
 
+Using the fluent configuration pattern:
 
 ```java
 ServiceCollection services = new ServiceCollection();
@@ -510,7 +514,9 @@ The mediator dispatches messages in-memory, making it useful for lightweight sce
 
 Configure the bus by registering consumers, selecting a transport,
 connecting to the broker, customizing entity names, and auto-configuring
-endpoints with a name formatter.
+endpoints with a name formatter. These examples use the fluent
+configuration pattern; similar options exist when using the factory
+pattern.
 
 #### C#
 
