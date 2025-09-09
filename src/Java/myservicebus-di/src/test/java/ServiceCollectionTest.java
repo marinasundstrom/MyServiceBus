@@ -1,6 +1,8 @@
 import com.myservicebus.di.ServiceCollection;
 import com.myservicebus.di.ServiceProvider;
 import com.myservicebus.di.ServiceScope;
+import com.myservicebus.di.ServiceDescriptor;
+import com.myservicebus.di.ServiceLifetime;
 import com.myservicebus.logging.LoggerFactory;
 import com.myservicebus.logging.LogLevel;
 import com.myservicebus.logging.Logger;
@@ -189,5 +191,41 @@ public class ServiceCollectionTest {
         Logger logger = factory.create("test");
 
         assertTrue(logger.isDebugEnabled());
+    }
+
+    @Test
+    void removedServiceIsNotResolved() {
+        ServiceCollection sc = new ServiceCollection();
+        sc.addSingleton(Processor.class, ProcessorImpl.class);
+        sc.remove(Processor.class);
+        ServiceProvider sp = sc.buildServiceProvider();
+
+        Processor p = sp.getService(Processor.class);
+        assertNull(p);
+    }
+
+    @Test
+    void removedDeferredServiceIsNotResolved() {
+        ServiceCollection sc = new ServiceCollection();
+        sc.addScoped(Processor.class, sp -> () -> new ProcessorImpl());
+        sc.remove(Processor.class);
+        ServiceProvider sp = sc.buildServiceProvider();
+
+        try (ServiceScope scope = sp.createScope()) {
+            var scopedSp = scope.getServiceProvider();
+            Processor p = scopedSp.getService(Processor.class);
+            assertNull(p);
+        }
+    }
+
+    @Test
+    void serviceDescriptorsExposeRegistrations() {
+        ServiceCollection sc = new ServiceCollection();
+        sc.addSingleton(Processor.class, ProcessorImpl.class);
+
+        assertEquals(1, sc.getDescriptors().size());
+        ServiceDescriptor d = sc.getDescriptors().get(0);
+        assertEquals(Processor.class, d.getServiceType());
+        assertEquals(ServiceLifetime.SINGLETON, d.getLifetime());
     }
 }

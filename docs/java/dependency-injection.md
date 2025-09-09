@@ -4,6 +4,10 @@ Custom wrapper around Guice. Made to look similar to .NET DI.
 
 Supporting lifetimes, scopes, and injecting `ServiceProvider`.
 
+The default container registers the `ServiceProvider` itself, allowing any
+service to take `ServiceProvider` as a dependency and use it to resolve
+additional services.
+
 Use `getService` when a missing binding is acceptable or `getRequiredService`
 to throw an exception if the service isn't registered, mirroring .NET's
 `GetRequiredService`.
