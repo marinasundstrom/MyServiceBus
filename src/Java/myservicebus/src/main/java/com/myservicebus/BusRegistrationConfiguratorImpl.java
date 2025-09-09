@@ -143,4 +143,9 @@ public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigura
     public ServiceCollection getServiceCollection() {
         return serviceCollection;
     }
+
+    @Override
+    public TopologyRegistry getTopologyRegistry() {
+        return topology;
+    }
 }

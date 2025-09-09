@@ -169,7 +169,7 @@ RabbitMqBusFactory.configure(services, x -> {
     x.addConsumer(SubmitOrderConsumer.class);
 }, (context, cfg) -> {
     cfg.receiveEndpoint("submit-order", e ->
-        e.configureConsumer(SubmitOrderConsumer.class, context)
+        e.configureConsumer(context, SubmitOrderConsumer.class)
     );
 });
 
@@ -204,10 +204,14 @@ services.AddServiceBus(x =>
 
 ```java
 ServiceCollection services = new ServiceCollection();
-MessageBus bus = MessageBusImpl.configure(services, cfg -> {
+HttpMessageBusFactory.configure(services, cfg -> {
     cfg.addConsumer(SubmitOrderConsumer.class);
-    HttpTransport.configure(cfg, URI.create("http://localhost:5000/"));
+}, (context, http) -> {
+    http.host(URI.create("http://localhost:5000/"));
+    http.receiveEndpoint("submit-order", e -> e.configureConsumer(context, SubmitOrderConsumer.class));
 });
+ServiceProvider provider = services.buildServiceProvider();
+MessageBus bus = provider.getService(MessageBus.class);
 bus.start();
 ```
 
