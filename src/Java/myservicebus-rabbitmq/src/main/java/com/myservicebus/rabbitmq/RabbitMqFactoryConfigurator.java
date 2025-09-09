@@ -1,11 +1,17 @@
 package com.myservicebus.rabbitmq;
 
+import com.myservicebus.BusFactoryConfigurator;
+import com.myservicebus.BusRegistrationConfiguratorImpl;
+import com.myservicebus.MessageBus;
+import com.myservicebus.MessageBusImpl;
 import com.myservicebus.ConsumeContext;
 import com.myservicebus.EndpointNameFormatter;
 import com.myservicebus.PipeConfigurator;
 import com.myservicebus.RetryConfigurator;
 import com.myservicebus.EntityNameFormatter;
 import com.myservicebus.MessageEntityNameFormatter;
+import com.myservicebus.di.ServiceCollection;
+import com.myservicebus.di.ServiceProvider;
 import com.myservicebus.topology.ConsumerTopology;
 import com.myservicebus.topology.MessageBinding;
 import com.myservicebus.topology.TopologyRegistry;
@@ -15,7 +21,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Consumer;
 
-public class RabbitMqFactoryConfigurator {
+public class RabbitMqFactoryConfigurator implements BusFactoryConfigurator {
     private String clientHost = "localhost";
     private String username = "guest";
     private String password = "guest";
@@ -104,6 +110,32 @@ public class RabbitMqFactoryConfigurator {
 
     public int getPrefetchCount() {
         return prefetchCount;
+    }
+
+    @Override
+    public MessageBus build() {
+        ServiceCollection services = new ServiceCollection();
+        build(services);
+        ServiceProvider provider = services.buildServiceProvider();
+        return provider.getService(MessageBus.class);
+    }
+
+    @Override
+    public void build(ServiceCollection services) {
+        BusRegistrationConfiguratorImpl cfg = new BusRegistrationConfiguratorImpl(services);
+        RabbitMqTransport.configure(cfg, this);
+        cfg.complete();
+        services.addSingleton(MessageBus.class, sp -> () -> {
+            BusRegistrationContext context = new BusRegistrationContext(sp);
+            configureEndpoints(context);
+            MessageBusImpl bus = new MessageBusImpl(sp);
+            try {
+                applyHandlers(bus);
+            } catch (Exception ex) {
+                throw new RuntimeException("Failed to apply handlers", ex);
+            }
+            return bus;
+        });
     }
 
     private static class RabbitMqHostConfiguratorImpl implements RabbitMqHostConfigurator {
