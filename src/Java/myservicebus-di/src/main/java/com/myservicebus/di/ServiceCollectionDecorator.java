@@ -4,6 +4,7 @@ import java.util.function.Consumer;
 
 import com.google.inject.Injector;
 import com.myservicebus.logging.ConsoleLoggerConfig;
+import com.myservicebus.logging.Slf4jLoggerConfig;
 
 public abstract class ServiceCollectionDecorator extends ServiceCollection {
     protected final ServiceCollection inner;
@@ -65,6 +66,14 @@ public abstract class ServiceCollectionDecorator extends ServiceCollection {
     @Override
     public void addSlf4jLogger() {
         inner.addSlf4jLogger();
+    }
+
+    
+    
+    
+    @Override
+    public void addSlf4jLogger(Consumer<Slf4jLoggerConfig> configure) {
+        inner.addSlf4jLogger(configure);
     }
 
     @Override

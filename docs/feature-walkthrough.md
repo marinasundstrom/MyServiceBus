@@ -717,7 +717,7 @@ Register a logging provider using the `Logging` decorator:
 ServiceCollection services = new ServiceCollection();
 
 services.for(Logging.class)
-        .addLogging(LoggingBuilder::addSlf4j);
+        .addLogging(b -> b.addSlf4j(cfg -> cfg.setMinimumLevel(LogLevel.WARN)));
 
 services.from(MessageBusServices.class)
         .addServiceBus(cfg -> {

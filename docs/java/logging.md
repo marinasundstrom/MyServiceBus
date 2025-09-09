@@ -27,11 +27,14 @@ services.for(Logging.class)
         }));
 ```
 
-To use SLF4J as the backend:
+SLF4J can also be configured via `Slf4jLoggerConfig`:
 
 ```java
 services.for(Logging.class)
-        .addLogging(LoggingBuilder::addSlf4j);
+        .addLogging(builder -> builder.addSlf4j(cfg -> {
+            cfg.setMinimumLevel(LogLevel.WARN);
+            cfg.setLevel("com.myservicebus", LogLevel.DEBUG);
+        }));
 ```
 
 If no providers are registered, `Slf4jLoggerFactory` is added automatically so any SLF4J-compatible implementation (Logback, Log4j, etc.) can serve as the logging backend.

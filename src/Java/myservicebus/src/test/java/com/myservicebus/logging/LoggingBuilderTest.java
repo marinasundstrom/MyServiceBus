@@ -27,9 +27,26 @@ public class LoggingBuilderTest {
     }
 
     @Test
+    void configureSlf4jSetsMinimumLevel() {
+        ServiceCollection services = new ServiceCollection();
+        services.from(Logging.class).addLogging(b -> b.addSlf4j(cfg -> cfg.setMinimumLevel(LogLevel.ERROR)));
+        ServiceProvider provider = services.buildServiceProvider();
+        LoggerFactory factory = provider.getService(LoggerFactory.class);
+        Logger logger = factory.create("test");
+        assertFalse(logger.isDebugEnabled());
+    }
+
+    @Test
     void loggerFactoryBuilderCreatesConsoleFactory() {
         LoggerFactory factory = LoggerFactoryBuilder.create(b -> b.addConsole());
         assertTrue(factory.create("test") instanceof ConsoleLogger);
     }
-}
 
+    @Test
+    void loggerFactoryBuilderCreatesSlf4jFactoryWithConfig() {
+        LoggerFactory factory = LoggerFactoryBuilder
+                .create(b -> b.addSlf4j(cfg -> cfg.setMinimumLevel(LogLevel.ERROR)));
+        Logger logger = factory.create("test");
+        assertFalse(logger.isDebugEnabled());
+    }
+}

@@ -37,18 +37,27 @@ class LoggingBuilderImpl implements LoggingBuilder {
 
     @Override
     public void addSlf4j() {
+        addSlf4j(cfg -> {
+        });
+    }
+
+    @Override
+    public void addSlf4j(Consumer<Slf4jLoggerConfig> configure) {
         if (services != null) {
-            services.addSlf4jLogger();
+            services.addSlf4jLogger(configure);
         } else {
-            factory = new Slf4jLoggerFactory();
+            Slf4jLoggerConfig config = new Slf4jLoggerConfig();
+            if (configure != null) {
+                configure.accept(config);
+            }
+            factory = new Slf4jLoggerFactory(config);
         }
     }
 
     LoggerFactory getFactory() {
         if (factory == null) {
-            factory = new Slf4jLoggerFactory();
+            factory = new Slf4jLoggerFactory(new Slf4jLoggerConfig());
         }
         return factory;
     }
 }
-

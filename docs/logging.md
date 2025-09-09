@@ -7,7 +7,8 @@ providers are registered through a `Logging` decorator:
 
 ```java
 ServiceCollection services = new ServiceCollection();
-services.for(Logging.class).addLogging(LoggingBuilder::addSlf4j);
+services.for(Logging.class)
+        .addLogging(b -> b.addSlf4j(cfg -> cfg.setMinimumLevel(LogLevel.WARN)));
 ```
 
 ## What is logged
