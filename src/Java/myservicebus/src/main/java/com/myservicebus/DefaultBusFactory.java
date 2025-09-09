@@ -4,7 +4,7 @@ import java.util.function.Consumer;
 
 public class DefaultBusFactory implements BusFactory {
     @Override
-    public <T extends BusFactoryConfigurator> MessageBus configure(Class<T> configuratorClass, Consumer<T> configure) {
+    public <T extends BusFactoryConfigurator> MessageBus create(Class<T> configuratorClass, Consumer<T> configure) {
         try {
             T cfg = configuratorClass.getDeclaredConstructor().newInstance();
             if (configure != null) {
