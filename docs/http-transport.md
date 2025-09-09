@@ -12,6 +12,8 @@ This **experimental** transport maps basic messaging semantics onto HTTP and beh
 
 Register the transport using the `UsingHttp` extension and set the base address using the configurator's `Host` method.
 
+### C#
+
 ```csharp
 services.AddServiceBus(cfg =>
 {
@@ -19,9 +21,23 @@ services.AddServiceBus(cfg =>
 });
 ```
 
+### Java
+
+```java
+ServiceCollection services = new ServiceCollection();
+services.from(MessageBusServices.class)
+        .addServiceBus(cfg -> {
+            cfg.using(HttpFactoryConfigurator.class, (context, http) -> {
+                http.host(URI.create("http://localhost:5000/"));
+            });
+        });
+```
+
 ### Standalone bus
 
 Create a self-contained bus using `MessageBus.Factory`:
+
+#### C#
 
 ```csharp
 IMessageBus bus = MessageBus.Factory.Create<HttpFactoryConfigurator>(cfg =>
@@ -30,9 +46,22 @@ IMessageBus bus = MessageBus.Factory.Create<HttpFactoryConfigurator>(cfg =>
 });
 ```
 
+#### Java
+
+```java
+ServiceCollection services = new ServiceCollection();
+HttpMessageBusFactory.configure(services, cfg -> {}, (context, http) -> {
+    http.host(URI.create("http://localhost:5000/"));
+});
+ServiceProvider provider = services.buildServiceProvider();
+MessageBus bus = provider.getService(MessageBus.class);
+```
+
 ### Consumers
 
 Map consumers to HTTP endpoints using extension methods that mirror the RabbitMQ configuration style:
+
+#### C#
 
 ```csharp
 services.AddServiceBus(cfg =>
@@ -45,6 +74,21 @@ services.AddServiceBus(cfg =>
             e.ConfigureConsumer<SubmitOrderConsumer>(context));
     });
 });
+```
+
+#### Java
+
+```java
+ServiceCollection services = new ServiceCollection();
+services.from(MessageBusServices.class)
+        .addServiceBus(cfg -> {
+            cfg.addConsumer(SubmitOrderConsumer.class);
+            cfg.using(HttpFactoryConfigurator.class, (context, http) -> {
+                http.host(URI.create("http://localhost:5000/"));
+                http.receiveEndpoint("submit-order", e ->
+                        e.configureConsumer(context, SubmitOrderConsumer.class));
+            });
+        });
 ```
 
 Using the factory, endpoints can be configured directly:
@@ -60,6 +104,18 @@ IMessageBus bus = MessageBus.Factory.Create<HttpFactoryConfigurator>(cfg =>
 });
 ```
 
+```java
+ServiceCollection services = new ServiceCollection();
+HttpMessageBusFactory.configure(services, cfg -> {}, (context, http) -> {
+    http.host(URI.create("http://localhost:5000/"));
+    http.receiveEndpoint("submit-order", e -> {
+        // configure consumers
+    });
+});
+ServiceProvider provider = services.buildServiceProvider();
+MessageBus bus = provider.getService(MessageBus.class);
+```
+
 Explicit endpoints can also be configured:
 
 ```csharp
@@ -71,6 +127,18 @@ IMessageBus bus = MessageBus.Factory.Create<HttpFactoryConfigurator>(cfg =>
         // configure consumers
     });
 });
+```
+
+```java
+ServiceCollection services = new ServiceCollection();
+HttpMessageBusFactory.configure(services, cfg -> {}, (context, http) -> {
+    http.host(URI.create("http://localhost:5000/"));
+    http.receiveEndpoint("submit-order", e -> {
+        // configure consumers
+    });
+});
+ServiceProvider provider = services.buildServiceProvider();
+MessageBus bus = provider.getService(MessageBus.class);
 ```
 
 As an alternative, consumers can be added at runtime by calling `IMessageBus.AddConsumer` with a `ConsumerTopology` and explicit URI.
