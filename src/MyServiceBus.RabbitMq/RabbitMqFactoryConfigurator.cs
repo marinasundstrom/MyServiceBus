@@ -3,6 +3,7 @@ namespace MyServiceBus;
 using System;
 using System.Collections.Generic;
 using Microsoft.Extensions.DependencyInjection;
+using MyServiceBus.Serialization;
 using RabbitMQ.Client;
 
 public class RabbitMqFactoryConfigurator : IRabbitMqFactoryConfigurator, IBusFactoryConfigurator
