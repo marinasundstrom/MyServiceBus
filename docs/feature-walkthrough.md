@@ -183,6 +183,10 @@ endpoint.send(new SubmitOrder(UUID.randomUUID())).join();
 
 ##### Hosting consumers over HTTP
 
+The experimental HTTP transport maps messaging semantics onto HTTP and is more akin to a WebHook callback.
+There is no persistent connection and it does not follow the typical HTTP request/response flow.
+It is not a substitute for a web application framework such as ASP.NET Core; features like authentication or authorization are not supported.
+
 Configure the HTTP transport with extension methods similar to RabbitMQ:
 
 ```csharp
@@ -196,6 +200,15 @@ services.AddServiceBus(x =>
             e.ConfigureConsumer<SubmitOrderConsumer>(context));
     });
 });
+```
+
+```java
+ServiceCollection services = new ServiceCollection();
+MessageBus bus = MessageBusImpl.configure(services, cfg -> {
+    cfg.addConsumer(SubmitOrderConsumer.class);
+    HttpTransport.configure(cfg, URI.create("http://localhost:5000/"));
+});
+bus.start();
 ```
 
 Consumers added this way handle POST requests to `http://localhost:5000/submit-order`. Alternatively, a consumer can be added at runtime via `IMessageBus.AddConsumer` and a `ConsumerTopology` with an explicit URI.
@@ -222,6 +235,25 @@ var request = new HttpRequestMessage(HttpMethod.Post, "submit-order")
 request.Headers.Add("source", "sample");
 
 await client.SendAsync(request);
+```
+
+```java
+HttpClient client = HttpClient.newHttpClient();
+
+Envelope<SubmitOrder> envelope = new Envelope<>();
+envelope.setMessageId(UUID.randomUUID());
+envelope.setMessageType(List.of("urn:message:Contracts:SubmitOrder"));
+envelope.setMessage(new SubmitOrder(UUID.randomUUID()));
+
+ObjectMapper mapper = new ObjectMapper();
+String body = mapper.writeValueAsString(envelope);
+
+HttpRequest request = HttpRequest.newBuilder(URI.create("http://localhost:5000/submit-order"))
+        .header("source", "sample")
+        .POST(HttpRequest.BodyPublishers.ofString(body))
+        .build();
+
+client.sendAsync(request, HttpResponse.BodyHandlers.discarding());
 ```
 
 Any headers added to the `HttpRequestMessage` flow into the receive context's
