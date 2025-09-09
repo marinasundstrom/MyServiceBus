@@ -16,7 +16,7 @@ public static class ServiceExtensions
         services.AddSingleton<IReceiveEndpointConnector>([Throws(typeof(InvalidCastException), typeof(InvalidOperationException))] (sp) => (IReceiveEndpointConnector)sp.GetRequiredService<IMessageBus>());
 
         services.AddScoped(typeof(IRequestClient<>), typeof(GenericRequestClient<>));
-        services.AddScoped<IScopedClientFactory, RequestClientFactory>();
+        services.AddScoped<IRequestClientFactory, RequestClientFactory>();
 
         return services;
     }

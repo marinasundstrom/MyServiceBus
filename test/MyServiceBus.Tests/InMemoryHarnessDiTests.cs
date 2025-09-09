@@ -85,7 +85,7 @@ public class InMemoryHarnessDiTests
 
         await harness.Start();
 
-        var factory = provider.GetRequiredService<IScopedClientFactory>();
+        var factory = provider.GetRequiredService<IRequestClientFactory>();
         var address = new Uri($"rabbitmq://localhost/exchange/{EntityNameFormatter.Format(typeof(CheckOrder))}");
         var client = factory.CreateRequestClient<CheckOrder>(address);
         var orderId = Guid.NewGuid();
