@@ -2,7 +2,7 @@
 
 The HTTP transport uses simple HTTP POST requests to exchange serialized message envelopes between services. It is available in both the C# and Java implementations.
 
-This transport maps basic messaging semantics onto HTTP and is intentionally minimal. It does not aim to replace a full-featured web application framework such as ASP.NET Core and lacks capabilities like authentication or authorization.
+This **experimental** transport maps basic messaging semantics onto HTTP and behaves more like a WebHook callback than a traditional web application. Messages do not ride on a persistent connection and the transport does not map to the HTTP request/response model in the same way a web framework does. Consequently, it is intentionally minimal and lacks features such as authentication or authorization and is not a substitute for a full-featured framework like ASP.NET Core.
 
 - Each send endpoint performs a POST to the configured URI. Message headers are copied to HTTP headers.
 - Receive endpoints host an `HttpListener` (C#) or lightweight `HttpServer` (Java) that accepts POSTed envelopes and dispatches them through the consume pipeline.

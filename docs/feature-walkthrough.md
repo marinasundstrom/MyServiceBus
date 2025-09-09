@@ -183,7 +183,9 @@ endpoint.send(new SubmitOrder(UUID.randomUUID())).join();
 
 ##### Hosting consumers over HTTP
 
-The HTTP transport maps messaging semantics onto HTTP and is not a substitute for a web application framework such as ASP.NET Core; features like authentication or authorization are not supported.
+The experimental HTTP transport maps messaging semantics onto HTTP and is more akin to a WebHook callback.
+There is no persistent connection and it does not follow the typical HTTP request/response flow.
+It is not a substitute for a web application framework such as ASP.NET Core; features like authentication or authorization are not supported.
 
 Configure the HTTP transport with extension methods similar to RabbitMQ:
 
