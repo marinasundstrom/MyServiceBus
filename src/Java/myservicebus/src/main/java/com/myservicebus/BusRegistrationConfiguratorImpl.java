@@ -12,7 +12,9 @@ import com.myservicebus.di.ServiceCollection;
 import com.myservicebus.BusFactoryConfigurator;
 import com.myservicebus.topology.TopologyRegistry;
 import com.myservicebus.logging.Logger;
-import com.myservicebus.logging.Slf4jLoggerFactory;
+import com.myservicebus.logging.LoggerFactory;
+import com.myservicebus.logging.ConsoleLoggerFactory;
+import com.myservicebus.logging.ConsoleLoggerConfig;
 import com.myservicebus.KebabCaseEndpointNameFormatter;
 
 public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigurator {
@@ -24,7 +26,8 @@ public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigura
     private Class<? extends com.myservicebus.serialization.MessageSerializer> serializerClass = com.myservicebus.serialization.EnvelopeMessageSerializer.class;
     private Class<? extends com.myservicebus.serialization.MessageDeserializer> deserializerClass = com.myservicebus.serialization.EnvelopeMessageDeserializer.class;
     private final Set<Class<?>> consumerTypes = new HashSet<>();
-    private final Logger logger = new Slf4jLoggerFactory().create(BusRegistrationConfiguratorImpl.class);
+    private final Logger logger = new ConsoleLoggerFactory(new ConsoleLoggerConfig())
+            .create(BusRegistrationConfiguratorImpl.class);
     private java.util.function.BiConsumer<BusRegistrationContext, Object> transportConfigure;
     private Class<?> factoryConfiguratorClass;
 
@@ -141,6 +144,12 @@ public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigura
     }
 
     public void complete() {
+        boolean hasLogger = serviceCollection.getDescriptors().stream()
+                .anyMatch(d -> d.getServiceType().equals(LoggerFactory.class));
+        if (!hasLogger) {
+            serviceCollection.addConsoleLogger();
+        }
+
         serviceCollection.addScoped(ConsumeContextProvider.class, sp -> () -> new ConsumeContextProvider());
         serviceCollection.addScoped(SendEndpointProvider.class,
                 sp -> () -> new SendEndpointProviderImpl(

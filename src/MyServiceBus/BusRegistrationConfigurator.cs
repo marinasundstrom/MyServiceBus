@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using MyServiceBus.Topology;
 using MyServiceBus.Serialization;
 using System;
@@ -24,7 +25,7 @@ public class BusRegistrationConfigurator : IBusRegistrationConfigurator
         publishConfigurator.UseFilter(new OpenTelemetrySendFilter());
     }
 
-    [Throws(typeof(InvalidOperationException), typeof(TargetInvocationException), typeof(NotSupportedException), typeof(RegexMatchTimeoutException))]
+    [Throws(typeof(InvalidOperationException), typeof(TargetInvocationException), typeof(NotSupportedException), typeof(RegexMatchTimeoutException), typeof(AmbiguousMatchException))]
     public void AddConsumer<TConsumer>() where TConsumer : class, IConsumer
     {
         Services.AddScoped<TConsumer>();
@@ -39,7 +40,7 @@ public class BusRegistrationConfigurator : IBusRegistrationConfigurator
       );
     }
 
-    [Throws(typeof(InvalidOperationException), typeof(RegexMatchTimeoutException))]
+    [Throws(typeof(InvalidOperationException), typeof(RegexMatchTimeoutException), typeof(AmbiguousMatchException))]
     public void AddConsumer<TConsumer, TMessage>(Action<PipeConfigurator<ConsumeContext<TMessage>>>? configure = null)
         where TConsumer : class, IConsumer<TMessage>
         where TMessage : class
@@ -102,6 +103,9 @@ public class BusRegistrationConfigurator : IBusRegistrationConfigurator
 
     public void Build()
     {
+        if (!Services.Any(d => d.ServiceType == typeof(ILoggerFactory)))
+            Services.AddLogging(b => b.AddSimpleConsole());
+
         Services.AddSingleton(_topology);
         Services.AddSingleton<IBusTopology>(_ => _topology);
         Services.AddSingleton<IPostBuildAction>(_ => new ConsumerRegistrationAction(_topology));

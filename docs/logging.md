@@ -8,8 +8,10 @@ providers are registered through a `Logging` decorator:
 ```java
 ServiceCollection services = new ServiceCollection();
 services.for(Logging.class)
-        .addLogging(b -> b.addSlf4j(cfg -> cfg.setMinimumLevel(LogLevel.WARN)));
+        .addLogging(b -> b.addConsole());
 ```
+
+If no provider is configured, a console logger is added automatically.
 
 ## What is logged
 

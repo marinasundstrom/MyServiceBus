@@ -3,9 +3,10 @@ package com.myservicebus;
 import java.lang.reflect.Method;
 import java.util.function.Consumer;
 
+import com.myservicebus.ScopeConsumerFactory;
 import com.myservicebus.di.ServiceCollection;
 import com.myservicebus.di.ServiceCollectionDecorator;
-import com.myservicebus.ScopeConsumerFactory;
+import com.myservicebus.logging.LoggerFactory;
 
 public class MessageBusServices extends ServiceCollectionDecorator {
 
@@ -14,6 +15,12 @@ public class MessageBusServices extends ServiceCollectionDecorator {
     }
 
     public ServiceCollection addServiceBus(Consumer<BusRegistrationConfigurator> configure) {
+
+        boolean hasLogger = inner.getDescriptors().stream()
+                .anyMatch(d -> d.getServiceType().equals(LoggerFactory.class));
+        if (!hasLogger) {
+            inner.addConsoleLogger();
+        }
 
         BusRegistrationConfiguratorImpl cfg = new BusRegistrationConfiguratorImpl(inner);
         if (configure != null) {

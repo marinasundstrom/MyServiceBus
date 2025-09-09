@@ -131,10 +131,12 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
                         .filter(b -> MessageUrn.forClass(b.getMessageType()).equals(messageTypeUrn))
                         .findFirst()
                         .orElse(null);
-                if (binding == null) {
-                    logger.warn("Received message with unregistered type {}", messageTypeUrn);
-                    return CompletableFuture.completedFuture(null);
-                }
+                  if (binding == null) {
+                      if (logger != null) {
+                          logger.warn("Received message with unregistered type {}", messageTypeUrn);
+                      }
+                      return CompletableFuture.completedFuture(null);
+                  }
 
                 Type messageType = resolveMessageType(consumerDef.getConsumerType(), binding.getMessageType());
                 Envelope<?> typedEnvelope = messageDeserializer.deserialize(transportMessage.getBody(),
@@ -204,10 +206,12 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
                         ? envelope.getMessageType().get(0)
                         : null;
                 String expectedUrn = MessageUrn.forClass(messageType);
-                if (!expectedUrn.equals(messageTypeUrn)) {
-                    logger.warn("Received message with unregistered type {}", messageTypeUrn);
-                    return CompletableFuture.completedFuture(null);
-                }
+                  if (!expectedUrn.equals(messageTypeUrn)) {
+                      if (logger != null) {
+                          logger.warn("Received message with unregistered type {}", messageTypeUrn);
+                      }
+                      return CompletableFuture.completedFuture(null);
+                  }
 
                 Envelope<?> typedEnvelope = messageDeserializer.deserialize(tm.getBody(), messageType);
                 String faultAddress = typedEnvelope.getFaultAddress();
