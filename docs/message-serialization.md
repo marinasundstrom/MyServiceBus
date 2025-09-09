@@ -29,7 +29,7 @@ ServiceCollection services = new ServiceCollection();
 services.from(MessageBusServices.class)
         .addServiceBus(cfg -> {
             cfg.setSerializer(RawJsonMessageSerializer.class);
-            cfg.using(RabbitMqTransport.class, (context, rbCfg) -> {});
+            cfg.using(RabbitMqFactoryConfigurator.class, (context, rbCfg) -> {});
         });
 ```
 

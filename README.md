@@ -109,7 +109,7 @@ ServiceCollection services = new ServiceCollection();
 services.from(MessageBusServices.class)
         .addServiceBus(cfg -> {
             cfg.addConsumer(SubmitOrderConsumer.class);
-            cfg.using(RabbitMqTransport.class, (context, rbCfg) -> rbCfg.configureEndpoints(context));
+            cfg.using(RabbitMqFactoryConfigurator.class, (context, rbCfg) -> rbCfg.configureEndpoints(context));
         });
 
 ServiceProvider provider = services.buildServiceProvider();

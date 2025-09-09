@@ -4,6 +4,7 @@ import com.myservicebus.di.ServiceCollection;
 import com.myservicebus.serialization.MessageDeserializer;
 import com.myservicebus.serialization.MessageSerializer;
 import java.util.function.Consumer;
+import com.myservicebus.BusFactoryConfigurator;
 
 public abstract class BusRegistrationConfiguratorDecorator implements BusRegistrationConfigurator {
 
@@ -52,9 +53,10 @@ public abstract class BusRegistrationConfiguratorDecorator implements BusRegistr
     }
 
     @Override
-    public <TConfigurator> BusRegistrationConfigurator using(Class<?> transportClass,
+    public <TConfigurator extends BusFactoryConfigurator> BusRegistrationConfigurator using(
+            Class<TConfigurator> configuratorClass,
             java.util.function.BiConsumer<BusRegistrationContext, TConfigurator> configure) {
-        return inner.using(transportClass, configure);
+        return inner.using(configuratorClass, configure);
     }
 }
 

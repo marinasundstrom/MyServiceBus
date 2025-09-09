@@ -84,7 +84,7 @@ ServiceCollection services = new ServiceCollection();
 services.from(MessageBusServices.class)
         .addServiceBus(cfg -> {
             cfg.addConsumer(SubmitOrderConsumer.class);
-            cfg.using(RabbitMqTransport.class, (context, rbCfg) -> rbCfg.configureEndpoints(context));
+            cfg.using(RabbitMqFactoryConfigurator.class, (context, rbCfg) -> rbCfg.configureEndpoints(context));
         });
 
 ServiceProvider serviceProvider = services.buildServiceProvider();
@@ -168,7 +168,7 @@ ServiceCollection services = new ServiceCollection();
 services.from(MessageBusServices.class)
         .addServiceBus(cfg -> {
             cfg.addConsumer(SubmitOrderConsumer.class);
-            cfg.using(RabbitMqTransport.class, (context, rbCfg) -> rbCfg.receiveEndpoint("submit-order",
+            cfg.using(RabbitMqFactoryConfigurator.class, (context, rbCfg) -> rbCfg.receiveEndpoint("submit-order",
                     e -> e.configureConsumer(SubmitOrderConsumer.class, context)));
         });
 
@@ -513,7 +513,7 @@ ServiceCollection services = new ServiceCollection();
 services.from(MessageBusServices.class)
         .addServiceBus(cfg -> {
             cfg.addConsumer(SubmitOrderConsumer.class);
-            cfg.using(RabbitMqTransport.class, (context, rbCfg) -> {
+            cfg.using(RabbitMqFactoryConfigurator.class, (context, rbCfg) -> {
                 rbCfg.host("rabbitmq://localhost");
                 rbCfg.message(SubmitOrder.class, m -> {
                     m.setEntityName("submit-order-exchange");
@@ -681,7 +681,7 @@ ServiceCollection services = new ServiceCollection();
 services.from(MessageBusServices.class)
         .addServiceBus(cfg -> {
             // consumers and other options
-            cfg.using(RabbitMqTransport.class, (context, rbCfg) -> rbCfg.host("rabbitmq://localhost"));
+            cfg.using(RabbitMqFactoryConfigurator.class, (context, rbCfg) -> rbCfg.host("rabbitmq://localhost"));
         });
 
 ServiceProvider provider = services.buildServiceProvider();
@@ -787,7 +787,7 @@ services.from(MessageBusServices.class)
                 ctx.getHeaders().put("published", true);
                 return CompletableFuture.completedFuture(null);
             }));
-            cfg.using(RabbitMqTransport.class, (context, rbCfg) -> rbCfg.host("rabbitmq://localhost"));
+            cfg.using(RabbitMqFactoryConfigurator.class, (context, rbCfg) -> rbCfg.host("rabbitmq://localhost"));
         });
 
 ServiceProvider provider = services.buildServiceProvider();

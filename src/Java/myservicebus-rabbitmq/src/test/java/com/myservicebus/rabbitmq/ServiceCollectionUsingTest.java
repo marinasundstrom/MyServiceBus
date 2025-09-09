@@ -17,7 +17,7 @@ public class ServiceCollectionUsingTest {
 
         services.from(MessageBusServices.class)
                 .addServiceBus(cfg -> {
-                    cfg.using(RabbitMqTransport.class, (context, rb) -> {
+                    cfg.using(RabbitMqFactoryConfigurator.class, (context, rb) -> {
                     });
                 });
 
