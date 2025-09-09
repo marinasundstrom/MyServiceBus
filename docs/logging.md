@@ -2,7 +2,14 @@
 
 MyServiceBus uses structured logging to capture key events in the bus.
 The .NET implementation is built on `Microsoft.Extensions.Logging`,
-which allows applications to plug in any provider.
+which allows applications to plug in any provider. In Java, logging
+providers are registered through a `Logging` decorator:
+
+```java
+ServiceCollection services = new ServiceCollection();
+services.for(Logging.class)
+        .addLogging(b -> b.addSlf4j(cfg -> cfg.setMinimumLevel(LogLevel.WARN)));
+```
 
 ## What is logged
 

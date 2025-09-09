@@ -10,6 +10,7 @@ import java.util.function.Consumer;
 
 import com.myservicebus.logging.LoggerFactory;
 import com.myservicebus.logging.Slf4jLoggerFactory;
+import com.myservicebus.logging.Slf4jLoggerConfig;
 import com.myservicebus.logging.ConsoleLoggerConfig;
 import com.myservicebus.logging.ConsoleLoggerFactory;
 
@@ -91,6 +92,26 @@ public class ServiceCollection implements Iterable<ServiceDescriptor> {
         loggerFactoryRegistered = true;
     }
 
+    public void addSlf4jLogger() {
+        addSlf4jLogger(c -> {
+        });
+    }
+
+    public void addSlf4jLogger(Consumer<Slf4jLoggerConfig> configure) {
+        if (built) {
+            throw new IllegalStateException("Cannot add service to container that has been built.");
+        }
+
+        Slf4jLoggerConfig config = new Slf4jLoggerConfig();
+        configure.accept(config);
+
+        descriptors.add(new ServiceDescriptor(Slf4jLoggerConfig.class, null, null, config, ServiceLifetime.SINGLETON, false));
+        descriptors.add(new ServiceDescriptor(LoggerFactory.class, Slf4jLoggerFactory.class, null, null,
+                ServiceLifetime.SINGLETON, false));
+
+        loggerFactoryRegistered = true;
+    }
+
     public <T> void remove(Class<T> type) {
         if (built) {
             throw new IllegalStateException("Cannot remove service from container that has been built.");
@@ -113,6 +134,7 @@ public class ServiceCollection implements Iterable<ServiceDescriptor> {
 
         List<ServiceDescriptor> effective = new ArrayList<>(descriptors);
         if (!loggerFactoryRegistered) {
+            effective.add(new ServiceDescriptor(Slf4jLoggerConfig.class, null, null, new Slf4jLoggerConfig(), ServiceLifetime.SINGLETON, false));
             effective.add(new ServiceDescriptor(LoggerFactory.class, Slf4jLoggerFactory.class, null, null,
                     ServiceLifetime.SINGLETON, false));
         }
@@ -170,6 +192,7 @@ public class ServiceCollection implements Iterable<ServiceDescriptor> {
 
         List<ServiceDescriptor> effective = new ArrayList<>(descriptors);
         if (!loggerFactoryRegistered) {
+            effective.add(new ServiceDescriptor(Slf4jLoggerConfig.class, null, null, new Slf4jLoggerConfig(), ServiceLifetime.SINGLETON, false));
             effective.add(new ServiceDescriptor(LoggerFactory.class, Slf4jLoggerFactory.class, null, null,
                     ServiceLifetime.SINGLETON, false));
         }

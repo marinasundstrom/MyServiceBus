@@ -711,11 +711,13 @@ builder.Services.AddServiceBus(x =>
 
 #### Java
 
-MyServiceBus uses SLF4J. Include a binding such as `slf4j-simple` and configure it before starting the bus:
+Register a logging provider using the `Logging` decorator:
 
 ```java
-System.setProperty("org.slf4j.simpleLogger.defaultLogLevel", "info");
 ServiceCollection services = new ServiceCollection();
+
+services.for(Logging.class)
+        .addLogging(b -> b.addSlf4j(cfg -> cfg.setMinimumLevel(LogLevel.WARN)));
 
 services.from(MessageBusServices.class)
         .addServiceBus(cfg -> {
