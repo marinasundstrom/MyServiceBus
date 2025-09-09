@@ -4,10 +4,11 @@ import java.net.URI;
 import java.util.function.Consumer;
 
 import com.myservicebus.BusRegistrationConfigurator;
+import com.myservicebus.FactoryConfigurator;
 import com.myservicebus.topology.ConsumerTopology;
 import com.myservicebus.topology.TopologyRegistry;
 
-public class HttpFactoryConfigurator {
+public class HttpFactoryConfigurator implements FactoryConfigurator<HttpReceiveEndpointConfigurator> {
     private final TopologyRegistry topology;
     private URI baseAddress = URI.create("http://localhost/");
 
@@ -30,6 +31,7 @@ public class HttpFactoryConfigurator {
         return baseAddress;
     }
 
+    @Override
     public void receiveEndpoint(String path, Consumer<HttpReceiveEndpointConfigurator> configure) {
         if (configure != null) {
             HttpReceiveEndpointConfigurator endpointConfigurator = new HttpReceiveEndpointConfigurator(topology, baseAddress,
