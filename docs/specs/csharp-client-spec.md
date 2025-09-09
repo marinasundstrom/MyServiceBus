@@ -17,7 +17,7 @@ The ServiceBus C# client provides a lightweight messaging abstraction for buildi
 
 ### Request–Response
 - `GenericRequestClient` sends requests and awaits responses or faults using per-request temporary exchanges, mirroring the Java client.
-- `IScopedClientFactory` creates `IRequestClient<T>` instances with optional destination addresses and default timeouts.
+- `IRequestClientFactory` creates `IRequestClient<T>` instances with optional destination addresses and default timeouts.
 - Consumers can reply with `RespondAsync` or signal failures with `RespondFaultAsync`.
 - If a fault response is returned but no fault type is requested, `GenericRequestClient` throws `RequestFaultException`.
 

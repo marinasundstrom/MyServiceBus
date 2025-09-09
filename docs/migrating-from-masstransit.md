@@ -9,7 +9,7 @@ The following checklist highlights common areas to evaluate when switching:
   provided configurators.
 - **Unified bus interface** – MyServiceBus uses `IMessageBus` for send, publish, and request/response
   instead of `IBus` and `IBusControl`.
-- **Request clients** – create request clients through `IScopedClientFactory` or `RequestClientFactory` rather than
+- **Request clients** – create request clients through `IRequestClientFactory` or `RequestClientFactory` rather than
   MassTransit's extension methods.
 - **Exception handling** – adopt `[Throws]` attributes and catch exceptions locally as required by the CheckedExceptions analyzer.
 - **Java parity** – if services mix C# and Java clients, ensure consumers and contracts are exercised in both runtimes

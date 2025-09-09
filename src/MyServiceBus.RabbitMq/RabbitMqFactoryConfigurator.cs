@@ -114,7 +114,7 @@ public class RabbitMqFactoryConfigurator : IRabbitMqFactoryConfigurator, IBusFac
         services.AddSingleton<IReceiveEndpointConnector>(sp => (IReceiveEndpointConnector)sp.GetRequiredService<IMessageBus>());
         services.AddHostedService<ServiceBusHostedService>();
         services.AddScoped(typeof(IRequestClient<>), typeof(GenericRequestClient<>));
-        services.AddScoped<IScopedClientFactory, RequestClientFactory>();
+        services.AddScoped<IRequestClientFactory, RequestClientFactory>();
     }
 }
 
