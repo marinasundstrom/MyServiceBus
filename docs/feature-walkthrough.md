@@ -722,7 +722,7 @@ Register a logging provider using the `Logging` decorator:
 ```java
 ServiceCollection services = new ServiceCollection();
 
-services.for(Logging.class)
+services.from(Logging.class)
         .addLogging(b -> b.addConsole());
 
 services.from(MessageBusServices.class)
