@@ -60,6 +60,17 @@ MessageBus bus = MessageBusImpl.configure(services, cfg -> {
 // POST to http://localhost:5000/submit-order reaches SubmitOrderConsumer
 ```
 
+Explicit endpoints can also be configured:
+
+```java
+MessageBus bus = MessageBusImpl.configure(services, cfg -> {
+    cfg.addConsumer(SubmitOrderConsumer.class);
+    HttpTransport.configure(cfg, URI.create("http://localhost:5000/"), http -> {
+        http.receiveEndpoint("submit-order", e -> e.configureConsumer(SubmitOrderConsumer.class));
+    });
+});
+```
+
 As an alternative, consumers can be added at runtime by calling `IMessageBus.AddConsumer` with a `ConsumerTopology` and explicit URI.
 
 ## Sending with `HttpClient`
