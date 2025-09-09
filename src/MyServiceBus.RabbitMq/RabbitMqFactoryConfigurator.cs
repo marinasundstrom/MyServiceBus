@@ -12,6 +12,7 @@ public class RabbitMqFactoryConfigurator : IRabbitMqFactoryConfigurator, IBusFac
     private readonly List<Action<IMessageBus, IServiceProvider>> _endpointActions = new();
     private IEndpointNameFormatter? _endpointNameFormatter;
     private IMessageEntityNameFormatter? _entityNameFormatter;
+    private Type _consumerFactoryType = typeof(DefaultConstructorConsumerFactory<>);
     public ushort PrefetchCount { get; private set; }
 
     public RabbitMqFactoryConfigurator()
@@ -55,6 +56,11 @@ public class RabbitMqFactoryConfigurator : IRabbitMqFactoryConfigurator, IBusFac
         MyServiceBus.EntityNameFormatter.SetFormatter(formatter);
     }
 
+    public void SetConsumerFactory(Type consumerFactoryType)
+    {
+        _consumerFactoryType = consumerFactoryType;
+    }
+
     public void SetPrefetchCount(ushort prefetchCount)
     {
         PrefetchCount = prefetchCount;
@@ -80,6 +86,8 @@ public class RabbitMqFactoryConfigurator : IRabbitMqFactoryConfigurator, IBusFac
     {
         var configurator = new BusRegistrationConfigurator(services);
         configurator.Build();
+
+        services.AddSingleton(typeof(IConsumerFactory<>), _consumerFactoryType);
 
         services.AddSingleton<IRabbitMqFactoryConfigurator>(this);
         services.AddSingleton<IPostBuildAction>(new PostBuildConfigureAction((context, cfg) =>

@@ -52,7 +52,8 @@ public class ErrorQueueTests
 
         var configurator = new PipeConfigurator<ConsumeContext<TestMessage>>();
         configurator.UseFilter(new ErrorTransportFilter<TestMessage>());
-        configurator.UseFilter(new ConsumerMessageFilter<FaultingConsumer, TestMessage>(provider));
+        var factory = new ScopeConsumerFactory<FaultingConsumer>(provider);
+        configurator.UseFilter(new ConsumerMessageFilter<FaultingConsumer, TestMessage>(factory));
         var pipe = new ConsumePipe<TestMessage>(configurator.Build());
 
         await Should.ThrowAsync<InvalidOperationException>([Throws(typeof(InvalidCastException))] () => pipe.Send(context));
@@ -99,7 +100,8 @@ public class ErrorQueueTests
 
         var configurator = new PipeConfigurator<ConsumeContext<TestMessage>>();
         configurator.UseFilter(new ErrorTransportFilter<TestMessage>());
-        configurator.UseFilter(new ConsumerMessageFilter<FaultingConsumer, TestMessage>(provider));
+        var factory = new ScopeConsumerFactory<FaultingConsumer>(provider);
+        configurator.UseFilter(new ConsumerMessageFilter<FaultingConsumer, TestMessage>(factory));
         var pipe = new ConsumePipe<TestMessage>(configurator.Build());
 
         await Should.ThrowAsync<InvalidOperationException>(() => pipe.Send(context));
@@ -127,6 +129,7 @@ public class ErrorQueueTests
         public readonly CaptureSendTransport SendTransport = new();
         public Uri? Address { get; private set; }
 
+        [Throws(typeof(InvalidOperationException))]
         public Task<ISendTransport> GetSendTransport(Uri address, CancellationToken cancellationToken = default)
         {
             Address = address;

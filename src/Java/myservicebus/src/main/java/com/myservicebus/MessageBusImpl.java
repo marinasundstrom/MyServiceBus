@@ -38,9 +38,15 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
     private final BusTopology topology;
     private final Set<String> consumerRegistrations = new HashSet<>();
     private final Set<String> messageTypes = new HashSet<>();
+    private final Function<Class<?>, ConsumerFactory> consumerFactoryFactory;
 
     public MessageBusImpl(ServiceProvider serviceProvider) {
+        this(serviceProvider, type -> new ScopeConsumerFactory(serviceProvider));
+    }
+
+    public MessageBusImpl(ServiceProvider serviceProvider, Function<Class<?>, ConsumerFactory> consumerFactoryFactory) {
         this.serviceProvider = serviceProvider;
+        this.consumerFactoryFactory = consumerFactoryFactory;
         this.transportFactory = serviceProvider.getService(TransportFactory.class);
         this.transportSendEndpointProvider = serviceProvider.getService(TransportSendEndpointProvider.class);
         PublishContextFactory factory = serviceProvider.getService(PublishContextFactory.class);
@@ -102,9 +108,9 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
         configurator.useFilter(faultFilter);
         if (consumerDef.getConfigure() != null)
             consumerDef.getConfigure().accept(configurator);
+        ConsumerFactory factory = consumerFactoryFactory.apply(consumerDef.getConsumerType());
         @SuppressWarnings({ "unchecked", "rawtypes" })
-        Filter<ConsumeContext<Object>> consumerFilter = new ConsumerMessageFilter(serviceProvider,
-                consumerDef.getConsumerType());
+        Filter<ConsumeContext<Object>> consumerFilter = new ConsumerMessageFilter(consumerDef.getConsumerType(), factory);
         configurator.useFilter(consumerFilter);
         Pipe<ConsumeContext<Object>> pipe = configurator.build(serviceProvider);
 

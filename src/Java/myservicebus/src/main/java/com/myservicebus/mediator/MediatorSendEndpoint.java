@@ -3,7 +3,9 @@ package com.myservicebus.mediator;
 import com.myservicebus.ConsumeContext;
 import com.myservicebus.Consumer;
 import com.myservicebus.ConsumerFaultFilter;
+import com.myservicebus.ConsumerFactory;
 import com.myservicebus.ConsumerMessageFilter;
+import com.myservicebus.ScopeConsumerFactory;
 import com.myservicebus.ErrorTransportFilter;
 import com.myservicebus.Filter;
 import com.myservicebus.OpenTelemetryConsumeFilter;
@@ -56,7 +58,8 @@ public class MediatorSendEndpoint implements SendEndpoint {
                 configurator.useFilter(faultFilter);
                 if (consumerTopology.getConfigure() != null)
                     consumerTopology.getConfigure().accept((PipeConfigurator) configurator);
-                Filter<ConsumeContext<Object>> consumerFilter = new ConsumerMessageFilter<>(serviceProvider, consumerType);
+                ConsumerFactory factory = new ScopeConsumerFactory(serviceProvider);
+                Filter<ConsumeContext<Object>> consumerFilter = new ConsumerMessageFilter(consumerType, factory);
                 configurator.useFilter(consumerFilter);
 
                 Pipe<ConsumeContext<Object>> pipe = configurator.build(serviceProvider);

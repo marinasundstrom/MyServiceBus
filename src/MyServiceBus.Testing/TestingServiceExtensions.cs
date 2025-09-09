@@ -13,6 +13,7 @@ public static class TestingServiceExtensions
         configurator.Build();
 
         services.AddSingleton<InMemoryTestHarness>();
+        services.AddSingleton(typeof(IConsumerFactory<>), typeof(ScopeConsumerFactory<>));
         services.AddSingleton<IMessageBus>([Throws(typeof(InvalidOperationException))] (sp) => sp.GetRequiredService<InMemoryTestHarness>());
         services.AddSingleton<ITransportFactory>([Throws(typeof(InvalidOperationException))] (sp) => sp.GetRequiredService<InMemoryTestHarness>());
         services.AddSingleton<IReceiveEndpointConnector>([Throws(typeof(InvalidOperationException), typeof(InvalidCastException))] (sp) => (IReceiveEndpointConnector)sp.GetRequiredService<IMessageBus>());

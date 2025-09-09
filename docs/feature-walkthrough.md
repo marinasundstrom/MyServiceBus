@@ -84,12 +84,27 @@ constructors and cannot rely on application dependencies. This mirrors
 the Java pattern but in .NET the standard practice is to use dependency
 injection via `AddServiceBus`.
 
+The factory uses `DefaultConstructorConsumerFactory` by default to
+instantiate consumers. A different factory can be supplied if your
+consumers require dependencies:
+
 ```csharp
 IMessageBus bus = MessageBus.Factory.Create<RabbitMqFactoryConfigurator>(cfg =>
 {
+    cfg.SetConsumerFactory(typeof(ScopeConsumerFactory<>));
     cfg.ReceiveEndpoint("orders", e => e.Consumer<SubmitOrderConsumer>());
 });
-await bus.StartAsync();
+```
+
+In Java, `RabbitMqFactoryConfigurator` also defaults to
+`DefaultConstructorConsumerFactory`. Use `cfg.setConsumerFactory` to
+provide a different implementation:
+
+```java
+MessageBus bus = MessageBus.factory.create(RabbitMqFactoryConfigurator.class, cfg -> {
+    cfg.setConsumerFactory((sp, type) -> new ScopeConsumerFactory(sp));
+    // configure endpoints...
+});
 ```
 
 #### Java

@@ -2,39 +2,29 @@ package com.myservicebus;
 
 import java.util.concurrent.CompletableFuture;
 
-import com.myservicebus.di.ServiceProvider;
-import com.myservicebus.di.ServiceScope;
-
 /**
- * Filter that resolves a consumer from the service provider and invokes it.
+ * Filter that resolves a consumer using the configured factory and invokes it.
  */
-public class ConsumerMessageFilter<T> implements Filter<ConsumeContext<T>> {
-    private final ServiceProvider provider;
-    private final Class<? extends Consumer<T>> consumerType;
+public class ConsumerMessageFilter<TConsumer extends Consumer<T>, T> implements Filter<ConsumeContext<T>> {
+    private final Class<TConsumer> consumerType;
+    private final ConsumerFactory factory;
 
-    public ConsumerMessageFilter(ServiceProvider provider, Class<? extends Consumer<T>> consumerType) {
-        this.provider = provider;
+    public ConsumerMessageFilter(Class<TConsumer> consumerType, ConsumerFactory factory) {
         this.consumerType = consumerType;
+        this.factory = factory;
     }
 
     @Override
     public CompletableFuture<Void> send(ConsumeContext<T> context, Pipe<ConsumeContext<T>> next) {
-        try (ServiceScope scope = provider.createScope()) {
-            ServiceProvider scoped = scope.getServiceProvider();
-            ConsumeContextProvider ctxProvider = scoped.getService(ConsumeContextProvider.class);
-            ctxProvider.setContext(context);
+        return factory.send(consumerType, context, Pipes.execute(cc -> {
+            CompletableFuture<Void> consumerFuture;
             try {
-                Consumer<T> consumer = (Consumer<T>) scoped.getService(consumerType);
-                CompletableFuture<Void> consumerFuture;
-                try {
-                    consumerFuture = consumer.consume(context);
-                } catch (Exception ex) {
-                    consumerFuture = CompletableFuture.failedFuture(ex);
-                }
-                return consumerFuture.thenCompose(v -> next.send(context));
-            } finally {
-                ctxProvider.clear();
+                consumerFuture = cc.getConsumer().consume(cc);
+            } catch (Exception ex) {
+                consumerFuture = CompletableFuture.failedFuture(ex);
             }
-        }
+            return consumerFuture.thenCompose(v -> next.send(cc));
+        }));
     }
 }
+
