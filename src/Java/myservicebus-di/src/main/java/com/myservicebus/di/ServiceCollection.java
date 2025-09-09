@@ -23,7 +23,6 @@ public class ServiceCollection implements Iterable<ServiceDescriptor> {
     private final List<ServiceDescriptor> descriptors = new ArrayList<>();
     private final PerMessageScope perMessageScope = new PerMessageScope();
     private boolean built;
-    private boolean loggerFactoryRegistered;
 
     public <T extends ServiceCollection> T from(Class<T> decoratorType) {
         try {
@@ -88,8 +87,6 @@ public class ServiceCollection implements Iterable<ServiceDescriptor> {
                 new ServiceDescriptor(ConsoleLoggerConfig.class, null, null, config, ServiceLifetime.SINGLETON, false));
         descriptors.add(new ServiceDescriptor(LoggerFactory.class, ConsoleLoggerFactory.class, null, null,
                 ServiceLifetime.SINGLETON, false));
-
-        loggerFactoryRegistered = true;
     }
 
     public void addSlf4jLogger() {
@@ -108,8 +105,6 @@ public class ServiceCollection implements Iterable<ServiceDescriptor> {
         descriptors.add(new ServiceDescriptor(Slf4jLoggerConfig.class, null, null, config, ServiceLifetime.SINGLETON, false));
         descriptors.add(new ServiceDescriptor(LoggerFactory.class, Slf4jLoggerFactory.class, null, null,
                 ServiceLifetime.SINGLETON, false));
-
-        loggerFactoryRegistered = true;
     }
 
     public <T> void remove(Class<T> type) {
@@ -133,11 +128,6 @@ public class ServiceCollection implements Iterable<ServiceDescriptor> {
         MutableHolder<ServiceProvider> holder = new MutableHolder<>();
 
         List<ServiceDescriptor> effective = new ArrayList<>(descriptors);
-        if (!loggerFactoryRegistered) {
-            effective.add(new ServiceDescriptor(Slf4jLoggerConfig.class, null, null, new Slf4jLoggerConfig(), ServiceLifetime.SINGLETON, false));
-            effective.add(new ServiceDescriptor(LoggerFactory.class, Slf4jLoggerFactory.class, null, null,
-                    ServiceLifetime.SINGLETON, false));
-        }
 
         List<com.google.inject.Module> modules = new ArrayList<>();
         List<ServiceDescriptor> deferred = new ArrayList<>();
@@ -191,11 +181,6 @@ public class ServiceCollection implements Iterable<ServiceDescriptor> {
         MutableHolder<ServiceProvider> holder = new MutableHolder<>();
 
         List<ServiceDescriptor> effective = new ArrayList<>(descriptors);
-        if (!loggerFactoryRegistered) {
-            effective.add(new ServiceDescriptor(Slf4jLoggerConfig.class, null, null, new Slf4jLoggerConfig(), ServiceLifetime.SINGLETON, false));
-            effective.add(new ServiceDescriptor(LoggerFactory.class, Slf4jLoggerFactory.class, null, null,
-                    ServiceLifetime.SINGLETON, false));
-        }
 
         List<com.google.inject.Module> modules = new ArrayList<>();
         List<ServiceDescriptor> deferred = new ArrayList<>();

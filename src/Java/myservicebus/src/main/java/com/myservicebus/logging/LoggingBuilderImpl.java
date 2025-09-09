@@ -56,7 +56,7 @@ class LoggingBuilderImpl implements LoggingBuilder {
 
     LoggerFactory getFactory() {
         if (factory == null) {
-            factory = new Slf4jLoggerFactory(new Slf4jLoggerConfig());
+            factory = new ConsoleLoggerFactory(new ConsoleLoggerConfig());
         }
         return factory;
     }

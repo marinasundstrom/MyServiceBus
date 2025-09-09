@@ -17,6 +17,8 @@ services.for(Logging.class)
         .addLogging(builder -> builder.addConsole());
 ```
 
+If no provider is configured, a console logger is added automatically.
+
 The console logger can be tuned with `ConsoleLoggerConfig`:
 
 ```java
@@ -37,7 +39,7 @@ services.for(Logging.class)
         }));
 ```
 
-If no providers are registered, `Slf4jLoggerFactory` is added automatically so any SLF4J-compatible implementation (Logback, Log4j, etc.) can serve as the logging backend.
+If no providers are registered, `ConsoleLoggerFactory` is added automatically.
 
 ## Factory creation
 

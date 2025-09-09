@@ -29,7 +29,9 @@ class HandlerFaultFilter<T> implements Filter<ConsumeContext<T>> {
             if (ex != null) {
                 Throwable cause = ex instanceof CompletionException && ex.getCause() != null ? ex.getCause() : ex;
                 context.respondFault(cause instanceof Exception ? (Exception) cause : new RuntimeException(cause), CancellationToken.none).join();
-                logger.error("Handler faulted", cause);
+                if (logger != null) {
+                    logger.error("Handler faulted", cause);
+                }
                 throw new CompletionException(cause);
             }
             return null;
