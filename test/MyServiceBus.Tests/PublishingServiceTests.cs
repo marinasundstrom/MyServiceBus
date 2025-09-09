@@ -35,7 +35,7 @@ public class PublishingServiceTests
         var service = provider.GetRequiredService<PublishingService>();
         await service.Submit(Guid.NewGuid());
 
-        Assert.True(harness.WasConsumed<ValueSubmitted>());
+        Assert.True(await harness.WaitForConsumed<ValueSubmitted>());
 
         await harness.Stop();
     }

@@ -81,6 +81,19 @@ public class InMemoryTestHarness : IMessageBus, ITransportFactory, IReceiveEndpo
 
     public bool WasConsumed<T>() where T : class => consumed.OfType<T>().Any();
 
+    public async Task<bool> WaitForConsumed<T>(TimeSpan? timeout = null) where T : class
+    {
+        var end = DateTime.UtcNow + (timeout ?? TimeSpan.FromSeconds(1));
+        while (DateTime.UtcNow < end)
+        {
+            if (WasConsumed<T>())
+                return true;
+            await Task.Delay(10).ConfigureAwait(false);
+        }
+
+        return WasConsumed<T>();
+    }
+
     [Throws(typeof(InvalidCastException))]
     public Task Publish<TMessage>(object message, Action<IPublishContext>? contextCallback = null, CancellationToken cancellationToken = default) where TMessage : class
         => Publish((TMessage)message, contextCallback, cancellationToken);
@@ -127,7 +140,6 @@ public class InMemoryTestHarness : IMessageBus, ITransportFactory, IReceiveEndpo
         return Task.CompletedTask;
     }
 
-    [Throws(typeof(InvalidOperationException))]
     public Task<ISendTransport> GetSendTransport(Uri address, CancellationToken cancellationToken = default)
         => Task.FromResult<ISendTransport>(new HarnessSendTransport(this));
 
@@ -308,7 +320,7 @@ public class InMemoryTestHarness : IMessageBus, ITransportFactory, IReceiveEndpo
         public IDictionary<string, object> Headers { get; }
         public DateTimeOffset SentTime { get; }
 
-        [Throws(typeof(InvalidOperationException), typeof(ObjectDisposedException))]
+        [Throws(typeof(ObjectDisposedException))]
         public bool TryGetMessage<T>(out T? msg) where T : class
         {
             if (message is T m)
