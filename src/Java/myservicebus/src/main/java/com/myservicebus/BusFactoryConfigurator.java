@@ -5,5 +5,5 @@ import com.myservicebus.di.ServiceCollection;
 public interface BusFactoryConfigurator {
     MessageBus build();
 
-    void build(ServiceCollection services);
+    void configure(ServiceCollection services);
 }

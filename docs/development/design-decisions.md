@@ -9,7 +9,7 @@ This document explains why some MyServiceBus APIs differ from MassTransit and hi
 
 ## Java-specific differences
 
- - **Manual bus lifecycle** – The Java examples register the bus via `services.from(MessageBusServices.class).addServiceBus(cfg -> ...)`, resolve a `MessageBus` from the container, and call `start()` explicitly. C# offers `MessageBus.Factory.CreateUsingRabbitMq` for a self-contained bus or `RabbitMqBusFactory.Configure` to populate an `IServiceCollection`, but ASP.NET typically starts the bus via a hosted service. Unlike ASP.NET's hosting model, Java lacks a standardized host so the bus must manage its own lifecycle.
+ - **Manual bus lifecycle** – The Java examples register the bus via `services.from(MessageBusServices.class).addServiceBus(cfg -> ...)`, resolve a `MessageBus` from the container, and call `start()` explicitly. C# can create a self-contained bus via `MessageBus.Factory` or populate an `IServiceCollection` with `AddServiceBus`, but ASP.NET typically starts the bus via a hosted service. Unlike ASP.NET's hosting model, Java lacks a standardized host so the bus must manage its own lifecycle.
 - **Asynchronous style** – C# relies on `async`/`await` with `Task`, while Java returns `CompletableFuture` and callers often invoke `.join()`. This pattern reflects Java's lack of a language-level async keyword.
 - **Cancellation tokens** – Operations in Java require an explicit `CancellationToken.none` because the JDK has no built-in cancellation primitive comparable to .NET's `CancellationToken` parameter defaults.
 - **Endpoint resolution** – C# examples resolve `ISendEndpoint` from DI. Java acquires a `SendEndpoint` via a `SendEndpointProvider` and a URI, mirroring how MassTransit addresses endpoints but adapted for Java's type system.

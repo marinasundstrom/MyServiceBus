@@ -18,7 +18,6 @@ import com.myservicebus.PublishEndpoint;
 import com.myservicebus.di.ServiceCollection;
 import com.myservicebus.di.ServiceProvider;
 import com.myservicebus.di.ServiceScope;
-import com.myservicebus.rabbitmq.RabbitMqBusFactory;
 import com.myservicebus.rabbitmq.RabbitMqFactoryConfigurator;
 import com.myservicebus.rabbitmq.RabbitMqTransport;
 import com.myservicebus.tasks.CancellationToken;

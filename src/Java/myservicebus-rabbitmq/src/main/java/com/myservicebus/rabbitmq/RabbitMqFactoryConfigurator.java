@@ -116,13 +116,13 @@ public class RabbitMqFactoryConfigurator implements BusFactoryConfigurator {
     @Override
     public MessageBus build() {
         ServiceCollection services = new ServiceCollection();
-        build(services);
+        configure(services);
         ServiceProvider provider = services.buildServiceProvider();
         return provider.getService(MessageBus.class);
     }
 
     @Override
-    public void build(ServiceCollection services) {
+    public void configure(ServiceCollection services) {
         BusRegistrationConfiguratorImpl cfg = new BusRegistrationConfiguratorImpl(services);
         RabbitMqTransport.configure(cfg, this);
         cfg.complete();

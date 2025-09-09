@@ -12,7 +12,7 @@ namespace MyServiceBus;
 
 public class MessageBus : IMessageBus, IReceiveEndpointConnector
 {
-    public static BusFactory Factory { get; } = new();
+    public static IBusFactory Factory { get; } = new DefaultBusFactory();
 
     private readonly ITransportFactory _transportFactory;
     private readonly IServiceProvider _serviceProvider;
