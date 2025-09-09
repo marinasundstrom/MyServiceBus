@@ -1,9 +1,10 @@
 package com.myservicebus.di;
 
 import com.google.inject.*;
-import com.google.inject.Module;
 import com.google.inject.multibindings.Multibinder;
+import com.google.inject.binder.ScopedBindingBuilder;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.function.Consumer;
 
@@ -12,10 +13,13 @@ import com.myservicebus.logging.Slf4jLoggerFactory;
 import com.myservicebus.logging.ConsoleLoggerConfig;
 import com.myservicebus.logging.ConsoleLoggerFactory;
 
-public class ServiceCollection {
-    private final List<Module> modules = new ArrayList<>();
-    private final List<Module> deferredModules = new ArrayList<>();
-    private final List<Consumer<ServiceProvider>> deferredScopedProviders = new ArrayList<>();
+/**
+ * Collects service registrations using {@link ServiceDescriptor} entries. The
+ * collection can be
+ * iterated to build a {@link ServiceProvider} backed by any IoC container.
+ */
+public class ServiceCollection implements Iterable<ServiceDescriptor> {
+    private final List<ServiceDescriptor> descriptors = new ArrayList<>();
     private final PerMessageScope perMessageScope = new PerMessageScope();
     private boolean built;
     private boolean loggerFactoryRegistered;
@@ -29,118 +33,46 @@ public class ServiceCollection {
         }
     }
 
-    public <T> void addSingleton(Class<T> type, ServiceProviderBasedProvider<T> providerFactory) {
-        if (built) {
-            throw new IllegalStateException("Cannot add service to container that has been built.");
-        }
+    @Override
+    public Iterator<ServiceDescriptor> iterator() {
+        return descriptors.iterator();
+    }
 
-        deferredScopedProviders.add(sp -> {
-            deferredModules.add(new AbstractModule() {
-                @Override
-                protected void configure() {
-                    bind(type).toProvider(providerFactory.create(sp)).in(Scopes.SINGLETON);
-                }
-            });
-        });
+    public <T> void addSingleton(Class<T> type, ServiceProviderBasedProvider<T> providerFactory) {
+        addDescriptor(new ServiceDescriptor(type, null, providerFactory, null, ServiceLifetime.SINGLETON, false));
     }
 
     public <T, U extends T> void addSingleton(Class<T> type) {
-        if (built) {
-            throw new IllegalStateException("Cannot add service to container that has been built.");
-        }
-
-        modules.add(new AbstractModule() {
-            @Override
-            protected void configure() {
-                bind(type).in(Scopes.SINGLETON);
-            }
-        });
+        addDescriptor(new ServiceDescriptor(type, type, null, null, ServiceLifetime.SINGLETON, false));
     }
 
     public <T, U extends T> void addSingleton(Class<T> iface, Class<U> impl) {
-        if (built) {
-            throw new IllegalStateException("Cannot add service to container that has been built.");
-        }
-
-        modules.add(new AbstractModule() {
-            @Override
-            protected void configure() {
-                bind(iface).to(impl).in(Scopes.SINGLETON);
-            }
-        });
+        addDescriptor(new ServiceDescriptor(iface, impl, null, null, ServiceLifetime.SINGLETON, false));
     }
 
     public <T> void addScoped(Class<T> type) {
-        if (built) {
-            throw new IllegalStateException("Cannot add service to container that has been built.");
-        }
-
-        modules.add(new AbstractModule() {
-            @Override
-            protected void configure() {
-                bind(type).in(Scoped.class);
-            }
-        });
+        addDescriptor(new ServiceDescriptor(type, type, null, null, ServiceLifetime.SCOPED, false));
     }
 
     public <T> void addScoped(Class<T> type, ServiceProviderBasedProvider<T> providerFactory) {
-        if (built) {
-            throw new IllegalStateException("Cannot add service to container that has been built.");
-        }
-
-        deferredScopedProviders.add(sp -> {
-            deferredModules.add(new AbstractModule() {
-                @Override
-                protected void configure() {
-                    bind(type).toProvider(providerFactory.create(sp)).in(Scoped.class);
-                }
-            });
-        });
+        addDescriptor(new ServiceDescriptor(type, null, providerFactory, null, ServiceLifetime.SCOPED, false));
     }
 
     public <T, U extends T> void addScoped(Class<T> iface, Class<U> impl) {
-        if (built) {
-            throw new IllegalStateException("Cannot add service to container that has been built.");
-        }
-
-        modules.add(new AbstractModule() {
-            @Override
-            protected void configure() {
-                bind(iface).to(impl).in(Scoped.class);
-            }
-        });
+        addDescriptor(new ServiceDescriptor(iface, impl, null, null, ServiceLifetime.SCOPED, false));
     }
 
     public <T, U extends T> void addMultiBinding(Class<T> iface, Class<U> impl) {
-        if (built) {
-            throw new IllegalStateException("Cannot add service to container that has been built.");
-        }
-
-        modules.add(new AbstractModule() {
-            @Override
-            protected void configure() {
-                Multibinder<T> binder = Multibinder.newSetBinder(binder(), iface);
-                binder.addBinding().to(impl);
-            }
-        });
+        addDescriptor(new ServiceDescriptor(iface, impl, null, null, ServiceLifetime.TRANSIENT, true));
     }
 
     public <T, U extends T> void addScopedMultiBinding(Class<T> iface, Class<U> impl) {
-        if (built) {
-            throw new IllegalStateException("Cannot add service to container that has been built.");
-        }
-
-        modules.add(new AbstractModule() {
-            @Override
-            protected void configure() {
-                Multibinder<T> binder = Multibinder.newSetBinder(binder(), iface);
-                binder.addBinding().to(impl).in(Scoped.class);
-            }
-        });
+        addDescriptor(new ServiceDescriptor(iface, impl, null, null, ServiceLifetime.SCOPED, true));
     }
 
     public void addConsoleLogger() {
-        addConsoleLogger(c -> {});
+        addConsoleLogger(c -> {
+        });
     }
 
     public void addConsoleLogger(Consumer<ConsoleLoggerConfig> configure) {
@@ -151,15 +83,24 @@ public class ServiceCollection {
         ConsoleLoggerConfig config = new ConsoleLoggerConfig();
         configure.accept(config);
 
-        modules.add(new AbstractModule() {
-            @Override
-            protected void configure() {
-                bind(ConsoleLoggerConfig.class).toInstance(config);
-                bind(LoggerFactory.class).to(ConsoleLoggerFactory.class).in(Scopes.SINGLETON);
-            }
-        });
+        descriptors.add(
+                new ServiceDescriptor(ConsoleLoggerConfig.class, null, null, config, ServiceLifetime.SINGLETON, false));
+        descriptors.add(new ServiceDescriptor(LoggerFactory.class, ConsoleLoggerFactory.class, null, null,
+                ServiceLifetime.SINGLETON, false));
 
         loggerFactoryRegistered = true;
+    }
+
+    public <T> void remove(Class<T> type) {
+        if (built) {
+            throw new IllegalStateException("Cannot remove service from container that has been built.");
+        }
+
+        descriptors.removeIf(d -> type.equals(d.getServiceType()));
+    }
+
+    public List<ServiceDescriptor> getDescriptors() {
+        return List.copyOf(descriptors);
     }
 
     public ServiceProvider buildServiceProvider() {
@@ -170,22 +111,29 @@ public class ServiceCollection {
 
         MutableHolder<ServiceProvider> holder = new MutableHolder<>();
 
-        // FIRST: Add the scope registration module
-        modules.add(0, new AbstractModule() {
+        List<ServiceDescriptor> effective = new ArrayList<>(descriptors);
+        if (!loggerFactoryRegistered) {
+            effective.add(new ServiceDescriptor(LoggerFactory.class, Slf4jLoggerFactory.class, null, null,
+                    ServiceLifetime.SINGLETON, false));
+        }
+
+        List<com.google.inject.Module> modules = new ArrayList<>();
+        List<ServiceDescriptor> deferred = new ArrayList<>();
+
+        modules.add(new AbstractModule() {
             @Override
             protected void configure() {
-                bindScope(Scoped.class, perMessageScope); // ✅ must come before anything uses @Scoped
+                bindScope(Scoped.class, perMessageScope);
                 bind(PerMessageScope.class).toInstance(perMessageScope);
             }
         });
 
-        if (!loggerFactoryRegistered) {
-            modules.add(new AbstractModule() {
-                @Override
-                protected void configure() {
-                    bind(LoggerFactory.class).to(Slf4jLoggerFactory.class).in(Scopes.SINGLETON);
-                }
-            });
+        for (ServiceDescriptor d : effective) {
+            if (d.getImplementationFactory() != null) {
+                deferred.add(d);
+            } else {
+                modules.add(createModule(d));
+            }
         }
 
         modules.add(new AbstractModule() {
@@ -195,19 +143,19 @@ public class ServiceCollection {
             }
         });
 
-        Injector injector = Guice.createInjector(new ArrayList<>(modules));
+        Injector injector = Guice.createInjector(modules);
 
-        // Now create the ServiceProvider and set it
         ServiceProviderImpl provider = new ServiceProviderImpl(injector, perMessageScope);
         holder.set(provider);
 
-        // Apply the deferred bindings
-        deferredScopedProviders.forEach(p -> p.accept(holder.get()));
-
-        // Add the new modules with bindings
-        injector = injector.createChildInjector(deferredModules); // or re-create the final injector
-
-        provider.setInjector(injector);
+        if (!deferred.isEmpty()) {
+            List<com.google.inject.Module> deferredModules = new ArrayList<>();
+            for (ServiceDescriptor d : deferred) {
+                deferredModules.add(createDeferredModule(d, holder.get()));
+            }
+            injector = injector.createChildInjector(deferredModules);
+            provider.setInjector(injector);
+        }
 
         return provider;
     }
@@ -220,7 +168,16 @@ public class ServiceCollection {
 
         MutableHolder<ServiceProvider> holder = new MutableHolder<>();
 
-        modules.add(0, new AbstractModule() {
+        List<ServiceDescriptor> effective = new ArrayList<>(descriptors);
+        if (!loggerFactoryRegistered) {
+            effective.add(new ServiceDescriptor(LoggerFactory.class, Slf4jLoggerFactory.class, null, null,
+                    ServiceLifetime.SINGLETON, false));
+        }
+
+        List<com.google.inject.Module> modules = new ArrayList<>();
+        List<ServiceDescriptor> deferred = new ArrayList<>();
+
+        modules.add(new AbstractModule() {
             @Override
             protected void configure() {
                 bindScope(Scoped.class, perMessageScope);
@@ -228,13 +185,12 @@ public class ServiceCollection {
             }
         });
 
-        if (!loggerFactoryRegistered) {
-            modules.add(new AbstractModule() {
-                @Override
-                protected void configure() {
-                    bind(LoggerFactory.class).to(Slf4jLoggerFactory.class).in(Scopes.SINGLETON);
-                }
-            });
+        for (ServiceDescriptor d : effective) {
+            if (d.getImplementationFactory() != null) {
+                deferred.add(d);
+            } else {
+                modules.add(createModule(d));
+            }
         }
 
         modules.add(new AbstractModule() {
@@ -244,17 +200,86 @@ public class ServiceCollection {
             }
         });
 
-        Injector injector = parentInjector.createChildInjector(new ArrayList<>(modules));
+        Injector injector = parentInjector.createChildInjector(modules);
 
         ServiceProviderImpl provider = new ServiceProviderImpl(injector, perMessageScope);
         holder.set(provider);
 
-        deferredScopedProviders.forEach(p -> p.accept(holder.get()));
-
-        injector = injector.createChildInjector(deferredModules);
-
-        provider.setInjector(injector);
+        if (!deferred.isEmpty()) {
+            List<com.google.inject.Module> deferredModules = new ArrayList<>();
+            for (ServiceDescriptor d : deferred) {
+                deferredModules.add(createDeferredModule(d, holder.get()));
+            }
+            injector = injector.createChildInjector(deferredModules);
+            provider.setInjector(injector);
+        }
 
         return provider;
+    }
+
+    private void addDescriptor(ServiceDescriptor descriptor) {
+        if (built) {
+            throw new IllegalStateException("Cannot add service to container that has been built.");
+        }
+        descriptors.add(descriptor);
+    }
+
+    private com.google.inject.Module createModule(ServiceDescriptor d) {
+        return new AbstractModule() {
+            @Override
+            @SuppressWarnings({ "unchecked", "rawtypes" })
+            protected void configure() {
+                Class serviceType = d.getServiceType();
+                if (d.isMultiBinding()) {
+                    Multibinder binder = Multibinder.newSetBinder(binder(), serviceType);
+                    if (d.getImplementationInstance() != null) {
+                        binder.addBinding().toInstance(d.getImplementationInstance());
+                    } else {
+                        ScopedBindingBuilder scoped = binder.addBinding().to(d.getImplementationType());
+                        applyScope(scoped, d.getLifetime());
+                    }
+                } else {
+                    if (d.getImplementationInstance() != null) {
+                        bind(serviceType).toInstance(d.getImplementationInstance());
+                    } else {
+                        ScopedBindingBuilder scoped;
+                        if (d.getImplementationType() != null && !serviceType.equals(d.getImplementationType())) {
+                            scoped = bind(serviceType).to(d.getImplementationType());
+                        } else {
+                            scoped = bind(serviceType);
+                        }
+                        applyScope(scoped, d.getLifetime());
+                    }
+                }
+            }
+        };
+    }
+
+    private com.google.inject.Module createDeferredModule(ServiceDescriptor d, ServiceProvider provider) {
+        return new AbstractModule() {
+            @Override
+            @SuppressWarnings({ "unchecked", "rawtypes" })
+            protected void configure() {
+                Class serviceType = d.getServiceType();
+                Provider guiceProvider = d.getImplementationFactory().create(provider);
+                if (d.isMultiBinding()) {
+                    Multibinder binder = Multibinder.newSetBinder(binder(), serviceType);
+                    ScopedBindingBuilder scoped = binder.addBinding().toProvider(guiceProvider);
+                    applyScope(scoped, d.getLifetime());
+                } else {
+                    ScopedBindingBuilder scoped = bind(serviceType).toProvider(guiceProvider);
+                    applyScope(scoped, d.getLifetime());
+                }
+            }
+        };
+    }
+
+    private void applyScope(ScopedBindingBuilder builder, ServiceLifetime lifetime) {
+        switch (lifetime) {
+            case SINGLETON -> builder.in(Scopes.SINGLETON);
+            case SCOPED -> builder.in(Scoped.class);
+            default -> {
+            }
+        }
     }
 }
