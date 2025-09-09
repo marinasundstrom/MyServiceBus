@@ -2,8 +2,11 @@ namespace MyServiceBus;
 
 using System;
 using System.Collections.Generic;
+using Microsoft.Extensions.DependencyInjection;
+using MyServiceBus.Serialization;
+using RabbitMQ.Client;
 
-internal sealed class RabbitMqFactoryConfigurator : IRabbitMqFactoryConfigurator
+public class RabbitMqFactoryConfigurator : IRabbitMqFactoryConfigurator, IBusFactoryConfigurator
 {
     private readonly Dictionary<Type, string> _exchangeNames = new();
     private readonly List<Action<IMessageBus, IServiceProvider>> _endpointActions = new();
@@ -61,6 +64,57 @@ internal sealed class RabbitMqFactoryConfigurator : IRabbitMqFactoryConfigurator
     {
         foreach (var action in _endpointActions)
             action(bus, provider);
+    }
+
+    public IMessageBus Build()
+    {
+        var services = new ServiceCollection();
+        Configure(services);
+        var provider = services.BuildServiceProvider();
+        foreach (var action in provider.GetServices<IPostBuildAction>())
+            action.Execute(provider);
+        return provider.GetRequiredService<IMessageBus>();
+    }
+
+    public void Configure(IServiceCollection services)
+    {
+        var configurator = new BusRegistrationConfigurator(services);
+        configurator.Build();
+
+        services.AddSingleton<IRabbitMqFactoryConfigurator>(this);
+        services.AddSingleton<IPostBuildAction>(new PostBuildConfigureAction((context, cfg) =>
+        {
+            this.ConfigureEndpoints(context);
+        }, this));
+
+        services.AddSingleton<ConnectionProvider>(sp =>
+        {
+            var factory = new ConnectionFactory
+            {
+                HostName = ClientHost,
+                AutomaticRecoveryEnabled = true,
+                TopologyRecoveryEnabled = true,
+            };
+            return new ConnectionProvider(factory);
+        });
+
+        services.AddSingleton<ITransportFactory, RabbitMqTransportFactory>();
+        services.AddSingleton<ISendContextFactory, RabbitMqSendContextFactory>();
+        services.AddSingleton<IPublishContextFactory, RabbitMqPublishContextFactory>();
+        services.AddSingleton<IMessageBus>([Throws(typeof(UriFormatException))] (sp) => new MessageBus(
+            sp.GetRequiredService<ITransportFactory>(),
+            sp,
+            sp.GetRequiredService<ISendPipe>(),
+            sp.GetRequiredService<IPublishPipe>(),
+            sp.GetRequiredService<IMessageSerializer>(),
+            new Uri($"rabbitmq://{ClientHost}/"),
+            sp.GetRequiredService<ISendContextFactory>(),
+            sp.GetRequiredService<IPublishContextFactory>()));
+
+        services.AddSingleton<IReceiveEndpointConnector>(sp => (IReceiveEndpointConnector)sp.GetRequiredService<IMessageBus>());
+        services.AddHostedService<ServiceBusHostedService>();
+        services.AddScoped(typeof(IRequestClient<>), typeof(GenericRequestClient<>));
+        services.AddScoped<IScopedClientFactory, RequestClientFactory>();
     }
 }
 

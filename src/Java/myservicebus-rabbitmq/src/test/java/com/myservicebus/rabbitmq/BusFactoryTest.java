@@ -22,7 +22,7 @@ public class BusFactoryTest {
         RabbitMqFactoryConfigurator cfg = new RabbitMqFactoryConfigurator();
         cfg.host("localhost");
         ServiceCollection services = new ServiceCollection();
-        cfg.build(services);
+        cfg.configure(services);
         ServiceProvider provider = services.buildServiceProvider();
         MessageBus bus = provider.getService(MessageBus.class);
         assertNotNull(bus);
