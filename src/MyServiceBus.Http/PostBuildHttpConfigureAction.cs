@@ -17,7 +17,7 @@ internal class PostBuildHttpConfigureAction : IPostBuildAction
     [Throws(typeof(InvalidOperationException))]
     public void Execute(IServiceProvider provider)
     {
-        var context = new BusRegistrationContext(provider);
+        var context = new HttpBusRegistrationContext(provider);
         _configure(context, _configurator);
         if (_configurator is HttpFactoryConfigurator cfg)
         {
@@ -25,4 +25,14 @@ internal class PostBuildHttpConfigureAction : IPostBuildAction
             cfg.Apply(bus, provider);
         }
     }
+}
+
+internal sealed class HttpBusRegistrationContext : IBusRegistrationContext
+{
+    public HttpBusRegistrationContext(IServiceProvider serviceProvider)
+    {
+        this.ServiceProvider = serviceProvider;
+    }
+
+    public IServiceProvider ServiceProvider { get; }
 }

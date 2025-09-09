@@ -18,7 +18,7 @@ public static class HttpConfiguratorExtensions
             var messageType = consumer.Bindings.First().MessageType;
             var path = formatter?.Format(messageType) ?? consumer.Address;
 
-            configurator.ReceiveEndpoint(path, [Throws(typeof(AmbiguousMatchException))] (e) =>
+            configurator.ReceiveEndpoint(path, (e) =>
             {
                 var method = typeof(HttpReceiveEndpointConfigurator)
                     .GetMethod(nameof(HttpReceiveEndpointConfigurator.ConfigureConsumer))!
