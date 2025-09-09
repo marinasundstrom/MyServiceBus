@@ -16,9 +16,7 @@ import java.net.URI;
 public class RabbitMqTransport {
 
     // Equivalent to "UsingRabbitMq" in .NET impl
-    public static void configure(BusRegistrationConfigurator x) {
-
-        RabbitMqFactoryConfigurator factoryConfigurator = new RabbitMqFactoryConfigurator();
+    public static void configure(BusRegistrationConfigurator x, RabbitMqFactoryConfigurator factoryConfigurator) {
 
         ServiceCollection services = x.getServiceCollection();
         services.addSingleton(RabbitMqFactoryConfigurator.class, sp -> () -> factoryConfigurator);
@@ -58,5 +56,9 @@ public class RabbitMqTransport {
                 sp -> () -> new RabbitMqRequestClientTransport(sp.getService(ConnectionProvider.class)));
         services.addScoped(ScopedClientFactory.class,
                 sp -> () -> new RequestClientFactory(sp.getService(RequestClientTransport.class)));
+    }
+
+    public static void configure(BusRegistrationConfigurator x) {
+        configure(x, new RabbitMqFactoryConfigurator());
     }
 }
