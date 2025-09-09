@@ -106,7 +106,7 @@ services.from(MessageBusServices.class)
 
 ServiceProvider serviceProvider = services.buildServiceProvider();
 MessageBus bus = serviceProvider.getService(MessageBus.class);
-bus.start().join();
+bus.start();
 ```
 
 Java accepts this self-contained model because the runtime lacks a
@@ -190,7 +190,7 @@ services.from(MessageBusServices.class)
         .addServiceBus(cfg -> {
             cfg.addConsumer(SubmitOrderConsumer.class);
             cfg.using(RabbitMqFactoryConfigurator.class, (context, rbCfg) -> rbCfg.receiveEndpoint("submit-order",
-                    e -> e.configureConsumer(SubmitOrderConsumer.class, context)));
+                    e -> e.configureConsumer(context, SubmitOrderConsumer.class)));
         });
 
 ServiceProvider serviceProvider = services.buildServiceProvider();
@@ -667,7 +667,7 @@ public class MyService {
     }
 
     public CompletableFuture<Void> doWork(MyEvent event) {
-        return publishEndpoint.publish(event, CancellationToken.none());
+        return publishEndpoint.publish(event, CancellationToken.none);
     }
 }
 ```
