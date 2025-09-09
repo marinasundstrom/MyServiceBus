@@ -106,14 +106,14 @@ Register the bus:
 ```java
 ServiceCollection services = new ServiceCollection();
 
-RabbitMqBusFactory.configure(services, x -> {
-    x.addConsumer(SubmitOrderConsumer.class);
-}, (context, cfg) -> {
-    cfg.configureEndpoints(context);
-});
+services.from(MessageBusServices.class)
+        .addServiceBus(RabbitMqFactoryConfigurator.class, cfg -> {
+            cfg.addConsumer(SubmitOrderConsumer.class);
+            cfg.usingRabbitMq((context, rbCfg) -> rbCfg.configureEndpoints(context));
+        });
 
 ServiceProvider provider = services.buildServiceProvider();
-ServiceBus bus = provider.getService(ServiceBus.class);
+MessageBus bus = provider.getService(MessageBus.class);
 bus.start().join();
 ```
 

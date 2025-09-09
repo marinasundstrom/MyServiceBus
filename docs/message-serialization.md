@@ -24,9 +24,13 @@ services.AddServiceBus(x =>
 **Java**
 
 ```java
-ServiceBus.configure(services, cfg -> {
-    cfg.setSerializer(RawJsonMessageSerializer.class);
-});
+ServiceCollection services = new ServiceCollection();
+
+services.from(MessageBusServices.class)
+        .addServiceBus(RabbitMqFactoryConfigurator.class, cfg -> {
+            cfg.setSerializer(RawJsonMessageSerializer.class);
+            cfg.usingRabbitMq((context, rbCfg) -> {});
+        });
 ```
 
 `EnvelopeMessageSerializer` remains the default and wraps the message with metadata. Use `RawJsonMessageSerializer` to send the payload as raw JSON.
