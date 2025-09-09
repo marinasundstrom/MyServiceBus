@@ -41,6 +41,6 @@ public final class HttpTransport {
     }
 
     public static void configure(BusRegistrationConfigurator cfg) {
-        configure(cfg, new HttpFactoryConfigurator(cfg));
+        configure(cfg, new HttpFactoryConfigurator());
     }
 }

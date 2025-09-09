@@ -26,19 +26,16 @@ public class HttpFactoryConfiguratorTests {
 
     @Test
     public void maps_consumer_to_explicit_endpoint() {
-        ServiceCollection services = new ServiceCollection();
-        BusRegistrationConfiguratorImpl cfg = new BusRegistrationConfiguratorImpl(services);
+        HttpFactoryConfigurator cfg = new HttpFactoryConfigurator();
         cfg.addConsumer(MyConsumer.class);
+        cfg.host(URI.create("http://localhost:5000/"));
+        cfg.receiveEndpoint("submit-order", e -> e.configureConsumer(MyConsumer.class));
 
-        HttpTransport.configure(cfg);
-        cfg.complete();
-
+        ServiceCollection services = new ServiceCollection();
+        cfg.configure(services);
         ServiceProvider provider = services.buildServiceProvider();
-        HttpFactoryConfigurator http = provider.getService(HttpFactoryConfigurator.class);
-        URI base = URI.create("http://localhost:5000/");
-        http.host(base);
-        BusRegistrationContext context = new BusRegistrationContext(provider);
-        http.receiveEndpoint("submit-order", e -> e.configureConsumer(context, MyConsumer.class));
+
+        provider.getService(MessageBus.class);
 
         TopologyRegistry registry = provider.getService(TopologyRegistry.class);
         ConsumerTopology def = registry.getConsumers().stream()

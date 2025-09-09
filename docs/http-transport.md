@@ -49,12 +49,9 @@ IMessageBus bus = MessageBus.Factory.Create<HttpFactoryConfigurator>(cfg =>
 #### Java
 
 ```java
-ServiceCollection services = new ServiceCollection();
-HttpMessageBusFactory.configure(services, cfg -> {}, (context, http) -> {
-    http.host(URI.create("http://localhost:5000/"));
+MessageBus bus = MessageBus.factory.create(HttpFactoryConfigurator.class, cfg -> {
+    cfg.host(URI.create("http://localhost:5000/"));
 });
-ServiceProvider provider = services.buildServiceProvider();
-MessageBus bus = provider.getService(MessageBus.class);
 ```
 
 ### Consumers
@@ -105,15 +102,12 @@ IMessageBus bus = MessageBus.Factory.Create<HttpFactoryConfigurator>(cfg =>
 ```
 
 ```java
-ServiceCollection services = new ServiceCollection();
-HttpMessageBusFactory.configure(services, cfg -> {}, (context, http) -> {
-    http.host(URI.create("http://localhost:5000/"));
-    http.receiveEndpoint("submit-order", e -> {
+MessageBus bus = MessageBus.factory.create(HttpFactoryConfigurator.class, cfg -> {
+    cfg.host(URI.create("http://localhost:5000/"));
+    cfg.receiveEndpoint("submit-order", e -> {
         // configure consumers
     });
 });
-ServiceProvider provider = services.buildServiceProvider();
-MessageBus bus = provider.getService(MessageBus.class);
 ```
 
 Explicit endpoints can also be configured:
@@ -130,15 +124,12 @@ IMessageBus bus = MessageBus.Factory.Create<HttpFactoryConfigurator>(cfg =>
 ```
 
 ```java
-ServiceCollection services = new ServiceCollection();
-HttpMessageBusFactory.configure(services, cfg -> {}, (context, http) -> {
-    http.host(URI.create("http://localhost:5000/"));
-    http.receiveEndpoint("submit-order", e -> {
+MessageBus bus = MessageBus.factory.create(HttpFactoryConfigurator.class, cfg -> {
+    cfg.host(URI.create("http://localhost:5000/"));
+    cfg.receiveEndpoint("submit-order", e -> {
         // configure consumers
     });
 });
-ServiceProvider provider = services.buildServiceProvider();
-MessageBus bus = provider.getService(MessageBus.class);
 ```
 
 As an alternative, consumers can be added at runtime by calling `IMessageBus.AddConsumer` with a `ConsumerTopology` and explicit URI.
