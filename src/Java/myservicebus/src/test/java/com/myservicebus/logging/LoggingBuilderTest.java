@@ -43,6 +43,13 @@ public class LoggingBuilderTest {
     }
 
     @Test
+    void loggerFactoryBuilderDefaultsToConsole() {
+        LoggerFactory factory = LoggerFactoryBuilder.create(b -> {
+        });
+        assertTrue(factory.create("test") instanceof ConsoleLogger);
+    }
+
+    @Test
     void loggerFactoryBuilderCreatesSlf4jFactoryWithConfig() {
         LoggerFactory factory = LoggerFactoryBuilder
                 .create(b -> b.addSlf4j(cfg -> cfg.setMinimumLevel(LogLevel.ERROR)));
