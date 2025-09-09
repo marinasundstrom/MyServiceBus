@@ -1,10 +1,10 @@
 # Implementing a New Transport
 
-This guide walks through adding a new transport to MyServiceBus, using Azure Service Bus as an example. It highlights the common steps and the differences between the C# and Java implementations.
+This guide walks through adding a new transport to MyServiceBus, using Azure Service Bus as an example. It highlights the common steps and the differences between the C# and Java implementations. For background on the overarching factory and dependency injection approaches, see [configuration-patterns](../configuration-patterns.md).
 
 ## 1. Define the Transport Factory
 
-The transport factory creates and caches send and receive transports.
+The transport factory creates and caches send and receive transports. The implementation should follow the [factory pattern](../configuration-patterns.md#factory-pattern).
 
 ### C#
 - Implement `ITransportFactory`.
@@ -56,6 +56,8 @@ Both implementations should map MyServiceBus addresses to the transport's constr
 
 ## 4. Registration and Configuration
 
+Transport registration is handled through dependency injection. Review the [dependency injection pattern](../configuration-patterns.md#dependency-injection-pattern) for the underlying concepts.
+
 ### C#
 - Expose an extension method `UseAzureServiceBus` that registers the transport factory and any options in DI.
 - Follow the pattern used by `RabbitMqServiceBusConfigurationBuilderExt`.
@@ -63,6 +65,23 @@ Both implementations should map MyServiceBus addresses to the transport's constr
 ### Java
 - Provide a configuration helper, e.g., `AzureServiceBusTransport.configure(cfg)`.
 - Supply builders for receive endpoints and send endpoints within the Java configuration DSL.
+
+## Interfaces and Configuration Classes
+
+Understanding the contracts used during configuration helps recreate the structure in a new transport.
+
+### C#
+
+- `ITransportFactory` – implemented by a transport-specific factory such as `AzureServiceBusTransportFactory`.
+- `ISendTransport` / `IReceiveTransport` – concrete transports created by the factory.
+- `IBusRegistrationConfigurator` – type extended by `UseAzureServiceBus` to register services in `IServiceCollection`.
+- `IPostBuildAction` and context factories (`ISendContextFactory`, `IPublishContextFactory`) registered for later use when building `IMessageBus`.
+
+### Java
+
+- `TransportFactory` – concrete factory class creating `SendTransport` and `ReceiveTransport` instances.
+- `SendTransport` / `ReceiveTransport` – implementations returned by the factory.
+- `ServiceBusConfiguration` (or `cfg` in DSL) – configuration object passed to `AzureServiceBusTransport.configure` to wire the factory and options.
 
 ## 5. Testing
 
@@ -81,3 +100,17 @@ Both implementations should map MyServiceBus addresses to the transport's constr
 | Exception handling | Uses `[Throws]` attributes and domain exceptions | Uses checked or runtime exceptions |
 
 Following these guidelines should make it straightforward to add new transports such as Azure Service Bus while maintaining parity between the C# and Java ecosystems.
+
+## Conformance Checklist
+
+Use this list to verify a new transport aligns with MyServiceBus expectations:
+
+- **Factory and DI** – implement a transport factory (`ITransportFactory` or `TransportFactory`) and register it through an extension method or configuration helper.
+- **Send and receive transports** – provide concrete `ISendTransport`/`SendTransport` and `IReceiveTransport`/`ReceiveTransport` implementations.
+- **Topology mapping** – create exchanges, topics, and queues as needed and map addresses consistently.
+- **Error handling** – support `_error`, `_fault`, and `_skipped` queues so failed or unknown messages are preserved.
+- **Logging** – emit messages using the standard logging categories.
+- **Testing** – add unit tests, exercise error paths, and run `dotnet test` and `./gradlew test`.
+- **Documentation** – update README or transport-specific docs with usage and configuration details.
+
+Refer to [configuration-patterns](../configuration-patterns.md) for examples of the factory and dependency injection patterns used throughout transports.
