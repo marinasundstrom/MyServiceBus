@@ -73,7 +73,7 @@ HttpMessageBusFactory.configure(services, cfg -> {
     cfg.addConsumer(SubmitOrderConsumer.class);
 }, (context, http) -> {
     http.host(URI.create("http://localhost:5000/"));
-    http.receiveEndpoint("submit-order", e -> e.configureConsumer(SubmitOrderConsumer.class));
+    http.receiveEndpoint("submit-order", e -> e.configureConsumer(context, SubmitOrderConsumer.class));
 });
 ```
 

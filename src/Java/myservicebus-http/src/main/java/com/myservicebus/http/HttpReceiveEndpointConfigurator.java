@@ -18,7 +18,7 @@ public class HttpReceiveEndpointConfigurator {
         this.path = path.startsWith("/") ? path.substring(1) : path;
     }
 
-    public void configureConsumer(Class<?> consumerClass) {
+    public void configureConsumer(BusRegistrationContext context, Class<?> consumerClass) {
         ConsumerTopology def = topology.getConsumers().stream()
                 .filter(c -> c.getConsumerType().equals(consumerClass))
                 .findFirst()

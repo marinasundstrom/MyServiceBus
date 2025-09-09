@@ -37,7 +37,8 @@ public class HttpFactoryConfiguratorTests {
         HttpFactoryConfigurator http = provider.getService(HttpFactoryConfigurator.class);
         URI base = URI.create("http://localhost:5000/");
         http.host(base);
-        http.receiveEndpoint("submit-order", e -> e.configureConsumer(MyConsumer.class));
+        BusRegistrationContext context = new BusRegistrationContext(provider);
+        http.receiveEndpoint("submit-order", e -> e.configureConsumer(context, MyConsumer.class));
 
         TopologyRegistry registry = provider.getService(TopologyRegistry.class);
         ConsumerTopology def = registry.getConsumers().stream()

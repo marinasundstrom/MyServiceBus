@@ -169,7 +169,7 @@ RabbitMqBusFactory.configure(services, x -> {
     x.addConsumer(SubmitOrderConsumer.class);
 }, (context, cfg) -> {
     cfg.receiveEndpoint("submit-order", e ->
-        e.configureConsumer(SubmitOrderConsumer.class, context)
+        e.configureConsumer(context, SubmitOrderConsumer.class)
     );
 });
 
