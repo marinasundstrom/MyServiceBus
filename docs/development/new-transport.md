@@ -1,6 +1,6 @@
 # Implementing a New Transport
 
-This guide walks through adding a new transport to MyServiceBus, using Azure Service Bus as an example. It highlights the common steps and the differences between the C# and Java implementations. For background on the overarching factory and dependency injection approaches, see [configuration-patterns](../configuration-patterns.md).
+This guide walks through adding a new transport to MyServiceBus, using Azure Service Bus as an example. It highlights the common steps and the differences between the C# and Java implementations. For background on the overarching factory and fluent configuration approaches, see [configuration-patterns](../configuration-patterns.md).
 
 ## 1. Define the Transport Factory
 
@@ -10,7 +10,7 @@ The transport factory creates and caches send and receive transports. The implem
 - Implement `ITransportFactory`.
 - Resolve connections (e.g., `ServiceBusClient`) in the constructor.
 - Implement `GetSendTransport` and `CreateReceiveTransport` using asynchronous `Task` methods.
-- Use dependency injection via a configuration builder extension similar to `RabbitMqServiceBusConfigurationBuilderExt`.
+- Use the fluent configuration pattern via a configuration builder extension similar to `RabbitMqServiceBusConfigurationBuilderExt`.
 
 ### Java
 - Create a `TransportFactory` class analogous to `RabbitMqTransportFactory`.
@@ -37,7 +37,7 @@ Both implementations should map MyServiceBus addresses to the transport's constr
 
 ## 4. Registration and Configuration
 
-Transport registration is handled through dependency injection. Review the [dependency injection pattern](../configuration-patterns.md#dependency-injection-pattern) for the underlying concepts.
+Transport registration uses the fluent configuration pattern. Review the [fluent configuration pattern](../configuration-patterns.md#fluent-configuration-pattern) for the underlying concepts.
 
 ### C#
 - Expose an extension method `UseAzureServiceBus` that registers the transport factory and any options in DI.
@@ -94,4 +94,4 @@ Use this list to verify a new transport aligns with MyServiceBus expectations:
 - **Testing** – add unit tests, exercise error paths, and run `dotnet test` and `./gradlew test`.
 - **Documentation** – update README or transport-specific docs with usage and configuration details.
 
-Refer to [configuration-patterns](../configuration-patterns.md) for examples of the factory and dependency injection patterns used throughout transports.
+Refer to [configuration-patterns](../configuration-patterns.md) for examples of the factory and fluent configuration patterns used throughout transports.

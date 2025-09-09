@@ -34,35 +34,28 @@ ITransport transport = factory.Create();
 - `ITransportFactory` – interface with a `Create` method returning an `ITransport`.
 - `RabbitMqTransportFactory` – concrete factory that instantiates `RabbitMqTransport`.
 
-## Dependency Injection Pattern
+## Fluent Configuration Pattern
 
-Dependency injection (DI) supplies required dependencies to a component rather than having the component build them itself. DI containers resolve constructor arguments and manage object lifetimes. This pattern improves testability and decouples modules from concrete implementations.
+The fluent configuration pattern chains builder methods to register transports, endpoints, and options in a readable way. It centralizes setup logic and often integrates with dependency injection to compose the bus. This approach:
+
+- centralizes registration in a single builder
+- leverages extension methods for discoverability
+- integrates with dependency injection when building the bus
 
 ```csharp
-public class MessagePublisher
-{
-    private readonly ITransport transport;
+var builder = new ServiceBusConfigurationBuilder();
 
-    public MessagePublisher(ITransport transport) => this.transport = transport;
+builder.UseRabbitMq("amqp://localhost")
+       .ConfigureEndpoint("orders", endpoint =>
+       {
+           endpoint.PrefetchCount = 16;
+       });
 
-    public void Publish(Message msg) => transport.Send(msg);
-}
-
-// Registration
-var services = new ServiceCollection();
-services.AddSingleton<ITransport, RabbitMqTransport>();
-services.AddTransient<MessagePublisher>();
-var provider = services.BuildServiceProvider();
-
-// Resolution
-var publisher = provider.GetRequiredService<MessagePublisher>();
+var bus = builder.Build();
 ```
-
-The DI container injects an `ITransport` implementation when constructing `MessagePublisher`, so the class remains agnostic of the concrete transport.
 
 ### Interfaces and Classes
 
-- `ITransport` – dependency required by `MessagePublisher`.
-- `MessagePublisher` – consumes `ITransport` via constructor injection.
-- `ServiceCollection` – DI container used to register `ITransport` and `MessagePublisher`.
+- `ServiceBusConfigurationBuilder` – exposes fluent methods for configuring the bus.
+- `UseRabbitMq` / `ConfigureEndpoint` – sample extension methods that register transports and endpoints.
 
