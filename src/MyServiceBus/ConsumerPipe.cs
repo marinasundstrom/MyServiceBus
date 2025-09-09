@@ -31,32 +31,20 @@ public class ConsumerMessageFilter<TConsumer, TMessage> : IFilter<ConsumeContext
     where TConsumer : class, IConsumer<TMessage>
     where TMessage : class
 {
-    readonly IServiceProvider provider;
+    readonly IConsumerFactory<TConsumer> factory;
 
-    public ConsumerMessageFilter(IServiceProvider provider)
+    public ConsumerMessageFilter(IConsumerFactory<TConsumer> factory)
     {
-        this.provider = provider;
+        this.factory = factory;
     }
 
-    [Throws(typeof(Exception))]
-    public async Task Send(ConsumeContext<TMessage> context, IPipe<ConsumeContext<TMessage>> next)
+    public Task Send(ConsumeContext<TMessage> context, IPipe<ConsumeContext<TMessage>> next)
     {
-        using var scope = provider.CreateScope();
-        var contextProvider = scope.ServiceProvider.GetService<ConsumeContextProvider>();
-        if (contextProvider != null)
-            contextProvider.Context = context;
-
-        try
+        return factory.Send(context, Pipe.Execute<ConsumerConsumeContext<TConsumer, TMessage>>(async consumerContext =>
         {
-            var consumer = scope.ServiceProvider.GetRequiredService<TConsumer>();
-            await consumer.Consume(context);
-            await next.Send(context);
-        }
-        finally
-        {
-            if (contextProvider != null)
-                contextProvider.Context = null;
-        }
+            await consumerContext.Consumer.Consume(consumerContext);
+            await next.Send(consumerContext);
+        }));
     }
 }
 
@@ -71,7 +59,7 @@ public class ConsumerFaultFilter<TConsumer, TMessage> : IFilter<ConsumeContext<T
         this.provider = provider;
     }
 
-    [Throws(typeof(InvalidOperationException))]
+    [Throws(typeof(Exception))]
     public async Task Send(ConsumeContext<TMessage> context, IPipe<ConsumeContext<TMessage>> next)
     {
         try

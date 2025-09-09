@@ -26,6 +26,7 @@ public class RabbitMqTransportFactoryTests
         public void SetEndpointNameFormatter(IEndpointNameFormatter formatter) { }
         public void SetEntityNameFormatter(IMessageEntityNameFormatter formatter) { }
         public void SetPrefetchCount(ushort prefetchCount) => PrefetchCount = prefetchCount;
+        public void SetConsumerFactory(Type consumerFactoryType) { }
     }
     [Fact]
     [Throws(typeof(Exception))]

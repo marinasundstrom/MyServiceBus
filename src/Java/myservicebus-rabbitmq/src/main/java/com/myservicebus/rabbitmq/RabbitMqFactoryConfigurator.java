@@ -11,6 +11,8 @@ import com.myservicebus.PipeConfigurator;
 import com.myservicebus.RetryConfigurator;
 import com.myservicebus.EntityNameFormatter;
 import com.myservicebus.MessageEntityNameFormatter;
+import com.myservicebus.ConsumerFactory;
+import com.myservicebus.DefaultConstructorConsumerFactory;
 import com.myservicebus.di.ServiceCollection;
 import com.myservicebus.di.ServiceProvider;
 import com.myservicebus.topology.ConsumerTopology;
@@ -31,6 +33,8 @@ public class RabbitMqFactoryConfigurator implements BusFactoryConfigurator {
     private MessageEntityNameFormatter entityNameFormatter;
     private final java.util.List<HandlerRegistration<?>> handlerRegistrations = new java.util.ArrayList<>();
     private int prefetchCount;
+    private java.util.function.BiFunction<ServiceProvider, Class<?>, ConsumerFactory> consumerFactory =
+            (sp, type) -> new DefaultConstructorConsumerFactory();
 
     public void host(String host) {
         this.clientHost = host;
@@ -113,6 +117,10 @@ public class RabbitMqFactoryConfigurator implements BusFactoryConfigurator {
         return prefetchCount;
     }
 
+    public void setConsumerFactory(java.util.function.BiFunction<ServiceProvider, Class<?>, ConsumerFactory> factory) {
+        this.consumerFactory = factory;
+    }
+
     @Override
     public MessageBus build() {
         ServiceCollection services = new ServiceCollection();
@@ -129,7 +137,7 @@ public class RabbitMqFactoryConfigurator implements BusFactoryConfigurator {
         services.addSingleton(MessageBus.class, sp -> () -> {
             BusRegistrationContext context = new BusRegistrationContext(sp);
             configureEndpoints(context);
-            MessageBusImpl bus = new MessageBusImpl(sp);
+            MessageBusImpl bus = new MessageBusImpl(sp, type -> consumerFactory.apply(sp, type));
             try {
                 applyHandlers(bus);
             } catch (Exception ex) {

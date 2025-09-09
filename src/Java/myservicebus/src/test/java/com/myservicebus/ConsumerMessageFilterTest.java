@@ -64,7 +64,8 @@ class ConsumerMessageFilterTest {
         PipeConfigurator<ConsumeContext<TestMessage>> configurator = new PipeConfigurator<>();
         configurator.useFilter(new ConsumerFaultFilter<>(provider, FaultingConsumer.class));
         configurator.useRetry(1);
-        configurator.useFilter(new ConsumerMessageFilter<>(provider, FaultingConsumer.class));
+        ConsumerFactory factory = new ScopeConsumerFactory(provider);
+        configurator.useFilter(new ConsumerMessageFilter<>(FaultingConsumer.class, factory));
         Pipe<ConsumeContext<TestMessage>> pipe = configurator.build();
 
         CompletableFuture<Void> future = pipe.send(ctx);

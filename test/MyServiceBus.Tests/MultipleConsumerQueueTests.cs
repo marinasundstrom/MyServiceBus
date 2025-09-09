@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using MyServiceBus;
 using MyServiceBus.Serialization;
@@ -28,6 +29,7 @@ public class MultipleConsumerQueueTests
     {
         public readonly List<string> Queues = new();
 
+        [Throws(typeof(InvalidOperationException))]
         public Task<ISendTransport> GetSendTransport(Uri address, CancellationToken cancellationToken = default)
             => Task.FromResult<ISendTransport>(new NopSendTransport());
 
@@ -55,7 +57,7 @@ public class MultipleConsumerQueueTests
     }
 
     [Fact]
-    [Throws(typeof(UriFormatException))]
+    [Throws(typeof(UriFormatException), typeof(AmbiguousMatchException), typeof(TypeLoadException))]
     public async Task Allows_multiple_consumers_on_distinct_queues()
     {
         var factory = new CapturingTransportFactory();
@@ -67,6 +69,7 @@ public class MultipleConsumerQueueTests
         services.AddSingleton<ISendContextFactory, SendContextFactory>();
         services.AddSingleton<IPublishContextFactory, PublishContextFactory>();
         services.AddSingleton<TopologyRegistry>();
+        services.AddSingleton(typeof(IConsumerFactory<>), typeof(DefaultConstructorConsumerFactory<>));
 
         var provider = services.BuildServiceProvider();
         var bus = new MessageBus(

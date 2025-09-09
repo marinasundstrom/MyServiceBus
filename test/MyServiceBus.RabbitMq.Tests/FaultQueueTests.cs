@@ -53,7 +53,8 @@ public class FaultQueueTests
         var configurator = new PipeConfigurator<ConsumeContext<TestMessage>>();
         configurator.UseFilter(new ErrorTransportFilter<TestMessage>());
         configurator.UseFilter(new ConsumerFaultFilter<FaultingConsumer, TestMessage>(provider));
-        configurator.UseFilter(new ConsumerMessageFilter<FaultingConsumer, TestMessage>(provider));
+        var factory = new ScopeConsumerFactory<FaultingConsumer>(provider);
+        configurator.UseFilter(new ConsumerMessageFilter<FaultingConsumer, TestMessage>(factory));
         var pipe = new ConsumePipe<TestMessage>(configurator.Build());
 
         await Should.ThrowAsync<InvalidOperationException>(() => pipe.Send(context));
@@ -63,7 +64,7 @@ public class FaultQueueTests
     }
 
     [Fact]
-    [Throws(typeof(UriFormatException), typeof(JsonException), typeof(ArgumentException), typeof(KeyNotFoundException))]
+    [Throws(typeof(UriFormatException), typeof(JsonException), typeof(ArgumentException), typeof(KeyNotFoundException), typeof(FileNotFoundException))]
     public async Task Sends_fault_to_fault_queue_when_handler_faults()
     {
         var services = new ServiceCollection();
@@ -119,6 +120,7 @@ public class FaultQueueTests
     {
         public readonly Dictionary<Uri, CaptureSendTransport> Transports = new();
 
+        [Throws(typeof(InvalidOperationException))]
         public Task<ISendTransport> GetSendTransport(Uri address, CancellationToken cancellationToken = default)
         {
             if (!Transports.TryGetValue(address, out var transport))

@@ -173,7 +173,8 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
         configurator.UseFilter(new ConsumerFaultFilter<TConsumer, TMessage>(_serviceProvider));
         if (configure is Action<PipeConfigurator<ConsumeContext<TMessage>>> cfg)
             cfg(configurator);
-        configurator.UseFilter(new ConsumerMessageFilter<TConsumer, TMessage>(_serviceProvider));
+        var factory = _serviceProvider.GetRequiredService<IConsumerFactory<TConsumer>>();
+        configurator.UseFilter(new ConsumerMessageFilter<TConsumer, TMessage>(factory));
         var pipe = new ConsumePipe<TMessage>(configurator.Build(_serviceProvider));
 
         var serializer = consumer.SerializerType != null
