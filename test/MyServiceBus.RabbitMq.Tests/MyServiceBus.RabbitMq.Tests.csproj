@@ -19,7 +19,9 @@
   <ItemGroup>
     <ProjectReference Include="../../src/MyServiceBus/MyServiceBus.csproj" />
     <ProjectReference Include="../../src/MyServiceBus.RabbitMq/MyServiceBus.RabbitMq.csproj" />
-    <ProjectReference Include="../../src/MyServiceBus.Transport.Queues/MyServiceBus.Transport.Queues.csproj" />
+    <ProjectReference
+      Include="../../src/MyServiceBus.Transport.Queues/MyServiceBus.Transport.Queues.csproj" />
+    <ProjectReference Include="../../src/MyServiceBus.Testing/MyServiceBus.Testing.csproj" />
   </ItemGroup>
 
   <ItemGroup>

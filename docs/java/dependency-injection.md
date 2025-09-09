@@ -12,6 +12,39 @@ Use `getService` when a missing binding is acceptable or `getRequiredService`
 to throw an exception if the service isn't registered, mirroring .NET's
 `GetRequiredService`.
 
+### ServiceCollection
+
+`ServiceCollection` gathers service registrations before the `ServiceProvider`
+is built. It mirrors .NET's `IServiceCollection` and exposes methods to add
+singletons, scoped services, or multi-bindings. Because it implements
+`Iterable<ServiceDescriptor>`, the registrations can be inspected or modified
+up front:
+
+```java
+ServiceCollection services = new ServiceCollection();
+services.addSingleton(MyService.class, MyServiceImpl.class);
+services.addScoped(MyScopedService.class);
+
+services.remove(MyService.class); // optional removal
+
+for (com.myservicebus.di.ServiceDescriptor d : services.getDescriptors()) {
+    System.out.println(d.getServiceType());
+}
+```
+
+Once `buildServiceProvider` or `connectAndBuild` is called the collection is
+frozen and further modifications throw an `IllegalStateException`.
+
+### ServiceDescriptor
+
+Each registration in the collection is represented by a `ServiceDescriptor`
+containing the service type, implementation type or factory, optional instance,
+the service lifetime (`SINGLETON` or `SCOPED`), and whether it participates in
+multi-binding. Descriptors are primarily consumed when building the underlying
+Guice injector but can also be used for diagnostics or tooling.
+
+### Basic usage
+
 ```java
 package com.myservicebus;
 

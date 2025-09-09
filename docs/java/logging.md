@@ -13,7 +13,7 @@ Logging providers are registered through a `Logging` decorator that exposes a `L
 
 ```java
 ServiceCollection services = new ServiceCollection();
-services.for(Logging.class)
+services.from(Logging.class)
         .addLogging(builder -> builder.addConsole());
 ```
 
@@ -22,7 +22,7 @@ If no provider is configured, a console logger is added automatically.
 The console logger can be tuned with `ConsoleLoggerConfig`:
 
 ```java
-services.for(Logging.class)
+services.from(Logging.class)
         .addLogging(builder -> builder.addConsole(cfg -> {
             cfg.setMinimumLevel(LogLevel.WARN);
             cfg.setLevel("com.myservicebus", LogLevel.DEBUG);
@@ -32,7 +32,7 @@ services.for(Logging.class)
 SLF4J can also be configured via `Slf4jLoggerConfig`:
 
 ```java
-services.for(Logging.class)
+services.from(Logging.class)
         .addLogging(builder -> builder.addSlf4j(cfg -> {
             cfg.setMinimumLevel(LogLevel.WARN);
             cfg.setLevel("com.myservicebus", LogLevel.DEBUG);

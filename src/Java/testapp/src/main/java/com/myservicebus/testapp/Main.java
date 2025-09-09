@@ -21,14 +21,23 @@ import com.myservicebus.di.ServiceScope;
 import com.myservicebus.rabbitmq.RabbitMqFactoryConfigurator;
 import com.myservicebus.rabbitmq.RabbitMqTransport;
 import com.myservicebus.tasks.CancellationToken;
+import com.myservicebus.logging.LogLevel;
 import com.myservicebus.logging.Logger;
 import com.myservicebus.logging.LoggerFactory;
+import com.myservicebus.logging.Logging;
 
 public class Main {
     public static void main(String[] args) {
 
         ServiceCollection services = new ServiceCollection();
         services.addScoped(MyService.class, MyServiceImpl.class);
+
+        // Configure logging provider Slf4j
+        services.from(Logging.class)
+                .addLogging(builder -> builder.addSlf4j(cfg -> {
+                    cfg.setMinimumLevel(LogLevel.WARN);
+                    cfg.setLevel("com.myservicebus", LogLevel.DEBUG);
+                }));
 
         String rabbitMqHost = System.getenv().getOrDefault("RABBITMQ_HOST", "localhost");
 
