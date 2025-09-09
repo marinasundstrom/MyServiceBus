@@ -11,7 +11,7 @@ import com.myservicebus.di.ServiceProvider;
 public class BusFactoryTest {
     @Test
     public void factoryBuildsBus() {
-        MessageBus bus = MessageBus.factory.configure(RabbitMqFactoryConfigurator.class, cfg -> {
+        MessageBus bus = MessageBus.factory.create(RabbitMqFactoryConfigurator.class, cfg -> {
             cfg.host("localhost");
         });
         assertNotNull(bus);

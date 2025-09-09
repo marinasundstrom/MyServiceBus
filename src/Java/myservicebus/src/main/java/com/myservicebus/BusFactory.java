@@ -3,5 +3,5 @@ package com.myservicebus;
 import java.util.function.Consumer;
 
 public interface BusFactory {
-    <T extends BusFactoryConfigurator> MessageBus configure(Class<T> configuratorClass, Consumer<T> configure);
+    <T extends BusFactoryConfigurator> MessageBus create(Class<T> configuratorClass, Consumer<T> configure);
 }

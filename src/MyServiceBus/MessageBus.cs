@@ -12,6 +12,8 @@ namespace MyServiceBus;
 
 public class MessageBus : IMessageBus, IReceiveEndpointConnector
 {
+    public static BusFactory Factory { get; } = new();
+
     private readonly ITransportFactory _transportFactory;
     private readonly IServiceProvider _serviceProvider;
     private readonly ISendPipe _sendPipe;
@@ -49,14 +51,14 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
 
     public IBusTopology Topology => _topology;
 
-    [Throws(typeof(UriFormatException), typeof(InvalidOperationException))]
+    [Throws(typeof(UriFormatException), typeof(InvalidOperationException), typeof(AmbiguousMatchException), typeof(TypeLoadException))]
     public Task Publish<TMessage>(object message, Action<IPublishContext>? contextCallback = null, CancellationToken cancellationToken = default) where TMessage : class
     {
         var typed = message as TMessage ?? MessageProxy.Create<TMessage>(message);
         return Publish(typed, contextCallback, cancellationToken);
     }
 
-    [Throws(typeof(UriFormatException), typeof(InvalidOperationException), typeof(AmbiguousMatchException))]
+    [Throws(typeof(UriFormatException), typeof(InvalidOperationException), typeof(AmbiguousMatchException), typeof(TypeLoadException))]
     public async Task Publish<T>(T message, Action<IPublishContext>? contextCallback = null, CancellationToken cancellationToken = default) where T : class
     {
         var exchangeName = EntityNameFormatter.Format(message.GetType());
@@ -130,7 +132,7 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
         _activeTransports.Add(receiveTransport);
     }
 
-    [Throws(typeof(InvalidOperationException), typeof(AmbiguousMatchException))]
+    [Throws(typeof(InvalidOperationException), typeof(AmbiguousMatchException), typeof(TypeLoadException))]
     public async Task AddConsumer<TMessage, TConsumer>(ConsumerTopology consumer, Delegate? configure = null, CancellationToken cancellationToken = default)
         where TConsumer : class, IConsumer<TMessage>
         where TMessage : class
