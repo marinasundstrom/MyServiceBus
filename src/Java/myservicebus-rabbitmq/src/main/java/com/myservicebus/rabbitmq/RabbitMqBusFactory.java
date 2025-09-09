@@ -2,6 +2,7 @@ package com.myservicebus.rabbitmq;
 
 import com.myservicebus.BusRegistrationConfigurator;
 import com.myservicebus.BusRegistrationConfiguratorImpl;
+import com.myservicebus.BusRegistrationContext;
 import com.myservicebus.MessageBus;
 import com.myservicebus.MessageBusImpl;
 import com.myservicebus.ReceiveEndpointConnector;

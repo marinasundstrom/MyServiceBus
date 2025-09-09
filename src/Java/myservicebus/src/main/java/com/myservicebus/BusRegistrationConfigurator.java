@@ -12,4 +12,9 @@ public interface BusRegistrationConfigurator {
     void setSerializer(Class<? extends MessageSerializer> serializerClass);
     void setDeserializer(Class<? extends MessageDeserializer> deserializerClass);
     ServiceCollection getServiceCollection();
+
+    default <TConfigurator> BusRegistrationConfigurator using(Class<?> transportClass,
+            java.util.function.BiConsumer<BusRegistrationContext, TConfigurator> configure) {
+        throw new UnsupportedOperationException("Transport registration not supported");
+    }
 }
