@@ -19,22 +19,15 @@ services.AddServiceBus(cfg =>
 });
 ```
 
-### Java
+### Standalone bus
 
-Configure the transport during bus registration using `HttpMessageBusFactory`:
+Create a self-contained bus using `MessageBus.Factory`:
 
-```java
-ServiceCollection services = new ServiceCollection();
-
-HttpMessageBusFactory.configure(services, cfg -> {
-    cfg.addConsumer(SubmitOrderConsumer.class);
-}, (context, http) -> {
-    http.host(URI.create("http://localhost:5000/"));
+```csharp
+IMessageBus bus = MessageBus.Factory.Create<HttpFactoryConfigurator>(cfg =>
+{
+    cfg.Host(new Uri("http://localhost:5000/"));
 });
-
-ServiceProvider provider = services.buildServiceProvider();
-MessageBus bus = provider.getService(MessageBus.class);
-bus.start();
 ```
 
 ### Consumers
@@ -54,27 +47,29 @@ services.AddServiceBus(cfg =>
 });
 ```
 
-In Java, consumers added during registration handle POST requests whose paths match the kebab-case message type:
+Using the factory, endpoints can be configured directly:
 
-```java
-HttpMessageBusFactory.configure(services, cfg -> {
-    cfg.addConsumer(SubmitOrderConsumer.class);
-}, (context, http) -> {
-    http.host(URI.create("http://localhost:5000/"));
+```csharp
+IMessageBus bus = MessageBus.Factory.Create<HttpFactoryConfigurator>(cfg =>
+{
+    cfg.Host(new Uri("http://localhost:5000/"));
+    cfg.ReceiveEndpoint("submit-order", e =>
+    {
+        // configure consumers
+    });
 });
-ServiceProvider provider = services.buildServiceProvider();
-MessageBus bus = provider.getService(MessageBus.class);
-// POST to http://localhost:5000/submit-order reaches SubmitOrderConsumer
 ```
 
 Explicit endpoints can also be configured:
 
-```java
-HttpMessageBusFactory.configure(services, cfg -> {
-    cfg.addConsumer(SubmitOrderConsumer.class);
-}, (context, http) -> {
-    http.host(URI.create("http://localhost:5000/"));
-    http.receiveEndpoint("submit-order", e -> e.configureConsumer(context, SubmitOrderConsumer.class));
+```csharp
+IMessageBus bus = MessageBus.Factory.Create<HttpFactoryConfigurator>(cfg =>
+{
+    cfg.Host(new Uri("http://localhost:5000/"));
+    cfg.ReceiveEndpoint("submit-order", e =>
+    {
+        // configure consumers
+    });
 });
 ```
 

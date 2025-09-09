@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using MyServiceBus.Topology;
+using MyServiceBus.Serialization;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -18,7 +19,7 @@ public interface IHttpFactoryConfigurator
     void ReceiveEndpoint(string path, Action<HttpReceiveEndpointConfigurator> configure);
 }
 
-internal sealed class HttpFactoryConfigurator : IHttpFactoryConfigurator
+public class HttpFactoryConfigurator : IHttpFactoryConfigurator, IBusFactoryConfigurator
 {
     private readonly IList<Action<IMessageBus, IServiceProvider>> _endpointActions = new List<Action<IMessageBus, IServiceProvider>>();
     private IEndpointNameFormatter? _endpointNameFormatter;
@@ -47,6 +48,35 @@ internal sealed class HttpFactoryConfigurator : IHttpFactoryConfigurator
     {
         foreach (var action in _endpointActions)
             action(bus, provider);
+    }
+
+    public IMessageBus Build()
+    {
+        var services = new ServiceCollection();
+        Configure(services);
+        var provider = services.BuildServiceProvider();
+        foreach (var action in provider.GetServices<IPostBuildAction>())
+            action.Execute(provider);
+        return provider.GetRequiredService<IMessageBus>();
+    }
+
+    public void Configure(IServiceCollection services)
+    {
+        var configurator = new BusRegistrationConfigurator(services);
+        configurator.Build();
+
+        services.AddSingleton<IHttpFactoryConfigurator>(this);
+        services.AddSingleton<IPostBuildAction>(new PostBuildHttpConfigureAction((_, _) => { }, this));
+        services.AddSingleton<ITransportFactory, HttpTransportFactory>();
+        services.AddSingleton<IMessageBus>(sp => new MessageBus(
+            sp.GetRequiredService<ITransportFactory>(),
+            sp,
+            sp.GetRequiredService<ISendPipe>(),
+            sp.GetRequiredService<IPublishPipe>(),
+            sp.GetRequiredService<IMessageSerializer>(),
+            BaseAddress,
+            sp.GetRequiredService<ISendContextFactory>(),
+            sp.GetRequiredService<IPublishContextFactory>()));
     }
 }
 

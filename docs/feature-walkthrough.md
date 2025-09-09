@@ -245,17 +245,15 @@ services.AddServiceBus(x =>
 });
 ```
 
-```java
-ServiceCollection services = new ServiceCollection();
-HttpMessageBusFactory.configure(services, cfg -> {
-    cfg.addConsumer(SubmitOrderConsumer.class);
-}, (context, http) -> {
-    http.host(URI.create("http://localhost:5000/"));
-    http.receiveEndpoint("submit-order", e -> e.configureConsumer(context, SubmitOrderConsumer.class));
+```csharp
+IMessageBus bus = MessageBus.Factory.Create<HttpFactoryConfigurator>(cfg =>
+{
+    cfg.Host(new Uri("http://localhost:5000/"));
+    cfg.ReceiveEndpoint("submit-order", e =>
+    {
+        // configure consumers
+    });
 });
-ServiceProvider provider = services.buildServiceProvider();
-MessageBus bus = provider.getService(MessageBus.class);
-bus.start();
 ```
 
 Consumers added this way handle POST requests to `http://localhost:5000/submit-order`. Alternatively, a consumer can be added at runtime via `IMessageBus.AddConsumer` and a `ConsumerTopology` with an explicit URI.
