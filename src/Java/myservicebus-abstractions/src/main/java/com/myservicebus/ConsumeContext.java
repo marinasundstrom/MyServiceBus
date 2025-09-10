@@ -7,10 +7,12 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.net.URI;
 
 import com.myservicebus.tasks.CancellationToken;
+import com.myservicebus.JobScheduler;
 
 /**
  * Context passed to consumers when a message is received.
@@ -36,27 +38,33 @@ public class ConsumeContext<T>
     private final CancellationToken cancellationToken;
     private final SendEndpointProvider sendEndpointProvider;
     private final URI busAddress;
+    private final JobScheduler jobScheduler;
 
     public ConsumeContext(T message, Map<String, Object> headers, SendEndpointProvider provider) {
-        this(message, headers, null, null, null, CancellationToken.none, provider, URI.create("loopback://localhost/"));
+        this(message, headers, null, null, null, CancellationToken.none, provider, URI.create("loopback://localhost/"), null);
     }
 
     public ConsumeContext(T message, Map<String, Object> headers, SendEndpointProvider provider, URI busAddress) {
-        this(message, headers, null, null, null, CancellationToken.none, provider, busAddress);
+        this(message, headers, null, null, null, CancellationToken.none, provider, busAddress, null);
     }
 
     public ConsumeContext(T message, Map<String, Object> headers, String responseAddress, String faultAddress,
             CancellationToken cancellationToken, SendEndpointProvider provider) {
-        this(message, headers, responseAddress, faultAddress, null, cancellationToken, provider, URI.create("loopback://localhost/"));
+        this(message, headers, responseAddress, faultAddress, null, cancellationToken, provider, URI.create("loopback://localhost/"), null);
     }
 
     public ConsumeContext(T message, Map<String, Object> headers, String responseAddress, String faultAddress,
             CancellationToken cancellationToken, SendEndpointProvider provider, URI busAddress) {
-        this(message, headers, responseAddress, faultAddress, null, cancellationToken, provider, busAddress);
+        this(message, headers, responseAddress, faultAddress, null, cancellationToken, provider, busAddress, null);
     }
 
     public ConsumeContext(T message, Map<String, Object> headers, String responseAddress, String faultAddress,
             String errorAddress, CancellationToken cancellationToken, SendEndpointProvider provider, URI busAddress) {
+        this(message, headers, responseAddress, faultAddress, errorAddress, cancellationToken, provider, busAddress, null);
+    }
+
+    public ConsumeContext(T message, Map<String, Object> headers, String responseAddress, String faultAddress,
+            String errorAddress, CancellationToken cancellationToken, SendEndpointProvider provider, URI busAddress, JobScheduler jobScheduler) {
         this.message = message;
         this.headers = headers;
         this.responseAddress = responseAddress;
@@ -65,6 +73,7 @@ public class ConsumeContext<T>
         this.cancellationToken = cancellationToken;
         this.sendEndpointProvider = provider;
         this.busAddress = busAddress;
+        this.jobScheduler = jobScheduler;
     }
 
     public T getMessage() {
@@ -95,6 +104,28 @@ public class ConsumeContext<T>
         URI dest = busAddress.resolve("exchange/" + exchange);
         context.setSourceAddress(busAddress);
         context.setDestinationAddress(dest);
+        Instant scheduled = context.getScheduledEnqueueTime();
+        if (scheduled != null) {
+            if (jobScheduler != null) {
+                return jobScheduler.schedule(scheduled, () -> {
+                    context.setScheduledEnqueueTime((Instant) null);
+                    SendEndpoint endpoint = getSendEndpoint(dest.toString());
+                    return endpoint.send(context);
+                });
+            } else {
+                Duration delay = Duration.between(Instant.now(), scheduled);
+                if (delay.isNegative()) {
+                    delay = Duration.ZERO;
+                }
+                CompletableFuture<Void> delayFuture = new CompletableFuture<>();
+                CompletableFuture.delayedExecutor(delay.toMillis(), TimeUnit.MILLISECONDS)
+                        .execute(() -> delayFuture.complete(null));
+                context.setScheduledEnqueueTime((Instant) null);
+                SendEndpoint endpoint = getSendEndpoint(dest.toString());
+                return delayFuture.thenCompose(v -> endpoint.send(context));
+            }
+        }
+
         SendEndpoint endpoint = getSendEndpoint(dest.toString());
         return endpoint.send(context);
     }

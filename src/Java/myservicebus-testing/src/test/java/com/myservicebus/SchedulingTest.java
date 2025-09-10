@@ -61,6 +61,27 @@ public class SchedulingTest {
     }
 
     @Test
+    void consumeContext_publish_delays_message() {
+        InMemoryTestHarness harness = new InMemoryTestHarness();
+        CompletableFuture<Void> handled = new CompletableFuture<>();
+        Duration delay = Duration.ofMillis(100);
+        harness.registerHandler(Integer.class, ctx -> ctx.publish("hi", c -> c.setScheduledEnqueueTime(delay)));
+        harness.registerHandler(String.class, ctx -> {
+            handled.complete(null);
+            return CompletableFuture.completedFuture(null);
+        });
+
+        Instant start = Instant.now();
+        harness.send(42).join();
+        handled.join();
+        Instant end = Instant.now();
+        Duration elapsed = Duration.between(start, end);
+        Duration tolerance = Duration.ofMillis(20);
+        assertTrue(elapsed.toMillis() >= delay.minus(tolerance).toMillis());
+        assertTrue(harness.wasConsumed(String.class));
+    }
+
+    @Test
     void customScheduler_is_used() {
         InMemoryTestHarness harness = new InMemoryTestHarness();
         CompletableFuture<Void> handled = new CompletableFuture<>();
