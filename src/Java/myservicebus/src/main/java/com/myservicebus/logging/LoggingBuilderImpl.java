@@ -3,6 +3,8 @@ package com.myservicebus.logging;
 import java.util.function.Consumer;
 
 import com.myservicebus.di.ServiceCollection;
+import com.myservicebus.di.ServiceDescriptor;
+import com.myservicebus.di.ServiceLifetime;
 
 class LoggingBuilderImpl implements LoggingBuilder {
     private final ServiceCollection services;
@@ -30,8 +32,9 @@ class LoggingBuilderImpl implements LoggingBuilder {
         }
 
         if (services != null) {
-            services.addSingleton(ConsoleLoggerConfig.class, sp -> () -> config);
-            services.addSingleton(LoggerFactory.class, sp -> () -> new ConsoleLoggerFactory(config));
+            services.add(new ServiceDescriptor(ConsoleLoggerConfig.class, null, null, config,
+                    ServiceLifetime.SINGLETON, false));
+            services.addSingleton(LoggerFactory.class, ConsoleLoggerFactory.class);
         } else {
             factory = new ConsoleLoggerFactory(config);
         }
@@ -51,8 +54,9 @@ class LoggingBuilderImpl implements LoggingBuilder {
         }
 
         if (services != null) {
-            services.addSingleton(Slf4jLoggerConfig.class, sp -> () -> config);
-            services.addSingleton(LoggerFactory.class, sp -> () -> new Slf4jLoggerFactory(config));
+            services.add(new ServiceDescriptor(Slf4jLoggerConfig.class, null, null, config,
+                    ServiceLifetime.SINGLETON, false));
+            services.addSingleton(LoggerFactory.class, Slf4jLoggerFactory.class);
         } else {
             factory = new Slf4jLoggerFactory(config);
         }
