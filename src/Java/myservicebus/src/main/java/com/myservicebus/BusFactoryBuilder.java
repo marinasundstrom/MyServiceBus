@@ -35,7 +35,7 @@ public class BusFactoryBuilder implements BusFactory {
                 configure.accept(cfg);
             }
 
-            ServiceCollection services = new ServiceCollection();
+            ServiceCollection services = ServiceCollection.create();
             for (Consumer<ServiceCollection> action : serviceActions) {
                 action.accept(services);
             }

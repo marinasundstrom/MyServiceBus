@@ -104,7 +104,7 @@ class PipeConfiguratorTest {
 
     @Test
     void resolvesFilterFromServiceProvider() {
-        ServiceCollection services = new ServiceCollection();
+        ServiceCollection services = ServiceCollection.create();
         services.addSingleton(Counter.class);
         services.addSingleton(DiFilter.class);
         ServiceProvider provider = services.buildServiceProvider();

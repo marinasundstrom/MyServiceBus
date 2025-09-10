@@ -6,7 +6,7 @@ which allows applications to plug in any provider. In Java, logging
 providers are registered through a `Logging` decorator:
 
 ```java
-ServiceCollection services = new ServiceCollection();
+ServiceCollection services = ServiceCollection.create();
 services.from(Logging.class)
         .addLogging(b -> b.addConsole());
 ```

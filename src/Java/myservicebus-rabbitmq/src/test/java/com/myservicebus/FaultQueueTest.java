@@ -25,7 +25,7 @@ class FaultQueueTest {
         List<SendContext> errorMessages = new ArrayList<>();
         StubFactory factory = new StubFactory();
 
-        ServiceCollection services = new ServiceCollection();
+        ServiceCollection services = ServiceCollection.create();
         services.addSingleton(ConsumeContextProvider.class, sp -> () -> new ConsumeContextProvider());
         services.addSingleton(SendPipe.class, sp -> () -> new SendPipe(ctx -> CompletableFuture.completedFuture(null)));
         services.addSingleton(PublishPipe.class, sp -> () -> new PublishPipe(ctx -> CompletableFuture.completedFuture(null)));

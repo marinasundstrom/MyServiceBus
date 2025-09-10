@@ -24,13 +24,15 @@ class LoggingBuilderImpl implements LoggingBuilder {
 
     @Override
     public void addConsole(Consumer<ConsoleLoggerConfig> configure) {
+        ConsoleLoggerConfig config = new ConsoleLoggerConfig();
+        if (configure != null) {
+            configure.accept(config);
+        }
+
         if (services != null) {
-            services.addConsoleLogger(configure);
+            services.addSingleton(ConsoleLoggerConfig.class, sp -> () -> config);
+            services.addSingleton(LoggerFactory.class, sp -> () -> new ConsoleLoggerFactory(config));
         } else {
-            ConsoleLoggerConfig config = new ConsoleLoggerConfig();
-            if (configure != null) {
-                configure.accept(config);
-            }
             factory = new ConsoleLoggerFactory(config);
         }
     }
@@ -43,13 +45,15 @@ class LoggingBuilderImpl implements LoggingBuilder {
 
     @Override
     public void addSlf4j(Consumer<Slf4jLoggerConfig> configure) {
+        Slf4jLoggerConfig config = new Slf4jLoggerConfig();
+        if (configure != null) {
+            configure.accept(config);
+        }
+
         if (services != null) {
-            services.addSlf4jLogger(configure);
+            services.addSingleton(Slf4jLoggerConfig.class, sp -> () -> config);
+            services.addSingleton(LoggerFactory.class, sp -> () -> new Slf4jLoggerFactory(config));
         } else {
-            Slf4jLoggerConfig config = new Slf4jLoggerConfig();
-            if (configure != null) {
-                configure.accept(config);
-            }
             factory = new Slf4jLoggerFactory(config);
         }
     }

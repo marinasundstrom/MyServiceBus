@@ -26,7 +26,7 @@ public class DuplicateConsumerRegistrationTest {
 
     @Test
     void duplicate_consumer_registration_is_ignored() {
-        ServiceCollection services = new ServiceCollection();
+        ServiceCollection services = ServiceCollection.create();
         TestingServiceExtensions.addServiceBusTestHarness(services, cfg -> {
             cfg.addConsumer(PingConsumer.class);
             cfg.addConsumer(PingConsumer.class);

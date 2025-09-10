@@ -45,7 +45,7 @@ public class InMemoryHarnessDiTest {
 
     @Test
     void request_client_round_trip() {
-        ServiceCollection services = new ServiceCollection();
+        ServiceCollection services = ServiceCollection.create();
         TestingServiceExtensions.addServiceBusTestHarness(services, cfg -> {
             cfg.addConsumer(PingConsumer.class);
         });

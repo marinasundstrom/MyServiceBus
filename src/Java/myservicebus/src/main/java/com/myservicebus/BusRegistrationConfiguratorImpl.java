@@ -151,7 +151,8 @@ public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigura
         boolean hasLogger = serviceCollection.getDescriptors().stream()
                 .anyMatch(d -> d.getServiceType().equals(LoggerFactory.class));
         if (!hasLogger) {
-            serviceCollection.addConsoleLogger();
+            serviceCollection.addSingleton(LoggerFactory.class,
+                    sp -> () -> new ConsoleLoggerFactory(new ConsoleLoggerConfig()));
         }
 
         serviceCollection.addScoped(ConsumeContextProvider.class, sp -> () -> new ConsumeContextProvider());

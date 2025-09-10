@@ -11,7 +11,7 @@ public class ConstructorInjectionTest {
 
     @Test
     public void testSetInjectionInConstructor() {
-        ServiceCollection collection = new ServiceCollection();
+        ServiceCollection collection = ServiceCollection.create();
         collection.addMultiBinding(Handler.class, HandlerA.class);
         collection.addMultiBinding(Handler.class, HandlerB.class);
         collection.addSingleton(HandlerConsumer.class);

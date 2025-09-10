@@ -12,7 +12,7 @@ The Java project defines its own minimal logging abstraction so applications can
 Logging providers are registered through a `Logging` decorator that exposes a `LoggingBuilder`:
 
 ```java
-ServiceCollection services = new ServiceCollection();
+ServiceCollection services = ServiceCollection.create();
 services.from(Logging.class)
         .addLogging(builder -> builder.addConsole());
 ```

@@ -11,7 +11,7 @@ import com.myservicebus.di.ServiceScope;
 public class SendEndpointProviderDiTest {
     @Test
     void resolves_send_endpoint_provider() {
-        ServiceCollection services = new ServiceCollection();
+        ServiceCollection services = ServiceCollection.create();
         TestingServiceExtensions.addServiceBusTestHarness(services, cfg -> {
         });
 

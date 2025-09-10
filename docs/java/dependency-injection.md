@@ -2,6 +2,10 @@
 
 Custom wrapper around Guice. Made to look similar to .NET DI.
 
+`ServiceCollection.create()` constructs a `DefaultServiceCollection`
+backed by [Guice](https://github.com/google/guice), so the default container
+uses Guice under the hood while presenting a .NET-like API.
+
 Supporting lifetimes, scopes, and injecting `ServiceProvider`.
 
 The default container registers the `ServiceProvider` itself, allowing any
@@ -21,7 +25,7 @@ singletons, scoped services, or multi-bindings. Because it implements
 up front:
 
 ```java
-ServiceCollection services = new ServiceCollection();
+ServiceCollection services = ServiceCollection.create();
 services.addSingleton(MyService.class, MyServiceImpl.class);
 services.addScoped(MyScopedService.class);
 
@@ -54,7 +58,7 @@ import com.myservicebus.di.ServiceScope;
 
 public class Main {
     public static void main(String[] args) {
-        ServiceCollection services = new ServiceCollection();
+        ServiceCollection services = ServiceCollection.create();
         services.addSingleton(MyService.class, MyServiceImpl.class);
         services.addScoped(MyScopedService.class);
         services.addScoped(MySecondService.class);
@@ -76,20 +80,30 @@ public class Main {
 
 ### Connecting to an existing Guice injector
 
-If you already have a Guice `Injector`, call `connectAndBuild` to reuse it:
+If you already have a Guice `Injector`, `DefaultServiceCollection` can reuse it via `connectAndBuild`:
 
 ```java
 import com.google.inject.Guice;
 import com.google.inject.Injector;
-import com.myservicebus.di.ServiceCollection;
+import com.myservicebus.di.DefaultServiceCollection;
 import com.myservicebus.di.ServiceProvider;
 
 Injector existing = Guice.createInjector();
-ServiceCollection services = new ServiceCollection();
+DefaultServiceCollection services = new DefaultServiceCollection();
 services.addSingleton(MyService.class, MyServiceImpl.class);
 
 ServiceProvider provider = services.connectAndBuild(existing);
 ```
+
+### Integrating another DI container
+
+`DefaultServiceCollection` uses Guice internally, but you can adapt
+MyServiceBus to another IoC framework by implementing the `ServiceCollection`
+interface yourself. Your implementation can translate registrations into the
+container's API and return a custom `ServiceProvider` from `buildServiceProvider`.
+That provider must honor the `ServiceProvider` and `ServiceScope` interfaces so
+consumers can resolve services and create scopes just like the built-in
+implementation.
 
 ### Registering bindings for factories
 
