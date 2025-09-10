@@ -13,7 +13,7 @@ import com.myservicebus.tasks.CancellationToken;
 
 import java.time.Instant;
 
-public class SendContext implements PipeContext, MessageScheduler {
+public class SendContext implements PipeContext, ScheduledMessage {
     private Object message;
     private final Map<String, Object> headers = new HashMap<>();
     private final CancellationToken cancellationToken;

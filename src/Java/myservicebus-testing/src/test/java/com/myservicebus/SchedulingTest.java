@@ -8,6 +8,7 @@ import java.time.Instant;
 import org.junit.jupiter.api.Test;
 
 import java.util.concurrent.CompletableFuture;
+import com.myservicebus.tasks.CancellationToken;
 
 public class SchedulingTest {
     @Test
@@ -19,9 +20,16 @@ public class SchedulingTest {
             return CompletableFuture.completedFuture(null);
         });
 
-        SendEndpoint endpoint = harness.getSendEndpoint("loopback://localhost/queue");
+        MessageScheduler scheduler = new MessageSchedulerImpl(
+                new PublishEndpoint() {
+                    @Override
+                    public <T> CompletableFuture<Void> publish(T message, CancellationToken token) {
+                        return harness.send(message);
+                    }
+                },
+                uri -> harness.getSendEndpoint(uri));
         Instant start = Instant.now();
-        endpoint.send("hi", ctx -> ctx.setScheduledEnqueueTime(Duration.ofMillis(100))).join();
+        scheduler.scheduleSend("loopback://localhost/queue", "hi", Duration.ofMillis(100)).join();
         Instant end = Instant.now();
 
         assertTrue(Duration.between(start, end).toMillis() >= 100);

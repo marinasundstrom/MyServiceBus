@@ -1,13 +1,13 @@
 using System;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace MyServiceBus;
 
 public interface IMessageScheduler
 {
-    DateTime? ScheduledEnqueueTime { get; set; }
-
-    void SetScheduledEnqueueTime(DateTime scheduledTime) => ScheduledEnqueueTime = scheduledTime;
-
-    void SetScheduledEnqueueTime(TimeSpan delay) => SetScheduledEnqueueTime(DateTime.UtcNow + delay);
+    Task SchedulePublish<T>(T message, DateTime scheduledTime, CancellationToken cancellationToken = default) where T : class;
+    Task SchedulePublish<T>(T message, TimeSpan delay, CancellationToken cancellationToken = default) where T : class;
+    Task ScheduleSend<T>(Uri destination, T message, DateTime scheduledTime, CancellationToken cancellationToken = default) where T : class;
+    Task ScheduleSend<T>(Uri destination, T message, TimeSpan delay, CancellationToken cancellationToken = default) where T : class;
 }
-

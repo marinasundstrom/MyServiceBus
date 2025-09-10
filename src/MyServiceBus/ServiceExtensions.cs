@@ -19,6 +19,7 @@ public static class ServiceExtensions
 
         services.AddScoped(typeof(IRequestClient<>), typeof(GenericRequestClient<>));
         services.AddScoped<IRequestClientFactory, RequestClientFactory>();
+        services.AddScoped<IMessageScheduler, MessageScheduler>();
 
         return services;
     }

@@ -39,11 +39,11 @@ public class SchedulingTests
         var hosted = provider.GetRequiredService<IHostedService>();
         await hosted.StartAsync(CancellationToken.None);
 
-        var bus = provider.GetRequiredService<IMessageBus>();
+        var scheduler = provider.GetRequiredService<IMessageScheduler>();
         TestConsumer.Received = 0;
         var delay = TimeSpan.FromMilliseconds(100);
         var sw = Stopwatch.StartNew();
-        await bus.Publish(new TestMessage(), ctx => ctx.SetScheduledEnqueueTime(delay));
+        await scheduler.SchedulePublish(new TestMessage(), delay);
         sw.Stop();
 
         Assert.True(sw.Elapsed >= delay);

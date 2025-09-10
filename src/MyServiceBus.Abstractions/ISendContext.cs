@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 namespace MyServiceBus;
 
-public interface ISendContext : PipeContext, IMessageScheduler
+public interface ISendContext : PipeContext, IScheduledMessage
 {
     string MessageId { get; set; }
     string RoutingKey { get; set; }
