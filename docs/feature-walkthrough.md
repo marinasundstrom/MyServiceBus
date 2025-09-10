@@ -8,8 +8,9 @@ For Java build and run instructions, including optional JDK 17 toolchain setup a
 
 - [Basics](#basics)
   - [Setup](#setup)
-  - [Publishing](#publishing)
-  - [Sending](#sending)
+- [Publishing](#publishing)
+- [Sending](#sending)
+  - [Scheduling Messages](#scheduling-messages)
   - [Consuming Messages](#consuming-messages)
   - [Request/Response](#requestresponse)
   - [Adding Headers](#adding-headers)
@@ -245,6 +246,26 @@ endpoint.send(new SubmitOrder(UUID.randomUUID())).join();
 | Exchange (logical) | `exchange:<name>` | `exchange:orders` | Transport shortcut for publishing to an exchange |
 | Queue (RabbitMQ) | `rabbitmq://<host>/<queue>` | `rabbitmq://localhost/submit-order` | Sends to a queue via the default exchange |
 | Exchange (RabbitMQ) | `rabbitmq://<host>/exchange/<name>` | `rabbitmq://localhost/exchange/orders` | Publishes to the specified exchange; append `?durable=false&autodelete=true` to control exchange properties |
+
+### Scheduling Messages
+
+Use the scheduler to delay message delivery.
+
+#### C#
+
+```csharp
+await bus.SchedulePublish(TimeSpan.FromSeconds(30), new OrderSubmitted());
+var endpoint = await bus.GetSendEndpoint(new Uri("queue:submit-order"));
+await endpoint.ScheduleSend(TimeSpan.FromSeconds(30), new SubmitOrder());
+```
+
+#### Java
+
+```java
+bus.schedulePublish(new OrderSubmitted(), Duration.ofSeconds(30)).join();
+SendEndpoint endpoint = bus.getSendEndpoint("queue:submit-order");
+endpoint.scheduleSend(new SubmitOrder(), Duration.ofSeconds(30)).join();
+```
 
 ### Consuming Messages
 
