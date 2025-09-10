@@ -132,7 +132,7 @@ MessageBus bus = MessageBus.factory
 Using the fluent configuration pattern:
 
 ```java
-ServiceCollection services = new ServiceCollection();
+ServiceCollection services = ServiceCollection.create();
 
 services.from(MessageBusServices.class)
         .addServiceBus(cfg -> {
@@ -223,7 +223,7 @@ await endpoint.Send(new SubmitOrder { OrderId = Guid.NewGuid() });
 
 ```java
 // register the consumer and its endpoint
-ServiceCollection services = new ServiceCollection();
+ServiceCollection services = ServiceCollection.create();
 
 services.from(MessageBusServices.class)
         .addServiceBus(cfg -> {
@@ -595,7 +595,7 @@ builder.Services.AddServiceBus(x =>
 #### Java
 
 ```java
-ServiceCollection services = new ServiceCollection();
+ServiceCollection services = ServiceCollection.create();
 MediatorBus bus = MediatorBus.configure(services, cfg -> {
     cfg.addConsumer(SubmitOrderConsumer.class);
 });
@@ -651,7 +651,7 @@ builder.Services.AddServiceBus(x =>
 #### Java
 
 ```java
-ServiceCollection services = new ServiceCollection();
+ServiceCollection services = ServiceCollection.create();
 
 services.from(MessageBusServices.class)
         .addServiceBus(cfg -> {
@@ -818,7 +818,7 @@ builder.Services.AddServiceBus(x =>
 Register a logging provider using the `Logging` decorator:
 
 ```java
-ServiceCollection services = new ServiceCollection();
+ServiceCollection services = ServiceCollection.create();
 
 services.from(Logging.class)
         .addLogging(b -> b.addConsole());
@@ -911,7 +911,7 @@ builder.Services.AddServiceBus(x =>
 ##### Java
 
 ```java
-ServiceCollection services = new ServiceCollection();
+ServiceCollection services = ServiceCollection.create();
 
 services.from(MessageBusServices.class)
         .addServiceBus(cfg -> {
@@ -1035,7 +1035,7 @@ await harness.Stop();
 #### Java
 
 ```java
-ServiceCollection services = new ServiceCollection();
+ServiceCollection services = ServiceCollection.create();
 TestingServiceExtensions.addServiceBusTestHarness(services, cfg -> {
     cfg.addConsumer(SubmitOrderConsumer.class);
 });

@@ -45,7 +45,7 @@ public class HttpFactoryConfigurator implements BusFactoryConfigurator {
 
     @Override
     public MessageBus build() {
-        ServiceCollection services = new ServiceCollection();
+        ServiceCollection services = ServiceCollection.create();
         configure(services);
         ServiceProvider provider = services.buildServiceProvider();
         return provider.getService(MessageBus.class);

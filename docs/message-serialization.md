@@ -24,7 +24,7 @@ services.AddServiceBus(x =>
 **Java**
 
 ```java
-ServiceCollection services = new ServiceCollection();
+ServiceCollection services = ServiceCollection.create();
 
 services.from(MessageBusServices.class)
         .addServiceBus(cfg -> {

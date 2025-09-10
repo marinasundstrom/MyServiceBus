@@ -31,7 +31,7 @@ public class HttpFactoryConfiguratorTests {
         cfg.host(URI.create("http://localhost:5000/"));
         cfg.receiveEndpoint("submit-order", e -> e.configureConsumer(MyConsumer.class));
 
-        ServiceCollection services = new ServiceCollection();
+        ServiceCollection services = ServiceCollection.create();
         cfg.configure(services);
         ServiceProvider provider = services.buildServiceProvider();
 

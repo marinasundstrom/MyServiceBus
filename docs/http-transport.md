@@ -24,7 +24,7 @@ services.AddServiceBus(cfg =>
 ### Java
 
 ```java
-ServiceCollection services = new ServiceCollection();
+ServiceCollection services = ServiceCollection.create();
 services.from(MessageBusServices.class)
         .addServiceBus(cfg -> {
             cfg.using(HttpFactoryConfigurator.class, (context, http) -> {
@@ -76,7 +76,7 @@ services.AddServiceBus(cfg =>
 #### Java
 
 ```java
-ServiceCollection services = new ServiceCollection();
+ServiceCollection services = ServiceCollection.create();
 services.from(MessageBusServices.class)
         .addServiceBus(cfg -> {
             cfg.addConsumer(SubmitOrderConsumer.class);
