@@ -249,22 +249,26 @@ endpoint.send(new SubmitOrder(UUID.randomUUID())).join();
 
 ### Scheduling Messages
 
-Use the scheduler to delay message delivery.
+Delay message delivery by setting the scheduled enqueue time on the send or publish context.
 
 #### C#
 
 ```csharp
-await bus.SchedulePublish(TimeSpan.FromSeconds(30), new OrderSubmitted());
+await bus.Publish(new OrderSubmitted(), ctx =>
+    ctx.SetScheduledEnqueueTime(TimeSpan.FromSeconds(30)));
 var endpoint = await bus.GetSendEndpoint(new Uri("queue:submit-order"));
-await endpoint.ScheduleSend(TimeSpan.FromSeconds(30), new SubmitOrder());
+await endpoint.Send(new SubmitOrder(), ctx =>
+    ctx.SetScheduledEnqueueTime(TimeSpan.FromSeconds(30)));
 ```
 
 #### Java
 
 ```java
-bus.schedulePublish(new OrderSubmitted(), Duration.ofSeconds(30)).join();
+bus.publish(new OrderSubmitted(),
+    ctx -> ctx.setScheduledEnqueueTime(Duration.ofSeconds(30))).join();
 SendEndpoint endpoint = bus.getSendEndpoint("queue:submit-order");
-endpoint.scheduleSend(new SubmitOrder(), Duration.ofSeconds(30)).join();
+endpoint.send(new SubmitOrder(),
+    ctx -> ctx.setScheduledEnqueueTime(Duration.ofSeconds(30))).join();
 ```
 
 ### Consuming Messages

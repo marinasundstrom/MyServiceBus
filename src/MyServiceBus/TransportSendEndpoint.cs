@@ -44,6 +44,13 @@ internal class TransportSendEndpoint : ISendEndpoint
 
         contextCallback?.Invoke(context);
 
+        if (context.ScheduledEnqueueTime is DateTime scheduled)
+        {
+            var delay = scheduled - DateTime.UtcNow;
+            if (delay > TimeSpan.Zero)
+                await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
+        }
+
         await _sendPipe.Send(context);
         var typed = message is T t ? t : (T)MessageProxy.Create(typeof(T), message);
         await transport.Send(typed, context, cancellationToken);

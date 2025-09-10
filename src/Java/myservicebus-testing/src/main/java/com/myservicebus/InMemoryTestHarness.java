@@ -5,6 +5,9 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
@@ -61,6 +64,24 @@ public class InMemoryTestHarness implements RequestClientTransport, TransportSen
     }
 
     public <T> CompletableFuture<Void> send(SendContext context) {
+        Instant scheduled = context.getScheduledEnqueueTime();
+        if (scheduled != null) {
+            Duration delay = Duration.between(Instant.now(), scheduled);
+            if (delay.isNegative()) {
+                delay = Duration.ZERO;
+            }
+            CompletableFuture<Void> future = new CompletableFuture<>();
+            CompletableFuture.delayedExecutor(delay.toMillis(), TimeUnit.MILLISECONDS)
+                    .execute(() -> sendInternal(context, null, null)
+                            .whenComplete((r, e) -> {
+                                if (e != null) {
+                                    future.completeExceptionally(e);
+                                } else {
+                                    future.complete(r);
+                                }
+                            }));
+            return future;
+        }
         return sendInternal(context, null, null);
     }
 
@@ -246,7 +267,7 @@ public class InMemoryTestHarness implements RequestClientTransport, TransportSen
 
         @Override
         public CompletableFuture<Void> send(SendContext context) {
-            return InMemoryTestHarness.this.sendInternal(context, null, null);
+            return InMemoryTestHarness.this.send(context);
         }
     }
 }

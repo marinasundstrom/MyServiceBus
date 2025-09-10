@@ -17,6 +17,24 @@ public interface PublishEndpoint {
     }
 
     default CompletableFuture<Void> publish(PublishContext context) {
+        Instant scheduled = context.getScheduledEnqueueTime();
+        if (scheduled != null) {
+            Duration delay = Duration.between(Instant.now(), scheduled);
+            if (delay.isNegative()) {
+                delay = Duration.ZERO;
+            }
+            CompletableFuture<Void> future = new CompletableFuture<>();
+            CompletableFuture.delayedExecutor(delay.toMillis(), TimeUnit.MILLISECONDS)
+                    .execute(() -> publish(context.getMessage(), context.getCancellationToken())
+                            .whenComplete((r, e) -> {
+                                if (e != null) {
+                                    future.completeExceptionally(e);
+                                } else {
+                                    future.complete(r);
+                                }
+                            }));
+            return future;
+        }
         return publish(context.getMessage(), context.getCancellationToken());
     }
 
@@ -49,53 +67,4 @@ public interface PublishEndpoint {
         return publish(messageType, message, CancellationToken.none);
     }
 
-    default <T> CompletableFuture<Void> schedulePublish(T message, Duration delay, CancellationToken cancellationToken) {
-        if (delay.isNegative()) {
-            delay = Duration.ZERO;
-        }
-        CompletableFuture<Void> future = new CompletableFuture<>();
-        CompletableFuture.delayedExecutor(delay.toMillis(), TimeUnit.MILLISECONDS)
-                .execute(() -> publish(message, cancellationToken)
-                        .whenComplete((r, e) -> {
-                            if (e != null) {
-                                future.completeExceptionally(e);
-                            } else {
-                                future.complete(r);
-                            }
-                        }));
-        return future;
-    }
-
-    default <T> CompletableFuture<Void> schedulePublish(T message, Duration delay) {
-        return schedulePublish(message, delay, CancellationToken.none);
-    }
-
-    default <T> CompletableFuture<Void> schedulePublish(T message, Instant scheduledTime, CancellationToken cancellationToken) {
-        Duration delay = Duration.between(Instant.now(), scheduledTime);
-        return schedulePublish(message, delay, cancellationToken);
-    }
-
-    default <T> CompletableFuture<Void> schedulePublish(T message, Instant scheduledTime) {
-        return schedulePublish(message, scheduledTime, CancellationToken.none);
-    }
-
-    default <T> CompletableFuture<Void> schedulePublish(Class<T> messageType, Object message, Duration delay,
-            CancellationToken cancellationToken) {
-        T proxy = MessageProxy.create(messageType, message);
-        return schedulePublish(proxy, delay, cancellationToken);
-    }
-
-    default <T> CompletableFuture<Void> schedulePublish(Class<T> messageType, Object message, Duration delay) {
-        return schedulePublish(messageType, message, delay, CancellationToken.none);
-    }
-
-    default <T> CompletableFuture<Void> schedulePublish(Class<T> messageType, Object message, Instant scheduledTime,
-            CancellationToken cancellationToken) {
-        T proxy = MessageProxy.create(messageType, message);
-        return schedulePublish(proxy, scheduledTime, cancellationToken);
-    }
-
-    default <T> CompletableFuture<Void> schedulePublish(Class<T> messageType, Object message, Instant scheduledTime) {
-        return schedulePublish(messageType, message, scheduledTime, CancellationToken.none);
-    }
 }

@@ -21,7 +21,7 @@ public class SchedulingTest {
 
         SendEndpoint endpoint = harness.getSendEndpoint("loopback://localhost/queue");
         Instant start = Instant.now();
-        endpoint.scheduleSend("hi", Duration.ofMillis(100)).join();
+        endpoint.send("hi", ctx -> ctx.setScheduledEnqueueTime(Duration.ofMillis(100))).join();
         Instant end = Instant.now();
 
         assertTrue(Duration.between(start, end).toMillis() >= 100);

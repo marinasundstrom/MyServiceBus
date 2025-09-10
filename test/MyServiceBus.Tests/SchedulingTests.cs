@@ -43,7 +43,7 @@ public class SchedulingTests
         TestConsumer.Received = 0;
         var delay = TimeSpan.FromMilliseconds(100);
         var sw = Stopwatch.StartNew();
-        await bus.SchedulePublish(delay, new TestMessage());
+        await bus.Publish(new TestMessage(), ctx => ctx.SetScheduledEnqueueTime(delay));
         sw.Stop();
 
         Assert.True(sw.Elapsed >= delay);

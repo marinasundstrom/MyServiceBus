@@ -200,47 +200,6 @@ public class ConsumeContext<T>
         return send(destination, messageType, message, CancellationToken.none);
     }
 
-    public <TMessage> CompletableFuture<Void> scheduleSend(String destination, TMessage message, Duration delay,
-            CancellationToken cancellationToken) {
-        SendEndpoint endpoint = getSendEndpoint(destination);
-        return endpoint.scheduleSend(message, delay, cancellationToken);
-    }
-
-    public <TMessage> CompletableFuture<Void> scheduleSend(String destination, TMessage message, Duration delay) {
-        return scheduleSend(destination, message, delay, CancellationToken.none);
-    }
-
-    public <TMessage> CompletableFuture<Void> scheduleSend(String destination, TMessage message, Instant scheduledTime,
-            CancellationToken cancellationToken) {
-        SendEndpoint endpoint = getSendEndpoint(destination);
-        return endpoint.scheduleSend(message, scheduledTime, cancellationToken);
-    }
-
-    public <TMessage> CompletableFuture<Void> scheduleSend(String destination, TMessage message, Instant scheduledTime) {
-        return scheduleSend(destination, message, scheduledTime, CancellationToken.none);
-    }
-
-    public <TMessage> CompletableFuture<Void> scheduleSend(String destination, Class<TMessage> messageType, Object message,
-            Duration delay, CancellationToken cancellationToken) {
-        SendEndpoint endpoint = getSendEndpoint(destination);
-        return endpoint.scheduleSend(messageType, message, delay, cancellationToken);
-    }
-
-    public <TMessage> CompletableFuture<Void> scheduleSend(String destination, Class<TMessage> messageType, Object message,
-            Duration delay) {
-        return scheduleSend(destination, messageType, message, delay, CancellationToken.none);
-    }
-
-    public <TMessage> CompletableFuture<Void> scheduleSend(String destination, Class<TMessage> messageType, Object message,
-            Instant scheduledTime, CancellationToken cancellationToken) {
-        SendEndpoint endpoint = getSendEndpoint(destination);
-        return endpoint.scheduleSend(messageType, message, scheduledTime, cancellationToken);
-    }
-
-    public <TMessage> CompletableFuture<Void> scheduleSend(String destination, Class<TMessage> messageType, Object message,
-            Instant scheduledTime) {
-        return scheduleSend(destination, messageType, message, scheduledTime, CancellationToken.none);
-    }
 
     public <TMessage> CompletableFuture<Void> forward(String destination, TMessage message, CancellationToken cancellationToken) {
         SendEndpoint endpoint = getSendEndpoint(destination);

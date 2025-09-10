@@ -17,6 +17,24 @@ public interface SendEndpoint {
     }
 
     default CompletableFuture<Void> send(SendContext context) {
+        Instant scheduled = context.getScheduledEnqueueTime();
+        if (scheduled != null) {
+            Duration delay = Duration.between(Instant.now(), scheduled);
+            if (delay.isNegative()) {
+                delay = Duration.ZERO;
+            }
+            CompletableFuture<Void> future = new CompletableFuture<>();
+            CompletableFuture.delayedExecutor(delay.toMillis(), TimeUnit.MILLISECONDS)
+                    .execute(() -> send(context.getMessage(), context.getCancellationToken())
+                            .whenComplete((r, e) -> {
+                                if (e != null) {
+                                    future.completeExceptionally(e);
+                                } else {
+                                    future.complete(r);
+                                }
+                            }));
+            return future;
+        }
         return send(context.getMessage(), context.getCancellationToken());
     }
 
@@ -49,53 +67,4 @@ public interface SendEndpoint {
         return send(messageType, message, CancellationToken.none);
     }
 
-    default <T> CompletableFuture<Void> scheduleSend(T message, Duration delay, CancellationToken cancellationToken) {
-        if (delay.isNegative()) {
-            delay = Duration.ZERO;
-        }
-        CompletableFuture<Void> future = new CompletableFuture<>();
-        CompletableFuture.delayedExecutor(delay.toMillis(), TimeUnit.MILLISECONDS)
-                .execute(() -> send(message, cancellationToken)
-                        .whenComplete((r, e) -> {
-                            if (e != null) {
-                                future.completeExceptionally(e);
-                            } else {
-                                future.complete(r);
-                            }
-                        }));
-        return future;
-    }
-
-    default <T> CompletableFuture<Void> scheduleSend(T message, Duration delay) {
-        return scheduleSend(message, delay, CancellationToken.none);
-    }
-
-    default <T> CompletableFuture<Void> scheduleSend(T message, Instant scheduledTime, CancellationToken cancellationToken) {
-        Duration delay = Duration.between(Instant.now(), scheduledTime);
-        return scheduleSend(message, delay, cancellationToken);
-    }
-
-    default <T> CompletableFuture<Void> scheduleSend(T message, Instant scheduledTime) {
-        return scheduleSend(message, scheduledTime, CancellationToken.none);
-    }
-
-    default <T> CompletableFuture<Void> scheduleSend(Class<T> messageType, Object message, Duration delay,
-            CancellationToken cancellationToken) {
-        T proxy = MessageProxy.create(messageType, message);
-        return scheduleSend(proxy, delay, cancellationToken);
-    }
-
-    default <T> CompletableFuture<Void> scheduleSend(Class<T> messageType, Object message, Duration delay) {
-        return scheduleSend(messageType, message, delay, CancellationToken.none);
-    }
-
-    default <T> CompletableFuture<Void> scheduleSend(Class<T> messageType, Object message, Instant scheduledTime,
-            CancellationToken cancellationToken) {
-        T proxy = MessageProxy.create(messageType, message);
-        return scheduleSend(proxy, scheduledTime, cancellationToken);
-    }
-
-    default <T> CompletableFuture<Void> scheduleSend(Class<T> messageType, Object message, Instant scheduledTime) {
-        return scheduleSend(messageType, message, scheduledTime, CancellationToken.none);
-    }
 }
