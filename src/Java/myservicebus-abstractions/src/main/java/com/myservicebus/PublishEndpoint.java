@@ -1,6 +1,9 @@
 package com.myservicebus;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
 import com.myservicebus.tasks.CancellationToken;
@@ -14,6 +17,24 @@ public interface PublishEndpoint {
     }
 
     default CompletableFuture<Void> publish(PublishContext context) {
+        Instant scheduled = context.getScheduledEnqueueTime();
+        if (scheduled != null) {
+            Duration delay = Duration.between(Instant.now(), scheduled);
+            if (delay.isNegative()) {
+                delay = Duration.ZERO;
+            }
+            CompletableFuture<Void> future = new CompletableFuture<>();
+            CompletableFuture.delayedExecutor(delay.toMillis(), TimeUnit.MILLISECONDS)
+                    .execute(() -> publish(context.getMessage(), context.getCancellationToken())
+                            .whenComplete((r, e) -> {
+                                if (e != null) {
+                                    future.completeExceptionally(e);
+                                } else {
+                                    future.complete(r);
+                                }
+                            }));
+            return future;
+        }
         return publish(context.getMessage(), context.getCancellationToken());
     }
 
@@ -45,4 +66,5 @@ public interface PublishEndpoint {
     default <T> CompletableFuture<Void> publish(Class<T> messageType, Object message) {
         return publish(messageType, message, CancellationToken.none);
     }
+
 }

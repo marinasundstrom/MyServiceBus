@@ -56,6 +56,13 @@ public class MessageBusServices extends ServiceCollectionDecorator {
         inner.addSingleton(ReceiveEndpointConnector.class,
                 sp -> () -> (ReceiveEndpointConnector) sp.getService(MessageBus.class));
 
+        inner.addSingleton(JobScheduler.class, sp -> () -> new DefaultJobScheduler());
+        inner.addScoped(MessageScheduler.class,
+                sp -> () -> new MessageSchedulerImpl(
+                        (PublishEndpoint) sp.getService(MessageBus.class),
+                        (SendEndpointProvider) sp.getService(MessageBus.class),
+                        (JobScheduler) sp.getService(JobScheduler.class)));
+
         return inner;
     }
 }

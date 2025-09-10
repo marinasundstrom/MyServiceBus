@@ -8,8 +8,8 @@ For Java build and run instructions, including optional JDK 17 toolchain setup a
 
 - [Basics](#basics)
   - [Setup](#setup)
-  - [Publishing](#publishing)
-  - [Sending](#sending)
+- [Publishing](#publishing)
+- [Sending](#sending)
   - [Consuming Messages](#consuming-messages)
   - [Request/Response](#requestresponse)
   - [Adding Headers](#adding-headers)
@@ -23,6 +23,7 @@ For Java build and run instructions, including optional JDK 17 toolchain setup a
   - [OpenTelemetry](#opentelemetry)
   - [Health checks](#health-checks)
   - [Filters](#filters)
+  - [Scheduling Messages](#scheduling-messages)
   - [Unit Testing with the In-Memory Test Harness](#unit-testing-with-the-in-memory-test-harness)
 
 ## Basics
@@ -942,6 +943,34 @@ try (ServiceScope scope = provider.createScope()) {
 }
 ```
 
+
+### Scheduling Messages
+
+Delay message delivery by setting the scheduled enqueue time on the send or publish context or by using the `IMessageScheduler` service. External schedulers such as Quartz or Hangfire can be plugged in by providing a custom `IJobScheduler`/`JobScheduler` implementation.
+
+#### C#
+
+```csharp
+await bus.Publish(new OrderSubmitted(), ctx => ctx.SetScheduledEnqueueTime(TimeSpan.FromSeconds(30)));
+var endpoint = await bus.GetSendEndpoint(new Uri("queue:submit-order"));
+await endpoint.Send(new SubmitOrder(), ctx => ctx.SetScheduledEnqueueTime(TimeSpan.FromSeconds(30)));
+
+var scheduler = provider.GetRequiredService<IMessageScheduler>();
+await scheduler.SchedulePublish(new OrderSubmitted(), TimeSpan.FromSeconds(30));
+await scheduler.ScheduleSend(new Uri("queue:submit-order"), new SubmitOrder(), TimeSpan.FromSeconds(30));
+```
+
+#### Java
+
+```java
+bus.publish(new OrderSubmitted(), ctx -> ctx.setScheduledEnqueueTime(Duration.ofSeconds(30))).get();
+SendEndpoint endpoint = bus.getSendEndpoint("queue:submit-order");
+endpoint.send(new SubmitOrder(), ctx -> ctx.setScheduledEnqueueTime(Duration.ofSeconds(30))).get();
+
+MessageScheduler scheduler = services.getService(MessageScheduler.class);
+scheduler.schedulePublish(new OrderSubmitted(), Duration.ofSeconds(30)).get();
+scheduler.scheduleSend("queue:submit-order", new SubmitOrder(), Duration.ofSeconds(30)).get();
+```
 
 ### Unit Testing with the In-Memory Test Harness
 

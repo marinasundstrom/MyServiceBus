@@ -78,6 +78,31 @@ public class Main {
 }
 ```
 
+### Decorators with `ServiceCollection.from`
+
+`ServiceCollection.from(Class)` instantiates a decorator that wraps the
+collection, similar to .NET's extension methods. The decorator type must expose
+a constructor that accepts the current `ServiceCollection` and can add
+feature-specific registrations while returning the underlying collection for
+further configuration.
+
+```java
+ServiceCollection services = ServiceCollection.create();
+
+// Add logging services
+services.from(Logging.class)
+        .addLogging(b -> b.addConsole());
+
+// Configure the message bus
+services.from(MessageBusServices.class)
+        .addServiceBus(cfg -> {
+            cfg.addConsumer(SubmitOrderConsumer.class);
+        });
+```
+
+Each decorator appends to the original `ServiceCollection`, allowing multiple
+decorators to be chained before the provider is built.
+
 ### Connecting to an existing Guice injector
 
 If you already have a Guice `Injector`, `DefaultServiceCollection` can reuse it via `connectAndBuild`:
