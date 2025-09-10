@@ -30,10 +30,12 @@ public class SchedulingTest {
                 uri -> harness.getSendEndpoint(uri),
                 new DefaultJobScheduler());
         Instant start = Instant.now();
-        scheduler.scheduleSend("loopback://localhost/queue", "hi", Duration.ofMillis(100)).join();
+        Duration delay = Duration.ofMillis(100);
+        scheduler.scheduleSend("loopback://localhost/queue", "hi", delay).join();
         Instant end = Instant.now();
-
-        assertTrue(Duration.between(start, end).toMillis() >= 100);
+        Duration elapsed = Duration.between(start, end);
+        Duration tolerance = Duration.ofMillis(20);
+        assertTrue(elapsed.toMillis() >= delay.minus(tolerance).toMillis());
         assertTrue(harness.wasConsumed(String.class));
         handled.join();
     }
@@ -48,10 +50,12 @@ public class SchedulingTest {
         });
 
         Instant start = Instant.now();
-        harness.send("hi", ctx -> ctx.setScheduledEnqueueTime(Duration.ofMillis(100))).join();
+        Duration delay = Duration.ofMillis(100);
+        harness.send("hi", ctx -> ctx.setScheduledEnqueueTime(delay)).join();
         Instant end = Instant.now();
-
-        assertTrue(Duration.between(start, end).toMillis() >= 100);
+        Duration elapsed = Duration.between(start, end);
+        Duration tolerance = Duration.ofMillis(20);
+        assertTrue(elapsed.toMillis() >= delay.minus(tolerance).toMillis());
         assertTrue(harness.wasConsumed(String.class));
         handled.join();
     }

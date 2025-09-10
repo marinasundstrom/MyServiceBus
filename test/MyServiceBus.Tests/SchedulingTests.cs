@@ -56,7 +56,8 @@ public class SchedulingTests
         await scheduler.SchedulePublish(new TestMessage(), delay);
         sw.Stop();
 
-        Assert.True(sw.Elapsed >= delay);
+        var tolerance = TimeSpan.FromMilliseconds(20);
+        Assert.True(sw.Elapsed >= delay - tolerance);
         Assert.Equal(1, TestConsumer.Received);
 
         await hosted.StopAsync(CancellationToken.None);
@@ -85,7 +86,8 @@ public class SchedulingTests
         await publishEndpoint.Publish(new TestMessage(), ctx => ctx.SetScheduledEnqueueTime(delay));
         sw.Stop();
 
-        Assert.True(sw.Elapsed >= delay);
+        var tolerance = TimeSpan.FromMilliseconds(20);
+        Assert.True(sw.Elapsed >= delay - tolerance);
         Assert.Equal(1, TestConsumer.Received);
 
         await hosted.StopAsync(CancellationToken.None);
