@@ -35,7 +35,7 @@ public class Main {
         // Configure logging provider Slf4j
         services.from(Logging.class)
                 .addLogging(builder -> builder.addSlf4j(cfg -> {
-                    cfg.setMinimumLevel(LogLevel.WARN);
+                    // cfg.setMinimumLevel(LogLevel.WARN);
                     cfg.setLevel("com.myservicebus", LogLevel.DEBUG);
                 }));
 

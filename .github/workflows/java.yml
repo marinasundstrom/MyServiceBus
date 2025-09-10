@@ -25,5 +25,4 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
       - name: Build with Gradle
-        working-directory: src/Java
         run: ./gradlew test
