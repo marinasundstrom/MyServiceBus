@@ -25,7 +25,7 @@ public class RabbitMqFactoryConfiguratorTests {
 
     @Test
     public void consumerDefinitionReflectsCustomQueueAndExchange() {
-        ServiceCollection services = new ServiceCollection();
+        ServiceCollection services = ServiceCollection.create();
         BusRegistrationConfiguratorImpl cfg = new BusRegistrationConfiguratorImpl(services);
         cfg.addConsumer(MyConsumer.class);
 
@@ -61,7 +61,7 @@ public class RabbitMqFactoryConfiguratorTests {
 
     @Test
     public void messageUsesEntityNameFormatter() {
-        ServiceCollection services = new ServiceCollection();
+        ServiceCollection services = ServiceCollection.create();
         BusRegistrationConfiguratorImpl cfg = new BusRegistrationConfiguratorImpl(services);
         cfg.addConsumer(MyConsumer.class);
 
@@ -86,7 +86,7 @@ public class RabbitMqFactoryConfiguratorTests {
 
     @Test
     public void receiveEndpointAddsMessageRetry() {
-        ServiceCollection services = new ServiceCollection();
+        ServiceCollection services = ServiceCollection.create();
         BusRegistrationConfiguratorImpl cfg = new BusRegistrationConfiguratorImpl(services);
         cfg.addConsumer(MyConsumer.class);
 
@@ -113,7 +113,7 @@ public class RabbitMqFactoryConfiguratorTests {
 
     @Test
     public void receiveEndpointSetsQueueArguments() {
-        ServiceCollection services = new ServiceCollection();
+        ServiceCollection services = ServiceCollection.create();
         BusRegistrationConfiguratorImpl cfg = new BusRegistrationConfiguratorImpl(services);
         cfg.addConsumer(MyConsumer.class);
 
@@ -140,7 +140,7 @@ public class RabbitMqFactoryConfiguratorTests {
 
     @Test
     public void configureEndpointsUsesFormatter() {
-        ServiceCollection services = new ServiceCollection();
+        ServiceCollection services = ServiceCollection.create();
         BusRegistrationConfiguratorImpl cfg = new BusRegistrationConfiguratorImpl(services);
         cfg.addConsumer(MyConsumer.class);
 

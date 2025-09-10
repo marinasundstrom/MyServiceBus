@@ -25,7 +25,7 @@ class PublishContextAddressTest {
     void publish_sets_source_and_destination_addresses() throws Exception {
         AtomicReference<SendContext> captured = new AtomicReference<>();
 
-        ServiceCollection services = new ServiceCollection();
+        ServiceCollection services = ServiceCollection.create();
         services.addSingleton(SendPipe.class, sp -> () -> new SendPipe(new PipeConfigurator<SendContext>().build()));
         services.addSingleton(PublishPipe.class, sp -> () -> new PublishPipe(new PipeConfigurator<SendContext>().build()));
         services.addSingleton(ConsumeContextProvider.class, sp -> () -> new ConsumeContextProvider());

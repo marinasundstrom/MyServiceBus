@@ -29,7 +29,7 @@ import com.myservicebus.logging.Logging;
 public class Main {
     public static void main(String[] args) {
 
-        ServiceCollection services = new ServiceCollection();
+        ServiceCollection services = ServiceCollection.create();
         services.addScoped(MyService.class, MyServiceImpl.class);
 
         // Configure logging provider Slf4j

@@ -10,7 +10,7 @@ import com.myservicebus.di.ServiceProvider;
 public class LoggingBuilderTest {
     @Test
     void addConsoleRegistersConsoleLoggerFactory() {
-        ServiceCollection services = new ServiceCollection();
+        ServiceCollection services = ServiceCollection.create();
         services.from(Logging.class).addLogging(b -> b.addConsole());
         ServiceProvider provider = services.buildServiceProvider();
         LoggerFactory factory = provider.getService(LoggerFactory.class);
@@ -19,7 +19,7 @@ public class LoggingBuilderTest {
 
     @Test
     void addSlf4jRegistersSlf4jLoggerFactory() {
-        ServiceCollection services = new ServiceCollection();
+        ServiceCollection services = ServiceCollection.create();
         services.from(Logging.class).addLogging(b -> b.addSlf4j());
         ServiceProvider provider = services.buildServiceProvider();
         LoggerFactory factory = provider.getService(LoggerFactory.class);
@@ -28,7 +28,7 @@ public class LoggingBuilderTest {
 
     @Test
     void configureSlf4jSetsMinimumLevel() {
-        ServiceCollection services = new ServiceCollection();
+        ServiceCollection services = ServiceCollection.create();
         services.from(Logging.class).addLogging(b -> b.addSlf4j(cfg -> cfg.setMinimumLevel(LogLevel.ERROR)));
         ServiceProvider provider = services.buildServiceProvider();
         LoggerFactory factory = provider.getService(LoggerFactory.class);

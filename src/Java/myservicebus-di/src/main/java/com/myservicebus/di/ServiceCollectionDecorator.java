@@ -1,16 +1,23 @@
 package com.myservicebus.di;
 
-import java.util.function.Consumer;
+import java.util.Iterator;
+import java.util.List;
 
-import com.google.inject.Injector;
-import com.myservicebus.logging.ConsoleLoggerConfig;
-import com.myservicebus.logging.Slf4jLoggerConfig;
-
-public abstract class ServiceCollectionDecorator extends ServiceCollection {
+public abstract class ServiceCollectionDecorator implements ServiceCollection {
     protected final ServiceCollection inner;
 
     protected ServiceCollectionDecorator(ServiceCollection inner) {
         this.inner = inner;
+    }
+
+    @Override
+    public <T extends ServiceCollection> T from(Class<T> decoratorType) {
+        return inner.from(decoratorType);
+    }
+
+    @Override
+    public Iterator<ServiceDescriptor> iterator() {
+        return inner.iterator();
     }
 
     @Override
@@ -54,35 +61,17 @@ public abstract class ServiceCollectionDecorator extends ServiceCollection {
     }
 
     @Override
-    public void addConsoleLogger() {
-        inner.addConsoleLogger();
+    public <T> void remove(Class<T> type) {
+        inner.remove(type);
     }
 
     @Override
-    public void addConsoleLogger(Consumer<ConsoleLoggerConfig> configure) {
-        inner.addConsoleLogger(configure);
-    }
-
-    @Override
-    public void addSlf4jLogger() {
-        inner.addSlf4jLogger();
-    }
-
-    
-    
-    
-    @Override
-    public void addSlf4jLogger(Consumer<Slf4jLoggerConfig> configure) {
-        inner.addSlf4jLogger(configure);
+    public List<ServiceDescriptor> getDescriptors() {
+        return inner.getDescriptors();
     }
 
     @Override
     public ServiceProvider buildServiceProvider() {
         return inner.buildServiceProvider();
-    }
-
-    @Override
-    public ServiceProvider connectAndBuild(Injector parentInjector) {
-        return inner.connectAndBuild(parentInjector);
     }
 }

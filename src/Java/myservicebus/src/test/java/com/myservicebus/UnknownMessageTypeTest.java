@@ -48,7 +48,7 @@ class UnknownMessageTypeTest {
     @Test
     void skipsUnregisteredMessageType() throws Exception {
         StubTransportFactory transportFactory = new StubTransportFactory();
-        ServiceCollection services = new ServiceCollection();
+        ServiceCollection services = ServiceCollection.create();
         services.addSingleton(TransportFactory.class, sp -> () -> transportFactory);
         services.addSingleton(TransportSendEndpointProvider.class, sp -> () -> new TransportSendEndpointProvider() {
             @Override

@@ -48,7 +48,7 @@ public class RequestClientFaultTest {
 
     @Test
     void request_fault_completes_exceptionally() {
-        ServiceCollection services = new ServiceCollection();
+        ServiceCollection services = ServiceCollection.create();
         TestingServiceExtensions.addServiceBusTestHarness(services, cfg -> {
             cfg.addConsumer(FaultingConsumer.class);
         });

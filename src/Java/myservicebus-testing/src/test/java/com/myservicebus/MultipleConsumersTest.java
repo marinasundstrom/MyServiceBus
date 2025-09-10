@@ -33,7 +33,7 @@ public class MultipleConsumersTest {
 
     @Test
     void multiple_consumers_receive_message() {
-        ServiceCollection services = new ServiceCollection();
+        ServiceCollection services = ServiceCollection.create();
         TestingServiceExtensions.addServiceBusTestHarness(services, cfg -> {
             cfg.addConsumer(FirstConsumer.class);
             cfg.addConsumer(SecondConsumer.class);
