@@ -1,18 +1,18 @@
 # MyServiceBus Java
 
-This folder contains the Java modules for MyServiceBus built with a Gradle multi-project build.
+This folder contains the Java modules for MyServiceBus. The Gradle multi-project build resides at the repository root.
 
 ## Prerequisites
 - JDK 17 (Temurin/OpenJDK recommended)
 - Docker (optional) to run RabbitMQ locally
 
 ## Build
-If the Gradle wrapper JAR is missing, bootstrap it:
+If the Gradle wrapper JAR is missing, bootstrap it from the repository root:
 ```bash
 gradle wrapper
 ```
 
-- Build all modules and run tests:
+- From the repository root, build all modules and run tests:
   ```bash
   ./gradlew test
   ```
@@ -29,7 +29,7 @@ RabbitMQ defaults: host `localhost`, port `5672`, mgmt UI `http://localhost:1567
 - From the module directory:
   ```bash
   cd src/Java/testapp
-  RABBITMQ_HOST=localhost HTTP_PORT=5301 ../gradlew run
+  RABBITMQ_HOST=localhost HTTP_PORT=5301 ../../gradlew run
   ```
 - From the repo root (no `cd` required):
   ```bash

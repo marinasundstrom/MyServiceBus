@@ -1,0 +1,30 @@
+rootProject.name = 'myservicebus-parent'
+
+def javaDir = 'src/Java'
+
+include 'myservicebus'
+project(':myservicebus').projectDir = file("${javaDir}/myservicebus")
+
+include 'myservicebus-abstractions'
+project(':myservicebus-abstractions').projectDir = file("${javaDir}/myservicebus-abstractions")
+
+include 'myservicebus-di'
+project(':myservicebus-di').projectDir = file("${javaDir}/myservicebus-di")
+
+include 'myservicebus-logging'
+project(':myservicebus-logging').projectDir = file("${javaDir}/myservicebus-logging")
+
+include 'myservicebus-tasks'
+project(':myservicebus-tasks').projectDir = file("${javaDir}/myservicebus-tasks")
+
+include 'myservicebus-rabbitmq'
+project(':myservicebus-rabbitmq').projectDir = file("${javaDir}/myservicebus-rabbitmq")
+
+include 'testapp'
+project(':testapp').projectDir = file("${javaDir}/testapp")
+
+include 'myservicebus-testing'
+project(':myservicebus-testing').projectDir = file("${javaDir}/myservicebus-testing")
+
+include 'di-testapp'
+project(':di-testapp').projectDir = file("${javaDir}/di-testapp")
