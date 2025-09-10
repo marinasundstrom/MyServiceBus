@@ -119,6 +119,41 @@ public class ServiceCollectionTest {
     }
 
     @Test
+    void testTryAddSingletonDoesNotOverride() {
+        ServiceCollection sc = ServiceCollection.create();
+        boolean first = sc.tryAddSingleton(Processor.class, ProcessorImpl.class);
+        boolean second = sc.tryAddSingleton(Processor.class, AnotherProcessor.class);
+        ServiceProvider sp = sc.buildServiceProvider();
+
+        Processor p = sp.getService(Processor.class);
+        assertTrue(first);
+        assertFalse(second);
+        assertEquals("processed", p.process());
+    }
+
+    @Test
+    void testTryAddScopedDoesNotOverride() {
+        ServiceCollection sc = ServiceCollection.create();
+        boolean first = sc.tryAddScoped(Processor.class, ProcessorImpl.class);
+        boolean second = sc.tryAddScoped(Processor.class, AnotherProcessor.class);
+        ServiceProvider sp = sc.buildServiceProvider();
+
+        Processor p1;
+        Processor p2;
+        try (ServiceScope scope = sp.createScope()) {
+            p1 = scope.getServiceProvider().getService(Processor.class);
+        }
+        try (ServiceScope scope = sp.createScope()) {
+            p2 = scope.getServiceProvider().getService(Processor.class);
+        }
+
+        assertTrue(first);
+        assertFalse(second);
+        assertEquals("processed", p1.process());
+        assertEquals("processed", p2.process());
+    }
+
+    @Test
     public void testMultiBindingResolvesAllImplementations() {
         // Arrange
         ServiceCollection collection = ServiceCollection.create();
@@ -221,6 +256,22 @@ public class ServiceCollectionTest {
             Processor p = scopedSp.getService(Processor.class);
             assertNull(p);
         }
+    }
+
+    @Test
+    void addedDescriptorCanBeQueriedAndRemoved() {
+        ServiceCollection sc = ServiceCollection.create();
+        ServiceDescriptor descriptor = new ServiceDescriptor(
+                Processor.class, ProcessorImpl.class, null, null, ServiceLifetime.SINGLETON, false);
+        sc.add(descriptor);
+
+        assertEquals(1, sc.getDescriptors().size());
+        ServiceDescriptor retrieved = sc.getDescriptors().get(0);
+        assertEquals(Processor.class, retrieved.getServiceType());
+
+        boolean removed = sc.remove(descriptor);
+        assertTrue(removed);
+        assertTrue(sc.getDescriptors().isEmpty());
     }
 
     @Test

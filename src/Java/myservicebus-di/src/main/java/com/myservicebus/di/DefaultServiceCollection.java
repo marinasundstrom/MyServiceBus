@@ -33,35 +33,83 @@ public class DefaultServiceCollection implements ServiceCollection {
     }
 
     public <T> void addSingleton(Class<T> type, ServiceProviderBasedProvider<T> providerFactory) {
-        addDescriptor(new ServiceDescriptor(type, null, providerFactory, null, ServiceLifetime.SINGLETON, false));
+        add(new ServiceDescriptor(type, null, providerFactory, null, ServiceLifetime.SINGLETON, false));
     }
 
     public <T, U extends T> void addSingleton(Class<T> type) {
-        addDescriptor(new ServiceDescriptor(type, type, null, null, ServiceLifetime.SINGLETON, false));
+        add(new ServiceDescriptor(type, type, null, null, ServiceLifetime.SINGLETON, false));
     }
 
     public <T, U extends T> void addSingleton(Class<T> iface, Class<U> impl) {
-        addDescriptor(new ServiceDescriptor(iface, impl, null, null, ServiceLifetime.SINGLETON, false));
+        add(new ServiceDescriptor(iface, impl, null, null, ServiceLifetime.SINGLETON, false));
     }
 
     public <T> void addScoped(Class<T> type) {
-        addDescriptor(new ServiceDescriptor(type, type, null, null, ServiceLifetime.SCOPED, false));
+        add(new ServiceDescriptor(type, type, null, null, ServiceLifetime.SCOPED, false));
     }
 
     public <T> void addScoped(Class<T> type, ServiceProviderBasedProvider<T> providerFactory) {
-        addDescriptor(new ServiceDescriptor(type, null, providerFactory, null, ServiceLifetime.SCOPED, false));
+        add(new ServiceDescriptor(type, null, providerFactory, null, ServiceLifetime.SCOPED, false));
     }
 
     public <T, U extends T> void addScoped(Class<T> iface, Class<U> impl) {
-        addDescriptor(new ServiceDescriptor(iface, impl, null, null, ServiceLifetime.SCOPED, false));
+        add(new ServiceDescriptor(iface, impl, null, null, ServiceLifetime.SCOPED, false));
+    }
+
+    public <T> boolean tryAddSingleton(Class<T> type, ServiceProviderBasedProvider<T> providerFactory) {
+        if (contains(type)) {
+            return false;
+        }
+        addSingleton(type, providerFactory);
+        return true;
+    }
+
+    public <T, U extends T> boolean tryAddSingleton(Class<T> type) {
+        if (contains(type)) {
+            return false;
+        }
+        addSingleton(type);
+        return true;
+    }
+
+    public <T, U extends T> boolean tryAddSingleton(Class<T> iface, Class<U> impl) {
+        if (contains(iface)) {
+            return false;
+        }
+        addSingleton(iface, impl);
+        return true;
+    }
+
+    public <T> boolean tryAddScoped(Class<T> type) {
+        if (contains(type)) {
+            return false;
+        }
+        addScoped(type);
+        return true;
+    }
+
+    public <T> boolean tryAddScoped(Class<T> type, ServiceProviderBasedProvider<T> providerFactory) {
+        if (contains(type)) {
+            return false;
+        }
+        addScoped(type, providerFactory);
+        return true;
+    }
+
+    public <T, U extends T> boolean tryAddScoped(Class<T> iface, Class<U> impl) {
+        if (contains(iface)) {
+            return false;
+        }
+        addScoped(iface, impl);
+        return true;
     }
 
     public <T, U extends T> void addMultiBinding(Class<T> iface, Class<U> impl) {
-        addDescriptor(new ServiceDescriptor(iface, impl, null, null, ServiceLifetime.TRANSIENT, true));
+        add(new ServiceDescriptor(iface, impl, null, null, ServiceLifetime.TRANSIENT, true));
     }
 
     public <T, U extends T> void addScopedMultiBinding(Class<T> iface, Class<U> impl) {
-        addDescriptor(new ServiceDescriptor(iface, impl, null, null, ServiceLifetime.SCOPED, true));
+        add(new ServiceDescriptor(iface, impl, null, null, ServiceLifetime.SCOPED, true));
     }
 
     public <T> void remove(Class<T> type) {
@@ -70,6 +118,15 @@ public class DefaultServiceCollection implements ServiceCollection {
         }
 
         descriptors.removeIf(d -> type.equals(d.getServiceType()));
+    }
+
+    @Override
+    public boolean remove(ServiceDescriptor descriptor) {
+        if (built) {
+            throw new IllegalStateException("Cannot remove service from container that has been built.");
+        }
+
+        return descriptors.remove(descriptor);
     }
 
     public List<ServiceDescriptor> getDescriptors() {
@@ -182,7 +239,13 @@ public class DefaultServiceCollection implements ServiceCollection {
         return provider;
     }
 
-    private void addDescriptor(ServiceDescriptor descriptor) {
+    private boolean contains(Class<?> serviceType) {
+        return descriptors.stream()
+                .anyMatch(d -> serviceType.equals(d.getServiceType()) && !d.isMultiBinding());
+    }
+
+    @Override
+    public void add(ServiceDescriptor descriptor) {
         if (built) {
             throw new IllegalStateException("Cannot add service to container that has been built.");
         }
