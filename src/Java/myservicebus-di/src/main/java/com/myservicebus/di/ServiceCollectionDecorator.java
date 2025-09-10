@@ -21,6 +21,11 @@ public abstract class ServiceCollectionDecorator implements ServiceCollection {
     }
 
     @Override
+    public void add(ServiceDescriptor descriptor) {
+        inner.add(descriptor);
+    }
+
+    @Override
     public <T> void addSingleton(Class<T> type, ServiceProviderBasedProvider<T> providerFactory) {
         inner.addSingleton(type, providerFactory);
     }
@@ -51,6 +56,36 @@ public abstract class ServiceCollectionDecorator implements ServiceCollection {
     }
 
     @Override
+    public <T> boolean tryAddSingleton(Class<T> type, ServiceProviderBasedProvider<T> providerFactory) {
+        return inner.tryAddSingleton(type, providerFactory);
+    }
+
+    @Override
+    public <T, U extends T> boolean tryAddSingleton(Class<T> type) {
+        return inner.tryAddSingleton(type);
+    }
+
+    @Override
+    public <T, U extends T> boolean tryAddSingleton(Class<T> iface, Class<U> impl) {
+        return inner.tryAddSingleton(iface, impl);
+    }
+
+    @Override
+    public <T> boolean tryAddScoped(Class<T> type) {
+        return inner.tryAddScoped(type);
+    }
+
+    @Override
+    public <T> boolean tryAddScoped(Class<T> type, ServiceProviderBasedProvider<T> providerFactory) {
+        return inner.tryAddScoped(type, providerFactory);
+    }
+
+    @Override
+    public <T, U extends T> boolean tryAddScoped(Class<T> iface, Class<U> impl) {
+        return inner.tryAddScoped(iface, impl);
+    }
+
+    @Override
     public <T, U extends T> void addMultiBinding(Class<T> iface, Class<U> impl) {
         inner.addMultiBinding(iface, impl);
     }
@@ -63,6 +98,11 @@ public abstract class ServiceCollectionDecorator implements ServiceCollection {
     @Override
     public <T> void remove(Class<T> type) {
         inner.remove(type);
+    }
+
+    @Override
+    public boolean remove(ServiceDescriptor descriptor) {
+        return inner.remove(descriptor);
     }
 
     @Override

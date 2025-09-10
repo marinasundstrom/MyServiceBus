@@ -9,6 +9,8 @@ public interface ServiceCollection extends Iterable<ServiceDescriptor> {
 
     <T extends ServiceCollection> T from(Class<T> decoratorType);
 
+    void add(ServiceDescriptor descriptor);
+
     <T> void addSingleton(Class<T> type, ServiceProviderBasedProvider<T> providerFactory);
 
     <T, U extends T> void addSingleton(Class<T> type);
@@ -21,11 +23,25 @@ public interface ServiceCollection extends Iterable<ServiceDescriptor> {
 
     <T, U extends T> void addScoped(Class<T> iface, Class<U> impl);
 
+    <T> boolean tryAddSingleton(Class<T> type, ServiceProviderBasedProvider<T> providerFactory);
+
+    <T, U extends T> boolean tryAddSingleton(Class<T> type);
+
+    <T, U extends T> boolean tryAddSingleton(Class<T> iface, Class<U> impl);
+
+    <T> boolean tryAddScoped(Class<T> type);
+
+    <T> boolean tryAddScoped(Class<T> type, ServiceProviderBasedProvider<T> providerFactory);
+
+    <T, U extends T> boolean tryAddScoped(Class<T> iface, Class<U> impl);
+
     <T, U extends T> void addMultiBinding(Class<T> iface, Class<U> impl);
 
     <T, U extends T> void addScopedMultiBinding(Class<T> iface, Class<U> impl);
 
     <T> void remove(Class<T> type);
+
+    boolean remove(ServiceDescriptor descriptor);
 
     List<ServiceDescriptor> getDescriptors();
 
