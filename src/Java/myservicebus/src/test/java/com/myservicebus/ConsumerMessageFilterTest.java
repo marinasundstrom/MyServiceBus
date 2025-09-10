@@ -44,7 +44,7 @@ class ConsumerMessageFilterTest {
 
     @Test
     void sendsFaultWhenConsumerThrows() {
-        ServiceCollection services = new ServiceCollection();
+        ServiceCollection services = ServiceCollection.create();
         services.addScoped(FaultingConsumer.class);
         services.addSingleton(ConsumeContextProvider.class, sp -> () -> new ConsumeContextProvider());
         ServiceProvider provider = services.buildServiceProvider();

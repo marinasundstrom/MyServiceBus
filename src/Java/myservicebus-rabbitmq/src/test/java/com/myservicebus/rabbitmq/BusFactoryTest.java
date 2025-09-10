@@ -28,7 +28,7 @@ public class BusFactoryTest {
     public void buildConfiguresServices() {
         RabbitMqFactoryConfigurator cfg = new RabbitMqFactoryConfigurator();
         cfg.host("localhost");
-        ServiceCollection services = new ServiceCollection();
+        ServiceCollection services = ServiceCollection.create();
         cfg.configure(services);
         ServiceProvider provider = services.buildServiceProvider();
         MessageBus bus = provider.getService(MessageBus.class);

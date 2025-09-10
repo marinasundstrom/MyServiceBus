@@ -55,7 +55,7 @@ class ErrorTransportFilterTest {
 
     @Test
     void sanitizesMalformedRedeliveryCount() {
-        ServiceProvider provider = new ServiceCollection().buildServiceProvider();
+        ServiceProvider provider = ServiceCollection.create().buildServiceProvider();
         CaptureProvider sendProvider = new CaptureProvider();
         UUID id = UUID.randomUUID();
         ConsumeContext<TestMessage> ctx = new ConsumeContext<>(

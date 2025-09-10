@@ -67,7 +67,7 @@ class MultipleConsumersTest {
         topology.registerConsumer(ConsumerA.class, "queueA", null, MyMessage.class);
         topology.registerConsumer(ConsumerB.class, "queueB", null, MyMessage.class);
 
-        ServiceCollection services = new ServiceCollection();
+        ServiceCollection services = ServiceCollection.create();
         services.addSingleton(TopologyRegistry.class, sp -> () -> topology);
         services.addSingleton(ConsumeContextProvider.class, sp -> () -> new ConsumeContextProvider());
         services.addSingleton(SendPipe.class, sp -> () -> new SendPipe(ctx -> CompletableFuture.completedFuture(null)));
