@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace MyServiceBus;
 
@@ -19,7 +20,7 @@ public static class ServiceExtensions
 
         services.AddScoped(typeof(IRequestClient<>), typeof(GenericRequestClient<>));
         services.AddScoped<IRequestClientFactory, RequestClientFactory>();
-        services.AddSingleton<IJobScheduler, DefaultJobScheduler>();
+        services.TryAddSingleton<IJobScheduler, DefaultJobScheduler>();
         services.AddScoped<IMessageScheduler, MessageScheduler>();
 
         return services;
