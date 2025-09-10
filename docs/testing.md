@@ -80,7 +80,7 @@ class PublishingService {
     }
 }
 
-ServiceCollection services = new ServiceCollection();
+ServiceCollection services = ServiceCollection.create();
 TestingServiceExtensions.addServiceBusTestHarness(services, cfg -> {});
 services.addScoped(PublishingService.class);
 

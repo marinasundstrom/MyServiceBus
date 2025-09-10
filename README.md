@@ -104,7 +104,7 @@ await bus.Publish(new SubmitOrder(Guid.NewGuid()),
 Register the bus:
 
 ```java
-ServiceCollection services = new ServiceCollection();
+ServiceCollection services = ServiceCollection.create();
 
 services.from(MessageBusServices.class)
         .addServiceBus(cfg -> {
