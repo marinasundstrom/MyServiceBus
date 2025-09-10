@@ -27,6 +27,7 @@ public class SendContext : BasePipeContext, ISendContext
     public Uri? FaultAddress { get; set; }
     public Uri? SourceAddress { get; set; }
     public Uri? DestinationAddress { get; set; }
+    public DateTime? ScheduledEnqueueTime { get; set; }
 
     [Throws(typeof(UriFormatException))]
     public async Task<ReadOnlyMemory<byte>> Serialize<T>(T message)

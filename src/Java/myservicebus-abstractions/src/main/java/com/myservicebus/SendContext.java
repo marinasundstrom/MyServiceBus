@@ -11,12 +11,15 @@ import java.util.UUID;
 
 import com.myservicebus.tasks.CancellationToken;
 
-public class SendContext implements PipeContext {
+import java.time.Instant;
+
+public class SendContext implements PipeContext, ScheduledMessage {
     private Object message;
     private final Map<String, Object> headers = new HashMap<>();
     private final CancellationToken cancellationToken;
     private URI sourceAddress;
     private URI destinationAddress;
+    private Instant scheduledEnqueueTime;
 
     public SendContext(Object message, CancellationToken cancellationToken) {
         this.message = message;
@@ -49,6 +52,16 @@ public class SendContext implements PipeContext {
 
     public void setDestinationAddress(URI destinationAddress) {
         this.destinationAddress = destinationAddress;
+    }
+
+    @Override
+    public Instant getScheduledEnqueueTime() {
+        return scheduledEnqueueTime;
+    }
+
+    @Override
+    public void setScheduledEnqueueTime(Instant scheduledTime) {
+        this.scheduledEnqueueTime = scheduledTime;
     }
 
     public byte[] serialize(MessageSerializer serializer) throws Exception {

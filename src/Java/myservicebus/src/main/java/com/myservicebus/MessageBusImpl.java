@@ -6,6 +6,9 @@ import java.util.List;
 import java.util.Set;
 import java.util.HashSet;
 import java.util.concurrent.CompletableFuture;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
@@ -305,7 +308,22 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
         String address = transportFactory.getPublishAddress(exchange);
         context.setSourceAddress(this.address);
         context.setDestinationAddress(URI.create(address));
-        return publishPipe.send(context).thenCompose(v -> {
+
+        CompletableFuture<Void> delayFuture;
+        Instant scheduled = context.getScheduledEnqueueTime();
+        if (scheduled != null) {
+            Duration delay = Duration.between(Instant.now(), scheduled);
+            if (delay.isNegative()) {
+                delay = Duration.ZERO;
+            }
+            delayFuture = new CompletableFuture<>();
+            CompletableFuture.delayedExecutor(delay.toMillis(), TimeUnit.MILLISECONDS)
+                    .execute(() -> delayFuture.complete(null));
+        } else {
+            delayFuture = CompletableFuture.completedFuture(null);
+        }
+
+        return delayFuture.thenCompose(v -> publishPipe.send(context).thenCompose(x -> {
             SendEndpointProvider provider = serviceProvider.getService(SendEndpointProvider.class);
             SendEndpoint endpoint = provider.getSendEndpoint(address);
             return endpoint.send(context).thenRun(() -> {
@@ -313,7 +331,7 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
                     logger.debug("Published message of type {}", context.getMessage().getClass().getSimpleName());
                 }
             });
-        });
+        }));
     }
 
     public <T> CompletableFuture<Void> publish(T message) {

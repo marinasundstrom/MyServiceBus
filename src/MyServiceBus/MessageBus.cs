@@ -74,6 +74,12 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
         context.DestinationAddress = uri;
 
         contextCallback?.Invoke(context);
+        if (context.ScheduledEnqueueTime is DateTime scheduled)
+        {
+            var delay = scheduled - DateTime.UtcNow;
+            if (delay > TimeSpan.Zero)
+                await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
+        }
 
         await _publishPipe.Send(context);
         await _sendPipe.Send(context);
