@@ -19,11 +19,13 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
     private readonly ISendContextFactory _sendContextFactory;
     private readonly IPublishContextFactory _publishContextFactory;
     private readonly ILoggerFactory? _loggerFactory;
+    private readonly IJobScheduler _jobScheduler;
     private TMessage? message;
 
     public ConsumeContextImpl(ReceiveContext receiveContext, ITransportFactory transportFactory,
         ISendPipe sendPipe, IPublishPipe publishPipe, IMessageSerializer messageSerializer, Uri address,
-        ISendContextFactory sendContextFactory, IPublishContextFactory publishContextFactory, ILoggerFactory? loggerFactory = null)
+        ISendContextFactory sendContextFactory, IPublishContextFactory publishContextFactory,
+        ILoggerFactory? loggerFactory = null, IJobScheduler? jobScheduler = null)
         : base(receiveContext.CancellationToken)
     {
         this.receiveContext = receiveContext;
@@ -35,6 +37,7 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
         _sendContextFactory = sendContextFactory;
         _publishContextFactory = publishContextFactory;
         _loggerFactory = loggerFactory;
+        _jobScheduler = jobScheduler ?? new DefaultJobScheduler();
     }
 
     internal ReceiveContext ReceiveContext => receiveContext;
@@ -44,11 +47,11 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
     public Task<ISendEndpoint> GetSendEndpoint(Uri uri)
     {
         var logger = _loggerFactory?.CreateLogger<TransportSendEndpoint>();
-        ISendEndpoint endpoint = new TransportSendEndpoint(_transportFactory, _sendPipe, _messageSerializer, uri, _address, _sendContextFactory, logger);
+        ISendEndpoint endpoint = new TransportSendEndpoint(_transportFactory, _sendPipe, _messageSerializer, uri, _address, _sendContextFactory, logger, _jobScheduler);
         return Task.FromResult(endpoint);
     }
 
-    [Throws(typeof(UriFormatException), typeof(InvalidOperationException), typeof(InvalidCastException), typeof(AmbiguousMatchException))]
+    [Throws(typeof(UriFormatException), typeof(InvalidOperationException), typeof(InvalidCastException), typeof(AmbiguousMatchException), typeof(TypeLoadException))]
     public async Task Publish<T>(T message, Action<IPublishContext>? contextCallback = null, CancellationToken cancellationToken = default) where T : class
     {
         await Publish<T>((object)message!, contextCallback, cancellationToken);
@@ -60,7 +63,6 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
         var exchangeName = EntityNameFormatter.Format(typeof(T));
 
         var uri = new Uri(_address, $"exchange/{exchangeName}");
-        var transport = await _transportFactory.GetSendTransport(uri, cancellationToken);
 
         var context = _publishContextFactory.Create(MessageTypeCache.GetMessageTypes(typeof(T)), _messageSerializer, cancellationToken);
         context.MessageId = Guid.NewGuid().ToString();
@@ -69,11 +71,26 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
         context.RoutingKey = exchangeName;
 
         contextCallback?.Invoke(context);
-
-        await _publishPipe.Send(context);
-        await _sendPipe.Send(context);
-        var typed = message is T t ? t : (T)MessageProxy.Create(typeof(T), message);
-        await transport.Send(typed, context, cancellationToken);
+        if (context.ScheduledEnqueueTime is DateTime scheduled)
+        {
+            await _jobScheduler.Schedule(scheduled, async ct =>
+            {
+                context.ScheduledEnqueueTime = null;
+                var transport = await _transportFactory.GetSendTransport(uri, ct);
+                await _publishPipe.Send(context);
+                await _sendPipe.Send(context);
+                var typed = message is T mt ? mt : (T)MessageProxy.Create(typeof(T), message);
+                await transport.Send(typed, context, ct);
+            }, cancellationToken);
+        }
+        else
+        {
+            var transport = await _transportFactory.GetSendTransport(uri, cancellationToken);
+            await _publishPipe.Send(context);
+            await _sendPipe.Send(context);
+            var typed = message is T t ? t : (T)MessageProxy.Create(typeof(T), message);
+            await transport.Send(typed, context, cancellationToken);
+        }
     }
 
     [Throws(typeof(InvalidOperationException))]

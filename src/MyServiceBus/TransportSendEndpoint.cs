@@ -15,8 +15,9 @@ internal class TransportSendEndpoint : ISendEndpoint
     readonly Uri _sourceAddress;
     readonly ISendContextFactory _contextFactory;
     readonly ILogger<TransportSendEndpoint>? _logger;
+    readonly IJobScheduler _jobScheduler;
 
-    public TransportSendEndpoint(ITransportFactory transportFactory, ISendPipe sendPipe, IMessageSerializer serializer, Uri address, Uri sourceAddress, ISendContextFactory contextFactory, ILogger<TransportSendEndpoint>? logger = null)
+    public TransportSendEndpoint(ITransportFactory transportFactory, ISendPipe sendPipe, IMessageSerializer serializer, Uri address, Uri sourceAddress, ISendContextFactory contextFactory, ILogger<TransportSendEndpoint>? logger = null, IJobScheduler? jobScheduler = null)
     {
         _transportFactory = transportFactory;
         _sendPipe = sendPipe;
@@ -25,6 +26,7 @@ internal class TransportSendEndpoint : ISendEndpoint
         _sourceAddress = sourceAddress;
         _contextFactory = contextFactory;
         _logger = logger;
+        _jobScheduler = jobScheduler ?? new DefaultJobScheduler();
     }
 
     [Throws(typeof(InvalidOperationException))]
@@ -36,7 +38,6 @@ internal class TransportSendEndpoint : ISendEndpoint
     {
         _logger?.LogDebug("Sending {MessageType} to {DestinationAddress}", typeof(T).Name, _address);
 
-        var transport = await _transportFactory.GetSendTransport(_address, cancellationToken);
         var context = _contextFactory.Create(MessageTypeCache.GetMessageTypes(typeof(T)), _serializer, cancellationToken);
         context.MessageId = Guid.NewGuid().ToString();
         context.SourceAddress = _sourceAddress;
@@ -46,13 +47,21 @@ internal class TransportSendEndpoint : ISendEndpoint
 
         if (context.ScheduledEnqueueTime is DateTime scheduled)
         {
-            var delay = scheduled - DateTime.UtcNow;
-            if (delay > TimeSpan.Zero)
-                await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
+            await _jobScheduler.Schedule(scheduled, async ct =>
+            {
+                context.ScheduledEnqueueTime = null;
+                var transport = await _transportFactory.GetSendTransport(_address, ct);
+                await _sendPipe.Send(context);
+                var typed = message is T mt ? mt : (T)MessageProxy.Create(typeof(T), message);
+                await transport.Send(typed, context, ct);
+            }, cancellationToken);
         }
-
-        await _sendPipe.Send(context);
-        var typed = message is T t ? t : (T)MessageProxy.Create(typeof(T), message);
-        await transport.Send(typed, context, cancellationToken);
+        else
+        {
+            var transport = await _transportFactory.GetSendTransport(_address, cancellationToken);
+            await _sendPipe.Send(context);
+            var typed = message is T t ? t : (T)MessageProxy.Create(typeof(T), message);
+            await transport.Send(typed, context, cancellationToken);
+        }
     }
 }
