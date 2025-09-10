@@ -24,6 +24,15 @@ public class SchedulingTests
         }
     }
 
+    class ImmediateJobScheduler : IJobScheduler
+    {
+        public Task Schedule(DateTime scheduledTime, Func<CancellationToken, Task> callback, CancellationToken cancellationToken = default)
+            => callback(cancellationToken);
+
+        public Task Schedule(TimeSpan delay, Func<CancellationToken, Task> callback, CancellationToken cancellationToken = default)
+            => callback(cancellationToken);
+    }
+
     [Fact]
     [Throws(typeof(TrueException))]
     public async Task SchedulePublish_delays_message()
@@ -77,6 +86,36 @@ public class SchedulingTests
         sw.Stop();
 
         Assert.True(sw.Elapsed >= delay);
+        Assert.Equal(1, TestConsumer.Received);
+
+        await hosted.StopAsync(CancellationToken.None);
+    }
+
+    [Fact]
+    [Throws(typeof(TrueException))]
+    public async Task Custom_scheduler_is_used()
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddSingleton<IJobScheduler, ImmediateJobScheduler>();
+        services.AddServiceBus(cfg =>
+        {
+            cfg.UsingMediator();
+            cfg.AddConsumer<TestConsumer>();
+        });
+
+        await using var provider = services.BuildServiceProvider();
+        var hosted = provider.GetRequiredService<IHostedService>();
+        await hosted.StartAsync(CancellationToken.None);
+
+        var scheduler = provider.GetRequiredService<IMessageScheduler>();
+        TestConsumer.Received = 0;
+        var delay = TimeSpan.FromSeconds(1);
+        var sw = Stopwatch.StartNew();
+        await scheduler.SchedulePublish(new TestMessage(), delay);
+        sw.Stop();
+
+        Assert.True(sw.Elapsed < delay);
         Assert.Equal(1, TestConsumer.Received);
 
         await hosted.StopAsync(CancellationToken.None);
