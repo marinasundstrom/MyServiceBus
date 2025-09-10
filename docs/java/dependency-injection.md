@@ -95,6 +95,16 @@ services.addSingleton(MyService.class, MyServiceImpl.class);
 ServiceProvider provider = services.connectAndBuild(existing);
 ```
 
+### Integrating another DI container
+
+`DefaultServiceCollection` uses Guice internally, but you can adapt
+MyServiceBus to another IoC framework by implementing the `ServiceCollection`
+interface yourself. Your implementation can translate registrations into the
+container's API and return a custom `ServiceProvider` from `buildServiceProvider`.
+That provider must honor the `ServiceProvider` and `ServiceScope` interfaces so
+consumers can resolve services and create scopes just like the built-in
+implementation.
+
 ### Registering bindings for factories
 
 Sometimes the service you want to register is itself a factory. Use the
