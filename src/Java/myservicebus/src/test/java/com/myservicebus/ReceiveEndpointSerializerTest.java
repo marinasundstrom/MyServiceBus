@@ -78,7 +78,7 @@ class ReceiveEndpointSerializerTest {
 
     @Test
     void handler_uses_custom_serializer() throws Exception {
-        ServiceCollection services = new ServiceCollection();
+        ServiceCollection services = ServiceCollection.create();
         StubTransportFactory factory = new StubTransportFactory();
         StubProvider provider = new StubProvider();
         services.addSingleton(TransportFactory.class, sp -> () -> factory);

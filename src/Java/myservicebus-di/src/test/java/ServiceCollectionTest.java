@@ -6,6 +6,8 @@ import com.myservicebus.di.ServiceLifetime;
 import com.myservicebus.logging.LoggerFactory;
 import com.myservicebus.logging.LogLevel;
 import com.myservicebus.logging.Logger;
+import com.myservicebus.logging.ConsoleLoggerConfig;
+import com.myservicebus.logging.ConsoleLoggerFactory;
 
 import org.junit.jupiter.api.Test;
 
@@ -16,7 +18,7 @@ import static org.junit.jupiter.api.Assertions.*;
 public class ServiceCollectionTest {
     @Test
     void testSingletonSelfBinding() {
-        ServiceCollection sc = new ServiceCollection();
+        ServiceCollection sc = ServiceCollection.create();
         sc.addSingleton(ProcessorImpl.class);
         ServiceProvider sp = sc.buildServiceProvider();
 
@@ -29,7 +31,7 @@ public class ServiceCollectionTest {
 
     @Test
     void testSingletonInterfaceBinding() {
-        ServiceCollection sc = new ServiceCollection();
+        ServiceCollection sc = ServiceCollection.create();
         sc.addSingleton(Processor.class, ProcessorImpl.class);
         ServiceProvider sp = sc.buildServiceProvider();
 
@@ -39,7 +41,7 @@ public class ServiceCollectionTest {
 
     @Test
     void testSingletonProviderBinding() {
-        ServiceCollection sc = new ServiceCollection();
+        ServiceCollection sc = ServiceCollection.create();
         sc.addSingleton(Processor.class, sp -> () -> new ProcessorImpl());
         ServiceProvider sp = sc.buildServiceProvider();
 
@@ -49,7 +51,7 @@ public class ServiceCollectionTest {
 
     @Test
     void testScopedSelfBinding() {
-        ServiceCollection sc = new ServiceCollection();
+        ServiceCollection sc = ServiceCollection.create();
         sc.addScoped(ProcessorImpl.class);
         ServiceProvider sp = sc.buildServiceProvider();
 
@@ -72,7 +74,7 @@ public class ServiceCollectionTest {
 
     @Test
     void testScopedInterfaceBinding() {
-        ServiceCollection sc = new ServiceCollection();
+        ServiceCollection sc = ServiceCollection.create();
         sc.addScoped(Processor.class, ProcessorImpl.class);
         ServiceProvider sp = sc.buildServiceProvider();
 
@@ -95,7 +97,7 @@ public class ServiceCollectionTest {
 
     @Test
     void testScopedProviderBinding() {
-        ServiceCollection sc = new ServiceCollection();
+        ServiceCollection sc = ServiceCollection.create();
         sc.addScoped(Processor.class, sp -> () -> new ProcessorImpl());
         ServiceProvider sp = sc.buildServiceProvider();
 
@@ -119,7 +121,7 @@ public class ServiceCollectionTest {
     @Test
     public void testMultiBindingResolvesAllImplementations() {
         // Arrange
-        ServiceCollection collection = new ServiceCollection();
+        ServiceCollection collection = ServiceCollection.create();
         collection.addMultiBinding(Handler.class, HandlerA.class);
         collection.addMultiBinding(Handler.class, HandlerB.class);
 
@@ -140,7 +142,7 @@ public class ServiceCollectionTest {
 
     @Test
     void testScopedMultiBinding() {
-        ServiceCollection sc = new ServiceCollection();
+        ServiceCollection sc = ServiceCollection.create();
         sc.addScopedMultiBinding(Processor.class, ProcessorImpl.class);
         sc.addScopedMultiBinding(Processor.class, AnotherProcessor.class);
         ServiceProvider sp = sc.buildServiceProvider();
@@ -166,7 +168,7 @@ public class ServiceCollectionTest {
 
     @Test
     void testGetRequiredServiceReturnsService() {
-        ServiceCollection sc = new ServiceCollection();
+        ServiceCollection sc = ServiceCollection.create();
         sc.addSingleton(Processor.class, ProcessorImpl.class);
         ServiceProvider sp = sc.buildServiceProvider();
 
@@ -176,15 +178,18 @@ public class ServiceCollectionTest {
 
     @Test
     void testGetRequiredServiceThrowsWhenMissing() {
-        ServiceProvider sp = new ServiceCollection().buildServiceProvider();
+        ServiceProvider sp = ServiceCollection.create().buildServiceProvider();
 
         assertThrows(IllegalStateException.class, () -> sp.getRequiredService(Processor.class));
     }
 
     @Test
     void consoleLoggerCanBeConfigured() {
-        ServiceCollection sc = new ServiceCollection();
-        sc.addConsoleLogger(cfg -> cfg.setMinimumLevel(LogLevel.DEBUG));
+        ServiceCollection sc = ServiceCollection.create();
+        ConsoleLoggerConfig cfg = new ConsoleLoggerConfig();
+        cfg.setMinimumLevel(LogLevel.DEBUG);
+        sc.addSingleton(ConsoleLoggerConfig.class, sp -> () -> cfg);
+        sc.addSingleton(LoggerFactory.class, sp -> () -> new ConsoleLoggerFactory(cfg));
         ServiceProvider sp = sc.buildServiceProvider();
 
         LoggerFactory factory = sp.getService(LoggerFactory.class);
@@ -195,7 +200,7 @@ public class ServiceCollectionTest {
 
     @Test
     void removedServiceIsNotResolved() {
-        ServiceCollection sc = new ServiceCollection();
+        ServiceCollection sc = ServiceCollection.create();
         sc.addSingleton(Processor.class, ProcessorImpl.class);
         sc.remove(Processor.class);
         ServiceProvider sp = sc.buildServiceProvider();
@@ -206,7 +211,7 @@ public class ServiceCollectionTest {
 
     @Test
     void removedDeferredServiceIsNotResolved() {
-        ServiceCollection sc = new ServiceCollection();
+        ServiceCollection sc = ServiceCollection.create();
         sc.addScoped(Processor.class, sp -> () -> new ProcessorImpl());
         sc.remove(Processor.class);
         ServiceProvider sp = sc.buildServiceProvider();
@@ -220,7 +225,7 @@ public class ServiceCollectionTest {
 
     @Test
     void serviceDescriptorsExposeRegistrations() {
-        ServiceCollection sc = new ServiceCollection();
+        ServiceCollection sc = ServiceCollection.create();
         sc.addSingleton(Processor.class, ProcessorImpl.class);
 
         assertEquals(1, sc.getDescriptors().size());

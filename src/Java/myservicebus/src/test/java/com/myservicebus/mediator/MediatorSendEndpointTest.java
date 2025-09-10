@@ -28,7 +28,7 @@ class MediatorSendEndpointTest {
 
     @Test
     void doesNotRetryByDefault() {
-        ServiceCollection services = new ServiceCollection();
+        ServiceCollection services = ServiceCollection.create();
         services.addScoped(RetryConsumer.class);
         services.addScoped(ConsumeContextProvider.class, sp -> () -> new ConsumeContextProvider());
 
@@ -47,7 +47,7 @@ class MediatorSendEndpointTest {
 
     @Test
     void retriesWhenConfigured() {
-        ServiceCollection services = new ServiceCollection();
+        ServiceCollection services = ServiceCollection.create();
         services.addScoped(RetryConsumer.class);
         services.addScoped(ConsumeContextProvider.class, sp -> () -> new ConsumeContextProvider());
 

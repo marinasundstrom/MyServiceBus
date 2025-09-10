@@ -5,6 +5,7 @@ The Service Bus API is still in the works.
 ## Configure Service Bus
 
 We use `ServiceCollection` to register services that will supplied to the `Consumers`.
+`ServiceCollection.create()` produces the default implementation built on Guice.
 
 ```java
 package com.myservicebus.testapp;
@@ -22,7 +23,7 @@ import com.myservicebus.rabbitmq.RabbitMqFactoryConfigurator;
 
 public class Main {
     public static void main(String[] args) throws Exception {
-        ServiceCollection services = new ServiceCollection();
+        ServiceCollection services = ServiceCollection.create();
         services.addScoped(MyService.class, MyServiceImpl.class);
 
         services.from(MessageBusServices.class)

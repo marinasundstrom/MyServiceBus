@@ -98,7 +98,7 @@ public class MediatorTransportFactoryTest {
     @Test
     @Disabled("Scope setup under development")
     public void publishDeliversMessageToConsumer() {
-        ServiceCollection services = new ServiceCollection();
+        ServiceCollection services = ServiceCollection.create();
         MediatorBus bus = MediatorBus.configure(services, cfg -> {
             cfg.addConsumer(TestConsumer.class);
         });
@@ -112,7 +112,7 @@ public class MediatorTransportFactoryTest {
     @Test
     @Disabled("Scope setup under development")
     public void publishDeliversMessageToHandler() {
-        ServiceCollection services = new ServiceCollection();
+        ServiceCollection services = ServiceCollection.create();
         MediatorBus bus = MediatorBus.configure(services, cfg -> {
             cfg.addConsumer(TestHandler.class);
         });

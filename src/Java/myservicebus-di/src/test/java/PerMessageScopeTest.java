@@ -9,7 +9,7 @@ import static org.junit.jupiter.api.Assertions.*;
 public class PerMessageScopeTest {
     @Test
     void scopedServiceReturnsSameInstanceWithinScope() {
-        ServiceCollection sc = new ServiceCollection();
+        ServiceCollection sc = ServiceCollection.create();
         sc.addScoped(ProcessorImpl.class);
         ServiceProvider sp = sc.buildServiceProvider();
 
@@ -32,7 +32,7 @@ public class PerMessageScopeTest {
 
     @Test
     void nestedScopesHaveIsolatedInstances() {
-        ServiceCollection sc = new ServiceCollection();
+        ServiceCollection sc = ServiceCollection.create();
         sc.addScoped(ProcessorImpl.class);
         ServiceProvider sp = sc.buildServiceProvider();
 

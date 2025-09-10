@@ -6,7 +6,7 @@ import com.myservicebus.di.ServiceScope;
 
 public class Main {
     public static void main(String[] args) {
-        ServiceCollection services = new ServiceCollection();
+        ServiceCollection services = ServiceCollection.create();
         services.addSingleton(MyService.class, (sp) -> () -> new MyServiceImpl(sp));
         services.addScoped(MyScopedService.class);
         services.addScoped(MySecondService.class);

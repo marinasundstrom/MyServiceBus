@@ -35,7 +35,7 @@ class ServiceBusPublishFilterTest {
             return CompletableFuture.completedFuture(null);
         });
 
-        ServiceCollection services = new ServiceCollection();
+        ServiceCollection services = ServiceCollection.create();
         services.addSingleton(SendPipe.class, sp -> () -> new SendPipe(sendCfg.build()));
         services.addSingleton(PublishPipe.class, sp -> () -> new PublishPipe(publishCfg.build()));
         services.addSingleton(ConsumeContextProvider.class, sp -> () -> new ConsumeContextProvider());

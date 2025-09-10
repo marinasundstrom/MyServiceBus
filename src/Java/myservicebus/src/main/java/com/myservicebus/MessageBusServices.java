@@ -7,6 +7,8 @@ import com.myservicebus.ScopeConsumerFactory;
 import com.myservicebus.di.ServiceCollection;
 import com.myservicebus.di.ServiceCollectionDecorator;
 import com.myservicebus.logging.LoggerFactory;
+import com.myservicebus.logging.ConsoleLoggerFactory;
+import com.myservicebus.logging.ConsoleLoggerConfig;
 
 public class MessageBusServices extends ServiceCollectionDecorator {
 
@@ -19,7 +21,8 @@ public class MessageBusServices extends ServiceCollectionDecorator {
         boolean hasLogger = inner.getDescriptors().stream()
                 .anyMatch(d -> d.getServiceType().equals(LoggerFactory.class));
         if (!hasLogger) {
-            inner.addConsoleLogger();
+            inner.addSingleton(LoggerFactory.class,
+                    sp -> () -> new ConsoleLoggerFactory(new ConsoleLoggerConfig()));
         }
 
         BusRegistrationConfiguratorImpl cfg = new BusRegistrationConfiguratorImpl(inner);
