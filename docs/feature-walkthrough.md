@@ -894,6 +894,49 @@ scheduler.schedulePublish(new OrderSubmitted(), Duration.ofSeconds(30)).get();
 scheduler.scheduleSend("queue:submit-order", new SubmitOrder(), Duration.ofSeconds(30)).get();
 ```
 
+##### Custom schedulers
+
+`AddServiceBus` registers a simple timer-based `DefaultJobScheduler`. To integrate a production scheduler such as Quartz or Hangfire, implement `IJobScheduler`/`JobScheduler` and register it so it replaces the default.
+
+**C#**
+
+```csharp
+class HangfireJobScheduler : IJobScheduler
+{
+    readonly IBackgroundJobClient jobs;
+    public HangfireJobScheduler(IBackgroundJobClient jobs) => this.jobs = jobs;
+
+    public Task Schedule(DateTime scheduledTime, Func<CancellationToken, Task> callback, CancellationToken token = default)
+    {
+        jobs.Schedule(() => callback(token), scheduledTime);
+        return Task.CompletedTask;
+    }
+}
+
+services.AddSingleton<IJobScheduler, HangfireJobScheduler>();
+services.AddServiceBus(cfg => { /* ... */ });
+```
+
+**Java**
+
+```java
+class QuartzJobScheduler implements JobScheduler {
+    private final Scheduler scheduler;
+    QuartzJobScheduler(Scheduler scheduler) { this.scheduler = scheduler; }
+
+    public CompletionStage<Void> schedule(Instant scheduledTime,
+            Function<CancellationToken, CompletionStage<Void>> callback,
+            CancellationToken token) {
+        scheduler.scheduleJob(() -> callback.apply(token), Date.from(scheduledTime));
+        return CompletableFuture.completedFuture(null);
+    }
+}
+
+ServiceCollection services = ServiceCollection.create();
+services.addSingleton(JobScheduler.class, sp -> new QuartzJobScheduler(quartz));
+services.addServiceBus(cfg -> { /* ... */ });
+```
+
 ### Unit Testing with the In-Memory Test Harness
 
 #### C#
