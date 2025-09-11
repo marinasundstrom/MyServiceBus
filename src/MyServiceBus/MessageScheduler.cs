@@ -17,19 +17,38 @@ public class MessageScheduler : IMessageScheduler
         _jobScheduler = jobScheduler;
     }
 
-    public Task SchedulePublish<T>(T message, DateTime scheduledTime, CancellationToken cancellationToken = default) where T : class
-        => _jobScheduler.Schedule(scheduledTime, ct => _publishEndpoint.Publish(message, cancellationToken: ct), cancellationToken);
+    public async Task<ScheduledMessageHandle> SchedulePublish<T>(T message, DateTime scheduledTime, CancellationToken cancellationToken = default) where T : class
+    {
+        var tokenId = await _jobScheduler.Schedule(scheduledTime, ct => _publishEndpoint.Publish(message, cancellationToken: ct), cancellationToken);
+        return new ScheduledMessageHandle(tokenId, scheduledTime);
+    }
 
-    public Task SchedulePublish<T>(T message, TimeSpan delay, CancellationToken cancellationToken = default) where T : class
-        => _jobScheduler.Schedule(delay, ct => _publishEndpoint.Publish(message, cancellationToken: ct), cancellationToken);
+    public Task<ScheduledMessageHandle> SchedulePublish<T>(T message, TimeSpan delay, CancellationToken cancellationToken = default) where T : class
+        => SchedulePublish(message, DateTime.UtcNow + delay, cancellationToken);
 
-    public Task ScheduleSend<T>(Uri destination, T message, DateTime scheduledTime, CancellationToken cancellationToken = default) where T : class
-        => _jobScheduler.Schedule(scheduledTime, async ct =>
+    public async Task<ScheduledMessageHandle> ScheduleSend<T>(Uri destination, T message, DateTime scheduledTime, CancellationToken cancellationToken = default) where T : class
+    {
+        async Task Callback(CancellationToken ct)
         {
             var endpoint = await _sendEndpointProvider.GetSendEndpoint(destination);
             await endpoint.Send(message, cancellationToken: ct);
-        }, cancellationToken);
+        }
+        var tokenId = await _jobScheduler.Schedule(scheduledTime, Callback, cancellationToken);
+        return new ScheduledMessageHandle(tokenId, scheduledTime);
+    }
 
-    public Task ScheduleSend<T>(Uri destination, T message, TimeSpan delay, CancellationToken cancellationToken = default) where T : class
+    public Task<ScheduledMessageHandle> ScheduleSend<T>(Uri destination, T message, TimeSpan delay, CancellationToken cancellationToken = default) where T : class
         => ScheduleSend(destination, message, DateTime.UtcNow + delay, cancellationToken);
+
+    public Task CancelScheduledPublish(Guid tokenId, CancellationToken cancellationToken = default)
+        => _jobScheduler.Cancel(tokenId);
+
+    public Task CancelScheduledPublish(ScheduledMessageHandle handle, CancellationToken cancellationToken = default)
+        => CancelScheduledPublish(handle.TokenId, cancellationToken);
+
+    public Task CancelScheduledSend(Guid tokenId, CancellationToken cancellationToken = default)
+        => _jobScheduler.Cancel(tokenId);
+
+    public Task CancelScheduledSend(ScheduledMessageHandle handle, CancellationToken cancellationToken = default)
+        => CancelScheduledSend(handle.TokenId, cancellationToken);
 }

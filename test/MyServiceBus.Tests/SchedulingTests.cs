@@ -17,20 +17,74 @@ public class SchedulingTests
     class TestConsumer : IConsumer<TestMessage>
     {
         public static int Received;
+        public static TaskCompletionSource<DateTime>? Completed;
         public Task Consume(ConsumeContext<TestMessage> context)
         {
             Received++;
+            Completed?.TrySetResult(DateTime.UtcNow);
             return Task.CompletedTask;
         }
     }
 
     class ImmediateJobScheduler : IJobScheduler
     {
-        public Task Schedule(DateTime scheduledTime, Func<CancellationToken, Task> callback, CancellationToken cancellationToken = default)
-            => callback(cancellationToken);
+        public Task<Guid> Schedule(DateTime scheduledTime, Func<CancellationToken, Task> callback, CancellationToken cancellationToken = default)
+        {
+            _ = callback(cancellationToken);
+            return Task.FromResult(Guid.NewGuid());
+        }
 
-        public Task Schedule(TimeSpan delay, Func<CancellationToken, Task> callback, CancellationToken cancellationToken = default)
-            => callback(cancellationToken);
+        public Task<Guid> Schedule(TimeSpan delay, Func<CancellationToken, Task> callback, CancellationToken cancellationToken = default)
+        {
+            _ = callback(cancellationToken);
+            return Task.FromResult(Guid.NewGuid());
+        }
+
+        public Task Cancel(Guid tokenId) => Task.CompletedTask;
+    }
+
+    class StubSendContext : IPublishContext
+    {
+        public string MessageId { get; set; } = string.Empty;
+        public string RoutingKey { get; set; } = string.Empty;
+        public IDictionary<string, object> Headers { get; } = new Dictionary<string, object>();
+        public string? CorrelationId { get; set; }
+        public Uri? ResponseAddress { get; set; }
+        public Uri? FaultAddress { get; set; }
+        public DateTime? ScheduledEnqueueTime { get; set; }
+        public CancellationToken CancellationToken { get; } = CancellationToken.None;
+    }
+
+    class StubPublishEndpoint : IPublishEndpoint
+    {
+        public StubSendContext? Context;
+
+        public Task Publish<T>(object message, Action<IPublishContext>? contextCallback = null, CancellationToken cancellationToken = default) where T : class
+            => Publish((T)message, contextCallback, cancellationToken);
+
+        public Task Publish<T>(T message, Action<IPublishContext>? contextCallback = null, CancellationToken cancellationToken = default) where T : class
+        {
+            var ctx = new StubSendContext();
+            contextCallback?.Invoke(ctx);
+            Context = ctx;
+            return Task.CompletedTask;
+        }
+    }
+
+    class StubSendEndpoint : ISendEndpoint
+    {
+        public StubSendContext? Context;
+
+        public Task Send<T>(T message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default) where T : class
+        {
+            var ctx = new StubSendContext();
+            contextCallback?.Invoke(ctx);
+            Context = ctx;
+            return Task.CompletedTask;
+        }
+
+        public Task Send<T>(object message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default) where T : class
+            => Send((T)message, contextCallback, cancellationToken);
     }
 
     [Fact]
@@ -51,14 +105,15 @@ public class SchedulingTests
 
         var scheduler = provider.GetRequiredService<IMessageScheduler>();
         TestConsumer.Received = 0;
+        TestConsumer.Completed = new TaskCompletionSource<DateTime>(TaskCreationOptions.RunContinuationsAsynchronously);
         var delay = TimeSpan.FromMilliseconds(100);
-        var sw = Stopwatch.StartNew();
+        var before = DateTime.UtcNow;
         await scheduler.SchedulePublish(new TestMessage(), delay);
-        sw.Stop();
-
+        var consumedAt = await TestConsumer.Completed.Task;
         var tolerance = TimeSpan.FromMilliseconds(20);
-        Assert.True(sw.Elapsed >= delay - tolerance);
+        Assert.True(consumedAt - before >= delay - tolerance);
         Assert.Equal(1, TestConsumer.Received);
+        TestConsumer.Completed = null;
 
         await hosted.StopAsync(CancellationToken.None);
     }
@@ -112,13 +167,69 @@ public class SchedulingTests
 
         var scheduler = provider.GetRequiredService<IMessageScheduler>();
         TestConsumer.Received = 0;
+        TestConsumer.Completed = new TaskCompletionSource<DateTime>(TaskCreationOptions.RunContinuationsAsynchronously);
         var delay = TimeSpan.FromSeconds(1);
-        var sw = Stopwatch.StartNew();
         await scheduler.SchedulePublish(new TestMessage(), delay);
-        sw.Stop();
-
-        Assert.True(sw.Elapsed < delay);
+        await TestConsumer.Completed.Task; // should complete immediately
+        Assert.True(TestConsumer.Completed.Task.IsCompleted);
         Assert.Equal(1, TestConsumer.Received);
+        TestConsumer.Completed = null;
+
+        await hosted.StopAsync(CancellationToken.None);
+    }
+
+    [Fact]
+    [Throws(typeof(NotNullException), typeof(InRangeException))]
+    public async Task Publish_extension_sets_scheduled_time()
+    {
+        var endpoint = new StubPublishEndpoint();
+        var delay = TimeSpan.FromMilliseconds(100);
+        var before = DateTime.UtcNow;
+        await endpoint.SchedulePublish(new TestMessage(), delay);
+
+        Assert.NotNull(endpoint.Context);
+        var scheduled = endpoint.Context!.ScheduledEnqueueTime;
+        var tolerance = TimeSpan.FromMilliseconds(50);
+        Assert.InRange(scheduled!.Value, before + delay - tolerance, before + delay + tolerance);
+    }
+
+    [Fact]
+    [Throws(typeof(NotNullException), typeof(InRangeException))]
+    public async Task Send_extension_sets_scheduled_time()
+    {
+        var endpoint = new StubSendEndpoint();
+        var delay = TimeSpan.FromMilliseconds(100);
+        var before = DateTime.UtcNow;
+        await endpoint.ScheduleSend(new TestMessage(), delay);
+
+        Assert.NotNull(endpoint.Context);
+        var scheduled = endpoint.Context!.ScheduledEnqueueTime;
+        var tolerance = TimeSpan.FromMilliseconds(50);
+        Assert.InRange(scheduled!.Value, before + delay - tolerance, before + delay + tolerance);
+    }
+
+    [Fact]
+    public async Task Cancel_prevents_scheduled_publish()
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddServiceBus(cfg =>
+        {
+            cfg.UsingMediator();
+            cfg.AddConsumer<TestConsumer>();
+        });
+
+        await using var provider = services.BuildServiceProvider();
+        var hosted = provider.GetRequiredService<IHostedService>();
+        await hosted.StartAsync(CancellationToken.None);
+
+        var scheduler = provider.GetRequiredService<IMessageScheduler>();
+        TestConsumer.Received = 0;
+        var delay = TimeSpan.FromMilliseconds(200);
+        var handle = await scheduler.SchedulePublish(new TestMessage(), delay);
+        await scheduler.CancelScheduledPublish(handle);
+        await Task.Delay(delay + TimeSpan.FromMilliseconds(50));
+        Assert.Equal(0, TestConsumer.Received);
 
         await hosted.StopAsync(CancellationToken.None);
     }
