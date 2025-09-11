@@ -14,8 +14,6 @@ public class SchedulingTests
 {
     class TestMessage { }
 
-    class TriggerMessage { }
-
     class TestConsumer : IConsumer<TestMessage>
     {
         public static int Received;
@@ -28,20 +26,31 @@ public class SchedulingTests
         }
     }
 
-    class TriggerConsumer : IConsumer<TriggerMessage>
+    class ImmediateMessageScheduler : IMessageScheduler
     {
-        public static TimeSpan Delay;
-        public Task Consume(ConsumeContext<TriggerMessage> context)
-            => context.Publish(new TestMessage(), ctx => ctx.SetScheduledEnqueueTime(Delay));
-    }
+        readonly IPublishEndpoint _publishEndpoint;
+        readonly ISendEndpointProvider _sendEndpointProvider;
 
-    class ImmediateJobScheduler : IJobScheduler
-    {
-        public Task Schedule(DateTime scheduledTime, Func<CancellationToken, Task> callback, CancellationToken cancellationToken = default)
-            => callback(cancellationToken);
+        public ImmediateMessageScheduler(IPublishEndpoint publishEndpoint, ISendEndpointProvider sendEndpointProvider)
+        {
+            _publishEndpoint = publishEndpoint;
+            _sendEndpointProvider = sendEndpointProvider;
+        }
 
-        public Task Schedule(TimeSpan delay, Func<CancellationToken, Task> callback, CancellationToken cancellationToken = default)
-            => callback(cancellationToken);
+        public Task SchedulePublish<T>(T message, DateTime scheduledTime, CancellationToken cancellationToken = default) where T : class
+            => _publishEndpoint.Publish(message, cancellationToken: cancellationToken);
+
+        public Task SchedulePublish<T>(T message, TimeSpan delay, CancellationToken cancellationToken = default) where T : class
+            => _publishEndpoint.Publish(message, cancellationToken: cancellationToken);
+
+        public async Task ScheduleSend<T>(Uri destination, T message, DateTime scheduledTime, CancellationToken cancellationToken = default) where T : class
+        {
+            var endpoint = await _sendEndpointProvider.GetSendEndpoint(destination);
+            await endpoint.Send(message, cancellationToken: cancellationToken);
+        }
+
+        public Task ScheduleSend<T>(Uri destination, T message, TimeSpan delay, CancellationToken cancellationToken = default) where T : class
+            => ScheduleSend(destination, message, DateTime.UtcNow, cancellationToken);
     }
 
     [Fact]
@@ -76,80 +85,16 @@ public class SchedulingTests
 
     [Fact]
     [Throws(typeof(TrueException))]
-    public async Task Publish_context_delays_message()
-    {
-        var services = new ServiceCollection();
-        services.AddLogging();
-        services.AddServiceBus(cfg =>
-        {
-            cfg.UsingMediator();
-            cfg.AddConsumer<TestConsumer>();
-        });
-
-        await using var provider = services.BuildServiceProvider();
-        var hosted = provider.GetRequiredService<IHostedService>();
-        await hosted.StartAsync(CancellationToken.None);
-
-        var publishEndpoint = provider.GetRequiredService<IPublishEndpoint>();
-        TestConsumer.Received = 0;
-        var delay = TimeSpan.FromMilliseconds(100);
-        var sw = Stopwatch.StartNew();
-        await publishEndpoint.Publish(new TestMessage(), ctx => ctx.SetScheduledEnqueueTime(delay));
-        sw.Stop();
-
-        var tolerance = TimeSpan.FromMilliseconds(20);
-        Assert.True(sw.Elapsed >= delay - tolerance);
-        Assert.Equal(1, TestConsumer.Received);
-
-        await hosted.StopAsync(CancellationToken.None);
-    }
-
-    [Fact]
-    [Throws(typeof(TrueException))]
-    public async Task ConsumeContext_publish_delays_message()
-    {
-        var services = new ServiceCollection();
-        services.AddLogging();
-        services.AddServiceBus(cfg =>
-        {
-            cfg.UsingMediator();
-            cfg.AddConsumer<TriggerConsumer>();
-            cfg.AddConsumer<TestConsumer>();
-        });
-
-        await using var provider = services.BuildServiceProvider();
-        var hosted = provider.GetRequiredService<IHostedService>();
-        await hosted.StartAsync(CancellationToken.None);
-
-        var publishEndpoint = provider.GetRequiredService<IPublishEndpoint>();
-        TestConsumer.Received = 0;
-        TestConsumer.Completed = new TaskCompletionSource<bool>();
-        var delay = TimeSpan.FromMilliseconds(100);
-        TriggerConsumer.Delay = delay;
-        var sw = Stopwatch.StartNew();
-        await publishEndpoint.Publish(new TriggerMessage());
-        await TestConsumer.Completed.Task;
-        sw.Stop();
-
-        var tolerance = TimeSpan.FromMilliseconds(20);
-        Assert.True(sw.Elapsed >= delay - tolerance);
-        Assert.Equal(1, TestConsumer.Received);
-
-        await hosted.StopAsync(CancellationToken.None);
-    }
-
-    [Fact]
-    [Throws(typeof(TrueException))]
     public async Task Custom_scheduler_is_used()
     {
         var services = new ServiceCollection();
         services.AddLogging();
-        services.AddSingleton<IJobScheduler, ImmediateJobScheduler>();
         services.AddServiceBus(cfg =>
         {
             cfg.UsingMediator();
             cfg.AddConsumer<TestConsumer>();
         });
+        services.AddScoped<IMessageScheduler, ImmediateMessageScheduler>();
 
         await using var provider = services.BuildServiceProvider();
         var hosted = provider.GetRequiredService<IHostedService>();
@@ -160,40 +105,6 @@ public class SchedulingTests
         var delay = TimeSpan.FromSeconds(1);
         var sw = Stopwatch.StartNew();
         await scheduler.SchedulePublish(new TestMessage(), delay);
-        sw.Stop();
-
-        Assert.True(sw.Elapsed < delay);
-        Assert.Equal(1, TestConsumer.Received);
-
-        await hosted.StopAsync(CancellationToken.None);
-    }
-
-    [Fact]
-    [Throws(typeof(TrueException))]
-    public async Task ConsumeContext_publish_uses_custom_scheduler()
-    {
-        var services = new ServiceCollection();
-        services.AddLogging();
-        services.AddSingleton<IJobScheduler, ImmediateJobScheduler>();
-        services.AddServiceBus(cfg =>
-        {
-            cfg.UsingMediator();
-            cfg.AddConsumer<TriggerConsumer>();
-            cfg.AddConsumer<TestConsumer>();
-        });
-
-        await using var provider = services.BuildServiceProvider();
-        var hosted = provider.GetRequiredService<IHostedService>();
-        await hosted.StartAsync(CancellationToken.None);
-
-        var publishEndpoint = provider.GetRequiredService<IPublishEndpoint>();
-        TestConsumer.Received = 0;
-        TestConsumer.Completed = new TaskCompletionSource<bool>();
-        var delay = TimeSpan.FromSeconds(1);
-        TriggerConsumer.Delay = delay;
-        var sw = Stopwatch.StartNew();
-        await publishEndpoint.Publish(new TriggerMessage());
-        await TestConsumer.Completed.Task;
         sw.Stop();
 
         Assert.True(sw.Elapsed < delay);

@@ -19,13 +19,12 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
     private readonly ISendContextFactory _sendContextFactory;
     private readonly IPublishContextFactory _publishContextFactory;
     private readonly ILoggerFactory? _loggerFactory;
-    private readonly IJobScheduler _jobScheduler;
     private TMessage? message;
 
     public ConsumeContextImpl(ReceiveContext receiveContext, ITransportFactory transportFactory,
         ISendPipe sendPipe, IPublishPipe publishPipe, IMessageSerializer messageSerializer, Uri address,
         ISendContextFactory sendContextFactory, IPublishContextFactory publishContextFactory,
-        ILoggerFactory? loggerFactory = null, IJobScheduler? jobScheduler = null)
+        ILoggerFactory? loggerFactory = null)
         : base(receiveContext.CancellationToken)
     {
         this.receiveContext = receiveContext;
@@ -37,7 +36,6 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
         _sendContextFactory = sendContextFactory;
         _publishContextFactory = publishContextFactory;
         _loggerFactory = loggerFactory;
-        _jobScheduler = jobScheduler ?? new DefaultJobScheduler();
     }
 
     internal ReceiveContext ReceiveContext => receiveContext;
@@ -47,7 +45,7 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
     public Task<ISendEndpoint> GetSendEndpoint(Uri uri)
     {
         var logger = _loggerFactory?.CreateLogger<TransportSendEndpoint>();
-        ISendEndpoint endpoint = new TransportSendEndpoint(_transportFactory, _sendPipe, _messageSerializer, uri, _address, _sendContextFactory, logger, _jobScheduler);
+        ISendEndpoint endpoint = new TransportSendEndpoint(_transportFactory, _sendPipe, _messageSerializer, uri, _address, _sendContextFactory, logger);
         return Task.FromResult(endpoint);
     }
 
@@ -71,26 +69,11 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
         context.RoutingKey = exchangeName;
 
         contextCallback?.Invoke(context);
-        if (context.ScheduledEnqueueTime is DateTime scheduled)
-        {
-            await _jobScheduler.Schedule(scheduled, async ct =>
-            {
-                context.ScheduledEnqueueTime = null;
-                var transport = await _transportFactory.GetSendTransport(uri, ct);
-                await _publishPipe.Send(context);
-                await _sendPipe.Send(context);
-                var typed = message is T mt ? mt : (T)MessageProxy.Create(typeof(T), message);
-                await transport.Send(typed, context, ct);
-            }, cancellationToken);
-        }
-        else
-        {
-            var transport = await _transportFactory.GetSendTransport(uri, cancellationToken);
-            await _publishPipe.Send(context);
-            await _sendPipe.Send(context);
-            var typed = message is T t ? t : (T)MessageProxy.Create(typeof(T), message);
-            await transport.Send(typed, context, cancellationToken);
-        }
+        var transport = await _transportFactory.GetSendTransport(uri, cancellationToken);
+        await _publishPipe.Send(context);
+        await _sendPipe.Send(context);
+        var typed = message is T t ? t : (T)MessageProxy.Create(typeof(T), message);
+        await transport.Send(typed, context, cancellationToken);
     }
 
     [Throws(typeof(InvalidOperationException))]

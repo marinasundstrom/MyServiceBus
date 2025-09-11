@@ -865,15 +865,11 @@ try (ServiceScope scope = provider.createScope()) {
 
 ### Scheduling Messages
 
-Delay message delivery by setting the scheduled enqueue time on the send or publish context or by using the `IMessageScheduler` service. External schedulers such as Quartz or Hangfire can be plugged in by providing a custom `IJobScheduler`/`JobScheduler` implementation.
+Delay message delivery using the `IMessageScheduler` service. External schedulers such as Quartz or Hangfire can be plugged in by providing a custom `IMessageScheduler` implementation.
 
 #### C#
 
 ```csharp
-await bus.Publish(new OrderSubmitted(), ctx => ctx.SetScheduledEnqueueTime(TimeSpan.FromSeconds(30)));
-var endpoint = await bus.GetSendEndpoint(new Uri("queue:submit-order"));
-await endpoint.Send(new SubmitOrder(), ctx => ctx.SetScheduledEnqueueTime(TimeSpan.FromSeconds(30)));
-
 var scheduler = provider.GetRequiredService<IMessageScheduler>();
 await scheduler.SchedulePublish(new OrderSubmitted(), TimeSpan.FromSeconds(30));
 await scheduler.ScheduleSend(new Uri("queue:submit-order"), new SubmitOrder(), TimeSpan.FromSeconds(30));

@@ -24,7 +24,6 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
     private readonly ILogger<MessageBus>? _logger;
     private readonly ISendContextFactory _sendContextFactory;
     private readonly IPublishContextFactory _publishContextFactory;
-    private readonly IJobScheduler _jobScheduler;
 
     private readonly List<IReceiveTransport> _activeTransports = new();
 
@@ -46,7 +45,6 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
         _logger = _serviceProvider.GetService<ILogger<MessageBus>>();
         _sendContextFactory = sendContextFactory;
         _publishContextFactory = publishContextFactory;
-        _jobScheduler = _serviceProvider.GetService<IJobScheduler>() ?? new DefaultJobScheduler();
     }
 
     public Uri Address => _address;
@@ -76,23 +74,9 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
         context.DestinationAddress = uri;
 
         contextCallback?.Invoke(context);
-        if (context.ScheduledEnqueueTime is DateTime scheduled)
-        {
-            await _jobScheduler.Schedule(scheduled, async ct =>
-            {
-                context.ScheduledEnqueueTime = null;
-                var transport = await _transportFactory.GetSendTransport(uri, ct);
-                await _publishPipe.Send(context);
-                await _sendPipe.Send(context);
-                await transport.Send(message, context, ct);
-            }, cancellationToken);
-        }
-        else
-        {
-            await _publishPipe.Send(context);
-            await _sendPipe.Send(context);
-            await transport.Send(message, context, cancellationToken);
-        }
+        await _publishPipe.Send(context);
+        await _sendPipe.Send(context);
+        await transport.Send(message, context, cancellationToken);
     }
 
     public IPublishEndpoint GetPublishEndpoint() => this;
@@ -101,7 +85,7 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
     {
         var loggerFactory = _serviceProvider.GetService<ILoggerFactory>();
         var logger = loggerFactory?.CreateLogger<TransportSendEndpoint>();
-        ISendEndpoint endpoint = new TransportSendEndpoint(_transportFactory, _sendPipe, _messageSerializer, uri, _address, _sendContextFactory, logger, _jobScheduler);
+        ISendEndpoint endpoint = new TransportSendEndpoint(_transportFactory, _sendPipe, _messageSerializer, uri, _address, _sendContextFactory, logger);
         return Task.FromResult(endpoint);
     }
 
@@ -137,7 +121,7 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
         async Task TransportHandler(ReceiveContext context)
         {
             var messageSerializer = serializer ?? _messageSerializer;
-            var consumeContext = new ConsumeContextImpl<TMessage>(context, _transportFactory, _sendPipe, _publishPipe, messageSerializer, _address, _sendContextFactory, _publishContextFactory, _serviceProvider.GetService<ILoggerFactory>(), _jobScheduler);
+            var consumeContext = new ConsumeContextImpl<TMessage>(context, _transportFactory, _sendPipe, _publishPipe, messageSerializer, _address, _sendContextFactory, _publishContextFactory, _serviceProvider.GetService<ILoggerFactory>());
             await pipe.Send(consumeContext).ConfigureAwait(false);
         }
 
@@ -243,8 +227,7 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
                 _address,
                 _sendContextFactory,
                 _publishContextFactory,
-                _serviceProvider.GetService<ILoggerFactory>(),
-                _jobScheduler)
+                _serviceProvider.GetService<ILoggerFactory>())
                 ?? throw new InvalidOperationException("Failed to create ConsumeContext");
 
             _logger?.LogDebug("Received {MessageType}", messageTypeName);

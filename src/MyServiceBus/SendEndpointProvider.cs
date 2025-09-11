@@ -14,10 +14,9 @@ internal class SendEndpointProvider : ISendEndpointProvider
     readonly IMessageBus _bus;
     readonly ISendContextFactory _sendContextFactory;
     readonly ILoggerFactory? _loggerFactory;
-    readonly IJobScheduler _jobScheduler;
 
     public SendEndpointProvider(ITransportFactory transportFactory, ISendPipe sendPipe, IMessageSerializer serializer,
-        ConsumeContextProvider contextProvider, IMessageBus bus, ISendContextFactory sendContextFactory, ILoggerFactory? loggerFactory = null, IJobScheduler? jobScheduler = null)
+        ConsumeContextProvider contextProvider, IMessageBus bus, ISendContextFactory sendContextFactory, ILoggerFactory? loggerFactory = null)
     {
         _transportFactory = transportFactory;
         _sendPipe = sendPipe;
@@ -26,7 +25,6 @@ internal class SendEndpointProvider : ISendEndpointProvider
         _bus = bus;
         _sendContextFactory = sendContextFactory;
         _loggerFactory = loggerFactory;
-        _jobScheduler = jobScheduler ?? new DefaultJobScheduler();
     }
 
     public Task<ISendEndpoint> GetSendEndpoint(Uri uri)
@@ -35,7 +33,7 @@ internal class SendEndpointProvider : ISendEndpointProvider
             return _contextProvider.Context.GetSendEndpoint(uri);
 
         var logger = _loggerFactory?.CreateLogger<TransportSendEndpoint>();
-        ISendEndpoint endpoint = new TransportSendEndpoint(_transportFactory, _sendPipe, _serializer, uri, _bus.Address, _sendContextFactory, logger, _jobScheduler);
+        ISendEndpoint endpoint = new TransportSendEndpoint(_transportFactory, _sendPipe, _serializer, uri, _bus.Address, _sendContextFactory, logger);
         return Task.FromResult(endpoint);
     }
 }
