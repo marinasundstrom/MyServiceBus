@@ -33,6 +33,50 @@ public class SchedulingTests
             => callback(cancellationToken);
     }
 
+    class StubSendContext : IPublishContext
+    {
+        public string MessageId { get; set; } = string.Empty;
+        public string RoutingKey { get; set; } = string.Empty;
+        public IDictionary<string, object> Headers { get; } = new Dictionary<string, object>();
+        public string? CorrelationId { get; set; }
+        public Uri? ResponseAddress { get; set; }
+        public Uri? FaultAddress { get; set; }
+        public DateTime? ScheduledEnqueueTime { get; set; }
+        public CancellationToken CancellationToken { get; } = CancellationToken.None;
+    }
+
+    class StubPublishEndpoint : IPublishEndpoint
+    {
+        public StubSendContext? Context;
+
+        public Task Publish<T>(object message, Action<IPublishContext>? contextCallback = null, CancellationToken cancellationToken = default) where T : class
+            => Publish((T)message, contextCallback, cancellationToken);
+
+        public Task Publish<T>(T message, Action<IPublishContext>? contextCallback = null, CancellationToken cancellationToken = default) where T : class
+        {
+            var ctx = new StubSendContext();
+            contextCallback?.Invoke(ctx);
+            Context = ctx;
+            return Task.CompletedTask;
+        }
+    }
+
+    class StubSendEndpoint : ISendEndpoint
+    {
+        public StubSendContext? Context;
+
+        public Task Send<T>(T message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default) where T : class
+        {
+            var ctx = new StubSendContext();
+            contextCallback?.Invoke(ctx);
+            Context = ctx;
+            return Task.CompletedTask;
+        }
+
+        public Task Send<T>(object message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default) where T : class
+            => Send((T)message, contextCallback, cancellationToken);
+    }
+
     [Fact]
     [Throws(typeof(TrueException))]
     public async Task SchedulePublish_delays_message()
@@ -121,5 +165,35 @@ public class SchedulingTests
         Assert.Equal(1, TestConsumer.Received);
 
         await hosted.StopAsync(CancellationToken.None);
+    }
+
+    [Fact]
+    [Throws(typeof(NotNullException))]
+    public async Task Publish_extension_sets_scheduled_time()
+    {
+        var endpoint = new StubPublishEndpoint();
+        var delay = TimeSpan.FromMilliseconds(100);
+        var before = DateTime.UtcNow;
+        await endpoint.SchedulePublish(new TestMessage(), delay);
+
+        Assert.NotNull(endpoint.Context);
+        var scheduled = endpoint.Context!.ScheduledEnqueueTime;
+        var tolerance = TimeSpan.FromMilliseconds(50);
+        Assert.InRange(scheduled!.Value, before + delay - tolerance, before + delay + tolerance);
+    }
+
+    [Fact]
+    [Throws(typeof(NotNullException))]
+    public async Task Send_extension_sets_scheduled_time()
+    {
+        var endpoint = new StubSendEndpoint();
+        var delay = TimeSpan.FromMilliseconds(100);
+        var before = DateTime.UtcNow;
+        await endpoint.ScheduleSend(new TestMessage(), delay);
+
+        Assert.NotNull(endpoint.Context);
+        var scheduled = endpoint.Context!.ScheduledEnqueueTime;
+        var tolerance = TimeSpan.FromMilliseconds(50);
+        Assert.InRange(scheduled!.Value, before + delay - tolerance, before + delay + tolerance);
     }
 }

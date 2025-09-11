@@ -874,6 +874,9 @@ await bus.Publish(new OrderSubmitted(), ctx => ctx.SetScheduledEnqueueTime(TimeS
 var endpoint = await bus.GetSendEndpoint(new Uri("queue:submit-order"));
 await endpoint.Send(new SubmitOrder(), ctx => ctx.SetScheduledEnqueueTime(TimeSpan.FromSeconds(30)));
 
+await bus.SchedulePublish(new OrderSubmitted(), TimeSpan.FromSeconds(30));
+await endpoint.ScheduleSend(new SubmitOrder(), TimeSpan.FromSeconds(30));
+
 var scheduler = provider.GetRequiredService<IMessageScheduler>();
 await scheduler.SchedulePublish(new OrderSubmitted(), TimeSpan.FromSeconds(30));
 await scheduler.ScheduleSend(new Uri("queue:submit-order"), new SubmitOrder(), TimeSpan.FromSeconds(30));
