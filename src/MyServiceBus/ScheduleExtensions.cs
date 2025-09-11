@@ -21,4 +21,16 @@ public static class ScheduleExtensions
     public static Task ScheduleSend<T>(this ISendEndpoint endpoint, T message, TimeSpan delay, CancellationToken cancellationToken = default)
         where T : class
         => endpoint.Send(message, ctx => ctx.SetScheduledEnqueueTime(delay), cancellationToken);
+
+    public static Task CancelScheduledPublish(this IPublishEndpoint endpoint, IMessageScheduler scheduler, Guid tokenId, CancellationToken cancellationToken = default)
+        => scheduler.CancelScheduledPublish(tokenId, cancellationToken);
+
+    public static Task CancelScheduledPublish(this IPublishEndpoint endpoint, IMessageScheduler scheduler, ScheduledMessageHandle handle, CancellationToken cancellationToken = default)
+        => scheduler.CancelScheduledPublish(handle, cancellationToken);
+
+    public static Task CancelScheduledSend(this ISendEndpoint endpoint, IMessageScheduler scheduler, Guid tokenId, CancellationToken cancellationToken = default)
+        => scheduler.CancelScheduledSend(tokenId, cancellationToken);
+
+    public static Task CancelScheduledSend(this ISendEndpoint endpoint, IMessageScheduler scheduler, ScheduledMessageHandle handle, CancellationToken cancellationToken = default)
+        => scheduler.CancelScheduledSend(handle, cancellationToken);
 }

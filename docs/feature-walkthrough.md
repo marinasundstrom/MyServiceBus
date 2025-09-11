@@ -865,7 +865,7 @@ try (ServiceScope scope = provider.createScope()) {
 
 ### Scheduling Messages
 
-Delay message delivery by setting the scheduled enqueue time on the send or publish context or by using the `IMessageScheduler` service. External schedulers such as Quartz or Hangfire can be plugged in by providing a custom `IJobScheduler`/`JobScheduler` implementation.
+Delay message delivery by setting the scheduled enqueue time on the send or publish context or by using the `IMessageScheduler` service. `IMessageScheduler` returns a `ScheduledMessageHandle` that can be used to cancel a scheduled message. External schedulers such as Quartz or Hangfire can be plugged in by providing a custom `IJobScheduler`/`JobScheduler` implementation.
 
 #### C#
 
@@ -878,7 +878,8 @@ await bus.SchedulePublish(new OrderSubmitted(), TimeSpan.FromSeconds(30));
 await endpoint.ScheduleSend(new SubmitOrder(), TimeSpan.FromSeconds(30));
 
 var scheduler = provider.GetRequiredService<IMessageScheduler>();
-await scheduler.SchedulePublish(new OrderSubmitted(), TimeSpan.FromSeconds(30));
+var handle = await scheduler.SchedulePublish(new OrderSubmitted(), TimeSpan.FromSeconds(30));
+await scheduler.CancelScheduledPublish(handle);
 await scheduler.ScheduleSend(new Uri("queue:submit-order"), new SubmitOrder(), TimeSpan.FromSeconds(30));
 ```
 
@@ -906,11 +907,13 @@ class HangfireJobScheduler : IJobScheduler
     readonly IBackgroundJobClient jobs;
     public HangfireJobScheduler(IBackgroundJobClient jobs) => this.jobs = jobs;
 
-    public Task Schedule(DateTime scheduledTime, Func<CancellationToken, Task> callback, CancellationToken token = default)
+    public Task<Guid> Schedule(DateTime scheduledTime, Func<CancellationToken, Task> callback, CancellationToken token = default)
     {
         jobs.Schedule(() => callback(token), scheduledTime);
-        return Task.CompletedTask;
+        return Task.FromResult(Guid.NewGuid());
     }
+
+    public Task Cancel(Guid tokenId) => Task.CompletedTask;
 }
 
 services.AddSingleton<IJobScheduler, HangfireJobScheduler>();
@@ -924,10 +927,14 @@ class QuartzJobScheduler implements JobScheduler {
     private final Scheduler scheduler;
     QuartzJobScheduler(Scheduler scheduler) { this.scheduler = scheduler; }
 
-    public CompletionStage<Void> schedule(Instant scheduledTime,
+    public CompletionStage<UUID> schedule(Instant scheduledTime,
             Function<CancellationToken, CompletionStage<Void>> callback,
             CancellationToken token) {
         scheduler.scheduleJob(() -> callback.apply(token), Date.from(scheduledTime));
+        return CompletableFuture.completedFuture(UUID.randomUUID());
+    }
+
+    public CompletionStage<Void> cancel(UUID tokenId) {
         return CompletableFuture.completedFuture(null);
     }
 }
