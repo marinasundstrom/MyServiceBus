@@ -4,6 +4,7 @@ This folder contains the Java modules for MyServiceBus. The Gradle multi-project
 
 ## Prerequisites
 - JDK 17 (Temurin/OpenJDK recommended)
+- Gradle
 - Docker (optional) to run RabbitMQ locally
 
 ## Build
