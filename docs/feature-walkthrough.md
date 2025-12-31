@@ -2,19 +2,21 @@
 
 This guide compares basic usage of MyServiceBus in C# and Java. It is split into basics and advanced sections so newcomers can focus on fundamental messaging patterns before exploring configuration and other features.
 
-For an explanation of why the C# and Java examples differ, see the [design decisions](development/design-decisions.md).
+For an explanation of why the C# and Java examples differ, see the [design decisions](development/design-decisions.md).  
 For Java build and run instructions, including optional JDK 17 toolchain setup and how to run the test app, see `src/Java/README.md`.
+
 ## Contents
 
 - [Basics](#basics)
   - [Setup](#setup)
-- [Publishing](#publishing)
-- [Sending](#sending)
+  - [Publishing](#publishing)
+  - [Sending](#sending)
   - [Consuming Messages](#consuming-messages)
-  - [Request/Response](#requestresponse)
-  - [Adding Headers](#adding-headers)
   - [Retries](#retries)
   - [Error Handling](#error-handling)
+  - [Request/Response](#requestresponse)
+  - [Anonymous Messages](#anonymous-messages)
+  - [Adding Headers](#adding-headers)
   - [Mediator (In-Memory Transport)](#mediator-in-memory-transport)
 - [Advanced](#advanced)
   - [Configuration](#configuration)
@@ -30,10 +32,14 @@ For Java build and run instructions, including optional JDK 17 toolchain setup a
 
 ### Setup
 
-The examples below use the fluent configuration pattern unless noted. The
-factory pattern is demonstrated as well.
+The examples below use the fluent configuration pattern unless noted. The factory pattern is demonstrated as well.
+
+> **Why the ServiceProvider abstraction exists**
+>
+> MyServiceBus relies on scoped services to create consumers per message and to flow contextual data (headers, cancellation tokens, tracing) through send/publish/consume pipelines. The container integration is how MyServiceBus achieves MassTransit-like behavior without global state.
 
 #### C#
+
 Using the ASP.NET Core host builder (fluent configuration pattern):
 
 ```csharp
@@ -58,8 +64,7 @@ var bus = app.Services.GetRequiredService<IMessageBus>();
 
 **Without host (fluent configuration pattern)**
 
-Outside of an ASP.NET host (or generic host), the fluent configuration
-pattern can populate an `IServiceCollection` directly.
+Outside of an ASP.NET host (or generic host), the fluent configuration pattern can populate an `IServiceCollection` directly.
 
 ```csharp
 var services = new ServiceCollection();
@@ -81,16 +86,9 @@ await bus.StartAsync();
 
 **Factory pattern**
 
-The factory pattern uses `MessageBus.Factory` to create a self-contained
-bus without building an `IServiceCollection`. The factory spins up its
-own service provider, so consumers must have parameterless constructors
-and cannot rely on application dependencies. This mirrors the Java
-pattern but in .NET the standard practice is to use dependency injection
-via `AddServiceBus`.
+The factory pattern uses `MessageBus.Factory` to create a self-contained bus without building an `IServiceCollection`. The factory spins up its own service provider, so consumers must have parameterless constructors and cannot rely on application dependencies. This mirrors the Java pattern but in .NET the standard practice is to use dependency injection via `AddServiceBus`.
 
-The factory uses `DefaultConstructorConsumerFactory` by default to
-instantiate consumers. A different factory can be supplied if your
-consumers require dependencies:
+The factory uses `DefaultConstructorConsumerFactory` by default to instantiate consumers. A different factory can be supplied if your consumers require dependencies:
 
 ```csharp
 IMessageBus bus = MessageBus.Factory.Create<RabbitMqFactoryConfigurator>(cfg =>
@@ -100,9 +98,7 @@ IMessageBus bus = MessageBus.Factory.Create<RabbitMqFactoryConfigurator>(cfg =>
 });
 ```
 
-In Java, `RabbitMqFactoryConfigurator` also defaults to
-`DefaultConstructorConsumerFactory`. Use `cfg.setConsumerFactory` to
-provide a different implementation:
+In Java, `RabbitMqFactoryConfigurator` also defaults to `DefaultConstructorConsumerFactory`. Use `cfg.setConsumerFactory` to provide a different implementation:
 
 ```java
 MessageBus bus = MessageBus.factory.create(RabbitMqFactoryConfigurator.class, cfg -> {
@@ -145,26 +141,17 @@ MessageBus bus = serviceProvider.getService(MessageBus.class);
 bus.start();
 ```
 
-`addServiceBus` activates consumers using `ScopeConsumerFactory`, so they
-can resolve dependencies from the `ServiceProvider`.
+`addServiceBus` activates consumers using `ScopeConsumerFactory`, so they can resolve dependencies from the `ServiceProvider`.
 
-Java accepts this self-contained model because the runtime lacks a
-standard dependency injection library; consumers typically provide their
-own dependencies directly.
+Java accepts this self-contained model because the runtime lacks a standard dependency injection library; consumers typically provide their own dependencies directly.
 
+---
 
 ### Publishing
 
-Publish raises an event 🎉 to all interested consumers. It is fan-out by
-message type and does not target a specific queue. Use it for domain
-events or notifications. Multiple queues can listen to the same
-exchange or topic to receive the event. See
-[Adding Headers](#adding-headers) to attach tracing or other metadata.
+Publish raises an event 🎉 to all interested consumers. It is fan-out by message type and does not target a specific queue. Use it for domain events or notifications. Multiple queues can listen to the same exchange or topic to receive the event. See [Adding Headers](#adding-headers) to attach tracing or other metadata.
 
-`IMessageBus` is a singleton and implements `IPublishEndpoint`, so you can
-publish directly from the bus as shown. In scoped code paths (such as an
-ASP.NET request or inside a consumer), prefer resolving `IPublishEndpoint`
-from the scope so headers and cancellation tokens flow automatically.
+`IMessageBus` is a singleton and implements `IPublishEndpoint`, so you can publish directly from the bus as shown. In scoped code paths (such as an ASP.NET request or inside a consumer), prefer resolving `IPublishEndpoint` from the scope so headers and cancellation tokens flow automatically.
 
 #### C#
 
@@ -181,20 +168,15 @@ MessageBus bus = serviceProvider.getService(MessageBus.class);
 bus.publish(new SubmitOrder(UUID.randomUUID())); // 🚀 publish event
 ```
 
+---
 
 ### Sending
 
-Send delivers a command to a specific endpoint/queue, where exactly one
-consumer processes it. Use this for directed, point-to-point operations
-instead of broadcasting.
+Send delivers a command to a specific endpoint/queue, where exactly one consumer processes it. Use this for directed, point-to-point operations instead of broadcasting.
 
-Sending and request/response operations rely on scoped abstractions. Resolve
-`ISendEndpointProvider` and `IRequestClient<T>` from a service scope rather
-than using the bus directly so contextual information like headers and
-cancellation tokens is propagated, in line with MassTransit.
+Sending and request/response operations rely on scoped abstractions. Resolve `ISendEndpointProvider` and `IRequestClient<T>` from a service scope rather than using the bus directly so contextual information like headers and cancellation tokens is propagated, in line with MassTransit.
 
-To target a specific queue, obtain a send endpoint for its URI and ensure a
-consumer is wired to that queue.
+To target a specific queue, obtain a send endpoint for its URI and ensure a consumer is wired to that queue.
 
 #### C#
 
@@ -247,22 +229,15 @@ endpoint.send(new SubmitOrder(UUID.randomUUID())).join();
 | Queue (RabbitMQ) | `rabbitmq://<host>/<queue>` | `rabbitmq://localhost/submit-order` | Sends to a queue via the default exchange |
 | Exchange (RabbitMQ) | `rabbitmq://<host>/exchange/<name>` | `rabbitmq://localhost/exchange/orders` | Publishes to the specified exchange; append `?durable=false&autodelete=true` to control exchange properties |
 
+---
+
 ### Consuming Messages
 
-Define consumers to handle messages. The consume context provides the
-message, headers, and helpers to publish, send, or respond. Completing
-successfully acknowledges the message ✅; throwing creates a fault ❌.
+Define consumers to handle messages. The consume context provides the message, headers, and helpers to publish, send, or respond. Completing successfully acknowledges the message ✅; throwing triggers retries and eventual failure ❌.
 
-Consumers can bind to the same topic or exchange to subscribe to
-notifications or events. Multiple replicas of a service may bind to the
-same queue; the first instance to dequeue a message processes it,
-supporting scaling and resilience.
+Consumers can bind to the same topic or exchange to subscribe to notifications or events. Multiple replicas of a service may bind to the same queue; the first instance to dequeue a message processes it, supporting scaling and resilience.
 
-Multiple consumer types can handle the same message. MyServiceBus invokes
-them one at a time; if any consumer throws, remaining consumers are skipped
-and the message is moved to the error queue. Consumers can also bind to
-different queues for the same message type, such as processing an
-`_error` queue alongside the primary endpoint.
+Multiple consumer types can handle the same message. MyServiceBus invokes them one at a time; if any consumer throws, remaining consumers are skipped and failure handling applies (retries → faults → potential error queue). Consumers can also bind to different queues for the same message type, such as processing an `_error` queue alongside the primary endpoint.
 
 #### C#
 
@@ -287,12 +262,103 @@ class SubmitOrderConsumer implements Consumer<SubmitOrder> {
 }
 ```
 
+---
+
+### Retries
+
+Transient issues like network hiccups or temporary I/O errors may succeed on a subsequent attempt. MyServiceBus lets you opt into retry policies using filters, similar to MassTransit. Configure a consumer's pipe with `UseRetry` to automatically re-invoke it before faulting. After the retry limit is reached, the message is faulted; see [Faults](#faults) for details.
+
+---
+
+## Error Handling
+
+MyServiceBus separates consumer failures into **faults** and **errors**.
+This distinction is intentional and mirrors MassTransit semantics.
+
+* **Faults** are *messages* that describe a failure.
+* **Errors** are *dead-lettered originals* that require manual intervention.
+
+You may subscribe to **both** fault and error queues, but they serve very different purposes and must be handled differently.
+
+### Faults
+
+A **fault** is published when a consumer throws an unhandled exception and all configured retry policies are exhausted.
+
+When this happens, MyServiceBus publishes a `Fault<T>` message containing:
+
+* The original message payload
+* Details of the exception(s) that occurred
+* Metadata for diagnostics, correlation, and compensation
+
+If no explicit fault address is provided, the fault is published to a queue named:
+
+```
+<queue>_fault
+```
+
+Fault messages are **first-class messages**. They are meant to be consumed, observed, logged, or used to trigger compensating actions.
+
+This is the same mechanism used by request/response clients: if a request results in a fault, the client receives a `Fault<T>` response instead of a successful reply.
+
+#### Consuming fault messages
+
+Bind a consumer to the fault queue to inspect or react to failures:
+
+##### C#
+
+```csharp
+cfg.ReceiveEndpoint("submit-order_fault", e =>
+{
+    e.Handler<Fault<SubmitOrder>>(context =>
+    {
+        var original = context.Message.Message;
+        var exceptions = context.Message.Exceptions;
+
+        // log, notify, or trigger compensation
+        return Task.CompletedTask;
+    });
+});
+```
+
+##### Java
+
+```java
+cfg.receiveEndpoint("submit-order_fault", e ->
+    e.handler(Fault.class, ctx -> {
+        SubmitOrder original = ctx.getMessage().getMessage();
+        return CompletableFuture.completedFuture(null);
+    })
+);
+```
+
+Fault consumers **must not** re-publish the original message blindly. Faults describe a failure; they do not imply the message is safe to retry.
+
+### Errors
+
+An **error** represents a message that could not be processed successfully *even after* all retry and redelivery policies were exhausted.
+
+In this case, the **original message** is moved to an error queue named:
+
+```
+<queue>_error
+```
+
+This behavior mirrors MassTransit.
+
+Messages may also land in the error queue if deserialization or middleware fails before the consumer runs.
+
+> **Important**
+> Do **not** re-publish messages from an error queue.
+>
+> Error messages retain failure headers and routing metadata. Republishing them can cause loops, immediate re-faulting, or duplicate deliveries.
+
+Inspect and process the error queue with a dedicated consumer or tool, then send the message back to the original queue once the issue is resolved.
+
+---
 
 ### Request/Response
 
-Use request/response for RPC-style interactions over the bus. A consumer
-responds to a request, and the client correlates replies, propagates
-headers, and manages timeouts.
+Use request/response for RPC-style interactions over the bus. A consumer responds to a request, and the client correlates replies, propagates headers, and manages timeouts.
 
 #### C#
 
@@ -332,9 +398,7 @@ If the consumer responds with a `Fault<CheckOrderStatus>` but the client only re
 
 #### Handling Multiple Response Types
 
-Clients can await more than one possible response (e.g., success or
-fault). Inspect the typed result to branch accordingly and surface rich
-fault details when something fails.
+Clients can await more than one possible response (e.g., success or fault). Inspect the typed result to branch accordingly and surface rich fault details when something fails.
 
 ##### C#
 
@@ -364,6 +428,8 @@ response.as(Fault.class)
     .ifPresent(r -> System.out.println(r.getMessage().getExceptions().get(0).getMessage()));
 ```
 
+---
+
 ### Anonymous Messages
 
 MassTransit lets you pass anonymous objects that are mapped to message interfaces. MyServiceBus mirrors this behavior for send, publish, and respond in both languages.
@@ -386,11 +452,11 @@ context.respond(Order.class, Map.of("id", 42));
 
 Anonymous payloads must include properties that match the message interface; any missing members are defaulted.
 
+---
+
 ### Adding Headers
 
-Headers let you attach metadata such as tracing information or
-correlation identifiers. Set them using the send, publish, or request
-context.
+Headers let you attach metadata such as tracing information or correlation identifiers. Set them using the send, publish, or request context.
 
 #### C#
 
@@ -419,69 +485,11 @@ OrderStatus response = client.getResponse(
     CancellationToken.none).join();
 ```
 
-### Retries
-
-Transient issues like network hiccups or temporary I/O errors may succeed on a subsequent attempt. MyServiceBus lets you opt into retry policies using filters, similar to MassTransit. Configure a consumer's pipe with `UseRetry` to automatically re-invoke it before faulting. After the retry limit is reached, the message is faulted; see [Faults](#faults) for details.
-
-### Error Handling
-
-MyServiceBus separates consumer failures into **faults** and **errors**.
-
-
-#### Faults
-
-When a consumer throws an exception that isn't handled and any configured
-retries are exhausted, MyServiceBus publishes a `Fault<T>` message. This
-message contains the original payload and details about the captured
-exceptions so request clients or other observers can react to the failure.
-If the incoming message doesn't specify a fault address, the fault is
-published to a queue named `<queue>_fault`.
-
-#### Errors
-
-When the bus exhausts all retry or re-delivery policies (immediate,
-scheduled, etc.) and the consumer still fails, the original message is
-moved to an error queue named `<queue>_error`, mirroring MassTransit.
-Messages can also land in the error queue if deserialization or
-middleware fails before the consumer runs.
-
-Bind a consumer to `<queue>_error` to inspect or replay failed messages:
-
-#### C#
-
-```csharp
-cfg.ReceiveEndpoint("submit-order_error", e =>
-{
-    e.Handler<SubmitOrder>(context =>
-    {
-        // inspect, fix, or resend the failed message
-        return context.Send(new Uri("queue:submit-order"), context.Message);
-    });
-});
-```
-
-#### Java
-
-```java
-cfg.receiveEndpoint("submit-order_error", e ->
-    e.handler(SubmitOrder.class, ctx -> {
-        // inspect, fix, or resend the failed message
-        return ctx.send("queue:submit-order", ctx.getMessage());
-    })
-);
-```
-
-> **Note**
-> `forward` copies the original headers and is intended only for republishes to an exchange. Forwarding to a queue leaves the error and destination headers intact, so the broker will route the message back to the error queue and consumers may see duplicates. Use `send` when moving a message to another queue.
-
-Inspect and process the error queue with a dedicated consumer or tool,
-then send the message back to the original queue once the issue is
-resolved.
+---
 
 ### Mediator (In-Memory Transport)
 
-Run the same messaging model entirely in-process without a broker. Ideal
-for tests, local tools, or lightweight modules.
+Run the same messaging model entirely in-process without a broker. Ideal for tests, local tools, or lightweight modules.
 
 #### C#
 
@@ -493,9 +501,7 @@ builder.Services.AddServiceBus(x =>
 });
 ```
 
-To use compatibility handler interfaces that provide a MassTransit-style
-`Handle` method, derive from the `Handler<T>` base class (or implement
-`IHandler<T>`/`IHandler<T,TResult>`):
+To use compatibility handler interfaces that provide a MassTransit-style `Handle` method, derive from the `Handler<T>` base class (or implement `IHandler<T>`/`IHandler<T,TResult>`):
 
 ```csharp
 public class SubmitOrderHandler : Handler<SubmitOrder>
@@ -524,16 +530,13 @@ bus.publish(new SubmitOrder(UUID.randomUUID()));
 
 The mediator dispatches messages in-memory, making it useful for lightweight scenarios and testing without a broker.
 
+---
 
 ## Advanced
 
 ### Configuration
 
-Configure the bus by registering consumers, selecting a transport,
-connecting to the broker, customizing entity names, and auto-configuring
-endpoints with a name formatter. These examples use the fluent
-configuration pattern; similar options exist when using the factory
-pattern.
+Configure the bus by registering consumers, selecting a transport, connecting to the broker, customizing entity names, and auto-configuring endpoints with a name formatter. These examples use the fluent configuration pattern; similar options exist when using the factory pattern.
 
 #### C#
 
@@ -618,6 +621,7 @@ Built-in endpoint name formatters include `DefaultEndpointNameFormatter`, `Kebab
 Customize RabbitMQ queues with broker-specific arguments.
 
 ##### C#
+
 ```csharp
 cfg.ReceiveEndpoint("submit-order-queue", e =>
 {
@@ -627,6 +631,7 @@ cfg.ReceiveEndpoint("submit-order-queue", e =>
 ```
 
 ##### Java
+
 ```java
 cfg.receiveEndpoint("submit-order-queue", e -> {
     e.setQueueArgument("x-queue-type", "quorum");
@@ -634,12 +639,16 @@ cfg.receiveEndpoint("submit-order-queue", e -> {
 });
 ```
 
+---
 
 ### Dependency Injection
 
-MyServiceBus registers common messaging abstractions in each client's
-dependency injection container so application code can depend on
-interfaces rather than concrete implementations.
+MyServiceBus registers common messaging abstractions in each client's dependency injection container so application code can depend on interfaces rather than concrete implementations.
+
+> **Short version**
+>
+> The DI integration exists so message operations can be scoped and contextual:
+> a consumer message handler, an HTTP request, or any unit of work can carry the same headers/tracing/cancellation through publish/send/respond without thread-local hacks.
 
 #### C#
 
@@ -647,14 +656,10 @@ interfaces rather than concrete implementations.
 
 - `IMessageBus` – **singleton** that starts, stops, and routes messages.
 - `IPublishEndpoint` – **scoped** facade for publishing events.
-- `ISendEndpoint` – **scoped** handle to the default send queue.
-  Use `ISendEndpointProvider` (also scoped) to resolve endpoints by URI.
+- `ISendEndpoint` – **scoped** handle to the default send queue. Use `ISendEndpointProvider` (also scoped) to resolve endpoints by URI.
 - `IRequestClient<T>` – **scoped** helper for request/response exchanges.
 
-In scoped handlers or web requests, depend on these interfaces instead of
-`IMessageBus` so that headers, cancellation tokens, and other context flow as
-expected. This matches MassTransit's guidance of using scoped endpoint
-providers rather than the bus for send or request interactions.
+In scoped handlers or web requests, depend on these interfaces instead of `IMessageBus` so that headers, cancellation tokens, and other context flow as expected. This matches MassTransit's guidance of using scoped endpoint providers rather than the bus for send or request interactions.
 
 Consumers are registered as scoped dependencies and created per message.
 
@@ -677,27 +682,17 @@ public class MyService
 
 #### Java
 
-`services.from(MessageBusServices.class).addServiceBus(cfg -> ...)` populates a `ServiceCollection`
-with analogous
+`services.from(MessageBusServices.class).addServiceBus(cfg -> ...)` populates a `ServiceCollection` with analogous services:
 
-- `MessageBus` – **singleton** providing `start`, `publish`, and transport
-  management.
+- `MessageBus` – **singleton** providing `start`, `publish`, and transport management.
 - `PublishEndpoint` – **scoped** facade for publishing events.
-- `SendEndpoint` – **scoped** handle for sending to queues derived from
-  message types.
-- `SendEndpointProvider` – **scoped** for resolving endpoints by URI when
-  needed.
-- `RequestClientFactory` – **scoped** used to create transient
-  `RequestClient<T>` instances for request/response.
+- `SendEndpoint` – **scoped** handle for sending to queues derived from message types.
+- `SendEndpointProvider` – **scoped** for resolving endpoints by URI when needed.
+- `RequestClientFactory` – **scoped** used to create transient `RequestClient<T>` instances for request/response.
 
-In scoped handlers or web requests, depend on these interfaces instead of
-`MessageBus` so that headers and cancellation tokens flow as expected,
-mirroring MassTransit's guidance.
+In scoped handlers or web requests, depend on these interfaces instead of `MessageBus` so that headers and cancellation tokens flow as expected, mirroring MassTransit's guidance.
 
-Consumers are registered as scoped services. Because Java's container cannot
-infer generic types, endpoints and request clients are typically obtained from
-providers or factories rather than injected directly. A `SendEndpoint` is
-registered directly for convenience and routes messages based on their type.
+Consumers are registered as scoped services. Because Java's container cannot infer generic types, endpoints and request clients are typically obtained from providers or factories rather than injected directly. A `SendEndpoint` is registered directly for convenience and routes messages based on their type.
 
 ```java
 public class MyService {
@@ -713,10 +708,15 @@ public class MyService {
 }
 ```
 
+---
 
 ### Logging
 
 Both clients rely on their platform's logging abstractions so bus activity can be observed using familiar tooling.
+
+> **Why not a custom logger?**
+>
+> Logging is intentionally “bring your own” so MyServiceBus can integrate with whatever your service already uses (Microsoft.Extensions.Logging on .NET, SLF4J/logback/log4j/etc. on Java) without forcing a new logging model.
 
 #### C#
 
@@ -756,17 +756,19 @@ try (ServiceScope scope = provider.createScope()) {
 }
 ```
 
+---
 
 ### OpenTelemetry
 
-MyServiceBus automatically creates spans for send and consume operations and propagates
-W3C `traceparent` headers. Any active span when publishing or sending is injected into the
-message headers, and consumers create child spans from those headers. This mirrors
-MassTransit's OpenTelemetry integration so traces flow across both C# and Java services.
+MyServiceBus automatically creates spans for send and consume operations and propagates W3C `traceparent` headers. Any active span when publishing or sending is injected into the message headers, and consumers create child spans from those headers. This mirrors MassTransit's OpenTelemetry integration so traces flow across both C# and Java services.
+
+---
 
 ### Health checks
 
 MyServiceBus exposes a health check that verifies the underlying RabbitMQ connection. In ASP.NET Core, register it via `AddHealthChecks().AddMyServiceBus()` to surface bus connectivity on liveness or readiness endpoints. Java services can instantiate `RabbitMqHealthCheck` and integrate it with their preferred health check framework.
+
+---
 
 ### Filters
 
@@ -862,6 +864,7 @@ try (ServiceScope scope = provider.createScope()) {
 }
 ```
 
+---
 
 ### Scheduling Messages
 
@@ -946,6 +949,8 @@ services.addSingleton(JobScheduler.class, sp -> new QuartzJobScheduler(quartz));
 services.addServiceBus(cfg -> { /* ... */ });
 ```
 
+---
+
 ### Unit Testing with the In-Memory Test Harness
 
 #### C#
@@ -1024,6 +1029,8 @@ harness.stop().join();
 ```
 
 The harness is registered for `IMessageBus` and `ITransportFactory`, so existing abstractions like `IRequestClient<T>` resolve from the container without special test hooks.
+
+---
 
 ## Next Steps
 
