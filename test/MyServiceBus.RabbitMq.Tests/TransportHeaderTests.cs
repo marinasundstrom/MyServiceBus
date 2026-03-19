@@ -15,7 +15,6 @@ public class TransportHeaderTests
     class TestMessage { }
 
     [Fact]
-    [Throws(typeof(NotSupportedException))]
     public async Task Underscore_headers_are_applied_to_basic_properties()
     {
         var channel = Substitute.For<IChannel>();

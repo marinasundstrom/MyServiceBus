@@ -20,7 +20,6 @@ public class MultipleConsumersTests
     }
 
     [Fact]
-    [Throws(typeof(InvalidOperationException))]
     public async Task Should_invoke_all_consumers()
     {
         var services = new ServiceCollection();

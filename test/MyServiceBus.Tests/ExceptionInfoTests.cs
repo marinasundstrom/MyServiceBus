@@ -7,7 +7,6 @@ namespace MyServiceBus.Tests;
 public class ExceptionInfoTests
 {
     [Fact]
-    [Throws(typeof(EqualException))]
     public void FromException_captures_details()
     {
         var inner = new InvalidOperationException("inner");

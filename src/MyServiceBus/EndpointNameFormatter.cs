@@ -22,7 +22,6 @@ public class KebabCaseEndpointNameFormatter : IEndpointNameFormatter
 {
     public static readonly KebabCaseEndpointNameFormatter Instance = new();
 
-    [Throws(typeof(ArgumentException), typeof(RegexMatchTimeoutException))]
     public string Format(Type messageType)
     {
         var name = messageType.Name;
@@ -34,7 +33,6 @@ public class SnakeCaseEndpointNameFormatter : IEndpointNameFormatter
 {
     public static readonly SnakeCaseEndpointNameFormatter Instance = new();
 
-    [Throws(typeof(ArgumentException), typeof(RegexMatchTimeoutException))]
     public string Format(Type messageType)
     {
         var name = messageType.Name;

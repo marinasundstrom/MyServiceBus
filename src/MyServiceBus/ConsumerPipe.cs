@@ -20,7 +20,6 @@ public class ConsumePipe<TMessage> : IConsumePipe
         this.pipe = pipe;
     }
 
-    [Throws(typeof(InvalidCastException))]
     public Task Send(ConsumeContext context)
     {
         return pipe.Send((ConsumeContext<TMessage>)context);
@@ -59,7 +58,6 @@ public class ConsumerFaultFilter<TConsumer, TMessage> : IFilter<ConsumeContext<T
         this.provider = provider;
     }
 
-    [Throws(typeof(Exception))]
     public async Task Send(ConsumeContext<TMessage> context, IPipe<ConsumeContext<TMessage>> next)
     {
         try

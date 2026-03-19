@@ -10,7 +10,6 @@ using Xunit;
 public class ReceiveContextFaultAddressTests
 {
     [Fact]
-    [Throws(typeof(EncoderFallbackException), typeof(UriFormatException), typeof(JsonException))]
     public void Envelope_context_reads_fault_address_from_transport_headers()
     {
         var json = Encoding.UTF8.GetBytes("{\"messageId\":\"00000000-0000-0000-0000-000000000000\",\"messageType\":[],\"message\":{}}");
@@ -24,7 +23,6 @@ public class ReceiveContextFaultAddressTests
     }
 
     [Fact]
-    [Throws(typeof(EncoderFallbackException), typeof(UriFormatException), typeof(JsonException))]
     public void Raw_context_reads_fault_address_from_transport_headers()
     {
         var json = Encoding.UTF8.GetBytes("{}");

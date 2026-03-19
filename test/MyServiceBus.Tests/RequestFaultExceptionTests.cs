@@ -10,7 +10,6 @@ public class RequestFaultExceptionTests
     }
 
     [Fact]
-    [Throws(typeof(ContainsException))]
     public void Uses_exception_type_when_message_missing()
     {
         var fault = new Fault<DummyRequest>

@@ -12,7 +12,6 @@ public class RabbitMqPublishContextTests
     class TestMessage { }
 
     [Fact]
-    [Throws(typeof(IOException))]
     public async Task Uses_context_properties()
     {
         var channel = Substitute.For<IChannel>();

@@ -27,7 +27,7 @@ The transport factory creates and caches send and receive transports. The implem
 ### Java
 - Implement the `SendTransport` and `ReceiveTransport` interfaces.
 - Use blocking send/receive operations or `CompletableFuture` if asynchronous behavior is required.
-- Wrap checked exceptions in runtime exceptions or define domain-specific exceptions.
+- Wrap transport-specific failures in runtime exceptions or define domain-specific exceptions.
 
 ## 3. Topology and Addressing
 
@@ -78,7 +78,7 @@ Understanding the contracts used during configuration helps recreate the structu
 | Send transport | Implements `ISendTransport` (`Task Send`) | Implements `SendTransport` (`void send`) |
 | Receive transport | Implements `IReceiveTransport` with async callback | Implements `ReceiveTransport` with synchronous supplier |
 | DI/configuration | Extension methods registering services | Static `configure` helpers wiring factories |
-| Exception handling | Uses `[Throws]` attributes and domain exceptions | Uses checked or runtime exceptions |
+| Exception handling | Uses typed exceptions, XML docs, and domain exceptions | Uses checked or runtime exceptions |
 
 Following these guidelines should make it straightforward to add new transports such as Azure Service Bus while maintaining parity between the C# and Java ecosystems.
 

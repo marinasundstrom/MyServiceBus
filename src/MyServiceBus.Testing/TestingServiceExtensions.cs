@@ -14,9 +14,9 @@ public static class TestingServiceExtensions
 
         services.AddSingleton<InMemoryTestHarness>();
         services.AddSingleton(typeof(IConsumerFactory<>), typeof(ScopeConsumerFactory<>));
-        services.AddSingleton<IMessageBus>([Throws(typeof(InvalidOperationException))] (sp) => sp.GetRequiredService<InMemoryTestHarness>());
-        services.AddSingleton<ITransportFactory>([Throws(typeof(InvalidOperationException))] (sp) => sp.GetRequiredService<InMemoryTestHarness>());
-        services.AddSingleton<IReceiveEndpointConnector>([Throws(typeof(InvalidOperationException), typeof(InvalidCastException))] (sp) => (IReceiveEndpointConnector)sp.GetRequiredService<IMessageBus>());
+        services.AddSingleton<IMessageBus>((sp) => sp.GetRequiredService<InMemoryTestHarness>());
+        services.AddSingleton<ITransportFactory>((sp) => sp.GetRequiredService<InMemoryTestHarness>());
+        services.AddSingleton<IReceiveEndpointConnector>((sp) => (IReceiveEndpointConnector)sp.GetRequiredService<IMessageBus>());
         services.AddScoped(typeof(IRequestClient<>), typeof(GenericRequestClient<>));
         services.AddScoped<IRequestClientFactory, RequestClientFactory>();
 

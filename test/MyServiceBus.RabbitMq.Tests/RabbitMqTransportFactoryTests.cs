@@ -29,7 +29,6 @@ public class RabbitMqTransportFactoryTests
         public void SetConsumerFactory(Type consumerFactoryType) { }
     }
     [Fact]
-    [Throws(typeof(Exception))]
     public async Task Declares_error_exchange_and_queue()
     {
         var channel = Substitute.For<IChannel>();
@@ -126,7 +125,6 @@ public class RabbitMqTransportFactoryTests
     }
 
     [Fact]
-    [Throws(typeof(Exception))]
     public async Task Passes_queue_arguments_to_queue_declare()
     {
         var channel = Substitute.For<IChannel>();
@@ -198,7 +196,6 @@ public class RabbitMqTransportFactoryTests
     }
 
     [Fact]
-    [Throws(typeof(ObjectDisposedException), typeof(OperationCanceledException))]
     public async Task Does_not_declare_error_queue_for_autodelete_endpoints()
     {
         var channel = Substitute.For<IChannel>();
@@ -287,7 +284,6 @@ public class RabbitMqTransportFactoryTests
     }
 
     [Fact]
-    [Throws(typeof(OverflowException), typeof(InvalidOperationException), typeof(OperationCanceledException), typeof(UriFormatException))]
     public async Task Supports_exchange_scheme_uri()
     {
         var channel = Substitute.For<IChannel>();
@@ -328,7 +324,6 @@ public class RabbitMqTransportFactoryTests
     }
 
     [Fact]
-    [Throws(typeof(OverflowException), typeof(InvalidOperationException), typeof(OperationCanceledException), typeof(UriFormatException))]
     public async Task Supports_queue_scheme_uri()
     {
         var channel = Substitute.For<IChannel>();

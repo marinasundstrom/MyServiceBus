@@ -19,7 +19,6 @@ public class TopologyRegistry : IBusTopology
         });
     }
 
-    [Throws(typeof(AmbiguousMatchException), typeof(TypeLoadException))]
     private MessageTopology RegisterMessage(Type messageType, string? entityName = null)
     {
         var messageTopology = new MessageTopology
@@ -31,7 +30,6 @@ public class TopologyRegistry : IBusTopology
         return messageTopology;
     }
 
-    [Throws(typeof(AmbiguousMatchException))]
     public void RegisterConsumer<TConsumer>(string queueName, Delegate? configurePipe, params Type[] messageTypes)
     {
         var bindings = messageTypes.Select(mt =>

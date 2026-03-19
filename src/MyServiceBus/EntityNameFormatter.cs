@@ -14,7 +14,6 @@ public static class EntityNameFormatter
         _formatter = formatter;
     }
 
-    [Throws(typeof(AmbiguousMatchException), typeof(TypeLoadException))]
     public static string Format(Type messageType)
     {
         var attr = messageType.GetCustomAttribute<EntityNameAttribute>();

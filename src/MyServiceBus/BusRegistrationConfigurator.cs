@@ -25,11 +25,10 @@ public class BusRegistrationConfigurator : IBusRegistrationConfigurator
         publishConfigurator.UseFilter(new OpenTelemetrySendFilter());
     }
 
-    [Throws(typeof(InvalidOperationException), typeof(TargetInvocationException), typeof(NotSupportedException), typeof(RegexMatchTimeoutException), typeof(AmbiguousMatchException))]
     public void AddConsumer<TConsumer>() where TConsumer : class, IConsumer
     {
         Services.AddScoped<TConsumer>();
-        Services.AddScoped<IConsumer, TConsumer>([Throws(typeof(InvalidOperationException))] (sp) => sp.GetRequiredService<TConsumer>());
+        Services.AddScoped<IConsumer, TConsumer>((sp) => sp.GetRequiredService<TConsumer>());
 
         var messageType = GetHandledMessageTypes(typeof(TConsumer)).First();
 
@@ -40,13 +39,12 @@ public class BusRegistrationConfigurator : IBusRegistrationConfigurator
       );
     }
 
-    [Throws(typeof(InvalidOperationException), typeof(RegexMatchTimeoutException), typeof(AmbiguousMatchException))]
     public void AddConsumer<TConsumer, TMessage>(Action<PipeConfigurator<ConsumeContext<TMessage>>>? configure = null)
         where TConsumer : class, IConsumer<TMessage>
         where TMessage : class
     {
         Services.AddScoped<TConsumer>();
-        Services.AddScoped<IConsumer, TConsumer>([Throws(typeof(InvalidOperationException))] (sp) => sp.GetRequiredService<TConsumer>());
+        Services.AddScoped<IConsumer, TConsumer>((sp) => sp.GetRequiredService<TConsumer>());
 
         _topology.RegisterConsumer<TConsumer>(
             queueName: KebabCaseEndpointNameFormatter.Instance.Format(typeof(TMessage)),
@@ -54,7 +52,6 @@ public class BusRegistrationConfigurator : IBusRegistrationConfigurator
             messageTypes: typeof(TMessage));
     }
 
-    [Throws(typeof(InvalidOperationException), typeof(TargetInvocationException), typeof(NotSupportedException), typeof(OverflowException), typeof(ReflectionTypeLoadException), typeof(TargetException), typeof(TargetParameterCountException), typeof(MethodAccessException))]
     public void AddConsumers(params Assembly[] assemblies)
     {
         var consumerTypes = assemblies
@@ -91,7 +88,6 @@ public class BusRegistrationConfigurator : IBusRegistrationConfigurator
         serializerType = typeof(TSerializer);
     }
 
-    [Throws(typeof(TargetInvocationException), typeof(NotSupportedException), typeof(InvalidOperationException))]
     private static Type[] GetHandledMessageTypes(Type consumerType)
     {
         return consumerType
@@ -117,6 +113,6 @@ public class BusRegistrationConfigurator : IBusRegistrationConfigurator
         Services.AddScoped<ConsumeContextProvider>();
         Services.AddScoped<ISendEndpointProvider, SendEndpointProvider>();
         Services.AddScoped<IPublishEndpointProvider, PublishEndpointProvider>();
-        Services.AddScoped<IPublishEndpoint>([Throws(typeof(InvalidOperationException))] (sp) => sp.GetRequiredService<IPublishEndpointProvider>().GetPublishEndpoint());
+        Services.AddScoped<IPublishEndpoint>((sp) => sp.GetRequiredService<IPublishEndpointProvider>().GetPublishEndpoint());
     }
 }

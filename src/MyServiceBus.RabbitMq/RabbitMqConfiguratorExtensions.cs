@@ -7,7 +7,6 @@ using System.Reflection;
 
 public static class RabbitMqConfiguratorExtensions
 {
-    [Throws(typeof(InvalidOperationException))]
     public static void ConfigureEndpoints(this IRabbitMqFactoryConfigurator configurator, IBusRegistrationContext context)
     {
         var registry = context.ServiceProvider.GetRequiredService<TopologyRegistry>();
@@ -21,7 +20,7 @@ public static class RabbitMqConfiguratorExtensions
 
             try
             {
-                configurator.ReceiveEndpoint(queueName, [Throws(typeof(AmbiguousMatchException), typeof(InvalidOperationException))] (endpoint) =>
+                configurator.ReceiveEndpoint(queueName, (endpoint) =>
                 {
                     var method = typeof(ReceiveEndpointConfigurator)
                         .GetMethod("ConfigureConsumer")!

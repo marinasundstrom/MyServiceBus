@@ -26,7 +26,6 @@ public class FilterDiTests
     }
 
     [Fact]
-    [Throws(typeof(InvalidOperationException), typeof(MissingMethodException))]
     public async Task Resolves_filter_from_service_provider()
     {
         var services = new ServiceCollection();

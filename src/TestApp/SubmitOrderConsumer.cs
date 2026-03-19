@@ -14,7 +14,6 @@ class SubmitOrderConsumer :
         _logger = logger;
     }
 
-    [Throws(typeof(SecurityException))]
     public async Task Consume(ConsumeContext<SubmitOrder> context)
     {
         _logger.LogInformation("📨 Received SubmitOrder {OrderId} from {Message} ✅", context.Message.OrderId, context.Message.Message);

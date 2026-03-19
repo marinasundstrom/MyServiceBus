@@ -15,7 +15,6 @@ public class OpenTelemetryFilterTests
     class TestMessage { }
 
     [Fact]
-    [Throws(typeof(TrueException))]
     public async Task Send_filter_adds_traceparent_header()
     {
         using var listener = new ActivityListener
@@ -36,7 +35,6 @@ public class OpenTelemetryFilterTests
     }
 
     [Fact]
-    [Throws(typeof(System.Text.Json.JsonException), typeof(UriFormatException), typeof(EncoderFallbackException))]
     public async Task Consume_filter_uses_parent_trace()
     {
         using var listener = new ActivityListener
@@ -79,7 +77,6 @@ public class OpenTelemetryFilterTests
 
     class StubTransportFactory : ITransportFactory
     {
-        [Throws(typeof(InvalidOperationException))]
         public Task<ISendTransport> GetSendTransport(System.Uri address, CancellationToken cancellationToken = default) => Task.FromResult<ISendTransport>(new StubSendTransport());
         public Task<IReceiveTransport> CreateReceiveTransport(ReceiveEndpointTopology topology, Func<ReceiveContext, Task> handler, Func<string?, bool>? isMessageTypeRegistered = null, CancellationToken cancellationToken = default) => Task.FromResult<IReceiveTransport>(new StubReceiveTransport());
 

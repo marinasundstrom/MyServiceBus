@@ -14,7 +14,6 @@ class TestRequestConsumer :
         _logger = logger;
     }
 
-    [Throws(typeof(InvalidOperationException))]
     public async Task Consume(ConsumeContext<TestRequest> context)
     {
         var message = context.Message.Message;

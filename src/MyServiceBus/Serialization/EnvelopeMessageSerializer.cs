@@ -11,7 +11,6 @@ public class EnvelopeMessageSerializer : IMessageSerializer
         WriteIndented = false
     };
 
-    [Throws(typeof(NotSupportedException), typeof(ArgumentException))]
     public Task<byte[]> SerializeAsync<T>(MessageSerializationContext<T> context) where T : class
     {
         context.Headers["content_type"] = "application/vnd.masstransit+json";

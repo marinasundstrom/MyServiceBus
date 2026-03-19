@@ -6,7 +6,7 @@ MyServiceBus adopts a unified cross-language approach to reporting and handling 
 
 - **MassTransit alignment with added clarity**: follow MassTransit's distinction between retryable and non-retryable faults, but validate inputs early and throw well-named exceptions for misconfiguration or illegal arguments.
 - **Documented public API**: every public method lists the exceptions it can raise, and only domain-specific or well-understood framework exceptions escape to callers.
-- **Platform idioms**: C# surfaces errors via typed exceptions and `[Throws]` attributes, while Java uses checked exceptions (`throws` clauses) when callers are expected to recover.
+- **Platform idioms**: C# surfaces errors via typed exceptions and XML documentation for notable public exceptions, while Java uses `throws` clauses when callers are expected to recover.
 
 ## Exception taxonomy
 
@@ -32,8 +32,7 @@ MyServiceBus adopts a unified cross-language approach to reporting and handling 
 - Examples in [`feature-walkthrough.md`](feature-walkthrough.md) illustrate recovery patterns.
 - Run `dotnet test` and `./gradlew test` to verify behavior across languages.
 
-## Checked exceptions and parity
+## Cross-language parity
 
-- C# uses the CheckedExceptions analyzer to emulate Java's checked exception model; see [`checked-exceptions-guidelines.md`](checked-exceptions-guidelines.md).
-- Java relies on built-in checked exceptions. Use checked exceptions when callers can act on the failure and runtime exceptions for programming errors.
-
+- C# does not emulate Java's compile-time exception declarations. Catch and translate exceptions where it improves the API, and document notable public exceptions in XML docs.
+- Java relies on language-level exception declarations. Use them when callers can act on the failure and runtime exceptions for programming errors.

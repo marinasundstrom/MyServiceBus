@@ -14,7 +14,6 @@ public class ScopeConsumerFactory<TConsumer> : IConsumerFactory<TConsumer>
         this.provider = provider;
     }
 
-    [Throws(typeof(Exception))]
     public async Task Send<TMessage>(ConsumeContext<TMessage> context,
         IPipe<ConsumerConsumeContext<TConsumer, TMessage>> next) where TMessage : class
     {

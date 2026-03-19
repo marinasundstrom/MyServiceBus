@@ -52,7 +52,6 @@ Unlike most Java messaging solutions, MyServiceBus does **not require a framewor
 - Fault and error handling semantics aligned with MassTransit
 - Middleware / pipeline behaviors
 - OpenTelemetry support
-- Annotated for use with the [CheckedExceptions](https://github.com/marinasundstrom/CheckedExceptions) analyzer
 - Java and C# implementations with aligned semantics
 
 ---

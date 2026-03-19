@@ -25,7 +25,6 @@ public class InMemoryHarnessDiTests
     }
 
     [Fact]
-    [Throws(typeof(InvalidOperationException), typeof(TrueException))]
     public async Task Should_resolve_consumer_from_di()
     {
         var services = new ServiceCollection();
@@ -47,7 +46,6 @@ public class InMemoryHarnessDiTests
     }
 
     [Fact]
-    [Throws(typeof(InvalidOperationException), typeof(RequestFaultException))]
     public async Task Should_resolve_request_client()
     {
         var services = new ServiceCollection();
@@ -71,7 +69,6 @@ public class InMemoryHarnessDiTests
     }
 
     [Fact]
-    [Throws(typeof(InvalidOperationException), typeof(RequestFaultException), typeof(UriFormatException), typeof(AmbiguousMatchException), typeof(TypeLoadException))]
     public async Task Should_create_request_client_from_factory()
     {
         var services = new ServiceCollection();

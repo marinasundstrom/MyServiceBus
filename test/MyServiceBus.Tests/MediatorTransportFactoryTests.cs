@@ -34,7 +34,6 @@ public class MediatorTransportFactoryTests
     {
         public static TaskCompletionSource<ConsumerMessage> Received = new();
 
-        [Throws(typeof(ObjectDisposedException))]
         public Task Consume(ConsumeContext<ConsumerMessage> context)
         {
             Received.TrySetResult(context.Message);
@@ -46,7 +45,6 @@ public class MediatorTransportFactoryTests
     {
         public static TaskCompletionSource<ConsumerMessage> Received = new();
 
-        [Throws(typeof(ObjectDisposedException))]
         public override Task Handle(ConsumerMessage message, CancellationToken cancellationToken)
         {
             Received.TrySetResult(message);
@@ -58,7 +56,6 @@ public class MediatorTransportFactoryTests
     {
         public static TaskCompletionSource<CancellationToken> ReceivedToken = new();
 
-        [Throws(typeof(ObjectDisposedException))]
         public override Task<ResponseMessage> Handle(RequestMessage message, CancellationToken cancellationToken)
         {
             ReceivedToken.TrySetResult(cancellationToken);
@@ -78,7 +75,6 @@ public class MediatorTransportFactoryTests
             CancellationToken = cancellationToken;
         }
 
-        [Throws(typeof(ObjectDisposedException))]
         public Task RespondAsync<TResponse>(TResponse message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default) where TResponse : class
         {
             Response.TrySetResult(message);
@@ -117,7 +113,6 @@ public class MediatorTransportFactoryTests
     }
 
     [Fact]
-    [Throws(typeof(EqualException), typeof(Exception))]
     public async Task Send_Invokes_RegisteredHandler()
     {
         var factory = new MediatorTransportFactory();
@@ -129,7 +124,7 @@ public class MediatorTransportFactoryTests
             RoutingKey = ""
         };
 
-        var receive = await factory.CreateReceiveTransport(topology, [Throws(typeof(InvalidOperationException))] (ctx) =>
+        var receive = await factory.CreateReceiveTransport(topology, (ctx) =>
         {
             ctx.TryGetMessage<SampleMessage>(out var msg);
             tcs.SetResult(msg!);
@@ -156,7 +151,6 @@ public class MediatorTransportFactoryTests
     }
 
     [Fact]
-    [Throws(typeof(EqualException), typeof(Exception))]
     public async Task Publish_delivers_message_to_registered_consumer()
     {
         var services = new ServiceCollection();
@@ -184,7 +178,6 @@ public class MediatorTransportFactoryTests
     }
 
     [Fact]
-    [Throws(typeof(EqualException), typeof(Exception))]
     public async Task Publish_delivers_message_to_registered_handler()
     {
         var services = new ServiceCollection();
@@ -212,7 +205,6 @@ public class MediatorTransportFactoryTests
     }
 
     [Fact]
-    [Throws(typeof(EqualException), typeof(Exception))]
     public async Task Handler_with_result_responds()
     {
         ResponseHandler.ReceivedToken = new TaskCompletionSource<CancellationToken>();

@@ -20,7 +20,6 @@ public sealed class RabbitMqTransportFactory : ITransportFactory
         _prefetchCount = configurator.PrefetchCount;
     }
 
-    [Throws(typeof(OverflowException), typeof(InvalidOperationException), typeof(OperationCanceledException))]
     public async Task<ISendTransport> GetSendTransport(Uri address, CancellationToken cancellationToken = default)
     {
         string? exchange = null;
@@ -180,7 +179,6 @@ public sealed class RabbitMqTransportFactory : ITransportFactory
         return sendTransport;
     }
 
-    [Throws(typeof(ObjectDisposedException), typeof(OperationCanceledException))]
     public async Task<IReceiveTransport> CreateReceiveTransport(
         ReceiveEndpointTopology topology,
         Func<ReceiveContext, Task> handler,
@@ -303,7 +301,6 @@ public sealed class RabbitMqTransportFactory : ITransportFactory
         return new RabbitMqReceiveTransport(channel, topology.QueueName, handler, hasErrorQueue, isMessageTypeRegistered);
     }
 
-    [Throws(typeof(OverflowException))]
     private static void ParseExchangeSettings(string? queryString, ref bool durable, ref bool autoDelete)
     {
         if (string.IsNullOrEmpty(queryString))

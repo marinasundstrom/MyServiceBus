@@ -29,7 +29,6 @@ public class MultipleConsumersFaultTests
     }
 
     [Fact]
-    [Throws(typeof(InvalidOperationException))]
     public async Task Should_stop_after_first_consumer_faults()
     {
         FirstConsumer.Calls = 0;

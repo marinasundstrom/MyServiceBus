@@ -8,7 +8,6 @@ using Xunit.Sdk;
 public class SendEndpointProviderDiTests
 {
     [Fact]
-    [Throws(typeof(NotNullException), typeof(InvalidOperationException), typeof(UriFormatException))]
     public async Task Should_resolve_send_endpoint_provider()
     {
         var services = new ServiceCollection();

@@ -19,12 +19,10 @@ public class HeaderEncodingTests
 
     class FaultingConsumer : IConsumer<TestMessage>
     {
-        [Throws(typeof(InvalidOperationException))]
         public Task Consume(ConsumeContext<TestMessage> context) => throw new InvalidOperationException("boom");
     }
 
     [Fact]
-    [Throws(typeof(UriFormatException), typeof(ArgumentException), typeof(InvalidOperationException), typeof(JsonException))]
     public async Task Faulted_message_headers_include_mt_prefix()
     {
         var channel = Substitute.For<IChannel>();
@@ -66,7 +64,7 @@ public class HeaderEncodingTests
         configurator.UseFilter(new ConsumerMessageFilter<FaultingConsumer, TestMessage>(factory));
         var pipe = new ConsumePipe<TestMessage>(configurator.Build());
 
-        await Should.ThrowAsync<InvalidOperationException>([Throws(typeof(InvalidCastException))] () => pipe.Send(consumeContext));
+        await Should.ThrowAsync<InvalidOperationException>(() => pipe.Send(consumeContext));
 
         captured.ShouldNotBeNull();
         captured!.Headers.ShouldContainKey("MT-Host-MachineName");

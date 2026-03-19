@@ -39,12 +39,10 @@ public class DefaultConsumeContext<TMessage> : BasePipeContext, ConsumeContext<T
         return Task.CompletedTask;
     }
 
-    [Throws(typeof(InvalidCastException))]
     public Task Send<T>(Uri address, T message, Action<ISendContext>? contextCallback = null,
         CancellationToken cancellationToken = default) where T : class
         => Send<T>(address, (object)message!, contextCallback, cancellationToken);
 
-    [Throws(typeof(InvalidOperationException))]
     public async Task Send<T>(Uri address, object message, Action<ISendContext>? contextCallback = null,
         CancellationToken cancellationToken = default) where T : class
     {
@@ -55,11 +53,9 @@ public class DefaultConsumeContext<TMessage> : BasePipeContext, ConsumeContext<T
         await endpoint.Send<T>(message, contextCallback, cancellationToken).ConfigureAwait(false);
     }
 
-    [Throws(typeof(InvalidCastException))]
     public Task Forward<T>(Uri address, T message, CancellationToken cancellationToken = default) where T : class
         => Forward<T>(address, (object)message!, cancellationToken);
 
-    [Throws(typeof(InvalidOperationException))]
     public async Task Forward<T>(Uri address, object message, CancellationToken cancellationToken = default) where T : class
     {
         if (sendEndpointProvider == null)
@@ -69,7 +65,6 @@ public class DefaultConsumeContext<TMessage> : BasePipeContext, ConsumeContext<T
         await endpoint.Send<T>(message, null, cancellationToken).ConfigureAwait(false);
     }
 
-    [Throws(typeof(InvalidOperationException))]
     public Task<ISendEndpoint> GetSendEndpoint(Uri uri)
     {
         if (sendEndpointProvider == null)

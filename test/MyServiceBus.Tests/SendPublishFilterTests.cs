@@ -22,16 +22,13 @@ public class SendPublishFilterTests
     {
         public readonly CaptureSendTransport Transport = new();
 
-        [Throws(typeof(InvalidOperationException))]
         public Task<ISendTransport> GetSendTransport(Uri address, CancellationToken cancellationToken = default)
             => Task.FromResult<ISendTransport>(Transport);
-        [Throws(typeof(NotImplementedException))]
         public Task<IReceiveTransport> CreateReceiveTransport(ReceiveEndpointTopology topology, Func<ReceiveContext, Task> handler, Func<string?, bool>? isMessageTypeRegistered = null, CancellationToken cancellationToken = default)
             => throw new NotImplementedException();
     }
 
     [Fact]
-    [Throws(typeof(UriFormatException), typeof(InvalidOperationException), typeof(TrueException))]
     public async Task Executes_send_and_publish_filters()
     {
         var sendExecuted = false;

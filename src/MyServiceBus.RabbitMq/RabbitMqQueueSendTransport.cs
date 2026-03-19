@@ -17,7 +17,6 @@ public sealed class RabbitMqQueueSendTransport : ISendTransport
         _queue = queue;
     }
 
-    [Throws(typeof(IOException))]
     public async Task Send<T>(T message, SendContext context, CancellationToken cancellationToken = default)
         where T : class
     {

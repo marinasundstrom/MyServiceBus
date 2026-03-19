@@ -23,7 +23,6 @@ public class RabbitMqFactoryConfiguratorTests
 
     class TestMessageBus : IMessageBus
     {
-        [Throws(typeof(UriFormatException))]
         public Uri Address => new("loopback://localhost/");
         public IBusTopology Topology => new TopologyRegistry();
         public Task StartAsync(CancellationToken cancellationToken) => Task.CompletedTask;
@@ -93,7 +92,6 @@ public class RabbitMqFactoryConfiguratorTests
     }
 
     [Fact]
-    [Throws(typeof(EqualException), typeof(Exception))]
     public void ReceiveEndpoint_overrides_queue_and_exchange()
     {
         var registry = new TopologyRegistry();
@@ -106,8 +104,8 @@ public class RabbitMqFactoryConfiguratorTests
         var context = new TestBusRegistrationContext(provider);
 
         var configurator = new TestRabbitMqFactoryConfigurator();
-        configurator.Message<MyMessage>([Throws(typeof(NotSupportedException))] (m) => m.SetEntityName("custom-exchange"));
-        configurator.ReceiveEndpoint("custom-queue", [Throws(typeof(InvalidOperationException))] (e) => e.ConfigureConsumer<MyConsumer>(context));
+        configurator.Message<MyMessage>((m) => m.SetEntityName("custom-exchange"));
+        configurator.ReceiveEndpoint("custom-queue", (e) => e.ConfigureConsumer<MyConsumer>(context));
 
         var def = registry.Consumers.First(c => c.ConsumerType == typeof(MyConsumer));
         Assert.Equal("custom-queue", def.QueueName);
@@ -120,7 +118,6 @@ public class RabbitMqFactoryConfiguratorTests
     }
 
     [Fact]
-    [Throws(typeof(EqualException), typeof(Exception))]
     public void Message_uses_entity_name_formatter()
     {
         var registry = new TopologyRegistry();
@@ -141,7 +138,6 @@ public class RabbitMqFactoryConfiguratorTests
     }
 
     [Fact]
-    [Throws(typeof(NotNullException), typeof(Exception))]
     public void ReceiveEndpoint_adds_message_retry()
     {
         var registry = new TopologyRegistry();
@@ -154,7 +150,7 @@ public class RabbitMqFactoryConfiguratorTests
         var context = new TestBusRegistrationContext(provider);
 
         var configurator = new TestRabbitMqFactoryConfigurator();
-        configurator.ReceiveEndpoint("custom-queue", [Throws(typeof(InvalidOperationException))] (e) =>
+        configurator.ReceiveEndpoint("custom-queue", (e) =>
         {
             e.UseMessageRetry(r => r.Immediate(2));
             e.ConfigureConsumer<MyConsumer>(context);
@@ -165,7 +161,6 @@ public class RabbitMqFactoryConfiguratorTests
     }
 
     [Fact]
-    [Throws(typeof(EqualException), typeof(Exception))]
     public void ReceiveEndpoint_sets_queue_arguments()
     {
         var registry = new TopologyRegistry();
@@ -194,7 +189,6 @@ public class RabbitMqFactoryConfiguratorTests
     }
 
     [Fact]
-    [Throws(typeof(EqualException), typeof(Exception))]
     public void ConfigureEndpoints_uses_formatter()
     {
         var registry = new TopologyRegistry();

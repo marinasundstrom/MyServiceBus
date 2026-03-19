@@ -15,7 +15,6 @@ using Xunit.Sdk;
 public class ConsumeContextTests
 {
     [Fact]
-    [Throws(typeof(EqualException))]
     public async Task Passes_Message_Through_Pipeline()
     {
         var collected = new List<string>();
@@ -34,7 +33,6 @@ public class ConsumeContextTests
     }
 
     [Fact]
-    [Throws(typeof(EncoderFallbackException), typeof(JsonException), typeof(UriFormatException))]
     public void ConsumeContext_uses_receive_cancellation_token()
     {
         var cts = new CancellationTokenSource();
@@ -61,7 +59,6 @@ public class ConsumeContextTests
     }
 
     [Fact]
-    [Throws(typeof(UriFormatException), typeof(EncoderFallbackException), typeof(InvalidOperationException), typeof(JsonException))]
     public async Task Publish_uses_exchange_uri()
     {
         var json = Encoding.UTF8.GetBytes("{\"messageId\":\"00000000-0000-0000-0000-000000000000\",\"messageType\":[],\"message\":{}}");
@@ -85,7 +82,6 @@ public class ConsumeContextTests
     }
 
     [Fact]
-    [Throws(typeof(UriFormatException), typeof(EncoderFallbackException), typeof(JsonException))]
     public async Task Forward_uses_queue_uri()
     {
         var json = Encoding.UTF8.GetBytes("{\"messageId\":\"00000000-0000-0000-0000-000000000000\",\"messageType\":[],\"message\":{}}");
@@ -107,7 +103,6 @@ public class ConsumeContextTests
     }
 
     [Fact]
-    [Throws(typeof(UriFormatException), typeof(EncoderFallbackException), typeof(JsonException))]
     public async Task Send_uses_queue_uri()
     {
         var json = Encoding.UTF8.GetBytes("{\"messageId\":\"00000000-0000-0000-0000-000000000000\",\"messageType\":[],\"message\":{}}");
@@ -129,7 +124,6 @@ public class ConsumeContextTests
     }
 
     [Fact]
-    [Throws(typeof(UriFormatException), typeof(EncoderFallbackException), typeof(InvalidOperationException), typeof(JsonException))]
     public async Task Respond_uses_response_address()
     {
         var json = Encoding.UTF8.GetBytes("{\"messageId\":\"00000000-0000-0000-0000-000000000000\",\"messageType\":[],\"responseAddress\":\"queue:response\",\"message\":{}}");
@@ -157,14 +151,12 @@ public class ConsumeContextTests
         public Uri? Address { get; private set; }
         public SendContext? Context { get; private set; }
 
-        [Throws(typeof(InvalidOperationException))]
         public Task<ISendTransport> GetSendTransport(Uri address, CancellationToken cancellationToken = default)
         {
             Address = address;
             return Task.FromResult<ISendTransport>(new StubSendTransport(this));
         }
 
-        [Throws(typeof(NotImplementedException))]
         public Task<IReceiveTransport> CreateReceiveTransport(
             ReceiveEndpointTopology topology,
             Func<ReceiveContext, Task> handler,
@@ -191,11 +183,9 @@ public class ConsumeContextTests
 
     class StubTransportFactory : ITransportFactory
     {
-        [Throws(typeof(NotImplementedException), typeof(InvalidOperationException))]
         public Task<ISendTransport> GetSendTransport(Uri address, CancellationToken cancellationToken = default)
             => throw new NotImplementedException();
 
-        [Throws(typeof(NotImplementedException))]
         public Task<IReceiveTransport> CreateReceiveTransport(
             ReceiveEndpointTopology topology,
             Func<ReceiveContext, Task> handler,

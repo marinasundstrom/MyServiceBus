@@ -89,7 +89,6 @@ public class UnknownMessageTypeTests
     }
 
     [Fact]
-    [Throws(typeof(UriFormatException), typeof(AmbiguousMatchException))]
     public async Task Logs_warning_for_unregistered_message_type()
     {
         var logger = new ListLogger<MessageBus>();
@@ -103,7 +102,6 @@ public class UnknownMessageTypeTests
         var context = new TestReceiveContext(new object(), "urn:message:Unknown");
         var method = typeof(MessageBus).GetMethod("HandleMessageAsync", BindingFlags.Instance | BindingFlags.NonPublic);
         await Should.NotThrowAsync(
-            [Throws(typeof(TargetException), typeof(TargetInvocationException), typeof(TargetParameterCountException), typeof(MethodAccessException))]
         () => (Task)method!.Invoke(bus, new object[] { "test-queue", context })!);
 
         Assert.Contains(LogLevel.Warning, logger.Levels);

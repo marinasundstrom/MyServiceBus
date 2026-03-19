@@ -27,7 +27,6 @@ public class SendEndpointAddressTests
     {
         public readonly CaptureSendTransport Transport = new();
 
-        [Throws(typeof(InvalidOperationException))]
         public Task<ISendTransport> GetSendTransport(Uri address, CancellationToken cancellationToken = default)
         {
             return Task.FromResult<ISendTransport>(Transport);
@@ -38,7 +37,6 @@ public class SendEndpointAddressTests
     }
 
     [Fact]
-    [Throws(typeof(UriFormatException))]
     public async Task SendEndpoint_sets_source_and_destination_addresses()
     {
         var factory = new StubTransportFactory();

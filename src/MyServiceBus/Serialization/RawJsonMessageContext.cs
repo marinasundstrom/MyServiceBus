@@ -10,7 +10,6 @@ public class RawJsonMessageContext : IMessageContext
     private readonly Dictionary<Type, object> _messageCache = new();
     private readonly IDictionary<string, object> _transportHeaders;
 
-    [Throws(typeof(JsonException), typeof(ArgumentException))]
     public RawJsonMessageContext(byte[] jsonBytes, IDictionary<string, object> transportHeaders)
     {
         _jsonDocument = JsonDocument.Parse(jsonBytes);
@@ -40,7 +39,6 @@ public class RawJsonMessageContext : IMessageContext
     public Uri? FaultAddress { get; }
     public DateTimeOffset SentTime { get; }
 
-    [Throws(typeof(ObjectDisposedException))]
     public bool TryGetMessage<T>(out T? message) where T : class
     {
         if (_messageCache.TryGetValue(typeof(T), out var cached))

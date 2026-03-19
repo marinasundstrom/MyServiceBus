@@ -16,11 +16,10 @@ public class PipeConfigurator<TContext>
         filters.Add(_ => filter);
     }
 
-    [Throws(typeof(MissingMethodException))]
     public void UseFilter<TFilter>()
         where TFilter : class, IFilter<TContext>
     {
-        filters.Add([Throws(typeof(MissingMethodException))] (provider) => provider != null
+        filters.Add((provider) => provider != null
                 ? (IFilter<TContext>)ActivatorUtilities.GetServiceOrCreateInstance(provider, typeof(TFilter))
                 : Activator.CreateInstance<TFilter>()!);
     }

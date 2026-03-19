@@ -20,7 +20,6 @@ public class PublishingServiceTests
     }
 
     [Fact]
-    [Throws(typeof(InvalidOperationException), typeof(ArgumentException))]
     public async Task Should_publish_message_from_service()
     {
         var services = new ServiceCollection();

@@ -22,12 +22,10 @@ public class FaultQueueTests
 
     class FaultingConsumer : IConsumer<TestMessage>
     {
-        [Throws(typeof(InvalidOperationException))]
         public Task Consume(ConsumeContext<TestMessage> context) => throw new InvalidOperationException("boom");
     }
 
     [Fact]
-    [Throws(typeof(UriFormatException), typeof(JsonException), typeof(ArgumentException), typeof(KeyNotFoundException))]
     public async Task Sends_fault_to_fault_queue_when_consumer_faults()
     {
         var services = new ServiceCollection();
@@ -64,7 +62,6 @@ public class FaultQueueTests
     }
 
     [Fact]
-    [Throws(typeof(UriFormatException), typeof(JsonException), typeof(ArgumentException), typeof(KeyNotFoundException), typeof(FileNotFoundException))]
     public async Task Sends_fault_to_fault_queue_when_handler_faults()
     {
         var services = new ServiceCollection();
@@ -120,7 +117,6 @@ public class FaultQueueTests
     {
         public readonly Dictionary<Uri, CaptureSendTransport> Transports = new();
 
-        [Throws(typeof(InvalidOperationException))]
         public Task<ISendTransport> GetSendTransport(Uri address, CancellationToken cancellationToken = default)
         {
             if (!Transports.TryGetValue(address, out var transport))
@@ -131,7 +127,6 @@ public class FaultQueueTests
             return Task.FromResult<ISendTransport>(transport);
         }
 
-        [Throws(typeof(NotImplementedException))]
         public Task<IReceiveTransport> CreateReceiveTransport(ReceiveEndpointTopology topology, Func<ReceiveContext, Task> handler, Func<string?, bool>? isMessageTypeRegistered = null, CancellationToken cancellationToken = default)
             => throw new NotImplementedException();
     }

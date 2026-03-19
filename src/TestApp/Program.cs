@@ -26,7 +26,7 @@ builder.Services.AddServiceBus(x =>
     x.AddConsumer<TestRequestConsumer>();
     x.AddConsumer<SubmitOrderFaultConsumer>();
 
-    x.UsingRabbitMq([Throws(typeof(InvalidOperationException), typeof(SecurityException))] (context, cfg) =>
+    x.UsingRabbitMq((context, cfg) =>
     {
         var rabbitMqHost = Environment.GetEnvironmentVariable("RABBITMQ_HOST") ?? "localhost";
 
@@ -102,7 +102,7 @@ app.MapPost("/publish", async (IPublishEndpoint publishEndpoint, CancellationTok
 .WithTags("Test");
 */
 
-app.MapGet("/publish", [Throws(typeof(Exception))] async (IMessageBus messageBus, ILogger<Program> logger, CancellationToken cancellationToken = default) =>
+app.MapGet("/publish", async (IMessageBus messageBus, ILogger<Program> logger, CancellationToken cancellationToken = default) =>
 {
     var message = new SubmitOrder() { OrderId = Guid.NewGuid(), Message = DemoScenario.CreateSubmitMessage("csharp", shouldFault: false) };
     try
@@ -119,7 +119,7 @@ app.MapGet("/publish", [Throws(typeof(Exception))] async (IMessageBus messageBus
 .WithName("Test_Publish")
 .WithTags("Test");
 
-app.MapGet("/publish/fault", [Throws(typeof(Exception))] async (IMessageBus messageBus, ILogger<Program> logger, CancellationToken cancellationToken = default) =>
+app.MapGet("/publish/fault", async (IMessageBus messageBus, ILogger<Program> logger, CancellationToken cancellationToken = default) =>
 {
     var message = new SubmitOrder() { OrderId = Guid.NewGuid(), Message = DemoScenario.CreateSubmitMessage("csharp", shouldFault: true) };
     try
@@ -136,7 +136,7 @@ app.MapGet("/publish/fault", [Throws(typeof(Exception))] async (IMessageBus mess
 .WithName("Test_PublishFault")
 .WithTags("Test");
 
-app.MapGet("/send", [Throws(typeof(Exception))] async (ISendEndpointProvider sendEndpointProvider, ILogger<Program> logger, CancellationToken cancellationToken = default) =>
+app.MapGet("/send", async (ISendEndpointProvider sendEndpointProvider, ILogger<Program> logger, CancellationToken cancellationToken = default) =>
 {
     var sendEndpoint = await sendEndpointProvider.GetSendEndpoint(new Uri("rabbitmq://localhost/submit-order"));
     var message = new SubmitOrder { OrderId = Guid.NewGuid(), Message = DemoScenario.CreateSubmitMessage("csharp", shouldFault: false) };
@@ -154,7 +154,7 @@ app.MapGet("/send", [Throws(typeof(Exception))] async (ISendEndpointProvider sen
 .WithName("Test_Send")
 .WithTags("Test");
 
-app.MapGet("/send/fault", [Throws(typeof(Exception))] async (ISendEndpointProvider sendEndpointProvider, ILogger<Program> logger, CancellationToken cancellationToken = default) =>
+app.MapGet("/send/fault", async (ISendEndpointProvider sendEndpointProvider, ILogger<Program> logger, CancellationToken cancellationToken = default) =>
 {
     var sendEndpoint = await sendEndpointProvider.GetSendEndpoint(new Uri("rabbitmq://localhost/submit-order"));
     var message = new SubmitOrder { OrderId = Guid.NewGuid(), Message = DemoScenario.CreateSubmitMessage("csharp", shouldFault: true) };
@@ -209,7 +209,7 @@ app.MapGet("/request/fault", async Task<Results<Ok<string>, InternalServerError<
 .WithTags("Test");
 
 
-app.MapGet("/request_multi", [Throws(typeof(RequestFaultException))] async Task<Results<Ok<string>, InternalServerError<string>, NoContent>> (IRequestClient<TestRequest> client, ILogger<Program> logger, CancellationToken cancellationToken = default) =>
+app.MapGet("/request_multi", async Task<Results<Ok<string>, InternalServerError<string>, NoContent>> (IRequestClient<TestRequest> client, ILogger<Program> logger, CancellationToken cancellationToken = default) =>
 {
     var message = new TestRequest() { Message = DemoScenario.CreateRequestMessage("csharp", shouldFault: false) };
     var response = await client.GetResponseAsync<TestResponse, Fault<TestRequest>>(message, null, cancellationToken);
@@ -231,7 +231,7 @@ app.MapGet("/request_multi", [Throws(typeof(RequestFaultException))] async Task<
 .WithName("Test_RequestMulti")
 .WithTags("Test");
 
-app.MapGet("/request_multi/fault", [Throws(typeof(RequestFaultException))] async Task<Results<Ok<string>, InternalServerError<string>, NoContent>> (IRequestClient<TestRequest> client, ILogger<Program> logger, CancellationToken cancellationToken = default) =>
+app.MapGet("/request_multi/fault", async Task<Results<Ok<string>, InternalServerError<string>, NoContent>> (IRequestClient<TestRequest> client, ILogger<Program> logger, CancellationToken cancellationToken = default) =>
 {
     var message = new TestRequest() { Message = DemoScenario.CreateRequestMessage("csharp", shouldFault: true) };
     var response = await client.GetResponseAsync<TestResponse, Fault<TestRequest>>(message, null, cancellationToken);
@@ -270,7 +270,6 @@ public class HostedService : IHostedService
         this.messageBus = messageBus;
     }
 
-    [Throws(typeof(ObjectDisposedException))]
     public async Task StartAsync(CancellationToken cancellationToken)
     {
         try

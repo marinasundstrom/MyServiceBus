@@ -36,13 +36,11 @@ public class SendAnonymousInterfaceTests
         public Task<ISendTransport> GetSendTransport(Uri address, CancellationToken cancellationToken = default)
             => Task.FromResult<ISendTransport>(Transport);
 
-        [Throws(typeof(NotImplementedException))]
         public Task<IReceiveTransport> CreateReceiveTransport(ReceiveEndpointTopology topology, Func<ReceiveContext, Task> handler, Func<string?, bool>? isMessageTypeRegistered = null, CancellationToken cancellationToken = default)
             => throw new NotImplementedException();
     }
 
     [Fact]
-    [Throws(typeof(UriFormatException), typeof(IsAssignableFromException))]
     public async Task Should_send_anonymous_object_as_interface()
     {
         var factory = new StubTransportFactory();
