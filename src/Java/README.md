@@ -55,6 +55,41 @@ Run multiple instances by changing `HTTP_PORT` (e.g., 5301 and 5302).
 - `RABBITMQ_HOST`: RabbitMQ host (default `localhost`)
 - `HTTP_PORT`: HTTP port for testapp (default `5301`)
 
+## Aspire and OpenTelemetry
+
+To run the Java test app under Aspire, two things must be true:
+
+1. The OpenTelemetry Java agent JAR must exist at `src/AspireApp/agents/opentelemetry-javaagent.jar`.
+2. A trusted Aspire OTLP certificate PEM must exist at `src/AspireApp/agents/aspire-localhost-cert.pem`.
+3. The test app JAR must be built before the AppHost starts.
+
+Build the executable JAR from the repository root:
+
+```bash
+./gradlew :testapp:jar
+```
+
+Set up the Java agent:
+
+```bash
+mkdir -p src/AspireApp/agents
+curl -fL \
+  https://github.com/open-telemetry/opentelemetry-java-instrumentation/releases/latest/download/opentelemetry-javaagent.jar \
+  -o src/AspireApp/agents/opentelemetry-javaagent.jar
+```
+
+The AppHost also configures the Java agent to trust a local Aspire OTLP certificate PEM at:
+
+`src/AspireApp/agents/aspire-localhost-cert.pem`
+
+Then start Aspire:
+
+```bash
+dotnet run --project src/AspireApp/AspireApp.csproj
+```
+
+Additional details are documented in [`docs/development/aspire-java-telemetry.md`](/Users/robert/Projects/MyServiceBus/docs/development/aspire-java-telemetry.md).
+
 See also: `docs/two-service-sample.md` for running .NET and Java together.
 
 ## Notes

@@ -1,11 +1,23 @@
 using System;
+using System.Security;
 using MyServiceBus;
 using TestApp;
 using System.Linq;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.Extensions.Logging;
+using OpenTelemetry.Trace;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddOpenTelemetry()
+    .WithTracing(tracing =>
+    {
+        tracing
+            .AddSource("MyServiceBus")
+            .AddAspNetCoreInstrumentation()
+            .AddHttpClientInstrumentation()
+            .AddOtlpExporter();
+    });
 
 builder.Services.AddServiceBus(x =>
 {
@@ -13,7 +25,7 @@ builder.Services.AddServiceBus(x =>
     x.AddConsumer<OrderSubmittedConsumer>();
     x.AddConsumer<TestRequestConsumer>();
 
-    x.UsingRabbitMq([Throws(typeof(InvalidOperationException))] (context, cfg) =>
+    x.UsingRabbitMq([Throws(typeof(InvalidOperationException), typeof(SecurityException))] (context, cfg) =>
     {
         var rabbitMqHost = Environment.GetEnvironmentVariable("RABBITMQ_HOST") ?? "localhost";
 
