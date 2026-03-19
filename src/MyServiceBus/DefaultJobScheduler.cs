@@ -21,7 +21,6 @@ public class DefaultJobScheduler : IJobScheduler
     public Task<Guid> Schedule(TimeSpan delay, Func<CancellationToken, Task> callback, CancellationToken cancellationToken = default)
         => Schedule(DateTime.UtcNow + delay, callback, cancellationToken);
 
-    [Throws(typeof(AggregateException))]
     public Task Cancel(Guid tokenId)
     {
         if (_jobs.TryRemove(tokenId, out var cts))

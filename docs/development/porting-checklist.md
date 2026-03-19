@@ -8,8 +8,7 @@
 - **Set up test harness**: Adapt the shared test harness so transport behavior can be verified consistently.
 - **Provision infrastructure**: Configure a RabbitMQ broker and in-memory mediator for the platform and its tests.
 - **Port core messaging features**: Implement publish/subscribe and request/response patterns, retries, and metrics in a way that fits platform conventions.
-- **Handle errors**: Replicate or adapt error-handling semantics as needed; checked exception support can be deferred.
+- **Handle errors**: Replicate or adapt error-handling semantics as needed, using public API docs and tests to keep behavior aligned across runtimes.
 - **Integrate logging**: Use the platform's standard logging abstraction and ensure consumer failures are logged instead of crashing the process.
 - **Establish CI**: Set up a continuous integration pipeline to build the new client, run its tests, and enforce formatting.
 - **Document and validate**: Update the quick start guide and feature walkthrough and add tests mirroring existing ones to verify feature parity.
-

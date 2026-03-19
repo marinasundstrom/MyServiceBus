@@ -18,7 +18,6 @@ class StaticFormatter : IMessageEntityNameFormatter
 public class FormatterTests
 {
     [Fact]
-    [Throws(typeof(EqualException))]
     public void GetMessageUrn_ReturnsExpected()
     {
         var urn = MessageUrn.For(typeof(SampleUrnMessage));
@@ -26,7 +25,6 @@ public class FormatterTests
     }
 
     [Fact]
-    [Throws(typeof(EqualException), typeof(AmbiguousMatchException), typeof(TypeLoadException))]
     public void GetExchangeName_UsesAttribute()
     {
         var name = EntityNameFormatter.Format(typeof(AttributeMessage));
@@ -34,7 +32,6 @@ public class FormatterTests
     }
 
     [Fact]
-    [Throws(typeof(EqualException), typeof(AmbiguousMatchException), typeof(TypeLoadException))]
     public void GetExchangeName_UsesFormatter()
     {
         var previous = EntityNameFormatter.Formatter;

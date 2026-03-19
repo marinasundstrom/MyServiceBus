@@ -22,12 +22,12 @@ public class PipeTests
     public async Task Executes_Filters_In_Order()
     {
         var configurator = new PipeConfigurator<TestContext>();
-        configurator.UseExecute([Throws(typeof(NotSupportedException))] (ctx) =>
+        configurator.UseExecute((ctx) =>
         {
             ctx.Calls.Add("A");
             return Task.CompletedTask;
         });
-        configurator.UseExecute([Throws(typeof(NotSupportedException))] (ctx) =>
+        configurator.UseExecute((ctx) =>
         {
             ctx.Calls.Add("B");
             return Task.CompletedTask;
@@ -43,7 +43,7 @@ public class PipeTests
     [Fact]
     public async Task Execute_Pipe_Invokes_Callback()
     {
-        var pipe = Pipe.Execute<TestContext>([Throws(typeof(NotSupportedException))] (ctx) =>
+        var pipe = Pipe.Execute<TestContext>((ctx) =>
         {
             ctx.Calls.Add("X");
             return Task.CompletedTask;
@@ -61,7 +61,7 @@ public class PipeTests
         var configurator = new PipeConfigurator<TestContext>();
         var attempts = 0;
         configurator.UseRetry(2);
-        configurator.UseExecute([Throws(typeof(InvalidOperationException))] (ctx) =>
+        configurator.UseExecute((ctx) =>
         {
             attempts++;
             if (attempts < 3)
@@ -85,7 +85,7 @@ public class PipeTests
         var configurator = new PipeConfigurator<TestContext>();
         var attempts = 0;
         configurator.UseMessageRetry(r => r.Immediate(2));
-        configurator.UseExecute([Throws(typeof(InvalidOperationException))] (ctx) =>
+        configurator.UseExecute((ctx) =>
         {
             attempts++;
             if (attempts < 3)

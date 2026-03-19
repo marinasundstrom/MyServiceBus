@@ -14,7 +14,6 @@ internal class PostBuildHttpConfigureAction : IPostBuildAction
         _configurator = configurator;
     }
 
-    [Throws(typeof(InvalidOperationException))]
     public void Execute(IServiceProvider provider)
     {
         var context = new HttpBusRegistrationContext(provider);

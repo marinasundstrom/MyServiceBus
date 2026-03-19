@@ -29,7 +29,6 @@ public class MultipleConsumerQueueTests
     {
         public readonly List<string> Queues = new();
 
-        [Throws(typeof(InvalidOperationException))]
         public Task<ISendTransport> GetSendTransport(Uri address, CancellationToken cancellationToken = default)
             => Task.FromResult<ISendTransport>(new NopSendTransport());
 
@@ -57,7 +56,6 @@ public class MultipleConsumerQueueTests
     }
 
     [Fact]
-    [Throws(typeof(UriFormatException), typeof(AmbiguousMatchException), typeof(TypeLoadException))]
     public async Task Allows_multiple_consumers_on_distinct_queues()
     {
         var factory = new CapturingTransportFactory();

@@ -16,7 +16,6 @@ public class DuplicateConsumerRegistrationTests
     }
 
     [Fact]
-    [Throws(typeof(InvalidOperationException), typeof(ArgumentException), typeof(TrueException))]
     public async Task Should_ignore_duplicate_consumer_registration()
     {
         var services = new ServiceCollection();

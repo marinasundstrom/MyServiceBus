@@ -11,7 +11,6 @@ public sealed class HttpSendTransport : ISendTransport
         _address = address;
     }
 
-    [Throws(typeof(HttpRequestException), typeof(TaskCanceledException), typeof(UriFormatException))]
     public async Task Send<T>(T message, SendContext context, CancellationToken cancellationToken = default)
         where T : class
     {

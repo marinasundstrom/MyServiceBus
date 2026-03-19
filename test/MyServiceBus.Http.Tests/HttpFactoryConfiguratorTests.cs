@@ -10,7 +10,6 @@ namespace MyServiceBus.Http.Tests;
 public class HttpFactoryConfiguratorTests
 {
     [Fact]
-    [Throws(typeof(UriFormatException), typeof(SocketException))]
     public async Task Creates_and_starts_bus()
     {
         var port = GetFreePort();
@@ -24,7 +23,6 @@ public class HttpFactoryConfiguratorTests
         await bus.StopAsync(CancellationToken.None);
     }
 
-    [Throws(typeof(SocketException))]
     private static int GetFreePort()
     {
         var listener = new TcpListener(IPAddress.Loopback, 0);

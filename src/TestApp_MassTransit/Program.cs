@@ -86,7 +86,7 @@ app.MapGet("/weatherforecast", () =>
 })
 .WithName("GetWeatherForecast");
 
-app.MapGet("/publish", [Throws(typeof(Exception))] async (IPublishEndpoint publishEndpoint, ILogger<Program> logger, CancellationToken cancellationToken = default) =>
+app.MapGet("/publish", async (IPublishEndpoint publishEndpoint, ILogger<Program> logger, CancellationToken cancellationToken = default) =>
 {
     var message = new SubmitOrder() { OrderId = Guid.NewGuid(), Message = "MT" };
     try
@@ -103,7 +103,7 @@ app.MapGet("/publish", [Throws(typeof(Exception))] async (IPublishEndpoint publi
 .WithName("Test_Publish")
 .WithTags("Test");
 
-app.MapGet("/send", [Throws(typeof(Exception))] async (ISendEndpointProvider sendEndpointProvider, ILogger<Program> logger, CancellationToken cancellationToken = default) =>
+app.MapGet("/send", async (ISendEndpointProvider sendEndpointProvider, ILogger<Program> logger, CancellationToken cancellationToken = default) =>
 {
     try
     {

@@ -15,7 +15,6 @@ public class AddConsumersTests
     }
 
     [Fact]
-    [Throws(typeof(InvalidOperationException), typeof(ArgumentException), typeof(TrueException))]
     public async Task Should_register_all_consumers_from_assembly()
     {
         var services = new ServiceCollection();

@@ -1,8 +1,8 @@
 # TestApp
 
-Running the app will produce `SubmitOrder` that will be consumed by `SubmitOrderConsumer`.
+Running the app will produce `SubmitOrder` messages that are consumed by `SubmitOrderConsumer`.
 
-The consumer uses `MyServiceImpl`, which randomly throws to simulate failures. When that happens, MyServiceBus publishes a `Fault<SubmitOrder>` to the `submit-order_fault` queue, where `SubmitOrderFaultConsumer` logs the fault details. Consumers of `Fault<SubmitOrder>` must subscribe to `submit-order_fault`; this fault queue differs from the `submit-order_error` queue, which stores failed messages that should not be re-published as-is.
+The sample no longer uses randomized failures. Failure cases are isolated to explicit routes such as `/publish/fault`, `/send/fault`, `/request/fault`, and `/request_multi/fault`. When a submit-order fault occurs, MyServiceBus publishes a `Fault<SubmitOrder>` to the `submit-order_fault` queue, where `SubmitOrderFaultConsumer` logs the fault details.
 
 ## Running
 
@@ -13,4 +13,3 @@ From this directory, execute:
 ```
 
 The script builds required modules and starts the app.
-

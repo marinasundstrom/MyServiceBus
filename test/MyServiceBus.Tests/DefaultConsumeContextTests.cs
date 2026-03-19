@@ -14,15 +14,13 @@ public class DefaultConsumeContextTests
     }
 
     [Fact]
-    [Throws(typeof(InvalidOperationException))]
     public async Task GetSendEndpoint_throws_when_provider_missing()
     {
         var context = new DefaultConsumeContext<TestMessage>(new TestMessage());
-        await Assert.ThrowsAsync<InvalidOperationException>([Throws(typeof(UriFormatException))] () => context.GetSendEndpoint(new Uri("queue:test")));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => context.GetSendEndpoint(new Uri("queue:test")));
     }
 
     [Fact]
-    [Throws(typeof(UriFormatException))]
     public async Task Forward_uses_send_endpoint_provider()
     {
         var sendEndpoint = Substitute.For<ISendEndpoint>();

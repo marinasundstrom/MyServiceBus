@@ -15,7 +15,6 @@ internal class PostBuildConfigureAction : IPostBuildAction
         _configurator = configurator;
     }
 
-    [Throws(typeof(InvalidOperationException))]
     public void Execute(IServiceProvider provider)
     {
         var context = new BusRegistrationContext(provider);

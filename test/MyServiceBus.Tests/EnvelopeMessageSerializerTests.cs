@@ -14,7 +14,6 @@ public class EnvelopeMessageSerializerTests
     }
 
     [Fact]
-    [Throws(typeof(Exception))]
     public async Task Envelope_contains_addresses()
     {
         var message = new SampleMessage
@@ -34,7 +33,6 @@ public class EnvelopeMessageSerializerTests
     }
 
     [Fact]
-    [Throws(typeof(Exception))]
     public async Task Envelope_omits_mt_host_headers()
     {
         var message = new SampleMessage { Value = "Test" };

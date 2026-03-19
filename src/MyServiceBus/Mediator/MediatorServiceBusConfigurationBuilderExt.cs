@@ -13,7 +13,7 @@ public static class MediatorServiceBusConfigurationBuilderExt
         builder.Services.AddSingleton<ITransportFactory, MediatorTransportFactory>();
         builder.Services.AddScoped<ISendEndpointProvider, SendEndpointProvider>();
         builder.Services.AddScoped<IPublishEndpointProvider, PublishEndpointProvider>();
-        builder.Services.AddSingleton<IMessageBus>([Throws(typeof(InvalidOperationException), typeof(UriFormatException))] (sp) => new MessageBus(
+        builder.Services.AddSingleton<IMessageBus>((sp) => new MessageBus(
             sp.GetRequiredService<ITransportFactory>(),
             sp,
             sp.GetRequiredService<ISendPipe>(),

@@ -30,15 +30,12 @@ public class PublishAnonymousInterfaceTests
     {
         public readonly CaptureSendTransport Transport = new();
 
-        [Throws(typeof(InvalidOperationException))]
         public Task<ISendTransport> GetSendTransport(Uri address, CancellationToken cancellationToken = default) => Task.FromResult<ISendTransport>(Transport);
 
-        [Throws(typeof(NotImplementedException))]
         public Task<IReceiveTransport> CreateReceiveTransport(EndpointDefinition definition, Func<ReceiveContext, Task> handler, Func<string?, bool>? isMessageTypeRegistered = null, CancellationToken cancellationToken = default) => throw new NotImplementedException();
     }
 
     [Fact]
-    [Throws(typeof(UriFormatException))]
     public async Task Should_publish_anonymous_object_as_interface()
     {
         var factory = new StubTransportFactory();

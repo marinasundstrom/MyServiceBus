@@ -44,7 +44,6 @@ public class MessageConfigurator
         _exchangeNames = exchangeNames;
     }
 
-    [Throws(typeof(NotSupportedException))]
     public void SetEntityName(string name)
     {
         _exchangeNames[_messageType] = name;
@@ -93,7 +92,6 @@ public class ReceiveEndpointConfigurator
         _serializerType = typeof(TSerializer);
     }
 
-    [Throws(typeof(InvalidOperationException))]
     public void ConfigureConsumer<T>(IBusRegistrationContext context)
     {
         var consumerType = typeof(T);
@@ -157,14 +155,13 @@ public class ReceiveEndpointConfigurator
         }
     }
 
-    [Throws(typeof(AmbiguousMatchException), typeof(TypeLoadException))]
     public void Handler<T>(Func<ConsumeContext<T>, Task> handler)
         where T : class
     {
         var exchangeName = _exchangeNames.TryGetValue(typeof(T), out var entity)
             ? entity
             : EntityNameFormatter.Format(typeof(T))!;
-        _endpointActions.Add([Throws(typeof(Exception))] (bus, provider) =>
+        _endpointActions.Add((bus, provider) =>
         {
             IMessageSerializer? serializer = _serializerType != null
                 ? (IMessageSerializer)ActivatorUtilities.CreateInstance(provider, _serializerType)

@@ -15,7 +15,6 @@ public class RabbitMqSendContextTests
 
 
     [Fact]
-    [Throws(typeof(IOException))]
     public async Task Uses_context_properties()
     {
         var channel = Substitute.For<IChannel>();
@@ -33,7 +32,6 @@ public class RabbitMqSendContextTests
     }
 
     [Fact]
-    [Throws(typeof(IOException), typeof(EqualException), typeof(FalseException))]
     public async Task Queue_settings_flow_through_context()
     {
         var channel = Substitute.For<IChannel>();

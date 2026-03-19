@@ -11,7 +11,7 @@ The following checklist highlights common areas to evaluate when switching:
   instead of `IBus` and `IBusControl`.
 - **Request clients** – create request clients through `IRequestClientFactory` or `RequestClientFactory` rather than
   MassTransit's extension methods.
-- **Exception handling** – adopt `[Throws]` attributes and catch exceptions locally as required by the CheckedExceptions analyzer.
+- **Exception handling** – catch exceptions you can handle locally, prefer domain-specific exceptions when surfacing failures, and document notable public exceptions in XML docs.
 - **Java parity** – if services mix C# and Java clients, ensure consumers and contracts are exercised in both runtimes
   during migration.
 

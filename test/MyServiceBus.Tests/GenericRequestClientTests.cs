@@ -24,7 +24,6 @@ public class GenericRequestClientTests
     }
 
     [Fact]
-    [Throws(typeof(Exception), typeof(AmbiguousMatchException))]
     public async Task Sets_temporary_response_exchange_options()
     {
         var transportFactory = new MediatorTransportFactory();
@@ -37,7 +36,7 @@ public class GenericRequestClientTests
 
         var captured = new TaskCompletionSource<(Uri Response, Uri Fault)>(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        var receive = await transportFactory.CreateReceiveTransport(endpoint, [Throws(typeof(InvalidOperationException))] async (ctx) =>
+        var receive = await transportFactory.CreateReceiveTransport(endpoint, async (ctx) =>
         {
             captured.TrySetResult((ctx.ResponseAddress!, ctx.FaultAddress!));
 
@@ -67,7 +66,6 @@ public class GenericRequestClientTests
     }
 
     [Fact]
-    [Throws(typeof(Exception), typeof(AmbiguousMatchException))]
     public async Task Returns_expected_response_for_multiple_types()
     {
         var transportFactory = new MediatorTransportFactory();
@@ -78,7 +76,7 @@ public class GenericRequestClientTests
             Address = EntityNameFormatter.Format(typeof(OrderRequest))!
         };
 
-        var receive = await transportFactory.CreateReceiveTransport(endpoint, [Throws(typeof(InvalidOperationException))] async (ctx) =>
+        var receive = await transportFactory.CreateReceiveTransport(endpoint, async (ctx) =>
         {
             if (ctx.TryGetMessage<OrderRequest>(out var request))
             {
@@ -112,7 +110,6 @@ public class GenericRequestClientTests
     }
 
     [Fact]
-    [Throws(typeof(AmbiguousMatchException), typeof(TypeLoadException))]
     public async Task Throws_when_fault_received()
     {
         var transportFactory = new MediatorTransportFactory();
@@ -123,7 +120,7 @@ public class GenericRequestClientTests
             Address = EntityNameFormatter.Format(typeof(OrderRequest))!
         };
 
-        var receive = await transportFactory.CreateReceiveTransport(endpoint, [Throws(typeof(InvalidOperationException))] async (ctx) =>
+        var receive = await transportFactory.CreateReceiveTransport(endpoint, async (ctx) =>
         {
             if (ctx.TryGetMessage<OrderRequest>(out var request))
             {
@@ -145,13 +142,12 @@ public class GenericRequestClientTests
         await receive.Start();
 
         var client = new GenericRequestClient<OrderRequest>(transportFactory, serializer, new SendContextFactory());
-        await Assert.ThrowsAsync<RequestFaultException>([Throws(typeof(UriFormatException), typeof(AmbiguousMatchException), typeof(RequestFaultException), typeof(TypeLoadException))] () => client.GetResponseAsync<OrderAccepted, OrderRejected>(new OrderRequest { Accept = true }));
+        await Assert.ThrowsAsync<RequestFaultException>(() => client.GetResponseAsync<OrderAccepted, OrderRejected>(new OrderRequest { Accept = true }));
 
         await receive.Stop();
     }
 
     [Fact]
-    [Throws(typeof(Exception), typeof(AmbiguousMatchException))]
     public async Task Returns_fault_response_when_fault_type_expected()
     {
         var transportFactory = new MediatorTransportFactory();
@@ -162,7 +158,7 @@ public class GenericRequestClientTests
             Address = EntityNameFormatter.Format(typeof(OrderRequest))!
         };
 
-        var receive = await transportFactory.CreateReceiveTransport(endpoint, [Throws(typeof(InvalidOperationException))] async (ctx) =>
+        var receive = await transportFactory.CreateReceiveTransport(endpoint, async (ctx) =>
         {
             if (ctx.TryGetMessage<OrderRequest>(out var request))
             {

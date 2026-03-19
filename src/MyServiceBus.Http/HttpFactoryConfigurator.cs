@@ -93,7 +93,6 @@ public class HttpReceiveEndpointConfigurator
         _endpointActions = endpointActions;
     }
 
-    [Throws(typeof(InvalidOperationException))]
     public void ConfigureConsumer<T>(IBusRegistrationContext context)
     {
         var consumerType = typeof(T);
@@ -111,7 +110,7 @@ public class HttpReceiveEndpointConfigurator
             var method = typeof(IMessageBus).GetMethod(nameof(IMessageBus.AddConsumer))!
                 .MakeGenericMethod(messageType, consumerType);
 
-            _endpointActions.Add([Throws(typeof(TargetException), typeof(TargetInvocationException))] (bus, _) =>
+            _endpointActions.Add((bus, _) =>
                 ((Task)method.Invoke(bus, new object[] { consumer, consumer.ConfigurePipe, CancellationToken.None })!)
                     .GetAwaiter().GetResult());
         }

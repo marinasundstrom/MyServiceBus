@@ -16,7 +16,6 @@ internal sealed class ConsumerRegistrationAction : IPostBuildAction
         _topology = topology;
     }
 
-    [Throws(typeof(InvalidOperationException))]
     public void Execute(IServiceProvider provider)
     {
         var bus = provider.GetRequiredService<IMessageBus>();

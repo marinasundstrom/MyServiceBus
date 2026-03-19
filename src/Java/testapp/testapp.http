@@ -1,0 +1,33 @@
+@JavaTestApp_HostAddress = http://localhost:5301
+
+GET {{JavaTestApp_HostAddress}}/publish
+
+###
+
+GET {{JavaTestApp_HostAddress}}/publish/fault
+
+###
+
+GET {{JavaTestApp_HostAddress}}/send
+
+###
+
+GET {{JavaTestApp_HostAddress}}/send/fault
+
+###
+
+GET {{JavaTestApp_HostAddress}}/request
+
+###
+
+GET {{JavaTestApp_HostAddress}}/request/fault
+
+###
+
+GET {{JavaTestApp_HostAddress}}/request_multi
+
+###
+
+GET {{JavaTestApp_HostAddress}}/request_multi/fault
+
+###

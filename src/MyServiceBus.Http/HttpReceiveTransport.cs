@@ -25,7 +25,6 @@ public sealed class HttpReceiveTransport : IReceiveTransport
         _isMessageTypeRegistered = isMessageTypeRegistered;
     }
 
-    [Throws(typeof(HttpListenerException))]
     public Task Start(CancellationToken cancellationToken = default)
     {
         _listener.Start();
@@ -33,7 +32,6 @@ public sealed class HttpReceiveTransport : IReceiveTransport
         return Task.CompletedTask;
     }
 
-    [Throws(typeof(AggregateException))]
     public async Task Stop(CancellationToken cancellationToken = default)
     {
         _cts.Cancel();
@@ -64,7 +62,6 @@ public sealed class HttpReceiveTransport : IReceiveTransport
         }
     }
 
-    [Throws(typeof(ProtocolViolationException))]
     private async Task HandleRequest(HttpListenerContext ctx)
     {
         try

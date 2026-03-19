@@ -19,12 +19,10 @@ public class FaultHandlingTests
 
     class FaultingConsumer : IConsumer<TestMessage>
     {
-        [Throws(typeof(InvalidOperationException))]
         public Task Consume(ConsumeContext<TestMessage> context) => throw new InvalidOperationException("boom");
     }
 
     [Fact]
-    [Throws(typeof(Exception))]
     public async Task Sends_fault_to_fault_address_when_consumer_throws()
     {
         var services = new ServiceCollection();
@@ -79,14 +77,12 @@ public class FaultHandlingTests
         public readonly CaptureSendTransport SendTransport = new();
         public Uri? Address { get; private set; }
 
-        [Throws(typeof(InvalidOperationException))]
         public Task<ISendTransport> GetSendTransport(Uri address, CancellationToken cancellationToken = default)
         {
             Address = address;
             return Task.FromResult<ISendTransport>(SendTransport);
         }
 
-        [Throws(typeof(NotImplementedException))]
         public Task<IReceiveTransport> CreateReceiveTransport(EndpointDefinition definition, Func<ReceiveContext, Task> handler, Func<string?, bool>? isMessageTypeRegistered = null, CancellationToken cancellationToken = default)
             => throw new NotImplementedException();
     }
@@ -101,7 +97,6 @@ public class FaultHandlingTests
         public Uri? ErrorAddress { get; set; }
         public IDictionary<string, object> Headers { get; } = new Dictionary<string, object>();
         public CancellationToken CancellationToken => CancellationToken.None;
-        [Throws(typeof(InvalidCastException))]
         public bool TryGetMessage<T>(out T? message) where T : class
         {
             if (typeof(T) == typeof(TestMessage))

@@ -51,14 +51,12 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
 
     public IBusTopology Topology => _topology;
 
-    [Throws(typeof(UriFormatException), typeof(InvalidOperationException), typeof(AmbiguousMatchException), typeof(TypeLoadException))]
     public Task Publish<TMessage>(object message, Action<IPublishContext>? contextCallback = null, CancellationToken cancellationToken = default) where TMessage : class
     {
         var typed = message as TMessage ?? MessageProxy.Create<TMessage>(message);
         return Publish(typed, contextCallback, cancellationToken);
     }
 
-    [Throws(typeof(UriFormatException), typeof(InvalidOperationException), typeof(AmbiguousMatchException), typeof(TypeLoadException))]
     public async Task Publish<T>(T message, Action<IPublishContext>? contextCallback = null, CancellationToken cancellationToken = default) where T : class
     {
         var exchangeName = EntityNameFormatter.Format(message.GetType());
@@ -96,7 +94,6 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
         return Task.FromResult(endpoint);
     }
 
-    [Throws(typeof(InvalidOperationException))]
     public async Task AddHandler<TMessage>(string queueName, string exchangeName, Func<ConsumeContext<TMessage>, Task> handler,
         int? retryCount = null, TimeSpan? retryDelay = null, ushort? prefetchCount = null,
         IDictionary<string, object?>? queueArguments = null, IMessageSerializer? serializer = null, CancellationToken cancellationToken = default)
@@ -129,7 +126,6 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
         configurator.UseFilter(new HandlerMessageFilter<TMessage>(handler));
         var pipe = new ConsumePipe<TMessage>(configurator.Build(_serviceProvider));
 
-        [Throws(typeof(InvalidCastException))]
         async Task TransportHandler(ReceiveContext context)
         {
             var messageSerializer = serializer ?? _messageSerializer;
@@ -143,7 +139,6 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
         _activeTransports.Add(receiveTransport);
     }
 
-    [Throws(typeof(InvalidOperationException), typeof(AmbiguousMatchException), typeof(TypeLoadException))]
     public async Task AddConsumer<TMessage, TConsumer>(ConsumerTopology consumer, Delegate? configure = null, CancellationToken cancellationToken = default)
         where TConsumer : class, IConsumer<TMessage>
         where TMessage : class
@@ -187,7 +182,7 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
             _consumers.TryGetValue(queueName, out var regs) && regs.Any(r => r.MessageUrn == mt);
         var receiveTransport = await _transportFactory.CreateReceiveTransport(
             endpoint,
-            [Throws(typeof(TargetInvocationException), typeof(InvalidComObjectException), typeof(COMException), typeof(TypeLoadException))] (ctx) => HandleMessageAsync(queueName, ctx),
+            (ctx) => HandleMessageAsync(queueName, ctx),
             isRegistered,
             cancellationToken);
 
@@ -223,7 +218,6 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
         await Task.WhenAll(_activeTransports.Select(async transport => await transport.Stop(cancellationToken)));
     }
 
-    [Throws(typeof(InvalidOperationException), typeof(NotSupportedException), typeof(InvalidCastException), typeof(TargetInvocationException), typeof(MemberAccessException), typeof(InvalidComObjectException), typeof(COMException), typeof(TypeLoadException))]
     private async Task HandleMessageAsync(string queueName, ReceiveContext context)
     {
         var messageTypeName = context.MessageType.FirstOrDefault();

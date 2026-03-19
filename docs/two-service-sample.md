@@ -1,6 +1,6 @@
 # Two-service sample
 
-This sample runs the existing .NET and Java test apps together using MyServiceBus. The Java service is run twice to demonstrate multiple consumers processing the same queue.
+This sample runs the .NET and Java test apps together using MyServiceBus. Both apps expose the same demo endpoints and use the same message patterns so you can compare logs, faults, and traces directly.
 
 ## 1. Start RabbitMQ
 
@@ -16,54 +16,74 @@ docker compose up rabbitmq
 dotnet run --project src/TestApp
 ```
 
-The service listens on `http://localhost:5112` and publishes `SubmitOrder` messages when its `/publish` endpoint is called.
+The service listens on `http://localhost:5112`.
 
-## 3. Run two Java service replicas
+## 3. Run the Java service
 
-Run the Java test app twice on different ports. Gradle will build only the requested module and its dependencies.
-
-In two separate terminals, from the repository root:
+From the repository root:
 
 ```bash
-# Build all Java modules (once)
-./gradlew build -x test
-
-# Instance 1
-RABBITMQ_HOST=localhost HTTP_PORT=5301 ./gradlew -p testapp run
-
-# Instance 2
-RABBITMQ_HOST=localhost HTTP_PORT=5302 ./gradlew -p testapp run
+./gradlew :testapp:run
 ```
 
 Notes:
 - `RABBITMQ_HOST` defaults to `localhost` if not set.
-- `HTTP_PORT` selects the HTTP port for each replica.
-- `-p` selects the project; Gradle builds the module and its dependencies automatically.
+- `HTTP_PORT` defaults to `5301` if not set.
 - See `src/Java/README.md` for full Java build/run details and optional JDK 17 toolchain enforcement.
 
-Each instance consumes `SubmitOrder` messages from the same queue.
+The Java service listens on `http://localhost:5301`.
 
-### Java consumer failures
+## 4. Available endpoints
 
-The Java `SubmitOrderConsumer` calls a service that randomly throws to simulate processing errors. When that happens, MyServiceBus publishes a `Fault<SubmitOrder>` to the `submit-order_fault` queue, where `SubmitOrderFaultConsumer` records the failure details. Consumers of `Fault<SubmitOrder>` must explicitly subscribe to this fault queue to observe exceptions; it is separate from the `submit-order_error` queue, which holds failed messages that should not be re-published as-is.
+Both services expose the same endpoints:
 
-## 4. Publish a message
+- `/publish`
+- `/publish/fault`
+- `/send`
+- `/send/fault`
+- `/request`
+- `/request/fault`
+- `/request_multi`
+- `/request_multi/fault`
 
-From another terminal call the .NET service:
+The `.http` files for invoking them are:
+
+- `src/TestApp/TestApp.http`
+- `src/Java/testapp/testapp.http`
+
+## 5. Fault behavior
+
+Failure cases are explicit and isolated to the `*/fault` routes. There is no randomized failure logic in the sample anymore.
+
+- `/publish` and `/send` produce a normal `SubmitOrder`
+- `/publish/fault` and `/send/fault` produce a `SubmitOrder` that the consumer intentionally faults
+- `/request` and `/request_multi` produce a normal `TestRequest`
+- `/request/fault` and `/request_multi/fault` produce a `TestRequest` that the consumer intentionally faults
+
+When a `SubmitOrder` consumer faults, MyServiceBus publishes a `Fault<SubmitOrder>` to the `submit-order_fault` queue. Both sample apps register `SubmitOrderFaultConsumer` on that queue so you can compare the behavior in each runtime.
+
+## 6. Try the flow
+
+Send a normal publish from .NET to Java:
 
 ```bash
 curl http://localhost:5112/publish
 ```
 
-One of the Java replicas logs the `SubmitOrder` and responds with `OrderSubmitted`, including its `HTTP_PORT` so the .NET service logs which replica processed the order.
-
-To send from Java instead, call either Java instance:
+Send an intentional fault from Java:
 
 ```bash
-curl http://localhost:5301/publish
+curl http://localhost:5301/publish/fault
 ```
 
-The .NET service logs the received `SubmitOrder`.
+Test request/response from either app:
+
+```bash
+curl http://localhost:5112/request
+curl http://localhost:5301/request_multi/fault
+```
+
+You should see matching trace shapes in Aspire and comparable logs in both services, with differences limited to the runtime-specific exception formatting.
 
 ## Troubleshooting
 - If Gradle reports missing modules, run a full build first:

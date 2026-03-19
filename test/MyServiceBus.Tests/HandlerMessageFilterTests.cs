@@ -9,7 +9,6 @@ namespace MyServiceBus.Tests;
 public class HandlerMessageFilterTests
 {
     [Fact]
-    [Throws(typeof(FileNotFoundException), typeof(FileLoadException), typeof(BadImageFormatException))]
     public async Task Invokes_handler_and_next()
     {
         bool handlerCalled = false;

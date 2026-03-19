@@ -9,7 +9,6 @@ namespace MyServiceBus.Http.Tests;
 
 public class HttpTransportTests
 {
-    [Throws(typeof(SocketException))]
     private static int GetFreePort()
     {
         var listener = new TcpListener(IPAddress.Loopback, 0);
@@ -20,7 +19,6 @@ public class HttpTransportTests
     }
 
     [Fact]
-    [Throws(typeof(UriFormatException), typeof(SocketException))]
     public async Task Sends_and_receives_message()
     {
         var port = GetFreePort();
@@ -54,7 +52,6 @@ public class HttpTransportTests
     }
 
     [Fact]
-    [Throws(typeof(UriFormatException), typeof(SocketException))]
     public async Task Sets_default_fault_address()
     {
         var port = GetFreePort();
@@ -86,7 +83,6 @@ public class HttpTransportTests
     }
 
     [Fact]
-    [Throws(typeof(UriFormatException), typeof(SocketException))]
     public async Task Returns_error_when_handler_faults()
     {
         var port = GetFreePort();

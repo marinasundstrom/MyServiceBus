@@ -21,13 +21,11 @@ public class ErrorQueueTests
 
     class FaultingConsumer : IConsumer<TestMessage>
     {
-        [Throws(typeof(InvalidOperationException))]
         public Task Consume(ConsumeContext<TestMessage> context)
             => throw new InvalidOperationException("boom");
     }
 
     [Fact]
-    [Throws(typeof(UriFormatException), typeof(JsonException), typeof(ArgumentException), typeof(KeyNotFoundException))]
     public async Task Moves_message_to_error_queue_when_consumer_faults()
     {
         var services = new ServiceCollection();
@@ -56,7 +54,7 @@ public class ErrorQueueTests
         configurator.UseFilter(new ConsumerMessageFilter<FaultingConsumer, TestMessage>(factory));
         var pipe = new ConsumePipe<TestMessage>(configurator.Build());
 
-        await Should.ThrowAsync<InvalidOperationException>([Throws(typeof(InvalidCastException))] () => pipe.Send(context));
+        await Should.ThrowAsync<InvalidOperationException>(() => pipe.Send(context));
 
         transportFactory.Address.ShouldBe(errorUri);
         var sent = transportFactory.SendTransport.Sent.ShouldBeOfType<TestMessage>();
@@ -71,7 +69,6 @@ public class ErrorQueueTests
     }
 
     [Fact]
-    [Throws(typeof(UriFormatException), typeof(JsonException), typeof(ArgumentException), typeof(KeyNotFoundException))]
     public async Task Sanitizes_malformed_redelivery_count_header()
     {
         var services = new ServiceCollection();
@@ -129,14 +126,12 @@ public class ErrorQueueTests
         public readonly CaptureSendTransport SendTransport = new();
         public Uri? Address { get; private set; }
 
-        [Throws(typeof(InvalidOperationException))]
         public Task<ISendTransport> GetSendTransport(Uri address, CancellationToken cancellationToken = default)
         {
             Address = address;
             return Task.FromResult<ISendTransport>(SendTransport);
         }
 
-        [Throws(typeof(NotImplementedException))]
         public Task<IReceiveTransport> CreateReceiveTransport(EndpointDefinition definition, Func<ReceiveContext, Task> handler, Func<string?, bool>? isMessageTypeRegistered = null, CancellationToken cancellationToken = default)
             => throw new NotImplementedException();
     }

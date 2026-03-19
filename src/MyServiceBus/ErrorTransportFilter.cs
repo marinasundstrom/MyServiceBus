@@ -39,7 +39,7 @@ public class ErrorTransportFilter<TMessage> : IFilter<ConsumeContext<TMessage>>
                         }
                     }
 
-                    await endpoint.Send(ctx.Message, [Throws(typeof(NotSupportedException))] (sendCtx) =>
+                    await endpoint.Send(ctx.Message, (sendCtx) =>
                     {
                         sendCtx.Headers[MessageHeaders.ExceptionType] = ex.GetType().FullName ?? ex.GetType().Name;
                         sendCtx.Headers[MessageHeaders.ExceptionMessage] = ex.Message;

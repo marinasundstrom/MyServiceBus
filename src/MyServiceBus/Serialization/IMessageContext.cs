@@ -10,7 +10,6 @@ public interface IMessageContext
     IDictionary<string, object> Headers { get; }
     public DateTimeOffset SentTime { get; }
 
-    [Throws(typeof(InvalidOperationException), typeof(ObjectDisposedException))]
     bool TryGetMessage<T>(out T? message)
         where T : class;
 }

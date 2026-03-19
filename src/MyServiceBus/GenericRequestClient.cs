@@ -33,7 +33,6 @@ public sealed class GenericRequestClient<TRequest> : IRequestClient<TRequest>, I
 
     }
 
-    [Throws(typeof(UriFormatException), typeof(InvalidOperationException), typeof(AmbiguousMatchException), typeof(TypeLoadException), typeof(RequestFaultException))]
     public async Task<Response<T>> GetResponseAsync<T>(TRequest request, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default, RequestTimeout timeout = default) where T : class
     {
         var taskCompletionSource = new TaskCompletionSource<Response<T>>();
@@ -56,7 +55,7 @@ public sealed class GenericRequestClient<TRequest> : IRequestClient<TRequest>, I
 
         IReceiveTransport? responseReceiveTransport = null;
 
-        var responseHandler = [Throws(typeof(ObjectDisposedException))] async (ReceiveContext context) =>
+        var responseHandler = async (ReceiveContext context) =>
         {
             try
             {
@@ -99,7 +98,7 @@ public sealed class GenericRequestClient<TRequest> : IRequestClient<TRequest>, I
         var actualTimeout = timeout.TimeSpan == default ? _timeout.TimeSpan : timeout.TimeSpan;
         timeoutCts.CancelAfter(actualTimeout);
 
-        await using var registration = timeoutCts.Token.Register([Throws(typeof(ObjectDisposedException))] () =>
+        await using var registration = timeoutCts.Token.Register(() =>
         {
             taskCompletionSource.TrySetException(new TimeoutException("Request timed out."));
         });
@@ -114,7 +113,6 @@ public sealed class GenericRequestClient<TRequest> : IRequestClient<TRequest>, I
         }
     }
 
-    [Throws(typeof(UriFormatException), typeof(InvalidOperationException), typeof(AmbiguousMatchException), typeof(TypeLoadException), typeof(RequestFaultException))]
     public async Task<Response<T1, T2>> GetResponseAsync<T1, T2>(TRequest request, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default, RequestTimeout timeout = default)
         where T1 : class
         where T2 : class
@@ -139,7 +137,7 @@ public sealed class GenericRequestClient<TRequest> : IRequestClient<TRequest>, I
 
         IReceiveTransport? responseReceiveTransport = null;
 
-        var responseHandler = [Throws(typeof(ObjectDisposedException))] async (ReceiveContext context) =>
+        var responseHandler = async (ReceiveContext context) =>
         {
             try
             {
@@ -189,7 +187,7 @@ public sealed class GenericRequestClient<TRequest> : IRequestClient<TRequest>, I
         var actualTimeout = timeout.TimeSpan == default ? _timeout.TimeSpan : timeout.TimeSpan;
         timeoutCts.CancelAfter(actualTimeout);
 
-        await using var registration = timeoutCts.Token.Register([Throws(typeof(ObjectDisposedException))] () =>
+        await using var registration = timeoutCts.Token.Register(() =>
         {
             taskCompletionSource.TrySetException(new TimeoutException("Request timed out."));
         });

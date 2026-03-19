@@ -15,7 +15,6 @@ public class RawJsonMessageSerializerTests
     }
 
     [Fact]
-    [Throws(typeof(System.NotSupportedException), typeof(DecoderFallbackException), typeof(ContainsException), typeof(KeyNotFoundException))]
     public async Task Serializes_message_as_json()
     {
         var serializer = new RawJsonMessageSerializer();

@@ -48,13 +48,11 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
         return Task.FromResult(endpoint);
     }
 
-    [Throws(typeof(UriFormatException), typeof(InvalidOperationException), typeof(InvalidCastException), typeof(AmbiguousMatchException))]
     public async Task Publish<T>(T message, Action<IPublishContext>? contextCallback = null, CancellationToken cancellationToken = default) where T : class
     {
         await Publish<T>((object)message!, contextCallback, cancellationToken);
     }
 
-    [Throws(typeof(UriFormatException), typeof(InvalidOperationException), typeof(AmbiguousMatchException), typeof(TypeLoadException))]
     public async Task Publish<T>(object message, Action<IPublishContext>? contextCallback = null, CancellationToken cancellationToken = default) where T : class
     {
         var exchangeName = EntityNameFormatter.Format(typeof(T));
@@ -76,13 +74,11 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
         await transport.Send(typed, context, cancellationToken);
     }
 
-    [Throws(typeof(InvalidOperationException))]
     public async Task RespondAsync<T>(T message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default) where T : class
     {
         await RespondAsync<T>((object)message!, contextCallback, cancellationToken);
     }
 
-    [Throws(typeof(InvalidOperationException))]
     public async Task RespondAsync<T>(object message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default) where T : class
     {
         var address = receiveContext.ResponseAddress ??
@@ -102,7 +98,6 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
         await transport.Send(typed, context, cancellationToken);
     }
 
-    [Throws(typeof(InvalidOperationException))]
     internal async Task RespondFaultAsync(Exception exception, CancellationToken cancellationToken = default)
     {
         var address = receiveContext.FaultAddress ?? receiveContext.ResponseAddress;
@@ -129,7 +124,6 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
         await transport.Send(fault, context, cancellationToken);
     }
 
-    [Throws(typeof(InvalidCastException))]
     public Task Send<T>(Uri address, T message, Action<ISendContext>? contextCallback = null,
         CancellationToken cancellationToken = default) where T : class
         => Send<T>(address, (object)message!, contextCallback, cancellationToken);
@@ -142,7 +136,6 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
         await endpoint.Send<T>(typed, contextCallback, cancellationToken).ConfigureAwait(false);
     }
 
-    [Throws(typeof(InvalidCastException))]
     public Task Forward<T>(Uri address, T message, CancellationToken cancellationToken = default) where T : class
         => Forward<T>(address, (object)message!, cancellationToken);
 
@@ -152,7 +145,6 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
         await endpoint.Send<T>(message, null, cancellationToken).ConfigureAwait(false);
     }
 
-    [Throws(typeof(InvalidOperationException))]
     private static HostInfo GetHostInfo<T>() where T : class => new HostInfo
     {
         MachineName = Environment.MachineName,

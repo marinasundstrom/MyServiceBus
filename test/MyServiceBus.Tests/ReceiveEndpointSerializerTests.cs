@@ -15,7 +15,6 @@ public class ReceiveEndpointSerializerTests
     class CustomSerializer : IMessageSerializer
     {
         public int Calls;
-        [Throws(typeof(NotSupportedException))]
         public Task<byte[]> SerializeAsync<T>(MessageSerializationContext<T> context) where T : class
         {
             Calls++;
@@ -27,7 +26,6 @@ public class ReceiveEndpointSerializerTests
     class StubSendTransport : ISendTransport
     {
         public string? ContentType;
-        [Throws(typeof(UriFormatException))]
         public async Task Send<T>(T message, SendContext context, CancellationToken cancellationToken) where T : class
         {
             await context.Serialize(message);
@@ -40,7 +38,6 @@ public class ReceiveEndpointSerializerTests
         public Func<ReceiveContext, Task>? Handler;
         public readonly StubSendTransport SendTransport = new();
 
-        [Throws(typeof(InvalidOperationException))]
         public Task<ISendTransport> GetSendTransport(Uri address, CancellationToken cancellationToken = default)
             => Task.FromResult<ISendTransport>(SendTransport);
         public Task<IReceiveTransport> CreateReceiveTransport(EndpointDefinition definition, Func<ReceiveContext, Task> handler, Func<string?, bool>? isMessageTypeRegistered = null, CancellationToken cancellationToken = default)
@@ -60,7 +57,6 @@ public class ReceiveEndpointSerializerTests
     class ResponseMessage { }
 
     [Fact]
-    [Throws(typeof(UriFormatException), typeof(NotNullException), typeof(EqualException))]
     public async Task Handler_uses_custom_serializer_for_publish()
     {
         var services = new ServiceCollection();
@@ -112,7 +108,6 @@ public class ReceiveEndpointSerializerTests
         public IDictionary<string, object> Headers { get; }
         public DateTimeOffset SentTime { get; }
 
-        [Throws(typeof(InvalidOperationException), typeof(ObjectDisposedException))]
         public bool TryGetMessage<T>(out T? message) where T : class
         {
             if (_message is T t)

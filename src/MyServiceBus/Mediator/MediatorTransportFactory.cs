@@ -13,7 +13,6 @@ public class MediatorTransportFactory : ITransportFactory
 {
     private readonly ConcurrentDictionary<string, List<Func<ReceiveContext, Task>>> _handlers = new();
 
-    [Throws(typeof(InvalidOperationException))]
     public Task<ISendTransport> GetSendTransport(Uri address, CancellationToken cancellationToken = default)
     {
         var exchange = ExtractExchange(address);
@@ -45,7 +44,6 @@ public class MediatorTransportFactory : ITransportFactory
         return Task.CompletedTask;
     }
 
-    [Throws(typeof(OverflowException))]
     internal void Register(string exchange, Func<ReceiveContext, Task> handler)
     {
         var list = _handlers.GetOrAdd(exchange, _ => new List<Func<ReceiveContext, Task>>());
@@ -68,7 +66,6 @@ public class MediatorTransportFactory : ITransportFactory
         }
     }
 
-    [Throws(typeof(InvalidOperationException))]
     private static string ExtractExchange(Uri address)
     {
         try
@@ -95,7 +92,6 @@ public class MediatorTransportFactory : ITransportFactory
             _handler = handler;
         }
 
-        [Throws(typeof(OverflowException))]
         public Task Start(CancellationToken cancellationToken = default)
         {
             if (!_started)
@@ -188,7 +184,6 @@ public class MediatorTransportFactory : ITransportFactory
         public IDictionary<string, object> Headers { get; }
         public DateTimeOffset SentTime { get; }
 
-        [Throws(typeof(ObjectDisposedException))]
         public bool TryGetMessage<T>(out T? message) where T : class
         {
             if (_message is T msg)

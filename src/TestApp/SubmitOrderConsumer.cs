@@ -18,6 +18,12 @@ class SubmitOrderConsumer :
     {
         _logger.LogInformation("📨 Received SubmitOrder {OrderId} from {Message} ✅", context.Message.OrderId, context.Message.Message);
 
+        if (DemoScenario.ShouldFaultSubmit(context.Message.Message))
+        {
+            _logger.LogWarning("⚠️ SubmitOrder marked as fault case");
+            throw new InvalidOperationException("SubmitOrder demo fault");
+        }
+
         var replica = Environment.GetEnvironmentVariable("HTTP_PORT") ?? Environment.MachineName;
 
         await context.Publish(new OrderSubmitted(context.Message.OrderId, replica));

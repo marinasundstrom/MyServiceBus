@@ -109,7 +109,7 @@ public class RabbitMqFactoryConfigurator : IRabbitMqFactoryConfigurator, IBusFac
         services.AddSingleton<ITransportFactory, RabbitMqTransportFactory>();
         services.AddSingleton<ISendContextFactory, RabbitMqSendContextFactory>();
         services.AddSingleton<IPublishContextFactory, RabbitMqPublishContextFactory>();
-        services.AddSingleton<IMessageBus>([Throws(typeof(UriFormatException))] (sp) => new MessageBus(
+        services.AddSingleton<IMessageBus>((sp) => new MessageBus(
             sp.GetRequiredService<ITransportFactory>(),
             sp,
             sp.GetRequiredService<ISendPipe>(),

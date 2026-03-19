@@ -37,7 +37,7 @@ public static class RabbitMqServiceBusConfigurationBuilderExt
         builder.Services.AddSingleton<ITransportFactory, RabbitMqTransportFactory>();
         builder.Services.AddSingleton<ISendContextFactory, RabbitMqSendContextFactory>();
         builder.Services.AddSingleton<IPublishContextFactory, RabbitMqPublishContextFactory>();
-        builder.Services.AddSingleton<IMessageBus>([Throws(typeof(InvalidOperationException), typeof(UriFormatException))] (sp) => new MessageBus(
+        builder.Services.AddSingleton<IMessageBus>((sp) => new MessageBus(
             sp.GetRequiredService<ITransportFactory>(),
             sp,
             sp.GetRequiredService<ISendPipe>(),
@@ -62,7 +62,6 @@ public sealed class ConnectionProvider
         this.connectionFactory = connectionFactory;
     }
 
-    [Throws(typeof(ObjectDisposedException), typeof(OperationCanceledException))]
     public async Task<IConnection> GetOrCreateConnectionAsync(CancellationToken cancellationToken = default)
     {
         if (connection?.IsOpen == true)

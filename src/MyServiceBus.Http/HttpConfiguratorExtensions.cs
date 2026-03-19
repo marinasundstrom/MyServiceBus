@@ -6,7 +6,6 @@ namespace MyServiceBus;
 
 public static class HttpConfiguratorExtensions
 {
-    [Throws(typeof(InvalidOperationException))]
     public static void ConfigureEndpoints(this IHttpFactoryConfigurator configurator, IBusRegistrationContext context)
     {
         var registry = context.ServiceProvider.GetRequiredService<TopologyRegistry>();

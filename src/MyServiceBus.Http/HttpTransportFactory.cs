@@ -9,7 +9,6 @@ public sealed class HttpTransportFactory : ITransportFactory
     private readonly ConcurrentDictionary<string, HttpClient> _clients = new();
     private readonly ConcurrentDictionary<Uri, ISendTransport> _sendTransports = new();
 
-    [Throws(typeof(InvalidOperationException), typeof(UriFormatException))]
     public Task<ISendTransport> GetSendTransport(Uri address, CancellationToken cancellationToken = default)
     {
         var baseUri = new Uri(address.GetLeftPart(UriPartial.Authority));
@@ -19,7 +18,6 @@ public sealed class HttpTransportFactory : ITransportFactory
         return Task.FromResult(transport);
     }
 
-    [Throws(typeof(UriFormatException), typeof(PlatformNotSupportedException))]
     public Task<IReceiveTransport> CreateReceiveTransport(
         EndpointDefinition definition,
         Func<ReceiveContext, Task> handler,

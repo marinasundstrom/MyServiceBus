@@ -36,19 +36,16 @@ public class ConsumeContextAnonymousInterfaceTests
         public readonly CaptureSendTransport Transport = new();
         public Uri? Address;
 
-        [Throws(typeof(InvalidOperationException))]
         public Task<ISendTransport> GetSendTransport(Uri address, CancellationToken cancellationToken = default)
         {
             Address = address;
             return Task.FromResult<ISendTransport>(Transport);
         }
 
-        [Throws(typeof(NotImplementedException))]
         public Task<IReceiveTransport> CreateReceiveTransport(EndpointDefinition definition, Func<ReceiveContext, Task> handler, Func<string?, bool>? isMessageTypeRegistered = null, CancellationToken cancellationToken = default)
             => throw new NotImplementedException();
     }
 
-    [Throws(typeof(EncoderFallbackException), typeof(UriFormatException), typeof(JsonException))]
     static ConsumeContextImpl<FakeMessage> CreateContext(CaptureTransportFactory factory, string json)
     {
         var bytes = Encoding.UTF8.GetBytes(json);
@@ -60,7 +57,6 @@ public class ConsumeContextAnonymousInterfaceTests
     class FakeMessage { }
 
     [Fact]
-    [Throws(typeof(UriFormatException), typeof(InvalidOperationException), typeof(EncoderFallbackException), typeof(JsonException), typeof(IsAssignableFromException))]
     public async Task Should_publish_anonymous_object_as_interface()
     {
         var factory = new CaptureTransportFactory();
@@ -73,7 +69,6 @@ public class ConsumeContextAnonymousInterfaceTests
     }
 
     [Fact]
-    [Throws(typeof(UriFormatException), typeof(JsonException), typeof(EncoderFallbackException), typeof(IsAssignableFromException))]
     public async Task Should_send_anonymous_object_as_interface()
     {
         var factory = new CaptureTransportFactory();
@@ -87,7 +82,6 @@ public class ConsumeContextAnonymousInterfaceTests
     }
 
     [Fact]
-    [Throws(typeof(UriFormatException), typeof(InvalidOperationException), typeof(EncoderFallbackException), typeof(JsonException), typeof(IsAssignableFromException))]
     public async Task Should_respond_anonymous_object_as_interface()
     {
         var factory = new CaptureTransportFactory();

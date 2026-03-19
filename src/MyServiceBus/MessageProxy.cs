@@ -15,7 +15,6 @@ public static class MessageProxy
         object _source = null!;
         Dictionary<string, PropertyInfo> _properties = null!;
 
-        [Throws(typeof(TargetInvocationException), typeof(MethodAccessException), typeof(InvalidComObjectException), typeof(MissingMethodException), typeof(COMException), typeof(TypeLoadException))]
         protected override object? Invoke(MethodInfo targetMethod, object?[]? args)
         {
             if (targetMethod.IsSpecialName && targetMethod.Name.StartsWith("get_"))

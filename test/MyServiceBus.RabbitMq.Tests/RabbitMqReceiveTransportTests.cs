@@ -13,7 +13,6 @@ namespace MyServiceBus.RabbitMq.Tests;
 public class RabbitMqReceiveTransportTests
 {
     [Fact]
-    [Throws(typeof(ArrayTypeMismatchException), typeof(EncoderFallbackException))]
     public async Task Acks_message_when_handler_fails()
     {
         var channel = Substitute.For<IChannel>();

@@ -88,7 +88,6 @@ public class SchedulingTests
     }
 
     [Fact]
-    [Throws(typeof(TrueException))]
     public async Task SchedulePublish_delays_message()
     {
         var services = new ServiceCollection();
@@ -119,7 +118,6 @@ public class SchedulingTests
     }
 
     [Fact]
-    [Throws(typeof(TrueException))]
     public async Task Publish_context_delays_message()
     {
         var services = new ServiceCollection();
@@ -149,7 +147,6 @@ public class SchedulingTests
     }
 
     [Fact]
-    [Throws(typeof(TrueException))]
     public async Task Custom_scheduler_is_used()
     {
         var services = new ServiceCollection();
@@ -179,7 +176,6 @@ public class SchedulingTests
     }
 
     [Fact]
-    [Throws(typeof(NotNullException), typeof(InRangeException))]
     public async Task Publish_extension_sets_scheduled_time()
     {
         var endpoint = new StubPublishEndpoint();
@@ -194,7 +190,6 @@ public class SchedulingTests
     }
 
     [Fact]
-    [Throws(typeof(NotNullException), typeof(InRangeException))]
     public async Task Send_extension_sets_scheduled_time()
     {
         var endpoint = new StubSendEndpoint();

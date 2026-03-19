@@ -18,15 +18,16 @@ class TestRequestConsumer implements Consumer<TestRequest> {
 
     @Override
     public CompletableFuture<Void> consume(ConsumeContext<TestRequest> context) throws Exception {
-        var message = context.getMessage();
+        var message = context.getMessage().getMessage();
 
         logger.info("📨 Request: {}", message);
-        logger.warn("⚠️ Throwing IllegalStateException");
+
+        if (DemoScenario.shouldFaultRequest(message)) {
+            logger.warn("⚠️ TestRequest marked as fault case");
+            throw new IllegalStateException("TestRequest demo fault");
+        }
 
         var response = new TestResponse(message + " 42");
-
-        throw new IllegalStateException();
-
-        // return context.respond(response, context.getCancellationToken());
+        return context.respond(response, context.getCancellationToken());
     }
 }
