@@ -2,13 +2,9 @@ package com.myservicebus.testapp;
 
 import io.javalin.Javalin;
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 
 import com.myservicebus.ExceptionInfo;
 import com.myservicebus.Fault;
-import com.myservicebus.MyService;
-import com.myservicebus.MyServiceImpl;
 import com.myservicebus.ScopedClientFactory;
 import com.myservicebus.Response;
 import com.myservicebus.SendEndpointProvider;
@@ -19,7 +15,6 @@ import com.myservicebus.di.ServiceCollection;
 import com.myservicebus.di.ServiceProvider;
 import com.myservicebus.di.ServiceScope;
 import com.myservicebus.rabbitmq.RabbitMqFactoryConfigurator;
-import com.myservicebus.rabbitmq.RabbitMqTransport;
 import com.myservicebus.tasks.CancellationToken;
 import com.myservicebus.logging.LogLevel;
 import com.myservicebus.logging.Logger;
@@ -30,7 +25,6 @@ public class Main {
     public static void main(String[] args) {
 
         ServiceCollection services = ServiceCollection.create();
-        services.addScoped(MyService.class, MyServiceImpl.class);
 
         // Configure logging provider Slf4j
         services.from(Logging.class)
@@ -44,7 +38,7 @@ public class Main {
         services.from(MessageBusServices.class)
                 .addServiceBus(c -> {
                     c.addConsumer(SubmitOrderConsumer.class);
-                    // c.addConsumer(OrderSubmittedConsumer.class);
+                    c.addConsumer(OrderSubmittedConsumer.class);
                     c.addConsumer(TestRequestConsumer.class);
                     c.addConsumer(SubmitOrderFaultConsumer.class);
 
@@ -96,7 +90,7 @@ public class Main {
         app.get("/publish", ctx -> {
             try (ServiceScope scope = provider.createScope()) {
                 var publishEndpoint = scope.getServiceProvider().getService(PublishEndpoint.class);
-                SubmitOrder message = new SubmitOrder(UUID.randomUUID(), "MT Clone Java");
+                SubmitOrder message = new SubmitOrder(UUID.randomUUID(), DemoScenario.createSubmitMessage("java", false));
                 try {
                     publishEndpoint.publish(message, CancellationToken.none).join();
                     logger.info("📤 Published SubmitOrder {} ✅", message.getOrderId());
@@ -108,12 +102,27 @@ public class Main {
             }
         });
 
+        app.get("/publish/fault", ctx -> {
+            try (ServiceScope scope = provider.createScope()) {
+                var publishEndpoint = scope.getServiceProvider().getService(PublishEndpoint.class);
+                SubmitOrder message = new SubmitOrder(UUID.randomUUID(), DemoScenario.createSubmitMessage("java", true));
+                try {
+                    publishEndpoint.publish(message, CancellationToken.none).join();
+                    logger.info("📤 Published fault SubmitOrder {} ✅", message.getOrderId());
+                    ctx.result("Published fault SubmitOrder");
+                } catch (Exception e) {
+                    logger.error("❌ Failed to publish fault message", e);
+                    ctx.status(500).result("Failed to publish fault message");
+                }
+            }
+        });
+
         app.get("/send", ctx -> {
             try (ServiceScope scope = provider.createScope()) {
                 var scopedSp = scope.getServiceProvider();
                 var sendEndpointProvider = scopedSp.getService(SendEndpointProvider.class);
-                var sendEndpoint = sendEndpointProvider.getSendEndpoint("rabbitmq://localhost/orders-queue");
-                SubmitOrder message = new SubmitOrder(UUID.randomUUID(), "MT Clone Java");
+                var sendEndpoint = sendEndpointProvider.getSendEndpoint("rabbitmq://localhost/submit-order");
+                SubmitOrder message = new SubmitOrder(UUID.randomUUID(), DemoScenario.createSubmitMessage("java", false));
                 try {
                     sendEndpoint.send(message, CancellationToken.none).join();
                     logger.info("📤 Sent SubmitOrder {} ✅", message.getOrderId());
@@ -125,6 +134,23 @@ public class Main {
             }
         });
 
+        app.get("/send/fault", ctx -> {
+            try (ServiceScope scope = provider.createScope()) {
+                var scopedSp = scope.getServiceProvider();
+                var sendEndpointProvider = scopedSp.getService(SendEndpointProvider.class);
+                var sendEndpoint = sendEndpointProvider.getSendEndpoint("rabbitmq://localhost/submit-order");
+                SubmitOrder message = new SubmitOrder(UUID.randomUUID(), DemoScenario.createSubmitMessage("java", true));
+                try {
+                    sendEndpoint.send(message, CancellationToken.none).join();
+                    logger.info("📤 Sent fault SubmitOrder {} ✅", message.getOrderId());
+                    ctx.result("Sent fault SubmitOrder");
+                } catch (Exception e) {
+                    logger.error("❌ Failed to send fault message", e);
+                    ctx.status(500).result("Failed to send fault message");
+                }
+            }
+        });
+
         app.get("/request", ctx -> {
             try (ServiceScope scope = provider.createScope()) {
                 var scopedSp = scope.getServiceProvider();
@@ -132,13 +158,31 @@ public class Main {
                 var requestClient = requestClientFactory.create(TestRequest.class);
                 try {
                     var response = requestClient
-                            .getResponse(new TestRequest("Foo"), TestResponse.class, CancellationToken.none)
+                            .getResponse(new TestRequest(DemoScenario.createRequestMessage("java", false)), TestResponse.class, CancellationToken.none)
                             .get();
                     logger.info("📨 Received response {} ✅", response.getMessage().toString());
                     ctx.result(response.getMessage().toString());
                 } catch (Exception exc) {
                     logger.error("❌ Failed to get response", exc);
                     ctx.result(exc.getMessage().toString());
+                }
+            }
+        });
+
+        app.get("/request/fault", ctx -> {
+            try (ServiceScope scope = provider.createScope()) {
+                var scopedSp = scope.getServiceProvider();
+                var requestClientFactory = scopedSp.getService(ScopedClientFactory.class);
+                var requestClient = requestClientFactory.create(TestRequest.class);
+                try {
+                    var response = requestClient
+                            .getResponse(new TestRequest(DemoScenario.createRequestMessage("java", true)), TestResponse.class, CancellationToken.none)
+                            .get();
+                    logger.info("📨 Received response {} ✅", response.getMessage().toString());
+                    ctx.result(response.getMessage().toString());
+                } catch (Exception exc) {
+                    logger.error("❌ Failed to get response", exc);
+                    ctx.status(500).result(exc.getMessage());
                 }
             }
         });
@@ -150,7 +194,39 @@ public class Main {
                 var requestClient = requestClientFactory.create(TestRequest.class);
                 try {
                     var response = requestClient
-                            .getResponse(new TestRequest("Foo"), TestResponse.class,
+                            .getResponse(new TestRequest(DemoScenario.createRequestMessage("java", false)), TestResponse.class,
+                                    Fault.class, CancellationToken.none)
+                            .get();
+
+                    response.as(TestResponse.class).ifPresent((Response<TestResponse> r) -> {
+                        logger.info("📨 Received response {} ✅", r.getMessage().toString());
+                        ctx.result(r.getMessage().toString());
+                    });
+
+                    response.as(Fault.class).ifPresent(r -> {
+                        var exception = (ExceptionInfo) r.getMessage().getExceptions().get(0);
+                        String message = exception.getMessage();
+                        if (message == null) {
+                            message = exception.toString();
+                        }
+                        logger.error("❌ Fault received: " + message);
+                        ctx.status(500).result(message);
+                    });
+                } catch (Exception e) {
+                    logger.error("❌ Failed to get response", e);
+                    ctx.status(500).result("Failed to get response: " + e.getMessage());
+                }
+            }
+        });
+
+        app.get("/request_multi/fault", ctx -> {
+            try (ServiceScope scope = provider.createScope()) {
+                var scopedSp = scope.getServiceProvider();
+                var requestClientFactory = scopedSp.getService(ScopedClientFactory.class);
+                var requestClient = requestClientFactory.create(TestRequest.class);
+                try {
+                    var response = requestClient
+                            .getResponse(new TestRequest(DemoScenario.createRequestMessage("java", true)), TestResponse.class,
                                     Fault.class, CancellationToken.none)
                             .get();
 

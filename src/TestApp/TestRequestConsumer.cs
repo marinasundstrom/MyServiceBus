@@ -20,9 +20,12 @@ class TestRequestConsumer :
         var message = context.Message.Message;
 
         _logger.LogInformation("📨 Request: {Message}", message);
-        _logger.LogWarning("⚠️ Throwing InvalidOperationException");
 
-        throw new InvalidOperationException();
+        if (DemoScenario.ShouldFaultRequest(message))
+        {
+            _logger.LogWarning("⚠️ TestRequest marked as fault case");
+            throw new InvalidOperationException("TestRequest demo fault");
+        }
 
         await context.RespondAsync(new TestResponse
         {

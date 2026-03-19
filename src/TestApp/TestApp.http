@@ -4,3 +4,35 @@ GET {{TestApp_HostAddress}}/weatherforecast/
 Accept: application/json
 
 ###
+
+GET {{TestApp_HostAddress}}/publish
+
+###
+
+GET {{TestApp_HostAddress}}/publish/fault
+
+###
+
+GET {{TestApp_HostAddress}}/send
+
+###
+
+GET {{TestApp_HostAddress}}/send/fault
+
+###
+
+GET {{TestApp_HostAddress}}/request
+
+###
+
+GET {{TestApp_HostAddress}}/request/fault
+
+###
+
+GET {{TestApp_HostAddress}}/request_multi
+
+###
+
+GET {{TestApp_HostAddress}}/request_multi/fault
+
+###

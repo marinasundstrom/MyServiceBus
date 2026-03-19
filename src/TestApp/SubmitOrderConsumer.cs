@@ -14,9 +14,16 @@ class SubmitOrderConsumer :
         _logger = logger;
     }
 
+    [Throws(typeof(SecurityException))]
     public async Task Consume(ConsumeContext<SubmitOrder> context)
     {
         _logger.LogInformation("📨 Received SubmitOrder {OrderId} from {Message} ✅", context.Message.OrderId, context.Message.Message);
+
+        if (DemoScenario.ShouldFaultSubmit(context.Message.Message))
+        {
+            _logger.LogWarning("⚠️ SubmitOrder marked as fault case");
+            throw new InvalidOperationException("SubmitOrder demo fault");
+        }
 
         var replica = Environment.GetEnvironmentVariable("HTTP_PORT") ?? Environment.MachineName;
 
