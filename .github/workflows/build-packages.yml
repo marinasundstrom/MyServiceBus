@@ -1,0 +1,78 @@
+name: Build Packages
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build-packages:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set package version
+        id: version
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF_TYPE}" == "tag" && "${GITHUB_REF_NAME}" =~ ^v?(.+)$ ]]; then
+            version="${BASH_REMATCH[1]}"
+          else
+            version="0.0.0-ci.${GITHUB_RUN_NUMBER}"
+          fi
+
+          echo "package_version=${version}" >> "${GITHUB_OUTPUT}"
+          echo "Using package version: ${version}"
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Restore .NET solution
+        run: dotnet restore MyServiceBus.sln
+
+      - name: Test .NET solution
+        run: dotnet test MyServiceBus.sln --configuration Release --no-restore
+
+      - name: Pack .NET libraries
+        run: |
+          dotnet pack src/MyServiceBus.Abstractions/MyServiceBus.Abstractions.csproj --configuration Release --no-restore -p:PackageVersion=${{ steps.version.outputs.package_version }} -p:PackageOutputPath=${{ github.workspace }}/artifacts/packages/dotnet
+          dotnet pack src/MyServiceBus/MyServiceBus.csproj --configuration Release --no-restore -p:PackageVersion=${{ steps.version.outputs.package_version }} -p:PackageOutputPath=${{ github.workspace }}/artifacts/packages/dotnet
+          dotnet pack src/MyServiceBus.RabbitMq/MyServiceBus.RabbitMq.csproj --configuration Release --no-restore -p:PackageVersion=${{ steps.version.outputs.package_version }} -p:PackageOutputPath=${{ github.workspace }}/artifacts/packages/dotnet
+          dotnet pack src/MyServiceBus.Testing/MyServiceBus.Testing.csproj --configuration Release --no-restore -p:PackageVersion=${{ steps.version.outputs.package_version }} -p:PackageOutputPath=${{ github.workspace }}/artifacts/packages/dotnet
+
+      - name: Test Java build
+        run: gradle test
+
+      - name: Publish Java packages
+        run: gradle -PpackageVersion=${{ steps.version.outputs.package_version }} publishAllPublicationsToPackagesRepository
+
+      - name: Upload .NET packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: dotnet-packages-${{ steps.version.outputs.package_version }}
+          path: artifacts/packages/dotnet
+          if-no-files-found: error
+
+      - name: Upload Java packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: java-packages-${{ steps.version.outputs.package_version }}
+          path: build/packages/maven
+          if-no-files-found: error

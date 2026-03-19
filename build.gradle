@@ -1,6 +1,6 @@
 
 group = 'com.myservicebus'
-version = '1.0-SNAPSHOT'
+version = findProperty('packageVersion') ?: '1.0-SNAPSHOT'
 
 ext {
     lombokVersion = '1.18.34'
@@ -14,6 +14,15 @@ ext {
     mockitoVersion = '5.11.0'
     javalinVersion = '6.7.0'
     opentelemetryVersion = '1.43.0'
+    publishableJavaModules = [
+        'myservicebus',
+        'myservicebus-abstractions',
+        'myservicebus-di',
+        'myservicebus-logging',
+        'myservicebus-rabbitmq',
+        'myservicebus-tasks',
+        'myservicebus-testing'
+    ] as Set
 }
 
 subprojects {
@@ -26,6 +35,9 @@ subprojects {
     java {
         toolchain {
             languageVersion = JavaLanguageVersion.of(17)
+        }
+        if (rootProject.ext.publishableJavaModules.contains(project.name)) {
+            withSourcesJar()
         }
     }
 
@@ -52,5 +64,44 @@ subprojects {
 
     tasks.withType(Test) {
         useJUnitPlatform()
+    }
+
+    if (rootProject.ext.publishableJavaModules.contains(project.name)) {
+        apply plugin: 'maven-publish'
+
+        publishing {
+            publications {
+                mavenJava(MavenPublication) {
+                    from components.java
+                    artifactId = project.name
+
+                    pom {
+                        name = project.name
+                        description = "MyServiceBus ${project.name} library for Java."
+                        url = 'https://github.com/marinasundstrom/MyServiceBus'
+
+                        licenses {
+                            license {
+                                name = 'MIT License'
+                                url = 'https://opensource.org/licenses/MIT'
+                            }
+                        }
+
+                        scm {
+                            url = 'https://github.com/marinasundstrom/MyServiceBus'
+                            connection = 'scm:git:https://github.com/marinasundstrom/MyServiceBus.git'
+                            developerConnection = 'scm:git:https://github.com/marinasundstrom/MyServiceBus.git'
+                        }
+                    }
+                }
+            }
+
+            repositories {
+                maven {
+                    name = 'packages'
+                    url = rootProject.layout.buildDirectory.dir('packages/maven')
+                }
+            }
+        }
     }
 }

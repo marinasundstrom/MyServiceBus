@@ -3,6 +3,38 @@
         <UseArtifactsOutput>true</UseArtifactsOutput>
     </PropertyGroup>
 
+    <PropertyGroup Condition="'$(MSBuildProjectName)' == 'MyServiceBus' Or '$(MSBuildProjectName)' == 'MyServiceBus.Abstractions' Or '$(MSBuildProjectName)' == 'MyServiceBus.RabbitMq' Or '$(MSBuildProjectName)' == 'MyServiceBus.Testing'">
+        <IsPackable>true</IsPackable>
+        <PackageId>$(AssemblyName)</PackageId>
+        <Authors>Marina Sundstrom</Authors>
+        <Company>MyServiceBus</Company>
+        <PackageLicenseExpression>MIT</PackageLicenseExpression>
+        <RepositoryUrl>https://github.com/marinasundstrom/MyServiceBus</RepositoryUrl>
+        <RepositoryType>git</RepositoryType>
+        <PackageProjectUrl>https://github.com/marinasundstrom/MyServiceBus</PackageProjectUrl>
+        <PackageTags>servicebus;messaging;rabbitmq;masstransit</PackageTags>
+        <PublishRepositoryUrl>true</PublishRepositoryUrl>
+        <EmbedUntrackedSources>true</EmbedUntrackedSources>
+        <IncludeSymbols>true</IncludeSymbols>
+        <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    </PropertyGroup>
+
+    <PropertyGroup Condition="'$(MSBuildProjectName)' == 'MyServiceBus'">
+        <Description>Core MyServiceBus APIs and runtime for building message-based applications on .NET.</Description>
+    </PropertyGroup>
+
+    <PropertyGroup Condition="'$(MSBuildProjectName)' == 'MyServiceBus.Abstractions'">
+        <Description>Shared contracts and abstractions for MyServiceBus applications on .NET.</Description>
+    </PropertyGroup>
+
+    <PropertyGroup Condition="'$(MSBuildProjectName)' == 'MyServiceBus.RabbitMq'">
+        <Description>RabbitMQ transport integration for MyServiceBus on .NET.</Description>
+    </PropertyGroup>
+
+    <PropertyGroup Condition="'$(MSBuildProjectName)' == 'MyServiceBus.Testing'">
+        <Description>Testing helpers and in-memory harness support for MyServiceBus on .NET.</Description>
+    </PropertyGroup>
+
     <ItemGroup>
         <PackageReference Include="Sundstrom.CheckedExceptions">
             <PrivateAssets>all</PrivateAssets>
