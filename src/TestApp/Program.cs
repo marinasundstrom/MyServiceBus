@@ -9,15 +9,7 @@ using OpenTelemetry.Trace;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddOpenTelemetry()
-    .WithTracing(tracing =>
-    {
-        tracing
-            .AddSource("MyServiceBus")
-            .AddAspNetCoreInstrumentation()
-            .AddHttpClientInstrumentation()
-            .AddOtlpExporter();
-    });
+builder.AddServiceDefaults();
 
 builder.Services.AddServiceBus(x =>
 {
@@ -252,6 +244,8 @@ app.MapGet("/request_multi/fault", async Task<Results<Ok<string>, InternalServer
 })
 .WithName("Test_RequestMultiFault")
 .WithTags("Test");
+
+app.MapDefaultEndpoints();
 
 app.Run();
 
