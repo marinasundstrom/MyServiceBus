@@ -762,6 +762,8 @@ try (ServiceScope scope = provider.createScope()) {
 
 MyServiceBus automatically creates spans for send and consume operations and propagates W3C `traceparent` headers. Any active span when publishing or sending is injected into the message headers, and consumers create child spans from those headers. This mirrors MassTransit's OpenTelemetry integration so traces flow across both C# and Java services.
 
+For C# apps, OpenTelemetry must subscribe to the `MyServiceBus` activity source. The shared Aspire `AddServiceDefaults()` setup in this repository now does that automatically. If you configure OpenTelemetry manually, include `AddSource("MyServiceBus")` in your tracing setup or the bus spans and propagated trace headers will be missing.
+
 ---
 
 ### Health checks

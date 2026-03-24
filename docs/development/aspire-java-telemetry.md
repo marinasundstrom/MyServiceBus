@@ -90,7 +90,7 @@ dotnet run --project src/AspireApp/AspireApp.csproj
 
 ## C# telemetry note
 
-The C# app does not need an agent, but it does need to register the custom `MyServiceBus` activity source with OpenTelemetry so Aspire can export those spans.
+The C# app does not need an agent, but it does need to register the custom `MyServiceBus` activity source with OpenTelemetry so Aspire can export those spans. In this repository, `AddServiceDefaults()` now adds that source automatically. Custom hosts still need to call `AddSource("MyServiceBus")` themselves.
 
 See:
 

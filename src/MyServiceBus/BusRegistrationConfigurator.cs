@@ -21,8 +21,8 @@ public class BusRegistrationConfigurator : IBusRegistrationConfigurator
     public BusRegistrationConfigurator(IServiceCollection services)
     {
         Services = services;
-        sendConfigurator.UseFilter(new OpenTelemetrySendFilter());
-        publishConfigurator.UseFilter(new OpenTelemetrySendFilter());
+        sendConfigurator.UseFilter<OpenTelemetrySendFilter>();
+        publishConfigurator.UseFilter<OpenTelemetrySendFilter>();
     }
 
     public void AddConsumer<TConsumer>() where TConsumer : class, IConsumer

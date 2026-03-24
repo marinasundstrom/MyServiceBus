@@ -11,7 +11,16 @@ var rabbitmq = builder.AddRabbitMQ("messaging", rabbitUser, rabbitPassword, port
 
 var csharpTestApp = builder.AddProject<TestApp>("testapp")
     .WithReference(rabbitmq)
-    .WithExternalHttpEndpoints()
+    .WithEndpoint("https", endpoint =>
+    {
+        endpoint.Port = 7244;
+        endpoint.IsExternal = true;
+    })
+    .WithEndpoint("http", endpoint =>
+    {
+        endpoint.Port = 5112;
+        endpoint.IsExternal = true;
+    })
     .WaitFor(rabbitmq);
 
 var javaTestApp = builder.AddJavaApp(
