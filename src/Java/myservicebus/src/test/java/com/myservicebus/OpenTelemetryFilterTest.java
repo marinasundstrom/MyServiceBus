@@ -17,6 +17,8 @@ import io.opentelemetry.api.trace.Tracer;
 import io.opentelemetry.context.Context;
 import io.opentelemetry.context.propagation.ContextPropagators;
 import io.opentelemetry.context.propagation.TextMapPropagator;
+import io.opentelemetry.sdk.trace.SdkTracerProvider;
+import io.opentelemetry.sdk.trace.samplers.Sampler;
 import io.opentelemetry.api.trace.propagation.W3CTraceContextPropagator;
 import io.opentelemetry.sdk.OpenTelemetrySdk;
 
@@ -25,6 +27,7 @@ class OpenTelemetryFilterTest {
     void setup() {
         GlobalOpenTelemetry.resetForTest();
         OpenTelemetrySdk.builder()
+            .setTracerProvider(SdkTracerProvider.builder().setSampler(Sampler.alwaysOn()).build())
             .setPropagators(ContextPropagators.create(W3CTraceContextPropagator.getInstance()))
             .buildAndRegisterGlobal();
     }

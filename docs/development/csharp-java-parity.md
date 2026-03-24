@@ -14,3 +14,4 @@ This matrix tracks behavioral parity across the two client implementations. The 
 | Transport abstraction | Implemented | Implemented | RabbitMQ transport factories ensure exchanges exist before use. |
 | Retries | Implemented | Implemented | Both clients require explicit configuration to retry consumers. |
 | Configuration API (host, queue, message overrides, endpoint formatter) | Implemented | Implemented | Both clients support overriding names and automatic endpoint configuration with custom formatters. |
+| Logging and tracing flow | Implemented | Implemented | Both clients emit MassTransit-style lifecycle and message-flow logs and propagate OpenTelemetry context across send/publish/consume pipelines. |

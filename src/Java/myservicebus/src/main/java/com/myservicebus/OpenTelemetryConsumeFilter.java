@@ -13,9 +13,6 @@ import io.opentelemetry.context.propagation.TextMapGetter;
 import io.opentelemetry.context.propagation.TextMapPropagator;
 
 public class OpenTelemetryConsumeFilter<T> implements Filter<ConsumeContext<T>> {
-    private static final Tracer tracer = GlobalOpenTelemetry.getTracer("MyServiceBus");
-    private static final TextMapPropagator propagator = GlobalOpenTelemetry.getPropagators().getTextMapPropagator();
-
     private static final TextMapGetter<Map<String, Object>> getter = new TextMapGetter<>() {
         @Override
         public Iterable<String> keys(Map<String, Object> carrier) {
@@ -31,6 +28,8 @@ public class OpenTelemetryConsumeFilter<T> implements Filter<ConsumeContext<T>> 
 
     @Override
     public CompletableFuture<Void> send(ConsumeContext<T> context, Pipe<ConsumeContext<T>> next) {
+        Tracer tracer = GlobalOpenTelemetry.getTracer("MyServiceBus");
+        TextMapPropagator propagator = GlobalOpenTelemetry.getPropagators().getTextMapPropagator();
         Context parent = propagator.extract(Context.current(), context.getHeaders(), getter);
         Span span = tracer.spanBuilder("consume").setSpanKind(SpanKind.CONSUMER).setParent(parent).startSpan();
         try (Scope scope = span.makeCurrent()) {

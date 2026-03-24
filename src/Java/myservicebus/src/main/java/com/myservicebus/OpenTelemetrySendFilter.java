@@ -11,11 +11,10 @@ import io.opentelemetry.context.Context;
 import io.opentelemetry.context.propagation.TextMapPropagator;
 
 public class OpenTelemetrySendFilter implements Filter<SendContext> {
-    private static final Tracer tracer = GlobalOpenTelemetry.getTracer("MyServiceBus");
-    private static final TextMapPropagator propagator = GlobalOpenTelemetry.getPropagators().getTextMapPropagator();
-
     @Override
     public CompletableFuture<Void> send(SendContext context, Pipe<SendContext> next) {
+        Tracer tracer = GlobalOpenTelemetry.getTracer("MyServiceBus");
+        TextMapPropagator propagator = GlobalOpenTelemetry.getPropagators().getTextMapPropagator();
         Span span = tracer.spanBuilder("send").setSpanKind(SpanKind.PRODUCER).startSpan();
         try (Scope scope = span.makeCurrent()) {
             propagator.inject(Context.current(), context.getHeaders(), (c, k, v) -> c.put(k, v));

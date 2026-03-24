@@ -155,7 +155,8 @@ public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigura
         serviceCollection.addScoped(SendEndpointProvider.class,
                 sp -> () -> new SendEndpointProviderImpl(
                         sp.getService(ConsumeContextProvider.class),
-                        sp.getService(TransportSendEndpointProvider.class)));
+                        sp.getService(TransportSendEndpointProvider.class),
+                        sp.getService(LoggerFactory.class)));
         serviceCollection.addScoped(PublishEndpointProvider.class,
                 sp -> () -> new PublishEndpointProviderImpl(
                         sp.getService(ConsumeContextProvider.class),

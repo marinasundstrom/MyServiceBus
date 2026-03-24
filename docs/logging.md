@@ -16,7 +16,7 @@ If no provider is configured, a console logger is added automatically.
 ## What is logged
 
 - **Message operations** – sending, publishing, and receiving messages log
-  at the `Debug` level for traceability of message flow (message type and destination).
+  at the `Debug` level for traceability of message flow (message type and destination), using MassTransit-like `Sending`, `Publishing`, and `Received` messages in both clients.
 - **Lifecycle events** – starting and stopping the bus is reported at the
   `Information` level.
 - **Recoverable issues** – conditions such as malformed headers or

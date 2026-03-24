@@ -86,6 +86,10 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
         for (ReceiveTransport transport : receiveTransports) {
             transport.start();
         }
+
+        if (logger != null) {
+            logger.info("Service bus started");
+        }
     }
 
     public void addConsumer(ConsumerTopology consumerDef) throws Exception {
@@ -163,6 +167,9 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
                         CancellationToken.none,
                         provider,
                         this.address);
+                if (logger != null) {
+                    logger.debug("Received {}", messageTypeUrn);
+                }
                 return pipe.send(ctx);
             } catch (Exception e) {
                 CompletableFuture<Void> f = new CompletableFuture<>();
@@ -229,6 +236,9 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
                         typedEnvelope.getResponseAddress(), faultAddress, errorAddress, CancellationToken.none,
                         provider,
                         this.address);
+                if (logger != null) {
+                    logger.debug("Received {}", messageTypeUrn);
+                }
                 return pipe.send(ctx);
             } catch (Exception e) {
                 CompletableFuture<Void> f = new CompletableFuture<>();
@@ -274,6 +284,10 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
         for (ReceiveTransport transport : receiveTransports) {
             transport.stop();
         }
+
+        if (logger != null) {
+            logger.info("Service bus stopped");
+        }
     }
 
     @Override
@@ -309,6 +323,10 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
         context.setSourceAddress(this.address);
         context.setDestinationAddress(URI.create(address));
 
+        if (logger != null) {
+            logger.debug("Publishing {} to {}", context.getMessage().getClass().getSimpleName(), context.getDestinationAddress());
+        }
+
         CompletableFuture<Void> delayFuture;
         Instant scheduled = context.getScheduledEnqueueTime();
         if (scheduled != null) {
@@ -326,11 +344,7 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
         return delayFuture.thenCompose(v -> publishPipe.send(context).thenCompose(x -> {
             SendEndpointProvider provider = serviceProvider.getService(SendEndpointProvider.class);
             SendEndpoint endpoint = provider.getSendEndpoint(address);
-            return endpoint.send(context).thenRun(() -> {
-                if (logger != null) {
-                    logger.debug("Published message of type {}", context.getMessage().getClass().getSimpleName());
-                }
-            });
+            return endpoint.send(context);
         }));
     }
 
