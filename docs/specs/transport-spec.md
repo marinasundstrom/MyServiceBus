@@ -6,7 +6,7 @@ This document defines the contract for ServiceBus transports. It mirrors MassTra
 
 - Provide a factory that resolves send and receive transports and manages underlying connections.
 - Ensure required topology (queues, exchanges, topics) exists before sending or receiving messages.
-- Serialize and transmit envelopes with `content_type` defaulting to `application/vnd.masstransit+json` so they are compatible with MassTransit.
+- Serialize and transmit envelopes with `content_type` defaulting to `application/vnd.masstransit+json` so they are compatible with MassTransit. Transports may also send raw JSON with `content_type=application/json` when a raw serializer is explicitly selected. Receive paths must continue to support envelope messages by default and may dispatch raw `application/json` messages for endpoints that are explicitly configured for raw consumption.
 - Map headers prefixed with `_` to native transport properties.
 - Propagate cancellation tokens so operations can observe shutdown or timeouts.
 - Move failed messages to `<queue>_error` and publish `Fault<T>` messages to `<queue>_fault` describing the exception, matching MassTransit's fault-handling behavior.
@@ -26,4 +26,3 @@ This document defines the contract for ServiceBus transports. It mirrors MassTra
 ## Examples
 
 The RabbitMQ transport demonstrates these requirements. See [RabbitMQ Transport](rabbitmq-transport.md) for a concrete implementation.
-

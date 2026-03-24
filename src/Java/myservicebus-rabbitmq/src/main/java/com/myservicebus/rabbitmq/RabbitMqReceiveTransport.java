@@ -42,6 +42,11 @@ public class RabbitMqReceiveTransport implements ReceiveTransport {
             final Map<String, Object> headers = delivery.getProperties().getHeaders() != null
                     ? new HashMap<>(delivery.getProperties().getHeaders())
                     : new HashMap<>();
+            if (delivery.getProperties().getContentType() != null) {
+                headers.put("content_type", delivery.getProperties().getContentType());
+            } else {
+                headers.putIfAbsent("content_type", "application/vnd.masstransit+json");
+            }
             headers.putIfAbsent(MessageHeaders.FAULT_ADDRESS, faultAddress);
 
             TransportMessage tm = new TransportMessage(delivery.getBody(), headers);

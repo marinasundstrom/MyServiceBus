@@ -3,8 +3,10 @@ package com.myservicebus;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.HashSet;
+import java.nio.charset.StandardCharsets;
 import java.util.concurrent.CompletableFuture;
 import java.time.Duration;
 import java.time.Instant;
@@ -13,12 +15,14 @@ import java.util.function.Function;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.myservicebus.di.ServiceCollection;
 import com.myservicebus.di.ServiceProvider;
 import com.myservicebus.logging.Logger;
 import com.myservicebus.logging.LoggerFactory;
 import com.myservicebus.serialization.MessageDeserializer;
 import com.myservicebus.serialization.MessageSerializer;
+import com.myservicebus.serialization.RawJsonMessageSerializer;
 import com.myservicebus.tasks.CancellationToken;
 import com.myservicebus.topology.BusTopology;
 import com.myservicebus.topology.ConsumerTopology;
@@ -42,6 +46,7 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
     private final Set<String> consumerRegistrations = new HashSet<>();
     private final Set<String> messageTypes = new HashSet<>();
     private final Function<Class<?>, ConsumerFactory> consumerFactoryFactory;
+    private final ObjectMapper rawMessageMapper;
 
     public MessageBusImpl(ServiceProvider serviceProvider) {
         this(serviceProvider, type -> new ScopeConsumerFactory(serviceProvider));
@@ -62,6 +67,8 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
             md = new com.myservicebus.serialization.EnvelopeMessageDeserializer();
         }
         this.messageDeserializer = md;
+        this.rawMessageMapper = new ObjectMapper();
+        this.rawMessageMapper.findAndRegisterModules();
         BusTopology top = serviceProvider.getService(TopologyRegistry.class);
         this.topology = top != null ? top : new TopologyRegistry();
         URI configuredAddress = serviceProvider.getService(URI.class);
@@ -124,44 +131,60 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
         MessageSerializer endpointSerializer = consumerDef.getSerializerClass() != null
                 ? consumerDef.getSerializerClass().getDeclaredConstructor().newInstance()
                 : null;
+        boolean rawSerializer = isRawSerializer(endpointSerializer);
         TransportSendEndpointProvider provider = endpointSerializer != null
                 ? transportSendEndpointProvider.withSerializer(endpointSerializer)
                 : transportSendEndpointProvider;
 
         Function<TransportMessage, CompletableFuture<Void>> handler = transportMessage -> {
             try {
-                Envelope<Object> envelope = messageDeserializer.deserialize(transportMessage.getBody(), Object.class);
-                String messageTypeUrn = envelope.getMessageType() != null && !envelope.getMessageType().isEmpty()
-                        ? envelope.getMessageType().get(0)
-                        : null;
-                MessageBinding binding = consumerDef.getBindings().stream()
-                        .filter(b -> MessageUrn.forClass(b.getMessageType()).equals(messageTypeUrn))
-                        .findFirst()
-                        .orElse(null);
-                  if (binding == null) {
-                      if (logger != null) {
-                          logger.warn("Received message with unregistered type {}", messageTypeUrn);
-                      }
-                      return CompletableFuture.completedFuture(null);
-                  }
+                String messageTypeUrn = null;
+                Object message;
+                Map<String, Object> headers;
+                String responseAddress = null;
+                String faultAddress = null;
+                MessageBinding binding;
 
-                Type messageType = resolveMessageType(consumerDef.getConsumerType(), binding.getMessageType());
-                Envelope<?> typedEnvelope = messageDeserializer.deserialize(transportMessage.getBody(),
-                        messageType);
+                if (rawSerializer && isRawContentType(transportMessage)) {
+                    binding = consumerDef.getBindings().get(0);
+                    Type messageType = resolveMessageType(consumerDef.getConsumerType(), binding.getMessageType());
+                    message = deserializeRaw(transportMessage.getBody(), messageType);
+                    headers = transportMessage.getHeaders();
+                    faultAddress = getHeaderString(transportMessage.getHeaders(), MessageHeaders.FAULT_ADDRESS);
+                } else {
+                    Envelope<Object> envelope = messageDeserializer.deserialize(transportMessage.getBody(), Object.class);
+                    messageTypeUrn = envelope.getMessageType() != null && !envelope.getMessageType().isEmpty()
+                            ? envelope.getMessageType().get(0)
+                            : null;
+                    final String resolvedMessageTypeUrn = messageTypeUrn;
+                    binding = consumerDef.getBindings().stream()
+                            .filter(b -> MessageUrn.forClass(b.getMessageType()).equals(resolvedMessageTypeUrn))
+                            .findFirst()
+                            .orElse(null);
+                    if (binding == null) {
+                        if (logger != null) {
+                            logger.warn("Received message with unregistered type {}", messageTypeUrn);
+                        }
+                        return CompletableFuture.completedFuture(null);
+                    }
 
-                String faultAddress = typedEnvelope.getFaultAddress();
-                if (faultAddress == null && transportMessage.getHeaders() != null) {
-                    Object header = transportMessage.getHeaders().get(MessageHeaders.FAULT_ADDRESS);
-                    if (header instanceof String s) {
-                        faultAddress = s;
+                    Type messageType = resolveMessageType(consumerDef.getConsumerType(), binding.getMessageType());
+                    Envelope<?> typedEnvelope = messageDeserializer.deserialize(transportMessage.getBody(), messageType);
+                    message = typedEnvelope.getMessage();
+                    headers = typedEnvelope.getHeaders();
+                    responseAddress = typedEnvelope.getResponseAddress();
+                    faultAddress = typedEnvelope.getFaultAddress();
+                    if (faultAddress == null && transportMessage.getHeaders() != null) {
+                        faultAddress = getHeaderString(transportMessage.getHeaders(), MessageHeaders.FAULT_ADDRESS);
                     }
                 }
+
                 String errorAddress = transportFactory.getPublishAddress(consumerDef.getQueueName() + "_error");
 
                 ConsumeContext<Object> ctx = new ConsumeContext<>(
-                        typedEnvelope.getMessage(),
-                        typedEnvelope.getHeaders(),
-                        typedEnvelope.getResponseAddress(),
+                        message,
+                        headers,
+                        responseAddress,
                         faultAddress,
                         errorAddress,
                         CancellationToken.none,
@@ -178,7 +201,7 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
             }
         };
 
-        java.util.function.Function<String, Boolean> isRegistered = urn -> messageTypes.contains(urn);
+        java.util.function.Function<String, Boolean> isRegistered = urn -> urn == null ? rawSerializer : messageTypes.contains(urn);
         ReceiveTransport transport = transportFactory.createReceiveTransport(consumerDef.getQueueName(),
                 consumerDef.getBindings(), handler, isRegistered,
                 consumerDef.getPrefetchCount() != null ? consumerDef.getPrefetchCount() : 0,
@@ -205,35 +228,49 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
         configurator.useFilter(new HandlerMessageFilter<>(handler));
         Pipe<ConsumeContext<T>> pipe = configurator.build(serviceProvider);
 
+        boolean rawSerializer = isRawSerializer(serializer);
         TransportSendEndpointProvider provider = serializer != null
                 ? transportSendEndpointProvider.withSerializer(serializer)
                 : transportSendEndpointProvider;
 
         java.util.function.Function<TransportMessage, CompletableFuture<Void>> transportHandler = tm -> {
             try {
-                Envelope<Object> envelope = messageDeserializer.deserialize(tm.getBody(), Object.class);
-                String messageTypeUrn = envelope.getMessageType() != null && !envelope.getMessageType().isEmpty()
-                        ? envelope.getMessageType().get(0)
-                        : null;
                 String expectedUrn = MessageUrn.forClass(messageType);
-                  if (!expectedUrn.equals(messageTypeUrn)) {
-                      if (logger != null) {
-                          logger.warn("Received message with unregistered type {}", messageTypeUrn);
-                      }
-                      return CompletableFuture.completedFuture(null);
-                  }
+                String messageTypeUrn = null;
+                T typedMessage;
+                Map<String, Object> headers;
+                String responseAddress = null;
+                String faultAddress = null;
 
-                Envelope<?> typedEnvelope = messageDeserializer.deserialize(tm.getBody(), messageType);
-                String faultAddress = typedEnvelope.getFaultAddress();
-                if (faultAddress == null && tm.getHeaders() != null) {
-                    Object header = tm.getHeaders().get(MessageHeaders.FAULT_ADDRESS);
-                    if (header instanceof String s) {
-                        faultAddress = s;
+                if (rawSerializer && isRawContentType(tm)) {
+                    typedMessage = deserializeRaw(tm.getBody(), messageType);
+                    headers = tm.getHeaders();
+                    faultAddress = getHeaderString(tm.getHeaders(), MessageHeaders.FAULT_ADDRESS);
+                } else {
+                    Envelope<Object> envelope = messageDeserializer.deserialize(tm.getBody(), Object.class);
+                    messageTypeUrn = envelope.getMessageType() != null && !envelope.getMessageType().isEmpty()
+                            ? envelope.getMessageType().get(0)
+                            : null;
+                    if (!expectedUrn.equals(messageTypeUrn)) {
+                        if (logger != null) {
+                            logger.warn("Received message with unregistered type {}", messageTypeUrn);
+                        }
+                        return CompletableFuture.completedFuture(null);
+                    }
+
+                    Envelope<?> typedEnvelope = messageDeserializer.deserialize(tm.getBody(), messageType);
+                    typedMessage = (T) typedEnvelope.getMessage();
+                    headers = typedEnvelope.getHeaders();
+                    responseAddress = typedEnvelope.getResponseAddress();
+                    faultAddress = typedEnvelope.getFaultAddress();
+                    if (faultAddress == null && tm.getHeaders() != null) {
+                        faultAddress = getHeaderString(tm.getHeaders(), MessageHeaders.FAULT_ADDRESS);
                     }
                 }
+
                 String errorAddress = transportFactory.getPublishAddress(queueName + "_error");
-                ConsumeContext<T> ctx = new ConsumeContext<>((T) typedEnvelope.getMessage(), typedEnvelope.getHeaders(),
-                        typedEnvelope.getResponseAddress(), faultAddress, errorAddress, CancellationToken.none,
+                ConsumeContext<T> ctx = new ConsumeContext<>(typedMessage, headers,
+                        responseAddress, faultAddress, errorAddress, CancellationToken.none,
                         provider,
                         this.address);
                 if (logger != null) {
@@ -254,7 +291,7 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
         bindings.add(binding);
 
         String expectedUrn = MessageUrn.forClass(messageType);
-        java.util.function.Function<String, Boolean> isRegisteredHandler = urn -> expectedUrn.equals(urn);
+        java.util.function.Function<String, Boolean> isRegisteredHandler = urn -> expectedUrn.equals(urn) || (rawSerializer && urn == null);
 
         ReceiveTransport transport = transportFactory.createReceiveTransport(queueName, bindings, transportHandler,
                 isRegisteredHandler, prefetchCount != null ? prefetchCount : 0, queueArguments);
@@ -278,6 +315,33 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
             }
         }
         return bindingType;
+    }
+
+    private static boolean isRawSerializer(MessageSerializer serializer) {
+        return serializer instanceof RawJsonMessageSerializer;
+    }
+
+    private static String getHeaderString(Map<String, Object> headers, String key) {
+        if (headers == null) {
+            return null;
+        }
+
+        Object value = headers.get(key);
+        if (value instanceof byte[] bytes) {
+            return new String(bytes, StandardCharsets.UTF_8);
+        }
+
+        return value != null ? value.toString() : null;
+    }
+
+    private static boolean isRawContentType(TransportMessage transportMessage) {
+        String contentType = getHeaderString(transportMessage.getHeaders(), "content_type");
+        return "application/json".equalsIgnoreCase(contentType);
+    }
+
+    @SuppressWarnings("unchecked")
+    private <T> T deserializeRaw(byte[] body, Type type) throws Exception {
+        return (T) rawMessageMapper.readValue(body, rawMessageMapper.getTypeFactory().constructType(type));
     }
 
     public void stop() throws Exception {

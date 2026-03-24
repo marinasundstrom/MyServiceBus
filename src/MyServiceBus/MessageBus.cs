@@ -99,6 +99,8 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
         IDictionary<string, object?>? queueArguments = null, IMessageSerializer? serializer = null, CancellationToken cancellationToken = default)
         where TMessage : class
     {
+        var endpointSerializer = serializer ?? _messageSerializer;
+        var rawSerializer = IsRawSerializer(endpointSerializer);
         var topology = new ReceiveEndpointTopology
         {
             QueueName = queueName,
@@ -123,13 +125,12 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
 
         async Task TransportHandler(ReceiveContext context)
         {
-            var messageSerializer = serializer ?? _messageSerializer;
-            var consumeContext = new ConsumeContextImpl<TMessage>(context, _transportFactory, _sendPipe, _publishPipe, messageSerializer, _address, _sendContextFactory, _publishContextFactory, _serviceProvider.GetService<ILoggerFactory>());
+            var consumeContext = new ConsumeContextImpl<TMessage>(context, _transportFactory, _sendPipe, _publishPipe, endpointSerializer, _address, _sendContextFactory, _publishContextFactory, _serviceProvider.GetService<ILoggerFactory>());
             await pipe.Send(consumeContext).ConfigureAwait(false);
         }
 
         var expectedUrn = MessageUrn.For(typeof(TMessage));
-        Func<string?, bool> isRegistered = mt => mt == expectedUrn;
+        Func<string?, bool> isRegistered = mt => mt == expectedUrn || (rawSerializer && mt == null);
         var receiveTransport = await _transportFactory.CreateReceiveTransport(topology, TransportHandler, isRegistered, cancellationToken);
         _activeTransports.Add(receiveTransport);
     }
@@ -160,7 +161,10 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
         };
 
         Func<string?, bool> isRegistered = mt =>
-            _consumers.TryGetValue(queueName, out var regs) && regs.Any(r => r.MessageUrn == mt);
+            _consumers.TryGetValue(queueName, out var regs)
+            && (mt == null
+                ? regs.Any(r => IsRawSerializer(r.Serializer))
+                : regs.Any(r => r.MessageUrn == mt));
         var receiveTransport = await _transportFactory.CreateReceiveTransport(
             topology,
             (ctx) => HandleMessageAsync(queueName, ctx),
@@ -202,13 +206,15 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
     private async Task HandleMessageAsync(string queueName, ReceiveContext context)
     {
         var messageTypeName = context.MessageType.FirstOrDefault();
-        if (messageTypeName == null || !_consumers.TryGetValue(queueName, out var registrations))
+        if (!_consumers.TryGetValue(queueName, out var registrations))
         {
             _logger?.LogWarning("Received message with unregistered type {MessageType}", messageTypeName ?? "<null>");
             return;
         }
 
-        var matches = registrations.Where(r => r.MessageUrn == messageTypeName).ToList();
+        var matches = messageTypeName == null
+            ? registrations.Where(r => IsRawSerializer(r.Serializer)).ToList()
+            : registrations.Where(r => r.MessageUrn == messageTypeName).ToList();
         if (matches.Count == 0)
         {
             _logger?.LogWarning("Received message with unregistered type {MessageType}", messageTypeName);
@@ -236,4 +242,6 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
         }
     }
 
+    private static bool IsRawSerializer(IMessageSerializer serializer)
+        => serializer is RawJsonMessageSerializer;
 }

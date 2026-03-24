@@ -9,7 +9,7 @@ The ServiceBus C# client provides a lightweight messaging abstraction for buildi
 - `ConsumeContext` supplies `Send` and `GetSendEndpoint` to send messages to arbitrary addresses.
 - `ConsumeContext` offers `Forward` to redirect a consumed message to another address.
 - `SendContext` captures headers, correlation and response addresses, and serializes messages into the ServiceBus envelope format.
-- Messages automatically include a `content_type` header with value `application/vnd.masstransit+json`. When a consumed message lacks this header, the client assumes the envelope content type.
+- Messages automatically include a `content_type` header with value `application/vnd.masstransit+json`. When `RawJsonMessageSerializer` is selected for outbound operations, the `content_type` becomes `application/json`. When a consumed message lacks a content type, the client assumes the envelope format.
 - Headers prefixed with `_` are applied to the underlying transport properties (for example, `_correlation_id` sets the AMQP `correlation-id`).
 
 ### Publishing
@@ -37,5 +37,5 @@ The ServiceBus C# client provides a lightweight messaging abstraction for buildi
 - Outgoing messages include host information such as machine name, process details, and framework version to aid in diagnostics and tracing.
 
 ## Behavior
-- Message serialization defaults to `EnvelopeMessageSerializer` but can be swapped (e.g., `RawJsonMessageSerializer`) via `SetSerializer<T>()` during registration.
+- Message serialization defaults to `EnvelopeMessageSerializer` but can be swapped (e.g., `RawJsonMessageSerializer`) via `SetSerializer<T>()` during registration. Raw mode supports outbound `send` and `publish`, and receive endpoints explicitly configured with `RawJsonMessageSerializer` can consume inbound `application/json` messages without an envelope.
 - Send, publish, and respond operations are asynchronous and honor cancellation tokens.
