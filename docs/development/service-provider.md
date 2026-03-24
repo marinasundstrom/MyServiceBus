@@ -20,3 +20,6 @@ expect the current provider instance to be supplied.
 The built-in Guice implementation automatically binds `ServiceProvider` to the provider it
 constructs, so your services can request it without additional configuration.
 
+Application-facing code should not depend on Guice annotations or Guice-only APIs.
+Use standard `javax.inject.Inject` for constructor injection so the same consumers
+and services can be activated by alternate adapters.

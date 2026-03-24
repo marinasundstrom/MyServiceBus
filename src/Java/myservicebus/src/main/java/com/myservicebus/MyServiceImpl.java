@@ -2,8 +2,8 @@ package com.myservicebus;
 
 import java.util.Random;
 
-import com.google.inject.Inject;
 import com.myservicebus.di.ServiceProvider;
+import javax.inject.Inject;
 
 public class MyServiceImpl implements MyService {
     private ServiceProvider serviceProvider;

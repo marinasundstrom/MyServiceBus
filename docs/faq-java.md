@@ -204,7 +204,7 @@ In .NET, these semantics are naturally provided by the platform’s dependency i
 
 To avoid coupling the core runtime to a specific framework, MyServiceBus defines a **minimal abstraction** that expresses only what the bus itself needs in order to function predictably.
 
-**Google Guice is used as the default implementation** of `ServiceProvider`. It was chosen because it is lightweight, code-first, and well suited for programmatic composition. This is an implementation detail; applications are not required to adopt Guice as their primary DI framework.
+**Google Guice is used as the default implementation** of `ServiceProvider`. It was chosen because it is lightweight, code-first, and well suited for programmatic composition. This is an implementation detail; applications are not required to adopt Guice as their primary DI framework, and application code should stick to MyServiceBus DI contracts plus standard `javax.inject` annotations.
 
 MyServiceBus can be used in multiple ways:
 

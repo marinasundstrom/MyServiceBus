@@ -20,4 +20,4 @@ These differences stem from language and platform constraints rather than diverg
 
 ## Dependency choices
 
-The .NET client builds on `System.Text.Json` and the `Microsoft.Extensions` stack for configuration, dependency injection, and logging. The Java client mirrors these roles with Jackson, Guice, and SLF4J. Both implementations use the RabbitMQ client provided by their platform. See [client dependencies](dependencies.md) for a full list.
+The .NET client builds on `System.Text.Json` and the `Microsoft.Extensions` stack for configuration, dependency injection, and logging. The Java client mirrors these roles with Jackson, MyServiceBus DI abstractions plus standard `javax.inject` annotations, a default Guice-backed container adapter, and SLF4J. Both implementations use the RabbitMQ client provided by their platform. See [client dependencies](dependencies.md) for a full list.

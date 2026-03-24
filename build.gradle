@@ -7,6 +7,7 @@ ext {
     jacksonVersion = '2.17.2'
     rabbitmqVersion = '5.20.0'
     guiceVersion = '5.1.0'
+    javaxInjectVersion = '1'
     slf4jVersion = '2.0.13'
     junitVersion = '5.10.0'
     // JUnit Platform version aligned with JUnit Jupiter 5.10.x
@@ -34,6 +35,7 @@ subprojects {
     }
 
     dependencies {
+        api "javax.inject:javax.inject:${javaxInjectVersion}"
         compileOnly "org.projectlombok:lombok:${lombokVersion}"
         annotationProcessor "org.projectlombok:lombok:${lombokVersion}"
         implementation "com.fasterxml.jackson.core:jackson-databind:${jacksonVersion}"

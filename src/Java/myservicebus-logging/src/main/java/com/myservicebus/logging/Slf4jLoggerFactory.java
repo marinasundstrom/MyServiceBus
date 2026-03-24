@@ -1,6 +1,6 @@
 package com.myservicebus.logging;
 
-import com.google.inject.Inject;
+import javax.inject.Inject;
 
 public class Slf4jLoggerFactory implements LoggerFactory {
     private final Slf4jLoggerConfig config;

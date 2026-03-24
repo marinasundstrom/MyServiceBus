@@ -12,7 +12,8 @@ This document lists the primary libraries used by the reference MyServiceBus cli
 ## Java
 
 - **Serialization**: `com.fasterxml.jackson` (`jackson-databind`, `jackson-datatype-jsr310`)
-- **Dependency injection**: `com.google.inject:guice`
+- **Dependency injection abstraction**: `javax.inject:javax.inject`
+- **Default DI container implementation**: `com.google.inject:guice`
 - **Logging**: `org.slf4j:slf4j-api` (examples use `slf4j-simple`)
 - **Transport**: `com.rabbitmq:amqp-client`
 

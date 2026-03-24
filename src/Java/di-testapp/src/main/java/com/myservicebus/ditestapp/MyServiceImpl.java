@@ -1,7 +1,7 @@
 package com.myservicebus.ditestapp;
 
-import com.google.inject.Inject;
 import com.myservicebus.di.ServiceProvider;
+import javax.inject.Inject;
 
 public class MyServiceImpl implements MyService {
     private ServiceProvider serviceProvider;

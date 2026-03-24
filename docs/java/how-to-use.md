@@ -5,7 +5,9 @@ The Service Bus API is still in the works.
 ## Configure Service Bus
 
 We use `ServiceCollection` to register services that will supplied to the `Consumers`.
-`ServiceCollection.create()` produces the default implementation built on Guice.
+`ServiceCollection.create()` produces the default implementation of the MyServiceBus DI abstractions.
+That implementation is currently backed by Guice, but application code should depend only on
+the MyServiceBus DI contracts and standard `javax.inject` annotations.
 
 ```java
 package com.myservicebus.testapp;
@@ -125,11 +127,11 @@ package com.myservicebus.testapp;
 
 import java.util.concurrent.CompletableFuture;
 
-import com.google.inject.Inject;
 import com.myservicebus.ConsumeContext;
 import com.myservicebus.Consumer;
 import com.myservicebus.MyService;
 import com.myservicebus.tasks.CancellationToken;
+import javax.inject.Inject;
 
 class SubmitOrderConsumer implements Consumer<SubmitOrder> {
     private MyService service;
@@ -190,4 +192,3 @@ MassTransit and the C# client bind filters using generics, so the compiler
 selects the correct pipeline for each message and context. Java's type erasure
 prevents that, so the Java client dispatches filters through a runtime registry
 indexed by `Class` tokens.
-

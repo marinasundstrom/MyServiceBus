@@ -1,10 +1,12 @@
 # Dependency injection
 
-Custom wrapper around Guice. Made to look similar to .NET DI.
+MyServiceBus defines a small DI abstraction that looks similar to .NET DI while
+staying container-agnostic at the library boundary.
 
-`ServiceCollection.create()` constructs a `DefaultServiceCollection`
-backed by [Guice](https://github.com/google/guice), so the default container
-uses Guice under the hood while presenting a .NET-like API.
+`ServiceCollection.create()` constructs the default `DefaultServiceCollection`.
+That implementation is currently backed by [Guice](https://github.com/google/guice),
+but Guice is an implementation detail of `myservicebus-di`, not part of the
+MyServiceBus application programming model.
 
 Supporting lifetimes, scopes, and injecting `ServiceProvider`.
 
@@ -44,8 +46,8 @@ frozen and further modifications throw an `IllegalStateException`.
 Each registration in the collection is represented by a `ServiceDescriptor`
 containing the service type, implementation type or factory, optional instance,
 the service lifetime (`SINGLETON` or `SCOPED`), and whether it participates in
-multi-binding. Descriptors are primarily consumed when building the underlying
-Guice injector but can also be used for diagnostics or tooling.
+multi-binding. Descriptors are primarily consumed when building the default
+container adapter but can also be used for diagnostics or tooling.
 
 ### Basic usage
 
@@ -122,13 +124,24 @@ ServiceProvider provider = services.connectAndBuild(existing);
 
 ### Integrating another DI container
 
-`DefaultServiceCollection` uses Guice internally, but you can adapt
-MyServiceBus to another IoC framework by implementing the `ServiceCollection`
-interface yourself. Your implementation can translate registrations into the
-container's API and return a custom `ServiceProvider` from `buildServiceProvider`.
-That provider must honor the `ServiceProvider` and `ServiceScope` interfaces so
-consumers can resolve services and create scopes just like the built-in
-implementation.
+`DefaultServiceCollection` uses Guice internally, but MyServiceBus does not
+require Guice-specific application code. To adapt MyServiceBus to another IoC
+framework, implement the `ServiceCollection` interface yourself. Your
+implementation can translate registrations into the container's API and return
+a custom `ServiceProvider` from `buildServiceProvider`. That provider must honor
+the `ServiceProvider` and `ServiceScope` interfaces so consumers can resolve
+services and create scopes just like the built-in implementation.
+
+Third-party adapters should treat these MyServiceBus contracts as the stable
+integration boundary:
+
+- `ServiceCollection` captures registrations.
+- `ServiceProvider` resolves services and creates child scopes.
+- `ServiceScope` defines the lifetime boundary for per-message dependencies.
+
+Application services, consumers, and MyServiceBus extensions should use
+standard `javax.inject.Inject` for constructor injection. This keeps user code
+portable across Guice, Spring, Dagger, CDI, or a custom adapter.
 
 ### Registering bindings for factories
 
@@ -146,13 +159,13 @@ WidgetFactory factory = provider.getService(WidgetFactory.class);
 Widget widget = factory.create();
 ```
 
-Constructor injection using Guice's `@Inject`:
+Constructor injection using standard JSR-330 `@Inject`:
 
 ```java
 package com.myservicebus;
 
-import com.google.inject.Inject;
 import com.myservicebus.di.ServiceProvider;
+import javax.inject.Inject;
 
 public class MyServiceImpl implements MyService {
     private ServiceProvider serviceProvider;

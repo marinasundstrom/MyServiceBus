@@ -8,11 +8,11 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.jupiter.api.Test;
+import javax.inject.Inject;
 
 import com.myservicebus.tasks.CancellationToken;
 import com.myservicebus.di.ServiceCollection;
 import com.myservicebus.di.ServiceProvider;
-import com.google.inject.Inject;
 
 class PipeConfiguratorTest {
     static class TestContext implements PipeContext {
