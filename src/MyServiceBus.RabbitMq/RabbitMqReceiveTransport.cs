@@ -17,7 +17,8 @@ public sealed class RabbitMqReceiveTransport : IReceiveTransport
     private readonly IChannel _channel;
     private readonly string _queueName;
     private readonly Func<ReceiveContext, Task> _messageHandler;
-    private readonly MessageContextFactory _contextFactory = new();
+    private readonly IInboundMessageResolver _inboundMessageResolver = new InboundMessageResolver();
+    private readonly IMessageHeaderConvention _headerConvention = MassTransitHeaderConvention.Instance;
     private readonly bool _hasErrorQueue;
     private readonly Func<string?, bool>? _isMessageTypeRegistered;
     private readonly ILogger<RabbitMqReceiveTransport>? _logger;
@@ -46,15 +47,15 @@ public sealed class RabbitMqReceiveTransport : IReceiveTransport
 
                 var headers = props.Headers?.ToDictionary(x => x.Key, x => (object)x.Value!) ?? new Dictionary<string, object>();
                 if (!string.IsNullOrEmpty(props.ContentType))
-                    headers["content_type"] = props.ContentType!;
-                else if (!headers.ContainsKey("content_type"))
-                    headers["content_type"] = "application/vnd.masstransit+json";
+                    headers[_headerConvention.ContentTypeHeader] = props.ContentType!;
+                else if (!headers.ContainsKey(_headerConvention.ContentTypeHeader))
+                    headers[_headerConvention.ContentTypeHeader] = InboundMessageResolver.EnvelopeContentType;
 
-                if (_hasErrorQueue && !headers.ContainsKey(MessageHeaders.FaultAddress))
-                    headers[MessageHeaders.FaultAddress] = $"rabbitmq://localhost/exchange/{_queueName}_fault";
+                if (_hasErrorQueue && !headers.ContainsKey(_headerConvention.FaultAddressHeader))
+                    headers[_headerConvention.FaultAddressHeader] = $"rabbitmq://localhost/exchange/{_queueName}_fault";
 
                 var transportMessage = new RabbitMqTransportMessage(headers, props.Persistent, payload);
-                var messageContext = _contextFactory.CreateMessageContext(transportMessage);
+                var messageContext = _inboundMessageResolver.Resolve(transportMessage);
 
                 var errorAddress = _hasErrorQueue
                     ? new Uri($"rabbitmq://localhost/exchange/{_queueName}_error")

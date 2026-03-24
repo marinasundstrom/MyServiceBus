@@ -8,6 +8,7 @@ public class EnvelopeMessageContext : IMessageContext
     private readonly JsonSerializerOptions _jsonSerializerOptions = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
     private readonly Dictionary<Type, object> _messageCache = new();
     private readonly IDictionary<string, object> _transportHeaders;
+    private readonly IMessageHeaderConvention _headerConvention;
 
     private Guid? _messageId;
     private Guid? _correlationId;
@@ -17,10 +18,11 @@ public class EnvelopeMessageContext : IMessageContext
     private Uri? _responseAddress;
     private Uri? _faultAddress;
 
-    public EnvelopeMessageContext(byte[] jsonBytes, IDictionary<string, object> transportHeaders)
+    public EnvelopeMessageContext(byte[] jsonBytes, IDictionary<string, object> transportHeaders, IMessageHeaderConvention? headerConvention = null)
     {
         _jsonDocument = JsonDocument.Parse(jsonBytes);
         _transportHeaders = transportHeaders;
+        _headerConvention = headerConvention ?? MassTransitHeaderConvention.Instance;
     }
 
     public Guid MessageId =>
@@ -58,7 +60,7 @@ public class EnvelopeMessageContext : IMessageContext
                 return _faultAddress;
             }
             var s = TryGetProperty("faultAddress")?.GetString();
-            if (s is null && _transportHeaders.TryGetValue(MessageHeaders.FaultAddress, out var header))
+            if (s is null && _transportHeaders.TryGetValue(_headerConvention.FaultAddressHeader, out var header))
             {
                 if (header is string str)
                     s = str;
@@ -77,6 +79,10 @@ public class EnvelopeMessageContext : IMessageContext
 
     public DateTimeOffset SentTime =>
         _sentTime ??= TryGetProperty("sentTime")?.GetDateTimeOffset() ?? default;
+
+    public string ContentType => InboundMessageResolver.EnvelopeContentType;
+
+    public InboundMessageFormat Format => InboundMessageFormat.Envelope;
 
     public bool TryGetMessage<T>(out T? message) where T : class
     {

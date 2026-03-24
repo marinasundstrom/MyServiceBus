@@ -15,10 +15,12 @@ public class ReceiveEndpointSerializerTests
     class CustomSerializer : IMessageSerializer
     {
         public int Calls;
+        public string ContentType => "application/custom";
+        public MessageEnvelopeMode EnvelopeMode => MessageEnvelopeMode.Raw;
         public Task<byte[]> SerializeAsync<T>(MessageSerializationContext<T> context) where T : class
         {
             Calls++;
-            context.Headers["content_type"] = "application/custom";
+            context.Headers["content_type"] = ContentType;
             return Task.FromResult(Array.Empty<byte>());
         }
     }
@@ -107,6 +109,8 @@ public class ReceiveEndpointSerializerTests
         public Uri? FaultAddress { get; }
         public IDictionary<string, object> Headers { get; }
         public DateTimeOffset SentTime { get; }
+        public string ContentType => InboundMessageResolver.EnvelopeContentType;
+        public InboundMessageFormat Format => InboundMessageFormat.Envelope;
 
         public bool TryGetMessage<T>(out T? message) where T : class
         {

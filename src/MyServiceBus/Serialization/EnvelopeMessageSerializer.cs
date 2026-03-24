@@ -5,6 +5,22 @@ namespace MyServiceBus.Serialization;
 
 public class EnvelopeMessageSerializer : IMessageSerializer
 {
+    private readonly IMessageHeaderConvention _headerConvention;
+
+    public EnvelopeMessageSerializer()
+        : this(MassTransitHeaderConvention.Instance)
+    {
+    }
+
+    public EnvelopeMessageSerializer(IMessageHeaderConvention headerConvention)
+    {
+        _headerConvention = headerConvention;
+    }
+
+    public string ContentType => InboundMessageResolver.EnvelopeContentType;
+
+    public MessageEnvelopeMode EnvelopeMode => MessageEnvelopeMode.Envelope;
+
     private static readonly JsonSerializerOptions _options = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -13,10 +29,10 @@ public class EnvelopeMessageSerializer : IMessageSerializer
 
     public Task<byte[]> SerializeAsync<T>(MessageSerializationContext<T> context) where T : class
     {
-        context.Headers["content_type"] = "application/vnd.masstransit+json";
+        context.Headers[_headerConvention.ContentTypeHeader] = ContentType;
 
         var headers = context.Headers
-            .Where(kv => !kv.Key.StartsWith("MT-Host-", StringComparison.Ordinal))
+            .Where(kv => !_headerConvention.IsHostHeader(kv.Key))
             .ToDictionary(kv => kv.Key, kv => kv.Value);
 
         var envelope = new Envelope<T>()

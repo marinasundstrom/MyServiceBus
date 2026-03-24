@@ -1,15 +1,5 @@
 namespace MyServiceBus.Serialization;
 
-public interface IMessageContext
+public interface IMessageContext : IInboundMessage
 {
-    Guid MessageId { get; }
-    Guid? CorrelationId { get; }
-    IList<string> MessageType { get; }
-    Uri? ResponseAddress { get; }
-    Uri? FaultAddress { get; }
-    IDictionary<string, object> Headers { get; }
-    public DateTimeOffset SentTime { get; }
-
-    bool TryGetMessage<T>(out T? message)
-        where T : class;
 }

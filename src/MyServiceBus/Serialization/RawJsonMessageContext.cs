@@ -9,11 +9,13 @@ public class RawJsonMessageContext : IMessageContext
     private readonly JsonSerializerOptions _jsonSerializerOptions = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
     private readonly Dictionary<Type, object> _messageCache = new();
     private readonly IDictionary<string, object> _transportHeaders;
+    private readonly IMessageHeaderConvention _headerConvention;
 
-    public RawJsonMessageContext(byte[] jsonBytes, IDictionary<string, object> transportHeaders)
+    public RawJsonMessageContext(byte[] jsonBytes, IDictionary<string, object> transportHeaders, IMessageHeaderConvention? headerConvention = null)
     {
         _jsonDocument = JsonDocument.Parse(jsonBytes);
         _transportHeaders = transportHeaders;
+        _headerConvention = headerConvention ?? MassTransitHeaderConvention.Instance;
 
         // These will just be "empty" in raw mode
         MessageId = Guid.Empty;
@@ -22,7 +24,7 @@ public class RawJsonMessageContext : IMessageContext
         MessageType = new List<string>();
         SentTime = DateTime.UtcNow;
 
-        if (transportHeaders.TryGetValue(MessageHeaders.FaultAddress, out var header))
+        if (transportHeaders.TryGetValue(_headerConvention.FaultAddressHeader, out var header))
         {
             if (header is string str)
                 FaultAddress = new Uri(str);
@@ -38,6 +40,8 @@ public class RawJsonMessageContext : IMessageContext
     public Uri? ResponseAddress { get; }
     public Uri? FaultAddress { get; }
     public DateTimeOffset SentTime { get; }
+    public string ContentType => InboundMessageResolver.RawJsonContentType;
+    public InboundMessageFormat Format => InboundMessageFormat.RawJson;
 
     public bool TryGetMessage<T>(out T? message) where T : class
     {

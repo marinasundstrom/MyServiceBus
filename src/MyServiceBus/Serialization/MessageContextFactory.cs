@@ -1,36 +1,14 @@
-using System;
-using System.Text.Json;
 using MyServiceBus.Transports;
 
 namespace MyServiceBus.Serialization;
 
-public class MessageContextFactory
+public class MessageContextFactory : IInboundMessageResolver
 {
+    private readonly InboundMessageResolver _resolver = new();
+
+    public IInboundMessage Resolve(ITransportMessage transportMessage)
+        => _resolver.Resolve(transportMessage);
+
     public IMessageContext CreateMessageContext(ITransportMessage transportMessage)
-    {
-        if (transportMessage.Headers.TryGetValue("content_type", out var contentTypeObj))
-        {
-            var contentType = contentTypeObj switch
-            {
-                byte[] bytes => System.Text.Encoding.UTF8.GetString(bytes),
-                _ => contentTypeObj.ToString(),
-            };
-
-            if (string.Equals(contentType, "application/vnd.masstransit+json", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(contentType, "application/vnd.masstransit+json", StringComparison.OrdinalIgnoreCase))
-            {
-                return new EnvelopeMessageContext(transportMessage.Payload, transportMessage.Headers);
-            }
-
-            if (string.Equals(contentType, "application/json", StringComparison.OrdinalIgnoreCase))
-            {
-                return new RawJsonMessageContext(transportMessage.Payload, transportMessage.Headers);
-            }
-
-            throw new InvalidOperationException($"Invalid Content Type: {contentType}");
-        }
-
-        return new EnvelopeMessageContext(transportMessage.Payload, transportMessage.Headers);
-    }
+        => (IMessageContext)Resolve(transportMessage);
 }
-

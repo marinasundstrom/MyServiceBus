@@ -181,6 +181,12 @@ public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigura
                 throw new RuntimeException(ex);
             }
         });
+        serviceCollection.addSingleton(com.myservicebus.serialization.MessageHeaderConvention.class,
+                sp -> () -> com.myservicebus.serialization.MassTransitHeaderConvention.INSTANCE);
+        serviceCollection.addSingleton(com.myservicebus.serialization.InboundMessageResolver.class, sp -> () ->
+                new com.myservicebus.serialization.DefaultInboundMessageResolver(
+                        sp.getService(com.myservicebus.serialization.MessageDeserializer.class),
+                        sp.getService(com.myservicebus.serialization.MessageHeaderConvention.class)));
     }
 
     @Override

@@ -22,14 +22,18 @@ public interface ReceiveContext : PipeContext
 
 public class ReceiveContextImpl : BasePipeContext, ReceiveContext
 {
-    private readonly IMessageContext messageContext;
+    private readonly IInboundMessage messageContext;
 
-    public ReceiveContextImpl(IMessageContext messageContext, Uri? errorAddress = null, CancellationToken cancellationToken = default)
+    public ReceiveContextImpl(IInboundMessage messageContext, Uri? errorAddress = null, CancellationToken cancellationToken = default)
         : base(cancellationToken)
     {
         this.messageContext = messageContext ?? throw new ArgumentNullException(nameof(messageContext));
         ErrorAddress = errorAddress;
     }
+
+    public ReceiveContextImpl(IMessageContext messageContext, Uri? errorAddress = null, CancellationToken cancellationToken = default)
+        : this((IInboundMessage)messageContext, errorAddress, cancellationToken)
+    { }
 
     public IDictionary<string, object> Headers => messageContext.Headers;
 
@@ -49,4 +53,3 @@ public class ReceiveContextImpl : BasePipeContext, ReceiveContext
         return messageContext.TryGetMessage(out message);
     }
 }
-

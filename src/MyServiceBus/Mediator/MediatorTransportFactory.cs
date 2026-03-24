@@ -177,6 +177,8 @@ public class MediatorTransportFactory : ITransportFactory
         public Uri? FaultAddress { get; }
         public IDictionary<string, object> Headers { get; }
         public DateTimeOffset SentTime { get; }
+        public string ContentType => InboundMessageResolver.EnvelopeContentType;
+        public InboundMessageFormat Format => InboundMessageFormat.Envelope;
 
         public bool TryGetMessage<T>(out T? message) where T : class
         {
@@ -191,4 +193,3 @@ public class MediatorTransportFactory : ITransportFactory
         }
     }
 }
-

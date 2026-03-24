@@ -8,19 +8,35 @@ import java.util.Map;
 
 public class EnvelopeMessageSerializer implements MessageSerializer {
     private final ObjectMapper mapper;
+    private final MessageHeaderConvention headerConvention;
+
+    @Override
+    public String getContentType() {
+        return DefaultInboundMessageResolver.ENVELOPE_CONTENT_TYPE;
+    }
+
+    @Override
+    public MessageEnvelopeMode getEnvelopeMode() {
+        return MessageEnvelopeMode.ENVELOPE;
+    }
 
     public EnvelopeMessageSerializer() {
+        this(MassTransitHeaderConvention.INSTANCE);
+    }
+
+    public EnvelopeMessageSerializer(MessageHeaderConvention headerConvention) {
+        this.headerConvention = headerConvention;
         this.mapper = new ObjectMapper();
         this.mapper.findAndRegisterModules();
     }
 
     @Override
     public <T> byte[] serialize(MessageSerializationContext<T> context) throws IOException {
-        context.getHeaders().put("content_type", "application/vnd.masstransit+json");
+        context.getHeaders().put(headerConvention.getContentTypeHeader(), getContentType());
 
         Map<String, Object> headers = new HashMap<>();
         context.getHeaders().forEach((k, v) -> {
-            if (!k.startsWith("MT-Host-")) {
+            if (!headerConvention.isHostHeader(k)) {
                 headers.put(k, v);
             }
         });

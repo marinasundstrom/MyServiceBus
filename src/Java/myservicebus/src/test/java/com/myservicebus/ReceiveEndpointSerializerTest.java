@@ -11,6 +11,7 @@ import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.Test;
 
 import com.myservicebus.serialization.MessageSerializer;
+import com.myservicebus.serialization.MessageEnvelopeMode;
 import com.myservicebus.serialization.MessageSerializationContext;
 import com.myservicebus.serialization.EnvelopeMessageSerializer;
 import com.myservicebus.tasks.CancellationToken;
@@ -24,8 +25,18 @@ class ReceiveEndpointSerializerTest {
 
     static class CustomSerializer implements MessageSerializer {
         @Override
+        public String getContentType() {
+            return "application/custom";
+        }
+
+        @Override
+        public MessageEnvelopeMode getEnvelopeMode() {
+            return MessageEnvelopeMode.RAW;
+        }
+
+        @Override
         public <T> byte[] serialize(MessageSerializationContext<T> context) {
-            context.getHeaders().put("content_type", "application/custom");
+            context.getHeaders().put("content_type", getContentType());
             return new byte[0];
         }
     }

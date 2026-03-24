@@ -243,5 +243,5 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
     }
 
     private static bool IsRawSerializer(IMessageSerializer serializer)
-        => serializer is RawJsonMessageSerializer;
+        => serializer.EnvelopeMode == MessageEnvelopeMode.Raw;
 }

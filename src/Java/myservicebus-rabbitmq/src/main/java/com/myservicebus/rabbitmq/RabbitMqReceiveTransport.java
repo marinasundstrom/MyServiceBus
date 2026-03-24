@@ -16,6 +16,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.myservicebus.logging.Logger;
 import com.myservicebus.logging.LoggerFactory;
+import com.myservicebus.serialization.MassTransitHeaderConvention;
+import com.myservicebus.serialization.MessageHeaderConvention;
 
 public class RabbitMqReceiveTransport implements ReceiveTransport {
     private final Channel channel;
@@ -24,6 +26,7 @@ public class RabbitMqReceiveTransport implements ReceiveTransport {
     private final String faultAddress;
     private final Function<String, Boolean> isMessageTypeRegistered;
     private final Logger logger;
+    private final MessageHeaderConvention headerConvention = MassTransitHeaderConvention.INSTANCE;
 
     public RabbitMqReceiveTransport(Channel channel, String queueName,
             Function<TransportMessage, CompletableFuture<Void>> handler, String faultAddress,
@@ -43,11 +46,11 @@ public class RabbitMqReceiveTransport implements ReceiveTransport {
                     ? new HashMap<>(delivery.getProperties().getHeaders())
                     : new HashMap<>();
             if (delivery.getProperties().getContentType() != null) {
-                headers.put("content_type", delivery.getProperties().getContentType());
+                headers.put(headerConvention.getContentTypeHeader(), delivery.getProperties().getContentType());
             } else {
-                headers.putIfAbsent("content_type", "application/vnd.masstransit+json");
+                headers.putIfAbsent(headerConvention.getContentTypeHeader(), "application/vnd.masstransit+json");
             }
-            headers.putIfAbsent(MessageHeaders.FAULT_ADDRESS, faultAddress);
+            headers.putIfAbsent(headerConvention.getFaultAddressHeader(), faultAddress);
 
             TransportMessage tm = new TransportMessage(delivery.getBody(), headers);
             String messageTypeUrn = null;

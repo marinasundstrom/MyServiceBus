@@ -301,6 +301,8 @@ public class InMemoryTestHarness : IMessageBus, ITransportFactory, IReceiveEndpo
         public Uri? FaultAddress { get; }
         public IDictionary<string, object> Headers { get; }
         public DateTimeOffset SentTime { get; }
+        public string ContentType => InboundMessageResolver.EnvelopeContentType;
+        public InboundMessageFormat Format => InboundMessageFormat.Envelope;
 
         public bool TryGetMessage<T>(out T? msg) where T : class
         {
