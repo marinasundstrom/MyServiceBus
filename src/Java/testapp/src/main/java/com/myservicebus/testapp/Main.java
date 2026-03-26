@@ -20,9 +20,15 @@ import com.myservicebus.logging.LogLevel;
 import com.myservicebus.logging.Logger;
 import com.myservicebus.logging.LoggerFactory;
 import com.myservicebus.logging.Logging;
+import com.myservicebus.testapp.dashboard.DashboardApi;
+import com.myservicebus.testapp.dashboard.DashboardMetricsFilters;
+import com.myservicebus.testapp.dashboard.DashboardMetadata;
+import com.myservicebus.testapp.dashboard.DashboardState;
+import java.time.Instant;
 
 public class Main {
     public static void main(String[] args) {
+        DashboardState inspectionState = new DashboardState();
 
         ServiceCollection services = ServiceCollection.create();
 
@@ -37,9 +43,14 @@ public class Main {
 
         services.from(MessageBusServices.class)
                 .addServiceBus(c -> {
-                    c.addConsumer(SubmitOrderConsumer.class);
-                    c.addConsumer(OrderSubmittedConsumer.class);
-                    c.addConsumer(TestRequestConsumer.class);
+                    c.configureSend(cfg -> cfg.useFilter(new DashboardMetricsFilters.SendMetricsFilter(inspectionState)));
+                    c.configurePublish(cfg -> cfg.useFilter(new DashboardMetricsFilters.PublishMetricsFilter(inspectionState)));
+                    c.addConsumer(SubmitOrderConsumer.class, SubmitOrder.class,
+                            cfg -> cfg.useFilter(new DashboardMetricsFilters.ConsumeMetricsFilter<>(inspectionState, "submit-order", SubmitOrder.class)));
+                    c.addConsumer(OrderSubmittedConsumer.class, OrderSubmitted.class,
+                            cfg -> cfg.useFilter(new DashboardMetricsFilters.ConsumeMetricsFilter<>(inspectionState, "order-submitted", OrderSubmitted.class)));
+                    c.addConsumer(TestRequestConsumer.class, TestRequest.class,
+                            cfg -> cfg.useFilter(new DashboardMetricsFilters.ConsumeMetricsFilter<>(inspectionState, "test-request", TestRequest.class)));
                     c.addConsumer(SubmitOrderFaultConsumer.class);
 
                     c.using(RabbitMqFactoryConfigurator.class, (context, cfg) -> {
@@ -78,6 +89,7 @@ public class Main {
 
         try {
             serviceBus.start();
+            inspectionState.markStarted(Instant.now());
             logger.info("🚀 Test app started");
         } catch (Exception e) {
             logger.error("❌ Failed to start service bus", e);
@@ -86,6 +98,9 @@ public class Main {
 
         int httpPort = Integer.parseInt(System.getenv().getOrDefault("HTTP_PORT", "5301"));
         var app = Javalin.create().start(httpPort);
+        app.get("/health/live", ctx -> ctx.status(200));
+        app.get("/health/ready", ctx -> ctx.status(inspectionState.isStarted() ? 200 : 503));
+        DashboardApi.register(app, serviceBus, new DashboardMetadata("TestApp", "rabbitmq"), inspectionState);
 
         app.get("/publish", ctx -> {
             try (ServiceScope scope = provider.createScope()) {

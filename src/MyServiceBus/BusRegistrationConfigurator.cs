@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using MyServiceBus.Inspection;
 using MyServiceBus.Topology;
 using MyServiceBus.Serialization;
 using System;
@@ -104,6 +105,7 @@ public class BusRegistrationConfigurator : IBusRegistrationConfigurator
 
         Services.AddSingleton(_topology);
         Services.AddSingleton<IBusTopology>(_ => _topology);
+        Services.AddSingleton<IBusInspectionProvider, BusInspectionProvider>();
         Services.AddSingleton<IPostBuildAction>(_ => new ConsumerRegistrationAction(_topology));
         Services.AddSingleton<ISendPipe>((sp) => new SendPipe(sendConfigurator.Build(sp)));
         Services.AddSingleton<IPublishPipe>((sp) => new PublishPipe(publishConfigurator.Build(sp)));

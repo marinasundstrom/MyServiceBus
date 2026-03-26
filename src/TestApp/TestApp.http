@@ -36,3 +36,23 @@ GET {{TestApp_HostAddress}}/request_multi
 GET {{TestApp_HostAddress}}/request_multi/fault
 
 ###
+
+GET {{TestApp_HostAddress}}/dashboard/v1/overview
+Accept: application/json
+
+###
+
+GET {{TestApp_HostAddress}}/dashboard/v1/messages
+Accept: application/json
+
+###
+
+GET {{TestApp_HostAddress}}/dashboard/v1/consumers
+Accept: application/json
+
+###
+
+GET {{TestApp_HostAddress}}/dashboard/v1/topology
+Accept: application/json
+
+###

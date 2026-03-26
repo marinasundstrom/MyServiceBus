@@ -95,3 +95,6 @@ This changelog summarizes the bigger themes in the repository history. It is int
 ## Maintenance policy
 
 Keep this file updated for significant changes. Prefer adding dated entries that summarize the main themes of a change set instead of listing every commit.
+# Unreleased
+
+- Added sample-app dashboard endpoints in the .NET and Java `TestApp` projects under `/dashboard/v1/*`, exposing stable JSON snapshots for bus overview, messages, consumers, and topology without committing those contracts to the shared libraries yet.

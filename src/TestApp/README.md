@@ -12,6 +12,12 @@ Common routes:
 - `/request/fault`
 - `/request_multi`
 - `/request_multi/fault`
+- `/dashboard/v1/overview`
+- `/dashboard/v1/messages`
+- `/dashboard/v1/consumers`
+- `/dashboard/v1/topology`
+
+The `/dashboard/v1/*` routes expose stable JSON DTOs for dashboard experiments. They include bus address metadata, registered messages, queue bindings, and consumer settings without leaking runtime-specific objects such as `Type` instances or delegates.
 
 `/publish` and `/send` produce `SubmitOrder` messages. The `*/fault` variants mark the message so `SubmitOrderConsumer` intentionally throws and a `Fault<SubmitOrder>` is published to the `submit-order_fault` queue, where `SubmitOrderFaultConsumer` logs it.
 
