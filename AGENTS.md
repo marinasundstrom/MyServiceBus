@@ -22,6 +22,7 @@ This repository contains a .NET solution for MyServiceBus and a Java project. Fo
 - See `docs/development/design-goals.md` for overarching design goals, including MassTransit familiarity and C#↔Java parity.
 - Review `docs/specs/myservicebus-spec.md`, `docs/development/design-guidelines.md`, and related design documents for solution details; keep them and other docs up to date.
 - `docs/feature-walkthrough.md` is the canonical source for usage samples of MyServiceBus.
+- Keep `CHANGELOG.md` up to date for significant repository changes. Prefer chronological entries that summarize the larger themes of a change set rather than exhaustive commit-by-commit notes.
 
 ## Java project
 - The Java project resides in `src/Java`. See `src/Java/AGENTS.md` for instructions specific to that codebase.
