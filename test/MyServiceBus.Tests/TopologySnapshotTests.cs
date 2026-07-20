@@ -58,6 +58,23 @@ public class TopologySnapshotTests
         Assert.Equal([binding.Id], endpoint.BindingIds);
     }
 
+    [Fact]
+    public void Models_profile_neutral_runtime_endpoint_intent()
+    {
+        var topology = new ReceiveEndpointTransportTopology(
+            "orders",
+            durable: true,
+            temporary: false,
+            prefetchCount: 16,
+            [new MessageBinding { MessageType = typeof(OrderSubmitted), EntityName = "contracts-order-submitted" }]);
+
+        Assert.Equal("orders", topology.Name);
+        Assert.True(topology.Durable);
+        Assert.False(topology.Temporary);
+        Assert.Equal((ushort)16, topology.PrefetchCount);
+        Assert.Equal("contracts-order-submitted", Assert.Single(topology.Bindings).EntityName);
+    }
+
     private interface IOrderEvent;
 
     private sealed class OrderSubmitted : IOrderEvent;

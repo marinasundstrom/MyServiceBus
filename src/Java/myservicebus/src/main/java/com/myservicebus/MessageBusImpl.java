@@ -27,6 +27,7 @@ import com.myservicebus.tasks.CancellationToken;
 import com.myservicebus.topology.BusTopology;
 import com.myservicebus.topology.ConsumerTopology;
 import com.myservicebus.topology.MessageBinding;
+import com.myservicebus.topology.ReceiveEndpointTransportTopology;
 import com.myservicebus.topology.TopologyRegistry;
 import com.myservicebus.EntityNameFormatter;
 import com.myservicebus.MessageUrn;
@@ -200,10 +201,14 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
         };
 
         java.util.function.Function<String, Boolean> isRegistered = urn -> urn == null ? rawSerializer : messageTypes.contains(urn);
-        ReceiveTransport transport = transportFactory.createReceiveTransport(consumerDef.getQueueName(),
-                consumerDef.getBindings(), handler, isRegistered,
+        ReceiveEndpointTransportTopology endpointTopology = new ReceiveEndpointTransportTopology(
+                consumerDef.getQueueName(),
+                true,
+                false,
                 consumerDef.getPrefetchCount() != null ? consumerDef.getPrefetchCount() : 0,
+                consumerDef.getBindings(),
                 consumerDef.getQueueArguments());
+        ReceiveTransport transport = transportFactory.createReceiveTransport(endpointTopology, handler, isRegistered);
         receiveTransports.add(transport);
         consumerRegistrations.add(key);
     }
@@ -280,8 +285,15 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
         String expectedUrn = MessageUrn.forClass(messageType);
         java.util.function.Function<String, Boolean> isRegisteredHandler = urn -> expectedUrn.equals(urn) || (rawSerializer && urn == null);
 
-        ReceiveTransport transport = transportFactory.createReceiveTransport(queueName, bindings, transportHandler,
-                isRegisteredHandler, prefetchCount != null ? prefetchCount : 0, queueArguments);
+        ReceiveEndpointTransportTopology endpointTopology = new ReceiveEndpointTransportTopology(
+                queueName,
+                true,
+                false,
+                prefetchCount != null ? prefetchCount : 0,
+                bindings,
+                queueArguments);
+        ReceiveTransport transport = transportFactory.createReceiveTransport(
+                endpointTopology, transportHandler, isRegisteredHandler);
         receiveTransports.add(transport);
     }
 

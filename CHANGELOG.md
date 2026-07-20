@@ -9,6 +9,7 @@ This changelog summarizes the bigger themes in the repository history. It is int
 - Added corresponding versioned topology snapshots for C# and Java with stable identities, logical endpoint addresses, and canonical conformance fixtures.
 - Added synchronized public snapshot-version constants and explicit additive/breaking evolution rules.
 - Added corresponding RabbitMQ receive-topology projections that validate profile inputs before broker provisioning.
+- Moved the C# and Java bus runtimes onto corresponding profile-neutral receive-endpoint transport topology contracts while retaining legacy transport overload adapters.
 - Made inspection consume the normalized topology snapshot and stopped inferring RabbitMQ-specific details that are not supplied by an authoritative transport projection.
 
 ## 2026-03-24 to 2026-03-19

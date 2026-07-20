@@ -2,11 +2,14 @@ using MyServiceBus.Topology;
 
 namespace MyServiceBus;
 
+public sealed record RabbitMqMessageBindingTopology(
+    string ExchangeName,
+    string ExchangeType,
+    string RoutingKey);
+
 public sealed record RabbitMqReceiveEndpointTopology(
     string QueueName,
-    string ExchangeName,
-    string RoutingKey,
-    string ExchangeType,
+    IReadOnlyList<RabbitMqMessageBindingTopology> Bindings,
     bool Durable,
     bool AutoDelete,
     ushort PrefetchCount,
@@ -24,12 +27,33 @@ public sealed record RabbitMqReceiveEndpointTopology(
 
         return new RabbitMqReceiveEndpointTopology(
             endpoint.QueueName,
-            endpoint.ExchangeName,
-            endpoint.RoutingKey,
-            endpoint.ExchangeType,
+            [new RabbitMqMessageBindingTopology(endpoint.ExchangeName, endpoint.ExchangeType, endpoint.RoutingKey)],
             endpoint.Durable,
             endpoint.AutoDelete,
             endpoint.PrefetchCount,
             endpoint.QueueArguments);
+    }
+
+    public static RabbitMqReceiveEndpointTopology Project(ReceiveEndpointTransportTopology endpoint)
+    {
+        ArgumentNullException.ThrowIfNull(endpoint);
+
+        var bindings = endpoint.Bindings
+            .Select(binding =>
+            {
+                ArgumentException.ThrowIfNullOrWhiteSpace(binding.EntityName);
+                return new RabbitMqMessageBindingTopology(binding.EntityName, "fanout", string.Empty);
+            })
+            .ToArray();
+
+        return new RabbitMqReceiveEndpointTopology(
+            endpoint.Name,
+            bindings,
+            endpoint.Durable,
+            endpoint.Temporary,
+            endpoint.PrefetchCount,
+            endpoint.TransportOptions is null
+                ? null
+                : new Dictionary<string, object?>(endpoint.TransportOptions, StringComparer.Ordinal));
     }
 }

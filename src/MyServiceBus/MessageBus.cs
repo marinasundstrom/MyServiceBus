@@ -101,17 +101,13 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
     {
         var endpointSerializer = serializer ?? _messageSerializer;
         var rawSerializer = IsRawSerializer(endpointSerializer);
-        var topology = new ReceiveEndpointTopology
-        {
-            QueueName = queueName,
-            ExchangeName = exchangeName,
-            RoutingKey = string.Empty,
-            ExchangeType = "fanout",
-            Durable = true,
-            AutoDelete = false,
-            PrefetchCount = prefetchCount ?? 0,
-            QueueArguments = queueArguments
-        };
+        var topology = new ReceiveEndpointTransportTopology(
+            queueName,
+            durable: true,
+            temporary: false,
+            prefetchCount ?? 0,
+            [new MessageBinding { MessageType = typeof(TMessage), EntityName = exchangeName }],
+            queueArguments is null ? null : new Dictionary<string, object?>(queueArguments, StringComparer.Ordinal));
 
         var configurator = new PipeConfigurator<ConsumeContext<TMessage>>();
         configurator.UseFilter<OpenTelemetryConsumeFilter<TMessage>>();
@@ -148,17 +144,15 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
             return;
         }
 
-        var topology = new ReceiveEndpointTopology
-        {
-            QueueName = queueName,
-            ExchangeName = EntityNameFormatter.Format(messageType)!, // standard MT routing
-            RoutingKey = "", // messageType.FullName!,
-            ExchangeType = "fanout",
-            Durable = true,
-            AutoDelete = false,
-            PrefetchCount = consumer.PrefetchCount ?? 0,
-            QueueArguments = consumer.QueueArguments
-        };
+        var topology = new ReceiveEndpointTransportTopology(
+            queueName,
+            durable: true,
+            temporary: false,
+            consumer.PrefetchCount ?? 0,
+            consumer.Bindings.ToArray(),
+            consumer.QueueArguments is null
+                ? null
+                : new Dictionary<string, object?>(consumer.QueueArguments, StringComparer.Ordinal));
 
         Func<string?, bool> isRegistered = mt =>
             _consumers.TryGetValue(queueName, out var regs)

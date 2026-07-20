@@ -14,6 +14,7 @@ import com.myservicebus.TransportCapabilityDescriptor;
 import com.myservicebus.TransportCapabilityDescriptors;
 import com.myservicebus.TransportMessage;
 import com.myservicebus.topology.MessageBinding;
+import com.myservicebus.topology.ReceiveEndpointTransportTopology;
 import com.rabbitmq.client.BuiltinExchangeType;
 import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.Connection;
@@ -147,6 +148,20 @@ public class RabbitMqTransportFactory implements TransportFactory {
             Map<String, Object> queueArguments) throws Exception {
         RabbitMqReceiveEndpointTopology topology = RabbitMqReceiveEndpointTopology.project(
                 queueName, bindings, prefetchCount, queueArguments);
+        return createReceiveTransport(topology, handler, isMessageTypeRegistered);
+    }
+
+    @Override
+    public ReceiveTransport createReceiveTransport(ReceiveEndpointTransportTopology topology,
+            Function<TransportMessage, CompletableFuture<Void>> handler,
+            Function<String, Boolean> isMessageTypeRegistered) throws Exception {
+        return createReceiveTransport(
+                RabbitMqReceiveEndpointTopology.project(topology), handler, isMessageTypeRegistered);
+    }
+
+    private ReceiveTransport createReceiveTransport(RabbitMqReceiveEndpointTopology topology,
+            Function<TransportMessage, CompletableFuture<Void>> handler,
+            Function<String, Boolean> isMessageTypeRegistered) throws Exception {
         Connection connection = connectionProvider.getOrCreateConnection();
         Channel channel = connection.createChannel();
 

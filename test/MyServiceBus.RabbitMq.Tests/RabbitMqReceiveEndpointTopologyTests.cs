@@ -20,8 +20,8 @@ public class RabbitMqReceiveEndpointTopologyTests
         });
 
         projection.QueueName.ShouldBe("orders");
-        projection.ExchangeName.ShouldBe("Contracts:OrderSubmitted");
-        projection.ExchangeType.ShouldBe("fanout");
+        projection.Bindings[0].ExchangeName.ShouldBe("Contracts:OrderSubmitted");
+        projection.Bindings[0].ExchangeType.ShouldBe("fanout");
         projection.Durable.ShouldBeTrue();
         projection.AutoDelete.ShouldBeFalse();
         projection.PrefetchCount.ShouldBe((ushort)16);
@@ -39,5 +39,26 @@ public class RabbitMqReceiveEndpointTopologyTests
         };
 
         Should.Throw<ArgumentException>(() => RabbitMqReceiveEndpointTopology.Project(endpoint));
+    }
+
+    [Fact]
+    public void Projects_all_portable_bindings()
+    {
+        var endpoint = new ReceiveEndpointTransportTopology(
+            "orders",
+            durable: true,
+            temporary: false,
+            prefetchCount: 0,
+            [
+                new MessageBinding { MessageType = typeof(string), EntityName = "Contracts:OrderSubmitted" },
+                new MessageBinding { MessageType = typeof(object), EntityName = "Contracts:OrderUpdated" }
+            ]);
+
+        var projection = RabbitMqReceiveEndpointTopology.Project(endpoint);
+
+        projection.Bindings.Select(x => x.ExchangeName).ShouldBe([
+            "Contracts:OrderSubmitted",
+            "Contracts:OrderUpdated"
+        ]);
     }
 }

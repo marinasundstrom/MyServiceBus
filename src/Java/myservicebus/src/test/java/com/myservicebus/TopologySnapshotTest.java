@@ -3,9 +3,12 @@ package com.myservicebus;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.myservicebus.topology.TopologySnapshot;
 import com.myservicebus.topology.TopologyRegistry;
+import com.myservicebus.topology.MessageBinding;
+import com.myservicebus.topology.ReceiveEndpointTransportTopology;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -55,6 +58,22 @@ class TopologySnapshotTest {
         assertEquals("publish", binding.kind());
         assertEquals(List.of(consumer.id()), endpoint.consumerIds());
         assertEquals(List.of(binding.id()), endpoint.bindingIds());
+    }
+
+    @Test
+    void modelsProfileNeutralRuntimeEndpointIntent() {
+        MessageBinding binding = new MessageBinding();
+        binding.setMessageType(OrderSubmitted.class);
+        binding.setEntityName("contracts-order-submitted");
+
+        ReceiveEndpointTransportTopology topology = new ReceiveEndpointTransportTopology(
+                "orders", true, false, 16, List.of(binding), Map.of());
+
+        assertEquals("orders", topology.name());
+        assertTrue(topology.durable());
+        assertFalse(topology.temporary());
+        assertEquals(16, topology.prefetchCount());
+        assertEquals("contracts-order-submitted", topology.bindings().get(0).getEntityName());
     }
 
     private interface OrderEvent {

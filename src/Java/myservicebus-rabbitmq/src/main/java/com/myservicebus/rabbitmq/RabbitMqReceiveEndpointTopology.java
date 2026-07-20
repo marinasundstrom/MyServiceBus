@@ -1,6 +1,7 @@
 package com.myservicebus.rabbitmq;
 
 import com.myservicebus.topology.MessageBinding;
+import com.myservicebus.topology.ReceiveEndpointTransportTopology;
 
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -39,5 +40,16 @@ public record RabbitMqReceiveEndpointTopology(
             int prefetchCount,
             Map<String, Object> queueArguments) {
         return new RabbitMqReceiveEndpointTopology(queueName, bindings, prefetchCount, queueArguments);
+    }
+
+    public static RabbitMqReceiveEndpointTopology project(ReceiveEndpointTransportTopology endpoint) {
+        if (endpoint.durable() && endpoint.temporary()) {
+            throw new IllegalArgumentException("A RabbitMQ receive endpoint cannot be both durable and temporary");
+        }
+        return new RabbitMqReceiveEndpointTopology(
+                endpoint.name(),
+                endpoint.bindings(),
+                endpoint.prefetchCount(),
+                endpoint.transportOptions());
     }
 }

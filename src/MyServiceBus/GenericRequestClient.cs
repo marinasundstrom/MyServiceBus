@@ -37,15 +37,12 @@ public sealed class GenericRequestClient<TRequest> : IRequestClient<TRequest>, I
         var taskCompletionSource = new TaskCompletionSource<Response<T>>();
 
         var responseExchange = $"resp-{Guid.NewGuid():N}";
-        var responseReceiveTopology = new ReceiveEndpointTopology
-        {
-            QueueName = responseExchange,
-            ExchangeName = responseExchange,
-            RoutingKey = "",
-            ExchangeType = "fanout",
-            Durable = false,
-            AutoDelete = true
-        };
+        var responseReceiveTopology = new ReceiveEndpointTransportTopology(
+            responseExchange,
+            durable: false,
+            temporary: true,
+            prefetchCount: 0,
+            [new MessageBinding { MessageType = typeof(T), EntityName = responseExchange }]);
 
         IReceiveTransport? responseReceiveTransport = null;
 
@@ -117,15 +114,12 @@ public sealed class GenericRequestClient<TRequest> : IRequestClient<TRequest>, I
         var taskCompletionSource = new TaskCompletionSource<Response<T1, T2>>();
 
         var responseExchange = $"resp-{Guid.NewGuid():N}";
-        var responseReceiveTopology = new ReceiveEndpointTopology
-        {
-            QueueName = responseExchange,
-            ExchangeName = responseExchange,
-            RoutingKey = "",
-            ExchangeType = "fanout",
-            Durable = false,
-            AutoDelete = true
-        };
+        var responseReceiveTopology = new ReceiveEndpointTransportTopology(
+            responseExchange,
+            durable: false,
+            temporary: true,
+            prefetchCount: 0,
+            [new MessageBinding { MessageType = typeof(T1), EntityName = responseExchange }]);
 
         IReceiveTransport? responseReceiveTransport = null;
 

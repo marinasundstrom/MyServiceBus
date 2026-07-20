@@ -1,6 +1,7 @@
 package com.myservicebus.rabbitmq;
 
 import com.myservicebus.topology.MessageBinding;
+import com.myservicebus.topology.ReceiveEndpointTransportTopology;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -27,6 +28,20 @@ class RabbitMqReceiveEndpointTopologyTest {
     void rejectsMissingBindings() {
         assertThrows(IllegalArgumentException.class,
                 () -> RabbitMqReceiveEndpointTopology.project("orders", List.of(), 0, Map.of()));
+    }
+
+    @Test
+    void projectsPortableEndpointIntent() {
+        ReceiveEndpointTransportTopology endpoint = new ReceiveEndpointTransportTopology(
+                "orders", true, false, 16,
+                List.of(binding("Contracts:OrderSubmitted"), binding("Contracts:OrderUpdated")),
+                Map.of("x-queue-type", "quorum"));
+
+        RabbitMqReceiveEndpointTopology projection = RabbitMqReceiveEndpointTopology.project(endpoint);
+
+        assertEquals(2, projection.bindings().size());
+        assertEquals("Contracts:OrderUpdated", projection.bindings().get(1).getEntityName());
+        assertEquals("quorum", projection.queueArguments().get("x-queue-type"));
     }
 
     private static MessageBinding binding(String entityName) {
