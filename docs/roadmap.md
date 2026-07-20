@@ -60,6 +60,8 @@ The precise scope and matrix for this phase are defined in the [Compatibility Po
 
 **Exit criteria:** RabbitMQ and in-memory adapters describe their capabilities, and invalid feature combinations fail clearly before startup.
 
+**Status:** implemented. Both reference clients expose matching versioned descriptors for RabbitMQ and in-memory transports, validate explicit capability requirements before receive transports start, and route publish, request, temporary, error, and fault address production through transport profiles. The transport specification and new-transport checklist distinguish durable bus transports, event streams, hosting adapters, and application integrations.
+
 ## Phase 3: Inspection and Monitoring APIs
 
 **Outcome:** applications and tools can discover and observe a running MyServiceBus instance without coupling the core to a UI.
