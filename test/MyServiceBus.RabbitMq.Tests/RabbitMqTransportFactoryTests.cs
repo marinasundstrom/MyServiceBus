@@ -46,6 +46,12 @@ public class RabbitMqTransportFactoryTests
         Assert.Equal(
             new Uri("rabbitmq://broker.example:5678/exchange/reply?durable=false&autodelete=true"),
             factory.GetTemporaryEndpointAddress("reply"));
+        Assert.Equal(
+            new Uri("rabbitmq://broker.example:5678/exchange/input_error"),
+            factory.GetErrorAddress("input"));
+        Assert.Equal(
+            new Uri("rabbitmq://broker.example:5678/exchange/input_fault"),
+            factory.GetFaultAddress("input"));
     }
 
     [Fact]

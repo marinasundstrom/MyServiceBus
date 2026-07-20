@@ -170,7 +170,7 @@ public class RabbitMqTransportFactory implements TransportFactory {
         channel.queueDeclare(faultQueue, true, false, false, null);
         channel.queueBind(faultQueue, faultExchange, "");
 
-        String faultAddress = getPublishAddress(queueName + "_fault");
+        String faultAddress = getFaultAddress(queueName);
         return new RabbitMqReceiveTransport(channel, queueName, handler, faultAddress, isMessageTypeRegistered,
                 loggerFactory);
     }

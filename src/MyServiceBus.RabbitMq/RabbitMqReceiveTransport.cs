@@ -19,17 +19,19 @@ public sealed class RabbitMqReceiveTransport : IReceiveTransport
     private readonly Func<ReceiveContext, Task> _messageHandler;
     private readonly IInboundMessageResolver _inboundMessageResolver = new InboundMessageResolver();
     private readonly IMessageHeaderConvention _headerConvention = MassTransitHeaderConvention.Instance;
-    private readonly bool _hasErrorQueue;
+    private readonly Uri? _errorAddress;
+    private readonly Uri? _faultAddress;
     private readonly Func<string?, bool>? _isMessageTypeRegistered;
     private readonly ILogger<RabbitMqReceiveTransport>? _logger;
     private string _consumerTag;
 
-    public RabbitMqReceiveTransport(IChannel channel, string queueName, Func<ReceiveContext, Task> handler, bool hasErrorQueue, Func<string?, bool>? isMessageTypeRegistered, ILogger<RabbitMqReceiveTransport>? logger = null)
+    public RabbitMqReceiveTransport(IChannel channel, string queueName, Func<ReceiveContext, Task> handler, Uri? errorAddress, Uri? faultAddress, Func<string?, bool>? isMessageTypeRegistered, ILogger<RabbitMqReceiveTransport>? logger = null)
     {
         _channel = channel;
         _queueName = queueName;
         _messageHandler = handler;
-        _hasErrorQueue = hasErrorQueue;
+        _errorAddress = errorAddress;
+        _faultAddress = faultAddress;
         _isMessageTypeRegistered = isMessageTypeRegistered;
         _logger = logger;
     }
@@ -51,20 +53,17 @@ public sealed class RabbitMqReceiveTransport : IReceiveTransport
                 else if (!headers.ContainsKey(_headerConvention.ContentTypeHeader))
                     headers[_headerConvention.ContentTypeHeader] = InboundMessageResolver.EnvelopeContentType;
 
-                if (_hasErrorQueue && !headers.ContainsKey(_headerConvention.FaultAddressHeader))
-                    headers[_headerConvention.FaultAddressHeader] = $"rabbitmq://localhost/exchange/{_queueName}_fault";
+                if (_faultAddress != null && !headers.ContainsKey(_headerConvention.FaultAddressHeader))
+                    headers[_headerConvention.FaultAddressHeader] = _faultAddress.ToString();
 
                 var transportMessage = new RabbitMqTransportMessage(headers, props.Persistent, payload);
                 var messageContext = _inboundMessageResolver.Resolve(transportMessage);
 
-                var errorAddress = _hasErrorQueue
-                    ? new Uri($"rabbitmq://localhost/exchange/{_queueName}_error")
-                    : null;
-                var context = new RabbitMqReceiveContext(messageContext, props, ea.DeliveryTag, ea.Exchange, ea.RoutingKey, errorAddress);
+                var context = new RabbitMqReceiveContext(messageContext, props, ea.DeliveryTag, ea.Exchange, ea.RoutingKey, _errorAddress);
                 var messageType = context.MessageType.FirstOrDefault();
                 if (_isMessageTypeRegistered != null && !_isMessageTypeRegistered(messageType))
                 {
-                    if (_hasErrorQueue)
+                    if (_errorAddress != null)
                     {
                         await _channel.BasicPublishAsync(
                             exchange: _queueName + "_skipped",

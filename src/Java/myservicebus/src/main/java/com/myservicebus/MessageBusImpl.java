@@ -176,7 +176,7 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
                 Map<String, Object> headers = inboundMessage.getHeaders();
                 String responseAddress = inboundMessage.getResponseAddress();
                 String faultAddress = inboundMessage.getFaultAddress();
-                String errorAddress = transportFactory.getPublishAddress(consumerDef.getQueueName() + "_error");
+                String errorAddress = transportFactory.getErrorAddress(consumerDef.getQueueName());
 
                 ConsumeContext<Object> ctx = new ConsumeContext<>(
                         message,
@@ -254,7 +254,7 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
                 Map<String, Object> headers = inboundMessage.getHeaders();
                 String responseAddress = inboundMessage.getResponseAddress();
                 String faultAddress = inboundMessage.getFaultAddress();
-                String errorAddress = transportFactory.getPublishAddress(queueName + "_error");
+                String errorAddress = transportFactory.getErrorAddress(queueName);
                 ConsumeContext<T> ctx = new ConsumeContext<>(typedMessage, headers,
                         responseAddress, faultAddress, errorAddress, CancellationToken.none,
                         provider,

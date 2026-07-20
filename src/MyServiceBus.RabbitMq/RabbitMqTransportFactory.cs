@@ -29,6 +29,10 @@ public sealed class RabbitMqTransportFactory : ITransportFactory
     public Uri GetTemporaryEndpointAddress(string endpointName) =>
         new(_baseAddress, $"exchange/{endpointName}?durable=false&autodelete=true");
 
+    public Uri GetErrorAddress(string endpointName) => GetPublishAddress(endpointName + "_error");
+
+    public Uri GetFaultAddress(string endpointName) => GetPublishAddress(endpointName + "_fault");
+
     public async Task<ISendTransport> GetSendTransport(Uri address, CancellationToken cancellationToken = default)
     {
         string? exchange = null;
@@ -307,7 +311,9 @@ public sealed class RabbitMqTransportFactory : ITransportFactory
             cancellationToken: cancellationToken
         );
 
-        return new RabbitMqReceiveTransport(channel, topology.QueueName, handler, hasErrorQueue, isMessageTypeRegistered);
+        var errorAddress = hasErrorQueue ? GetErrorAddress(topology.QueueName) : null;
+        var faultAddress = hasErrorQueue ? GetFaultAddress(topology.QueueName) : null;
+        return new RabbitMqReceiveTransport(channel, topology.QueueName, handler, errorAddress, faultAddress, isMessageTypeRegistered);
     }
 
     private static void ParseExchangeSettings(string? queryString, ref bool durable, ref bool autoDelete)

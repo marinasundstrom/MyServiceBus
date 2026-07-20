@@ -38,7 +38,8 @@ public class RabbitMqReceiveTransportTests
             channel,
             "input",
             _ => throw new InvalidOperationException("boom"),
-            hasErrorQueue: true,
+            errorAddress: new Uri("rabbitmq://broker/exchange/input_error"),
+            faultAddress: new Uri("rabbitmq://broker/exchange/input_fault"),
             isMessageTypeRegistered: null);
 
         await transport.Start();

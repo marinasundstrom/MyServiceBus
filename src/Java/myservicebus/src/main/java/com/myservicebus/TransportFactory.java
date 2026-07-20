@@ -46,5 +46,13 @@ public interface TransportFactory extends PublishAddressProvider {
 
     String getPublishAddress(String exchange);
 
+    default String getErrorAddress(String endpointName) {
+        return getPublishAddress(endpointName + "_error");
+    }
+
+    default String getFaultAddress(String endpointName) {
+        return getPublishAddress(endpointName + "_fault");
+    }
+
     String getSendAddress(String queue);
 }

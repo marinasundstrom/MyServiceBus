@@ -11,6 +11,10 @@ public interface ITransportFactory
     Uri GetTemporaryEndpointAddress(string endpointName) =>
         new($"exchange:{endpointName}?durable=false&autodelete=true");
 
+    Uri GetErrorAddress(string endpointName) => GetPublishAddress(endpointName + "_error");
+
+    Uri GetFaultAddress(string endpointName) => GetPublishAddress(endpointName + "_fault");
+
     Task<ISendTransport> GetSendTransport(Uri address, CancellationToken cancellationToken = default);
 
     Task<IReceiveTransport> CreateReceiveTransport(

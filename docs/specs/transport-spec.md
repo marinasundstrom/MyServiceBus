@@ -105,7 +105,7 @@ RabbitMQ, Azure Service Bus, SQS/SNS, and other profiles are independent conform
 
 ## Address Production
 
-The transport factory owns address production because URI authority, virtual-host representation, entity paths, and temporary-endpoint parameters belong to the transport profile. The portable core supplies only the logical entity name. This applies equally to bus-level publish, publish from a consume context, request destinations, and temporary response endpoints.
+The transport factory owns address production because URI authority, virtual-host representation, entity paths, and temporary-endpoint parameters belong to the transport profile. The portable core supplies only the logical entity name. This applies equally to bus-level publish, publish from a consume context, request destinations, temporary response endpoints, and terminal error and fault destinations.
 
 For RabbitMQ, generated envelope addresses use the configured host and port instead of assuming `localhost`. The in-memory transport uses the `loopback` scheme. Custom transports should override the factory defaults whenever their addresses must be externally routable or appear in interoperable envelopes.
 
