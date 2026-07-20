@@ -31,3 +31,6 @@ project(':myservicebus-testing').projectDir = file("${javaDir}/myservicebus-test
 
 include 'di-testapp'
 project(':di-testapp').projectDir = file("${javaDir}/di-testapp")
+
+include 'interop-test-peer'
+project(':interop-test-peer').projectDir = file("${javaDir}/interop-test-peer")

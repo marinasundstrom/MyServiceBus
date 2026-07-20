@@ -23,11 +23,13 @@ public class RabbitMqTransport {
         services.addSingleton(ConnectionProvider.class, sp -> () -> {
             ConnectionFactory factory = new ConnectionFactory();
             factory.setHost(factoryConfigurator.getClientHost());
+            factory.setPort(factoryConfigurator.getClientPort());
             factory.setUsername(factoryConfigurator.getUsername());
             factory.setPassword(factoryConfigurator.getPassword());
             return new ConnectionProvider(factory);
         });
-        services.addSingleton(URI.class, sp -> () -> URI.create("rabbitmq://" + factoryConfigurator.getClientHost() + "/"));
+        services.addSingleton(URI.class, sp -> () -> URI.create("rabbitmq://" + factoryConfigurator.getClientHost()
+                + ":" + factoryConfigurator.getClientPort() + "/"));
         services.addSingleton(RabbitMqTransportFactory.class, sp -> () -> {
             ConnectionProvider provider = sp.getService(ConnectionProvider.class);
             RabbitMqFactoryConfigurator cfgRef = sp.getService(RabbitMqFactoryConfigurator.class);

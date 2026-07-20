@@ -33,8 +33,11 @@ builder.Services.AddServiceBus(x =>
     x.UsingRabbitMq((context, cfg) =>
     {
         var rabbitMqHost = Environment.GetEnvironmentVariable("RABBITMQ_HOST") ?? "localhost";
+        var rabbitMqPort = int.TryParse(Environment.GetEnvironmentVariable("RABBITMQ_PORT"), out var configuredPort)
+            ? configuredPort
+            : 5672;
 
-        cfg.Host(rabbitMqHost, h =>
+        cfg.Host(rabbitMqHost, rabbitMqPort, h =>
         {
             h.Username("guest");
             h.Password("guest");

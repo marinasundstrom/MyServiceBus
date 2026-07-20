@@ -56,6 +56,7 @@ public class RabbitMqFactoryConfiguratorTests
         public IEndpointNameFormatter? EndpointNameFormatter { get; private set; }
         public IMessageEntityNameFormatter? EntityNameFormatter { get; private set; }
         public string ClientHost => "localhost";
+        public int ClientPort => 5672;
         public ushort PrefetchCount { get; private set; }
 
         public void Message<T>(Action<MessageConfigurator> configure)
@@ -69,6 +70,10 @@ public class RabbitMqFactoryConfiguratorTests
         }
 
         public void Host(string host, Action<IRabbitMqHostConfigurator>? configure = null)
+        {
+        }
+
+        public void Host(string host, int port, Action<IRabbitMqHostConfigurator>? configure = null)
         {
         }
 

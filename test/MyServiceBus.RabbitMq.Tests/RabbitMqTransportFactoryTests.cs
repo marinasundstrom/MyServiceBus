@@ -19,10 +19,12 @@ public class RabbitMqTransportFactoryTests
         public IEndpointNameFormatter? EndpointNameFormatter => null;
         public IMessageEntityNameFormatter? EntityNameFormatter => null;
         public string ClientHost => "localhost";
+        public int ClientPort => 5672;
         public ushort PrefetchCount { get; private set; }
         public void Message<T>(Action<MessageConfigurator> configure) { }
         public void ReceiveEndpoint(string queueName, Action<ReceiveEndpointConfigurator> configure) { }
         public void Host(string host, Action<IRabbitMqHostConfigurator>? configure = null) { }
+        public void Host(string host, int port, Action<IRabbitMqHostConfigurator>? configure = null) { }
         public void SetEndpointNameFormatter(IEndpointNameFormatter formatter) { }
         public void SetEntityNameFormatter(IMessageEntityNameFormatter formatter) { }
         public void SetPrefetchCount(ushort prefetchCount) => PrefetchCount = prefetchCount;

@@ -26,6 +26,7 @@ import java.util.function.Consumer;
 
 public class RabbitMqFactoryConfigurator implements BusFactoryConfigurator {
     private String clientHost = "localhost";
+    private int clientPort = 5672;
     private String username = "guest";
     private String password = "guest";
     private final Map<Class<?>, String> exchangeNames = new HashMap<>();
@@ -37,11 +38,27 @@ public class RabbitMqFactoryConfigurator implements BusFactoryConfigurator {
             (sp, type) -> new DefaultConstructorConsumerFactory();
 
     public void host(String host) {
-        this.clientHost = host;
+        host(host, 5672, null);
     }
 
     public void host(String host, Consumer<RabbitMqHostConfigurator> configure) {
+        host(host, 5672, configure);
+    }
+
+    public void host(String host, int port) {
+        host(host, port, null);
+    }
+
+    public void host(String host, int port, Consumer<RabbitMqHostConfigurator> configure) {
+        if (host == null || host.isBlank()) {
+            throw new IllegalArgumentException("RabbitMQ host must not be blank");
+        }
+        if (port < 1 || port > 65535) {
+            throw new IllegalArgumentException("RabbitMQ port must be between 1 and 65535");
+        }
+
         this.clientHost = host;
+        this.clientPort = port;
         if (configure != null) {
             RabbitMqHostConfiguratorImpl cfg = new RabbitMqHostConfiguratorImpl();
             configure.accept(cfg);
@@ -90,6 +107,10 @@ public class RabbitMqFactoryConfigurator implements BusFactoryConfigurator {
 
     public String getClientHost() {
         return clientHost;
+    }
+
+    public int getClientPort() {
+        return clientPort;
     }
 
     public String getUsername() {
