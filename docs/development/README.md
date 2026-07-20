@@ -12,5 +12,6 @@ Start with:
 - [Compatibility Policy](../compatibility.md)
 - [Project Roadmap](../roadmap.md)
 - [MyServiceBus Specification](../specs/myservicebus-spec.md)
+- [Pipeline and Filter Specification](../specs/pipeline-filter-spec.md)
 - [Transport Specification](../specs/transport-spec.md)
 - [Implementing a New Transport](new-transport.md)

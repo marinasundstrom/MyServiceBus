@@ -36,6 +36,7 @@ This changelog summarizes the bigger themes in the repository history. It is int
 - Fixed Java mediator publication to resolve scoped endpoint services inside an active message scope and enabled its consumer and handler delivery tests to match the existing C# scenarios.
 - Preserved Java consume-context routing in scoped send-endpoint providers across asynchronous consumer continuations.
 - Made mediator handler snapshots and in-memory harness registration and consumption observations safe under concurrent dispatch in both reference clients.
+- Defined the portable pipeline and filter execution contract and added matching C# and Java conformance scenarios for wrapping, short-circuiting, failures, and cancellation propagation.
 
 ## 2026-03-24 to 2026-03-19
 

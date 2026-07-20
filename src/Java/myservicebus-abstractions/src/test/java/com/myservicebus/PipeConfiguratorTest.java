@@ -11,16 +11,40 @@ import org.junit.jupiter.api.Test;
 import javax.inject.Inject;
 
 import com.myservicebus.tasks.CancellationToken;
+import com.myservicebus.tasks.CancellationTokenSource;
 import com.myservicebus.di.ServiceCollection;
 import com.myservicebus.di.ServiceProvider;
 
 class PipeConfiguratorTest {
     static class TestContext implements PipeContext {
-        private final CancellationToken token = CancellationToken.none;
+        private final CancellationToken token;
         final List<String> calls = new ArrayList<>();
+
+        TestContext() {
+            this(CancellationToken.none);
+        }
+
+        TestContext(CancellationToken token) {
+            this.token = token;
+        }
+
         @Override
         public CancellationToken getCancellationToken() {
             return token;
+        }
+    }
+
+    static class RecordingFilter implements Filter<TestContext> {
+        private final String name;
+
+        RecordingFilter(String name) {
+            this.name = name;
+        }
+
+        @Override
+        public CompletableFuture<Void> send(TestContext context, Pipe<TestContext> next) {
+            context.calls.add(name + ":before");
+            return next.send(context).thenRun(() -> context.calls.add(name + ":after"));
         }
     }
 
@@ -58,6 +82,69 @@ class PipeConfiguratorTest {
         TestContext ctx = new TestContext();
         pipe.send(ctx).join();
         assertEquals(List.of("A", "B"), ctx.calls);
+    }
+
+    @Test
+    void filtersWrapDownstreamInRegistrationOrder() {
+        PipeConfigurator<TestContext> configurator = new PipeConfigurator<>();
+        configurator.useFilter(new RecordingFilter("outer"));
+        configurator.useFilter(new RecordingFilter("inner"));
+
+        TestContext ctx = new TestContext();
+        configurator.build().send(ctx).join();
+
+        assertEquals(List.of("outer:before", "inner:before", "inner:after", "outer:after"), ctx.calls);
+    }
+
+    @Test
+    void filterCanShortCircuitDownstreamPipeline() {
+        PipeConfigurator<TestContext> configurator = new PipeConfigurator<>();
+        configurator.useFilter((context, next) -> {
+            context.calls.add("stopped");
+            return CompletableFuture.completedFuture(null);
+        });
+        configurator.useExecute(context -> {
+            context.calls.add("downstream");
+            return CompletableFuture.completedFuture(null);
+        });
+
+        TestContext ctx = new TestContext();
+        configurator.build().send(ctx).join();
+
+        assertEquals(List.of("stopped"), ctx.calls);
+    }
+
+    @Test
+    void exceptionStopsPipelineAndPropagatesUnchanged() {
+        RuntimeException expected = new RuntimeException("failed");
+        PipeConfigurator<TestContext> configurator = new PipeConfigurator<>();
+        configurator.useExecute(context -> CompletableFuture.failedFuture(expected));
+        configurator.useExecute(context -> {
+            context.calls.add("downstream");
+            return CompletableFuture.completedFuture(null);
+        });
+
+        TestContext ctx = new TestContext();
+        java.util.concurrent.CompletionException actual = assertThrows(
+                java.util.concurrent.CompletionException.class,
+                () -> configurator.build().send(ctx).join());
+
+        assertSame(expected, actual.getCause());
+        assertTrue(ctx.calls.isEmpty());
+    }
+
+    @Test
+    void filtersObserveThePipelineCancellationToken() {
+        CancellationTokenSource source = new CancellationTokenSource();
+        source.cancel();
+        PipeConfigurator<TestContext> configurator = new PipeConfigurator<>();
+        configurator.useExecute(context -> {
+            assertSame(source.getToken(), context.getCancellationToken());
+            assertTrue(context.getCancellationToken().isCancelled());
+            return CompletableFuture.completedFuture(null);
+        });
+
+        configurator.build().send(new TestContext(source.getToken())).join();
     }
 
     @Test
