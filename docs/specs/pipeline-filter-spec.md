@@ -48,6 +48,20 @@ Filter instances supplied directly by an application may be reused concurrently.
 
 `UseScopedFilter<TFilter>` in C# and `useScopedFilter(FilterClass.class)` in Java resolve a registered filter from a new operation scope. The scope remains alive until the asynchronous downstream pipeline completes and is then disposed. Ordinary type-based `UseFilter<TFilter>`/`useFilter(FilterClass.class)` registration builds one filter instance with the pipe and must not be used when per-operation lifetime is required.
 
+## Descriptor model
+
+Every pipe configurator exposes an immutable, versioned `PipelineDescriptor`. Its ordered `FilterDescriptor` entries contain only stable configuration facts:
+
+- zero-based registration order
+- portable filter kind, initially `filter`, `execute`, or `retry`
+- optional platform implementation type name for diagnostics
+- lifetime: application-supplied instance, pipe lifetime, or operation scope
+- immutable string configuration values such as retry count and delay
+
+Descriptors never expose filter instances, dependency-injection providers, callbacks, delegates, or mutable configurator state. They are safe inputs for validation and future inspection projections. A later runtime integration layer will associate descriptors with send, publish, or consume operations and topology identities; the generic pipe configurator does not guess that operational context.
+
+`PipelineDescriptor.CurrentVersion` in C# and `PipelineDescriptor.CURRENT_VERSION` in Java advance together when the serialized meaning or structure changes. Descriptor versioning is independent from topology snapshot and package versions.
+
 ## Conformance
 
 C# and Java conformance tests must cover at least:

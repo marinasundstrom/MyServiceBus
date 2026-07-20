@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
+import java.util.Map;
 
 import com.myservicebus.di.ServiceProvider;
 import com.myservicebus.di.ServiceScope;
@@ -13,14 +14,14 @@ import com.myservicebus.di.ServiceScope;
  * Configures and builds pipes by chaining filters.
  */
 public class PipeConfigurator<TContext extends PipeContext> {
-    private final List<Function<ServiceProvider, Filter<TContext>>> filters = new ArrayList<>();
+    private final List<FilterRegistration<TContext>> filters = new ArrayList<>();
 
     public void useFilter(Filter<TContext> filter) {
-        filters.add(sp -> filter);
+        addFilter(sp -> filter, "filter", filter.getClass(), FilterLifetime.INSTANCE, Map.of());
     }
 
     public void useFilter(Class<? extends Filter<TContext>> filterClass) {
-        filters.add(sp -> {
+        addFilter(sp -> {
             try {
                 if (sp != null) {
                     Filter<TContext> resolved = sp.getService(filterClass);
@@ -32,11 +33,11 @@ public class PipeConfigurator<TContext extends PipeContext> {
             } catch (Exception ex) {
                 throw new RuntimeException("Failed to create filter " + filterClass.getName(), ex);
             }
-        });
+        }, "filter", filterClass, FilterLifetime.PIPE, Map.of());
     }
 
     public void useScopedFilter(Class<? extends Filter<TContext>> filterClass) {
-        filters.add(provider -> {
+        addFilter(provider -> {
             if (provider == null) {
                 throw new IllegalStateException("A service provider is required to use a scoped filter");
             }
@@ -52,7 +53,7 @@ public class PipeConfigurator<TContext extends PipeContext> {
                     return CompletableFuture.failedFuture(failure);
                 }
             };
-        });
+        }, "filter", filterClass, FilterLifetime.SCOPED, Map.of());
     }
 
     private static ServiceProvider providerFor(ServiceScope scope) {
@@ -60,7 +61,7 @@ public class PipeConfigurator<TContext extends PipeContext> {
     }
 
     public void useExecute(Function<TContext, CompletableFuture<Void>> callback) {
-        useFilter(new DelegateFilter(callback));
+        addFilter(sp -> new DelegateFilter(callback), "execute", null, FilterLifetime.INSTANCE, Map.of());
     }
 
     public void useRetry(int retryCount) {
@@ -68,7 +69,20 @@ public class PipeConfigurator<TContext extends PipeContext> {
     }
 
     public void useRetry(int retryCount, Duration delay) {
-        useFilter(new RetryFilter<>(retryCount, delay));
+        if (retryCount < 0) {
+            throw new IllegalArgumentException("retryCount");
+        }
+        Map<String, String> configuration = delay == null
+                ? Map.of("retryCount", Integer.toString(retryCount))
+                : Map.of(
+                        "retryCount", Integer.toString(retryCount),
+                        "delayMilliseconds", Long.toString(delay.toMillis()));
+        addFilter(
+                sp -> new RetryFilter<>(retryCount, delay),
+                "retry",
+                RetryFilter.class,
+                FilterLifetime.PIPE,
+                configuration);
     }
 
     public void useMessageRetry(java.util.function.Consumer<RetryConfigurator> configure) {
@@ -84,11 +98,37 @@ public class PipeConfigurator<TContext extends PipeContext> {
     public Pipe<TContext> build(ServiceProvider provider) {
         Pipe<TContext> next = Pipes.empty();
         for (int i = filters.size() - 1; i >= 0; i--) {
-            Filter<TContext> filter = filters.get(i).apply(provider);
+            Filter<TContext> filter = filters.get(i).factory().apply(provider);
             Pipe<TContext> current = next;
             next = ctx -> filter.send(ctx, current);
         }
         return next;
+    }
+
+    public PipelineDescriptor getDescriptor() {
+        return new PipelineDescriptor(
+                filters.stream().map(FilterRegistration::descriptor).toList());
+    }
+
+    private void addFilter(
+            Function<ServiceProvider, Filter<TContext>> factory,
+            String kind,
+            Class<?> implementation,
+            FilterLifetime lifetime,
+            Map<String, String> configuration) {
+        filters.add(new FilterRegistration<>(
+                factory,
+                new FilterDescriptor(
+                        filters.size(),
+                        kind,
+                        implementation != null ? implementation.getName() : null,
+                        lifetime,
+                        configuration)));
+    }
+
+    private record FilterRegistration<TContext extends PipeContext>(
+            Function<ServiceProvider, Filter<TContext>> factory,
+            FilterDescriptor descriptor) {
     }
 
     class DelegateFilter implements Filter<TContext> {
