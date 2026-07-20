@@ -135,14 +135,16 @@ The repository currently has the following executable foundation:
 | Round-trip a compatible envelope through RabbitMQ | Testcontainers | Testcontainers | Verified independently per client |
 | C# producer → Java consumer | Implemented | Implemented | Verified locally through RabbitMQ |
 | Java producer → C# consumer | Implemented | Implemented | Verified locally through RabbitMQ |
-| MyServiceBus → MassTransit | Not implemented | Not implemented | Required next |
-| MassTransit → MyServiceBus | Not implemented | Not implemented | Required next |
+| MyServiceBus → MassTransit | Verified from C# | Verified from Java | Verified locally through RabbitMQ |
+| MassTransit → MyServiceBus | Verified with C# | Verified with Java | Verified locally through RabbitMQ |
 
 The shared versioned fixtures live under `test/fixtures/protocol/v1`. They are canonical inputs for MyServiceBus protocol tests, but they do not become evidence of MassTransit interoperability until the corresponding MassTransit scenarios pass.
 
 RabbitMQ transport integration tests use a pinned RabbitMQ image through Testcontainers. They must use the container's dynamically mapped host and AMQP port and must not depend on a broker installed on the developer machine or a fixed host port.
 
 The cross-language tests are opt-in during ordinary local test runs because they start both runtimes. CI runs them in a dedicated interoperability job. Set `RUN_CROSS_LANGUAGE_TESTS=1` to execute them locally.
+
+The current RabbitMQ baseline uses RabbitMQ `4.1-alpine` and MassTransit `8.5.1`. Verification presently covers compatible envelope publication and consumption in each direction. Request/response, faults, retry exhaustion, skipped-message routing, and error destinations remain separate required scenarios before the complete immediate target can be labeled verified.
 
 ## Compatibility Status Labels
 

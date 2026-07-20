@@ -25,8 +25,9 @@ public final class InteropTestPeer {
     }
 
     public static void main(String[] args) throws Exception {
-        if (args.length != 4) {
-            throw new IllegalArgumentException("Expected: <consume|produce> <exchange> <queue> <value>");
+        if (args.length != 5) {
+            throw new IllegalArgumentException(
+                    "Expected: <consume|produce> <exchange> <queue> <value> <durable-exchange>");
         }
 
         String host = requiredEnvironment("RABBITMQ_HOST");
@@ -38,7 +39,7 @@ public final class InteropTestPeer {
         if ("consume".equals(args[0])) {
             consume(transportFactory, args[1], args[2], args[3]);
         } else if ("produce".equals(args[0])) {
-            produce(transportFactory, args[1], args[3]);
+            produce(transportFactory, args[1], args[3], Boolean.parseBoolean(args[4]));
         } else {
             throw new IllegalArgumentException("Unknown mode: " + args[0]);
         }
@@ -104,13 +105,14 @@ public final class InteropTestPeer {
         System.exit(0);
     }
 
-    private static void produce(RabbitMqTransportFactory transportFactory, String exchangeName, String value)
+    private static void produce(
+            RabbitMqTransportFactory transportFactory, String exchangeName, String value, boolean durableExchange)
             throws Exception {
         CrossLanguageMessage message = new CrossLanguageMessage();
         message.setValue(value);
         SendContext context = new SendContext(message, CancellationToken.none);
         byte[] body = context.serialize(new EnvelopeMessageSerializer());
-        SendTransport sendTransport = transportFactory.getSendTransport(exchangeName, false, true);
+        SendTransport sendTransport = transportFactory.getSendTransport(exchangeName, durableExchange, !durableExchange);
         sendTransport.send(body);
         System.out.println("SENT");
         System.out.flush();

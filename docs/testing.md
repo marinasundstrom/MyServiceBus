@@ -31,12 +31,12 @@ The first container-backed run may be slower while the RabbitMQ image is downloa
 
 ### Cross-language RabbitMQ matrix
 
-The bidirectional C#↔Java tests use one Testcontainers broker per scenario and launch the Java interoperability peer from the .NET test process. They require .NET, Java 17, Gradle, and Docker.
+The interoperability matrix uses one Testcontainers broker per scenario. It covers C#↔Java and both reference clients communicating with the pinned MassTransit version. Java scenarios launch the Java interoperability peer from the .NET test process. They require .NET, Java 17, Gradle, and Docker.
 
 ```bash
 RUN_CROSS_LANGUAGE_TESTS=1 \
   dotnet test test/MyServiceBus.RabbitMq.Tests/MyServiceBus.RabbitMq.Tests.csproj \
-  --filter CrossLanguageRabbitMqTests
+  --filter "CrossLanguageRabbitMqTests|MassTransitInteropTests"
 ```
 
 Ordinary test runs report these scenarios as skipped. The dedicated cross-language CI workflow enables them explicitly.

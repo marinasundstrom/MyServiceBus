@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using MyServiceBus.Serialization;
 using MyServiceBus.Topology;
 using RabbitMQ.Client;
@@ -7,6 +6,7 @@ using TestApp;
 
 namespace MyServiceBus.RabbitMq.Tests;
 
+[Collection(RabbitMqInteroperabilityCollection.Name)]
 public class CrossLanguageRabbitMqTests
 {
     [CrossLanguageFact]
@@ -19,9 +19,9 @@ public class CrossLanguageRabbitMqTests
         var exchangeName = $"csharp-to-java-{suffix}";
         var queueName = exchangeName;
         const string expectedValue = "from-csharp";
-        using var javaPeer = StartJavaPeer(container, "consume", exchangeName, queueName, expectedValue);
+        using var javaPeer = JavaInteropPeer.Start(container, "consume", exchangeName, queueName, expectedValue);
 
-        await WaitForOutput(javaPeer, "READY", TimeSpan.FromSeconds(60));
+        await JavaInteropPeer.WaitForOutput(javaPeer, "READY", TimeSpan.FromMinutes(2));
 
         var transportFactory = CreateTransportFactory(container);
         var serializer = new EnvelopeMessageSerializer();
@@ -30,8 +30,8 @@ public class CrossLanguageRabbitMqTests
             new Uri($"exchange:{exchangeName}"));
         await sendTransport.Send(new CrossLanguageMessage { Value = expectedValue }, sendContext);
 
-        await WaitForOutput(javaPeer, "RECEIVED", TimeSpan.FromSeconds(20));
-        await WaitForExit(javaPeer, TimeSpan.FromSeconds(10));
+        await JavaInteropPeer.WaitForOutput(javaPeer, "RECEIVED", TimeSpan.FromSeconds(20));
+        await JavaInteropPeer.WaitForExit(javaPeer, TimeSpan.FromSeconds(10));
         Assert.Equal(0, javaPeer.ExitCode);
     }
 
@@ -68,10 +68,10 @@ public class CrossLanguageRabbitMqTests
         await receiveTransport.Start();
         try
         {
-            using var javaPeer = StartJavaPeer(container, "produce", exchangeName, queueName, expectedValue);
-            await WaitForOutput(javaPeer, "SENT", TimeSpan.FromSeconds(60));
+            using var javaPeer = JavaInteropPeer.Start(container, "produce", exchangeName, queueName, expectedValue);
+            await JavaInteropPeer.WaitForOutput(javaPeer, "SENT", TimeSpan.FromMinutes(2));
             var message = await received.Task.WaitAsync(TimeSpan.FromSeconds(20));
-            await WaitForExit(javaPeer, TimeSpan.FromSeconds(10));
+            await JavaInteropPeer.WaitForExit(javaPeer, TimeSpan.FromSeconds(10));
 
             Assert.Equal(0, javaPeer.ExitCode);
             Assert.Equal(expectedValue, message.Value);
@@ -91,66 +91,6 @@ public class CrossLanguageRabbitMqTests
         return new RabbitMqTransportFactory(
             new ConnectionProvider(connectionFactory),
             new RabbitMqFactoryConfigurator());
-    }
-
-    private static Process StartJavaPeer(
-        RabbitMqContainer container,
-        string mode,
-        string exchangeName,
-        string queueName,
-        string value)
-    {
-        var connectionUri = new Uri(container.GetConnectionString());
-        var startInfo = new ProcessStartInfo
-        {
-            FileName = Environment.GetEnvironmentVariable("GRADLE_COMMAND") ?? "gradle",
-            WorkingDirectory = FindRepositoryRoot(),
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false
-        };
-        startInfo.ArgumentList.Add("--console=plain");
-        startInfo.ArgumentList.Add("-q");
-        startInfo.ArgumentList.Add(":interop-test-peer:run");
-        startInfo.ArgumentList.Add($"--args={mode} {exchangeName} {queueName} {value}");
-        startInfo.Environment["RABBITMQ_HOST"] = connectionUri.Host;
-        startInfo.Environment["RABBITMQ_PORT"] = connectionUri.Port.ToString();
-        var credentials = connectionUri.UserInfo.Split(':', 2);
-        startInfo.Environment["RABBITMQ_USERNAME"] = Uri.UnescapeDataString(credentials[0]);
-        startInfo.Environment["RABBITMQ_PASSWORD"] = Uri.UnescapeDataString(credentials[1]);
-
-        return Process.Start(startInfo)
-            ?? throw new InvalidOperationException("Failed to start the Java interoperability peer.");
-    }
-
-    private static async Task WaitForOutput(Process process, string expectedLine, TimeSpan timeout)
-    {
-        using var cancellation = new CancellationTokenSource(timeout);
-        while (await process.StandardOutput.ReadLineAsync(cancellation.Token) is { } line)
-        {
-            if (line == expectedLine)
-                return;
-        }
-
-        var error = await process.StandardError.ReadToEndAsync(cancellation.Token);
-        throw new InvalidOperationException(
-            $"Java interoperability peer exited before writing '{expectedLine}'. {error}");
-    }
-
-    private static async Task WaitForExit(Process process, TimeSpan timeout)
-    {
-        using var cancellation = new CancellationTokenSource(timeout);
-        await process.WaitForExitAsync(cancellation.Token);
-    }
-
-    private static string FindRepositoryRoot()
-    {
-        var directory = new DirectoryInfo(AppContext.BaseDirectory);
-        while (directory != null && !File.Exists(Path.Combine(directory.FullName, "settings.gradle")))
-            directory = directory.Parent;
-
-        return directory?.FullName
-            ?? throw new InvalidOperationException("Could not locate the repository root.");
     }
 
 }
