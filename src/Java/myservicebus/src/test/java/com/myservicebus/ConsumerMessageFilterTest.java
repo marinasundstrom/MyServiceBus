@@ -7,6 +7,7 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 import org.junit.jupiter.api.Test;
+import javax.inject.Inject;
 
 import com.myservicebus.di.ServiceCollection;
 import com.myservicebus.di.ServiceProvider;
@@ -29,6 +30,30 @@ class ConsumerMessageFilterTest {
         @Override
         public CompletableFuture<Void> consume(ConsumeContext<TestMessage> context) {
             return CompletableFuture.failedFuture(new RuntimeException("boom"));
+        }
+    }
+
+    static class AsyncConsumerState {
+        final CompletableFuture<Void> completion = new CompletableFuture<>();
+        boolean disposed;
+    }
+
+    static class ScopedAsyncConsumer implements Consumer<TestMessage>, AutoCloseable {
+        private final AsyncConsumerState state;
+
+        @Inject
+        ScopedAsyncConsumer(AsyncConsumerState state) {
+            this.state = state;
+        }
+
+        @Override
+        public CompletableFuture<Void> consume(ConsumeContext<TestMessage> context) {
+            return state.completion;
+        }
+
+        @Override
+        public void close() {
+            state.disposed = true;
         }
     }
 
@@ -76,5 +101,33 @@ class ConsumerMessageFilterTest {
         Fault<TestMessage> fault = (Fault<TestMessage>) endpoint.sent;
         assertEquals("boom", fault.getExceptions().get(0).getMessage());
         assertEquals(id, fault.getMessageId());
+    }
+
+    @Test
+    void keepsConsumerScopeAliveUntilAsyncCompletion() {
+        ServiceCollection services = ServiceCollection.create();
+        services.addSingleton(AsyncConsumerState.class);
+        services.addScoped(ScopedAsyncConsumer.class);
+        services.addScoped(ConsumeContextProvider.class, sp -> () -> new ConsumeContextProvider());
+        ServiceProvider provider = services.buildServiceProvider();
+        AsyncConsumerState state = provider.getRequiredService(AsyncConsumerState.class);
+        ConsumeContext<TestMessage> context = new ConsumeContext<>(
+                new TestMessage("hi"),
+                Map.of(),
+                uri -> new CaptureEndpoint());
+
+        ConsumerFactory factory = new ScopeConsumerFactory(provider);
+        CompletableFuture<Void> result = factory.send(
+                ScopedAsyncConsumer.class,
+                context,
+                consumerContext -> consumerContext.getConsumer().consume(consumerContext));
+
+        assertFalse(result.isDone());
+        assertFalse(state.disposed);
+
+        state.completion.complete(null);
+        result.join();
+
+        assertTrue(state.disposed);
     }
 }
