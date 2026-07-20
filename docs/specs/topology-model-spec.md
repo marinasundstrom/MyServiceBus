@@ -71,7 +71,17 @@ The C# and Java inspection adapters consume this snapshot rather than rebuilding
 
 ## Evolution
 
-New portable node kinds and fields are additive and versioned. Unknown extension data must be ignorable. Removing or changing the meaning of a stable field requires an explicit model-version decision.
+`TopologySnapshot.CurrentVersion` in C# and `TopologySnapshot.CURRENT_VERSION` in Java identify the newest snapshot version emitted by each client. Both constants must advance together and their canonical fixtures must land in the corresponding `test/fixtures/topology/v<version>` directory.
+
+Evolution follows these rules:
+
+- Adding an optional field or a new extension entry does not change the version. Readers must ignore unknown fields and continue to operate when optional data is absent.
+- Adding a required field, removing a field, changing a field's meaning or type, or changing stable identity construction requires a new version.
+- Writers emit exactly one declared version. Readers may accept older versions through an explicit adapter, but must not silently reinterpret an unsupported newer version.
+- Transport projections and feature extensions are namespaced and additive. They never replace portable node identity or redefine portable fields.
+- C# and Java publish the same version only when they serialize the same language-neutral contract and pass the same canonical fixtures.
+
+Snapshot versioning is independent from package versions, the MassTransit envelope format, and individual transport-profile versions. A change in one contract does not imply a change in the others.
 
 Sagas should extend the model with saga/state-machine identities, consumed and produced contracts, endpoint attachment, and persistence requirements. Outbox support should expose its configured delivery guarantee, scope, and persistence integration without leaking provider objects. New transports add projections and capability data; they do not redefine portable node identity.
 

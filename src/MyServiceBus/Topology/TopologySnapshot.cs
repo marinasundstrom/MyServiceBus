@@ -7,7 +7,10 @@ public sealed record TopologySnapshot(
     [property: JsonPropertyName("messages")] IReadOnlyList<MessageTopologySnapshot> Messages,
     [property: JsonPropertyName("receiveEndpoints")] IReadOnlyList<ReceiveEndpointTopologySnapshot> ReceiveEndpoints,
     [property: JsonPropertyName("consumers")] IReadOnlyList<ConsumerTopologySnapshot> Consumers,
-    [property: JsonPropertyName("bindings")] IReadOnlyList<MessageBindingTopologySnapshot> Bindings);
+    [property: JsonPropertyName("bindings")] IReadOnlyList<MessageBindingTopologySnapshot> Bindings)
+{
+    public const int CurrentVersion = 1;
+}
 
 public sealed record MessageTopologySnapshot(
     [property: JsonPropertyName("id")] string Id,
@@ -110,7 +113,7 @@ internal static class TopologySnapshotBuilder
             .OrderBy(x => x.Id, StringComparer.Ordinal)
             .ToArray();
 
-        return new TopologySnapshot(1, messages, endpoints, consumers, bindings);
+        return new TopologySnapshot(TopologySnapshot.CurrentVersion, messages, endpoints, consumers, bindings);
     }
 
     private static string EndpointId(string endpointName) => $"endpoint:{endpointName}";

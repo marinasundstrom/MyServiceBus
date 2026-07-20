@@ -13,7 +13,7 @@ public class TopologySnapshotTests
         var snapshot = JsonSerializer.Deserialize<TopologySnapshot>(File.ReadAllBytes(path));
 
         Assert.NotNull(snapshot);
-        Assert.Equal(1, snapshot.Version);
+        Assert.Equal(TopologySnapshot.CurrentVersion, snapshot.Version);
         Assert.Equal("urn:message:Contracts:OrderSubmitted", Assert.Single(snapshot.Messages).Id);
         Assert.Equal("queue:orders", Assert.Single(snapshot.ReceiveEndpoints).LogicalAddress);
         Assert.Equal("publish", Assert.Single(snapshot.Bindings).Kind);
@@ -31,7 +31,7 @@ public class TopologySnapshotTests
 
         var snapshot = ((IBusTopology)registry).GetSnapshot();
 
-        Assert.Equal(1, snapshot.Version);
+        Assert.Equal(TopologySnapshot.CurrentVersion, snapshot.Version);
         var message = Assert.Single(snapshot.Messages);
         Assert.Equal(MessageUrn.For(typeof(OrderSubmitted)), message.Id);
         Assert.Equal(typeof(OrderSubmitted).FullName, message.Type);

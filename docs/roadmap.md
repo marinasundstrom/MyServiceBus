@@ -78,6 +78,8 @@ The precise scope and matrix for this phase are defined in the [Compatibility Po
 
 The [Topology Model Specification](specs/topology-model-spec.md) defines the target boundary. This gate precedes expansion of inspection, dashboard, saga, outbox, and additional transport work.
 
+**Progress:** the normalized query APIs, version 1 canonical fixture, receive-endpoint intent, inspection consumption, and synchronized snapshot-version constants are implemented in C# and Java. The remaining gate work is the RabbitMQ transport projection and validation boundary, followed by extension-model validation against saga, outbox, and a materially different durable broker.
+
 ## Phase 3: Inspection and Monitoring APIs
 
 **Outcome:** applications and tools can discover and observe a running MyServiceBus instance without coupling the core to a UI.

@@ -17,7 +17,7 @@ class TopologySnapshotTest {
         try (var stream = getClass().getResourceAsStream("/topology/v1/basic-topology.json")) {
             var snapshot = new ObjectMapper().readValue(stream, TopologySnapshot.class);
 
-            assertEquals(1, snapshot.version());
+            assertEquals(TopologySnapshot.CURRENT_VERSION, snapshot.version());
             assertEquals("urn:message:Contracts:OrderSubmitted", snapshot.messages().get(0).id());
             assertEquals("queue:orders", snapshot.receiveEndpoints().get(0).logicalAddress());
             assertEquals("publish", snapshot.bindings().get(0).kind());
@@ -32,7 +32,7 @@ class TopologySnapshotTest {
 
         var snapshot = registry.getSnapshot();
 
-        assertEquals(1, snapshot.version());
+        assertEquals(TopologySnapshot.CURRENT_VERSION, snapshot.version());
         var message = snapshot.messages().get(0);
         assertEquals(MessageUrn.forClass(OrderSubmitted.class), message.id());
         assertEquals(OrderSubmitted.class.getName(), message.type());

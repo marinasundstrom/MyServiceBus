@@ -89,7 +89,7 @@ final class TopologySnapshots {
                 .sorted(Comparator.comparing(TopologySnapshot.ReceiveEndpoint::id))
                 .toList();
 
-        return new TopologySnapshot(1, messages, endpoints, consumers, bindings);
+        return new TopologySnapshot(TopologySnapshot.CURRENT_VERSION, messages, endpoints, consumers, bindings);
     }
 
     private static String endpointId(String endpointName) {

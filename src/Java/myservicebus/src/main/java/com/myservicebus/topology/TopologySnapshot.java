@@ -9,6 +9,8 @@ public record TopologySnapshot(
         List<Consumer> consumers,
         List<Binding> bindings) {
 
+    public static final int CURRENT_VERSION = 1;
+
     public TopologySnapshot {
         messages = List.copyOf(messages);
         receiveEndpoints = List.copyOf(receiveEndpoints);
