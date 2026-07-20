@@ -10,6 +10,8 @@ public class MessageSerializationContext<T>
 
     public Guid MessageId { get; set; }
 
+    public Guid? RequestId { get; set; }
+
     public Guid? CorrelationId { get; set; }
 
     public IList<string> MessageType { get; set; }

@@ -1,3 +1,5 @@
 dependencies {
     api project(':myservicebus')
+    api "com.rabbitmq:amqp-client:${rabbitmqVersion}"
+    testImplementation "org.testcontainers:testcontainers-rabbitmq:${testcontainersVersion}"
 }

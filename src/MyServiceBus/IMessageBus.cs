@@ -22,6 +22,9 @@ public interface IMessageBus :
     /// </summary>
     IBusTopology Topology { get; }
 
+    /// <exception cref="UnsupportedTransportCapabilityException">
+    /// Thrown before receive transports start when the selected transport cannot satisfy an explicitly required capability.
+    /// </exception>
     Task StartAsync(CancellationToken cancellationToken);
 
     Task StopAsync(CancellationToken cancellationToken);

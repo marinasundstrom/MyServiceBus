@@ -45,6 +45,12 @@ Both services expose the same endpoints:
 - `/request/fault`
 - `/request_multi`
 - `/request_multi/fault`
+- `/dashboard/v1/overview`
+- `/dashboard/v1/messages`
+- `/dashboard/v1/consumers`
+- `/dashboard/v1/topology`
+
+The dashboard routes return stable JSON snapshots that summarize the configured bus address, registered message contracts, and consumer-to-queue bindings. They are implemented in the sample apps only for now so you can prototype dashboards before deciding what belongs in shared libraries.
 
 The `.http` files for invoking them are:
 

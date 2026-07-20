@@ -17,6 +17,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="../../src/MyServiceBus.Inspection/MyServiceBus.Inspection.csproj" />
     <ProjectReference Include="../../src/MyServiceBus/MyServiceBus.csproj" />
     <ProjectReference Include="../../src/MyServiceBus.Testing/MyServiceBus.Testing.csproj" />
     <ProjectReference Include="../../src/TestApp/TestApp.csproj" />
@@ -24,6 +25,15 @@
 
   <ItemGroup>
     <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="../fixtures/protocol/v1/*.json"
+          Link="protocol-fixtures/%(Filename)%(Extension)"
+          CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../fixtures/topology/v1/*.json"
+          Link="topology-fixtures/%(Filename)%(Extension)"
+          CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

@@ -90,6 +90,22 @@ class RabbitMqSendEndpointProviderTest {
         assertNull(factory.exchange);
     }
 
+    @Test
+    void transportFactoryResolvesLogicalAddresses() {
+        StubFactory factory = new StubFactory();
+
+        factory.getSendTransport(URI.create("exchange:logical-exchange"));
+
+        assertEquals("logical-exchange", factory.exchange);
+        assertNull(factory.queue);
+
+        factory.exchange = null;
+        factory.getSendTransport(URI.create("queue:logical-queue"));
+
+        assertEquals("logical-queue", factory.queue);
+        assertNull(factory.exchange);
+    }
+
     static class StubFactory extends RabbitMqTransportFactory {
         String queue;
         String exchange;

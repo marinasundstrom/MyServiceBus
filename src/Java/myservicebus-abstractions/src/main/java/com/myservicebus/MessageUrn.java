@@ -11,4 +11,8 @@ public final class MessageUrn {
         }
         return String.format("urn:message:TestApp:%s", messageType.getSimpleName());
     }
+
+    public static String forFault(Class<?> messageType) {
+        return String.format("urn:message:MassTransit:Fault[[TestApp:%s]]", messageType.getSimpleName());
+    }
 }

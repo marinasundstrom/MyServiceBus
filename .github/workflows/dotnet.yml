@@ -16,14 +16,20 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Setup .NET
-        uses: actions/setup-dotnet@v3
+        uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '9.0.x'
+          dotnet-version: '10.0.x'
       - name: Restore dependencies
-        run: dotnet restore
+        run: dotnet restore --warnaserror:'NU1901;NU1902;NU1903;NU1904'
       - name: Build
-        run: dotnet build --no-restore
+        run: dotnet build --no-restore --configuration Release
       - name: Test
-        run: dotnet test --no-build --verbosity normal
+        run: dotnet test --no-build --configuration Release --verbosity normal
+      - name: Build NuGet packages
+        run: |
+          dotnet pack src/MyServiceBus.Abstractions/MyServiceBus.Abstractions.csproj --no-build --output artifacts/packages
+          dotnet pack src/MyServiceBus/MyServiceBus.csproj --no-build --output artifacts/packages
+          dotnet pack src/MyServiceBus.RabbitMq/MyServiceBus.RabbitMq.csproj --no-build --output artifacts/packages
+          dotnet pack src/MyServiceBus.Testing/MyServiceBus.Testing.csproj --no-build --output artifacts/packages

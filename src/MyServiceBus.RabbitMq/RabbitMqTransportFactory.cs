@@ -13,12 +13,25 @@ public sealed class RabbitMqTransportFactory : ITransportFactory
     private readonly ConcurrentDictionary<string, ISendTransport> _sendTransports = new();
     private readonly ConcurrentDictionary<string, ISendTransport> _queueTransports = new();
     private readonly ushort _prefetchCount;
+    private readonly Uri _baseAddress;
+
+    public TransportCapabilityDescriptor Capabilities => TransportCapabilityDescriptors.RabbitMq;
 
     public RabbitMqTransportFactory(ConnectionProvider connectionProvider, IRabbitMqFactoryConfigurator configurator)
     {
         _connectionProvider = connectionProvider;
         _prefetchCount = configurator.PrefetchCount;
+        _baseAddress = new UriBuilder("rabbitmq", configurator.ClientHost, configurator.ClientPort).Uri;
     }
+
+    public Uri GetPublishAddress(string entityName) => new(_baseAddress, $"exchange/{entityName}");
+
+    public Uri GetTemporaryEndpointAddress(string endpointName) =>
+        new(_baseAddress, $"exchange/{endpointName}?durable=false&autodelete=true");
+
+    public Uri GetErrorAddress(string endpointName) => GetPublishAddress(endpointName + "_error");
+
+    public Uri GetFaultAddress(string endpointName) => GetPublishAddress(endpointName + "_fault");
 
     public async Task<ISendTransport> GetSendTransport(Uri address, CancellationToken cancellationToken = default)
     {
@@ -64,7 +77,7 @@ public sealed class RabbitMqTransportFactory : ITransportFactory
             }
             else if (!string.IsNullOrEmpty(path))
             {
-                queue = path;
+                exchange = path;
             }
 
             ParseExchangeSettings(address.Query.TrimStart('?'), ref durable, ref autoDelete);
@@ -179,49 +192,74 @@ public sealed class RabbitMqTransportFactory : ITransportFactory
         return sendTransport;
     }
 
-    public async Task<IReceiveTransport> CreateReceiveTransport(
+    public Task<IReceiveTransport> CreateReceiveTransport(
         ReceiveEndpointTopology topology,
         Func<ReceiveContext, Task> handler,
         Func<string?, bool>? isMessageTypeRegistered = null,
         CancellationToken cancellationToken = default)
+        => CreateReceiveTransport(
+            RabbitMqReceiveEndpointTopology.Project(topology),
+            handler,
+            isMessageTypeRegistered,
+            cancellationToken);
+
+    public Task<IReceiveTransport> CreateReceiveTransport(
+        ReceiveEndpointTransportTopology topology,
+        Func<ReceiveContext, Task> handler,
+        Func<string?, bool>? isMessageTypeRegistered = null,
+        CancellationToken cancellationToken = default)
+        => CreateReceiveTransport(
+            RabbitMqReceiveEndpointTopology.Project(topology),
+            handler,
+            isMessageTypeRegistered,
+            cancellationToken);
+
+    private async Task<IReceiveTransport> CreateReceiveTransport(
+        RabbitMqReceiveEndpointTopology rabbitMqTopology,
+        Func<ReceiveContext, Task> handler,
+        Func<string?, bool>? isMessageTypeRegistered,
+        CancellationToken cancellationToken)
     {
         var connection = await _connectionProvider.GetOrCreateConnectionAsync(cancellationToken);
         var channel = await connection.CreateChannelAsync(cancellationToken: cancellationToken);
 
-        var prefetch = topology.PrefetchCount > 0 ? topology.PrefetchCount : _prefetchCount;
+        var prefetch = rabbitMqTopology.PrefetchCount > 0 ? rabbitMqTopology.PrefetchCount : _prefetchCount;
         if (prefetch > 0)
             await channel.BasicQosAsync(0, prefetch, false, cancellationToken);
 
-        await channel.ExchangeDeclareAsync(
-            exchange: topology.ExchangeName,
-            type: topology.ExchangeType,
-            durable: topology.Durable,
-            autoDelete: topology.AutoDelete,
-            cancellationToken: cancellationToken
-        );
+        foreach (var binding in rabbitMqTopology.Bindings)
+        {
+            await channel.ExchangeDeclareAsync(
+                exchange: binding.ExchangeName,
+                type: binding.ExchangeType,
+                durable: rabbitMqTopology.Durable,
+                autoDelete: rabbitMqTopology.AutoDelete,
+                cancellationToken: cancellationToken
+            );
+        }
 
-        var hasErrorQueue = !topology.AutoDelete;
+        var hasErrorQueue = !rabbitMqTopology.AutoDelete;
 
         if (hasErrorQueue)
         {
-            var errorExchange = topology.QueueName + "_error";
+            var errorExchange = rabbitMqTopology.QueueName + "_error";
             var errorQueue = errorExchange;
-            var skippedExchange = topology.QueueName + "_skipped";
+            var skippedExchange = rabbitMqTopology.QueueName + "_skipped";
             var skippedQueue = skippedExchange;
 
             await channel.ExchangeDeclareAsync(
                 exchange: errorExchange,
                 type: ExchangeType.Fanout,
-                durable: topology.Durable,
-                autoDelete: topology.AutoDelete,
+                durable: rabbitMqTopology.Durable,
+                autoDelete: rabbitMqTopology.AutoDelete,
                 cancellationToken: cancellationToken
             );
 
             await channel.QueueDeclareAsync(
                 queue: errorQueue,
-                durable: topology.Durable,
+                durable: rabbitMqTopology.Durable,
                 exclusive: false,
-                autoDelete: topology.AutoDelete,
+                autoDelete: rabbitMqTopology.AutoDelete,
                 cancellationToken: cancellationToken
             );
 
@@ -235,16 +273,16 @@ public sealed class RabbitMqTransportFactory : ITransportFactory
             await channel.ExchangeDeclareAsync(
                 exchange: skippedExchange,
                 type: ExchangeType.Fanout,
-                durable: topology.Durable,
-                autoDelete: topology.AutoDelete,
+                durable: rabbitMqTopology.Durable,
+                autoDelete: rabbitMqTopology.AutoDelete,
                 cancellationToken: cancellationToken
             );
 
             await channel.QueueDeclareAsync(
                 queue: skippedQueue,
-                durable: topology.Durable,
+                durable: rabbitMqTopology.Durable,
                 exclusive: false,
-                autoDelete: topology.AutoDelete,
+                autoDelete: rabbitMqTopology.AutoDelete,
                 cancellationToken: cancellationToken
             );
 
@@ -255,22 +293,22 @@ public sealed class RabbitMqTransportFactory : ITransportFactory
                 cancellationToken: cancellationToken
             );
 
-            var faultExchange = topology.QueueName + "_fault";
+            var faultExchange = rabbitMqTopology.QueueName + "_fault";
             var faultQueue = faultExchange;
 
             await channel.ExchangeDeclareAsync(
                 exchange: faultExchange,
                 type: ExchangeType.Fanout,
-                durable: topology.Durable,
-                autoDelete: topology.AutoDelete,
+                durable: rabbitMqTopology.Durable,
+                autoDelete: rabbitMqTopology.AutoDelete,
                 cancellationToken: cancellationToken
             );
 
             await channel.QueueDeclareAsync(
                 queue: faultQueue,
-                durable: topology.Durable,
+                durable: rabbitMqTopology.Durable,
                 exclusive: false,
-                autoDelete: topology.AutoDelete,
+                autoDelete: rabbitMqTopology.AutoDelete,
                 cancellationToken: cancellationToken
             );
 
@@ -283,22 +321,27 @@ public sealed class RabbitMqTransportFactory : ITransportFactory
         }
 
         await channel.QueueDeclareAsync(
-            queue: topology.QueueName,
-            durable: topology.Durable,
+            queue: rabbitMqTopology.QueueName,
+            durable: rabbitMqTopology.Durable,
             exclusive: false,
-            autoDelete: topology.AutoDelete,
-            arguments: topology.QueueArguments,
+            autoDelete: rabbitMqTopology.AutoDelete,
+            arguments: rabbitMqTopology.QueueArguments,
             cancellationToken: cancellationToken
         );
 
-        await channel.QueueBindAsync(
-            queue: topology.QueueName,
-            exchange: topology.ExchangeName,
-            routingKey: topology.RoutingKey,
-            cancellationToken: cancellationToken
-        );
+        foreach (var binding in rabbitMqTopology.Bindings)
+        {
+            await channel.QueueBindAsync(
+                queue: rabbitMqTopology.QueueName,
+                exchange: binding.ExchangeName,
+                routingKey: binding.RoutingKey,
+                cancellationToken: cancellationToken
+            );
+        }
 
-        return new RabbitMqReceiveTransport(channel, topology.QueueName, handler, hasErrorQueue, isMessageTypeRegistered);
+        var errorAddress = hasErrorQueue ? GetErrorAddress(rabbitMqTopology.QueueName) : null;
+        var faultAddress = hasErrorQueue ? GetFaultAddress(rabbitMqTopology.QueueName) : null;
+        return new RabbitMqReceiveTransport(channel, rabbitMqTopology.QueueName, handler, errorAddress, faultAddress, isMessageTypeRegistered);
     }
 
     private static void ParseExchangeSettings(string? queryString, ref bool durable, ref bool autoDelete)
@@ -320,6 +363,11 @@ public sealed class RabbitMqTransportFactory : ITransportFactory
                 durable = d;
             else if (key.Equals("autodelete", StringComparison.OrdinalIgnoreCase) && bool.TryParse(value, out var ad))
                 autoDelete = ad;
+            else if (key.Equals("temporary", StringComparison.OrdinalIgnoreCase) && bool.TryParse(value, out var temporary) && temporary)
+            {
+                durable = false;
+                autoDelete = true;
+            }
         }
     }
 }

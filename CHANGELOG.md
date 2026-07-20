@@ -2,6 +2,33 @@
 
 This changelog summarizes the bigger themes in the repository history. It is intentionally thematic rather than exhaustive, and is based on work landed between April 4, 2025 and March 24, 2026.
 
+## Unreleased
+
+### Stable cross-language topology foundation
+
+- Added corresponding versioned topology snapshots for C# and Java with stable identities, logical endpoint addresses, and canonical conformance fixtures.
+- Added synchronized public snapshot-version constants and explicit additive/breaking evolution rules.
+- Added corresponding RabbitMQ receive-topology projections that validate profile inputs before broker provisioning.
+- Moved the C# and Java bus runtimes onto corresponding profile-neutral receive-endpoint transport topology contracts while retaining legacy transport overload adapters.
+- Completed the topology stability gate with a prospective extension model for saga nodes, outbox policies, and materially different durable-broker projections.
+- Made inspection consume the normalized topology snapshot and stopped inferring RabbitMQ-specific details that are not supplied by an authoritative transport projection.
+
+### MVP API stabilization
+
+- Declared profile-neutral receive-endpoint topology as the supported transport extension point and deprecated legacy C# and Java receive-transport overloads without removing compatibility.
+
+### MVP dependency hygiene
+
+- Updated Aspire hosting, ASP.NET Core OpenAPI, and OpenTelemetry package families to patched releases so the resolved MVP application dependency graph is clear of known NuGet advisories.
+- Made .NET CI fail restoration when NuGet reports a low, moderate, high, or critical package advisory.
+
+### MVP packaging
+
+- Defined the four supported .NET artifacts as explicit `0.1.0-preview.1` NuGet packages with repository, license, description, readme, and symbol metadata; all non-package projects are excluded by default.
+- Defined seven foundational Java modules as `0.1.0-preview.1` Maven publications with source, Javadoc, license, project, developer, and source-control metadata; preview inspection and sample applications remain unpublished.
+- Scoped Java production dependencies to the modules that own them so published POMs do not expose unrelated broker, serialization, dependency-injection, logging, or telemetry libraries.
+- Added NuGet and Maven package construction to the regular .NET and Java CI workflows.
+
 ## 2026-03-24 to 2026-03-19
 
 ### Aspire, runtime modernization, and parity cleanup
@@ -95,3 +122,28 @@ This changelog summarizes the bigger themes in the repository history. It is int
 ## Maintenance policy
 
 Keep this file updated for significant changes. Prefer adding dated entries that summarize the main themes of a change set instead of listing every commit.
+# Unreleased
+
+- Added sample-app dashboard endpoints in the .NET and Java `TestApp` projects under `/dashboard/v1/*`, exposing stable JSON snapshots for bus overview, messages, consumers, and topology without committing those contracts to the shared libraries yet.
+- Split the programmatic inspection surface into first-party addon projects for .NET and Java, keeping the sample inspection endpoints working while removing the core bus packages' direct dependency on inspection registration.
+- Documented the long-term architecture and phased roadmap, including explicit compatibility levels, capability-aware transport profiles, event-stream and SignalR integration boundaries, cross-language conformance, and the optional inspection, monitoring, and dashboard plane.
+- Added shared versioned message, request, and fault fixtures with C# and Java validation, plus Testcontainers-backed RabbitMQ transport round-trip tests as the first executable compatibility baseline.
+- Added bidirectional C#↔Java RabbitMQ interoperability tests, a dedicated CI job, and configurable AMQP ports so normal client configuration works with dynamically mapped Testcontainers endpoints.
+- Extended the RabbitMQ conformance matrix with verified C#↔MassTransit and Java↔MassTransit envelope delivery in both directions.
+- Added correlated C#↔MassTransit request/response conformance and aligned C# and Java request envelopes on explicit request identifiers.
+- Completed the Java↔MassTransit request/response matrix, aligned temporary RabbitMQ endpoint addressing, and documented MyServiceBus as a focused interoperable alternative rather than an enterprise feature-parity competitor.
+- Completed bidirectional C# and Java fault-response conformance with MassTransit, including canonical generic fault URNs, correlated routing, strict response-type discrimination, and MassTransit fault field names.
+- Added live RabbitMQ conformance coverage for C# and Java retry exhaustion and MassTransit-readable `_error` and `_skipped` queue delivery.
+- Introduced matching versioned transport capability descriptors for C# and Java, with RabbitMQ and in-memory profiles using `native`, `emulated`, and `unsupported` classifications.
+- Added opt-in startup capability requirements in both clients, including the ability to require native support and clear failures before receive transports start.
+- Moved publish and temporary response address production behind transport factories, removing hard-coded RabbitMQ addresses from the C# request client and configured-host assumptions from Java RabbitMQ envelopes.
+- Routed bus-level and consume-context publication through transport-provided address producers in both clients, keeping broker URI structure out of portable publish behavior.
+- Defined cross-language conceptual parity as recognizable counterpart abstractions with idiomatic platform APIs and code organization, explicitly rejecting mechanical namespace/package and source translation.
+- Moved error and fault address production behind corresponding C# and Java transport-factory methods, eliminating portable-core and RabbitMQ receive-path assumptions about broker hostnames.
+- Replaced Java convenience-context RabbitMQ path inference with transport-neutral logical addresses and added matching logical `exchange:`/`queue:` resolution to the Java RabbitMQ adapter.
+- Marked the transport-capability foundation complete and revised the new-transport guide so terminal delivery, addressing, capabilities, and conformance are profile-driven rather than RabbitMQ-shaped.
+- Added Testcontainers-backed C# and Java directed-send conformance to MassTransit RabbitMQ receive endpoints, separating queue-address evidence from publish interoperability.
+- Completed the RabbitMQ directed-send matrix with MassTransit-to-C#, MassTransit-to-Java, and bidirectional C#↔Java queue-address delivery.
+- Defined a normalized, queryable cross-language topology model as a stability gate before inspection, dashboards, sagas, outbox support, and additional transports.
+- Added matching versioned topology snapshot APIs in C# and Java with deterministic message, endpoint, consumer, and binding identities, logical addresses, and immutable Java views.
+- Added corresponding receive-endpoint definitions to both topology registries so snapshots query normalized endpoint intent instead of embedding durability defaults in snapshot builders.

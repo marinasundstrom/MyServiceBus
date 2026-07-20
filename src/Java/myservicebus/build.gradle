@@ -3,4 +3,14 @@ dependencies {
     api project(':myservicebus-di')
     api project(':myservicebus-logging')
     api project(':myservicebus-tasks')
+    implementation "com.fasterxml.jackson.datatype:jackson-datatype-jsr310:${jacksonVersion}"
+    implementation "io.opentelemetry:opentelemetry-api:${opentelemetryVersion}"
+}
+
+sourceSets {
+    test {
+        resources {
+            srcDir "${rootProject.projectDir}/test/fixtures"
+        }
+    }
 }

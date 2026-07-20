@@ -14,15 +14,23 @@ import com.myservicebus.PublishEndpoint;
 import com.myservicebus.di.ServiceCollection;
 import com.myservicebus.di.ServiceProvider;
 import com.myservicebus.di.ServiceScope;
+import com.myservicebus.inspection.BusInspectionProvider;
+import com.myservicebus.inspection.InspectionServices;
 import com.myservicebus.rabbitmq.RabbitMqFactoryConfigurator;
 import com.myservicebus.tasks.CancellationToken;
 import com.myservicebus.logging.LogLevel;
 import com.myservicebus.logging.Logger;
 import com.myservicebus.logging.LoggerFactory;
 import com.myservicebus.logging.Logging;
+import com.myservicebus.testapp.dashboard.DashboardApi;
+import com.myservicebus.testapp.dashboard.DashboardMetricsFilters;
+import com.myservicebus.testapp.dashboard.DashboardMetadata;
+import com.myservicebus.testapp.dashboard.DashboardState;
+import java.time.Instant;
 
 public class Main {
     public static void main(String[] args) {
+        DashboardState inspectionState = new DashboardState();
 
         ServiceCollection services = ServiceCollection.create();
 
@@ -33,17 +41,26 @@ public class Main {
                     cfg.setLevel("com.myservicebus", LogLevel.DEBUG);
                 }));
 
+        services.from(InspectionServices.class)
+                .addInspection();
+
         String rabbitMqHost = System.getenv().getOrDefault("RABBITMQ_HOST", "localhost");
+        int rabbitMqPort = Integer.parseInt(System.getenv().getOrDefault("RABBITMQ_PORT", "5672"));
 
         services.from(MessageBusServices.class)
                 .addServiceBus(c -> {
-                    c.addConsumer(SubmitOrderConsumer.class);
-                    c.addConsumer(OrderSubmittedConsumer.class);
-                    c.addConsumer(TestRequestConsumer.class);
+                    c.configureSend(cfg -> cfg.useFilter(new DashboardMetricsFilters.SendMetricsFilter(inspectionState)));
+                    c.configurePublish(cfg -> cfg.useFilter(new DashboardMetricsFilters.PublishMetricsFilter(inspectionState)));
+                    c.addConsumer(SubmitOrderConsumer.class, SubmitOrder.class,
+                            cfg -> cfg.useFilter(new DashboardMetricsFilters.ConsumeMetricsFilter<>(inspectionState, "submit-order", SubmitOrder.class)));
+                    c.addConsumer(OrderSubmittedConsumer.class, OrderSubmitted.class,
+                            cfg -> cfg.useFilter(new DashboardMetricsFilters.ConsumeMetricsFilter<>(inspectionState, "order-submitted", OrderSubmitted.class)));
+                    c.addConsumer(TestRequestConsumer.class, TestRequest.class,
+                            cfg -> cfg.useFilter(new DashboardMetricsFilters.ConsumeMetricsFilter<>(inspectionState, "test-request", TestRequest.class)));
                     c.addConsumer(SubmitOrderFaultConsumer.class);
 
                     c.using(RabbitMqFactoryConfigurator.class, (context, cfg) -> {
-                        cfg.host(rabbitMqHost, h -> {
+                        cfg.host(rabbitMqHost, rabbitMqPort, h -> {
                             h.username("guest");
                             h.password("guest");
                         });
@@ -75,9 +92,11 @@ public class Main {
         LoggerFactory loggerFactory = provider.getService(LoggerFactory.class);
         final Logger logger = loggerFactory != null ? loggerFactory.create(Main.class) : null;
         MessageBus serviceBus = provider.getRequiredService(MessageBus.class);
+        BusInspectionProvider inspectionProvider = provider.getRequiredService(BusInspectionProvider.class);
 
         try {
             serviceBus.start();
+            inspectionState.markStarted(Instant.now());
             logger.info("🚀 Test app started");
         } catch (Exception e) {
             logger.error("❌ Failed to start service bus", e);
@@ -86,6 +105,9 @@ public class Main {
 
         int httpPort = Integer.parseInt(System.getenv().getOrDefault("HTTP_PORT", "5301"));
         var app = Javalin.create().start(httpPort);
+        app.get("/health/live", ctx -> ctx.status(200));
+        app.get("/health/ready", ctx -> ctx.status(inspectionState.isStarted() ? 200 : 503));
+        DashboardApi.register(app, inspectionProvider, new DashboardMetadata("TestApp", "rabbitmq"), inspectionState);
 
         app.get("/publish", ctx -> {
             try (ServiceScope scope = provider.createScope()) {

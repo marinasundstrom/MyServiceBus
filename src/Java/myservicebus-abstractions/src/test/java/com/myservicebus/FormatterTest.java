@@ -23,6 +23,12 @@ public class FormatterTest {
     }
 
     @Test
+    void getFaultMessageUrnReturnsExpected() {
+        String urn = MessageUrn.forFault(SampleUrnMessage.class);
+        assertEquals("urn:message:MassTransit:Fault[[TestApp:SampleUrnMessage]]", urn);
+    }
+
+    @Test
     void getExchangeNameUsesAttribute() {
         String name = EntityNameFormatter.format(AttributeMessage.class);
         assertEquals("custom-entity", name);

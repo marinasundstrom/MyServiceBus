@@ -25,6 +25,13 @@ public class FormatterTests
     }
 
     [Fact]
+    public void GetMessageUrn_FormatsMassTransitFaultContract()
+    {
+        var urn = MessageUrn.For(typeof(Fault<SampleUrnMessage>));
+        Assert.Equal("urn:message:MassTransit:Fault[[MyServiceBus.Tests:SampleUrnMessage]]", urn);
+    }
+
+    [Fact]
     public void GetExchangeName_UsesAttribute()
     {
         var name = EntityNameFormatter.Format(typeof(AttributeMessage));

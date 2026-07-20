@@ -2,6 +2,8 @@ package com.myservicebus.rabbitmq;
 
 import com.rabbitmq.client.Connection;
 import com.rabbitmq.client.ConnectionFactory;
+import java.net.URI;
+import java.net.URISyntaxException;
 
 public class ConnectionProvider {
     private final ConnectionFactory connectionFactory;
@@ -32,6 +34,29 @@ public class ConnectionProvider {
                 Thread.sleep(delay);
                 delay = Math.min(delay * 2, 5000);
             }
+        }
+    }
+
+    public String getPublishAddress(String exchange) {
+        return address("/exchange/" + exchange);
+    }
+
+    public String getSendAddress(String queue) {
+        return address("/" + queue);
+    }
+
+    private String address(String path) {
+        try {
+            return new URI(
+                    "rabbitmq",
+                    null,
+                    connectionFactory.getHost(),
+                    connectionFactory.getPort(),
+                    path,
+                    null,
+                    null).toString();
+        } catch (URISyntaxException exception) {
+            throw new IllegalArgumentException("Invalid RabbitMQ address", exception);
         }
     }
 }

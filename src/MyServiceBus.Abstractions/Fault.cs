@@ -10,9 +10,9 @@ public class Fault
 
     [JsonPropertyName("host")] public HostInfo? Host { get; set; }
 
-    [JsonPropertyName("messageId")] public Guid? MessageId { get; set; }
+    [JsonPropertyName("faultedMessageId")] public Guid? MessageId { get; set; }
 
-    [JsonPropertyName("sentTime")] public DateTimeOffset SentTime { get; set; }
+    [JsonPropertyName("timestamp")] public DateTimeOffset SentTime { get; set; }
 
     [JsonPropertyName("faultId")] public Guid FaultId { get; set; }
 

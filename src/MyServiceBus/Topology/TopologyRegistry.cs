@@ -9,6 +9,9 @@ public class TopologyRegistry : IBusTopology
 {
     public List<MessageTopology> Messages { get; } = new();
     public List<ConsumerTopology> Consumers { get; } = new();
+    private readonly List<ReceiveEndpointDefinition> _receiveEndpoints = new();
+
+    public IReadOnlyList<ReceiveEndpointDefinition> ReceiveEndpoints => _receiveEndpoints;
 
     public void RegisterMessage<T>(string entityName)
     {
@@ -32,6 +35,7 @@ public class TopologyRegistry : IBusTopology
 
     public void RegisterConsumer<TConsumer>(string queueName, Delegate? configurePipe, params Type[] messageTypes)
     {
+        EnsureReceiveEndpoint(queueName);
         var bindings = messageTypes.Select(mt =>
         {
             var msg = Messages.FirstOrDefault(m => m.MessageType == mt) ?? RegisterMessage(mt);
@@ -45,5 +49,13 @@ public class TopologyRegistry : IBusTopology
             Bindings = bindings,
             ConfigurePipe = configurePipe
         });
+    }
+
+    private void EnsureReceiveEndpoint(string endpointName)
+    {
+        if (_receiveEndpoints.Any(x => x.Name == endpointName))
+            return;
+
+        _receiveEndpoints.Add(new ReceiveEndpointDefinition(endpointName, Durable: true, Temporary: false));
     }
 }

@@ -57,7 +57,7 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
     {
         var exchangeName = EntityNameFormatter.Format(typeof(T));
 
-        var uri = new Uri(_address, $"exchange/{exchangeName}");
+        var uri = _transportFactory.GetPublishAddress(exchangeName);
         var transport = await _transportFactory.GetSendTransport(uri, cancellationToken);
 
         var context = _publishContextFactory.Create(MessageTypeCache.GetMessageTypes(typeof(T)), _messageSerializer, cancellationToken);
@@ -88,6 +88,7 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
 
         var context = _sendContextFactory.Create(MessageTypeCache.GetMessageTypes(typeof(T)), _messageSerializer, cancellationToken);
         context.MessageId = Guid.NewGuid().ToString();
+        context.RequestId = receiveContext.RequestId;
         context.SourceAddress = _address;
         context.DestinationAddress = address;
 
@@ -100,7 +101,7 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
 
     internal async Task RespondFaultAsync(Exception exception, CancellationToken cancellationToken = default)
     {
-        var address = receiveContext.FaultAddress ?? receiveContext.ResponseAddress;
+        var address = receiveContext.ResponseAddress ?? receiveContext.FaultAddress;
         if (address == null)
             return;
 
@@ -117,6 +118,7 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
         var transport = await _transportFactory.GetSendTransport(address, cancellationToken);
         var context = _sendContextFactory.Create(MessageTypeCache.GetMessageTypes(typeof(Fault<TMessage>)), _messageSerializer, cancellationToken);
         context.MessageId = Guid.NewGuid().ToString();
+        context.RequestId = receiveContext.RequestId;
         context.SourceAddress = _address;
         context.DestinationAddress = address;
 

@@ -12,6 +12,7 @@ public class EnvelopeMessageContext : IMessageContext
 
     private Guid? _messageId;
     private Guid? _correlationId;
+    private Guid? _requestId;
     private List<string>? _messageType;
     private Dictionary<string, object>? _headers;
     private DateTimeOffset? _sentTime;
@@ -30,6 +31,9 @@ public class EnvelopeMessageContext : IMessageContext
 
     public Guid? CorrelationId =>
         _correlationId ??= TryGetProperty("correlationId")?.GetGuid();
+
+    public Guid? RequestId =>
+        _requestId ??= TryGetProperty("requestId")?.GetGuid();
 
     public IList<string> MessageType =>
         _messageType ??= TryGetProperty("messageType")?.Deserialize<List<string>>() ?? new();

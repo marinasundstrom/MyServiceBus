@@ -24,6 +24,16 @@ public class RabbitMqFactoryConfiguratorTests {
     }
 
     @Test
+    public void factoryConfiguresNonDefaultPort() {
+        RabbitMqFactoryConfigurator configurator = new RabbitMqFactoryConfigurator();
+
+        configurator.host("container-host", 32789);
+
+        assertEquals("container-host", configurator.getClientHost());
+        assertEquals(32789, configurator.getClientPort());
+    }
+
+    @Test
     public void consumerDefinitionReflectsCustomQueueAndExchange() {
         ServiceCollection services = ServiceCollection.create();
         BusRegistrationConfiguratorImpl cfg = new BusRegistrationConfiguratorImpl(services);

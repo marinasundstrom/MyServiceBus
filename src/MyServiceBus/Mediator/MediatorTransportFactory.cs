@@ -12,6 +12,14 @@ public class MediatorTransportFactory : ITransportFactory
 {
     private readonly ConcurrentDictionary<string, List<Func<ReceiveContext, Task>>> _handlers = new();
 
+    public TransportCapabilityDescriptor Capabilities => TransportCapabilityDescriptors.InMemory;
+
+    public Uri GetPublishAddress(string entityName) =>
+        new($"loopback://localhost/exchange/{entityName}");
+
+    public Uri GetTemporaryEndpointAddress(string endpointName) =>
+        new($"loopback://localhost/exchange/{endpointName}?durable=false&autodelete=true");
+
     public Task<ISendTransport> GetSendTransport(Uri address, CancellationToken cancellationToken = default)
     {
         var exchange = ExtractExchange(address);
@@ -124,10 +132,7 @@ public class MediatorTransportFactory : ITransportFactory
             var messageId = Guid.TryParse(context.MessageId, out var id) ? id : Guid.NewGuid();
             Guid? correlationId = context.CorrelationId != null && Guid.TryParse(context.CorrelationId, out var cId) ? cId : null;
 
-            var messageTypes = MessageTypeCache
-                .GetMessageTypes(typeof(T))
-                .Select(t => MessageUrn.For(t))
-                .ToList();
+            var messageTypes = context.MessageTypeUrns.ToList();
 
             var headers = new Dictionary<string, object>(context.Headers);
 

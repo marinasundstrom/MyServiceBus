@@ -1,6 +1,7 @@
 package com.myservicebus.rabbitmq;
 
 import java.time.OffsetDateTime;
+import java.net.URI;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -48,25 +49,25 @@ public class RabbitMqRequestClientTransport implements RequestClientTransport {
             String responseQueue = channel.queueDeclare().getQueue();
             channel.exchangeDeclare(responseExchange, BuiltinExchangeType.FANOUT, false, true, null);
             channel.queueBind(responseQueue, responseExchange, "");
-            String address = "rabbitmq://localhost/exchange/" + responseExchange
+            String address = connectionProvider.getPublishAddress(responseExchange)
                     + "?durable=false&autodelete=true";
 
             DeliverCallback callback = (tag, delivery) -> {
                 try {
-                    JavaType type = mapper.getTypeFactory().constructParametricType(Envelope.class, responseType);
-                    Envelope<TResponse> envelope = mapper.readValue(delivery.getBody(), type);
-                    future.complete(envelope.getMessage());
-                } catch (Exception ex) {
-                    try {
+                    if (hasMessageType(delivery.getBody(), faultUrn(requestType))) {
                         JavaType faultInner = mapper.getTypeFactory().constructParametricType(Fault.class, requestType);
                         JavaType faultType = mapper.getTypeFactory().constructParametricType(Envelope.class,
                                 faultInner);
                         Envelope<Fault<TRequest>> fault = mapper.readValue(delivery.getBody(), faultType);
                         future.completeExceptionally(
                                 new RequestFaultException(requestType.getSimpleName(), fault.getMessage()));
-                    } catch (Exception inner) {
-                        future.completeExceptionally(inner);
+                    } else {
+                        JavaType type = mapper.getTypeFactory().constructParametricType(Envelope.class, responseType);
+                        Envelope<TResponse> envelope = mapper.readValue(delivery.getBody(), type);
+                        future.complete(envelope.getMessage());
                     }
+                } catch (Exception ex) {
+                    future.completeExceptionally(ex);
                 } finally {
                     try {
                         channel.basicCancel(tag);
@@ -80,14 +81,16 @@ public class RabbitMqRequestClientTransport implements RequestClientTransport {
             channel.basicConsume(responseQueue, true, callback, consumerTag -> {
             });
 
-            String exchange = EntityNameFormatter.format(requestType);
+            String destinationAddress = requestAddress(requestType, context);
+            String exchange = exchangeName(destinationAddress);
             channel.exchangeDeclare(exchange, BuiltinExchangeType.FANOUT, true);
 
             Envelope<TRequest> envelope = new Envelope<>();
             envelope.setMessageId(UUID.randomUUID());
+            envelope.setRequestId(UUID.randomUUID());
             envelope.setConversationId(UUID.randomUUID());
             envelope.setSentTime(OffsetDateTime.now());
-            envelope.setDestinationAddress("rabbitmq://localhost/exchange/" + exchange);
+            envelope.setDestinationAddress(destinationAddress);
             envelope.setResponseAddress(address);
             envelope.setFaultAddress(address);
             envelope.setMessageType(List.of(MessageUrn.forClass(requestType)));
@@ -122,31 +125,29 @@ public class RabbitMqRequestClientTransport implements RequestClientTransport {
             String responseQueue = channel.queueDeclare().getQueue();
             channel.exchangeDeclare(responseExchange, BuiltinExchangeType.FANOUT, false, true, null);
             channel.queueBind(responseQueue, responseExchange, "");
-            String address = "rabbitmq://localhost/exchange/" + responseExchange
+            String address = connectionProvider.getPublishAddress(responseExchange)
                     + "?durable=false&autodelete=true";
 
             DeliverCallback callback = (tag, delivery) -> {
                 try {
-                    try {
-                        JavaType type1 = mapper.getTypeFactory().constructParametricType(Envelope.class, responseType1);
-                        Envelope<T1> env1 = mapper.readValue(delivery.getBody(), type1);
-                        future.complete(Response2.fromT1(env1.getMessage()));
-                    } catch (Exception ex1) {
-                        JavaType type2 = mapper.getTypeFactory().constructParametricType(Envelope.class, responseType2);
-                        Envelope<T2> env2 = mapper.readValue(delivery.getBody(), type2);
-                        future.complete(Response2.fromT2(env2.getMessage()));
-                    }
-                } catch (Exception ex) {
-                    try {
+                    if (hasMessageType(delivery.getBody(), faultUrn(requestType))) {
                         JavaType faultInner = mapper.getTypeFactory().constructParametricType(Fault.class, requestType);
                         JavaType faultType = mapper.getTypeFactory().constructParametricType(Envelope.class,
                                 faultInner);
                         Envelope<Fault<TRequest>> fault = mapper.readValue(delivery.getBody(), faultType);
                         future.completeExceptionally(
                                 new RequestFaultException(requestType.getSimpleName(), fault.getMessage()));
-                    } catch (Exception inner) {
-                        future.completeExceptionally(inner);
+                    } else if (hasMessageType(delivery.getBody(), MessageUrn.forClass(responseType1))) {
+                        JavaType type1 = mapper.getTypeFactory().constructParametricType(Envelope.class, responseType1);
+                        Envelope<T1> env1 = mapper.readValue(delivery.getBody(), type1);
+                        future.complete(Response2.fromT1(env1.getMessage()));
+                    } else {
+                        JavaType type2 = mapper.getTypeFactory().constructParametricType(Envelope.class, responseType2);
+                        Envelope<T2> env2 = mapper.readValue(delivery.getBody(), type2);
+                        future.complete(Response2.fromT2(env2.getMessage()));
                     }
+                } catch (Exception ex) {
+                    future.completeExceptionally(ex);
                 } finally {
                     try {
                         channel.basicCancel(tag);
@@ -160,14 +161,16 @@ public class RabbitMqRequestClientTransport implements RequestClientTransport {
             channel.basicConsume(responseQueue, true, callback, consumerTag -> {
             });
 
-            String exchange = EntityNameFormatter.format(requestType);
+            String destinationAddress = requestAddress(requestType, context);
+            String exchange = exchangeName(destinationAddress);
             channel.exchangeDeclare(exchange, BuiltinExchangeType.FANOUT, true);
 
             Envelope<TRequest> envelope = new Envelope<>();
             envelope.setMessageId(UUID.randomUUID());
+            envelope.setRequestId(UUID.randomUUID());
             envelope.setConversationId(UUID.randomUUID());
             envelope.setSentTime(OffsetDateTime.now());
-            envelope.setDestinationAddress("rabbitmq://localhost/exchange/" + exchange);
+            envelope.setDestinationAddress(destinationAddress);
             envelope.setResponseAddress(address);
             envelope.setFaultAddress(address);
             envelope.setMessageType(List.of(MessageUrn.forClass(requestType)));
@@ -187,5 +190,35 @@ public class RabbitMqRequestClientTransport implements RequestClientTransport {
             future.completeExceptionally(ex);
         }
         return future;
+    }
+
+    private boolean hasMessageType(byte[] body, String expectedUrn) throws Exception {
+        Envelope<?> envelope = mapper.readValue(body, Envelope.class);
+        return envelope.getMessageType() != null && envelope.getMessageType().contains(expectedUrn);
+    }
+
+    private static String faultUrn(Class<?> requestType) {
+        return MessageUrn.forFault(requestType);
+    }
+
+    private String requestAddress(Class<?> requestType, SendContext context) {
+        return context.getDestinationAddress() != null
+                ? context.getDestinationAddress().toString()
+                : connectionProvider.getPublishAddress(EntityNameFormatter.format(requestType));
+    }
+
+    private static String exchangeName(String address) {
+        URI uri = URI.create(address);
+        if ("exchange".equalsIgnoreCase(uri.getScheme())) {
+            return uri.getSchemeSpecificPart().split("\\?", 2)[0];
+        }
+
+        String path = uri.getPath();
+        String prefix = "/exchange/";
+        if (path != null && path.startsWith(prefix) && path.length() > prefix.length()) {
+            return path.substring(prefix.length());
+        }
+
+        throw new IllegalArgumentException("RabbitMQ request destination must identify an exchange: " + address);
     }
 }

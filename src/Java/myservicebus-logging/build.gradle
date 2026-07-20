@@ -1,2 +1,4 @@
 dependencies {
+    api "javax.inject:javax.inject:${javaxInjectVersion}"
+    implementation "org.slf4j:slf4j-api:${slf4jVersion}"
 }

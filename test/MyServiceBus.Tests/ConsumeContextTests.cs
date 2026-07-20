@@ -151,6 +151,9 @@ public class ConsumeContextTests
         public Uri? Address { get; private set; }
         public SendContext? Context { get; private set; }
 
+        public Uri GetPublishAddress(string entityName) =>
+            new($"rabbitmq://localhost/exchange/{entityName}");
+
         public Task<ISendTransport> GetSendTransport(Uri address, CancellationToken cancellationToken = default)
         {
             Address = address;
@@ -194,4 +197,3 @@ public class ConsumeContextTests
             => throw new NotImplementedException();
     }
 }
-

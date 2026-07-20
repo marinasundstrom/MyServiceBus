@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+    <PackageReference Include="Microsoft.OpenApi" />
     <PackageReference Include="OpenTelemetry.Extensions.Hosting" />
     <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" />
     <PackageReference Include="OpenTelemetry.Instrumentation.Http" />
@@ -16,6 +17,7 @@
 
   <ItemGroup>
     <ProjectReference Include="../AspireApp.ServiceDefaults/AspireApp.ServiceDefaults.csproj" />
+    <ProjectReference Include="../MyServiceBus.Inspection/MyServiceBus.Inspection.csproj" />
     <ProjectReference Include="../MyServiceBus.RabbitMq/MyServiceBus.RabbitMq.csproj" />
     <ProjectReference Include="../TestApp.Contracts/TestApp.Contracts.csproj" />
   </ItemGroup>

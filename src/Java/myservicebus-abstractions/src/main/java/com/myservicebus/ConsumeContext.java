@@ -17,9 +17,8 @@ import com.myservicebus.tasks.CancellationToken;
  *
  * <p>
  * Provides basic send and publish capabilities by delegating to an injected
- * {@link SendEndpointProvider}. The URI scheme used matches the RabbitMQ
- * implementation: publishes target an exchange URI while sends target a queue
- * URI.
+ * {@link SendEndpointProvider}. Publish addresses are supplied by the selected
+ * transport profile.
  * </p>
  */
 public class ConsumeContext<T>
@@ -36,6 +35,7 @@ public class ConsumeContext<T>
     private final CancellationToken cancellationToken;
     private final SendEndpointProvider sendEndpointProvider;
     private final URI busAddress;
+    private final PublishAddressProvider publishAddressProvider;
 
     public ConsumeContext(T message, Map<String, Object> headers, SendEndpointProvider provider) {
         this(message, headers, null, null, null, CancellationToken.none, provider, URI.create("loopback://localhost/"));
@@ -57,6 +57,13 @@ public class ConsumeContext<T>
 
     public ConsumeContext(T message, Map<String, Object> headers, String responseAddress, String faultAddress,
             String errorAddress, CancellationToken cancellationToken, SendEndpointProvider provider, URI busAddress) {
+        this(message, headers, responseAddress, faultAddress, errorAddress, cancellationToken, provider, busAddress,
+                entityName -> "exchange:" + entityName);
+    }
+
+    public ConsumeContext(T message, Map<String, Object> headers, String responseAddress, String faultAddress,
+            String errorAddress, CancellationToken cancellationToken, SendEndpointProvider provider, URI busAddress,
+            PublishAddressProvider publishAddressProvider) {
         this.message = message;
         this.headers = headers;
         this.responseAddress = responseAddress;
@@ -65,6 +72,7 @@ public class ConsumeContext<T>
         this.cancellationToken = cancellationToken;
         this.sendEndpointProvider = provider;
         this.busAddress = busAddress;
+        this.publishAddressProvider = publishAddressProvider;
     }
 
     public T getMessage() {
@@ -92,7 +100,7 @@ public class ConsumeContext<T>
     @Override
     public CompletableFuture<Void> publish(PublishContext context) {
         String exchange = EntityNameFormatter.format(context.getMessage().getClass());
-        URI dest = busAddress.resolve("exchange/" + exchange);
+        URI dest = URI.create(publishAddressProvider.getPublishAddress(exchange));
         context.setSourceAddress(busAddress);
         context.setDestinationAddress(dest);
         SendEndpoint endpoint = getSendEndpoint(dest.toString());
@@ -211,7 +219,7 @@ public class ConsumeContext<T>
     }
 
     public CompletableFuture<Void> respondFault(Exception exception, CancellationToken cancellationToken) {
-        String address = faultAddress != null ? faultAddress : responseAddress;
+        String address = responseAddress != null ? responseAddress : faultAddress;
         if (address == null) {
             return CompletableFuture.completedFuture(null);
         }
@@ -234,7 +242,10 @@ public class ConsumeContext<T>
         }
 
         SendEndpoint endpoint = getSendEndpoint(address);
-        return endpoint.send(fault, cancellationToken);
+        return endpoint.send(
+                fault,
+                context -> context.setMessageTypes(Collections.singletonList(MessageUrn.forFault(message.getClass()))),
+                cancellationToken);
     }
 
     @Override

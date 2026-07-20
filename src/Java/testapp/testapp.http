@@ -31,3 +31,23 @@ GET {{JavaTestApp_HostAddress}}/request_multi
 GET {{JavaTestApp_HostAddress}}/request_multi/fault
 
 ###
+
+GET {{JavaTestApp_HostAddress}}/dashboard/v1/overview
+Accept: application/json
+
+###
+
+GET {{JavaTestApp_HostAddress}}/dashboard/v1/messages
+Accept: application/json
+
+###
+
+GET {{JavaTestApp_HostAddress}}/dashboard/v1/consumers
+Accept: application/json
+
+###
+
+GET {{JavaTestApp_HostAddress}}/dashboard/v1/topology
+Accept: application/json
+
+###

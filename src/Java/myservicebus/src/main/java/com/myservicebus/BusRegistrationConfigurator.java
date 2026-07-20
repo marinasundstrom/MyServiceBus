@@ -12,6 +12,10 @@ public interface BusRegistrationConfigurator {
     void configurePublish(java.util.function.Consumer<PipeConfigurator<SendContext>> configure);
     void setSerializer(Class<? extends MessageSerializer> serializerClass);
     void setDeserializer(Class<? extends MessageDeserializer> deserializerClass);
+    void requireTransportCapability(String capability, boolean requireNative);
+    default void requireTransportCapability(String capability) {
+        requireTransportCapability(capability, false);
+    }
     ServiceCollection getServiceCollection();
 
     default <TConfigurator extends BusFactoryConfigurator> BusRegistrationConfigurator using(
