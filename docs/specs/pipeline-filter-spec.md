@@ -42,6 +42,8 @@ Transport-internal pipelines may add connection, topology, serialization, settle
 
 A filter that catches a failure owns the decision to complete, transform, or rethrow it. Retry filters re-invoke only their downstream pipe segment. Terminal fault publication and error-transport behavior therefore run after configured retries are exhausted.
 
+Application filters registered before a retry filter are entered once and observe only the terminal outcome. Filters registered after retry are entered again for every attempt and observe individual attempt failures. This ordering is identical in the C# and Java mediator runtimes.
+
 The initial portable retry profile supports immediate and fixed-delay attempts. Exception selection, attempt metadata, scope behavior, and redelivery are separate compatibility requirements and must not be implied until specified and tested.
 
 ## Dependency injection and lifetime

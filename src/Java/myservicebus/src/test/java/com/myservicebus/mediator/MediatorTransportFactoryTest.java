@@ -2,13 +2,17 @@ package com.myservicebus.mediator;
 
 import com.myservicebus.ConsumeContext;
 import com.myservicebus.Consumer;
+import com.myservicebus.Filter;
 import com.myservicebus.Handler;
 import com.myservicebus.HandlerWithResult;
+import com.myservicebus.Pipe;
 import com.myservicebus.SendEndpoint;
 import com.myservicebus.SendEndpointProvider;
 import com.myservicebus.tasks.CancellationToken;
 import com.myservicebus.tasks.CancellationTokenSource;
 import com.myservicebus.di.ServiceCollection;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import javax.inject.Inject;
@@ -29,6 +33,36 @@ public class MediatorTransportFactoryTest {
         public CompletableFuture<Void> consume(ConsumeContext<TestMessage> context) {
             received.complete(context.getMessage());
             return CompletableFuture.completedFuture(null);
+        }
+    }
+
+    public static class RetryingConsumer implements Consumer<TestMessage> {
+        static int attempts;
+        static List<String> calls = new ArrayList<>();
+
+        @Override
+        public CompletableFuture<Void> consume(ConsumeContext<TestMessage> context) {
+            calls.add("consumer:" + ++attempts);
+            return attempts == 1
+                    ? CompletableFuture.failedFuture(new IllegalStateException("retry"))
+                    : CompletableFuture.completedFuture(null);
+        }
+    }
+
+    static class RecordingConsumeFilter implements Filter<ConsumeContext<TestMessage>> {
+        private final String name;
+        private final List<String> calls;
+
+        RecordingConsumeFilter(String name, List<String> calls) {
+            this.name = name;
+            this.calls = calls;
+        }
+
+        @Override
+        public CompletableFuture<Void> send(ConsumeContext<TestMessage> context, Pipe<ConsumeContext<TestMessage>> next) {
+            calls.add(name + ":before");
+            return next.send(context).whenComplete((ignored, failure) ->
+                    calls.add(name + (failure == null ? ":after" : ":fault")));
         }
     }
 
@@ -136,6 +170,34 @@ public class MediatorTransportFactoryTest {
         bus.publish(new TestMessage("hello"));
 
         Assertions.assertEquals("hello", TestConsumer.received.join().getValue());
+    }
+
+    @Test
+    public void consumeFiltersWrapRetryAndOnlyDownstreamFiltersAreReentered() {
+        RetryingConsumer.attempts = 0;
+        RetryingConsumer.calls = new ArrayList<>();
+        ServiceCollection services = ServiceCollection.create();
+        MediatorBus bus = MediatorBus.configure(services, cfg ->
+                cfg.addConsumer(RetryingConsumer.class, TestMessage.class, pipe -> {
+                    pipe.useFilter(new RecordingConsumeFilter("outer", RetryingConsumer.calls));
+                    pipe.useMessageRetry(retry -> retry.immediate(1));
+                    pipe.useFilter(new RecordingConsumeFilter("inner", RetryingConsumer.calls));
+                }));
+
+        bus.publish(new TestMessage("retry"));
+
+        Assertions.assertEquals(2, RetryingConsumer.attempts);
+        Assertions.assertEquals(
+                List.of(
+                        "outer:before",
+                        "inner:before",
+                        "consumer:1",
+                        "inner:fault",
+                        "inner:before",
+                        "consumer:2",
+                        "inner:after",
+                        "outer:after"),
+                RetryingConsumer.calls);
     }
 
     @Test

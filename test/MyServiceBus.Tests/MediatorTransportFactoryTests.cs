@@ -41,6 +41,38 @@ public class MediatorTransportFactoryTests
         }
     }
 
+    class RetryingConsumer : IConsumer<ConsumerMessage>
+    {
+        public static int Attempts;
+        public static IList<string> Calls = new List<string>();
+
+        public Task Consume(ConsumeContext<ConsumerMessage> context)
+        {
+            Calls.Add($"consumer:{++Attempts}");
+            return Attempts == 1
+                ? Task.FromException(new InvalidOperationException("retry"))
+                : Task.CompletedTask;
+        }
+    }
+
+    sealed class RecordingConsumeFilter(string name, IList<string> calls) : IFilter<ConsumeContext<ConsumerMessage>>
+    {
+        public async Task Send(ConsumeContext<ConsumerMessage> context, IPipe<ConsumeContext<ConsumerMessage>> next)
+        {
+            calls.Add($"{name}:before");
+            try
+            {
+                await next.Send(context);
+                calls.Add($"{name}:after");
+            }
+            catch
+            {
+                calls.Add($"{name}:fault");
+                throw;
+            }
+        }
+    }
+
     class SampleHandler : Handler<ConsumerMessage>
     {
         public static TaskCompletionSource<ConsumerMessage> Received = new();
@@ -173,6 +205,48 @@ public class MediatorTransportFactoryTests
 
         var message = await SampleConsumer.Received.Task;
         Assert.Equal("hello", message.Value);
+
+        await hosted.StopAsync(CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task Consume_filters_wrap_retry_and_only_downstream_filters_are_reentered()
+    {
+        RetryingConsumer.Attempts = 0;
+        RetryingConsumer.Calls = new List<string>();
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddServiceBus(cfg =>
+        {
+            cfg.UsingMediator();
+            cfg.AddConsumer<RetryingConsumer, ConsumerMessage>(pipe =>
+            {
+                pipe.UseFilter(new RecordingConsumeFilter("outer", RetryingConsumer.Calls));
+                pipe.UseMessageRetry(retry => retry.Immediate(1));
+                pipe.UseFilter(new RecordingConsumeFilter("inner", RetryingConsumer.Calls));
+            });
+        });
+
+        using var provider = services.BuildServiceProvider();
+        var hosted = provider.GetRequiredService<IHostedService>();
+        await hosted.StartAsync(CancellationToken.None);
+
+        await provider.GetRequiredService<IMessageBus>().Publish(new ConsumerMessage { Value = "retry" });
+
+        Assert.Equal(2, RetryingConsumer.Attempts);
+        Assert.Equal(
+            new[]
+            {
+                "outer:before",
+                "inner:before",
+                "consumer:1",
+                "inner:fault",
+                "inner:before",
+                "consumer:2",
+                "inner:after",
+                "outer:after"
+            },
+            RetryingConsumer.Calls);
 
         await hosted.StopAsync(CancellationToken.None);
     }
