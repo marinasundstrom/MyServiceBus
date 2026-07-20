@@ -118,3 +118,4 @@ Keep this file updated for significant changes. Prefer adding dated entries that
 - Added Testcontainers-backed C# and Java directed-send conformance to MassTransit RabbitMQ receive endpoints, separating queue-address evidence from publish interoperability.
 - Completed the RabbitMQ directed-send matrix with MassTransit-to-C#, MassTransit-to-Java, and bidirectional C#↔Java queue-address delivery.
 - Defined a normalized, queryable cross-language topology model as a stability gate before inspection, dashboards, sagas, outbox support, and additional transports.
+- Added matching versioned topology snapshot APIs in C# and Java with deterministic message, endpoint, consumer, and binding identities, logical addresses, and immutable Java views.

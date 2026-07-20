@@ -1,0 +1,48 @@
+{
+  "version": 1,
+  "messages": [
+    {
+      "id": "urn:message:Contracts:OrderSubmitted",
+      "type": "Contracts.OrderSubmitted",
+      "messageUrn": "urn:message:Contracts:OrderSubmitted",
+      "entityName": "Contracts:OrderSubmitted",
+      "implementedMessageUrns": [
+        "urn:message:Contracts:IOrderEvent"
+      ]
+    }
+  ],
+  "receiveEndpoints": [
+    {
+      "id": "endpoint:orders",
+      "name": "orders",
+      "logicalAddress": "queue:orders",
+      "durable": true,
+      "temporary": false,
+      "consumerIds": [
+        "endpoint:orders|consumer:Consumers.OrderConsumer"
+      ],
+      "bindingIds": [
+        "endpoint:orders|binding:urn:message:Contracts:OrderSubmitted|Contracts:OrderSubmitted"
+      ]
+    }
+  ],
+  "consumers": [
+    {
+      "id": "endpoint:orders|consumer:Consumers.OrderConsumer",
+      "type": "Consumers.OrderConsumer",
+      "endpointId": "endpoint:orders",
+      "messageIds": [
+        "urn:message:Contracts:OrderSubmitted"
+      ]
+    }
+  ],
+  "bindings": [
+    {
+      "id": "endpoint:orders|binding:urn:message:Contracts:OrderSubmitted|Contracts:OrderSubmitted",
+      "endpointId": "endpoint:orders",
+      "messageId": "urn:message:Contracts:OrderSubmitted",
+      "entityName": "Contracts:OrderSubmitted",
+      "kind": "publish"
+    }
+  ]
+}

@@ -28,7 +28,7 @@ The normalized model contains these corresponding concepts:
 | --- | --- |
 | Bus topology | model version, messages, receive endpoints, consumers, bindings |
 | Message topology | stable contract identity, message URN, entity name, implemented contract identities |
-| Receive endpoint topology | stable endpoint identity, endpoint name, address, durability intent, temporary intent, bindings, attached consumers |
+| Receive endpoint topology | stable endpoint identity, endpoint name, logical address, durability intent, temporary intent, bindings, attached consumers |
 | Consumer topology | stable consumer identity, consumer type identity, endpoint identity, consumed contract identities |
 | Message binding | endpoint identity, contract identity, entity name, binding kind |
 
@@ -63,6 +63,8 @@ Each client must provide:
 
 The mutable registration registry and the public query model may be separate types. This is preferred when it prevents configuration callbacks or implementation state from leaking into the stable API.
 
+The initial C# and Java query entry points are `IBusTopology.GetSnapshot()` and `BusTopology.getSnapshot()`. They return versioned immutable snapshot records with corresponding message, receive-endpoint, consumer, and binding nodes. Version 1 uses `endpoint:<name>` endpoint identities, message URNs as contract identities, and logical `queue:<name>` endpoint addresses. These logical addresses are not serialized broker addresses.
+
 ## Evolution
 
 New portable node kinds and fields are additive and versioned. Unknown extension data must be ignorable. Removing or changing the meaning of a stable field requires an explicit model-version decision.
@@ -71,4 +73,4 @@ Sagas should extend the model with saga/state-machine identities, consumed and p
 
 ## Conformance
 
-C# and Java topology conformance tests must build equivalent configurations and compare canonical language-neutral snapshots. Tests must cover ordering, stable identities, implemented contracts, multiple consumers on one endpoint, transport extensions, and omission of runtime-only callbacks. The same fixtures become inputs for inspection and dashboard tests later.
+C# and Java topology conformance tests must build equivalent configurations and compare canonical language-neutral snapshots. The version 1 fixtures live under `test/fixtures/topology/v1`. Tests must cover ordering, stable identities, implemented contracts, multiple consumers on one endpoint, transport extensions, and omission of runtime-only callbacks. The same fixtures become inputs for inspection and dashboard tests later.
