@@ -40,7 +40,11 @@ public class MediatorTransportFactory : ITransportFactory
     {
         if (_handlers.TryGetValue(exchange, out var handlers))
         {
-            var tasks = handlers.Select(h => h(context));
+            List<Func<ReceiveContext, Task>> snapshot;
+            lock (handlers)
+                snapshot = handlers.ToList();
+
+            var tasks = snapshot.Select(h => h(context));
             return Task.WhenAll(tasks);
         }
         return Task.CompletedTask;

@@ -12,6 +12,8 @@ MyServiceBus aims to become a modern, cross-language messaging runtime that:
 - exposes optional inspection and monitoring APIs for operational tools
 - supports a read-only dashboard before introducing control-plane operations
 
+The roadmap is centered on replacing MassTransit in basic broker-backed messaging scenarios. It does not currently seek to turn MyServiceBus into a general-purpose publisher/consumer abstraction for technologies without service-bus topology.
+
 It is positioned as a focused alternative for teams that do not need a large enterprise service-bus platform. Interoperability with MassTransit enables mixed systems and migration; it does not turn MassTransit's complete feature catalog into the destination of this roadmap.
 
 ## Decision Guardrails
@@ -28,6 +30,9 @@ Use these rules when accepting roadmap work:
 8. Prefer a small, coherent portable core over enterprise breadth; specialized patterns stay demand-driven.
 9. Keep shared concepts and useful counterpart types recognizable across clients, but never derive Java packages or APIs mechanically from C# namespaces and language features, or vice versa.
 10. Treat the normalized topology query model as a foundational API. Runtime provisioning, inspection, and dashboards must consume it rather than constructing separate topology interpretations.
+11. Keep broker-backed service-bus semantics as the stable product boundary. Explore HTTP, webhooks, realtime sessions, and similar delivery mechanisms separately and generalize the core only from demonstrated shared requirements.
+12. Treat mediator dispatch as an explicitly local execution mode. Externally observable events normally follow the broker-backed path.
+13. Support one logical bus per application. Do not add multiple hosted buses solely for MassTransit compatibility; reconsider them only for a concrete cross-platform use case with an idiomatic Java dependency-injection model.
 
 ## Phase 1: Protocol Baseline
 
@@ -81,6 +86,20 @@ The [Topology Model Specification](specs/topology-model-spec.md) defines the tar
 The [MVP Release Gate](development/mvp-release-gate.md) defines the release boundary and the remaining packaging, documentation, and release-candidate work that follows this fundamentals gate.
 
 **Status:** implemented. The normalized query APIs, version 1 canonical fixture, receive-endpoint intent, inspection consumption, synchronized snapshot-version constants, profile-neutral runtime endpoint topology, and named RabbitMQ receive-topology projection are implemented in C# and Java. Legacy transport overloads remain compatibility adapters. The [Topology Extension Model](specs/topology-extension-model.md) validates additive saga and outbox nodes plus a materially different Azure Service Bus projection without prematurely implementing those features.
+
+## Mediator and In-Memory Stability Gate
+
+**Outcome:** local dispatch and testing are predictable, cross-language implementations of the same application-visible messaging fundamentals.
+
+- Separate mediator runtime responsibilities from test-harness observation responsibilities.
+- Define matching C# and Java conformance scenarios for lifecycle, send, publish, request/response, faults, retries, filters, scopes, headers, cancellation, telemetry, scheduling, concurrency, and topology queries.
+- State which MassTransit mediator and in-memory semantics are compatible, intentionally different, or unsupported.
+- Make timing and failure guarantees deterministic enough for application tests.
+- Stabilize the ordinary mediator and harness APIs before adding another broker transport.
+
+**Exit criteria:** both reference clients pass the shared scenario matrix, capability descriptors match real behavior, and the documented lifecycle and delivery guarantees are suitable for preview packages.
+
+The detailed checklist is defined in the [Mediator and In-Memory Stability Gate](development/in-memory-stability-gate.md).
 
 ## Phase 3: Inspection and Monitoring APIs
 
@@ -177,9 +196,10 @@ The following work remains demand-driven and is not automatically part of the po
 
 The next coherent investment is:
 
-1. stabilize the inspection addon DTOs against the completed topology foundation without expanding the control plane
-2. build focused monitoring state and event records
-3. validate those APIs through a read-only dashboard prototype
-4. select the second durable broker only after demonstrated demand and capability-model validation
+1. complete the mediator and in-memory stability gate in matching C# and Java slices
+2. verify generated NuGet and Maven packages from isolated consumer projects
+3. stabilize the inspection addon DTOs against the completed topology foundation without expanding the control plane
+4. build focused monitoring state and event records
+5. select a second durable broker only after the local-runtime gate, demonstrated demand, and capability-model validation
 
-This sequence preserves current momentum while reducing the architectural risk of adding transports, languages, or dashboard behavior too early.
+This sequence prioritizes predictable application fundamentals while reducing the architectural risk of adding transports, languages, or dashboard behavior too early.

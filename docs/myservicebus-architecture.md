@@ -1,6 +1,6 @@
 # MyServiceBus Architecture
 
-MyServiceBus is a cross-language messaging runtime with a transport-independent application model and a MassTransit-compatible protocol profile. C# and Java are the reference implementations. Future clients should implement the same language-neutral specification using APIs that are idiomatic for their platforms.
+MyServiceBus is a cross-language, broker-backed service-bus runtime with a MassTransit-compatible protocol profile. C# and Java are the reference implementations. Future clients should implement the same language-neutral specification using APIs that are idiomatic for their platforms.
 
 The architecture deliberately separates compatibility, portable messaging behavior, broker integration, and optional operational tooling. This allows the project to interoperate with MassTransit without treating every MassTransit feature or historical API as a requirement.
 
@@ -10,10 +10,32 @@ MyServiceBus is not intended to compete directly with MassTransit as a fully sup
 
 Compatibility supports coexistence, incremental adoption, and migration. It is not a commitment to reproduce the entire product. Features enter the portable core because they provide current value across supported languages and transports, not merely because they exist in MassTransit. Specialized enterprise patterns remain demand-driven extensions or documented non-goals.
 
+The primary product goal is to replace MassTransit in basic broker-backed scenarios: configure one bus, connect it to a broker, send and publish messages, consume them reliably, perform request/response, and handle retries, faults, skipped messages, and terminal errors. The normalized topology model therefore represents service-bus intent and broker projections. It is not required to model arbitrary communication technologies that have no broker topology.
+
+HTTP callbacks, webhooks, WebSockets, SignalR, and similar technologies may eventually reuse contracts, envelopes, serialization, telemetry, or consumer pipelines. They are not bus transports merely because messages can travel through them. Generalizing the stable bus and topology APIs around those technologies would create a different product and requires separate, evidence-driven design work.
+
+### Mediator boundary
+
+The in-process mediator is an alternative execution mode over reusable consumer and pipeline infrastructure. It supports testing, explicitly local commands and queries, modular-monolith boundaries, lightweight tools, and gradual migration to a broker. It does not provide broker durability, independent delivery, or externally observable publication.
+
+When an application already uses a broker-backed bus, events that represent facts other processes may observe should ordinarily be published on that bus. Applications should not create mediator and broker paths for the same event by default: doing so creates different retry, durability, observability, and failure semantics. Any dual path must express a deliberate architectural distinction.
+
+Stabilizing mediator and in-memory harness semantics in both reference clients is the first implementation priority after the broker-backed MVP foundation. The [Mediator and In-Memory Stability Gate](development/in-memory-stability-gate.md) defines the required parity and conformance work.
+
+### Multiple bus instances
+
+The default hosting model is one application connected to one logical bus. This keeps lifecycle, endpoint ownership, topology, telemetry, and operational behavior understandable.
+
+MassTransit supports multiple bus instances in one host through separately registered types, often marker interfaces. MyServiceBus does not currently support or plan to mirror that facility. It is not the normal application model, it would complicate lifecycle and topology ownership, and the marker-interface or keyed-registration approach does not translate naturally to the current Java dependency-injection abstraction.
+
+Applications that require isolated buses should use separate application hosts or processes. Multiple in-process buses may be reconsidered only in response to a concrete use case and a design that remains idiomatic in both C# and Java; MassTransit compatibility alone is insufficient justification.
+
 ## Architectural Principles
 
 - **Wire compatibility is the strongest compatibility promise.** Compatible clients preserve the MassTransit envelope, message identity, headers, addressing, correlation, request/response, and fault conventions defined by the selected transport profile.
+- **Broker-backed messaging is the product boundary.** The stable bus and topology APIs model durable service-bus intent; unrelated delivery technologies do not drive those abstractions.
 - **The portable core is intentionally smaller than MassTransit.** Send, publish, consume, request/response, retries, faults, pipelines, serialization, telemetry, and lifecycle form the common messaging model.
+- **One bus per application is the supported model.** Multiple hosted bus instances are currently out of scope and are not added solely for MassTransit API compatibility.
 - **Simplicity is a product feature.** New surface area must justify its long-term conceptual, operational, and cross-language cost.
 - **Language APIs are idiomatic.** C# remains familiar to MassTransit users, while Java and future clients express the same concepts using conventions natural to their ecosystems.
 - **Integration abstractions stay small and owned.** The portable core avoids selecting a framework-specific DI or logging stack; optional adapters connect it to the ecosystems applications already use.

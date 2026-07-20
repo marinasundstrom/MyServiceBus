@@ -29,6 +29,14 @@ This changelog summarizes the bigger themes in the repository history. It is int
 - Scoped Java production dependencies to the modules that own them so published POMs do not expose unrelated broker, serialization, dependency-injection, logging, or telemetry libraries.
 - Added NuGet and Maven package construction to the regular .NET and Java CI workflows.
 
+### Product and hosting boundaries
+
+- Defined broker-backed, basic MassTransit replacement scenarios as the stable product scope; positioned mediator as deliberately local execution and explicitly kept multiple hosted buses outside the supported application model.
+- Made cross-language mediator and in-memory harness stability the first implementation priority before additional broker transports.
+- Fixed Java mediator publication to resolve scoped endpoint services inside an active message scope and enabled its consumer and handler delivery tests to match the existing C# scenarios.
+- Preserved Java consume-context routing in scoped send-endpoint providers across asynchronous consumer continuations.
+- Made mediator handler snapshots and in-memory harness registration and consumption observations safe under concurrent dispatch in both reference clients.
+
 ## 2026-03-24 to 2026-03-19
 
 ### Aspire, runtime modernization, and parity cleanup

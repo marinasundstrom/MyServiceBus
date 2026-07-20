@@ -1,5 +1,7 @@
 using System;
 using System.Reflection;
+using System.Collections.Concurrent;
+using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using MyServiceBus;
@@ -17,6 +19,7 @@ public class InMemoryHarnessDiTests
 
     record CheckOrder(Guid OrderId);
     record OrderStatus(Guid OrderId);
+    record ConcurrentMessage(int Sequence);
 
     class CheckOrderConsumer : IConsumer<CheckOrder>
     {
@@ -91,5 +94,24 @@ public class InMemoryHarnessDiTests
         Assert.Equal(orderId, response.Message.OrderId);
 
         await harness.Stop();
+    }
+
+    [Fact]
+    public async Task Should_record_concurrent_delivery_deterministically()
+    {
+        var harness = new InMemoryTestHarness();
+        var received = new ConcurrentBag<int>();
+        harness.RegisterHandler<ConcurrentMessage>(context =>
+        {
+            received.Add(context.Message.Sequence);
+            return Task.CompletedTask;
+        });
+
+        await Task.WhenAll(Enumerable.Range(0, 200)
+            .Select(sequence => harness.Publish(new ConcurrentMessage(sequence))));
+
+        Assert.Equal(200, received.Count);
+        Assert.Equal(200, received.Distinct().Count());
+        Assert.Equal(200, harness.Consumed.OfType<ConcurrentMessage>().Count());
     }
 }

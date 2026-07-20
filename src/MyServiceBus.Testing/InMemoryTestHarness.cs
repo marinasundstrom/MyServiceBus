@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Concurrent;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -12,8 +13,9 @@ namespace MyServiceBus;
 public class InMemoryTestHarness : IMessageBus, ITransportFactory, IReceiveEndpointConnector
 {
     readonly Dictionary<Type, List<Func<ReceiveContext, Task>>> handlers = new();
+    readonly object handlerLock = new();
     readonly List<Func<ReceiveContext, Task>> receiveHandlers = new();
-    readonly List<object> consumed = new();
+    readonly ConcurrentQueue<object> consumed = new();
     readonly HashSet<Type> consumerTypes = new();
     readonly IServiceProvider? provider;
     readonly IBusTopology topology;
@@ -23,7 +25,7 @@ public class InMemoryTestHarness : IMessageBus, ITransportFactory, IReceiveEndpo
     public Uri Address => new("loopback://localhost/");
     public IBusTopology Topology => topology;
 
-    public IReadOnlyCollection<object> Consumed => consumed.AsReadOnly();
+    public IReadOnlyCollection<object> Consumed => consumed.ToArray();
 
     public InMemoryTestHarness()
     {
@@ -61,21 +63,24 @@ public class InMemoryTestHarness : IMessageBus, ITransportFactory, IReceiveEndpo
 
     public void RegisterHandler<T>(Func<ConsumeContext<T>, Task> handler) where T : class
     {
-        if (!handlers.TryGetValue(typeof(T), out var list))
+        lock (handlerLock)
         {
-            list = new List<Func<ReceiveContext, Task>>();
-            handlers.Add(typeof(T), list);
-        }
-
-        list.Add(async ctx =>
-        {
-            if (ctx.TryGetMessage<T>(out var msg))
+            if (!handlers.TryGetValue(typeof(T), out var list))
             {
-                var consumeContext = new TestConsumeContext<T>(this, msg!, ctx);
-                await handler(consumeContext).ConfigureAwait(false);
-                consumed.Add(msg!);
+                list = new List<Func<ReceiveContext, Task>>();
+                handlers.Add(typeof(T), list);
             }
-        });
+
+            list.Add(async ctx =>
+            {
+                if (ctx.TryGetMessage<T>(out var msg))
+                {
+                    var consumeContext = new TestConsumeContext<T>(this, msg!, ctx);
+                    await handler(consumeContext).ConfigureAwait(false);
+                    consumed.Enqueue(msg!);
+                }
+            });
+        }
     }
 
     public bool WasConsumed<T>() where T : class => consumed.OfType<T>().Any();
@@ -105,8 +110,11 @@ public class InMemoryTestHarness : IMessageBus, ITransportFactory, IReceiveEndpo
         if (provider == null)
             throw new InvalidOperationException("Service provider is required to add consumers");
 
-        if (!consumerTypes.Add(typeof(TConsumer)))
-            return Task.CompletedTask;
+        lock (handlerLock)
+        {
+            if (!consumerTypes.Add(typeof(TConsumer)))
+                return Task.CompletedTask;
+        }
 
         var factory = provider.GetRequiredService<IConsumerFactory<TConsumer>>();
         RegisterHandler<TMessage>(context =>
@@ -167,10 +175,15 @@ public class InMemoryTestHarness : IMessageBus, ITransportFactory, IReceiveEndpo
         foreach (var handler in snapshot)
             await handler(receiveContext).ConfigureAwait(false);
 
-        if (handlers.TryGetValue(message!.GetType(), out var list))
+        List<Func<ReceiveContext, Task>> messageHandlers;
+        lock (handlerLock)
+            messageHandlers = handlers.TryGetValue(message!.GetType(), out var list)
+                ? list.ToList()
+                : new List<Func<ReceiveContext, Task>>();
+
+        foreach (var h in messageHandlers)
         {
-            foreach (var h in list)
-                await h(receiveContext).ConfigureAwait(false);
+            await h(receiveContext).ConfigureAwait(false);
         }
     }
 

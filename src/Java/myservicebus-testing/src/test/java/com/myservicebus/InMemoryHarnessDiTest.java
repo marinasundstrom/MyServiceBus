@@ -3,6 +3,7 @@ package com.myservicebus;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.util.concurrent.CompletableFuture;
+import java.util.stream.IntStream;
 
 import org.junit.jupiter.api.Test;
 
@@ -36,6 +37,9 @@ public class InMemoryHarnessDiTest {
         }
     }
 
+    record ConcurrentMessage(int sequence) {
+    }
+
     static class PingConsumer implements HandlerWithResult<Ping, Pong> {
         @Override
         public CompletableFuture<Pong> handle(Ping message, CancellationToken cancellationToken) {
@@ -58,5 +62,20 @@ public class InMemoryHarnessDiTest {
             Pong response = client.getResponse(new Ping("hi"), Pong.class).join();
             assertEquals("hi", response.getValue());
         }
+    }
+
+    @Test
+    void records_concurrent_delivery_deterministically() {
+        InMemoryTestHarness harness = new InMemoryTestHarness();
+        harness.registerHandler(ConcurrentMessage.class, context -> CompletableFuture.completedFuture(null));
+
+        CompletableFuture<?>[] sends = IntStream.range(0, 200)
+                .mapToObj(sequence -> harness.send(new ConcurrentMessage(sequence)))
+                .toArray(CompletableFuture[]::new);
+        CompletableFuture.allOf(sends).join();
+
+        assertEquals(200, harness.getConsumed().stream()
+                .filter(ConcurrentMessage.class::isInstance)
+                .count());
     }
 }

@@ -1,0 +1,45 @@
+# Mediator and In-Memory Stability Gate
+
+## Purpose
+
+Before adding another broker transport, MyServiceBus will stabilize its in-process mediator and in-memory test harness in C# and Java. They must provide predictable implementations of the same consumer, pipeline, request, fault, lifecycle, and dependency-injection concepts used by the broker-backed runtime.
+
+This work targets MassTransit semantic and API familiarity where those promises make sense in process. It does not claim MassTransit wire or broker-topology interoperability, durability, acknowledgement, competing consumers, or redelivery.
+
+## Separate responsibilities
+
+- The **mediator** is an application runtime for deliberately local dispatch. It invokes configured consumers and pipelines without serialization or broker delivery unless a documented option explicitly requests those boundaries.
+- The **in-memory test harness** is a testing runtime. It exposes deterministic observations of sent, published, consumed, faulted, and scheduled activity while exercising the same application-visible behavior.
+
+The harness may build on shared in-memory delivery machinery, but production code must not depend on test observation APIs. The two surfaces must not drift into different dispatch semantics accidentally.
+
+## Required conformance scenarios
+
+Matching C# and Java tests must define and verify:
+
+1. start, stop, repeated lifecycle calls, and operations attempted outside the valid lifecycle
+2. directed send to one endpoint and publish fan-out to all compatible consumers
+3. consumer scope creation and disposal for every delivered message
+4. request/response correlation, timeout, cancellation, and fault responses
+5. retry attempt counts, delays, terminal faults, and behavior when retry is not configured
+6. send, publish, and consume filters in their documented order
+7. propagation of headers, correlation identifiers, cancellation, and telemetry context
+8. interface and inherited message-type dispatch where supported by the portable model
+9. scheduled delivery and cancellation using deterministic timing controls where practical
+10. concurrent dispatch, ordering, and handler-failure behavior with explicit guarantees
+11. stable topology snapshots and capability descriptors that do not imply broker primitives
+12. equivalent harness observations and assertion timing in both languages
+
+Every unsupported MassTransit mediator or in-memory feature must be documented rather than approximated silently.
+
+## Exit criteria
+
+The gate is complete when:
+
+- a shared scenario matrix maps every required behavior to C# and Java tests
+- both implementations pass the same semantic scenarios with documented platform-specific asynchronous APIs
+- mediator and harness capabilities accurately distinguish native, emulated, and unsupported behavior
+- the feature walkthrough and testing guide describe lifecycle, delivery, concurrency, and failure guarantees
+- ordinary mediator and harness APIs are stable enough for the first preview package line
+
+Only after this gate should the roadmap prioritize a second broker transport. Inspection and monitoring can continue as optional work, but they must not displace correctness of the application runtime.
