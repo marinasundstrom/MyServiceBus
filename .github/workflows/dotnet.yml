@@ -24,6 +24,12 @@ jobs:
       - name: Restore dependencies
         run: dotnet restore --warnaserror:'NU1901;NU1902;NU1903;NU1904'
       - name: Build
-        run: dotnet build --no-restore
+        run: dotnet build --no-restore --configuration Release
       - name: Test
-        run: dotnet test --no-build --verbosity normal
+        run: dotnet test --no-build --configuration Release --verbosity normal
+      - name: Build NuGet packages
+        run: |
+          dotnet pack src/MyServiceBus.Abstractions/MyServiceBus.Abstractions.csproj --no-build --output artifacts/packages
+          dotnet pack src/MyServiceBus/MyServiceBus.csproj --no-build --output artifacts/packages
+          dotnet pack src/MyServiceBus.RabbitMq/MyServiceBus.RabbitMq.csproj --no-build --output artifacts/packages
+          dotnet pack src/MyServiceBus.Testing/MyServiceBus.Testing.csproj --no-build --output artifacts/packages
