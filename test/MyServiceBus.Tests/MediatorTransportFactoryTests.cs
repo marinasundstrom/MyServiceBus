@@ -55,6 +55,18 @@ public class MediatorTransportFactoryTests
         }
     }
 
+    class FailingConsumer : IConsumer<ConsumerMessage>
+    {
+        public static int Attempts;
+        public static IList<string> Calls = new List<string>();
+
+        public Task Consume(ConsumeContext<ConsumerMessage> context)
+        {
+            Calls.Add($"consumer:{++Attempts}");
+            return Task.FromException(new InvalidOperationException("exhausted"));
+        }
+    }
+
     sealed class RecordingConsumeFilter(string name, IList<string> calls) : IFilter<ConsumeContext<ConsumerMessage>>
     {
         public async Task Send(ConsumeContext<ConsumerMessage> context, IPipe<ConsumeContext<ConsumerMessage>> next)
@@ -247,6 +259,50 @@ public class MediatorTransportFactoryTests
                 "outer:after"
             },
             RetryingConsumer.Calls);
+
+        await hosted.StopAsync(CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task Retry_exhaustion_propagates_terminal_failure_through_upstream_filters_once()
+    {
+        FailingConsumer.Attempts = 0;
+        FailingConsumer.Calls = new List<string>();
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddServiceBus(cfg =>
+        {
+            cfg.UsingMediator();
+            cfg.AddConsumer<FailingConsumer, ConsumerMessage>(pipe =>
+            {
+                pipe.UseFilter(new RecordingConsumeFilter("outer", FailingConsumer.Calls));
+                pipe.UseMessageRetry(retry => retry.Immediate(1));
+                pipe.UseFilter(new RecordingConsumeFilter("inner", FailingConsumer.Calls));
+            });
+        });
+
+        using var provider = services.BuildServiceProvider();
+        var hosted = provider.GetRequiredService<IHostedService>();
+        await hosted.StartAsync(CancellationToken.None);
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            provider.GetRequiredService<IMessageBus>().Publish(new ConsumerMessage { Value = "fail" }));
+
+        Assert.Equal("exhausted", exception.Message);
+        Assert.Equal(2, FailingConsumer.Attempts);
+        Assert.Equal(
+            new[]
+            {
+                "outer:before",
+                "inner:before",
+                "consumer:1",
+                "inner:fault",
+                "inner:before",
+                "consumer:2",
+                "inner:fault",
+                "outer:fault"
+            },
+            FailingConsumer.Calls);
 
         await hosted.StopAsync(CancellationToken.None);
     }
