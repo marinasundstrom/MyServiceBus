@@ -193,6 +193,77 @@ public class MassTransitInteropTests
     }
 
     [CrossLanguageFact]
+    public async Task Java_MyServiceBus_request_client_receives_MassTransit_response()
+    {
+        await using var container = new RabbitMqBuilder("rabbitmq:4.1-alpine").Build();
+        await container.StartAsync();
+
+        var observedRequestId = new TaskCompletionSource<Guid>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var exchangeName = MyServiceBus.EntityNameFormatter.Format(typeof(InteropRequest));
+        var queueName = $"java-request-to-masstransit-{Guid.NewGuid():N}";
+        var bus = MassTransit.Bus.Factory.CreateUsingRabbitMq(configurator =>
+        {
+            configurator.Host(new Uri(container.GetConnectionString()));
+            configurator.ReceiveEndpoint(queueName, endpoint =>
+            {
+                endpoint.Consumer(() => new MassTransitRequestConsumer(observedRequestId));
+            });
+        });
+
+        await bus.StartAsync();
+        try
+        {
+            using var javaPeer = JavaInteropPeer.Start(
+                container, "request", exchangeName, queueName, "from-java", durableExchange: true);
+            await JavaInteropPeer.WaitForOutput(javaPeer, "RECEIVED", TimeSpan.FromMinutes(2));
+            await JavaInteropPeer.WaitForExit(javaPeer, TimeSpan.FromSeconds(10));
+
+            Assert.Equal(0, javaPeer.ExitCode);
+            Assert.NotEqual(Guid.Empty, await observedRequestId.Task.WaitAsync(TimeSpan.FromSeconds(20)));
+        }
+        finally
+        {
+            await bus.StopAsync();
+        }
+    }
+
+    [CrossLanguageFact]
+    public async Task MassTransit_request_client_receives_Java_MyServiceBus_response()
+    {
+        await using var container = new RabbitMqBuilder("rabbitmq:4.1-alpine").Build();
+        await container.StartAsync();
+
+        var exchangeName = MyServiceBus.EntityNameFormatter.Format(typeof(InteropRequest));
+        var queueName = $"masstransit-request-to-java-{Guid.NewGuid():N}";
+        using var javaPeer = JavaInteropPeer.Start(
+            container, "respond", exchangeName, queueName, "from-masstransit", durableExchange: true);
+        await JavaInteropPeer.WaitForOutput(javaPeer, "READY", TimeSpan.FromMinutes(2));
+
+        var bus = MassTransit.Bus.Factory.CreateUsingRabbitMq(configurator =>
+        {
+            configurator.Host(new Uri(container.GetConnectionString()));
+        });
+        await bus.StartAsync();
+        try
+        {
+            var client = bus.CreateRequestClient<InteropRequest>(
+                MassTransit.RequestTimeout.After(s: 20));
+            var response = await client.GetResponse<InteropResponse>(
+                new InteropRequest { Value = "from-masstransit" });
+
+            Assert.Equal("response-from-java", response.Message.Value);
+            await JavaInteropPeer.WaitForOutput(javaPeer, "RESPONDED", TimeSpan.FromSeconds(20));
+            await JavaInteropPeer.WaitForExit(javaPeer, TimeSpan.FromSeconds(10));
+            Assert.Equal(0, javaPeer.ExitCode);
+        }
+        finally
+        {
+            await bus.StopAsync();
+        }
+    }
+
+    [CrossLanguageFact]
     public async Task Java_MyServiceBus_producer_delivers_to_MassTransit_consumer()
     {
         await using var container = new RabbitMqBuilder("rabbitmq:4.1-alpine").Build();

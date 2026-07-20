@@ -104,3 +104,4 @@ Keep this file updated for significant changes. Prefer adding dated entries that
 - Added bidirectional C#↔Java RabbitMQ interoperability tests, a dedicated CI job, and configurable AMQP ports so normal client configuration works with dynamically mapped Testcontainers endpoints.
 - Extended the RabbitMQ conformance matrix with verified C#↔MassTransit and Java↔MassTransit envelope delivery in both directions.
 - Added correlated C#↔MassTransit request/response conformance and aligned C# and Java request envelopes on explicit request identifiers.
+- Completed the Java↔MassTransit request/response matrix, aligned temporary RabbitMQ endpoint addressing, and documented MyServiceBus as a focused interoperable alternative rather than an enterprise feature-parity competitor.

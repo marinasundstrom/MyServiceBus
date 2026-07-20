@@ -89,12 +89,34 @@ public class RabbitMqTransportFactory implements TransportFactory {
     @Override
     public SendTransport getSendTransport(URI address) {
         String path = address.getPath();
+        boolean temporary = queryFlag(address, "temporary");
+        boolean durable = !temporary && !queryFlag(address, "durable", false);
+        boolean autoDelete = temporary || queryFlag(address, "autodelete");
         if (path.contains("/exchange/")) {
             String exchange = path.substring(path.lastIndexOf('/') + 1);
-            return getSendTransport(exchange, true, false);
+            return getSendTransport(exchange, durable, autoDelete);
         }
-        String queue = path.substring(1);
-        return getQueueTransport(queue, true, false);
+        String exchange = path.substring(1);
+        return getSendTransport(exchange, durable, autoDelete);
+    }
+
+    private static boolean queryFlag(URI address, String name) {
+        return queryFlag(address, name, true);
+    }
+
+    private static boolean queryFlag(URI address, String name, boolean expectedValue) {
+        String query = address.getQuery();
+        if (query == null || query.isBlank()) {
+            return false;
+        }
+
+        for (String part : query.split("&")) {
+            String[] pair = part.split("=", 2);
+            if (pair.length == 2 && pair[0].equalsIgnoreCase(name)) {
+                return Boolean.parseBoolean(pair[1]) == expectedValue;
+            }
+        }
+        return false;
     }
 
     @Override

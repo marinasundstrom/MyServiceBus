@@ -12,6 +12,8 @@ MyServiceBus aims to become a modern, cross-language messaging runtime that:
 - exposes optional inspection and monitoring APIs for operational tools
 - supports a read-only dashboard before introducing control-plane operations
 
+It is positioned as a focused alternative for teams that do not need a large enterprise service-bus platform. Interoperability with MassTransit enables mixed systems and migration; it does not turn MassTransit's complete feature catalog into the destination of this roadmap.
+
 ## Decision Guardrails
 
 Use these rules when accepting roadmap work:
@@ -22,6 +24,8 @@ Use these rules when accepting roadmap work:
 4. C# and Java changes to shared behavior ship together or create an explicit, temporary parity entry.
 5. Inspection and monitoring remain optional addons. Message delivery must not depend on a dashboard or central registry.
 6. New language clients begin with conformance fixtures and one supported transport profile, not the full accumulated feature set.
+7. A MassTransit feature is not added solely for feature parity. It must materially improve interoperability, migration, or the focused MyServiceBus user experience.
+8. Prefer a small, coherent portable core over enterprise breadth; specialized patterns stay demand-driven.
 
 ## Phase 1: Protocol Baseline
 
@@ -148,11 +152,11 @@ The following work remains demand-driven and is not automatically part of the po
 
 The next coherent investment is:
 
-1. finish the inspection addon work already in progress
-2. extend the protocol fixtures into the C#↔Java and MassTransit RabbitMQ interoperability matrix
-3. introduce the transport capability descriptor
-4. build monitoring state and event records
+1. complete the C#↔Java and MassTransit RabbitMQ interoperability matrix
+2. introduce the transport capability descriptor
+3. stabilize the inspection addon contracts without expanding the control plane
+4. build focused monitoring state and event records
 5. validate those APIs through a read-only dashboard prototype
-6. select the second durable broker only after the capability foundation is exercised
+6. select the second durable broker only after demonstrated demand and capability-model validation
 
 This sequence preserves current momentum while reducing the architectural risk of adding transports, languages, or dashboard behavior too early.

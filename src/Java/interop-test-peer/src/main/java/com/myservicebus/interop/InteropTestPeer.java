@@ -10,6 +10,7 @@ import com.myservicebus.SendTransport;
 import com.myservicebus.logging.LoggerFactoryBuilder;
 import com.myservicebus.rabbitmq.ConnectionProvider;
 import com.myservicebus.rabbitmq.RabbitMqFactoryConfigurator;
+import com.myservicebus.rabbitmq.RabbitMqRequestClientTransport;
 import com.myservicebus.rabbitmq.RabbitMqTransportFactory;
 import com.myservicebus.serialization.EnvelopeMessageSerializer;
 import com.myservicebus.tasks.CancellationToken;
@@ -17,6 +18,7 @@ import com.myservicebus.topology.MessageBinding;
 import com.rabbitmq.client.ConnectionFactory;
 
 import java.util.List;
+import java.net.URI;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
@@ -27,25 +29,31 @@ public final class InteropTestPeer {
     public static void main(String[] args) throws Exception {
         if (args.length != 5) {
             throw new IllegalArgumentException(
-                    "Expected: <consume|produce> <exchange> <queue> <value> <durable-exchange>");
+                    "Expected: <consume|produce|request|respond> <exchange> <queue> <value> <durable-exchange>");
         }
 
         String host = requiredEnvironment("RABBITMQ_HOST");
         int port = Integer.parseInt(requiredEnvironment("RABBITMQ_PORT"));
         String username = requiredEnvironment("RABBITMQ_USERNAME");
         String password = requiredEnvironment("RABBITMQ_PASSWORD");
-        RabbitMqTransportFactory transportFactory = createTransportFactory(host, port, username, password);
+        ConnectionProvider connectionProvider = createConnectionProvider(host, port, username, password);
+        RabbitMqTransportFactory transportFactory = createTransportFactory(
+                connectionProvider, host, port, username, password);
 
         if ("consume".equals(args[0])) {
             consume(transportFactory, args[1], args[2], args[3]);
         } else if ("produce".equals(args[0])) {
             produce(transportFactory, args[1], args[3], Boolean.parseBoolean(args[4]));
+        } else if ("request".equals(args[0])) {
+            request(connectionProvider, args[3]);
+        } else if ("respond".equals(args[0])) {
+            respond(transportFactory, args[1], args[2], args[3]);
         } else {
             throw new IllegalArgumentException("Unknown mode: " + args[0]);
         }
     }
 
-    private static RabbitMqTransportFactory createTransportFactory(
+    private static ConnectionProvider createConnectionProvider(
             String host, int port, String username, String password) {
         ConnectionFactory connectionFactory = new ConnectionFactory();
         connectionFactory.setHost(host);
@@ -53,13 +61,19 @@ public final class InteropTestPeer {
         connectionFactory.setUsername(username);
         connectionFactory.setPassword(password);
 
+        return new ConnectionProvider(connectionFactory);
+    }
+
+    private static RabbitMqTransportFactory createTransportFactory(
+            ConnectionProvider connectionProvider, String host, int port, String username, String password) {
+
         RabbitMqFactoryConfigurator configurator = new RabbitMqFactoryConfigurator();
         configurator.host(host, port, credentials -> {
             credentials.username(username);
             credentials.password(password);
         });
         return new RabbitMqTransportFactory(
-                new ConnectionProvider(connectionFactory),
+                connectionProvider,
                 configurator,
                 LoggerFactoryBuilder.create(builder -> builder.addConsole()));
     }
@@ -119,6 +133,71 @@ public final class InteropTestPeer {
         System.exit(0);
     }
 
+    private static void request(ConnectionProvider connectionProvider, String value) throws Exception {
+        InteropRequest request = new InteropRequest();
+        request.setValue(value);
+        SendContext context = new SendContext(request, CancellationToken.none);
+        RabbitMqRequestClientTransport transport = new RabbitMqRequestClientTransport(connectionProvider);
+        InteropResponse response = transport.sendRequest(InteropRequest.class, context, InteropResponse.class)
+                .get(20, TimeUnit.SECONDS);
+        if (!"response-from-masstransit".equals(response.getValue())) {
+            throw new IllegalStateException("Unexpected response: " + response.getValue());
+        }
+        System.out.println("RECEIVED");
+        System.out.flush();
+        System.exit(0);
+    }
+
+    private static void respond(RabbitMqTransportFactory transportFactory, String exchangeName, String queueName,
+            String expectedValue) throws Exception {
+        MessageBinding binding = new MessageBinding();
+        binding.setMessageType(InteropRequest.class);
+        binding.setEntityName(exchangeName);
+
+        CompletableFuture<Void> responded = new CompletableFuture<>();
+        ObjectMapper mapper = new ObjectMapper().findAndRegisterModules();
+        ReceiveTransport receiveTransport = transportFactory.createReceiveTransport(
+                queueName,
+                List.of(binding),
+                transportMessage -> {
+                    try {
+                        Envelope<InteropRequest> requestEnvelope = mapper.readValue(
+                                transportMessage.getBody(), new TypeReference<>() { });
+                        if (!expectedValue.equals(requestEnvelope.getMessage().getValue())) {
+                            throw new IllegalStateException("Unexpected request: "
+                                    + requestEnvelope.getMessage().getValue());
+                        }
+
+                        InteropResponse response = new InteropResponse();
+                        response.setValue("response-from-java");
+                        SendContext responseContext = new SendContext(response, CancellationToken.none);
+                        responseContext.setRequestId(requestEnvelope.getRequestId());
+                        responseContext.setDestinationAddress(URI.create(requestEnvelope.getResponseAddress()));
+                        byte[] body = responseContext.serialize(new EnvelopeMessageSerializer());
+                        transportFactory.getSendTransport(URI.create(requestEnvelope.getResponseAddress())).send(body);
+                        responded.complete(null);
+                        return CompletableFuture.completedFuture(null);
+                    } catch (Exception exception) {
+                        responded.completeExceptionally(exception);
+                        return CompletableFuture.failedFuture(exception);
+                    }
+                },
+                MessageUrn.forClass(InteropRequest.class)::equals,
+                1);
+
+        receiveTransport.start();
+        System.out.println("READY");
+        System.out.flush();
+        try {
+            responded.get(20, TimeUnit.SECONDS);
+            System.out.println("RESPONDED");
+            System.out.flush();
+        } finally {
+            receiveTransport.stop();
+        }
+        System.exit(0);
+    }
+
     private static String requiredEnvironment(String name) {
         String value = System.getenv(name);
         if (value == null || value.isBlank()) {
@@ -128,6 +207,30 @@ public final class InteropTestPeer {
     }
 
     public static class CrossLanguageMessage {
+        private String value;
+
+        public String getValue() {
+            return value;
+        }
+
+        public void setValue(String value) {
+            this.value = value;
+        }
+    }
+
+    public static class InteropRequest {
+        private String value;
+
+        public String getValue() {
+            return value;
+        }
+
+        public void setValue(String value) {
+            this.value = value;
+        }
+    }
+
+    public static class InteropResponse {
         private String value;
 
         public String getValue() {
