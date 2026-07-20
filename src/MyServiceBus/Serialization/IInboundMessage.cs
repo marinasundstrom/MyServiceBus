@@ -3,6 +3,7 @@ namespace MyServiceBus.Serialization;
 public interface IInboundMessage
 {
     Guid MessageId { get; }
+    Guid? RequestId => null;
     Guid? CorrelationId { get; }
     IList<string> MessageType { get; }
     Uri? ResponseAddress { get; }

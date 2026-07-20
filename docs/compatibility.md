@@ -12,6 +12,17 @@ Every compatibility claim must identify:
 - the tested MassTransit version or version range, when applicable
 - any capability constraints or documented differences
 
+## Compatibility Priorities and Deliberate Divergence
+
+Compatibility is prioritized in this order:
+
+1. MyServiceBus clients must share a stable, language-neutral protocol and portable semantics.
+2. Supported transport profiles must interoperate with MassTransit where that enables mixed deployments and migration.
+3. C# APIs should remain familiar to MassTransit users, while every language exposes the same concepts idiomatically.
+4. Historical MassTransit behavior is optional when it does not contribute to interoperability, migration, or current user value.
+
+MyServiceBus may deliberately diverge from legacy MassTransit edges, but a divergence must be explicit. Its rationale, affected compatibility level, replacement behavior, and migration impact must be documented. Conformance tests must distinguish intentional differences from regressions. Wire-format or transport-profile divergence requires a versioned protocol decision and must not silently break previously verified peers.
+
 ## Compatibility Levels
 
 ### Level 1: Wire Compatibility
@@ -144,7 +155,7 @@ RabbitMQ transport integration tests use a pinned RabbitMQ image through Testcon
 
 The cross-language tests are opt-in during ordinary local test runs because they start both runtimes. CI runs them in a dedicated interoperability job. Set `RUN_CROSS_LANGUAGE_TESTS=1` to execute them locally.
 
-The current RabbitMQ baseline uses RabbitMQ `4.1-alpine` and MassTransit `8.5.1`. Verification presently covers compatible envelope publication and consumption in each direction. Request/response, faults, retry exhaustion, skipped-message routing, and error destinations remain separate required scenarios before the complete immediate target can be labeled verified.
+The current RabbitMQ baseline uses RabbitMQ `4.1-alpine` and MassTransit `8.5.1`. Verification covers compatible envelope publication and consumption in each direction, plus C# request/response interoperability in both directions. Both clients now emit request identifiers; Java↔MassTransit request/response, faults, retry exhaustion, skipped-message routing, and error destinations remain separate required scenarios before the complete immediate target can be labeled verified.
 
 ## Compatibility Status Labels
 

@@ -9,6 +9,7 @@ import java.util.UUID;
 
 public class MessageSerializationContext<T> {
     private UUID messageId;
+    private UUID requestId;
     private UUID correlationId;
     private List<String> messageType;
     private URI responseAddress;
@@ -30,6 +31,14 @@ public class MessageSerializationContext<T> {
 
     public void setMessageId(UUID messageId) {
         this.messageId = messageId;
+    }
+
+    public UUID getRequestId() {
+        return requestId;
+    }
+
+    public void setRequestId(UUID requestId) {
+        this.requestId = requestId;
     }
 
     public UUID getCorrelationId() {
@@ -112,4 +121,3 @@ public class MessageSerializationContext<T> {
         this.hostInfo = hostInfo;
     }
 }
-

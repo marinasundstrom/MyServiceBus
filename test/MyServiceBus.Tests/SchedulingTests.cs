@@ -46,6 +46,7 @@ public class SchedulingTests
     class StubSendContext : IPublishContext
     {
         public string MessageId { get; set; } = string.Empty;
+        public Guid? RequestId { get; set; }
         public string RoutingKey { get; set; } = string.Empty;
         public IDictionary<string, object> Headers { get; } = new Dictionary<string, object>();
         public string? CorrelationId { get; set; }

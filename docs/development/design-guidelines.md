@@ -6,5 +6,6 @@ To keep the C# and Java clients aligned, follow these guidelines:
 - **Maintain feature parity**: Introduce new capabilities to both clients in tandem. If a feature ships in one client first, document the gap in [csharp-java-parity.md](csharp-java-parity.md) and track it for the other language.
 - **Align APIs**: Keep the public surface area similar across languages, adjusting only for idiomatic differences. See [API Design Guidelines](api-design-guidelines.md) for guidance on what to expose.
 - **Document differences**: When divergence is unavoidable, clearly explain the rationale and differences in the documentation.
+- **Make divergence intentional**: Do not inherit legacy behavior solely for historical fidelity. Record the affected compatibility level, replacement behavior, and migration impact, and protect previously verified protocol behavior with conformance tests.
 
 These guidelines help ensure a consistent developer experience regardless of language.

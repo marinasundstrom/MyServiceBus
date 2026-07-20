@@ -9,6 +9,7 @@ namespace MyServiceBus;
 public interface ReceiveContext : PipeContext
 {
     Guid MessageId { get; }
+    Guid? RequestId => null;
     IList<string> MessageType { get; }
     Uri? ResponseAddress { get; }
     Uri? FaultAddress { get; }
@@ -38,6 +39,8 @@ public class ReceiveContextImpl : BasePipeContext, ReceiveContext
     public IDictionary<string, object> Headers => messageContext.Headers;
 
     public Guid MessageId => messageContext.MessageId;
+
+    public Guid? RequestId => messageContext.RequestId;
 
     public IList<string> MessageType => messageContext.MessageType;
 

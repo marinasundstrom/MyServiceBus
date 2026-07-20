@@ -20,6 +20,7 @@ public class SendContext : BasePipeContext, ISendContext
     }
 
     public string MessageId { get; set; }
+    public Guid? RequestId { get; set; }
     public string RoutingKey { get; set; } = ""; // Defaults to empty
     public IDictionary<string, object> Headers { get; } = new Dictionary<string, object>();
     public string? CorrelationId { get; set; }
@@ -35,6 +36,7 @@ public class SendContext : BasePipeContext, ISendContext
         var context = new MessageSerializationContext<T>(message)
         {
             MessageId = Guid.NewGuid(),
+            RequestId = RequestId,
             CorrelationId = null,
             MessageType = [.. messageTypes.Select(x => MessageUrn.For(x))],
             ResponseAddress = ResponseAddress,

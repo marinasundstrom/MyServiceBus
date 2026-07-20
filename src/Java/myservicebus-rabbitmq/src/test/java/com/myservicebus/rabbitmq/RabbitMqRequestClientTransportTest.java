@@ -1,6 +1,7 @@
 package com.myservicebus.rabbitmq;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
@@ -66,5 +67,6 @@ class RabbitMqRequestClientTransportTest {
         JavaType type = mapper.getTypeFactory().constructParametricType(Envelope.class, Ping.class);
         Envelope<Ping> env = mapper.readValue(body.getValue(), type);
         assertEquals(env.getResponseAddress(), env.getFaultAddress());
+        assertNotNull(env.getRequestId());
     }
 }

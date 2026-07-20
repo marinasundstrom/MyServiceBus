@@ -83,6 +83,7 @@ public sealed class GenericRequestClient<TRequest> : IRequestClient<TRequest>, I
         sendContext.ResponseAddress = responseAddress;
         sendContext.FaultAddress = responseAddress;
         sendContext.MessageId = Guid.NewGuid().ToString();
+        sendContext.RequestId = Guid.NewGuid();
 
         contextCallback?.Invoke(sendContext);
 
@@ -167,6 +168,7 @@ public sealed class GenericRequestClient<TRequest> : IRequestClient<TRequest>, I
         sendContext.ResponseAddress = responseAddress;
         sendContext.FaultAddress = responseAddress;
         sendContext.MessageId = Guid.NewGuid().ToString();
+        sendContext.RequestId = Guid.NewGuid();
 
         contextCallback?.Invoke(sendContext);
 

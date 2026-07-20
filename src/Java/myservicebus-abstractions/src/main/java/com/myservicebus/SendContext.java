@@ -20,6 +20,7 @@ public class SendContext implements PipeContext, ScheduledMessage {
     private URI sourceAddress;
     private URI destinationAddress;
     private Instant scheduledEnqueueTime;
+    private UUID requestId;
 
     public SendContext(Object message, CancellationToken cancellationToken) {
         this.message = message;
@@ -54,6 +55,14 @@ public class SendContext implements PipeContext, ScheduledMessage {
         this.destinationAddress = destinationAddress;
     }
 
+    public UUID getRequestId() {
+        return requestId;
+    }
+
+    public void setRequestId(UUID requestId) {
+        this.requestId = requestId;
+    }
+
     @Override
     public Instant getScheduledEnqueueTime() {
         return scheduledEnqueueTime;
@@ -67,6 +76,7 @@ public class SendContext implements PipeContext, ScheduledMessage {
     public byte[] serialize(MessageSerializer serializer) throws Exception {
         MessageSerializationContext<Object> context = new MessageSerializationContext<>(message);
         context.setMessageId(UUID.randomUUID());
+        context.setRequestId(requestId);
         context.setCorrelationId(null);
         context.setMessageType(List.of(MessageUrn.forClass(message.getClass())));
         context.setResponseAddress(null);

@@ -38,6 +38,7 @@ public class EnvelopeMessageSerializer : IMessageSerializer
         var envelope = new Envelope<T>()
         {
             MessageId = context.MessageId,
+            RequestId = context.RequestId,
             CorrelationId = context.CorrelationId,
             ConversationId = null,
             SourceAddress = context.SourceAddress,

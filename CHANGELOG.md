@@ -103,3 +103,4 @@ Keep this file updated for significant changes. Prefer adding dated entries that
 - Added shared versioned message, request, and fault fixtures with C# and Java validation, plus Testcontainers-backed RabbitMQ transport round-trip tests as the first executable compatibility baseline.
 - Added bidirectional C#↔Java RabbitMQ interoperability tests, a dedicated CI job, and configurable AMQP ports so normal client configuration works with dynamically mapped Testcontainers endpoints.
 - Extended the RabbitMQ conformance matrix with verified C#↔MassTransit and Java↔MassTransit envelope delivery in both directions.
+- Added correlated C#↔MassTransit request/response conformance and aligned C# and Java request envelopes on explicit request identifiers.

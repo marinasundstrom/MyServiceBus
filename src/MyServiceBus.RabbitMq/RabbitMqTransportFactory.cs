@@ -64,7 +64,7 @@ public sealed class RabbitMqTransportFactory : ITransportFactory
             }
             else if (!string.IsNullOrEmpty(path))
             {
-                queue = path;
+                exchange = path;
             }
 
             ParseExchangeSettings(address.Query.TrimStart('?'), ref durable, ref autoDelete);
@@ -320,6 +320,11 @@ public sealed class RabbitMqTransportFactory : ITransportFactory
                 durable = d;
             else if (key.Equals("autodelete", StringComparison.OrdinalIgnoreCase) && bool.TryParse(value, out var ad))
                 autoDelete = ad;
+            else if (key.Equals("temporary", StringComparison.OrdinalIgnoreCase) && bool.TryParse(value, out var temporary) && temporary)
+            {
+                durable = false;
+                autoDelete = true;
+            }
         }
     }
 }
