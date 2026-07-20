@@ -195,6 +195,10 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
+        var requirements = _serviceProvider.GetService<TransportCapabilityRequirements>();
+        if (requirements is not null)
+            TransportCapabilityValidator.Validate(_transportFactory.Capabilities, requirements.Items);
+
         await Task.WhenAll(_activeTransports.Select(async transport => await transport.Start(cancellationToken)));
     }
 

@@ -30,6 +30,7 @@ public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigura
             .create(BusRegistrationConfiguratorImpl.class);
     private java.util.function.BiConsumer<BusRegistrationContext, Object> transportConfigure;
     private Class<?> factoryConfiguratorClass;
+    private final TransportCapabilityRequirements capabilityRequirements = new TransportCapabilityRequirements();
 
     public BusRegistrationConfiguratorImpl(ServiceCollection serviceCollection) {
         this.serviceCollection = serviceCollection;
@@ -93,6 +94,11 @@ public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigura
 
     public void setDeserializer(Class<? extends com.myservicebus.serialization.MessageDeserializer> deserializerClass) {
         this.deserializerClass = deserializerClass;
+    }
+
+    @Override
+    public void requireTransportCapability(String capability, boolean requireNative) {
+        capabilityRequirements.require(capability, requireNative);
     }
 
     @Override
@@ -164,6 +170,7 @@ public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigura
         serviceCollection.addScoped(PublishEndpoint.class,
                 sp -> () -> sp.getService(PublishEndpointProvider.class).getPublishEndpoint());
         serviceCollection.addSingleton(TopologyRegistry.class, sp -> () -> topology);
+        serviceCollection.addSingleton(TransportCapabilityRequirements.class, sp -> () -> capabilityRequirements);
         serviceCollection.addSingleton(com.myservicebus.topology.BusTopology.class, sp -> () -> topology);
         serviceCollection.addSingleton(SendPipe.class, sp -> () -> new SendPipe(sendConfigurator.build(sp)));
         serviceCollection.addSingleton(PublishPipe.class, sp -> () -> new PublishPipe(publishConfigurator.build(sp)));

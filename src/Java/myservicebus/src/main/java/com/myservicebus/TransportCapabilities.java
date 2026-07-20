@@ -8,6 +8,7 @@ public final class TransportCapabilities {
     public static final String ACKNOWLEDGEMENT = "acknowledgement";
     public static final String REQUEST_RESPONSE = "requestResponse";
     public static final String SCHEDULING = "scheduling";
+    public static final String RETRY = "retry";
     public static final String REDELIVERY = "redelivery";
     public static final String ERROR_DESTINATIONS = "errorDestinations";
     public static final String ORDERING = "ordering";

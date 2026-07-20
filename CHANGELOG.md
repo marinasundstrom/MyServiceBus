@@ -108,3 +108,4 @@ Keep this file updated for significant changes. Prefer adding dated entries that
 - Completed bidirectional C# and Java fault-response conformance with MassTransit, including canonical generic fault URNs, correlated routing, strict response-type discrimination, and MassTransit fault field names.
 - Added live RabbitMQ conformance coverage for C# and Java retry exhaustion and MassTransit-readable `_error` and `_skipped` queue delivery.
 - Introduced matching versioned transport capability descriptors for C# and Java, with RabbitMQ and in-memory profiles using `native`, `emulated`, and `unsupported` classifications.
+- Added opt-in startup capability requirements in both clients, including the ability to require native support and clear failures before receive transports start.

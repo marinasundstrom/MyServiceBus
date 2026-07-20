@@ -48,6 +48,11 @@ public abstract class BusRegistrationConfiguratorDecorator implements BusRegistr
     }
 
     @Override
+    public void requireTransportCapability(String capability, boolean requireNative) {
+        inner.requireTransportCapability(capability, requireNative);
+    }
+
+    @Override
     public ServiceCollection getServiceCollection() {
         return inner.getServiceCollection();
     }
@@ -59,4 +64,3 @@ public abstract class BusRegistrationConfiguratorDecorator implements BusRegistr
         return inner.using(configuratorClass, configure);
     }
 }
-

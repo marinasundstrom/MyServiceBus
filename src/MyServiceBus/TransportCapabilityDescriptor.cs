@@ -39,6 +39,7 @@ public static class TransportCapabilities
     public const string Acknowledgement = "acknowledgement";
     public const string RequestResponse = "requestResponse";
     public const string Scheduling = "scheduling";
+    public const string Retry = "retry";
     public const string Redelivery = "redelivery";
     public const string ErrorDestinations = "errorDestinations";
     public const string Ordering = "ordering";
@@ -62,8 +63,9 @@ public static class TransportCapabilityDescriptors
             [TransportCapabilities.CompetingConsumers] = TransportCapabilitySupport.Native,
             [TransportCapabilities.Acknowledgement] = TransportCapabilitySupport.Native,
             [TransportCapabilities.RequestResponse] = TransportCapabilitySupport.Emulated,
-            [TransportCapabilities.Scheduling] = TransportCapabilitySupport.Unsupported,
-            [TransportCapabilities.Redelivery] = TransportCapabilitySupport.Emulated,
+            [TransportCapabilities.Scheduling] = TransportCapabilitySupport.Emulated,
+            [TransportCapabilities.Retry] = TransportCapabilitySupport.Emulated,
+            [TransportCapabilities.Redelivery] = TransportCapabilitySupport.Unsupported,
             [TransportCapabilities.ErrorDestinations] = TransportCapabilitySupport.Emulated,
             [TransportCapabilities.Ordering] = TransportCapabilitySupport.Native,
             [TransportCapabilities.Replay] = TransportCapabilitySupport.Unsupported,
@@ -81,8 +83,9 @@ public static class TransportCapabilityDescriptors
             [TransportCapabilities.CompetingConsumers] = TransportCapabilitySupport.Unsupported,
             [TransportCapabilities.Acknowledgement] = TransportCapabilitySupport.Unsupported,
             [TransportCapabilities.RequestResponse] = TransportCapabilitySupport.Emulated,
-            [TransportCapabilities.Scheduling] = TransportCapabilitySupport.Unsupported,
-            [TransportCapabilities.Redelivery] = TransportCapabilitySupport.Emulated,
+            [TransportCapabilities.Scheduling] = TransportCapabilitySupport.Emulated,
+            [TransportCapabilities.Retry] = TransportCapabilitySupport.Emulated,
+            [TransportCapabilities.Redelivery] = TransportCapabilitySupport.Unsupported,
             [TransportCapabilities.ErrorDestinations] = TransportCapabilitySupport.Emulated,
             [TransportCapabilities.Ordering] = TransportCapabilitySupport.Emulated,
             [TransportCapabilities.Replay] = TransportCapabilitySupport.Unsupported,

@@ -15,6 +15,7 @@ public class BusRegistrationConfigurator : IBusRegistrationConfigurator
     private readonly PipeConfigurator<SendContext> sendConfigurator = new();
     private readonly PipeConfigurator<PublishContext> publishConfigurator = new();
     private Type serializerType = typeof(EnvelopeMessageSerializer);
+    private readonly TransportCapabilityRequirements capabilityRequirements = new();
 
     public IServiceCollection Services { get; }
 
@@ -88,6 +89,11 @@ public class BusRegistrationConfigurator : IBusRegistrationConfigurator
         serializerType = typeof(TSerializer);
     }
 
+    public void RequireTransportCapability(string capability, bool requireNative = false)
+    {
+        capabilityRequirements.Require(capability, requireNative);
+    }
+
     private static Type[] GetHandledMessageTypes(Type consumerType)
     {
         return consumerType
@@ -108,6 +114,7 @@ public class BusRegistrationConfigurator : IBusRegistrationConfigurator
         Services.AddSingleton<ISendPipe>((sp) => new SendPipe(sendConfigurator.Build(sp)));
         Services.AddSingleton<IPublishPipe>((sp) => new PublishPipe(publishConfigurator.Build(sp)));
         Services.AddSingleton(typeof(IMessageSerializer), serializerType);
+        Services.AddSingleton(capabilityRequirements);
         Services.AddSingleton<ISendContextFactory, SendContextFactory>();
         Services.AddSingleton<IPublishContextFactory, PublishContextFactory>();
         Services.AddScoped<ConsumeContextProvider>();

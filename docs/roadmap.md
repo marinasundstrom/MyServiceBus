@@ -154,8 +154,8 @@ The following work remains demand-driven and is not automatically part of the po
 
 The next coherent investment is:
 
-1. complete startup validation against the transport capability descriptor
-2. separate any remaining RabbitMQ-specific assumptions from portable endpoint configuration
+1. separate any remaining RabbitMQ-specific assumptions from portable endpoint configuration
+2. define transport-specific validation for endpoint topology and settlement options
 3. stabilize the inspection addon contracts without expanding the control plane
 4. build focused monitoring state and event records
 5. validate those APIs through a read-only dashboard prototype

@@ -24,7 +24,8 @@ Capability descriptors use schema version `1` and the same JSON field names in e
   "transport": "rabbitmq",
   "capabilities": {
     "directedSend": "native",
-    "redelivery": "emulated",
+    "retry": "emulated",
+    "redelivery": "unsupported",
     "replay": "unsupported"
   }
 }
@@ -42,8 +43,9 @@ Unknown capability names are treated as `unsupported`. This lets newer runtimes 
 | `competingConsumers` | Native | Unsupported | Share a destination across consumer instances |
 | `acknowledgement` | Native | Unsupported | Settle delivery explicitly after processing |
 | `requestResponse` | Emulated | Emulated | Compose requests from messages, correlation, and temporary endpoints |
-| `scheduling` | Unsupported | Unsupported | Enqueue messages for future delivery |
-| `redelivery` | Emulated | Emulated | Retry consumption in the pipeline; this is not broker-native delayed redelivery |
+| `scheduling` | Emulated | Emulated | Schedule through the MyServiceBus job scheduler rather than a transport-native delayed-delivery primitive |
+| `retry` | Emulated | Emulated | Re-invoke the consume pipeline immediately or after an in-process delay |
+| `redelivery` | Unsupported | Unsupported | Release or defer a delivery and receive it again through the transport |
 | `errorDestinations` | Emulated | Emulated | Preserve terminal failures through MyServiceBus-managed destinations |
 | `ordering` | Native | Emulated | Retain transport ordering within its documented scope; concurrency can still affect completion order |
 | `replay` | Unsupported | Unsupported | Re-read retained history from an earlier position |
@@ -51,6 +53,25 @@ Unknown capability names are treated as `unsupported`. This lets newer runtimes 
 | `topologyProvisioning` | Native | Unsupported | Create broker entities and bindings |
 
 `native` describes a transport or broker primitive. `emulated` describes behavior composed by MyServiceBus and therefore requires its documented limitations to be considered. It does not mean the capability is lower quality for ordinary use.
+
+Applications may declare requirements during bus registration. Startup fails with `UnsupportedTransportCapabilityException` before any receive transport starts when the selected profile cannot satisfy them. By default, native and emulated support are both accepted; use the native flag only when the broker primitive is operationally required.
+
+```csharp
+services.AddServiceBus(x =>
+{
+    x.RequireTransportCapability(TransportCapabilities.Durability, requireNative: true);
+    x.RequireTransportCapability(TransportCapabilities.Retry);
+    x.UsingRabbitMq((context, rabbit) => { });
+});
+```
+
+```java
+MessageBus bus = MessageBusImpl.configure(services, x -> {
+    x.requireTransportCapability(TransportCapabilities.DURABILITY, true);
+    x.requireTransportCapability(TransportCapabilities.RETRY);
+    RabbitMqTransport.configure(x, rabbit);
+});
+```
 
 ## Transport Profiles
 

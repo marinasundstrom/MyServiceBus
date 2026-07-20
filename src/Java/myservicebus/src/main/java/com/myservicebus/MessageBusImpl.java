@@ -85,6 +85,18 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
     }
 
     public void start() throws Exception {
+        TransportCapabilityRequirements requirements = serviceProvider.getService(TransportCapabilityRequirements.class);
+        TransportCapabilityDescriptor descriptor = serviceProvider.getService(TransportCapabilityDescriptor.class);
+        if (requirements != null && !requirements.items().isEmpty()) {
+            if (descriptor == null && transportFactory != null) {
+                descriptor = transportFactory.getCapabilities();
+            }
+            if (descriptor == null) {
+                descriptor = TransportCapabilityDescriptors.unknown("unregistered");
+            }
+            TransportCapabilityValidator.validate(descriptor, requirements.items());
+        }
+
         TopologyRegistry topology = serviceProvider.getService(TopologyRegistry.class);
 
         for (ConsumerTopology consumerDef : topology.getConsumers()) {

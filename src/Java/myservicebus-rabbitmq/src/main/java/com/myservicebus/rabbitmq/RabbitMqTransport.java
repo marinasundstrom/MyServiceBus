@@ -8,6 +8,8 @@ import com.myservicebus.SendPipe;
 import com.myservicebus.SendContextFactory;
 import com.myservicebus.PublishContextFactory;
 import com.myservicebus.TransportSendEndpointProvider;
+import com.myservicebus.TransportCapabilityDescriptor;
+import com.myservicebus.TransportCapabilityDescriptors;
 import com.myservicebus.di.ServiceCollection;
 import com.myservicebus.logging.LoggerFactory;
 import com.rabbitmq.client.ConnectionFactory;
@@ -20,6 +22,8 @@ public class RabbitMqTransport {
 
         ServiceCollection services = x.getServiceCollection();
         services.addSingleton(RabbitMqFactoryConfigurator.class, sp -> () -> factoryConfigurator);
+        services.addSingleton(TransportCapabilityDescriptor.class,
+                sp -> () -> TransportCapabilityDescriptors.RABBITMQ);
         services.addSingleton(ConnectionProvider.class, sp -> () -> {
             ConnectionFactory factory = new ConnectionFactory();
             factory.setHost(factoryConfigurator.getClientHost());

@@ -13,6 +13,8 @@ public class MediatorTransport {
 
     public static void configure(BusRegistrationConfigurator x) {
         ServiceCollection services = x.getServiceCollection();
+        services.addSingleton(TransportCapabilityDescriptor.class,
+                sp -> () -> TransportCapabilityDescriptors.IN_MEMORY);
         services.addSingleton(MediatorSendEndpointProvider.class, sp -> () -> new MediatorSendEndpointProvider(sp));
         services.addSingleton(TransportSendEndpointProvider.class,
                 sp -> () -> sp.getService(MediatorSendEndpointProvider.class));

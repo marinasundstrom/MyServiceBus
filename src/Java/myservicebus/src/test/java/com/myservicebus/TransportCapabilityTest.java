@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.myservicebus.mediator.MediatorTransport;
+import com.myservicebus.di.ServiceCollection;
 
 class TransportCapabilityTest {
     @Test
@@ -16,7 +17,8 @@ class TransportCapabilityTest {
         assertEquals(1, descriptor.version());
         assertEquals("rabbitmq", descriptor.transport());
         assertEquals(TransportCapabilitySupport.NATIVE, descriptor.get(TransportCapabilities.DIRECTED_SEND));
-        assertEquals(TransportCapabilitySupport.EMULATED, descriptor.get(TransportCapabilities.REDELIVERY));
+        assertEquals(TransportCapabilitySupport.EMULATED, descriptor.get(TransportCapabilities.RETRY));
+        assertEquals(TransportCapabilitySupport.UNSUPPORTED, descriptor.get(TransportCapabilities.REDELIVERY));
         assertEquals(TransportCapabilitySupport.UNSUPPORTED, descriptor.get(TransportCapabilities.REPLAY));
         assertEquals(TransportCapabilitySupport.UNSUPPORTED, descriptor.get("unknownCapability"));
     }
@@ -38,5 +40,39 @@ class TransportCapabilityTest {
         assertEquals("\"unsupported\"", mapper.writeValueAsString(TransportCapabilitySupport.UNSUPPORTED));
         String descriptor = mapper.writeValueAsString(TransportCapabilityDescriptors.RABBITMQ);
         assertTrue(descriptor.contains("\"version\":1"));
+    }
+
+    @Test
+    void startupRejectsAnUnsupportedRequiredCapability() {
+        MessageBus bus = MessageBusImpl.configure(ServiceCollection.create(), configurator -> {
+            configurator.requireTransportCapability(TransportCapabilities.DURABILITY);
+            MediatorTransport.configure(configurator);
+        });
+
+        UnsupportedTransportCapabilityException exception = org.junit.jupiter.api.Assertions.assertThrows(
+                UnsupportedTransportCapabilityException.class,
+                bus::start);
+
+        assertEquals("in-memory", exception.getTransport());
+        assertEquals(TransportCapabilities.DURABILITY, exception.getCapability());
+    }
+
+    @Test
+    void startupAcceptsEmulationUnlessNativeSupportIsRequired() throws Exception {
+        MessageBus availableBus = MessageBusImpl.configure(ServiceCollection.create(), configurator -> {
+            configurator.requireTransportCapability(TransportCapabilities.SCHEDULING);
+            MediatorTransport.configure(configurator);
+        });
+        availableBus.start();
+        availableBus.stop();
+
+        MessageBus nativeBus = MessageBusImpl.configure(ServiceCollection.create(), configurator -> {
+            configurator.requireTransportCapability(TransportCapabilities.SCHEDULING, true);
+            MediatorTransport.configure(configurator);
+        });
+
+        org.junit.jupiter.api.Assertions.assertThrows(
+                UnsupportedTransportCapabilityException.class,
+                nativeBus::start);
     }
 }
