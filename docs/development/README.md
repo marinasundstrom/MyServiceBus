@@ -4,6 +4,8 @@ This folder contains materials for contributing to MyServiceBus. Documentation a
 
 Start with:
 
+- [MVP API Surface](mvp-api-surface.md)
+- [MVP Release Gate](mvp-release-gate.md)
 - [Design Goals](design-goals.md)
 - [MyServiceBus Architecture](../myservicebus-architecture.md)
 - [Compatibility Policy](../compatibility.md)

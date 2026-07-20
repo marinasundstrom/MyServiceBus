@@ -4,6 +4,8 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <IsPackable>true</IsPackable>
+    <Description>In-memory test harness and testing utilities for MyServiceBus.</Description>
   </PropertyGroup>
 
   <ItemGroup>

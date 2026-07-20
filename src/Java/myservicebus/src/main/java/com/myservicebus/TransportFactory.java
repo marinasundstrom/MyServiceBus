@@ -16,6 +16,10 @@ public interface TransportFactory extends PublishAddressProvider {
 
     SendTransport getSendTransport(URI address);
 
+    /**
+     * Creates a receive transport from profile-neutral endpoint intent.
+     * This is the supported extension point for new transport implementations.
+     */
     default ReceiveTransport createReceiveTransport(ReceiveEndpointTransportTopology topology,
             Function<TransportMessage, CompletableFuture<Void>> handler,
             Function<String, Boolean> isMessageTypeRegistered) throws Exception {
@@ -28,6 +32,11 @@ public interface TransportFactory extends PublishAddressProvider {
                 topology.transportOptions());
     }
 
+    /**
+     * @deprecated Override {@link #createReceiveTransport(ReceiveEndpointTransportTopology, Function, Function)}
+     *             for new transport implementations.
+     */
+    @Deprecated(forRemoval = false)
     default ReceiveTransport createReceiveTransport(String queueName, List<MessageBinding> bindings,
             Function<TransportMessage, CompletableFuture<Void>> handler,
             Function<String, Boolean> isMessageTypeRegistered, int prefetchCount,
@@ -35,26 +44,35 @@ public interface TransportFactory extends PublishAddressProvider {
         return createReceiveTransport(queueName, bindings, handler, isMessageTypeRegistered, prefetchCount);
     }
 
+    /** @deprecated Use the profile-neutral endpoint topology overload. */
+    @Deprecated(forRemoval = false)
     default ReceiveTransport createReceiveTransport(String queueName, List<MessageBinding> bindings,
             Function<TransportMessage, CompletableFuture<Void>> handler,
             Function<String, Boolean> isMessageTypeRegistered, int prefetchCount) throws Exception {
         return createReceiveTransport(queueName, bindings, handler);
     }
 
+    /** @deprecated Use the profile-neutral endpoint topology overload. */
+    @Deprecated(forRemoval = false)
     default ReceiveTransport createReceiveTransport(String queueName, List<MessageBinding> bindings,
             Function<TransportMessage, CompletableFuture<Void>> handler, int prefetchCount) throws Exception {
         return createReceiveTransport(queueName, bindings, handler, s -> true, prefetchCount);
     }
 
+    /** @deprecated Use the profile-neutral endpoint topology overload. */
+    @Deprecated(forRemoval = false)
     default ReceiveTransport createReceiveTransport(String queueName, List<MessageBinding> bindings,
             Function<TransportMessage, CompletableFuture<Void>> handler,
             Function<String, Boolean> isMessageTypeRegistered) throws Exception {
         return createReceiveTransport(queueName, bindings, handler, isMessageTypeRegistered, 0);
     }
 
+    /** @deprecated Use the profile-neutral endpoint topology overload. */
+    @Deprecated(forRemoval = false)
     default ReceiveTransport createReceiveTransport(String queueName, List<MessageBinding> bindings,
             Function<TransportMessage, CompletableFuture<Void>> handler) throws Exception {
-        return createReceiveTransport(queueName, bindings, handler, s -> true, 0);
+        throw new UnsupportedOperationException(
+                "Transport factory does not implement a receive transport contract");
     }
 
     String getPublishAddress(String exchange);

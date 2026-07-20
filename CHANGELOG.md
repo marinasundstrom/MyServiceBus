@@ -13,6 +13,22 @@ This changelog summarizes the bigger themes in the repository history. It is int
 - Completed the topology stability gate with a prospective extension model for saga nodes, outbox policies, and materially different durable-broker projections.
 - Made inspection consume the normalized topology snapshot and stopped inferring RabbitMQ-specific details that are not supplied by an authoritative transport projection.
 
+### MVP API stabilization
+
+- Declared profile-neutral receive-endpoint topology as the supported transport extension point and deprecated legacy C# and Java receive-transport overloads without removing compatibility.
+
+### MVP dependency hygiene
+
+- Updated Aspire hosting, ASP.NET Core OpenAPI, and OpenTelemetry package families to patched releases so the resolved MVP application dependency graph is clear of known NuGet advisories.
+- Made .NET CI fail restoration when NuGet reports a low, moderate, high, or critical package advisory.
+
+### MVP packaging
+
+- Defined the four supported .NET artifacts as explicit `0.1.0-preview.1` NuGet packages with repository, license, description, readme, and symbol metadata; all non-package projects are excluded by default.
+- Defined seven foundational Java modules as `0.1.0-preview.1` Maven publications with source, Javadoc, license, project, developer, and source-control metadata; preview inspection and sample applications remain unpublished.
+- Scoped Java production dependencies to the modules that own them so published POMs do not expose unrelated broker, serialization, dependency-injection, logging, or telemetry libraries.
+- Added NuGet and Maven package construction to the regular .NET and Java CI workflows.
+
 ## 2026-03-24 to 2026-03-19
 
 ### Aspire, runtime modernization, and parity cleanup
