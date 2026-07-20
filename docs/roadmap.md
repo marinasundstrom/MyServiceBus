@@ -12,6 +12,8 @@ MyServiceBus aims to become a modern, cross-language messaging runtime that:
 - exposes optional inspection and monitoring APIs for operational tools
 - supports a read-only dashboard before introducing control-plane operations
 
+The roadmap is centered on replacing MassTransit in basic broker-backed messaging scenarios. It does not currently seek to turn MyServiceBus into a general-purpose publisher/consumer abstraction for technologies without service-bus topology.
+
 It is positioned as a focused alternative for teams that do not need a large enterprise service-bus platform. Interoperability with MassTransit enables mixed systems and migration; it does not turn MassTransit's complete feature catalog into the destination of this roadmap.
 
 ## Decision Guardrails
@@ -28,6 +30,9 @@ Use these rules when accepting roadmap work:
 8. Prefer a small, coherent portable core over enterprise breadth; specialized patterns stay demand-driven.
 9. Keep shared concepts and useful counterpart types recognizable across clients, but never derive Java packages or APIs mechanically from C# namespaces and language features, or vice versa.
 10. Treat the normalized topology query model as a foundational API. Runtime provisioning, inspection, and dashboards must consume it rather than constructing separate topology interpretations.
+11. Keep broker-backed service-bus semantics as the stable product boundary. Explore HTTP, webhooks, realtime sessions, and similar delivery mechanisms separately and generalize the core only from demonstrated shared requirements.
+12. Treat mediator dispatch as an explicitly local execution mode. Externally observable events normally follow the broker-backed path.
+13. Support one logical bus per application. Do not add multiple hosted buses solely for MassTransit compatibility; reconsider them only for a concrete cross-platform use case with an idiomatic Java dependency-injection model.
 
 ## Phase 1: Protocol Baseline
 

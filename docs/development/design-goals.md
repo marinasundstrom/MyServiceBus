@@ -1,6 +1,7 @@
 # MyServiceBus Design Goals
 
 - **Explicit MassTransit Compatibility**: Preserve wire compatibility and the portable messaging semantics needed for interoperability. Claim transport-profile compatibility only where addressing, topology, and settlement behavior are covered by conformance tests; source compatibility and complete MassTransit feature parity are not goals.
+- **Broker-Backed Product Scope**: Optimize the stable runtime and topology model for basic broker-backed service-bus scenarios that can replace MassTransit. HTTP callbacks, webhooks, realtime sessions, and other non-broker technologies may reuse lower-level components, but they do not shape the bus abstraction without demonstrated need.
 - **Deliberate Modernization**: Retain MassTransit behavior when it supports protocol interoperability, migration, or a useful shared concept. Legacy edges may be replaced or omitted when they no longer serve those goals, provided the divergence and migration impact are explicit and versioned where necessary.
 - **MassTransit Familiarity in C#**: Developers coming from MassTransit should find the C# client familiar in its design and concepts.
 - **Cross-Language Conceptual Parity**: Moving between the C# and Java clients should require minimal adjustment. Shared concepts should have recognizable counterpart abstractions and, where natural, corresponding public types, while their APIs and code organization follow each platform's conventions.
@@ -15,6 +16,8 @@
 - **Idiomatic and Approachable Clients**: Each client should feel native to its platform and expose a clear default path. Shared internal abstractions must not make ordinary users adopt a framework or understand infrastructure they do not need to customize.
 - **No Mechanical Translation**: C# namespaces, project boundaries, inheritance models, overloads, and language features do not prescribe Java packages or class structure, and Java conventions do not prescribe C#. Alignment is required at the conceptual and behavioral boundaries, not through one-to-one source translation.
 - **Queryable Topology as a Foundation**: Model messages, endpoints, consumers, and bindings with corresponding, idiomatic C# and Java APIs. Runtime provisioning, inspection, and future dashboards must project from this model instead of independently inferring topology.
+- **Mediator as Local Execution**: Reuse consumers and pipelines in process for tests and deliberately local interactions, while directing externally observable events through the broker-backed bus instead of maintaining parallel mediator and bus paths by default.
+- **One Supported Bus per Application**: Keep hosting, dependency injection, lifecycle, topology, and telemetry centered on one logical bus. Multiple hosted bus instances are out of scope unless a concrete cross-platform use case later justifies an idiomatic C# and Java design.
 
 See the [design philosophy](design-philosophy.md) for how these goals shape cross-platform APIs and configuration.
 See the [architecture](../myservicebus-architecture.md) and [roadmap](../roadmap.md) for the intended system boundaries and delivery sequence.
