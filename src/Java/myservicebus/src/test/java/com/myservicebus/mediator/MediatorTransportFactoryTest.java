@@ -9,7 +9,6 @@ import com.myservicebus.SendEndpointProvider;
 import com.myservicebus.tasks.CancellationToken;
 import com.myservicebus.tasks.CancellationTokenSource;
 import com.myservicebus.di.ServiceCollection;
-import org.junit.jupiter.api.Disabled;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.Assertions;
@@ -96,7 +95,6 @@ public class MediatorTransportFactoryTest {
     }
 
     @Test
-    @Disabled("Scope setup under development")
     public void publishDeliversMessageToConsumer() {
         ServiceCollection services = ServiceCollection.create();
         MediatorBus bus = MediatorBus.configure(services, cfg -> {
@@ -110,7 +108,6 @@ public class MediatorTransportFactoryTest {
     }
 
     @Test
-    @Disabled("Scope setup under development")
     public void publishDeliversMessageToHandler() {
         ServiceCollection services = ServiceCollection.create();
         MediatorBus bus = MediatorBus.configure(services, cfg -> {

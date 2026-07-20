@@ -6,6 +6,7 @@ import com.myservicebus.EntityNameFormatter;
 import com.myservicebus.SendEndpointProvider;
 import com.myservicebus.di.ServiceCollection;
 import com.myservicebus.di.ServiceProvider;
+import com.myservicebus.di.ServiceScope;
 import com.myservicebus.tasks.CancellationToken;
 import java.util.function.Consumer;
 
@@ -27,8 +28,10 @@ public class MediatorBus {
 
     public void publish(Object message) {
         String exchange = EntityNameFormatter.format(message.getClass());
-        SendEndpointProvider provider = serviceProvider.getService(SendEndpointProvider.class);
-        provider.getSendEndpoint("loopback://" + exchange)
-                .send(message, CancellationToken.none).join();
+        try (ServiceScope scope = serviceProvider.createScope()) {
+            SendEndpointProvider provider = scope.getServiceProvider().getService(SendEndpointProvider.class);
+            provider.getSendEndpoint("loopback://" + exchange)
+                    .send(message, CancellationToken.none).join();
+        }
     }
 }
