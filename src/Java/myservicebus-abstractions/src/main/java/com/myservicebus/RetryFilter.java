@@ -5,7 +5,11 @@ import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
+
+import com.myservicebus.tasks.CancellationRegistration;
 
 /**
  * Filter that retries the next stage on failure.
@@ -41,13 +45,30 @@ public class RetryFilter<TContext extends PipeContext> implements Filter<TContex
                 Runnable retry = () -> attempt(context, next, remaining - 1, promise);
                 if (delay != null && !delay.isZero()) {
                     ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
-                    scheduler.schedule(() -> {
+                    AtomicReference<CancellationRegistration> registrationReference = new AtomicReference<>();
+                    ScheduledFuture<?> scheduled = scheduler.schedule(() -> {
                         try {
+                            CancellationRegistration registration = registrationReference.getAndSet(null);
+                            if (registration != null) {
+                                registration.close();
+                            }
                             retry.run();
                         } finally {
                             scheduler.shutdown();
                         }
-                    }, delay.toMillis(), TimeUnit.MILLISECONDS);
+                    }, Math.max(1, delay.toMillis()), TimeUnit.MILLISECONDS);
+                    CancellationRegistration registration = context.getCancellationToken().register(() -> {
+                        scheduled.cancel(false);
+                        promise.completeExceptionally(new CancellationException());
+                        scheduler.shutdown();
+                    });
+                    registrationReference.set(registration);
+                    if (scheduled.isDone()) {
+                        CancellationRegistration completedRegistration = registrationReference.getAndSet(null);
+                        if (completedRegistration != null) {
+                            completedRegistration.close();
+                        }
+                    }
                 } else {
                     retry.run();
                 }

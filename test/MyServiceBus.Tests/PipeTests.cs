@@ -230,4 +230,24 @@ public class PipeTests
         Assert.Equal(3, attempts);
         Assert.Equal(new[] { "done" }, context.Calls);
     }
+
+    [Fact]
+    public async Task Retry_delay_is_cancelled_without_starting_another_attempt()
+    {
+        using var source = new CancellationTokenSource();
+        var attempts = 0;
+        var configurator = new PipeConfigurator<TestContext>();
+        configurator.UseRetry(1, TimeSpan.FromSeconds(5));
+        configurator.UseExecute(_ =>
+        {
+            attempts++;
+            source.Cancel();
+            return Task.FromException(new InvalidOperationException("retry"));
+        });
+
+        var operation = configurator.Build().Send(new TestContext(source.Token));
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => operation.WaitAsync(TimeSpan.FromSeconds(1)));
+        Assert.Equal(1, attempts);
+    }
 }

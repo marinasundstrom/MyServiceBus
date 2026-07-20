@@ -48,6 +48,8 @@ When every attempt fails, the last underlying consumer failure remains the termi
 
 The initial portable retry profile supports immediate and fixed-delay attempts. Exception selection, attempt metadata, scope behavior, and redelivery are separate compatibility requirements and must not be implied until specified and tested.
 
+Cancellation while waiting for a fixed-delay retry completes the operation promptly with the platform's cancellation exception and prevents another attempt. Java cancellation tokens support unregisterable callbacks so delayed pipeline work can provide the same observable behavior as cancellation-aware .NET tasks.
+
 ## Dependency injection and lifetime
 
 Filter instances supplied directly by an application may be reused concurrently. Type-based filter registration may use dependency injection. Each client must expose and document whether such a filter is singleton, operation-scoped, or transient, and must dispose owned scopes predictably.

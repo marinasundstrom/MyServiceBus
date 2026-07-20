@@ -1,14 +1,11 @@
 package com.myservicebus.tasks;
 
-import java.util.concurrent.atomic.AtomicBoolean;
-
 // Source to trigger cancellation
 public class CancellationTokenSource {
-    private final AtomicBoolean cancelled = new AtomicBoolean(false);
-    private final CancellationToken token = new CancellationToken(cancelled);
+    private final CancellationToken token = new CancellationToken(new CancellationToken.State());
 
     public void cancel() {
-        cancelled.set(true);
+        token.cancel();
     }
 
     public CancellationToken getToken() {
@@ -16,6 +13,6 @@ public class CancellationTokenSource {
     }
 
     public boolean isCancelled() {
-        return cancelled.get();
+        return token.isCancelled();
     }
 }
