@@ -64,6 +64,8 @@ public class ProtocolFixtureTest {
         assertEquals("urn:message:MassTransit:Fault[[MyServiceBus.Compatibility:GetOrderStatus]]",
                 envelope.getMessageType().get(0));
         assertEquals(UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"), envelope.getMessage().getFaultId());
+        assertEquals(UUID.fromString("55555555-5555-5555-5555-555555555555"),
+                envelope.getMessage().getMessageId());
         assertEquals("Order was not found", envelope.getMessage().getExceptions().get(0).getMessage());
         assertEquals("44444444-4444-4444-4444-444444444444",
                 envelope.getMessage().getMessage().get("orderId"));

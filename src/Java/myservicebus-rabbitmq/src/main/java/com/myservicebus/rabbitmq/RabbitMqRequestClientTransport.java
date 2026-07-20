@@ -53,20 +53,20 @@ public class RabbitMqRequestClientTransport implements RequestClientTransport {
 
             DeliverCallback callback = (tag, delivery) -> {
                 try {
-                    JavaType type = mapper.getTypeFactory().constructParametricType(Envelope.class, responseType);
-                    Envelope<TResponse> envelope = mapper.readValue(delivery.getBody(), type);
-                    future.complete(envelope.getMessage());
-                } catch (Exception ex) {
-                    try {
+                    if (hasMessageType(delivery.getBody(), faultUrn(requestType))) {
                         JavaType faultInner = mapper.getTypeFactory().constructParametricType(Fault.class, requestType);
                         JavaType faultType = mapper.getTypeFactory().constructParametricType(Envelope.class,
                                 faultInner);
                         Envelope<Fault<TRequest>> fault = mapper.readValue(delivery.getBody(), faultType);
                         future.completeExceptionally(
                                 new RequestFaultException(requestType.getSimpleName(), fault.getMessage()));
-                    } catch (Exception inner) {
-                        future.completeExceptionally(inner);
+                    } else {
+                        JavaType type = mapper.getTypeFactory().constructParametricType(Envelope.class, responseType);
+                        Envelope<TResponse> envelope = mapper.readValue(delivery.getBody(), type);
+                        future.complete(envelope.getMessage());
                     }
+                } catch (Exception ex) {
+                    future.completeExceptionally(ex);
                 } finally {
                     try {
                         channel.basicCancel(tag);
@@ -128,26 +128,24 @@ public class RabbitMqRequestClientTransport implements RequestClientTransport {
 
             DeliverCallback callback = (tag, delivery) -> {
                 try {
-                    try {
-                        JavaType type1 = mapper.getTypeFactory().constructParametricType(Envelope.class, responseType1);
-                        Envelope<T1> env1 = mapper.readValue(delivery.getBody(), type1);
-                        future.complete(Response2.fromT1(env1.getMessage()));
-                    } catch (Exception ex1) {
-                        JavaType type2 = mapper.getTypeFactory().constructParametricType(Envelope.class, responseType2);
-                        Envelope<T2> env2 = mapper.readValue(delivery.getBody(), type2);
-                        future.complete(Response2.fromT2(env2.getMessage()));
-                    }
-                } catch (Exception ex) {
-                    try {
+                    if (hasMessageType(delivery.getBody(), faultUrn(requestType))) {
                         JavaType faultInner = mapper.getTypeFactory().constructParametricType(Fault.class, requestType);
                         JavaType faultType = mapper.getTypeFactory().constructParametricType(Envelope.class,
                                 faultInner);
                         Envelope<Fault<TRequest>> fault = mapper.readValue(delivery.getBody(), faultType);
                         future.completeExceptionally(
                                 new RequestFaultException(requestType.getSimpleName(), fault.getMessage()));
-                    } catch (Exception inner) {
-                        future.completeExceptionally(inner);
+                    } else if (hasMessageType(delivery.getBody(), MessageUrn.forClass(responseType1))) {
+                        JavaType type1 = mapper.getTypeFactory().constructParametricType(Envelope.class, responseType1);
+                        Envelope<T1> env1 = mapper.readValue(delivery.getBody(), type1);
+                        future.complete(Response2.fromT1(env1.getMessage()));
+                    } else {
+                        JavaType type2 = mapper.getTypeFactory().constructParametricType(Envelope.class, responseType2);
+                        Envelope<T2> env2 = mapper.readValue(delivery.getBody(), type2);
+                        future.complete(Response2.fromT2(env2.getMessage()));
                     }
+                } catch (Exception ex) {
+                    future.completeExceptionally(ex);
                 } finally {
                     try {
                         channel.basicCancel(tag);
@@ -189,5 +187,14 @@ public class RabbitMqRequestClientTransport implements RequestClientTransport {
             future.completeExceptionally(ex);
         }
         return future;
+    }
+
+    private boolean hasMessageType(byte[] body, String expectedUrn) throws Exception {
+        Envelope<?> envelope = mapper.readValue(body, Envelope.class);
+        return envelope.getMessageType() != null && envelope.getMessageType().contains(expectedUrn);
+    }
+
+    private static String faultUrn(Class<?> requestType) {
+        return MessageUrn.forFault(requestType);
     }
 }

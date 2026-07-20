@@ -21,6 +21,7 @@ public class SendContext implements PipeContext, ScheduledMessage {
     private URI destinationAddress;
     private Instant scheduledEnqueueTime;
     private UUID requestId;
+    private List<String> messageTypes;
 
     public SendContext(Object message, CancellationToken cancellationToken) {
         this.message = message;
@@ -63,6 +64,10 @@ public class SendContext implements PipeContext, ScheduledMessage {
         this.requestId = requestId;
     }
 
+    public void setMessageTypes(List<String> messageTypes) {
+        this.messageTypes = messageTypes;
+    }
+
     @Override
     public Instant getScheduledEnqueueTime() {
         return scheduledEnqueueTime;
@@ -78,7 +83,7 @@ public class SendContext implements PipeContext, ScheduledMessage {
         context.setMessageId(UUID.randomUUID());
         context.setRequestId(requestId);
         context.setCorrelationId(null);
-        context.setMessageType(List.of(MessageUrn.forClass(message.getClass())));
+        context.setMessageType(messageTypes != null ? messageTypes : List.of(MessageUrn.forClass(message.getClass())));
         context.setResponseAddress(null);
         context.setFaultAddress(null);
         context.setSourceAddress(sourceAddress != null ? sourceAddress : URI.create("loopback://localhost/source"));

@@ -11,6 +11,8 @@
 - **Capability-Aware Transports**: Model transport features as native, emulated, or unsupported so additional brokers and event streams retain their real delivery, ordering, settlement, and replay semantics.
 - **Optional Operations Plane**: Keep inspection, monitoring, and dashboards outside the delivery-critical core and expose them through stable programmatic APIs.
 - **Executable Specification**: Treat shared fixtures, cross-language tests, and transport-profile interoperability tests as the source of truth for every client and adapter.
+- **Alignment Before Stability**: While the protocol is still being aligned, MassTransit-compatible wire behavior takes precedence over preserving earlier incompatible MyServiceBus behavior. Stabilization and backward-compatibility commitments must be explicit future decisions.
+- **Idiomatic and Approachable Clients**: Each client should feel native to its platform and expose a clear default path. Shared internal abstractions must not make ordinary users adopt a framework or understand infrastructure they do not need to customize.
 
 See the [design philosophy](design-philosophy.md) for how these goals shape cross-platform APIs and configuration.
 See the [architecture](../myservicebus-architecture.md) and [roadmap](../roadmap.md) for the intended system boundaries and delivery sequence.

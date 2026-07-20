@@ -101,7 +101,7 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
 
     internal async Task RespondFaultAsync(Exception exception, CancellationToken cancellationToken = default)
     {
-        var address = receiveContext.FaultAddress ?? receiveContext.ResponseAddress;
+        var address = receiveContext.ResponseAddress ?? receiveContext.FaultAddress;
         if (address == null)
             return;
 
@@ -118,6 +118,7 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
         var transport = await _transportFactory.GetSendTransport(address, cancellationToken);
         var context = _sendContextFactory.Create(MessageTypeCache.GetMessageTypes(typeof(Fault<TMessage>)), _messageSerializer, cancellationToken);
         context.MessageId = Guid.NewGuid().ToString();
+        context.RequestId = receiveContext.RequestId;
         context.SourceAddress = _address;
         context.DestinationAddress = address;
 

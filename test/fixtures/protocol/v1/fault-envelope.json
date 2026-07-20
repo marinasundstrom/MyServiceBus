@@ -26,8 +26,8 @@
       }
     ],
     "host": null,
-    "messageId": "55555555-5555-5555-5555-555555555555",
-    "sentTime": "2026-01-02T03:04:06.678Z",
+    "faultedMessageId": "55555555-5555-5555-5555-555555555555",
+    "timestamp": "2026-01-02T03:04:06.678Z",
     "faultId": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
     "conversationId": "88888888-8888-8888-8888-888888888888",
     "correlationId": "77777777-7777-7777-7777-777777777777"

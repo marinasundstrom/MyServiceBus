@@ -2,6 +2,8 @@
 
 This matrix tracks behavioral parity across the two client implementations. The expected semantics are defined in the [MyServiceBus Specification](specs/myservicebus-spec.md).
 
+Parity in this document means equivalent behavior and wire outcomes. C# intentionally uses a MassTransit-familiar surface; Java intentionally expresses the same factory-based standalone setup, dependency-injection integration, and fluent configuration model in Java conventions. Keeping those paths recognizable across languages reduces migration and polyglot-team costs. MyServiceBus-owned DI and logging contracts remain small integration seams with optional ecosystem adapters.
+
 | Feature | C# Implementation | Java Implementation | Notes |
 | --- | --- | --- | --- |
 | Message sending | Implemented | Implemented | `ConsumeContext` resolves send endpoints in both clients. |

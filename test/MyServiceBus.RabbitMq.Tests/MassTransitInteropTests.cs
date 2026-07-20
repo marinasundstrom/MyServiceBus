@@ -192,6 +192,113 @@ public class MassTransitInteropTests
         }
     }
 
+    [Fact]
+    public async Task MyServiceBus_request_client_receives_MassTransit_fault()
+    {
+        await using var container = new RabbitMqBuilder("rabbitmq:4.1-alpine").Build();
+        await container.StartAsync();
+
+        var queueName = $"myservicebus-request-to-masstransit-fault-{Guid.NewGuid():N}";
+        var bus = MassTransit.Bus.Factory.CreateUsingRabbitMq(configurator =>
+        {
+            configurator.Host(new Uri(container.GetConnectionString()));
+            configurator.ReceiveEndpoint(queueName, endpoint =>
+            {
+                endpoint.Consumer<MassTransitFaultingConsumer>();
+            });
+        });
+
+        await bus.StartAsync();
+        try
+        {
+            var client = new GenericRequestClient<InteropRequest>(
+                CreateTransportFactory(container),
+                new EnvelopeMessageSerializer(),
+                new SendContextFactory(),
+                timeout: MyServiceBus.RequestTimeout.After(TimeSpan.FromSeconds(20)));
+
+            var exception = await Assert.ThrowsAsync<MyServiceBus.RequestFaultException>(() =>
+                client.GetResponseAsync<InteropResponse>(
+                    new InteropRequest { Value = "fault-from-masstransit" }));
+
+            Assert.Contains("mass-transit-fault", exception.Fault.Exceptions[0].Message);
+        }
+        finally
+        {
+            await bus.StopAsync();
+        }
+    }
+
+    [Fact]
+    public async Task MassTransit_request_client_receives_MyServiceBus_fault()
+    {
+        await using var container = new RabbitMqBuilder("rabbitmq:4.1-alpine").Build();
+        await container.StartAsync();
+
+        var transportFactory = CreateTransportFactory(container);
+        var exchangeName = MyServiceBus.EntityNameFormatter.Format(typeof(InteropRequest));
+        var queueName = $"masstransit-request-to-myservicebus-fault-{Guid.NewGuid():N}";
+        var receiveTransport = await transportFactory.CreateReceiveTransport(
+            new ReceiveEndpointTopology
+            {
+                QueueName = queueName,
+                ExchangeName = exchangeName,
+                Durable = true,
+                AutoDelete = false
+            },
+            async receiveContext =>
+            {
+                var address = receiveContext.ResponseAddress ?? receiveContext.FaultAddress
+                    ?? throw new InvalidOperationException("Request did not include a fault or response address.");
+                var sendTransport = await transportFactory.GetSendTransport(address);
+                var sendContext = new SendContext(
+                    MessageTypeCache.GetMessageTypes(typeof(Fault<InteropRequest>)),
+                    new EnvelopeMessageSerializer())
+                {
+                    MessageId = Guid.NewGuid().ToString(),
+                    RequestId = receiveContext.RequestId,
+                    DestinationAddress = address
+                };
+                await sendTransport.Send(
+                    new Fault<InteropRequest>
+                    {
+                        Message = new InteropRequest { Value = "fault-from-myservicebus" },
+                        FaultId = Guid.NewGuid(),
+                        MessageId = receiveContext.MessageId,
+                        SentTime = DateTimeOffset.UtcNow,
+                        Exceptions =
+                        [
+                            ExceptionInfo.FromException(
+                                new InvalidOperationException("myservicebus-fault"))
+                        ]
+                    },
+                    sendContext);
+            },
+            messageType => messageType == MessageUrn.For(typeof(InteropRequest)));
+
+        await receiveTransport.Start();
+        var bus = MassTransit.Bus.Factory.CreateUsingRabbitMq(configurator =>
+        {
+            configurator.Host(new Uri(container.GetConnectionString()));
+        });
+        await bus.StartAsync();
+        try
+        {
+            var client = bus.CreateRequestClient<InteropRequest>(
+                MassTransit.RequestTimeout.After(s: 20));
+            var exception = await Assert.ThrowsAsync<MassTransit.RequestFaultException>(() =>
+                client.GetResponse<InteropResponse>(
+                    new InteropRequest { Value = "fault-from-myservicebus" }));
+
+            Assert.Contains("myservicebus-fault", exception.Message);
+        }
+        finally
+        {
+            await bus.StopAsync();
+            await receiveTransport.Stop();
+        }
+    }
+
     [CrossLanguageFact]
     public async Task Java_MyServiceBus_request_client_receives_MassTransit_response()
     {
@@ -254,6 +361,75 @@ public class MassTransitInteropTests
 
             Assert.Equal("response-from-java", response.Message.Value);
             await JavaInteropPeer.WaitForOutput(javaPeer, "RESPONDED", TimeSpan.FromSeconds(20));
+            await JavaInteropPeer.WaitForExit(javaPeer, TimeSpan.FromSeconds(10));
+            Assert.Equal(0, javaPeer.ExitCode);
+        }
+        finally
+        {
+            await bus.StopAsync();
+        }
+    }
+
+    [CrossLanguageFact]
+    public async Task Java_MyServiceBus_request_client_receives_MassTransit_fault()
+    {
+        await using var container = new RabbitMqBuilder("rabbitmq:4.1-alpine").Build();
+        await container.StartAsync();
+
+        var exchangeName = MyServiceBus.EntityNameFormatter.Format(typeof(InteropRequest));
+        var queueName = $"java-request-to-masstransit-fault-{Guid.NewGuid():N}";
+        var bus = MassTransit.Bus.Factory.CreateUsingRabbitMq(configurator =>
+        {
+            configurator.Host(new Uri(container.GetConnectionString()));
+            configurator.ReceiveEndpoint(queueName, endpoint =>
+            {
+                endpoint.Consumer<MassTransitFaultingConsumer>();
+            });
+        });
+
+        await bus.StartAsync();
+        try
+        {
+            using var javaPeer = JavaInteropPeer.Start(
+                container, "request-fault", exchangeName, queueName, "fault-from-java", durableExchange: true);
+            await JavaInteropPeer.WaitForOutput(javaPeer, "FAULT", TimeSpan.FromMinutes(2));
+            await JavaInteropPeer.WaitForExit(javaPeer, TimeSpan.FromSeconds(10));
+            Assert.Equal(0, javaPeer.ExitCode);
+        }
+        finally
+        {
+            await bus.StopAsync();
+        }
+    }
+
+    [CrossLanguageFact]
+    public async Task MassTransit_request_client_receives_Java_MyServiceBus_fault()
+    {
+        await using var container = new RabbitMqBuilder("rabbitmq:4.1-alpine").Build();
+        await container.StartAsync();
+
+        var exchangeName = MyServiceBus.EntityNameFormatter.Format(typeof(InteropRequest));
+        var queueName = $"masstransit-request-to-java-fault-{Guid.NewGuid():N}";
+        using var javaPeer = JavaInteropPeer.Start(
+            container, "fault", exchangeName, queueName, "fault-from-masstransit", durableExchange: true);
+        await JavaInteropPeer.WaitForOutput(javaPeer, "READY", TimeSpan.FromMinutes(2));
+
+        var bus = MassTransit.Bus.Factory.CreateUsingRabbitMq(configurator =>
+        {
+            configurator.Host(new Uri(container.GetConnectionString()));
+        });
+        await bus.StartAsync();
+        try
+        {
+            var client = bus.CreateRequestClient<InteropRequest>(
+                MassTransit.RequestTimeout.After(s: 40));
+            var responseTask = client.GetResponse<InteropResponse>(
+                new InteropRequest { Value = "fault-from-masstransit" });
+            await JavaInteropPeer.WaitForOutput(javaPeer, "FAULTED", TimeSpan.FromSeconds(20));
+            var exception = await Assert.ThrowsAsync<MassTransit.RequestFaultException>(() =>
+                responseTask);
+
+            Assert.Contains("java-fault", exception.Message);
             await JavaInteropPeer.WaitForExit(javaPeer, TimeSpan.FromSeconds(10));
             Assert.Equal(0, javaPeer.ExitCode);
         }
@@ -374,6 +550,14 @@ public class MassTransitInteropTests
 
             await context.RespondAsync(
                 new InteropResponse { Value = "response-from-masstransit" });
+        }
+    }
+
+    private sealed class MassTransitFaultingConsumer : MassTransit.IConsumer<InteropRequest>
+    {
+        public Task Consume(MassTransit.ConsumeContext<InteropRequest> context)
+        {
+            throw new InvalidOperationException("mass-transit-fault");
         }
     }
 }

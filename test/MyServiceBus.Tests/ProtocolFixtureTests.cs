@@ -59,6 +59,8 @@ public class ProtocolFixtureTests
 
         Assert.Equal("urn:message:MassTransit:Fault[[MyServiceBus.Compatibility:GetOrderStatus]]", Assert.Single(envelope.MessageType));
         Assert.Equal(Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"), envelope.Message.FaultId);
+        Assert.Equal(Guid.Parse("55555555-5555-5555-5555-555555555555"), envelope.Message.MessageId);
+        Assert.Equal(DateTimeOffset.Parse("2026-01-02T03:04:06.678Z"), envelope.Message.SentTime);
         Assert.Equal("Order was not found", Assert.Single(envelope.Message.Exceptions).Message);
         Assert.Equal(
             "44444444-4444-4444-4444-444444444444",

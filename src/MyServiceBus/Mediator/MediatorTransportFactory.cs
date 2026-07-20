@@ -124,10 +124,7 @@ public class MediatorTransportFactory : ITransportFactory
             var messageId = Guid.TryParse(context.MessageId, out var id) ? id : Guid.NewGuid();
             Guid? correlationId = context.CorrelationId != null && Guid.TryParse(context.CorrelationId, out var cId) ? cId : null;
 
-            var messageTypes = MessageTypeCache
-                .GetMessageTypes(typeof(T))
-                .Select(t => MessageUrn.For(t))
-                .ToList();
+            var messageTypes = context.MessageTypeUrns.ToList();
 
             var headers = new Dictionary<string, object>(context.Headers);
 

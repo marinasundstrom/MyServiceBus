@@ -21,7 +21,13 @@ Compatibility is prioritized in this order:
 3. C# APIs should remain familiar to MassTransit users, while every language exposes the same concepts idiomatically.
 4. Historical MassTransit behavior is optional when it does not contribute to interoperability, migration, or current user value.
 
-MyServiceBus may deliberately diverge from legacy MassTransit edges, but a divergence must be explicit. Its rationale, affected compatibility level, replacement behavior, and migration impact must be documented. Conformance tests must distinguish intentional differences from regressions. Wire-format or transport-profile divergence requires a versioned protocol decision and must not silently break previously verified peers.
+MyServiceBus may deliberately diverge from legacy MassTransit edges, but a divergence must be explicit. Its rationale, affected compatibility level, replacement behavior, and migration impact must be documented. Conformance tests must distinguish intentional differences from regressions. After a stable protocol policy is declared, wire-format or transport-profile divergence requires a versioned protocol decision and must not silently break supported peers.
+
+### Alignment-Phase Directive
+
+Until MyServiceBus explicitly declares a stable protocol compatibility policy, MassTransit is authoritative for every wire shape and transport convention that MyServiceBus claims as MassTransit-compatible. When existing MyServiceBus behavior conflicts with that target, implementations, fixtures, and tests must be corrected to match MassTransit. The project does not need to retain aliases, fallback parsing, or compatibility modes solely for earlier MyServiceBus behavior during this alignment phase.
+
+This directive applies to accidental incompatibilities, not deliberate product divergence. A deliberate divergence remains allowed under the policy above, but it must be named and must not be presented as MassTransit-compatible behavior.
 
 ## Compatibility Levels
 
@@ -150,6 +156,8 @@ The repository currently has the following executable foundation:
 | MassTransit → MyServiceBus | Verified with C# | Verified with Java | Verified locally through RabbitMQ |
 | MyServiceBus request → MassTransit response | Verified from C# | Verified from Java | Correlated request/response verified through RabbitMQ |
 | MassTransit request → MyServiceBus response | Verified with C# | Verified with Java | Correlated request/response verified through RabbitMQ |
+| MyServiceBus request → MassTransit fault | Verified from C# | Verified from Java | Correlated fault response verified through RabbitMQ |
+| MassTransit request → MyServiceBus fault | Verified with C# | Verified with Java | Correlated fault response verified through RabbitMQ |
 
 The shared versioned fixtures live under `test/fixtures/protocol/v1`. They are canonical inputs for MyServiceBus protocol tests, but they do not become evidence of MassTransit interoperability until the corresponding MassTransit scenarios pass.
 
@@ -157,7 +165,7 @@ RabbitMQ transport integration tests use a pinned RabbitMQ image through Testcon
 
 The cross-language tests are opt-in during ordinary local test runs because they start both runtimes. CI runs them in a dedicated interoperability job. Set `RUN_CROSS_LANGUAGE_TESTS=1` to execute them locally.
 
-The current RabbitMQ baseline uses RabbitMQ `4.1-alpine` and MassTransit `8.5.1`. Verification covers compatible envelope publication, consumption, and correlated request/response in each direction for both reference clients. Faults, retry exhaustion, skipped-message routing, and error destinations remain separate required scenarios before the complete immediate target can be labeled verified.
+The current RabbitMQ baseline uses RabbitMQ `4.1-alpine` and MassTransit `8.5.1`. Verification covers compatible envelope publication, consumption, correlated request/response, and correlated fault responses in each direction for both reference clients. Retry exhaustion, skipped-message routing, and error destinations remain separate required scenarios before the complete immediate target can be labeled verified.
 
 ## Compatibility Status Labels
 

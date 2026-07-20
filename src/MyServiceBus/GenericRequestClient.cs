@@ -53,14 +53,16 @@ public sealed class GenericRequestClient<TRequest> : IRequestClient<TRequest>, I
         {
             try
             {
-                if (context.TryGetMessage<T>(out var responeMessage))
+                if (context.MessageType.Contains(MessageUrn.For(typeof(T))) &&
+                    context.TryGetMessage<T>(out var responeMessage))
                 {
                     var response = new Response<T>(responeMessage);
                     taskCompletionSource.TrySetResult(response);
                     return;
                 }
 
-                if (context.TryGetMessage<Fault<TRequest>>(out var fault))
+                if (context.MessageType.Contains(MessageUrn.For(typeof(Fault<TRequest>))) &&
+                    context.TryGetMessage<Fault<TRequest>>(out var fault))
                 {
                     taskCompletionSource.TrySetException(new RequestFaultException(typeof(TRequest).Name, fault!));
                 }
@@ -131,13 +133,15 @@ public sealed class GenericRequestClient<TRequest> : IRequestClient<TRequest>, I
         {
             try
             {
-                if (context.TryGetMessage<T1>(out var message1))
+                if (context.MessageType.Contains(MessageUrn.For(typeof(T1))) &&
+                    context.TryGetMessage<T1>(out var message1))
                 {
                     taskCompletionSource.TrySetResult(Response<T1, T2>.FromT1(message1));
                     return;
                 }
 
-                if (context.TryGetMessage<T2>(out var message2))
+                if (context.MessageType.Contains(MessageUrn.For(typeof(T2))) &&
+                    context.TryGetMessage<T2>(out var message2))
                 {
                     taskCompletionSource.TrySetResult(Response<T1, T2>.FromT2(message2));
                     return;
@@ -145,6 +149,7 @@ public sealed class GenericRequestClient<TRequest> : IRequestClient<TRequest>, I
 
                 if (!typeof(T1).IsAssignableFrom(typeof(Fault<TRequest>)) &&
                     !typeof(T2).IsAssignableFrom(typeof(Fault<TRequest>)) &&
+                    context.MessageType.Contains(MessageUrn.For(typeof(Fault<TRequest>))) &&
                     context.TryGetMessage<Fault<TRequest>>(out var fault))
                 {
                     taskCompletionSource.TrySetException(new RequestFaultException(typeof(TRequest).Name, fault));

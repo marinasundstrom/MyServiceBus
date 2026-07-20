@@ -211,7 +211,7 @@ public class ConsumeContext<T>
     }
 
     public CompletableFuture<Void> respondFault(Exception exception, CancellationToken cancellationToken) {
-        String address = faultAddress != null ? faultAddress : responseAddress;
+        String address = responseAddress != null ? responseAddress : faultAddress;
         if (address == null) {
             return CompletableFuture.completedFuture(null);
         }
@@ -234,7 +234,10 @@ public class ConsumeContext<T>
         }
 
         SendEndpoint endpoint = getSendEndpoint(address);
-        return endpoint.send(fault, cancellationToken);
+        return endpoint.send(
+                fault,
+                context -> context.setMessageTypes(Collections.singletonList(MessageUrn.forFault(message.getClass()))),
+                cancellationToken);
     }
 
     @Override

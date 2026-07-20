@@ -3,10 +3,13 @@ package com.myservicebus.interop;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.myservicebus.Envelope;
+import com.myservicebus.ExceptionInfo;
+import com.myservicebus.Fault;
 import com.myservicebus.MessageUrn;
 import com.myservicebus.ReceiveTransport;
 import com.myservicebus.SendContext;
 import com.myservicebus.SendTransport;
+import com.myservicebus.RequestFaultException;
 import com.myservicebus.logging.LoggerFactoryBuilder;
 import com.myservicebus.rabbitmq.ConnectionProvider;
 import com.myservicebus.rabbitmq.RabbitMqFactoryConfigurator;
@@ -19,7 +22,10 @@ import com.rabbitmq.client.ConnectionFactory;
 
 import java.util.List;
 import java.net.URI;
+import java.time.OffsetDateTime;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
 public final class InteropTestPeer {
@@ -29,7 +35,7 @@ public final class InteropTestPeer {
     public static void main(String[] args) throws Exception {
         if (args.length != 5) {
             throw new IllegalArgumentException(
-                    "Expected: <consume|produce|request|respond> <exchange> <queue> <value> <durable-exchange>");
+                    "Expected: <consume|produce|request|request-fault|respond|fault> <exchange> <queue> <value> <durable-exchange>");
         }
 
         String host = requiredEnvironment("RABBITMQ_HOST");
@@ -46,8 +52,12 @@ public final class InteropTestPeer {
             produce(transportFactory, args[1], args[3], Boolean.parseBoolean(args[4]));
         } else if ("request".equals(args[0])) {
             request(connectionProvider, args[3]);
+        } else if ("request-fault".equals(args[0])) {
+            requestFault(connectionProvider, args[3]);
         } else if ("respond".equals(args[0])) {
-            respond(transportFactory, args[1], args[2], args[3]);
+            reply(transportFactory, args[1], args[2], args[3], false);
+        } else if ("fault".equals(args[0])) {
+            reply(transportFactory, args[1], args[2], args[3], true);
         } else {
             throw new IllegalArgumentException("Unknown mode: " + args[0]);
         }
@@ -148,8 +158,30 @@ public final class InteropTestPeer {
         System.exit(0);
     }
 
-    private static void respond(RabbitMqTransportFactory transportFactory, String exchangeName, String queueName,
-            String expectedValue) throws Exception {
+    private static void requestFault(ConnectionProvider connectionProvider, String value) throws Exception {
+        InteropRequest request = new InteropRequest();
+        request.setValue(value);
+        SendContext context = new SendContext(request, CancellationToken.none);
+        RabbitMqRequestClientTransport transport = new RabbitMqRequestClientTransport(connectionProvider);
+        try {
+            transport.sendRequest(InteropRequest.class, context, InteropResponse.class)
+                    .get(20, TimeUnit.SECONDS);
+            throw new IllegalStateException("Expected the request to fault.");
+        } catch (ExecutionException exception) {
+            if (!(exception.getCause() instanceof RequestFaultException requestFault)
+                    || !requestFault.getMessage().contains("mass-transit-fault")) {
+                exception.getCause().printStackTrace(System.err);
+                System.err.flush();
+                System.exit(2);
+            }
+        }
+        System.out.println("FAULT");
+        System.out.flush();
+        System.exit(0);
+    }
+
+    private static void reply(RabbitMqTransportFactory transportFactory, String exchangeName, String queueName,
+            String expectedValue, boolean sendFault) throws Exception {
         MessageBinding binding = new MessageBinding();
         binding.setMessageType(InteropRequest.class);
         binding.setEntityName(exchangeName);
@@ -168,12 +200,9 @@ public final class InteropTestPeer {
                                     + requestEnvelope.getMessage().getValue());
                         }
 
-                        InteropResponse response = new InteropResponse();
-                        response.setValue("response-from-java");
-                        SendContext responseContext = new SendContext(response, CancellationToken.none);
-                        responseContext.setRequestId(requestEnvelope.getRequestId());
-                        responseContext.setDestinationAddress(URI.create(requestEnvelope.getResponseAddress()));
-                        byte[] body = responseContext.serialize(new EnvelopeMessageSerializer());
+                        byte[] body = sendFault
+                                ? createFaultEnvelope(mapper, requestEnvelope)
+                                : createResponseEnvelope(requestEnvelope);
                         transportFactory.getSendTransport(URI.create(requestEnvelope.getResponseAddress())).send(body);
                         responded.complete(null);
                         return CompletableFuture.completedFuture(null);
@@ -190,12 +219,42 @@ public final class InteropTestPeer {
         System.out.flush();
         try {
             responded.get(20, TimeUnit.SECONDS);
-            System.out.println("RESPONDED");
+            System.out.println(sendFault ? "FAULTED" : "RESPONDED");
             System.out.flush();
         } finally {
             receiveTransport.stop();
         }
         System.exit(0);
+    }
+
+    private static byte[] createResponseEnvelope(Envelope<InteropRequest> requestEnvelope) throws Exception {
+        InteropResponse response = new InteropResponse();
+        response.setValue("response-from-java");
+        SendContext responseContext = new SendContext(response, CancellationToken.none);
+        responseContext.setRequestId(requestEnvelope.getRequestId());
+        responseContext.setDestinationAddress(URI.create(requestEnvelope.getResponseAddress()));
+        return responseContext.serialize(new EnvelopeMessageSerializer());
+    }
+
+    private static byte[] createFaultEnvelope(
+            ObjectMapper mapper, Envelope<InteropRequest> requestEnvelope) throws Exception {
+        Fault<InteropRequest> fault = new Fault<>();
+        fault.setMessage(requestEnvelope.getMessage());
+        fault.setFaultId(UUID.randomUUID());
+        fault.setMessageId(requestEnvelope.getMessageId());
+        fault.setSentTime(OffsetDateTime.now());
+        fault.setExceptions(List.of(ExceptionInfo.fromException(
+                new IllegalStateException("java-fault"))));
+
+        Envelope<Fault<InteropRequest>> envelope = new Envelope<>();
+        envelope.setMessageId(UUID.randomUUID());
+        envelope.setRequestId(requestEnvelope.getRequestId());
+        envelope.setDestinationAddress(requestEnvelope.getResponseAddress());
+        envelope.setSentTime(OffsetDateTime.now());
+        envelope.setMessageType(List.of(MessageUrn.forFault(InteropRequest.class)));
+        envelope.setMessage(fault);
+        envelope.setContentType("application/json");
+        return mapper.writeValueAsBytes(envelope);
     }
 
     private static String requiredEnvironment(String name) {

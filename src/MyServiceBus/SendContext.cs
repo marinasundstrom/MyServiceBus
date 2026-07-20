@@ -29,6 +29,7 @@ public class SendContext : BasePipeContext, ISendContext
     public Uri? SourceAddress { get; set; }
     public Uri? DestinationAddress { get; set; }
     public DateTime? ScheduledEnqueueTime { get; set; }
+    internal IReadOnlyList<string> MessageTypeUrns => messageTypes.Select(MessageUrn.For).ToArray();
 
     public async Task<ReadOnlyMemory<byte>> Serialize<T>(T message)
         where T : class
