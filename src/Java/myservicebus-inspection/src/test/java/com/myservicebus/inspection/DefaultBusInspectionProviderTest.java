@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 class DefaultBusInspectionProviderTest {
     static class SubmitOrder {
@@ -39,6 +40,9 @@ class DefaultBusInspectionProviderTest {
         assertEquals(1, snapshot.receiveEndpoints().size());
         assertEquals(1, snapshot.consumers().size());
         assertEquals("submit-order", snapshot.receiveEndpoints().get(0).endpointName());
+        assertEquals("queue:submit-order", snapshot.receiveEndpoints().get(0).address());
+        assertNull(snapshot.receiveEndpoints().get(0).transport());
+        assertNull(snapshot.consumers().get(0).prefetchCount());
         assertNotNull(snapshot.capturedAt());
     }
 }

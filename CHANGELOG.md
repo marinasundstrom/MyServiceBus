@@ -2,6 +2,13 @@
 
 This changelog summarizes the bigger themes in the repository history. It is intentionally thematic rather than exhaustive, and is based on work landed between April 4, 2025 and March 24, 2026.
 
+## Unreleased
+
+### Stable cross-language topology foundation
+
+- Added corresponding versioned topology snapshots for C# and Java with stable identities, logical endpoint addresses, and canonical conformance fixtures.
+- Made inspection consume the normalized topology snapshot and stopped inferring RabbitMQ-specific details that are not supplied by an authoritative transport projection.
+
 ## 2026-03-24 to 2026-03-19
 
 ### Aspire, runtime modernization, and parity cleanup

@@ -19,6 +19,7 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 class DashboardSnapshotFactoryTest {
     @Test
@@ -48,9 +49,9 @@ class DashboardSnapshotFactoryTest {
         var consumer = snapshot.consumers().get(0);
         assertEquals(TestConsumer.class.getName(), consumer.consumerType());
         assertEquals("test-queue", consumer.queueName());
-        assertEquals(8, consumer.prefetchCount());
-        assertEquals(RawJsonMessageSerializer.class.getName(), consumer.serializerType());
-        assertEquals("quorum", consumer.queueArguments().get("x-queue-type"));
+        assertNull(consumer.prefetchCount());
+        assertNull(consumer.serializerType());
+        assertEquals(Map.of(), consumer.queueArguments());
         assertEquals(1, consumer.bindings().size());
         assertEquals(MessageUrn.forClass(TestMessage.class), consumer.bindings().get(0).messageUrn());
     }

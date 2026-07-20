@@ -67,6 +67,8 @@ The initial C# and Java query entry points are `IBusTopology.GetSnapshot()` and 
 
 The mutable registries retain corresponding `ReceiveEndpointDefinition` records as the source of normalized durability and temporary intent. Consumer registration currently creates the durable, non-temporary service-endpoint definition supported by both reference runtimes. Additional public endpoint-intent configuration must not be exposed until both transport contracts can validate and honor it.
 
+The C# and Java inspection adapters consume this snapshot rather than rebuilding topology from mutable registration state. Their endpoint addresses are therefore logical addresses. Transport inspection data remains absent until a transport supplies an authoritative projection; inspection must not invent exchange types, routing keys, durability, or error-queue conventions from the bus address.
+
 ## Evolution
 
 New portable node kinds and fields are additive and versioned. Unknown extension data must be ignorable. Removing or changing the meaning of a stable field requires an explicit model-version decision.

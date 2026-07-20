@@ -42,9 +42,9 @@ public class TestAppDashboardTests
         var consumer = snapshot.Consumers[0];
         consumer.ConsumerType.ShouldBe(typeof(TestConsumer).FullName);
         consumer.QueueName.ShouldBe("test-queue");
-        consumer.PrefetchCount.ShouldBe(8);
-        consumer.SerializerType.ShouldBe(typeof(RawJsonMessageSerializer).FullName);
-        consumer.QueueArguments["x-queue-type"].ShouldBe("quorum");
+        consumer.PrefetchCount.ShouldBeNull();
+        consumer.SerializerType.ShouldBeNull();
+        consumer.QueueArguments.ShouldBeEmpty();
         consumer.Bindings.Count.ShouldBe(1);
         consumer.Bindings[0].MessageUrn.ShouldBe(MessageUrn.For(typeof(TestMessage)));
     }
