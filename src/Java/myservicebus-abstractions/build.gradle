@@ -1,4 +1,5 @@
 dependencies {
     api project(':myservicebus-di')
     api project(':myservicebus-tasks')
+    api "com.fasterxml.jackson.core:jackson-databind:${jacksonVersion}"
 }

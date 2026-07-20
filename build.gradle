@@ -46,15 +46,8 @@ subprojects {
     }
 
     dependencies {
-        api "javax.inject:javax.inject:${javaxInjectVersion}"
         compileOnly "org.projectlombok:lombok:${lombokVersion}"
         annotationProcessor "org.projectlombok:lombok:${lombokVersion}"
-        implementation "com.fasterxml.jackson.core:jackson-databind:${jacksonVersion}"
-        implementation "com.fasterxml.jackson.datatype:jackson-datatype-jsr310:${jacksonVersion}"
-        implementation "com.rabbitmq:amqp-client:${rabbitmqVersion}"
-        implementation "com.google.inject:guice:${guiceVersion}"
-        implementation "org.slf4j:slf4j-api:${slf4jVersion}"
-        implementation "io.opentelemetry:opentelemetry-api:${opentelemetryVersion}"
         testImplementation "org.junit.jupiter:junit-jupiter:${junitVersion}"
         testImplementation "org.mockito:mockito-core:${mockitoVersion}"
         testImplementation "io.opentelemetry:opentelemetry-sdk:${opentelemetryVersion}"
