@@ -6,14 +6,18 @@ import com.myservicebus.Envelope;
 import com.myservicebus.ExceptionInfo;
 import com.myservicebus.Fault;
 import com.myservicebus.MessageUrn;
+import com.myservicebus.MessageBus;
+import com.myservicebus.MessageBusImpl;
 import com.myservicebus.ReceiveTransport;
 import com.myservicebus.SendContext;
 import com.myservicebus.SendTransport;
 import com.myservicebus.RequestFaultException;
 import com.myservicebus.logging.LoggerFactoryBuilder;
+import com.myservicebus.di.ServiceCollection;
 import com.myservicebus.rabbitmq.ConnectionProvider;
 import com.myservicebus.rabbitmq.RabbitMqFactoryConfigurator;
 import com.myservicebus.rabbitmq.RabbitMqRequestClientTransport;
+import com.myservicebus.rabbitmq.RabbitMqTransport;
 import com.myservicebus.rabbitmq.RabbitMqTransportFactory;
 import com.myservicebus.serialization.EnvelopeMessageSerializer;
 import com.myservicebus.tasks.CancellationToken;
@@ -27,6 +31,7 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public final class InteropTestPeer {
     private InteropTestPeer() {
@@ -35,7 +40,7 @@ public final class InteropTestPeer {
     public static void main(String[] args) throws Exception {
         if (args.length != 5) {
             throw new IllegalArgumentException(
-                    "Expected: <consume|produce|request|request-fault|respond|fault> <exchange> <queue> <value> <durable-exchange>");
+                    "Expected: <consume|consume-unrecognized|consume-fault|produce|request|request-fault|respond|fault> <exchange> <queue> <value> <durable-exchange>");
         }
 
         String host = requiredEnvironment("RABBITMQ_HOST");
@@ -48,6 +53,10 @@ public final class InteropTestPeer {
 
         if ("consume".equals(args[0])) {
             consume(transportFactory, args[1], args[2], args[3]);
+        } else if ("consume-unrecognized".equals(args[0])) {
+            consumeUnrecognized(transportFactory, args[1], args[2]);
+        } else if ("consume-fault".equals(args[0])) {
+            consumeFault(host, port, username, password, args[1], args[2]);
         } else if ("produce".equals(args[0])) {
             produce(transportFactory, args[1], args[3], Boolean.parseBoolean(args[4]));
         } else if ("request".equals(args[0])) {
@@ -61,6 +70,71 @@ public final class InteropTestPeer {
         } else {
             throw new IllegalArgumentException("Unknown mode: " + args[0]);
         }
+    }
+
+    private static void consumeUnrecognized(
+            RabbitMqTransportFactory transportFactory, String exchangeName, String queueName) throws Exception {
+        MessageBinding binding = new MessageBinding();
+        binding.setMessageType(InteropRequest.class);
+        binding.setEntityName(exchangeName);
+        ReceiveTransport receiveTransport = transportFactory.createReceiveTransport(
+                queueName,
+                List.of(binding),
+                transportMessage -> CompletableFuture.failedFuture(
+                        new IllegalStateException("An unrecognized message must not reach the handler.")),
+                ignored -> false,
+                1);
+
+        receiveTransport.start();
+        System.out.println("READY");
+        System.out.flush();
+        try {
+            Thread.sleep(TimeUnit.SECONDS.toMillis(30));
+        } finally {
+            receiveTransport.stop();
+        }
+    }
+
+    private static void consumeFault(
+            String host, int port, String username, String password, String exchangeName, String queueName)
+            throws Exception {
+        RabbitMqFactoryConfigurator rabbit = new RabbitMqFactoryConfigurator();
+        rabbit.host(host, port, credentials -> {
+            credentials.username(username);
+            credentials.password(password);
+        });
+        ServiceCollection services = ServiceCollection.create();
+        MessageBus bus = MessageBusImpl.configure(services, registration -> RabbitMqTransport.configure(registration, rabbit));
+        AtomicInteger attempts = new AtomicInteger();
+        CompletableFuture<Void> exhausted = new CompletableFuture<>();
+        ((MessageBusImpl) bus).addHandler(
+                queueName,
+                CrossLanguageMessage.class,
+                exchangeName,
+                context -> {
+                    if (attempts.incrementAndGet() == 3) {
+                        exhausted.complete(null);
+                    }
+                    return CompletableFuture.failedFuture(new IllegalStateException("retry-exhausted"));
+                },
+                2,
+                null,
+                1,
+                null,
+                null);
+
+        bus.start();
+        System.out.println("READY");
+        System.out.flush();
+        try {
+            exhausted.get(20, TimeUnit.SECONDS);
+            System.out.println("EXHAUSTED");
+            System.out.flush();
+            Thread.sleep(TimeUnit.SECONDS.toMillis(3));
+        } finally {
+            bus.stop();
+        }
+        System.exit(0);
     }
 
     private static ConnectionProvider createConnectionProvider(

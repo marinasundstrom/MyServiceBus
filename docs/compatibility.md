@@ -158,8 +158,8 @@ The repository currently has the following executable foundation:
 | MassTransit request → MyServiceBus response | Verified with C# | Verified with Java | Correlated request/response verified through RabbitMQ |
 | MyServiceBus request → MassTransit fault | Verified from C# | Verified from Java | Correlated fault response verified through RabbitMQ |
 | MassTransit request → MyServiceBus fault | Verified with C# | Verified with Java | Correlated fault response verified through RabbitMQ |
-| MassTransit message → MyServiceBus `_skipped` | Verified with C# | Not yet verified with Java | Unknown message is preserved and remains consumable as a MassTransit envelope |
-| Retry exhaustion → MyServiceBus `_error` | Verified with C# | Not yet verified with Java | `Immediate(2)` performs three total attempts before preserving the message in `_error` |
+| MassTransit message → MyServiceBus `_skipped` | Verified with C# | Verified with Java | Unknown message is preserved and remains consumable as a MassTransit envelope |
+| Retry exhaustion → MyServiceBus `_error` | Verified with C# | Verified with Java | `Immediate(2)` performs three total attempts before preserving the message in `_error` |
 
 The shared versioned fixtures live under `test/fixtures/protocol/v1`. They are canonical inputs for MyServiceBus protocol tests, but they do not become evidence of MassTransit interoperability until the corresponding MassTransit scenarios pass.
 
@@ -167,7 +167,7 @@ RabbitMQ transport integration tests use a pinned RabbitMQ image through Testcon
 
 The cross-language tests are opt-in during ordinary local test runs because they start both runtimes. CI runs them in a dedicated interoperability job. Set `RUN_CROSS_LANGUAGE_TESTS=1` to execute them locally.
 
-The current RabbitMQ baseline uses RabbitMQ `4.1-alpine` and MassTransit `8.5.1`. Verification covers compatible envelope publication, consumption, correlated request/response, and correlated fault responses in each direction for both reference clients. The C# runtime additionally verifies retry exhaustion plus `_error` and `_skipped` delivery. Equivalent Java terminal-delivery scenarios remain required before the complete immediate target can be labeled verified.
+The current RabbitMQ baseline uses RabbitMQ `4.1-alpine` and MassTransit `8.5.1`. Verification covers compatible envelope publication, consumption, correlated request/response, correlated fault responses, retry exhaustion, and MassTransit-readable `_error` and `_skipped` delivery for both reference clients.
 
 ## Compatibility Status Labels
 

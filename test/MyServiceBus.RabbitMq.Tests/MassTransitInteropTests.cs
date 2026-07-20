@@ -619,6 +619,87 @@ public class MassTransitInteropTests
         }
     }
 
+    [CrossLanguageFact]
+    public async Task MassTransit_message_is_moved_to_Java_MyServiceBus_skipped_queue_when_unrecognized()
+    {
+        await using var container = new RabbitMqBuilder("rabbitmq:4.1-alpine").Build();
+        await container.StartAsync();
+
+        var skipped = new TaskCompletionSource<CrossLanguageMessage>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var exchangeName = MyServiceBus.EntityNameFormatter.Format(typeof(CrossLanguageMessage));
+        var queueName = $"masstransit-to-java-skipped-{Guid.NewGuid():N}";
+        using var javaPeer = JavaInteropPeer.Start(
+            container, "consume-unrecognized", exchangeName, queueName, "unused", durableExchange: true);
+        await JavaInteropPeer.WaitForOutput(javaPeer, "READY", TimeSpan.FromMinutes(2));
+
+        var bus = MassTransit.Bus.Factory.CreateUsingRabbitMq(configurator =>
+        {
+            configurator.Host(new Uri(container.GetConnectionString()));
+            configurator.ReceiveEndpoint($"{queueName}_skipped", endpoint =>
+            {
+                endpoint.ConfigureConsumeTopology = false;
+                endpoint.Consumer(() => new MassTransitConsumer(skipped));
+            });
+        });
+
+        await bus.StartAsync();
+        try
+        {
+            await bus.Publish(new CrossLanguageMessage { Value = "skipped-by-java" });
+            var message = await skipped.Task.WaitAsync(TimeSpan.FromSeconds(20));
+            Assert.Equal("skipped-by-java", message.Value);
+        }
+        finally
+        {
+            if (!javaPeer.HasExited)
+                javaPeer.Kill(entireProcessTree: true);
+            await bus.StopAsync();
+        }
+    }
+
+    [CrossLanguageFact]
+    public async Task MassTransit_message_is_retried_then_moved_to_Java_MyServiceBus_error_queue()
+    {
+        await using var container = new RabbitMqBuilder("rabbitmq:4.1-alpine").Build();
+        await container.StartAsync();
+
+        var error = new TaskCompletionSource<CrossLanguageMessage>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var exchangeName = MyServiceBus.EntityNameFormatter.Format(typeof(CrossLanguageMessage));
+        var queueName = $"masstransit-to-java-error-{Guid.NewGuid():N}";
+        using var javaPeer = JavaInteropPeer.Start(
+            container, "consume-fault", exchangeName, queueName, "unused", durableExchange: true);
+        await JavaInteropPeer.WaitForOutput(javaPeer, "READY", TimeSpan.FromMinutes(2));
+
+        var bus = MassTransit.Bus.Factory.CreateUsingRabbitMq(configurator =>
+        {
+            configurator.Host(new Uri(container.GetConnectionString()));
+            configurator.ReceiveEndpoint($"{queueName}_error", endpoint =>
+            {
+                endpoint.ConfigureConsumeTopology = false;
+                endpoint.Consumer(() => new MassTransitConsumer(error));
+            });
+        });
+
+        await bus.StartAsync();
+        try
+        {
+            await bus.Publish(new CrossLanguageMessage { Value = "error-from-java" });
+            var message = await error.Task.WaitAsync(TimeSpan.FromSeconds(20));
+            Assert.Equal("error-from-java", message.Value);
+            await JavaInteropPeer.WaitForOutput(javaPeer, "EXHAUSTED", TimeSpan.FromSeconds(20));
+            await JavaInteropPeer.WaitForExit(javaPeer, TimeSpan.FromSeconds(10));
+            Assert.Equal(0, javaPeer.ExitCode);
+        }
+        finally
+        {
+            if (!javaPeer.HasExited)
+                javaPeer.Kill(entireProcessTree: true);
+            await bus.StopAsync();
+        }
+    }
+
     private static RabbitMqTransportFactory CreateTransportFactory(RabbitMqContainer container)
     {
         var connectionFactory = new ConnectionFactory
