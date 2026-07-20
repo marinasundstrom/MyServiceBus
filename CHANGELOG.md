@@ -25,6 +25,7 @@ This changelog summarizes the bigger themes in the repository history. It is int
 ### MVP packaging
 
 - Defined the four supported .NET artifacts as explicit `0.1.0-preview.1` NuGet packages with repository, license, description, readme, and symbol metadata; all non-package projects are excluded by default.
+- Defined seven foundational Java modules as `0.1.0-preview.1` Maven publications with source, Javadoc, license, project, developer, and source-control metadata; preview inspection and sample applications remain unpublished.
 
 ## 2026-03-24 to 2026-03-19
 

@@ -1,6 +1,16 @@
 
 group = 'com.myservicebus'
-version = '1.0-SNAPSHOT'
+version = '0.1.0-preview.1'
+
+def publishedProjectDescriptions = [
+    'myservicebus-abstractions': 'Portable messaging contracts and abstractions for MyServiceBus.',
+    'myservicebus-di'           : 'Dependency injection abstractions for MyServiceBus.',
+    'myservicebus-logging'      : 'Logging abstractions and adapters for MyServiceBus.',
+    'myservicebus-tasks'        : 'Asynchronous task abstractions for MyServiceBus.',
+    'myservicebus'              : 'Idiomatic Java messaging runtime with MassTransit-compatible concepts and wire conventions.',
+    'myservicebus-rabbitmq'     : 'RabbitMQ transport for MyServiceBus.',
+    'myservicebus-testing'      : 'In-memory test harness and testing utilities for MyServiceBus.'
+]
 
 ext {
     lombokVersion = '1.18.34'
@@ -55,5 +65,64 @@ subprojects {
 
     tasks.withType(Test) {
         useJUnitPlatform()
+    }
+}
+
+configure(subprojects.findAll { publishedProjectDescriptions.containsKey(it.name) }) {
+    apply plugin: 'maven-publish'
+
+    description = publishedProjectDescriptions[name]
+
+    java {
+        withSourcesJar()
+        withJavadocJar()
+    }
+
+    tasks.withType(Javadoc).configureEach {
+        options.addStringOption('Xdoclint:none', '-quiet')
+        options.encoding = 'UTF-8'
+    }
+
+    tasks.withType(Jar).configureEach {
+        from(rootProject.file('LICENSE')) {
+            into 'META-INF'
+        }
+    }
+
+    publishing {
+        publications {
+            mavenJava(MavenPublication) {
+                from components.java
+
+                pom {
+                    name = project.name
+                    description = project.description
+                    url = 'https://github.com/marinasundstrom/MyServiceBus'
+                    licenses {
+                        license {
+                            name = 'MIT License'
+                            url = 'https://opensource.org/licenses/MIT'
+                            distribution = 'repo'
+                        }
+                    }
+                    developers {
+                        developer {
+                            name = 'Marina Sundström'
+                        }
+                    }
+                    scm {
+                        connection = 'scm:git:git://github.com/marinasundstrom/MyServiceBus.git'
+                        developerConnection = 'scm:git:ssh://github.com/marinasundstrom/MyServiceBus.git'
+                        url = 'https://github.com/marinasundstrom/MyServiceBus'
+                    }
+                }
+            }
+        }
+        repositories {
+            maven {
+                name = 'staging'
+                url = layout.buildDirectory.dir('repository')
+            }
+        }
     }
 }
