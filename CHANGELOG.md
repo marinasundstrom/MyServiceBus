@@ -42,6 +42,7 @@ This changelog summarizes the bigger themes in the repository history. It is int
 - Added matching immutable pipeline and filter descriptors for validation and future inspection without exposing runtime middleware objects.
 - Corrected Java publish filters to use `PublishContext` and verified matching publish-then-send-then-transport ordering in both clients.
 - Verified matching mediator consume-filter wrapping and downstream-only retry re-entry in C# and Java.
+- Verified matching mediator retry-exhaustion attempt counts, filter observations, and terminal failure propagation.
 
 ## 2026-03-24 to 2026-03-19
 

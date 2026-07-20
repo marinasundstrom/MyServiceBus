@@ -15,6 +15,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import javax.inject.Inject;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -46,6 +47,17 @@ public class MediatorTransportFactoryTest {
             return attempts == 1
                     ? CompletableFuture.failedFuture(new IllegalStateException("retry"))
                     : CompletableFuture.completedFuture(null);
+        }
+    }
+
+    public static class FailingConsumer implements Consumer<TestMessage> {
+        static int attempts;
+        static List<String> calls = new ArrayList<>();
+
+        @Override
+        public CompletableFuture<Void> consume(ConsumeContext<TestMessage> context) {
+            calls.add("consumer:" + ++attempts);
+            return CompletableFuture.failedFuture(new IllegalStateException("exhausted"));
         }
     }
 
@@ -198,6 +210,38 @@ public class MediatorTransportFactoryTest {
                         "inner:after",
                         "outer:after"),
                 RetryingConsumer.calls);
+    }
+
+    @Test
+    public void retryExhaustionPropagatesTerminalFailureThroughUpstreamFiltersOnce() {
+        FailingConsumer.attempts = 0;
+        FailingConsumer.calls = new ArrayList<>();
+        ServiceCollection services = ServiceCollection.create();
+        MediatorBus bus = MediatorBus.configure(services, cfg ->
+                cfg.addConsumer(FailingConsumer.class, TestMessage.class, pipe -> {
+                    pipe.useFilter(new RecordingConsumeFilter("outer", FailingConsumer.calls));
+                    pipe.useMessageRetry(retry -> retry.immediate(1));
+                    pipe.useFilter(new RecordingConsumeFilter("inner", FailingConsumer.calls));
+                }));
+
+        CompletionException exception = Assertions.assertThrows(
+                CompletionException.class,
+                () -> bus.publish(new TestMessage("fail")));
+
+        Assertions.assertInstanceOf(IllegalStateException.class, exception.getCause());
+        Assertions.assertEquals("exhausted", exception.getCause().getMessage());
+        Assertions.assertEquals(2, FailingConsumer.attempts);
+        Assertions.assertEquals(
+                List.of(
+                        "outer:before",
+                        "inner:before",
+                        "consumer:1",
+                        "inner:fault",
+                        "inner:before",
+                        "consumer:2",
+                        "inner:fault",
+                        "outer:fault"),
+                FailingConsumer.calls);
     }
 
     @Test
