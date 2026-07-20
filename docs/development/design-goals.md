@@ -14,6 +14,7 @@
 - **Alignment Before Stability**: While the protocol is still being aligned, MassTransit-compatible wire behavior takes precedence over preserving earlier incompatible MyServiceBus behavior. Stabilization and backward-compatibility commitments must be explicit future decisions.
 - **Idiomatic and Approachable Clients**: Each client should feel native to its platform and expose a clear default path. Shared internal abstractions must not make ordinary users adopt a framework or understand infrastructure they do not need to customize.
 - **No Mechanical Translation**: C# namespaces, project boundaries, inheritance models, overloads, and language features do not prescribe Java packages or class structure, and Java conventions do not prescribe C#. Alignment is required at the conceptual and behavioral boundaries, not through one-to-one source translation.
+- **Queryable Topology as a Foundation**: Model messages, endpoints, consumers, and bindings with corresponding, idiomatic C# and Java APIs. Runtime provisioning, inspection, and future dashboards must project from this model instead of independently inferring topology.
 
 See the [design philosophy](design-philosophy.md) for how these goals shape cross-platform APIs and configuration.
 See the [architecture](../myservicebus-architecture.md) and [roadmap](../roadmap.md) for the intended system boundaries and delivery sequence.

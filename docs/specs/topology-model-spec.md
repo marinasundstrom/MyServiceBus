@@ -1,0 +1,74 @@
+# Topology Model Specification
+
+## Purpose
+
+MyServiceBus exposes topology as a first-class, queryable model shared by its language clients. The model is the authoritative description of configured messaging intent: contracts, receive endpoints, consumers, and their bindings. Runtime transport adapters project that intent into broker entities, while inspection and future dashboards query the same model instead of reconstructing topology from transport conventions.
+
+The C# and Java APIs should use recognizable counterpart concepts and types wherever natural. Their syntax, collection types, mutability patterns, builders, packages, and lifecycle integration remain idiomatic to each platform.
+
+## Stability Boundary
+
+The topology model is part of the stable foundation required before expanding inspection, adding a second transport, or implementing higher-level features such as sagas and outbox behavior.
+
+Stability applies to:
+
+- the meaning and identity of topology nodes
+- relationships between contracts, endpoints, consumers, and bindings
+- language-neutral snapshot fields and serialization
+- deterministic query results after configuration is complete
+- additive extension rules for transport- and feature-specific data
+
+Stability does not require exposing mutable runtime implementation objects, configuration callbacks, delegates, serializers, broker clients, or dependency-injection registrations.
+
+## Portable Model
+
+The normalized model contains these corresponding concepts:
+
+| Concept | Required portable data |
+| --- | --- |
+| Bus topology | model version, messages, receive endpoints, consumers, bindings |
+| Message topology | stable contract identity, message URN, entity name, implemented contract identities |
+| Receive endpoint topology | stable endpoint identity, endpoint name, address, durability intent, temporary intent, bindings, attached consumers |
+| Consumer topology | stable consumer identity, consumer type identity, endpoint identity, consumed contract identities |
+| Message binding | endpoint identity, contract identity, entity name, binding kind |
+
+Type objects such as .NET `Type` and Java `Class<?>` may remain available in language-native configuration APIs, but language-neutral queries use stable string identities and message URNs. Callback/delegate fields are runtime configuration and are never part of the normalized snapshot.
+
+## Model and Transport Projection
+
+Portable endpoint intent must not contain fields that only make sense for one broker. For example, an endpoint may declare that it is durable or temporary, but `fanout`, routing keys, queue arguments, subscriptions, sessions, partitions, and dead-letter settings belong to a named transport projection.
+
+```mermaid
+flowchart LR
+    Registration["Idiomatic registration APIs"] --> Model["Normalized topology model"]
+    Model --> Runtime["Runtime configuration"]
+    Model --> Query["Read-only topology query API"]
+    Runtime --> Profile["Transport-profile projection"]
+    Profile --> Broker["Broker entities and bindings"]
+    Query --> Inspection["Inspection addon"]
+    Inspection --> Dashboard["Future dashboard"]
+```
+
+Transport details are additive and namespaced by profile. A RabbitMQ projection may describe exchange type and routing key; Azure Service Bus may describe topic, subscription, session, and rule details. Consumers of the portable model must remain useful when those details are absent or unknown.
+
+## API Directive
+
+Each client must provide:
+
+- a read-only bus-topology entry point
+- deterministic enumeration or query of messages, endpoints, consumers, and bindings
+- stable identities suitable for joining nodes without relying on object identity
+- a snapshot boundary so callers do not observe configuration mutating underneath a query
+- corresponding public concepts across C# and Java, with idiomatic naming and collection APIs
+
+The mutable registration registry and the public query model may be separate types. This is preferred when it prevents configuration callbacks or implementation state from leaking into the stable API.
+
+## Evolution
+
+New portable node kinds and fields are additive and versioned. Unknown extension data must be ignorable. Removing or changing the meaning of a stable field requires an explicit model-version decision.
+
+Sagas should extend the model with saga/state-machine identities, consumed and produced contracts, endpoint attachment, and persistence requirements. Outbox support should expose its configured delivery guarantee, scope, and persistence integration without leaking provider objects. New transports add projections and capability data; they do not redefine portable node identity.
+
+## Conformance
+
+C# and Java topology conformance tests must build equivalent configurations and compare canonical language-neutral snapshots. Tests must cover ordering, stable identities, implemented contracts, multiple consumers on one endpoint, transport extensions, and omission of runtime-only callbacks. The same fixtures become inputs for inspection and dashboard tests later.

@@ -27,6 +27,7 @@ Use these rules when accepting roadmap work:
 7. A MassTransit feature is not added solely for feature parity. It must materially improve interoperability, migration, or the focused MyServiceBus user experience.
 8. Prefer a small, coherent portable core over enterprise breadth; specialized patterns stay demand-driven.
 9. Keep shared concepts and useful counterpart types recognizable across clients, but never derive Java packages or APIs mechanically from C# namespaces and language features, or vice versa.
+10. Treat the normalized topology query model as a foundational API. Runtime provisioning, inspection, and dashboards must consume it rather than constructing separate topology interpretations.
 
 ## Phase 1: Protocol Baseline
 
@@ -61,6 +62,21 @@ The precise scope and matrix for this phase are defined in the [Compatibility Po
 **Exit criteria:** RabbitMQ and in-memory adapters describe their capabilities, and invalid feature combinations fail clearly before startup.
 
 **Status:** implemented. Both reference clients expose matching versioned descriptors for RabbitMQ and in-memory transports, validate explicit capability requirements before receive transports start, and route publish, request, temporary, error, and fault address production through transport profiles. The transport specification and new-transport checklist distinguish durable bus transports, event streams, hosting adapters, and application integrations.
+
+## Fundamentals Stability Gate
+
+**Outcome:** higher-level features build on conforming, queryable, and intentionally versioned fundamentals.
+
+- Define the normalized topology model and corresponding idiomatic C# and Java query APIs.
+- Separate mutable registration state and runtime callbacks from stable topology snapshots.
+- Add canonical cross-language topology fixtures and conformance tests.
+- Replace RabbitMQ-shaped portable receive-topology fields with endpoint intent plus transport projections.
+- Define stability and evolution rules for protocol, topology, transport capabilities, lifecycle, and failure semantics.
+- Validate the extension model against prospective saga, outbox, and second-transport requirements without implementing those features prematurely.
+
+**Exit criteria:** equivalent C# and Java configurations produce the same canonical topology snapshot; RabbitMQ provisioning consumes a profile projection of that model; inspection can query it without inventing broker defaults; and the foundational compatibility contracts have an explicit versioning policy.
+
+The [Topology Model Specification](specs/topology-model-spec.md) defines the target boundary. This gate precedes expansion of inspection, dashboard, saga, outbox, and additional transport work.
 
 ## Phase 3: Inspection and Monitoring APIs
 
@@ -157,11 +173,13 @@ The following work remains demand-driven and is not automatically part of the po
 
 The next coherent investment is:
 
-1. define transport-specific validation for endpoint topology and settlement options
-2. replace RabbitMQ-shaped receive topology fields in the portable core with profile-neutral endpoint intent
-3. stabilize the inspection addon contracts without expanding the control plane
-4. build focused monitoring state and event records
-5. validate those APIs through a read-only dashboard prototype
-6. select the second durable broker only after demonstrated demand and capability-model validation
+1. implement matching read-only topology query APIs and canonical snapshots in C# and Java
+2. separate registration callbacks from stable topology facts
+3. define transport-specific validation and project profile-neutral endpoint intent into RabbitMQ topology
+4. prove that the model can extend to saga, outbox, and second-transport requirements
+5. stabilize the inspection addon against that model without expanding the control plane
+6. build focused monitoring state and event records
+7. validate those APIs through a read-only dashboard prototype
+8. select the second durable broker only after demonstrated demand and capability-model validation
 
 This sequence preserves current momentum while reducing the architectural risk of adding transports, languages, or dashboard behavior too early.

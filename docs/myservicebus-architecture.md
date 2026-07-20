@@ -19,6 +19,7 @@ Compatibility supports coexistence, incremental adoption, and migration. It is n
 - **Integration abstractions stay small and owned.** The portable core avoids selecting a framework-specific DI or logging stack; optional adapters connect it to the ecosystems applications already use.
 - **Transports declare capabilities.** The core does not assume every broker supports queues, fan-out, scheduling, ordering, replay, and dead-lettering in the same way.
 - **Operational tooling is optional.** Inspection, monitoring, and dashboard packages observe the runtime through stable APIs without becoming dependencies of message delivery.
+- **Topology is modeled once.** Registration, runtime provisioning, inspection, and future dashboards share a normalized topology model instead of deriving competing views from broker-specific assumptions.
 - **The specification, fixtures, and conformance suite are the cross-language source of truth.** No single client implementation defines the protocol by accident.
 
 ## Layered Architecture
@@ -66,7 +67,7 @@ flowchart TB
     Protocol --> Memory
 ```
 
-The portable semantic layer owns application-visible behavior. A transport adapter owns addressing, topology, settlement, native headers, delivery constraints, and connection management. The envelope is portable; broker topology is not.
+The portable semantic layer owns application-visible behavior and normalized topology intent. A transport adapter owns address realization, broker topology projection, settlement, native headers, delivery constraints, and connection management. Portable topology identity is shared; broker entity shape is profile-specific.
 
 ## Compatibility Model
 
@@ -194,6 +195,8 @@ flowchart LR
 ```
 
 Inspection describes configured endpoints, consumers, contracts, instances, versions, and capabilities. Monitoring describes activity observed by MyServiceBus, including retries, faults, skipped messages, and error moves. Broker depth and broker-native health belong to optional broker-specific metrics adapters, not the core inspection contract.
+
+Inspection must consume the stable topology query API. It must not infer endpoint durability, exchange types, addresses, or terminal destinations from a broker scheme or naming suffix. The normalized model and transport projection are defined in the [Topology Model Specification](specs/topology-model-spec.md).
 
 The initial dashboard is observational. Replay, purge, topology mutation, or remote configuration require a later control-plane design with authentication, authorization, audit records, and explicit safety boundaries.
 

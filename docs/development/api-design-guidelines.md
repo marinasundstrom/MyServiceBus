@@ -24,6 +24,8 @@ For every shared public concept, reviews should answer:
 3. Does each API feel native to its platform?
 4. Is any structural or behavioral difference intentional and documented?
 
+Topology APIs receive the same treatment. `BusTopology`, message topology, receive endpoint topology, consumer topology, and message bindings should be recognizable counterparts, but their builders, immutable views, collection interfaces, and package placement should follow each platform. Stable query APIs expose normalized facts and identities; configuration delegates, callbacks, and transport implementation objects remain outside the query model. See the [Topology Model Specification](../specs/topology-model-spec.md).
+
 ## Java Integration Abstractions
 
 Java has no single dependency-injection or logging abstraction that is appropriate for every framework. The portable runtime therefore keeps small MyServiceBus-owned DI and logging contracts so its core behavior does not depend on Spring, Jakarta CDI, Guice, Micronaut, Quarkus, or a particular logging facade.
