@@ -13,6 +13,7 @@ public sealed class RabbitMqTransportFactory : ITransportFactory
     private readonly ConcurrentDictionary<string, ISendTransport> _sendTransports = new();
     private readonly ConcurrentDictionary<string, ISendTransport> _queueTransports = new();
     private readonly ushort _prefetchCount;
+    private readonly Uri _baseAddress;
 
     public TransportCapabilityDescriptor Capabilities => TransportCapabilityDescriptors.RabbitMq;
 
@@ -20,7 +21,13 @@ public sealed class RabbitMqTransportFactory : ITransportFactory
     {
         _connectionProvider = connectionProvider;
         _prefetchCount = configurator.PrefetchCount;
+        _baseAddress = new UriBuilder("rabbitmq", configurator.ClientHost, configurator.ClientPort).Uri;
     }
+
+    public Uri GetPublishAddress(string entityName) => new(_baseAddress, $"exchange/{entityName}");
+
+    public Uri GetTemporaryEndpointAddress(string endpointName) =>
+        new(_baseAddress, $"exchange/{endpointName}?durable=false&autodelete=true");
 
     public async Task<ISendTransport> GetSendTransport(Uri address, CancellationToken cancellationToken = default)
     {

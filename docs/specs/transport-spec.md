@@ -90,6 +90,7 @@ RabbitMQ, Azure Service Bus, SQS/SNS, and other profiles are independent conform
 ## Responsibilities
 
 - Provide a factory that resolves send and receive transports and manages underlying connections.
+- Produce profile-correct publish and temporary-endpoint addresses. Portable request clients must obtain destination and response addresses from the transport rather than construct broker-specific URIs.
 - Ensure required topology exists before sending or receiving messages when topology provisioning is supported and enabled.
 - Serialize and transmit envelopes with `content_type` defaulting to `application/vnd.masstransit+json` so they are compatible with MassTransit. Transports may also send raw JSON with `content_type=application/json` when a raw serializer is explicitly selected. Receive paths must continue to support envelope messages by default and may dispatch raw `application/json` messages for endpoints that are explicitly configured for raw consumption.
 - Map headers prefixed with `_` to native transport properties.
@@ -101,6 +102,12 @@ RabbitMQ, Azure Service Bus, SQS/SNS, and other profiles are independent conform
 - Sends encoded envelopes to a destination address using the same semantics as MassTransit's send transport.
 - Honors headers, correlation, and response/fault addresses.
 - May be reused concurrently and must be thread safe.
+
+## Address Production
+
+The transport factory owns address production because URI authority, virtual-host representation, entity paths, and temporary-endpoint parameters belong to the transport profile. The portable core supplies only the logical entity name.
+
+For RabbitMQ, generated envelope addresses use the configured host and port instead of assuming `localhost`. The in-memory transport uses the `loopback` scheme. Custom transports should override the factory defaults whenever their addresses must be externally routable or appear in interoperable envelopes.
 
 ## Receive Transport
 

@@ -77,10 +77,10 @@ public sealed class GenericRequestClient<TRequest> : IRequestClient<TRequest>, I
 
         await responseReceiveTransport.Start(cancellationToken);
 
-        var requestAddress = _destinationAddress ?? new Uri($"rabbitmq://localhost/exchange/{EntityNameFormatter.Format(request.GetType())}");
+        var requestAddress = _destinationAddress ?? _transportFactory.GetPublishAddress(EntityNameFormatter.Format(request.GetType()));
         var requestSendTransport = await _transportFactory.GetSendTransport(requestAddress, cancellationToken);
 
-        var responseAddress = new Uri($"rabbitmq://localhost/exchange/{responseExchange}?durable=false&autodelete=true");
+        var responseAddress = _transportFactory.GetTemporaryEndpointAddress(responseExchange);
         var sendContext = _sendContextFactory.Create(MessageTypeCache.GetMessageTypes(typeof(TRequest)), _serializer, cancellationToken);
         sendContext.ResponseAddress = responseAddress;
         sendContext.FaultAddress = responseAddress;
@@ -165,10 +165,10 @@ public sealed class GenericRequestClient<TRequest> : IRequestClient<TRequest>, I
 
         await responseReceiveTransport.Start(cancellationToken);
 
-        var requestAddress = _destinationAddress ?? new Uri($"rabbitmq://localhost/exchange/{EntityNameFormatter.Format(request.GetType())}");
+        var requestAddress = _destinationAddress ?? _transportFactory.GetPublishAddress(EntityNameFormatter.Format(request.GetType()));
         var requestSendTransport = await _transportFactory.GetSendTransport(requestAddress, cancellationToken);
 
-        var responseAddress = new Uri($"rabbitmq://localhost/exchange/{responseExchange}?durable=false&autodelete=true");
+        var responseAddress = _transportFactory.GetTemporaryEndpointAddress(responseExchange);
         var sendContext = _sendContextFactory.Create(MessageTypeCache.GetMessageTypes(typeof(TRequest)), _serializer, cancellationToken);
         sendContext.ResponseAddress = responseAddress;
         sendContext.FaultAddress = responseAddress;

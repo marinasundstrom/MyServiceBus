@@ -30,6 +30,24 @@ public class RabbitMqTransportFactoryTests
         public void SetPrefetchCount(ushort prefetchCount) => PrefetchCount = prefetchCount;
         public void SetConsumerFactory(Type consumerFactoryType) { }
     }
+
+    [Fact]
+    public void Builds_profile_addresses_from_the_configured_host()
+    {
+        var connectionFactory = Substitute.For<IConnectionFactory>();
+        var configurator = Substitute.For<IRabbitMqFactoryConfigurator>();
+        configurator.ClientHost.Returns("broker.example");
+        configurator.ClientPort.Returns(5678);
+        var factory = new RabbitMqTransportFactory(new ConnectionProvider(connectionFactory), configurator);
+
+        Assert.Equal(
+            new Uri("rabbitmq://broker.example:5678/exchange/orders"),
+            factory.GetPublishAddress("orders"));
+        Assert.Equal(
+            new Uri("rabbitmq://broker.example:5678/exchange/reply?durable=false&autodelete=true"),
+            factory.GetTemporaryEndpointAddress("reply"));
+    }
+
     [Fact]
     public async Task Declares_error_exchange_and_queue()
     {

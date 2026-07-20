@@ -14,6 +14,12 @@ public class MediatorTransportFactory : ITransportFactory
 
     public TransportCapabilityDescriptor Capabilities => TransportCapabilityDescriptors.InMemory;
 
+    public Uri GetPublishAddress(string entityName) =>
+        new($"loopback://localhost/exchange/{entityName}");
+
+    public Uri GetTemporaryEndpointAddress(string endpointName) =>
+        new($"loopback://localhost/exchange/{endpointName}?durable=false&autodelete=true");
+
     public Task<ISendTransport> GetSendTransport(Uri address, CancellationToken cancellationToken = default)
     {
         var exchange = ExtractExchange(address);

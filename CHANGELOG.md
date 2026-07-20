@@ -109,3 +109,4 @@ Keep this file updated for significant changes. Prefer adding dated entries that
 - Added live RabbitMQ conformance coverage for C# and Java retry exhaustion and MassTransit-readable `_error` and `_skipped` queue delivery.
 - Introduced matching versioned transport capability descriptors for C# and Java, with RabbitMQ and in-memory profiles using `native`, `emulated`, and `unsupported` classifications.
 - Added opt-in startup capability requirements in both clients, including the ability to require native support and clear failures before receive transports start.
+- Moved publish and temporary response address production behind transport factories, removing hard-coded RabbitMQ addresses from the C# request client and configured-host assumptions from Java RabbitMQ envelopes.

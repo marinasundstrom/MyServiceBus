@@ -177,11 +177,11 @@ public class RabbitMqTransportFactory implements TransportFactory {
 
     @Override
     public String getPublishAddress(String exchange) {
-        return "rabbitmq://localhost/exchange/" + exchange;
+        return connectionProvider.getPublishAddress(exchange);
     }
 
     @Override
     public String getSendAddress(String queue) {
-        return "rabbitmq://localhost/" + queue;
+        return connectionProvider.getSendAddress(queue);
     }
 }

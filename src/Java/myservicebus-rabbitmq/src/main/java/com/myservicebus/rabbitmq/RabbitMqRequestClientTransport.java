@@ -1,6 +1,7 @@
 package com.myservicebus.rabbitmq;
 
 import java.time.OffsetDateTime;
+import java.net.URI;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -48,7 +49,7 @@ public class RabbitMqRequestClientTransport implements RequestClientTransport {
             String responseQueue = channel.queueDeclare().getQueue();
             channel.exchangeDeclare(responseExchange, BuiltinExchangeType.FANOUT, false, true, null);
             channel.queueBind(responseQueue, responseExchange, "");
-            String address = "rabbitmq://localhost/exchange/" + responseExchange
+            String address = connectionProvider.getPublishAddress(responseExchange)
                     + "?durable=false&autodelete=true";
 
             DeliverCallback callback = (tag, delivery) -> {
@@ -80,7 +81,8 @@ public class RabbitMqRequestClientTransport implements RequestClientTransport {
             channel.basicConsume(responseQueue, true, callback, consumerTag -> {
             });
 
-            String exchange = EntityNameFormatter.format(requestType);
+            String destinationAddress = requestAddress(requestType, context);
+            String exchange = exchangeName(destinationAddress);
             channel.exchangeDeclare(exchange, BuiltinExchangeType.FANOUT, true);
 
             Envelope<TRequest> envelope = new Envelope<>();
@@ -88,7 +90,7 @@ public class RabbitMqRequestClientTransport implements RequestClientTransport {
             envelope.setRequestId(UUID.randomUUID());
             envelope.setConversationId(UUID.randomUUID());
             envelope.setSentTime(OffsetDateTime.now());
-            envelope.setDestinationAddress("rabbitmq://localhost/exchange/" + exchange);
+            envelope.setDestinationAddress(destinationAddress);
             envelope.setResponseAddress(address);
             envelope.setFaultAddress(address);
             envelope.setMessageType(List.of(MessageUrn.forClass(requestType)));
@@ -123,7 +125,7 @@ public class RabbitMqRequestClientTransport implements RequestClientTransport {
             String responseQueue = channel.queueDeclare().getQueue();
             channel.exchangeDeclare(responseExchange, BuiltinExchangeType.FANOUT, false, true, null);
             channel.queueBind(responseQueue, responseExchange, "");
-            String address = "rabbitmq://localhost/exchange/" + responseExchange
+            String address = connectionProvider.getPublishAddress(responseExchange)
                     + "?durable=false&autodelete=true";
 
             DeliverCallback callback = (tag, delivery) -> {
@@ -159,7 +161,8 @@ public class RabbitMqRequestClientTransport implements RequestClientTransport {
             channel.basicConsume(responseQueue, true, callback, consumerTag -> {
             });
 
-            String exchange = EntityNameFormatter.format(requestType);
+            String destinationAddress = requestAddress(requestType, context);
+            String exchange = exchangeName(destinationAddress);
             channel.exchangeDeclare(exchange, BuiltinExchangeType.FANOUT, true);
 
             Envelope<TRequest> envelope = new Envelope<>();
@@ -167,7 +170,7 @@ public class RabbitMqRequestClientTransport implements RequestClientTransport {
             envelope.setRequestId(UUID.randomUUID());
             envelope.setConversationId(UUID.randomUUID());
             envelope.setSentTime(OffsetDateTime.now());
-            envelope.setDestinationAddress("rabbitmq://localhost/exchange/" + exchange);
+            envelope.setDestinationAddress(destinationAddress);
             envelope.setResponseAddress(address);
             envelope.setFaultAddress(address);
             envelope.setMessageType(List.of(MessageUrn.forClass(requestType)));
@@ -196,5 +199,26 @@ public class RabbitMqRequestClientTransport implements RequestClientTransport {
 
     private static String faultUrn(Class<?> requestType) {
         return MessageUrn.forFault(requestType);
+    }
+
+    private String requestAddress(Class<?> requestType, SendContext context) {
+        return context.getDestinationAddress() != null
+                ? context.getDestinationAddress().toString()
+                : connectionProvider.getPublishAddress(EntityNameFormatter.format(requestType));
+    }
+
+    private static String exchangeName(String address) {
+        URI uri = URI.create(address);
+        if ("exchange".equalsIgnoreCase(uri.getScheme())) {
+            return uri.getSchemeSpecificPart().split("\\?", 2)[0];
+        }
+
+        String path = uri.getPath();
+        String prefix = "/exchange/";
+        if (path != null && path.startsWith(prefix) && path.length() > prefix.length()) {
+            return path.substring(prefix.length());
+        }
+
+        throw new IllegalArgumentException("RabbitMQ request destination must identify an exchange: " + address);
     }
 }
