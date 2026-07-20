@@ -9,6 +9,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
 
 import com.myservicebus.di.ServiceProvider;
@@ -50,7 +51,7 @@ public class InMemoryTestHarness implements RequestClientTransport, TransportSen
     }
 
     public <T> void registerHandler(Class<T> type, com.myservicebus.Consumer<T> consumer) {
-        handlers.computeIfAbsent(type, k -> new ArrayList<>()).add(consumer);
+        handlers.computeIfAbsent(type, k -> new CopyOnWriteArrayList<>()).add(consumer);
     }
 
     public <T> CompletableFuture<Void> send(T message) {
@@ -246,7 +247,9 @@ public class InMemoryTestHarness implements RequestClientTransport, TransportSen
     }
 
     public List<Object> getConsumed() {
-        return consumed;
+        synchronized (consumed) {
+            return List.copyOf(consumed);
+        }
     }
 
     @Override
