@@ -11,11 +11,30 @@ public class PipeTests
 {
     class TestContext : BasePipeContext
     {
-        public TestContext() : base(CancellationToken.None)
+        public TestContext(CancellationToken cancellationToken = default) : base(cancellationToken)
         {
         }
 
         public IList<string> Calls { get; } = new List<string>();
+    }
+
+    sealed class RecordingFilter(string name) : IFilter<TestContext>
+    {
+        public async Task Send(TestContext context, IPipe<TestContext> next)
+        {
+            context.Calls.Add($"{name}:before");
+            await next.Send(context);
+            context.Calls.Add($"{name}:after");
+        }
+    }
+
+    sealed class ShortCircuitFilter : IFilter<TestContext>
+    {
+        public Task Send(TestContext context, IPipe<TestContext> next)
+        {
+            context.Calls.Add("stopped");
+            return Task.CompletedTask;
+        }
     }
 
     [Fact]
@@ -38,6 +57,115 @@ public class PipeTests
         await pipe.Send(context);
 
         Assert.Equal(new[] { "A", "B" }, context.Calls);
+    }
+
+    [Fact]
+    public async Task Filters_wrap_downstream_in_registration_order()
+    {
+        var configurator = new PipeConfigurator<TestContext>();
+        configurator.UseFilter(new RecordingFilter("outer"));
+        configurator.UseFilter(new RecordingFilter("inner"));
+
+        var context = new TestContext();
+        await configurator.Build().Send(context);
+
+        Assert.Equal(
+            new[] { "outer:before", "inner:before", "inner:after", "outer:after" },
+            context.Calls);
+    }
+
+    [Fact]
+    public async Task Filter_can_short_circuit_downstream_pipeline()
+    {
+        var configurator = new PipeConfigurator<TestContext>();
+        configurator.UseFilter(new ShortCircuitFilter());
+        configurator.UseExecute(context =>
+        {
+            context.Calls.Add("downstream");
+            return Task.CompletedTask;
+        });
+
+        var context = new TestContext();
+        await configurator.Build().Send(context);
+
+        Assert.Equal(new[] { "stopped" }, context.Calls);
+    }
+
+    [Fact]
+    public async Task Exception_stops_pipeline_and_propagates_unchanged()
+    {
+        var expected = new InvalidOperationException("failed");
+        var configurator = new PipeConfigurator<TestContext>();
+        configurator.UseExecute(_ => Task.FromException(expected));
+        configurator.UseExecute(context =>
+        {
+            context.Calls.Add("downstream");
+            return Task.CompletedTask;
+        });
+
+        var context = new TestContext();
+        var actual = await Assert.ThrowsAsync<InvalidOperationException>(() => configurator.Build().Send(context));
+
+        Assert.Same(expected, actual);
+        Assert.Empty(context.Calls);
+    }
+
+    [Fact]
+    public async Task Filters_observe_the_pipeline_cancellation_token()
+    {
+        using var source = new CancellationTokenSource();
+        source.Cancel();
+        var configurator = new PipeConfigurator<TestContext>();
+        configurator.UseExecute(context =>
+        {
+            Assert.Equal(source.Token, context.CancellationToken);
+            Assert.True(context.CancellationToken.IsCancellationRequested);
+            return Task.CompletedTask;
+        });
+
+        await configurator.Build().Send(new TestContext(source.Token));
+    }
+
+    [Fact]
+    public void Describes_filter_order_lifetime_and_configuration_without_instances()
+    {
+        var configurator = new PipeConfigurator<TestContext>();
+        configurator.UseExecute(_ => Task.CompletedTask);
+        configurator.UseRetry(2, TimeSpan.FromMilliseconds(25));
+        configurator.UseScopedFilter<ShortCircuitFilter>();
+
+        var descriptor = configurator.GetDescriptor();
+
+        Assert.Equal(PipelineDescriptor.CurrentVersion, descriptor.Version);
+        Assert.Collection(
+            descriptor.Filters,
+            filter =>
+            {
+                Assert.Equal(0, filter.Order);
+                Assert.Equal("execute", filter.Kind);
+                Assert.Null(filter.Implementation);
+                Assert.Equal(FilterLifetime.Instance, filter.Lifetime);
+            },
+            filter =>
+            {
+                Assert.Equal(1, filter.Order);
+                Assert.Equal("retry", filter.Kind);
+                Assert.Equal(FilterLifetime.Pipe, filter.Lifetime);
+                Assert.Equal("2", filter.Configuration["retryCount"]);
+                Assert.Equal("25", filter.Configuration["delayMilliseconds"]);
+            },
+            filter =>
+            {
+                Assert.Equal(2, filter.Order);
+                Assert.Equal("filter", filter.Kind);
+                Assert.EndsWith(nameof(ShortCircuitFilter), filter.Implementation);
+                Assert.Equal(FilterLifetime.Scoped, filter.Lifetime);
+            });
+
+        Assert.Throws<NotSupportedException>(() =>
+            ((IList<FilterDescriptor>)descriptor.Filters).Add(descriptor.Filters[0]));
+        Assert.Throws<NotSupportedException>(() =>
+            ((IDictionary<string, string>)descriptor.Filters[1].Configuration).Add("changed", "true"));
     }
 
     [Fact]
@@ -103,4 +231,3 @@ public class PipeTests
         Assert.Equal(new[] { "done" }, context.Calls);
     }
 }
-

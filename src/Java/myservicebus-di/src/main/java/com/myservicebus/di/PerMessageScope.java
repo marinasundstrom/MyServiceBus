@@ -21,15 +21,16 @@ public class PerMessageScope implements Scope {
         deque.push(new HashMap<>());
     }
 
-    public void exit() {
+    public Map<Key<?>, Object> exit() {
         Deque<Map<Key<?>, Object>> deque = scopeContext.get();
         if (deque == null || deque.isEmpty()) {
             throw new IllegalStateException("No scope to exit");
         }
-        deque.pop();
+        Map<Key<?>, Object> instances = deque.pop();
         if (deque.isEmpty()) {
             scopeContext.remove();
         }
+        return instances;
     }
 
     @Override

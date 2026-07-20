@@ -4,6 +4,7 @@ import com.myservicebus.ConsumeContext;
 import com.myservicebus.Filter;
 import com.myservicebus.MessageUrn;
 import com.myservicebus.Pipe;
+import com.myservicebus.PublishContext;
 import com.myservicebus.SendContext;
 
 import java.net.URI;
@@ -13,7 +14,7 @@ public final class DashboardMetricsFilters {
     private DashboardMetricsFilters() {
     }
 
-    public static final class PublishMetricsFilter implements Filter<SendContext> {
+    public static final class PublishMetricsFilter implements Filter<PublishContext> {
         private final DashboardState state;
 
         public PublishMetricsFilter(DashboardState state) {
@@ -21,7 +22,7 @@ public final class DashboardMetricsFilters {
         }
 
         @Override
-        public CompletableFuture<Void> send(SendContext context, Pipe<SendContext> next) {
+        public CompletableFuture<Void> send(PublishContext context, Pipe<PublishContext> next) {
             URI destination = context.getDestinationAddress();
             state.recordPublished(
                     destination == null ? null : DashboardSnapshotFactory.resolveMessageTypeFromDestination(destination),

@@ -821,6 +821,7 @@ builder.Services.AddServiceBus(x =>
         cfg.UseMessageRetry(r => r.Immediate(3));
         cfg.UseFilter(new LoggingFilter<SubmitOrder>());
         cfg.UseFilter<LoggingFilter<SubmitOrder>>();
+        cfg.UseScopedFilter<LoggingFilter<SubmitOrder>>();
         cfg.UseExecute(ctx =>
         {
             Console.WriteLine($"Processing {ctx.Message}");
@@ -844,6 +845,7 @@ services.from(MessageBusServices.class)
                 c.useMessageRetry(r -> r.immediate(3));
                 c.useFilter(new LoggingFilter<>());
                 c.useFilter(LoggingFilter.class);
+                c.useScopedFilter(LoggingFilter.class);
                 c.useExecute(ctx -> {
                     System.out.println("Processing " + ctx.getMessage());
                     return CompletableFuture.completedFuture(null);

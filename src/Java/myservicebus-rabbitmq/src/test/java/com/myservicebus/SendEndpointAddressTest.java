@@ -15,6 +15,7 @@ import com.myservicebus.SendPipe;
 import com.myservicebus.PublishPipe;
 import com.myservicebus.PipeConfigurator;
 import com.myservicebus.SendContext;
+import com.myservicebus.PublishContext;
 import com.myservicebus.SendEndpoint;
 import com.myservicebus.SendEndpointProvider;
 import com.myservicebus.TransportSendEndpointProvider;
@@ -35,7 +36,7 @@ class SendEndpointAddressTest {
 
         ServiceCollection services = ServiceCollection.create();
         services.addSingleton(SendPipe.class, sp -> () -> new SendPipe(new PipeConfigurator<SendContext>().build()));
-        services.addSingleton(PublishPipe.class, sp -> () -> new PublishPipe(new PipeConfigurator<SendContext>().build()));
+        services.addSingleton(PublishPipe.class, sp -> () -> new PublishPipe(new PipeConfigurator<PublishContext>().build()));
         services.addSingleton(ConsumeContextProvider.class, sp -> () -> new ConsumeContextProvider());
         services.addSingleton(TransportSendEndpointProvider.class, sp -> () -> new TransportSendEndpointProvider() {
             @Override
