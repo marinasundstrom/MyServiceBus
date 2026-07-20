@@ -288,7 +288,7 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
     private String getPublishAddress(String entityName) {
         return transportFactory != null
                 ? transportFactory.getPublishAddress(entityName)
-                : address.resolve("exchange/" + entityName).toString();
+                : "exchange:" + entityName;
     }
 
     private static Type resolveMessageType(Class<?> consumerType, Class<?> bindingType) {

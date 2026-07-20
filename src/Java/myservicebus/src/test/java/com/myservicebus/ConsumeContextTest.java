@@ -157,7 +157,7 @@ public class ConsumeContextTest {
         ctx.publish(new FakeMessage()).join();
 
         Assertions.assertEquals(URI.create("rabbitmq://localhost/"), captured.get().getSourceAddress());
-        Assertions.assertEquals(URI.create("rabbitmq://localhost/exchange/TestApp:FakeMessage"), captured.get().getDestinationAddress());
+        Assertions.assertEquals(URI.create("exchange:TestApp:FakeMessage"), captured.get().getDestinationAddress());
     }
 
     @Test

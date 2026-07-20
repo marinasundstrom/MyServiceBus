@@ -95,6 +95,13 @@ public class RabbitMqTransportFactory implements TransportFactory {
 
     @Override
     public SendTransport getSendTransport(URI address) {
+        if ("exchange".equalsIgnoreCase(address.getScheme())) {
+            return getSendTransport(address.getSchemeSpecificPart(), true, false);
+        }
+        if ("queue".equalsIgnoreCase(address.getScheme())) {
+            return getQueueTransport(address.getSchemeSpecificPart(), true, false);
+        }
+
         String path = address.getPath();
         boolean temporary = queryFlag(address, "temporary");
         boolean durable = !temporary && !queryFlag(address, "durable", false);

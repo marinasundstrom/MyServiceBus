@@ -113,3 +113,4 @@ Keep this file updated for significant changes. Prefer adding dated entries that
 - Routed bus-level and consume-context publication through transport-provided address producers in both clients, keeping broker URI structure out of portable publish behavior.
 - Defined cross-language conceptual parity as recognizable counterpart abstractions with idiomatic platform APIs and code organization, explicitly rejecting mechanical namespace/package and source translation.
 - Moved error and fault address production behind corresponding C# and Java transport-factory methods, eliminating portable-core and RabbitMQ receive-path assumptions about broker hostnames.
+- Replaced Java convenience-context RabbitMQ path inference with transport-neutral logical addresses and added matching logical `exchange:`/`queue:` resolution to the Java RabbitMQ adapter.

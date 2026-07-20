@@ -58,7 +58,7 @@ public class ConsumeContext<T>
     public ConsumeContext(T message, Map<String, Object> headers, String responseAddress, String faultAddress,
             String errorAddress, CancellationToken cancellationToken, SendEndpointProvider provider, URI busAddress) {
         this(message, headers, responseAddress, faultAddress, errorAddress, cancellationToken, provider, busAddress,
-                entityName -> busAddress.resolve("exchange/" + entityName).toString());
+                entityName -> "exchange:" + entityName);
     }
 
     public ConsumeContext(T message, Map<String, Object> headers, String responseAddress, String faultAddress,

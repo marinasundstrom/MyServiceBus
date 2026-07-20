@@ -109,6 +109,8 @@ The transport factory owns address production because URI authority, virtual-hos
 
 For RabbitMQ, generated envelope addresses use the configured host and port instead of assuming `localhost`. The in-memory transport uses the `loopback` scheme. Custom transports should override the factory defaults whenever their addresses must be externally routable or appear in interoperable envelopes.
 
+Portable contexts that are constructed without a transport profile may use logical `exchange:<name>` and `queue:<name>` addresses. A transport may resolve these logical forms for local API convenience, but transport-created runtime contexts must use the profile's externally meaningful addresses in serialized envelopes.
+
 ## Receive Transport
 
 - Connects to an address and feeds messages into the consume pipeline.
