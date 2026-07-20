@@ -33,6 +33,8 @@ This changelog summarizes the bigger themes in the repository history. It is int
 
 - Defined broker-backed, basic MassTransit replacement scenarios as the stable product scope; positioned mediator as deliberately local execution and explicitly kept multiple hosted buses outside the supported application model.
 - Made cross-language mediator and in-memory harness stability the first implementation priority before additional broker transports.
+- Fixed Java mediator publication to resolve scoped endpoint services inside an active message scope and enabled its consumer and handler delivery tests to match the existing C# scenarios.
+- Preserved Java consume-context routing in scoped send-endpoint providers across asynchronous consumer continuations.
 
 ## 2026-03-24 to 2026-03-19
 

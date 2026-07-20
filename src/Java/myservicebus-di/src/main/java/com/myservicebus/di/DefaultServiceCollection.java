@@ -144,7 +144,7 @@ public class DefaultServiceCollection implements ServiceCollection {
         List<ServiceDescriptor> effective = new ArrayList<>(descriptors);
 
         List<com.google.inject.Module> modules = new ArrayList<>();
-        List<ServiceDescriptor> deferred = new ArrayList<>();
+        ServiceProvider factoryServiceProvider = forwardingProvider(holder);
 
         modules.add(new AbstractModule() {
             @Override
@@ -156,7 +156,7 @@ public class DefaultServiceCollection implements ServiceCollection {
 
         for (ServiceDescriptor d : effective) {
             if (d.getImplementationFactory() != null) {
-                deferred.add(d);
+                modules.add(createDeferredModule(d, factoryServiceProvider));
             } else {
                 modules.add(createModule(d));
             }
@@ -174,15 +174,6 @@ public class DefaultServiceCollection implements ServiceCollection {
         ServiceProviderImpl provider = new ServiceProviderImpl(injector, perMessageScope);
         holder.set(provider);
 
-        if (!deferred.isEmpty()) {
-            List<com.google.inject.Module> deferredModules = new ArrayList<>();
-            for (ServiceDescriptor d : deferred) {
-                deferredModules.add(createDeferredModule(d, holder.get()));
-            }
-            injector = injector.createChildInjector(deferredModules);
-            provider.setInjector(injector);
-        }
-
         return provider;
     }
 
@@ -197,7 +188,7 @@ public class DefaultServiceCollection implements ServiceCollection {
         List<ServiceDescriptor> effective = new ArrayList<>(descriptors);
 
         List<com.google.inject.Module> modules = new ArrayList<>();
-        List<ServiceDescriptor> deferred = new ArrayList<>();
+        ServiceProvider factoryServiceProvider = forwardingProvider(holder);
 
         modules.add(new AbstractModule() {
             @Override
@@ -209,7 +200,7 @@ public class DefaultServiceCollection implements ServiceCollection {
 
         for (ServiceDescriptor d : effective) {
             if (d.getImplementationFactory() != null) {
-                deferred.add(d);
+                modules.add(createDeferredModule(d, factoryServiceProvider));
             } else {
                 modules.add(createModule(d));
             }
@@ -227,16 +218,34 @@ public class DefaultServiceCollection implements ServiceCollection {
         ServiceProviderImpl provider = new ServiceProviderImpl(injector, perMessageScope);
         holder.set(provider);
 
-        if (!deferred.isEmpty()) {
-            List<com.google.inject.Module> deferredModules = new ArrayList<>();
-            for (ServiceDescriptor d : deferred) {
-                deferredModules.add(createDeferredModule(d, holder.get()));
-            }
-            injector = injector.createChildInjector(deferredModules);
-            provider.setInjector(injector);
-        }
-
         return provider;
+    }
+
+    private static ServiceProvider forwardingProvider(MutableHolder<ServiceProvider> holder) {
+        return new ServiceProvider() {
+            private ServiceProvider current() {
+                ServiceProvider provider = holder.get();
+                if (provider == null) {
+                    throw new IllegalStateException("Service provider is not available during container construction.");
+                }
+                return provider;
+            }
+
+            @Override
+            public <T> T getService(Class<T> type) {
+                return current().getService(type);
+            }
+
+            @Override
+            public <T> java.util.Set<T> getServices(Class<T> iface) {
+                return current().getServices(iface);
+            }
+
+            @Override
+            public ServiceScope createScope() {
+                return current().createScope();
+            }
+        };
     }
 
     private boolean contains(Class<?> serviceType) {
