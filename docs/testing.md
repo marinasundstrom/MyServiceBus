@@ -2,6 +2,33 @@
 
 MyServiceBus ships with an **in-memory test harness** for both the C# and Java clients. The harnesses share the same design so tests exercise the bus without requiring a running transport.
 
+## Protocol Conformance Fixtures
+
+Versioned fixtures under `test/fixtures/protocol/v1` define canonical message, request, and fault envelopes. Both the C# and Java suites load the same files and validate that their public envelope and fault models interpret portable metadata consistently.
+
+Add a new fixture when wire behavior changes intentionally. Do not edit an existing protocol version in a way that invalidates released clients; introduce a new fixture version instead.
+
+## RabbitMQ Integration Tests
+
+RabbitMQ transport tests use Testcontainers to start a disposable broker. Docker or another Testcontainers-compatible container runtime must be available.
+
+The tests:
+
+- pin the RabbitMQ image version
+- use dynamically mapped ports
+- create unique exchanges and queues
+- exercise the real send and receive transports
+- stop the receive transport and remove the container after completion
+
+Run the complete suites from the repository root:
+
+```bash
+dotnet test
+gradle test
+```
+
+The first container-backed run may be slower while the RabbitMQ image is downloaded.
+
 ## Goals
 - Mirror MassTransit's `InMemoryTestHarness` so existing users feel at home.
 - Keep the C# and Java harness implementations aligned, ensuring features and default behavior remain consistent across languages.

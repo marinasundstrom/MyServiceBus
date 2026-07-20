@@ -1,0 +1,21 @@
+{
+  "protocolVersion": "1",
+  "contentType": "application/vnd.masstransit+json",
+  "fixtures": [
+    {
+      "name": "message",
+      "file": "message-envelope.json",
+      "kind": "message"
+    },
+    {
+      "name": "request",
+      "file": "request-envelope.json",
+      "kind": "request"
+    },
+    {
+      "name": "fault",
+      "file": "fault-envelope.json",
+      "kind": "fault"
+    }
+  ]
+}

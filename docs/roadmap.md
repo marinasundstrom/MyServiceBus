@@ -32,6 +32,7 @@ Use these rules when accepting roadmap work:
 - Create canonical JSON fixtures for envelopes, headers, message URNs, requests, responses, and faults.
 - Create C#↔Java interoperability tests for publish, send, request/response, retries, and terminal faults.
 - Add MyServiceBus↔MassTransit RabbitMQ scenarios in both directions.
+- Run RabbitMQ integration and interoperability scenarios against disposable Testcontainers brokers with dynamically mapped ports.
 - Record tested MassTransit versions and intentional differences in a compatibility matrix.
 - Update the public specification so implementations are validated against it rather than inferred from one client.
 
@@ -148,7 +149,7 @@ The following work remains demand-driven and is not automatically part of the po
 The next coherent investment is:
 
 1. finish the inspection addon work already in progress
-2. establish protocol fixtures and the C#↔Java interoperability matrix
+2. extend the protocol fixtures into the C#↔Java and MassTransit RabbitMQ interoperability matrix
 3. introduce the transport capability descriptor
 4. build monitoring state and event records
 5. validate those APIs through a read-only dashboard prototype

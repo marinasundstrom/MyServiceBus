@@ -1,3 +1,4 @@
 dependencies {
     api project(':myservicebus')
+    testImplementation "org.testcontainers:testcontainers-rabbitmq:${testcontainersVersion}"
 }
