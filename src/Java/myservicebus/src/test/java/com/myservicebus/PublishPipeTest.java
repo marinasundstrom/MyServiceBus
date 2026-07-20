@@ -12,11 +12,11 @@ import com.myservicebus.tasks.CancellationToken;
 class PublishPipeTest {
     @Test
     void publish_filter_invoked() {
-        PipeConfigurator<SendContext> cfg = new PipeConfigurator<>();
+        PipeConfigurator<PublishContext> cfg = new PipeConfigurator<>();
         AtomicBoolean called = new AtomicBoolean(false);
         cfg.useExecute(ctx -> { called.set(true); return CompletableFuture.completedFuture(null); });
         PublishPipe publishPipe = new PublishPipe(cfg.build());
-        SendContext context = new SendContext("hi", CancellationToken.none);
+        PublishContext context = new PublishContext("hi", CancellationToken.none);
         publishPipe.send(context).join();
         assertTrue(called.get());
     }

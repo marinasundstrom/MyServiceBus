@@ -34,6 +34,8 @@ All clients must implement these rules:
 
 The portable model recognizes send, publish, and consume pipelines. Filters may be applicable to every operation of a context kind or to a specific message type where the client API supports that distinction. Equivalent client APIs must produce the same observable ordering and message outcome.
 
+Publish executes its publish pipeline to completion before entering the send pipeline used by the resolved transport endpoint. The transport is invoked only after both application pipelines complete successfully. C# and Java use distinct `PublishContext` and `SendContext` filter types for these stages.
+
 Transport-internal pipelines may add connection, topology, serialization, settlement, or acknowledgement stages. Those stages are transport capabilities and are not automatically part of the portable application-filter API.
 
 ## Failure and retry

@@ -1,12 +1,12 @@
 package com.myservicebus;
 
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.net.URI;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.ArrayList;
 import java.util.function.Function;
 
 import org.junit.jupiter.api.Test;
@@ -21,18 +21,17 @@ import com.myservicebus.serialization.MessageSerializer;
 class ServiceBusPublishFilterTest {
     @Test
     void publish_executes_send_and_publish_filters() throws Exception {
-        AtomicBoolean sendCalled = new AtomicBoolean(false);
-        AtomicBoolean publishCalled = new AtomicBoolean(false);
+        List<String> calls = new ArrayList<>();
 
         PipeConfigurator<SendContext> sendCfg = new PipeConfigurator<>();
-        sendCfg.useExecute(ctx -> {
-            sendCalled.set(true);
-            return CompletableFuture.completedFuture(null);
+        sendCfg.useFilter((context, next) -> {
+            calls.add("send:before");
+            return next.send(context).thenRun(() -> calls.add("send:after"));
         });
-        PipeConfigurator<SendContext> publishCfg = new PipeConfigurator<>();
-        publishCfg.useExecute(ctx -> {
-            publishCalled.set(true);
-            return CompletableFuture.completedFuture(null);
+        PipeConfigurator<PublishContext> publishCfg = new PipeConfigurator<>();
+        publishCfg.useFilter((context, next) -> {
+            calls.add("publish:before");
+            return next.send(context).thenRun(() -> calls.add("publish:after"));
         });
 
         ServiceCollection services = ServiceCollection.create();
@@ -49,7 +48,8 @@ class ServiceBusPublishFilterTest {
                 return new SendEndpoint() {
                     @Override
                     public CompletableFuture<Void> send(SendContext ctx) {
-                        return sp.getService(SendPipe.class).send(ctx);
+                        return sp.getService(SendPipe.class).send(ctx)
+                                .thenRun(() -> calls.add("transport"));
                     }
 
                     @Override
@@ -97,7 +97,8 @@ class ServiceBusPublishFilterTest {
 
         bus.publish("hi");
 
-        assertTrue(sendCalled.get());
-        assertTrue(publishCalled.get());
+        assertEquals(
+                List.of("publish:before", "publish:after", "send:before", "send:after", "transport"),
+                calls);
     }
 }

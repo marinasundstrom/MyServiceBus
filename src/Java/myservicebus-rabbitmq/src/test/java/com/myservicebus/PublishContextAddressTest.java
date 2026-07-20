@@ -27,7 +27,7 @@ class PublishContextAddressTest {
 
         ServiceCollection services = ServiceCollection.create();
         services.addSingleton(SendPipe.class, sp -> () -> new SendPipe(new PipeConfigurator<SendContext>().build()));
-        services.addSingleton(PublishPipe.class, sp -> () -> new PublishPipe(new PipeConfigurator<SendContext>().build()));
+        services.addSingleton(PublishPipe.class, sp -> () -> new PublishPipe(new PipeConfigurator<PublishContext>().build()));
         services.addSingleton(ConsumeContextProvider.class, sp -> () -> new ConsumeContextProvider());
         services.addSingleton(TransportSendEndpointProvider.class, sp -> () -> new TransportSendEndpointProvider() {
             @Override

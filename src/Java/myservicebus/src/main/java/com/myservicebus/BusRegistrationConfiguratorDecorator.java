@@ -33,7 +33,7 @@ public abstract class BusRegistrationConfiguratorDecorator implements BusRegistr
     }
 
     @Override
-    public void configurePublish(Consumer<PipeConfigurator<SendContext>> configure) {
+    public void configurePublish(Consumer<PipeConfigurator<PublishContext>> configure) {
         inner.configurePublish(configure);
     }
 

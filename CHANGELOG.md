@@ -40,6 +40,7 @@ This changelog summarizes the bigger themes in the repository history. It is int
 - Kept Java consumer scopes alive through asynchronous pipeline completion and deterministically closed scoped services afterward.
 - Added explicit operation-scoped filter registration with constructor injection and asynchronous disposal in both reference clients.
 - Added matching immutable pipeline and filter descriptors for validation and future inspection without exposing runtime middleware objects.
+- Corrected Java publish filters to use `PublishContext` and verified matching publish-then-send-then-transport ordering in both clients.
 
 ## 2026-03-24 to 2026-03-19
 
