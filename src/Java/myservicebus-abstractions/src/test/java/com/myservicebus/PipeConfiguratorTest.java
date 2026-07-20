@@ -5,6 +5,8 @@ import static org.junit.jupiter.api.Assertions.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.jupiter.api.Test;
@@ -245,6 +247,37 @@ class PipeConfiguratorTest {
         pipe.send(ctx).join();
         assertEquals(3, attempts.get());
         assertEquals(List.of("done"), ctx.calls);
+    }
+
+    @Test
+    void retryDelayIsCancelledWithoutStartingAnotherAttempt() {
+        CancellationTokenSource source = new CancellationTokenSource();
+        AtomicInteger attempts = new AtomicInteger();
+        PipeConfigurator<TestContext> configurator = new PipeConfigurator<>();
+        configurator.useRetry(1, java.time.Duration.ofSeconds(5));
+        configurator.useExecute(ctx -> {
+            attempts.incrementAndGet();
+            source.cancel();
+            return CompletableFuture.failedFuture(new IllegalStateException("retry"));
+        });
+
+        CompletableFuture<Void> operation = configurator.build().send(new TestContext(source.getToken()));
+
+        assertThrows(CancellationException.class, () -> operation.orTimeout(1, TimeUnit.SECONDS).join());
+        assertEquals(1, attempts.get());
+    }
+
+    @Test
+    void cancellationRegistrationsCanBeRemovedAndLateRegistrationsRunImmediately() {
+        CancellationTokenSource source = new CancellationTokenSource();
+        AtomicInteger calls = new AtomicInteger();
+        var removed = source.getToken().register(calls::incrementAndGet);
+        removed.close();
+
+        source.cancel();
+        source.getToken().register(calls::incrementAndGet);
+
+        assertEquals(1, calls.get());
     }
 
     @Test
