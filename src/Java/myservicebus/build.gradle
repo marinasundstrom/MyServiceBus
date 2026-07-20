@@ -4,3 +4,11 @@ dependencies {
     api project(':myservicebus-logging')
     api project(':myservicebus-tasks')
 }
+
+sourceSets {
+    test {
+        resources {
+            srcDir "${rootProject.projectDir}/test/fixtures"
+        }
+    }
+}

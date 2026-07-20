@@ -22,6 +22,8 @@ public interface IRegistrationConfigurator
 
     void SetSerializer<TSerializer>() where TSerializer : class, IMessageSerializer;
 
+    void RequireTransportCapability(string capability, bool requireNative = false);
+
     /*
     IConsumerRegistrationConfigurator<T> AddConsumer<T>(Action<IRegistrationContext, IConsumerConfigurator<T>> configure = null)
             where T : class, IConsumer;

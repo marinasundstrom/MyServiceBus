@@ -12,6 +12,8 @@ MyServiceBus aims to become a modern, cross-language messaging runtime that:
 - exposes optional inspection and monitoring APIs for operational tools
 - supports a read-only dashboard before introducing control-plane operations
 
+It is positioned as a focused alternative for teams that do not need a large enterprise service-bus platform. Interoperability with MassTransit enables mixed systems and migration; it does not turn MassTransit's complete feature catalog into the destination of this roadmap.
+
 ## Decision Guardrails
 
 Use these rules when accepting roadmap work:
@@ -22,6 +24,10 @@ Use these rules when accepting roadmap work:
 4. C# and Java changes to shared behavior ship together or create an explicit, temporary parity entry.
 5. Inspection and monitoring remain optional addons. Message delivery must not depend on a dashboard or central registry.
 6. New language clients begin with conformance fixtures and one supported transport profile, not the full accumulated feature set.
+7. A MassTransit feature is not added solely for feature parity. It must materially improve interoperability, migration, or the focused MyServiceBus user experience.
+8. Prefer a small, coherent portable core over enterprise breadth; specialized patterns stay demand-driven.
+9. Keep shared concepts and useful counterpart types recognizable across clients, but never derive Java packages or APIs mechanically from C# namespaces and language features, or vice versa.
+10. Treat the normalized topology query model as a foundational API. Runtime provisioning, inspection, and dashboards must consume it rather than constructing separate topology interpretations.
 
 ## Phase 1: Protocol Baseline
 
@@ -32,10 +38,13 @@ Use these rules when accepting roadmap work:
 - Create canonical JSON fixtures for envelopes, headers, message URNs, requests, responses, and faults.
 - Create C#↔Java interoperability tests for publish, send, request/response, retries, and terminal faults.
 - Add MyServiceBus↔MassTransit RabbitMQ scenarios in both directions.
+- Run RabbitMQ integration and interoperability scenarios against disposable Testcontainers brokers with dynamically mapped ports.
 - Record tested MassTransit versions and intentional differences in a compatibility matrix.
 - Update the public specification so implementations are validated against it rather than inferred from one client.
 
 **Exit criteria:** the reference clients pass the same protocol fixtures and the RabbitMQ interoperability matrix runs repeatably in CI.
+
+**Status:** implemented. The versioned fixtures and Testcontainers matrix cover the documented C#, Java, and MassTransit RabbitMQ baseline. Release claims remain scoped to the pinned versions in the compatibility policy.
 
 The precise scope and matrix for this phase are defined in the [Compatibility Policy](compatibility.md).
 
@@ -51,6 +60,25 @@ The precise scope and matrix for this phase are defined in the [Compatibility Po
 - Decide which stream concepts require distinct producer and endpoint APIs.
 
 **Exit criteria:** RabbitMQ and in-memory adapters describe their capabilities, and invalid feature combinations fail clearly before startup.
+
+**Status:** implemented. Both reference clients expose matching versioned descriptors for RabbitMQ and in-memory transports, validate explicit capability requirements before receive transports start, and route publish, request, temporary, error, and fault address production through transport profiles. The transport specification and new-transport checklist distinguish durable bus transports, event streams, hosting adapters, and application integrations.
+
+## Fundamentals Stability Gate
+
+**Outcome:** higher-level features build on conforming, queryable, and intentionally versioned fundamentals.
+
+- Define the normalized topology model and corresponding idiomatic C# and Java query APIs.
+- Separate mutable registration state and runtime callbacks from stable topology snapshots.
+- Add canonical cross-language topology fixtures and conformance tests.
+- Replace RabbitMQ-shaped portable receive-topology fields with endpoint intent plus transport projections.
+- Define stability and evolution rules for protocol, topology, transport capabilities, lifecycle, and failure semantics.
+- Validate the extension model against prospective saga, outbox, and second-transport requirements without implementing those features prematurely.
+
+**Exit criteria:** equivalent C# and Java configurations produce the same canonical topology snapshot; RabbitMQ provisioning consumes a profile projection of that model; inspection can query it without inventing broker defaults; and the foundational compatibility contracts have an explicit versioning policy.
+
+The [Topology Model Specification](specs/topology-model-spec.md) defines the target boundary. This gate precedes expansion of inspection, dashboard, saga, outbox, and additional transport work.
+
+**Status:** implemented. The normalized query APIs, version 1 canonical fixture, receive-endpoint intent, inspection consumption, synchronized snapshot-version constants, profile-neutral runtime endpoint topology, and named RabbitMQ receive-topology projection are implemented in C# and Java. Legacy transport overloads remain compatibility adapters. The [Topology Extension Model](specs/topology-extension-model.md) validates additive saga and outbox nodes plus a materially different Azure Service Bus projection without prematurely implementing those features.
 
 ## Phase 3: Inspection and Monitoring APIs
 
@@ -114,7 +142,7 @@ Choose the language from concrete adoption needs:
 - Go for infrastructure and operational services
 - Python for data, automation, and AI workloads
 
-Start with the portable core, canonical fixtures, and one transport profile. Generate data contracts or fixtures where useful, but keep concurrency, cancellation, lifecycle, and consumer APIs idiomatic and handwritten.
+Start with the portable core, canonical fixtures, and one transport profile. Map every shared concept to a recognizable platform counterpart, but design packages, modules, concurrency, cancellation, lifecycle, and consumer APIs idiomatically. Generate data contracts or fixtures where useful; do not generate a client by mechanically translating another implementation.
 
 **Exit criteria:** the client passes the same wire and interoperability suites and can be operated through the same introspection model.
 
@@ -147,11 +175,9 @@ The following work remains demand-driven and is not automatically part of the po
 
 The next coherent investment is:
 
-1. finish the inspection addon work already in progress
-2. establish protocol fixtures and the C#↔Java interoperability matrix
-3. introduce the transport capability descriptor
-4. build monitoring state and event records
-5. validate those APIs through a read-only dashboard prototype
-6. select the second durable broker only after the capability foundation is exercised
+1. stabilize the inspection addon DTOs against the completed topology foundation without expanding the control plane
+2. build focused monitoring state and event records
+3. validate those APIs through a read-only dashboard prototype
+4. select the second durable broker only after demonstrated demand and capability-model validation
 
 This sequence preserves current momentum while reducing the architectural risk of adding transports, languages, or dashboard behavior too early.

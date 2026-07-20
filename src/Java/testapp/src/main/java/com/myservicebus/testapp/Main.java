@@ -45,6 +45,7 @@ public class Main {
                 .addInspection();
 
         String rabbitMqHost = System.getenv().getOrDefault("RABBITMQ_HOST", "localhost");
+        int rabbitMqPort = Integer.parseInt(System.getenv().getOrDefault("RABBITMQ_PORT", "5672"));
 
         services.from(MessageBusServices.class)
                 .addServiceBus(c -> {
@@ -59,7 +60,7 @@ public class Main {
                     c.addConsumer(SubmitOrderFaultConsumer.class);
 
                     c.using(RabbitMqFactoryConfigurator.class, (context, cfg) -> {
-                        cfg.host(rabbitMqHost, h -> {
+                        cfg.host(rabbitMqHost, rabbitMqPort, h -> {
                             h.username("guest");
                             h.password("guest");
                         });

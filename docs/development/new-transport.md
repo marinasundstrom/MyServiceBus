@@ -12,12 +12,15 @@ Define its capability descriptor first. For every portable feature, record wheth
 
 ### C#
 - Implement `ITransportFactory`.
+- Expose the transport's `TransportCapabilityDescriptor` through `Capabilities`.
+- Produce publish, temporary endpoint, error, and fault addresses through the factory; portable code must not construct broker paths.
 - Resolve connections (e.g., `ServiceBusClient`) in the constructor.
 - Implement `GetSendTransport` and `CreateReceiveTransport` using asynchronous `Task` methods.
 - Use the fluent configuration pattern via a configuration builder extension similar to `RabbitMqServiceBusConfigurationBuilderExt`.
 
 ### Java
-- Create a `TransportFactory` class analogous to `RabbitMqTransportFactory`.
+- Implement `TransportFactory` in a class analogous to `RabbitMqTransportFactory` and return the descriptor from `getCapabilities()`.
+- Produce publish, send, error, and fault addresses through the factory. Keep Java URI parsing and configuration idiomatic rather than translating the C# implementation mechanically.
 - Manage connections (e.g., `ServiceBusClient`) and maintain a map of `SendTransport` instances.
 - Provide synchronous `getSendTransport` methods and hook into configuration through a `configure` helper.
 
@@ -38,6 +41,8 @@ Define its capability descriptor first. For every portable feature, record wheth
 Both implementations should map MyServiceBus addresses to the transport's constructs.
 - For Azure Service Bus, map exchanges to topics and queues as needed.
 - Ensure exchanges or topics are created if they do not exist.
+- Define externally meaningful address forms for serialized envelope fields and logical `exchange:`/`queue:` resolution where the profile supports those conveniences.
+- Define temporary, error, fault, and unrecognized-message destinations using native entities or documented emulation. RabbitMQ suffixes are profile conventions, not portable names that every broker must reproduce.
 
 ## 4. Registration and Configuration
 
@@ -72,13 +77,13 @@ Understanding the contracts used during configuration helps recreate the structu
 
 - Write unit tests for send and receive operations.
 - Validate error handling and topology creation logic.
-- Update documentation and run all tests (`dotnet test` and `./gradlew test` for the Java project).
+- Update documentation and run all tests (`dotnet test` and `gradle test` from the repository root).
 
 ## Divergence Summary
 
 | Aspect | C# | Java |
 | --- | --- | --- |
-| Factory interface | `ITransportFactory` with async `Task` methods | Custom `TransportFactory` with synchronous methods |
+| Factory interface | `ITransportFactory` with async `Task` methods | `TransportFactory` with synchronous creation methods |
 | Send transport | Implements `ISendTransport` (`Task Send`) | Implements `SendTransport` (`void send`) |
 | Receive transport | Implements `IReceiveTransport` with async callback | Implements `ReceiveTransport` with synchronous supplier |
 | DI/configuration | Extension methods registering services | Static `configure` helpers wiring factories |
@@ -95,9 +100,10 @@ Use this list to verify a new transport aligns with MyServiceBus expectations:
 - **Transport profile** – specify addressing, naming, topology, native headers, settlement, error behavior, and temporary endpoint conventions.
 - **Send and receive transports** – provide concrete `ISendTransport`/`SendTransport` and `IReceiveTransport`/`ReceiveTransport` implementations.
 - **Topology mapping** – create exchanges, topics, and queues as needed and map addresses consistently.
-- **Error handling** – support `_error`, `_fault`, and `_skipped` queues so failed or unknown messages are preserved.
+- **Terminal delivery** – preserve failed and unrecognized messages using the profile's error, fault, dead-letter, or skipped-message model; use `_error`, `_fault`, and `_skipped` only where that profile defines those conventions.
+- **Startup requirements** – test that unsupported and native-only capability requirements fail before receive transports start.
 - **Logging** – emit messages using the standard logging categories.
-- **Testing** – add unit tests, exercise error paths, and run `dotnet test` and `./gradlew test`.
+- **Testing** – add unit tests, exercise error paths, and run `dotnet test` and `gradle test`.
 - **Conformance** – run shared protocol tests, cross-language scenarios, and MassTransit interoperability scenarios when compatibility is claimed.
 - **Documentation** – update README or transport-specific docs with usage and configuration details.
 

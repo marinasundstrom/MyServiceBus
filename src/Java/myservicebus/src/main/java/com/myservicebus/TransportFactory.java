@@ -7,9 +7,26 @@ import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 
 import com.myservicebus.topology.MessageBinding;
+import com.myservicebus.topology.ReceiveEndpointTransportTopology;
 
-public interface TransportFactory {
+public interface TransportFactory extends PublishAddressProvider {
+    default TransportCapabilityDescriptor getCapabilities() {
+        return TransportCapabilityDescriptors.unknown(getClass().getSimpleName());
+    }
+
     SendTransport getSendTransport(URI address);
+
+    default ReceiveTransport createReceiveTransport(ReceiveEndpointTransportTopology topology,
+            Function<TransportMessage, CompletableFuture<Void>> handler,
+            Function<String, Boolean> isMessageTypeRegistered) throws Exception {
+        return createReceiveTransport(
+                topology.name(),
+                topology.bindings(),
+                handler,
+                isMessageTypeRegistered,
+                topology.prefetchCount(),
+                topology.transportOptions());
+    }
 
     default ReceiveTransport createReceiveTransport(String queueName, List<MessageBinding> bindings,
             Function<TransportMessage, CompletableFuture<Void>> handler,
@@ -41,6 +58,14 @@ public interface TransportFactory {
     }
 
     String getPublishAddress(String exchange);
+
+    default String getErrorAddress(String endpointName) {
+        return getPublishAddress(endpointName + "_error");
+    }
+
+    default String getFaultAddress(String endpointName) {
+        return getPublishAddress(endpointName + "_fault");
+    }
 
     String getSendAddress(String queue);
 }

@@ -28,6 +28,17 @@ public class BusFactoryTests
     }
 
     [Fact]
+    public void Factory_configures_non_default_port()
+    {
+        var cfg = new RabbitMqFactoryConfigurator();
+
+        cfg.Host("container-host", 32789);
+
+        Assert.Equal("container-host", cfg.ClientHost);
+        Assert.Equal(32789, cfg.ClientPort);
+    }
+
+    [Fact]
     public void Builder_applies_logger_and_services()
     {
         var loggerFactory = LoggerFactory.Create(b => b.AddConsole());

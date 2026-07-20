@@ -17,11 +17,13 @@ public interface IRabbitMqFactoryConfigurator
     void Message<T>(Action<MessageConfigurator> configure);
     void ReceiveEndpoint(string queueName, Action<ReceiveEndpointConfigurator> configure);
     void Host(string host, Action<IRabbitMqHostConfigurator>? configure = null);
+    void Host(string host, int port, Action<IRabbitMqHostConfigurator>? configure = null);
     void SetEndpointNameFormatter(IEndpointNameFormatter formatter);
     void SetEntityNameFormatter(IMessageEntityNameFormatter formatter);
     IEndpointNameFormatter? EndpointNameFormatter { get; }
     IMessageEntityNameFormatter? EntityNameFormatter { get; }
     string ClientHost { get; }
+    int ClientPort { get; }
     ushort PrefetchCount { get; }
     void SetPrefetchCount(ushort prefetchCount);
     void SetConsumerFactory(Type consumerFactoryType);

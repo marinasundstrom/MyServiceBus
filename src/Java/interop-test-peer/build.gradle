@@ -1,0 +1,11 @@
+plugins {
+    id 'application'
+}
+
+dependencies {
+    implementation project(':myservicebus-rabbitmq')
+}
+
+application {
+    mainClass = 'com.myservicebus.interop.InteropTestPeer'
+}

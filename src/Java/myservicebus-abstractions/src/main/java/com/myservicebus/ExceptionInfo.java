@@ -1,9 +1,11 @@
 package com.myservicebus;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import lombok.Data;
 
 @Data
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class ExceptionInfo {
     @JsonProperty("exceptionType")
     private String exceptionType;

@@ -1,8 +1,9 @@
 # MyServiceBus Design Goals
 
 - **Explicit MassTransit Compatibility**: Preserve wire compatibility and the portable messaging semantics needed for interoperability. Claim transport-profile compatibility only where addressing, topology, and settlement behavior are covered by conformance tests; source compatibility and complete MassTransit feature parity are not goals.
+- **Deliberate Modernization**: Retain MassTransit behavior when it supports protocol interoperability, migration, or a useful shared concept. Legacy edges may be replaced or omitted when they no longer serve those goals, provided the divergence and migration impact are explicit and versioned where necessary.
 - **MassTransit Familiarity in C#**: Developers coming from MassTransit should find the C# client familiar in its design and concepts.
-- **Cross-Language Parity**: Moving between the C# and Java clients should require minimal adjustment; the API and behavior should remain consistent once language-specific design choices are accounted for.
+- **Cross-Language Conceptual Parity**: Moving between the C# and Java clients should require minimal adjustment. Shared concepts should have recognizable counterpart abstractions and, where natural, corresponding public types, while their APIs and code organization follow each platform's conventions.
 - **Aligned Implementations**: The C# and Java codebases, including their test harnesses, should evolve together so that features and behavior stay in sync.
 - **Owned Abstractions**: Present a MassTransit-like surface through a single `IMessageBus` and self-contained envelope, fault, and pipeline contracts so the bus can evolve independently of MassTransit.
 - **Isolated Transports and Runtime Dependencies**: Keep brokers and runtime infrastructure behind pluggable adapters and rely on lightweight DI and logging abstractions so implementations can change without rippling through application code.
@@ -10,6 +11,10 @@
 - **Capability-Aware Transports**: Model transport features as native, emulated, or unsupported so additional brokers and event streams retain their real delivery, ordering, settlement, and replay semantics.
 - **Optional Operations Plane**: Keep inspection, monitoring, and dashboards outside the delivery-critical core and expose them through stable programmatic APIs.
 - **Executable Specification**: Treat shared fixtures, cross-language tests, and transport-profile interoperability tests as the source of truth for every client and adapter.
+- **Alignment Before Stability**: While the protocol is still being aligned, MassTransit-compatible wire behavior takes precedence over preserving earlier incompatible MyServiceBus behavior. Stabilization and backward-compatibility commitments must be explicit future decisions.
+- **Idiomatic and Approachable Clients**: Each client should feel native to its platform and expose a clear default path. Shared internal abstractions must not make ordinary users adopt a framework or understand infrastructure they do not need to customize.
+- **No Mechanical Translation**: C# namespaces, project boundaries, inheritance models, overloads, and language features do not prescribe Java packages or class structure, and Java conventions do not prescribe C#. Alignment is required at the conceptual and behavioral boundaries, not through one-to-one source translation.
+- **Queryable Topology as a Foundation**: Model messages, endpoints, consumers, and bindings with corresponding, idiomatic C# and Java APIs. Runtime provisioning, inspection, and future dashboards must project from this model instead of independently inferring topology.
 
 See the [design philosophy](design-philosophy.md) for how these goals shape cross-platform APIs and configuration.
 See the [architecture](../myservicebus-architecture.md) and [roadmap](../roadmap.md) for the intended system boundaries and delivery sequence.

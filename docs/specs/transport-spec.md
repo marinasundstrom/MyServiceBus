@@ -16,6 +16,63 @@ The descriptor should cover directed send, publish/subscribe, durability, compet
 
 The runtime must validate endpoint and bus configuration against the descriptor before startup. It must not silently replace a requested delivery guarantee with weaker behavior.
 
+Capability descriptors use schema version `1` and the same JSON field names in every client:
+
+```json
+{
+  "version": 1,
+  "transport": "rabbitmq",
+  "capabilities": {
+    "directedSend": "native",
+    "retry": "emulated",
+    "redelivery": "unsupported",
+    "replay": "unsupported"
+  }
+}
+```
+
+Unknown capability names are treated as `unsupported`. This lets newer runtimes add capability keys without older tooling accidentally assuming support.
+
+### Version 1 Capability Names
+
+| Capability | RabbitMQ | In-memory | Meaning |
+| --- | --- | --- | --- |
+| `directedSend` | Native | Emulated | Deliver to a named destination |
+| `publishSubscribe` | Native | Emulated | Fan out published messages to subscribers |
+| `durability` | Native | Unsupported | Preserve broker state and messages across process restarts |
+| `competingConsumers` | Native | Unsupported | Share a destination across consumer instances |
+| `acknowledgement` | Native | Unsupported | Settle delivery explicitly after processing |
+| `requestResponse` | Emulated | Emulated | Compose requests from messages, correlation, and temporary endpoints |
+| `scheduling` | Emulated | Emulated | Schedule through the MyServiceBus job scheduler rather than a transport-native delayed-delivery primitive |
+| `retry` | Emulated | Emulated | Re-invoke the consume pipeline immediately or after an in-process delay |
+| `redelivery` | Unsupported | Unsupported | Release or defer a delivery and receive it again through the transport |
+| `errorDestinations` | Emulated | Emulated | Preserve terminal failures through MyServiceBus-managed destinations |
+| `ordering` | Native | Emulated | Retain transport ordering within its documented scope; concurrency can still affect completion order |
+| `replay` | Unsupported | Unsupported | Re-read retained history from an earlier position |
+| `temporaryEndpoints` | Native | Emulated | Create short-lived response or receive destinations |
+| `topologyProvisioning` | Native | Unsupported | Create broker entities and bindings |
+
+`native` describes a transport or broker primitive. `emulated` describes behavior composed by MyServiceBus and therefore requires its documented limitations to be considered. It does not mean the capability is lower quality for ordinary use.
+
+Applications may declare requirements during bus registration. Startup fails with `UnsupportedTransportCapabilityException` before any receive transport starts when the selected profile cannot satisfy them. By default, native and emulated support are both accepted; use the native flag only when the broker primitive is operationally required.
+
+```csharp
+services.AddServiceBus(x =>
+{
+    x.RequireTransportCapability(TransportCapabilities.Durability, requireNative: true);
+    x.RequireTransportCapability(TransportCapabilities.Retry);
+    x.UsingRabbitMq((context, rabbit) => { });
+});
+```
+
+```java
+MessageBus bus = MessageBusImpl.configure(services, x -> {
+    x.requireTransportCapability(TransportCapabilities.DURABILITY, true);
+    x.requireTransportCapability(TransportCapabilities.RETRY);
+    RabbitMqTransport.configure(x, rabbit);
+});
+```
+
 ## Transport Profiles
 
 A MassTransit-compatible transport profile adds concrete rules to the generic contract:
@@ -33,6 +90,7 @@ RabbitMQ, Azure Service Bus, SQS/SNS, and other profiles are independent conform
 ## Responsibilities
 
 - Provide a factory that resolves send and receive transports and manages underlying connections.
+- Produce profile-correct publish and temporary-endpoint addresses. Portable request clients must obtain destination and response addresses from the transport rather than construct broker-specific URIs.
 - Ensure required topology exists before sending or receiving messages when topology provisioning is supported and enabled.
 - Serialize and transmit envelopes with `content_type` defaulting to `application/vnd.masstransit+json` so they are compatible with MassTransit. Transports may also send raw JSON with `content_type=application/json` when a raw serializer is explicitly selected. Receive paths must continue to support envelope messages by default and may dispatch raw `application/json` messages for endpoints that are explicitly configured for raw consumption.
 - Map headers prefixed with `_` to native transport properties.
@@ -44,6 +102,14 @@ RabbitMQ, Azure Service Bus, SQS/SNS, and other profiles are independent conform
 - Sends encoded envelopes to a destination address using the same semantics as MassTransit's send transport.
 - Honors headers, correlation, and response/fault addresses.
 - May be reused concurrently and must be thread safe.
+
+## Address Production
+
+The transport factory owns address production because URI authority, virtual-host representation, entity paths, and temporary-endpoint parameters belong to the transport profile. The portable core supplies only the logical entity name. This applies equally to bus-level publish, publish from a consume context, request destinations, temporary response endpoints, and terminal error and fault destinations.
+
+For RabbitMQ, generated envelope addresses use the configured host and port instead of assuming `localhost`. The in-memory transport uses the `loopback` scheme. Custom transports should override the factory defaults whenever their addresses must be externally routable or appear in interoperable envelopes.
+
+Portable contexts that are constructed without a transport profile may use logical `exchange:<name>` and `queue:<name>` addresses. A transport may resolve these logical forms for local API convenience, but transport-created runtime contexts must use the profile's externally meaningful addresses in serialized envelopes.
 
 ## Receive Transport
 

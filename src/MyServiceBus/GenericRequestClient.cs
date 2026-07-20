@@ -37,15 +37,12 @@ public sealed class GenericRequestClient<TRequest> : IRequestClient<TRequest>, I
         var taskCompletionSource = new TaskCompletionSource<Response<T>>();
 
         var responseExchange = $"resp-{Guid.NewGuid():N}";
-        var responseReceiveTopology = new ReceiveEndpointTopology
-        {
-            QueueName = responseExchange,
-            ExchangeName = responseExchange,
-            RoutingKey = "",
-            ExchangeType = "fanout",
-            Durable = false,
-            AutoDelete = true
-        };
+        var responseReceiveTopology = new ReceiveEndpointTransportTopology(
+            responseExchange,
+            durable: false,
+            temporary: true,
+            prefetchCount: 0,
+            [new MessageBinding { MessageType = typeof(T), EntityName = responseExchange }]);
 
         IReceiveTransport? responseReceiveTransport = null;
 
@@ -53,14 +50,16 @@ public sealed class GenericRequestClient<TRequest> : IRequestClient<TRequest>, I
         {
             try
             {
-                if (context.TryGetMessage<T>(out var responeMessage))
+                if (context.MessageType.Contains(MessageUrn.For(typeof(T))) &&
+                    context.TryGetMessage<T>(out var responeMessage))
                 {
                     var response = new Response<T>(responeMessage);
                     taskCompletionSource.TrySetResult(response);
                     return;
                 }
 
-                if (context.TryGetMessage<Fault<TRequest>>(out var fault))
+                if (context.MessageType.Contains(MessageUrn.For(typeof(Fault<TRequest>))) &&
+                    context.TryGetMessage<Fault<TRequest>>(out var fault))
                 {
                     taskCompletionSource.TrySetException(new RequestFaultException(typeof(TRequest).Name, fault!));
                 }
@@ -75,14 +74,15 @@ public sealed class GenericRequestClient<TRequest> : IRequestClient<TRequest>, I
 
         await responseReceiveTransport.Start(cancellationToken);
 
-        var requestAddress = _destinationAddress ?? new Uri($"rabbitmq://localhost/exchange/{EntityNameFormatter.Format(request.GetType())}");
+        var requestAddress = _destinationAddress ?? _transportFactory.GetPublishAddress(EntityNameFormatter.Format(request.GetType()));
         var requestSendTransport = await _transportFactory.GetSendTransport(requestAddress, cancellationToken);
 
-        var responseAddress = new Uri($"rabbitmq://localhost/exchange/{responseExchange}?durable=false&autodelete=true");
+        var responseAddress = _transportFactory.GetTemporaryEndpointAddress(responseExchange);
         var sendContext = _sendContextFactory.Create(MessageTypeCache.GetMessageTypes(typeof(TRequest)), _serializer, cancellationToken);
         sendContext.ResponseAddress = responseAddress;
         sendContext.FaultAddress = responseAddress;
         sendContext.MessageId = Guid.NewGuid().ToString();
+        sendContext.RequestId = Guid.NewGuid();
 
         contextCallback?.Invoke(sendContext);
 
@@ -114,15 +114,12 @@ public sealed class GenericRequestClient<TRequest> : IRequestClient<TRequest>, I
         var taskCompletionSource = new TaskCompletionSource<Response<T1, T2>>();
 
         var responseExchange = $"resp-{Guid.NewGuid():N}";
-        var responseReceiveTopology = new ReceiveEndpointTopology
-        {
-            QueueName = responseExchange,
-            ExchangeName = responseExchange,
-            RoutingKey = "",
-            ExchangeType = "fanout",
-            Durable = false,
-            AutoDelete = true
-        };
+        var responseReceiveTopology = new ReceiveEndpointTransportTopology(
+            responseExchange,
+            durable: false,
+            temporary: true,
+            prefetchCount: 0,
+            [new MessageBinding { MessageType = typeof(T1), EntityName = responseExchange }]);
 
         IReceiveTransport? responseReceiveTransport = null;
 
@@ -130,13 +127,15 @@ public sealed class GenericRequestClient<TRequest> : IRequestClient<TRequest>, I
         {
             try
             {
-                if (context.TryGetMessage<T1>(out var message1))
+                if (context.MessageType.Contains(MessageUrn.For(typeof(T1))) &&
+                    context.TryGetMessage<T1>(out var message1))
                 {
                     taskCompletionSource.TrySetResult(Response<T1, T2>.FromT1(message1));
                     return;
                 }
 
-                if (context.TryGetMessage<T2>(out var message2))
+                if (context.MessageType.Contains(MessageUrn.For(typeof(T2))) &&
+                    context.TryGetMessage<T2>(out var message2))
                 {
                     taskCompletionSource.TrySetResult(Response<T1, T2>.FromT2(message2));
                     return;
@@ -144,6 +143,7 @@ public sealed class GenericRequestClient<TRequest> : IRequestClient<TRequest>, I
 
                 if (!typeof(T1).IsAssignableFrom(typeof(Fault<TRequest>)) &&
                     !typeof(T2).IsAssignableFrom(typeof(Fault<TRequest>)) &&
+                    context.MessageType.Contains(MessageUrn.For(typeof(Fault<TRequest>))) &&
                     context.TryGetMessage<Fault<TRequest>>(out var fault))
                 {
                     taskCompletionSource.TrySetException(new RequestFaultException(typeof(TRequest).Name, fault));
@@ -159,14 +159,15 @@ public sealed class GenericRequestClient<TRequest> : IRequestClient<TRequest>, I
 
         await responseReceiveTransport.Start(cancellationToken);
 
-        var requestAddress = _destinationAddress ?? new Uri($"rabbitmq://localhost/exchange/{EntityNameFormatter.Format(request.GetType())}");
+        var requestAddress = _destinationAddress ?? _transportFactory.GetPublishAddress(EntityNameFormatter.Format(request.GetType()));
         var requestSendTransport = await _transportFactory.GetSendTransport(requestAddress, cancellationToken);
 
-        var responseAddress = new Uri($"rabbitmq://localhost/exchange/{responseExchange}?durable=false&autodelete=true");
+        var responseAddress = _transportFactory.GetTemporaryEndpointAddress(responseExchange);
         var sendContext = _sendContextFactory.Create(MessageTypeCache.GetMessageTypes(typeof(TRequest)), _serializer, cancellationToken);
         sendContext.ResponseAddress = responseAddress;
         sendContext.FaultAddress = responseAddress;
         sendContext.MessageId = Guid.NewGuid().ToString();
+        sendContext.RequestId = Guid.NewGuid();
 
         contextCallback?.Invoke(sendContext);
 

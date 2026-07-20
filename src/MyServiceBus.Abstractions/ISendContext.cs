@@ -6,6 +6,7 @@ namespace MyServiceBus;
 public interface ISendContext : PipeContext, IScheduledMessage
 {
     string MessageId { get; set; }
+    Guid? RequestId { get; set; }
     string RoutingKey { get; set; }
     IDictionary<string, object> Headers { get; }
     string? CorrelationId { get; set; }

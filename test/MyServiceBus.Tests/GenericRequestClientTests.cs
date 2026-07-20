@@ -65,6 +65,7 @@ public class GenericRequestClientTests
         var addresses = await captured.Task;
         Assert.Contains("durable=false", addresses.Response.Query);
         Assert.Contains("autodelete=true", addresses.Response.Query);
+        Assert.Equal("loopback", addresses.Response.Scheme);
         Assert.Equal(addresses.Response, addresses.Fault);
 
         await receive.Stop();

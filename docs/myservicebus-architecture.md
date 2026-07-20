@@ -4,13 +4,22 @@ MyServiceBus is a cross-language messaging runtime with a transport-independent 
 
 The architecture deliberately separates compatibility, portable messaging behavior, broker integration, and optional operational tooling. This allows the project to interoperate with MassTransit without treating every MassTransit feature or historical API as a requirement.
 
+## Product Boundary
+
+MyServiceBus is not intended to compete directly with MassTransit as a fully supported enterprise platform. It is a focused alternative for teams that want dependable messaging fundamentals, a smaller operational and conceptual footprint, and consistent clients across programming languages. Businesses may use it for production workloads, but the project does not claim MassTransit's breadth, maturity, commercial support model, or enterprise ecosystem.
+
+Compatibility supports coexistence, incremental adoption, and migration. It is not a commitment to reproduce the entire product. Features enter the portable core because they provide current value across supported languages and transports, not merely because they exist in MassTransit. Specialized enterprise patterns remain demand-driven extensions or documented non-goals.
+
 ## Architectural Principles
 
 - **Wire compatibility is the strongest compatibility promise.** Compatible clients preserve the MassTransit envelope, message identity, headers, addressing, correlation, request/response, and fault conventions defined by the selected transport profile.
 - **The portable core is intentionally smaller than MassTransit.** Send, publish, consume, request/response, retries, faults, pipelines, serialization, telemetry, and lifecycle form the common messaging model.
+- **Simplicity is a product feature.** New surface area must justify its long-term conceptual, operational, and cross-language cost.
 - **Language APIs are idiomatic.** C# remains familiar to MassTransit users, while Java and future clients express the same concepts using conventions natural to their ecosystems.
+- **Integration abstractions stay small and owned.** The portable core avoids selecting a framework-specific DI or logging stack; optional adapters connect it to the ecosystems applications already use.
 - **Transports declare capabilities.** The core does not assume every broker supports queues, fan-out, scheduling, ordering, replay, and dead-lettering in the same way.
 - **Operational tooling is optional.** Inspection, monitoring, and dashboard packages observe the runtime through stable APIs without becoming dependencies of message delivery.
+- **Topology is modeled once.** Registration, runtime provisioning, inspection, and future dashboards share a normalized topology model instead of deriving competing views from broker-specific assumptions.
 - **The specification, fixtures, and conformance suite are the cross-language source of truth.** No single client implementation defines the protocol by accident.
 
 ## Layered Architecture
@@ -58,7 +67,9 @@ flowchart TB
     Protocol --> Memory
 ```
 
-The portable semantic layer owns application-visible behavior. A transport adapter owns addressing, topology, settlement, native headers, delivery constraints, and connection management. The envelope is portable; broker topology is not.
+The portable semantic layer owns application-visible behavior and normalized topology intent. A transport adapter owns address realization, broker topology projection, settlement, native headers, delivery constraints, and connection management. Portable topology identity is shared; broker entity shape is profile-specific.
+
+Higher-level features extend this graph through typed portable nodes. Persistence-backed behavior such as sagas and outbox policies declares stable requirements without exposing provider objects, while each broker continues to supply a separate profile projection. See the [Topology Extension Model](specs/topology-extension-model.md).
 
 ## Compatibility Model
 
@@ -186,6 +197,8 @@ flowchart LR
 ```
 
 Inspection describes configured endpoints, consumers, contracts, instances, versions, and capabilities. Monitoring describes activity observed by MyServiceBus, including retries, faults, skipped messages, and error moves. Broker depth and broker-native health belong to optional broker-specific metrics adapters, not the core inspection contract.
+
+Inspection must consume the stable topology query API. It must not infer endpoint durability, exchange types, addresses, or terminal destinations from a broker scheme or naming suffix. The normalized model and transport projection are defined in the [Topology Model Specification](specs/topology-model-spec.md).
 
 The initial dashboard is observational. Replay, purge, topology mutation, or remote configuration require a later control-plane design with authentication, authorization, audit records, and explicit safety boundaries.
 

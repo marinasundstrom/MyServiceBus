@@ -27,6 +27,9 @@ public class PublishContextAddressTests
     {
         public readonly CaptureSendTransport Transport = new();
 
+        public Uri GetPublishAddress(string entityName) =>
+            new($"rabbitmq://localhost/exchange/{entityName}");
+
         public Task<ISendTransport> GetSendTransport(Uri address, CancellationToken cancellationToken = default) => Task.FromResult<ISendTransport>(Transport);
         public Task<IReceiveTransport> CreateReceiveTransport(ReceiveEndpointTopology topology, Func<ReceiveContext, Task> handler, Func<string?, bool>? isMessageTypeRegistered = null, CancellationToken cancellationToken = default) => throw new NotImplementedException();
     }

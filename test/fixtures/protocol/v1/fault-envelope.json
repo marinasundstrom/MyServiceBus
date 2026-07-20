@@ -1,0 +1,38 @@
+{
+  "messageId": "99999999-9999-9999-9999-999999999999",
+  "requestId": "66666666-6666-6666-6666-666666666666",
+  "correlationId": "77777777-7777-7777-7777-777777777777",
+  "conversationId": "88888888-8888-8888-8888-888888888888",
+  "initiatorId": "55555555-5555-5555-5555-555555555555",
+  "sourceAddress": "rabbitmq://localhost/get-order-status",
+  "destinationAddress": "rabbitmq://localhost/order-api_bus_abc123",
+  "responseAddress": null,
+  "faultAddress": null,
+  "expirationTime": null,
+  "sentTime": "2026-01-02T03:04:06.678Z",
+  "messageType": [
+    "urn:message:MassTransit:Fault[[MyServiceBus.Compatibility:GetOrderStatus]]"
+  ],
+  "message": {
+    "message": {
+      "orderId": "44444444-4444-4444-4444-444444444444"
+    },
+    "exceptions": [
+      {
+        "exceptionType": "MyServiceBus.Compatibility.OrderNotFoundException",
+        "message": "Order was not found",
+        "stackTrace": null,
+        "innerException": null
+      }
+    ],
+    "host": null,
+    "faultedMessageId": "55555555-5555-5555-5555-555555555555",
+    "timestamp": "2026-01-02T03:04:06.678Z",
+    "faultId": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+    "conversationId": "88888888-8888-8888-8888-888888888888",
+    "correlationId": "77777777-7777-7777-7777-777777777777"
+  },
+  "headers": {},
+  "host": null,
+  "contentType": "application/json"
+}

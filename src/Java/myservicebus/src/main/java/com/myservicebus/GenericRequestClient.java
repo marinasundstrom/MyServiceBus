@@ -26,12 +26,20 @@ public class GenericRequestClient<TRequest> implements RequestClient<TRequest> {
 
     @Override
     public <TResponse> CompletableFuture<TResponse> getResponse(SendContext context, Class<TResponse> responseType) {
+        applyDestination(context);
         return transport.sendRequest(requestType, context, responseType);
     }
 
     @Override
     public <T1, T2> CompletableFuture<Response2<T1, T2>> getResponse(SendContext context, Class<T1> responseType1,
             Class<T2> responseType2) {
+        applyDestination(context);
         return transport.sendRequest(requestType, context, responseType1, responseType2);
+    }
+
+    private void applyDestination(SendContext context) {
+        if (destinationAddress != null) {
+            context.setDestinationAddress(destinationAddress);
+        }
     }
 }

@@ -12,6 +12,23 @@ Every compatibility claim must identify:
 - the tested MassTransit version or version range, when applicable
 - any capability constraints or documented differences
 
+## Compatibility Priorities and Deliberate Divergence
+
+Compatibility is prioritized in this order:
+
+1. MyServiceBus clients must share a stable, language-neutral protocol and portable semantics.
+2. Supported transport profiles must interoperate with MassTransit where that enables mixed deployments and migration.
+3. C# APIs should remain familiar to MassTransit users, while every language exposes the same concepts idiomatically.
+4. Historical MassTransit behavior is optional when it does not contribute to interoperability, migration, or current user value.
+
+MyServiceBus may deliberately diverge from legacy MassTransit edges, but a divergence must be explicit. Its rationale, affected compatibility level, replacement behavior, and migration impact must be documented. Conformance tests must distinguish intentional differences from regressions. After a stable protocol policy is declared, wire-format or transport-profile divergence requires a versioned protocol decision and must not silently break supported peers.
+
+### Alignment-Phase Directive
+
+Until MyServiceBus explicitly declares a stable protocol compatibility policy, MassTransit is authoritative for every wire shape and transport convention that MyServiceBus claims as MassTransit-compatible. When existing MyServiceBus behavior conflicts with that target, implementations, fixtures, and tests must be corrected to match MassTransit. The project does not need to retain aliases, fallback parsing, or compatibility modes solely for earlier MyServiceBus behavior during this alignment phase.
+
+This directive applies to accidental incompatibilities, not deliberate product divergence. A deliberate divergence remains allowed under the policy above, but it must be named and must not be presented as MassTransit-compatible behavior.
+
 ## Compatibility Levels
 
 ### Level 1: Wire Compatibility
@@ -122,6 +139,40 @@ The following scenarios should become required integration tests:
 | MassTransit | MyServiceBus Java | Send, publish, request/response, fault |
 
 Each direction should verify envelope fields, message URNs, native RabbitMQ properties, topology, settlement, retries, skipped-message routing, and terminal error behavior where applicable.
+
+## Current Baseline
+
+The repository currently has the following executable foundation:
+
+| Check | C# | Java | Status |
+| --- | --- | --- | --- |
+| Read the shared message envelope fixture | Implemented | Implemented | Verified locally |
+| Read the shared request envelope fixture | Implemented | Implemented | Verified locally |
+| Read the shared fault envelope fixture | Implemented | Implemented | Verified locally |
+| Round-trip a compatible envelope through RabbitMQ | Testcontainers | Testcontainers | Verified independently per client |
+| C# producer → Java consumer | Implemented | Implemented | Verified locally through RabbitMQ |
+| Java producer → C# consumer | Implemented | Implemented | Verified locally through RabbitMQ |
+| MyServiceBus → MassTransit | Verified from C# | Verified from Java | Verified locally through RabbitMQ |
+| MyServiceBus directed send → MassTransit queue | Verified from C# | Verified from Java | Queue-address delivery verified through RabbitMQ |
+| MassTransit directed send → MyServiceBus queue | Verified with C# | Verified with Java | Queue-address delivery verified through RabbitMQ |
+| C# ↔ Java directed send | Verified producer and consumer | Verified producer and consumer | Both queue-address directions verified through RabbitMQ |
+| MassTransit → MyServiceBus | Verified with C# | Verified with Java | Verified locally through RabbitMQ |
+| MyServiceBus request → MassTransit response | Verified from C# | Verified from Java | Correlated request/response verified through RabbitMQ |
+| MassTransit request → MyServiceBus response | Verified with C# | Verified with Java | Correlated request/response verified through RabbitMQ |
+| MyServiceBus request → MassTransit fault | Verified from C# | Verified from Java | Correlated fault response verified through RabbitMQ |
+| MassTransit request → MyServiceBus fault | Verified with C# | Verified with Java | Correlated fault response verified through RabbitMQ |
+| MassTransit message → MyServiceBus `_skipped` | Verified with C# | Verified with Java | Unknown message is preserved and remains consumable as a MassTransit envelope |
+| Retry exhaustion → MyServiceBus `_error` | Verified with C# | Verified with Java | `Immediate(2)` performs three total attempts before preserving the message in `_error` |
+
+The shared versioned fixtures live under `test/fixtures/protocol/v1`. They are canonical inputs for MyServiceBus protocol tests, but they do not become evidence of MassTransit interoperability until the corresponding MassTransit scenarios pass.
+
+RabbitMQ transport integration tests use a pinned RabbitMQ image through Testcontainers. They must use the container's dynamically mapped host and AMQP port and must not depend on a broker installed on the developer machine or a fixed host port.
+
+The cross-language tests are opt-in during ordinary local test runs because they start both runtimes. CI runs them in a dedicated interoperability job. Set `RUN_CROSS_LANGUAGE_TESTS=1` to execute them locally.
+
+The current RabbitMQ baseline uses RabbitMQ `4.1-alpine` and MassTransit `8.5.1`. Verification covers compatible envelope publication, directed send in every C#, Java, and MassTransit direction, consumption, correlated request/response, correlated fault responses, retry exhaustion, and MassTransit-readable `_error` and `_skipped` delivery.
+
+This baseline is **verified with documented limitations** for the scenarios in the matrix. It is not a claim of complete MassTransit feature or API compatibility.
 
 ## Compatibility Status Labels
 

@@ -10,6 +10,11 @@ public interface MessageBus extends PublishEndpoint, PublishEndpointProvider, Se
 
     BusTopology getTopology();
 
+    /**
+     * Starts the bus after validating explicitly required transport capabilities.
+     *
+     * @throws UnsupportedTransportCapabilityException when the selected transport cannot satisfy a requirement
+     */
     void start() throws Exception;
 
     void stop() throws Exception;

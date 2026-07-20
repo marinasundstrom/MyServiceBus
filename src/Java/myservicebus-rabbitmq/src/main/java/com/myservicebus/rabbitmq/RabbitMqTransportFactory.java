@@ -10,14 +10,22 @@ import java.util.function.Function;
 import com.myservicebus.ReceiveTransport;
 import com.myservicebus.SendTransport;
 import com.myservicebus.TransportFactory;
+import com.myservicebus.TransportCapabilityDescriptor;
+import com.myservicebus.TransportCapabilityDescriptors;
 import com.myservicebus.TransportMessage;
 import com.myservicebus.topology.MessageBinding;
+import com.myservicebus.topology.ReceiveEndpointTransportTopology;
 import com.rabbitmq.client.BuiltinExchangeType;
 import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.Connection;
 import com.myservicebus.logging.LoggerFactory;
 
 public class RabbitMqTransportFactory implements TransportFactory {
+    @Override
+    public TransportCapabilityDescriptor getCapabilities() {
+        return TransportCapabilityDescriptors.RABBITMQ;
+    }
+
     private final ConnectionProvider connectionProvider;
     private final ConcurrentHashMap<String, RabbitMqSendTransport> exchangeTransports = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, RabbitMqSendTransport> queueTransports = new ConcurrentHashMap<>();
@@ -88,13 +96,42 @@ public class RabbitMqTransportFactory implements TransportFactory {
 
     @Override
     public SendTransport getSendTransport(URI address) {
+        if ("exchange".equalsIgnoreCase(address.getScheme())) {
+            return getSendTransport(address.getSchemeSpecificPart(), true, false);
+        }
+        if ("queue".equalsIgnoreCase(address.getScheme())) {
+            return getQueueTransport(address.getSchemeSpecificPart(), true, false);
+        }
+
         String path = address.getPath();
+        boolean temporary = queryFlag(address, "temporary");
+        boolean durable = !temporary && !queryFlag(address, "durable", false);
+        boolean autoDelete = temporary || queryFlag(address, "autodelete");
         if (path.contains("/exchange/")) {
             String exchange = path.substring(path.lastIndexOf('/') + 1);
-            return getSendTransport(exchange, true, false);
+            return getSendTransport(exchange, durable, autoDelete);
         }
-        String queue = path.substring(1);
-        return getQueueTransport(queue, true, false);
+        String exchange = path.substring(1);
+        return getSendTransport(exchange, durable, autoDelete);
+    }
+
+    private static boolean queryFlag(URI address, String name) {
+        return queryFlag(address, name, true);
+    }
+
+    private static boolean queryFlag(URI address, String name, boolean expectedValue) {
+        String query = address.getQuery();
+        if (query == null || query.isBlank()) {
+            return false;
+        }
+
+        for (String part : query.split("&")) {
+            String[] pair = part.split("=", 2);
+            if (pair.length == 2 && pair[0].equalsIgnoreCase(name)) {
+                return Boolean.parseBoolean(pair[1]) == expectedValue;
+            }
+        }
+        return false;
     }
 
     @Override
@@ -109,50 +146,66 @@ public class RabbitMqTransportFactory implements TransportFactory {
             Function<TransportMessage, CompletableFuture<Void>> handler,
             Function<String, Boolean> isMessageTypeRegistered, int prefetchCount,
             Map<String, Object> queueArguments) throws Exception {
+        RabbitMqReceiveEndpointTopology topology = RabbitMqReceiveEndpointTopology.project(
+                queueName, bindings, prefetchCount, queueArguments);
+        return createReceiveTransport(topology, handler, isMessageTypeRegistered);
+    }
+
+    @Override
+    public ReceiveTransport createReceiveTransport(ReceiveEndpointTransportTopology topology,
+            Function<TransportMessage, CompletableFuture<Void>> handler,
+            Function<String, Boolean> isMessageTypeRegistered) throws Exception {
+        return createReceiveTransport(
+                RabbitMqReceiveEndpointTopology.project(topology), handler, isMessageTypeRegistered);
+    }
+
+    private ReceiveTransport createReceiveTransport(RabbitMqReceiveEndpointTopology topology,
+            Function<TransportMessage, CompletableFuture<Void>> handler,
+            Function<String, Boolean> isMessageTypeRegistered) throws Exception {
         Connection connection = connectionProvider.getOrCreateConnection();
         Channel channel = connection.createChannel();
 
-        int count = prefetchCount > 0 ? prefetchCount : defaultPrefetchCount;
+        int count = topology.prefetchCount() > 0 ? topology.prefetchCount() : defaultPrefetchCount;
         if (count > 0) {
             channel.basicQos(count);
         }
 
-        for (MessageBinding binding : bindings) {
+        for (MessageBinding binding : topology.bindings()) {
             String exchangeName = binding.getEntityName();
             channel.exchangeDeclare(exchangeName, BuiltinExchangeType.FANOUT, true);
-            channel.queueDeclare(queueName, true, false, false, queueArguments);
-            channel.queueBind(queueName, exchangeName, "");
+            channel.queueDeclare(topology.queueName(), true, false, false, topology.queueArguments());
+            channel.queueBind(topology.queueName(), exchangeName, "");
         }
 
-        String errorExchange = queueName + "_error";
+        String errorExchange = topology.queueName() + "_error";
         String errorQueue = errorExchange;
         channel.exchangeDeclare(errorExchange, BuiltinExchangeType.FANOUT, true);
         channel.queueDeclare(errorQueue, true, false, false, null);
         channel.queueBind(errorQueue, errorExchange, "");
 
-        String skippedExchange = queueName + "_skipped";
+        String skippedExchange = topology.queueName() + "_skipped";
         String skippedQueue = skippedExchange;
         channel.exchangeDeclare(skippedExchange, BuiltinExchangeType.FANOUT, true);
         channel.queueDeclare(skippedQueue, true, false, false, null);
         channel.queueBind(skippedQueue, skippedExchange, "");
-        String faultExchange = queueName + "_fault";
+        String faultExchange = topology.queueName() + "_fault";
         String faultQueue = faultExchange;
         channel.exchangeDeclare(faultExchange, BuiltinExchangeType.FANOUT, true);
         channel.queueDeclare(faultQueue, true, false, false, null);
         channel.queueBind(faultQueue, faultExchange, "");
 
-        String faultAddress = getPublishAddress(queueName + "_fault");
-        return new RabbitMqReceiveTransport(channel, queueName, handler, faultAddress, isMessageTypeRegistered,
+        String faultAddress = getFaultAddress(topology.queueName());
+        return new RabbitMqReceiveTransport(channel, topology.queueName(), handler, faultAddress, isMessageTypeRegistered,
                 loggerFactory);
     }
 
     @Override
     public String getPublishAddress(String exchange) {
-        return "rabbitmq://localhost/exchange/" + exchange;
+        return connectionProvider.getPublishAddress(exchange);
     }
 
     @Override
     public String getSendAddress(String queue) {
-        return "rabbitmq://localhost/" + queue;
+        return connectionProvider.getSendAddress(queue);
     }
 }

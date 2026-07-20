@@ -1,6 +1,8 @@
 package com.myservicebus;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.Data;
 
 import java.time.OffsetDateTime;
@@ -9,6 +11,7 @@ import java.util.List;
 import java.util.UUID;
 
 @Data
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class Fault<T> {
 
     @JsonProperty("message")
@@ -20,10 +23,11 @@ public class Fault<T> {
     @JsonProperty("host")
     private HostInfo host;
 
-    @JsonProperty("messageId")
+    @JsonProperty("faultedMessageId")
     private UUID messageId;
 
-    @JsonProperty("sentTime")
+    @JsonProperty("timestamp")
+    @JsonFormat(shape = JsonFormat.Shape.STRING)
     private OffsetDateTime sentTime;
 
     @JsonProperty("faultId")

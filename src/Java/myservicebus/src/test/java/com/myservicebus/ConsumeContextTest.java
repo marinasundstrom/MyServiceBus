@@ -42,7 +42,7 @@ public class ConsumeContextTest {
     }
 
     @Test
-    public void publishUsesExchangeUri() {
+    public void publishUsesTransportAddressProvider() {
         class CapturingProvider implements SendEndpointProvider {
             String uri;
 
@@ -54,12 +54,21 @@ public class ConsumeContextTest {
         }
 
         CapturingProvider provider = new CapturingProvider();
-        ConsumeContext<FakeMessage> ctx = new ConsumeContext<>(new FakeMessage(), Map.of(), provider, URI.create("rabbitmq://localhost/"));
+        ConsumeContext<FakeMessage> ctx = new ConsumeContext<>(
+                new FakeMessage(),
+                Map.of(),
+                null,
+                null,
+                null,
+                CancellationToken.none,
+                provider,
+                URI.create("custom://source/"),
+                entityName -> "custom://publish/" + entityName);
 
         ctx.publish(new FakeMessage(), CancellationToken.none).join();
 
         Assertions.assertEquals(
-                "rabbitmq://localhost/exchange/TestApp:FakeMessage",
+                "custom://publish/TestApp:FakeMessage",
                 provider.uri);
     }
 
@@ -148,7 +157,7 @@ public class ConsumeContextTest {
         ctx.publish(new FakeMessage()).join();
 
         Assertions.assertEquals(URI.create("rabbitmq://localhost/"), captured.get().getSourceAddress());
-        Assertions.assertEquals(URI.create("rabbitmq://localhost/exchange/TestApp:FakeMessage"), captured.get().getDestinationAddress());
+        Assertions.assertEquals(URI.create("exchange:TestApp:FakeMessage"), captured.get().getDestinationAddress());
     }
 
     @Test

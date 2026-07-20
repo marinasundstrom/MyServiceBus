@@ -43,6 +43,7 @@ public class EnvelopeMessageSerializer implements MessageSerializer {
 
         Envelope<T> envelope = new Envelope<>();
         envelope.setMessageId(context.getMessageId());
+        envelope.setRequestId(context.getRequestId());
         envelope.setCorrelationId(context.getCorrelationId());
         envelope.setSourceAddress(
                 context.getSourceAddress() != null ? context.getSourceAddress().toString() : null);

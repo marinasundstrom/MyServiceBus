@@ -25,8 +25,10 @@ public class BusInspectionProviderTests
         snapshot.ReceiveEndpoints.Count.ShouldBe(1);
         snapshot.Consumers.Count.ShouldBe(1);
         snapshot.ReceiveEndpoints[0].EndpointName.ShouldBe("test-queue");
+        snapshot.ReceiveEndpoints[0].Address.ShouldBe("queue:test-queue");
         snapshot.ReceiveEndpoints[0].Bindings[0].MessageUrn.ShouldBe(MessageUrn.For(typeof(TestMessage)));
-        snapshot.ReceiveEndpoints[0].Transport?.TransportName.ShouldBe("rabbitmq");
+        snapshot.ReceiveEndpoints[0].Transport.ShouldBeNull();
+        snapshot.Consumers[0].PrefetchCount.ShouldBeNull();
     }
 
     private static MessageBus CreateBus(TopologyRegistry registry)

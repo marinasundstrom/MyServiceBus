@@ -1,0 +1,24 @@
+{
+  "messageId": "55555555-5555-5555-5555-555555555555",
+  "requestId": "66666666-6666-6666-6666-666666666666",
+  "correlationId": "77777777-7777-7777-7777-777777777777",
+  "conversationId": "88888888-8888-8888-8888-888888888888",
+  "initiatorId": null,
+  "sourceAddress": "rabbitmq://localhost/order-api_bus_abc123",
+  "destinationAddress": "rabbitmq://localhost/get-order-status",
+  "responseAddress": "rabbitmq://localhost/order-api_bus_abc123",
+  "faultAddress": "rabbitmq://localhost/order-api_bus_abc123",
+  "expirationTime": "2026-01-02T03:04:35.678Z",
+  "sentTime": "2026-01-02T03:04:05.678Z",
+  "messageType": [
+    "urn:message:MyServiceBus.Compatibility:GetOrderStatus"
+  ],
+  "message": {
+    "orderId": "44444444-4444-4444-4444-444444444444"
+  },
+  "headers": {
+    "request-timeout": "00:00:30"
+  },
+  "host": null,
+  "contentType": "application/json"
+}

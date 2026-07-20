@@ -26,6 +26,7 @@ public static class RabbitMqServiceBusConfigurationBuilderExt
             var factory = new ConnectionFactory
             {
                 HostName = rabbitConfigurator.ClientHost,
+                Port = rabbitConfigurator.ClientPort,
                 AutomaticRecoveryEnabled = true,
                 TopologyRecoveryEnabled = true,
                 //DispatchConsumersAsync = true
@@ -43,7 +44,7 @@ public static class RabbitMqServiceBusConfigurationBuilderExt
             sp.GetRequiredService<ISendPipe>(),
             sp.GetRequiredService<IPublishPipe>(),
             sp.GetRequiredService<IMessageSerializer>(),
-            new Uri($"rabbitmq://{rabbitConfigurator.ClientHost}/"),
+            new Uri($"rabbitmq://{rabbitConfigurator.ClientHost}:{rabbitConfigurator.ClientPort}/"),
             sp.GetRequiredService<ISendContextFactory>(),
             sp.GetRequiredService<IPublishContextFactory>()));
 

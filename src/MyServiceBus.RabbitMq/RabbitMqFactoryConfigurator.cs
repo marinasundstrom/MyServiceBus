@@ -8,6 +8,7 @@ using RabbitMQ.Client;
 
 public class RabbitMqFactoryConfigurator : IRabbitMqFactoryConfigurator, IBusFactoryConfigurator
 {
+    private const int DefaultAmqpPort = 5672;
     private readonly Dictionary<Type, string> _exchangeNames = new();
     private readonly List<Action<IMessageBus, IServiceProvider>> _endpointActions = new();
     private IEndpointNameFormatter? _endpointNameFormatter;
@@ -20,6 +21,7 @@ public class RabbitMqFactoryConfigurator : IRabbitMqFactoryConfigurator, IBusFac
     }
 
     public string ClientHost { get; private set; } = "localhost";
+    public int ClientPort { get; private set; } = DefaultAmqpPort;
     public string Password { get; internal set; }
     public string Username { get; internal set; }
     public IEndpointNameFormatter? EndpointNameFormatter => _endpointNameFormatter;
@@ -39,7 +41,17 @@ public class RabbitMqFactoryConfigurator : IRabbitMqFactoryConfigurator, IBusFac
 
     public void Host(string host, Action<IRabbitMqHostConfigurator>? configure = null)
     {
+        Host(host, DefaultAmqpPort, configure);
+    }
+
+    public void Host(string host, int port, Action<IRabbitMqHostConfigurator>? configure = null)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(host);
+        ArgumentOutOfRangeException.ThrowIfLessThan(port, 1);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(port, 65535);
+
         ClientHost = host;
+        ClientPort = port;
 
         IRabbitMqHostConfigurator? configurator = new RabbitMqHostConfigurator(this);
         configure?.Invoke(configurator!);
@@ -100,6 +112,7 @@ public class RabbitMqFactoryConfigurator : IRabbitMqFactoryConfigurator, IBusFac
             var factory = new ConnectionFactory
             {
                 HostName = ClientHost,
+                Port = ClientPort,
                 AutomaticRecoveryEnabled = true,
                 TopologyRecoveryEnabled = true,
             };
