@@ -20,6 +20,7 @@ This changelog summarizes the bigger themes in the repository history. It is int
 ### MVP dependency hygiene
 
 - Updated Aspire hosting, ASP.NET Core OpenAPI, and OpenTelemetry package families to patched releases so the resolved MVP application dependency graph is clear of known NuGet advisories.
+- Made .NET CI fail restoration when NuGet reports a low, moderate, high, or critical package advisory.
 
 ## 2026-03-24 to 2026-03-19
 
