@@ -51,6 +51,54 @@ public class MassTransitInteropTests
     }
 
     [Fact]
+    public async Task MassTransit_direct_send_delivers_to_MyServiceBus_consumer()
+    {
+        await using var container = new RabbitMqBuilder("rabbitmq:4.1-alpine").Build();
+        await container.StartAsync();
+
+        var transportFactory = CreateTransportFactory(container);
+        var received = new TaskCompletionSource<CrossLanguageMessage>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var queueName = $"masstransit-send-to-myservicebus-{Guid.NewGuid():N}";
+        var receiveTransport = await transportFactory.CreateReceiveTransport(
+            new ReceiveEndpointTopology
+            {
+                QueueName = queueName,
+                ExchangeName = MyServiceBus.EntityNameFormatter.Format(typeof(CrossLanguageMessage)),
+                Durable = true,
+                AutoDelete = false
+            },
+            context =>
+            {
+                if (context.TryGetMessage<CrossLanguageMessage>(out var message))
+                    received.TrySetResult(message);
+
+                return Task.CompletedTask;
+            },
+            messageType => messageType == MessageUrn.For(typeof(CrossLanguageMessage)));
+
+        await receiveTransport.Start();
+        var bus = MassTransit.Bus.Factory.CreateUsingRabbitMq(configurator =>
+        {
+            configurator.Host(new Uri(container.GetConnectionString()));
+        });
+        await bus.StartAsync();
+        try
+        {
+            var endpoint = await bus.GetSendEndpoint(new Uri($"queue:{queueName}"));
+            await endpoint.Send(new CrossLanguageMessage { Value = "masstransit-send-to-myservicebus" });
+
+            var message = await received.Task.WaitAsync(TimeSpan.FromSeconds(20));
+            Assert.Equal("masstransit-send-to-myservicebus", message.Value);
+        }
+        finally
+        {
+            await bus.StopAsync();
+            await receiveTransport.Stop();
+        }
+    }
+
+    [Fact]
     public async Task MyServiceBus_producer_delivers_to_MassTransit_consumer()
     {
         await using var container = new RabbitMqBuilder("rabbitmq:4.1-alpine").Build();
@@ -657,6 +705,38 @@ public class MassTransitInteropTests
 
             Assert.Equal(0, javaPeer.ExitCode);
             Assert.Equal("java-send-to-masstransit", message.Value);
+        }
+        finally
+        {
+            await bus.StopAsync();
+        }
+    }
+
+    [CrossLanguageFact]
+    public async Task MassTransit_direct_send_delivers_to_Java_MyServiceBus_consumer()
+    {
+        await using var container = new RabbitMqBuilder("rabbitmq:4.1-alpine").Build();
+        await container.StartAsync();
+
+        var queueName = $"masstransit-send-to-java-{Guid.NewGuid():N}";
+        var exchangeName = MyServiceBus.EntityNameFormatter.Format(typeof(CrossLanguageMessage));
+        using var javaPeer = JavaInteropPeer.Start(
+            container, "consume", exchangeName, queueName, "masstransit-send-to-java");
+        await JavaInteropPeer.WaitForOutput(javaPeer, "READY", TimeSpan.FromMinutes(2));
+
+        var bus = MassTransit.Bus.Factory.CreateUsingRabbitMq(configurator =>
+        {
+            configurator.Host(new Uri(container.GetConnectionString()));
+        });
+        await bus.StartAsync();
+        try
+        {
+            var endpoint = await bus.GetSendEndpoint(new Uri($"queue:{queueName}"));
+            await endpoint.Send(new CrossLanguageMessage { Value = "masstransit-send-to-java" });
+
+            await JavaInteropPeer.WaitForOutput(javaPeer, "RECEIVED", TimeSpan.FromSeconds(20));
+            await JavaInteropPeer.WaitForExit(javaPeer, TimeSpan.FromSeconds(10));
+            Assert.Equal(0, javaPeer.ExitCode);
         }
         finally
         {

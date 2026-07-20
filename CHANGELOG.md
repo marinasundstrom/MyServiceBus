@@ -116,3 +116,4 @@ Keep this file updated for significant changes. Prefer adding dated entries that
 - Replaced Java convenience-context RabbitMQ path inference with transport-neutral logical addresses and added matching logical `exchange:`/`queue:` resolution to the Java RabbitMQ adapter.
 - Marked the transport-capability foundation complete and revised the new-transport guide so terminal delivery, addressing, capabilities, and conformance are profile-driven rather than RabbitMQ-shaped.
 - Added Testcontainers-backed C# and Java directed-send conformance to MassTransit RabbitMQ receive endpoints, separating queue-address evidence from publish interoperability.
+- Completed the RabbitMQ directed-send matrix with MassTransit-to-C#, MassTransit-to-Java, and bidirectional C#↔Java queue-address delivery.
