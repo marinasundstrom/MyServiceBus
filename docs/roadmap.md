@@ -78,6 +78,8 @@ The precise scope and matrix for this phase are defined in the [Compatibility Po
 
 The [Topology Model Specification](specs/topology-model-spec.md) defines the target boundary. This gate precedes expansion of inspection, dashboard, saga, outbox, and additional transport work.
 
+The [MVP Release Gate](development/mvp-release-gate.md) defines the release boundary and the remaining packaging, documentation, and release-candidate work that follows this fundamentals gate.
+
 **Status:** implemented. The normalized query APIs, version 1 canonical fixture, receive-endpoint intent, inspection consumption, synchronized snapshot-version constants, profile-neutral runtime endpoint topology, and named RabbitMQ receive-topology projection are implemented in C# and Java. Legacy transport overloads remain compatibility adapters. The [Topology Extension Model](specs/topology-extension-model.md) validates additive saga and outbox nodes plus a materially different Azure Service Bus projection without prematurely implementing those features.
 
 ## Phase 3: Inspection and Monitoring APIs
