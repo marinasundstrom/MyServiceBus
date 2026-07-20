@@ -123,6 +123,7 @@ The immediate target explicitly does not include:
 - every MassTransit consumer, saga, routing-slip, persistence, scheduler, or middleware API
 - transport-profile compatibility beyond RabbitMQ
 - treating Kafka, SignalR, or serverless hosts as interchangeable queue transports
+- multiple bus instances in one host or MassTransit's marker-interface registration model
 - complete feature parity with the latest MassTransit release
 
 ## Immediate Conformance Matrix

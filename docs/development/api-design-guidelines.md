@@ -36,6 +36,16 @@ Framework integration belongs in adapters. An adapter may bridge MyServiceBus se
 
 The standalone factory path and the dependency-injection-integrated path are both first-class in C# and Java. Neither should be treated as a compatibility shim for the other. The existing Java API is a supported foundation, including its fluent configuration surface, and its similarity to C# is valuable for migration and polyglot teams. API improvement should focus on approachability, discoverability, diagnostics, and platform-appropriate details—not replacing a good API merely to make it look different from C#.
 
+## Hosting and bus identity
+
+The default dependency-injection experience should register one logical bus and one unambiguous set of publish, send, request, lifecycle, topology, and telemetry services. This is the normal application model in both C# and Java.
+
+Multiple buses in one process are currently unsupported. Do not add C# marker-interface registrations, keyed services, ambient bus names, or service-locator selection merely to reproduce MassTransit's multi-bus API. Those approaches would complicate the ordinary hosting model and do not map naturally to the current Java dependency-injection abstraction.
+
+Reconsider this boundary only when a concrete application requirement demonstrates that separate processes are inadequate. Any future proposal must define independent lifecycle, capabilities, endpoint ownership, topology, and telemetry in both reference clients without making single-bus applications more complex.
+
+The in-process mediator is not another hosted bus identity. It is a local dispatch mode that may reuse consumer and pipeline concepts without claiming broker delivery semantics.
+
 ## Public APIs
 
 Expose only the contracts necessary for application developers:
