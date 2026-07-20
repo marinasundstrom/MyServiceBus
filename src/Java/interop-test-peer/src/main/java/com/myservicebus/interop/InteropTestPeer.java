@@ -40,7 +40,7 @@ public final class InteropTestPeer {
     public static void main(String[] args) throws Exception {
         if (args.length != 5) {
             throw new IllegalArgumentException(
-                    "Expected: <consume|consume-unrecognized|consume-fault|produce|request|request-fault|respond|fault> <exchange> <queue> <value> <durable-exchange>");
+                    "Expected: <consume|consume-unrecognized|consume-fault|produce|send|request|request-fault|respond|fault> <exchange> <queue> <value> <durable-exchange>");
         }
 
         String host = requiredEnvironment("RABBITMQ_HOST");
@@ -59,6 +59,8 @@ public final class InteropTestPeer {
             consumeFault(host, port, username, password, args[1], args[2]);
         } else if ("produce".equals(args[0])) {
             produce(transportFactory, args[1], args[3], Boolean.parseBoolean(args[4]));
+        } else if ("send".equals(args[0])) {
+            send(transportFactory, args[2], args[3]);
         } else if ("request".equals(args[0])) {
             request(connectionProvider, args[3]);
         } else if ("request-fault".equals(args[0])) {
@@ -212,6 +214,18 @@ public final class InteropTestPeer {
         byte[] body = context.serialize(new EnvelopeMessageSerializer());
         SendTransport sendTransport = transportFactory.getSendTransport(exchangeName, durableExchange, !durableExchange);
         sendTransport.send(body);
+        System.out.println("SENT");
+        System.out.flush();
+        System.exit(0);
+    }
+
+    private static void send(RabbitMqTransportFactory transportFactory, String queueName, String value)
+            throws Exception {
+        CrossLanguageMessage message = new CrossLanguageMessage();
+        message.setValue(value);
+        SendContext context = new SendContext(message, CancellationToken.none);
+        byte[] body = context.serialize(new EnvelopeMessageSerializer());
+        transportFactory.getQueueTransport(queueName).send(body);
         System.out.println("SENT");
         System.out.flush();
         System.exit(0);

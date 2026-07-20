@@ -153,6 +153,7 @@ The repository currently has the following executable foundation:
 | C# producer → Java consumer | Implemented | Implemented | Verified locally through RabbitMQ |
 | Java producer → C# consumer | Implemented | Implemented | Verified locally through RabbitMQ |
 | MyServiceBus → MassTransit | Verified from C# | Verified from Java | Verified locally through RabbitMQ |
+| MyServiceBus directed send → MassTransit queue | Verified from C# | Verified from Java | Queue-address delivery verified through RabbitMQ |
 | MassTransit → MyServiceBus | Verified with C# | Verified with Java | Verified locally through RabbitMQ |
 | MyServiceBus request → MassTransit response | Verified from C# | Verified from Java | Correlated request/response verified through RabbitMQ |
 | MassTransit request → MyServiceBus response | Verified with C# | Verified with Java | Correlated request/response verified through RabbitMQ |
@@ -167,7 +168,7 @@ RabbitMQ transport integration tests use a pinned RabbitMQ image through Testcon
 
 The cross-language tests are opt-in during ordinary local test runs because they start both runtimes. CI runs them in a dedicated interoperability job. Set `RUN_CROSS_LANGUAGE_TESTS=1` to execute them locally.
 
-The current RabbitMQ baseline uses RabbitMQ `4.1-alpine` and MassTransit `8.5.1`. Verification covers compatible envelope publication, consumption, correlated request/response, correlated fault responses, retry exhaustion, and MassTransit-readable `_error` and `_skipped` delivery for both reference clients.
+The current RabbitMQ baseline uses RabbitMQ `4.1-alpine` and MassTransit `8.5.1`. Verification covers compatible envelope publication, directed send from both reference clients to MassTransit queues, consumption, correlated request/response, correlated fault responses, retry exhaustion, and MassTransit-readable `_error` and `_skipped` delivery. Reverse-direction and C#↔Java directed-send scenarios remain to complete the directed-send matrix.
 
 This baseline is **verified with documented limitations** for the scenarios in the matrix. It is not a claim of complete MassTransit feature or API compatibility.
 
