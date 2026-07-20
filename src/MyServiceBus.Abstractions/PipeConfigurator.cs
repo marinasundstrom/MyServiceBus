@@ -24,6 +24,14 @@ public class PipeConfigurator<TContext>
                 : Activator.CreateInstance<TFilter>()!);
     }
 
+    public void UseScopedFilter<TFilter>()
+        where TFilter : class, IFilter<TContext>
+    {
+        filters.Add(provider => provider != null
+            ? new ScopedFilter<TFilter>(provider)
+            : throw new InvalidOperationException("A service provider is required to use a scoped filter"));
+    }
+
     public void UseExecute(Func<TContext, Task> callback)
     {
         UseFilter(new DelegateFilter(callback));
@@ -83,6 +91,24 @@ public class PipeConfigurator<TContext>
         public Task Send(TContext context)
         {
             return filter.Send(context, next);
+        }
+    }
+
+    sealed class ScopedFilter<TFilter> : IFilter<TContext>
+        where TFilter : class, IFilter<TContext>
+    {
+        readonly IServiceProvider provider;
+
+        public ScopedFilter(IServiceProvider provider)
+        {
+            this.provider = provider;
+        }
+
+        public async Task Send(TContext context, IPipe<TContext> next)
+        {
+            await using var scope = provider.CreateAsyncScope();
+            var filter = scope.ServiceProvider.GetRequiredService<TFilter>();
+            await filter.Send(context, next);
         }
     }
 

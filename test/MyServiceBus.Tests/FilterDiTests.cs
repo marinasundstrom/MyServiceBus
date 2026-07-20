@@ -1,4 +1,5 @@
 using System.Threading.Tasks;
+using System;
 using Microsoft.Extensions.DependencyInjection;
 using MyServiceBus;
 using Xunit;
@@ -25,6 +26,34 @@ public class FilterDiTests
         }
     }
 
+    class ScopedFilterState
+    {
+        public readonly TaskCompletionSource Completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public bool Disposed;
+    }
+
+    class ScopedTestFilter : IFilter<ConsumeContext<string>>, IAsyncDisposable
+    {
+        readonly ScopedFilterState state;
+
+        public ScopedTestFilter(ScopedFilterState state)
+        {
+            this.state = state;
+        }
+
+        public async Task Send(ConsumeContext<string> context, IPipe<ConsumeContext<string>> next)
+        {
+            await state.Completion.Task;
+            await next.Send(context);
+        }
+
+        public ValueTask DisposeAsync()
+        {
+            state.Disposed = true;
+            return ValueTask.CompletedTask;
+        }
+    }
+
     [Fact]
     public async Task Resolves_filter_from_service_provider()
     {
@@ -40,5 +69,27 @@ public class FilterDiTests
         await pipe.Send(new DefaultConsumeContext<string>("hi"));
 
         Assert.Equal(1, provider.GetRequiredService<Counter>().Count);
+    }
+
+    [Fact]
+    public async Task Scoped_filter_is_disposed_after_async_pipeline_completion()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton<ScopedFilterState>();
+        services.AddScoped<ScopedTestFilter>();
+        await using var provider = services.BuildServiceProvider();
+        var state = provider.GetRequiredService<ScopedFilterState>();
+        var configurator = new PipeConfigurator<ConsumeContext<string>>();
+        configurator.UseScopedFilter<ScopedTestFilter>();
+        var pipe = configurator.Build(provider);
+
+        var result = pipe.Send(new DefaultConsumeContext<string>("hi"));
+        Assert.False(result.IsCompleted);
+        Assert.False(state.Disposed);
+
+        state.Completion.SetResult();
+        await result;
+
+        Assert.True(state.Disposed);
     }
 }

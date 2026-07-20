@@ -11,16 +11,40 @@ import org.junit.jupiter.api.Test;
 import javax.inject.Inject;
 
 import com.myservicebus.tasks.CancellationToken;
+import com.myservicebus.tasks.CancellationTokenSource;
 import com.myservicebus.di.ServiceCollection;
 import com.myservicebus.di.ServiceProvider;
 
 class PipeConfiguratorTest {
     static class TestContext implements PipeContext {
-        private final CancellationToken token = CancellationToken.none;
+        private final CancellationToken token;
         final List<String> calls = new ArrayList<>();
+
+        TestContext() {
+            this(CancellationToken.none);
+        }
+
+        TestContext(CancellationToken token) {
+            this.token = token;
+        }
+
         @Override
         public CancellationToken getCancellationToken() {
             return token;
+        }
+    }
+
+    static class RecordingFilter implements Filter<TestContext> {
+        private final String name;
+
+        RecordingFilter(String name) {
+            this.name = name;
+        }
+
+        @Override
+        public CompletableFuture<Void> send(TestContext context, Pipe<TestContext> next) {
+            context.calls.add(name + ":before");
+            return next.send(context).thenRun(() -> context.calls.add(name + ":after"));
         }
     }
 
@@ -43,6 +67,30 @@ class PipeConfiguratorTest {
         }
     }
 
+    static class ScopedFilterState {
+        final CompletableFuture<Void> completion = new CompletableFuture<>();
+        boolean disposed;
+    }
+
+    static class ScopedTestFilter implements Filter<TestContext>, AutoCloseable {
+        private final ScopedFilterState state;
+
+        @Inject
+        ScopedTestFilter(ScopedFilterState state) {
+            this.state = state;
+        }
+
+        @Override
+        public CompletableFuture<Void> send(TestContext context, Pipe<TestContext> next) {
+            return state.completion.thenCompose(ignored -> next.send(context));
+        }
+
+        @Override
+        public void close() {
+            state.disposed = true;
+        }
+    }
+
     @Test
     void executesFiltersInOrder() {
         PipeConfigurator<TestContext> configurator = new PipeConfigurator<>();
@@ -58,6 +106,69 @@ class PipeConfiguratorTest {
         TestContext ctx = new TestContext();
         pipe.send(ctx).join();
         assertEquals(List.of("A", "B"), ctx.calls);
+    }
+
+    @Test
+    void filtersWrapDownstreamInRegistrationOrder() {
+        PipeConfigurator<TestContext> configurator = new PipeConfigurator<>();
+        configurator.useFilter(new RecordingFilter("outer"));
+        configurator.useFilter(new RecordingFilter("inner"));
+
+        TestContext ctx = new TestContext();
+        configurator.build().send(ctx).join();
+
+        assertEquals(List.of("outer:before", "inner:before", "inner:after", "outer:after"), ctx.calls);
+    }
+
+    @Test
+    void filterCanShortCircuitDownstreamPipeline() {
+        PipeConfigurator<TestContext> configurator = new PipeConfigurator<>();
+        configurator.useFilter((context, next) -> {
+            context.calls.add("stopped");
+            return CompletableFuture.completedFuture(null);
+        });
+        configurator.useExecute(context -> {
+            context.calls.add("downstream");
+            return CompletableFuture.completedFuture(null);
+        });
+
+        TestContext ctx = new TestContext();
+        configurator.build().send(ctx).join();
+
+        assertEquals(List.of("stopped"), ctx.calls);
+    }
+
+    @Test
+    void exceptionStopsPipelineAndPropagatesUnchanged() {
+        RuntimeException expected = new RuntimeException("failed");
+        PipeConfigurator<TestContext> configurator = new PipeConfigurator<>();
+        configurator.useExecute(context -> CompletableFuture.failedFuture(expected));
+        configurator.useExecute(context -> {
+            context.calls.add("downstream");
+            return CompletableFuture.completedFuture(null);
+        });
+
+        TestContext ctx = new TestContext();
+        java.util.concurrent.CompletionException actual = assertThrows(
+                java.util.concurrent.CompletionException.class,
+                () -> configurator.build().send(ctx).join());
+
+        assertSame(expected, actual.getCause());
+        assertTrue(ctx.calls.isEmpty());
+    }
+
+    @Test
+    void filtersObserveThePipelineCancellationToken() {
+        CancellationTokenSource source = new CancellationTokenSource();
+        source.cancel();
+        PipeConfigurator<TestContext> configurator = new PipeConfigurator<>();
+        configurator.useExecute(context -> {
+            assertSame(source.getToken(), context.getCancellationToken());
+            assertTrue(context.getCancellationToken().isCancelled());
+            return CompletableFuture.completedFuture(null);
+        });
+
+        configurator.build().send(new TestContext(source.getToken())).join();
     }
 
     @Test
@@ -116,5 +227,26 @@ class PipeConfiguratorTest {
         pipe.send(ctx).join();
         Counter counter = provider.getService(Counter.class);
         assertEquals(1, counter.count);
+    }
+
+    @Test
+    void scopedFilterIsDisposedAfterAsyncPipelineCompletion() {
+        ServiceCollection services = ServiceCollection.create();
+        services.addSingleton(ScopedFilterState.class);
+        services.addScoped(ScopedTestFilter.class);
+        ServiceProvider provider = services.buildServiceProvider();
+        ScopedFilterState state = provider.getRequiredService(ScopedFilterState.class);
+        PipeConfigurator<TestContext> configurator = new PipeConfigurator<>();
+        configurator.useScopedFilter(ScopedTestFilter.class);
+        Pipe<TestContext> pipe = configurator.build(provider);
+
+        CompletableFuture<Void> result = pipe.send(new TestContext());
+        assertFalse(result.isDone());
+        assertFalse(state.disposed);
+
+        state.completion.complete(null);
+        result.join();
+
+        assertTrue(state.disposed);
     }
 }

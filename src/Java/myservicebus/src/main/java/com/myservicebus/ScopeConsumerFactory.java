@@ -19,7 +19,8 @@ public class ScopeConsumerFactory implements ConsumerFactory {
     public <TConsumer, T> CompletableFuture<Void> send(Class<TConsumer> consumerType,
             ConsumeContext<T> context,
             Pipe<ConsumerConsumeContext<TConsumer, T>> next) {
-        try (ServiceScope scope = provider.createScope()) {
+        ServiceScope scope = provider.createScope();
+        try {
             ServiceProvider scoped = scope.getServiceProvider();
             ConsumeContextProvider ctxProvider = scoped.getService(ConsumeContextProvider.class);
             ctxProvider.setContext(context);
@@ -27,11 +28,15 @@ public class ScopeConsumerFactory implements ConsumerFactory {
                 @SuppressWarnings("unchecked")
                 TConsumer consumer = (TConsumer) scoped.getService(consumerType);
                 ConsumerConsumeContext<TConsumer, T> consumerContext = new ConsumerConsumeContext<>(consumer, context);
-                return next.send(consumerContext);
+                CompletableFuture<Void> result = next.send(consumerContext);
+                scope.detach();
+                return result.whenComplete((ignored, failure) -> scope.close());
             } finally {
                 ctxProvider.clear();
             }
+        } catch (Throwable failure) {
+            scope.close();
+            return CompletableFuture.failedFuture(failure);
         }
     }
 }
-

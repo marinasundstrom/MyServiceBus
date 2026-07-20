@@ -17,7 +17,7 @@ MyServiceBus composes a distributed bus from a small set of building blocks:
 ## Core Concepts
 
 - **Envelope** – Messages use the MassTransit envelope format and carry headers, addresses, correlation and host metadata. The default `content_type` is `application/vnd.masstransit+json`.
-- **Pipes** – Send, publish and consume operations execute through a pipe-and-filter pipeline that propagates a cancellation token.
+- **Pipes** – Send, publish and consume operations execute through the portable [pipeline and filter contract](pipeline-filter-spec.md), including ordered wrapping, short-circuiting, failure propagation, retry re-entry, and cancellation propagation.
 - **Transports** – Serialized envelopes move between endpoints via pluggable transports. See the [ServiceBus Transport Specification](transport-spec.md).
 - **Send** – Consumers resolve send endpoints by URI and deliver messages to specific destinations.
 - **Publish** – Published messages are routed using message type conventions.
