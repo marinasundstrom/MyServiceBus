@@ -2,6 +2,8 @@
 
 MyServiceBus is a lightweight message bus modeled on MassTransit's semantics. It maintains wire-level compatibility with MassTransit's message envelope, contracts, and protocol so MyServiceBus clients can interoperate directly with MassTransit services. This specification defines the expected behavior for any implementation regardless of programming language or transport. The C# implementation in `src/MyServiceBus` and the Java implementation in `src/Java/myservicebus` were reviewed to ensure these semantics are reflected in both clients.
 
+Compatibility claims are scoped by level, client version, and transport profile. See the [Compatibility Policy](../compatibility.md). The immediate target is verified wire and semantic compatibility plus RabbitMQ transport-profile interoperability across MyServiceBus C#, MyServiceBus Java, and supported MassTransit versions.
+
 ## Architecture
 
 MyServiceBus composes a distributed bus from a small set of building blocks:
@@ -39,4 +41,3 @@ Transport implementations must comply with the [ServiceBus Transport Specificati
 ## Relation to MassTransit
 
 MyServiceBus aligns with MassTransit wherever possible. See [Differences from MassTransit](masstransit-differences.md) for notable deviations.
-

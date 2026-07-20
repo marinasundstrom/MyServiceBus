@@ -6,6 +6,10 @@ This guide walks through adding a new transport to MyServiceBus, using Azure Ser
 
 The transport factory creates and caches send and receive transports. The implementation should follow the [factory pattern](../configuration-patterns.md#factory-pattern).
 
+Before implementing the factory, classify the extension as a durable bus transport, event stream, hosting adapter, or application integration. Kafka-like streams and SignalR-like integrations should not be forced through the bus transport contract. See [MyServiceBus Architecture](../myservicebus-architecture.md#transport-architecture).
+
+Define its capability descriptor first. For every portable feature, record whether support is native, emulated with documented constraints, or unsupported. Configuration requiring an unsupported feature must fail before the bus starts.
+
 ### C#
 - Implement `ITransportFactory`.
 - Resolve connections (e.g., `ServiceBusClient`) in the constructor.
@@ -87,11 +91,14 @@ Following these guidelines should make it straightforward to add new transports 
 Use this list to verify a new transport aligns with MyServiceBus expectations:
 
 - **Factory and DI** – implement a transport factory (`ITransportFactory` or `TransportFactory`) and register it through an extension method or configuration helper.
+- **Classification and capabilities** – confirm this is a bus transport and document native, emulated, and unsupported behavior.
+- **Transport profile** – specify addressing, naming, topology, native headers, settlement, error behavior, and temporary endpoint conventions.
 - **Send and receive transports** – provide concrete `ISendTransport`/`SendTransport` and `IReceiveTransport`/`ReceiveTransport` implementations.
 - **Topology mapping** – create exchanges, topics, and queues as needed and map addresses consistently.
 - **Error handling** – support `_error`, `_fault`, and `_skipped` queues so failed or unknown messages are preserved.
 - **Logging** – emit messages using the standard logging categories.
 - **Testing** – add unit tests, exercise error paths, and run `dotnet test` and `./gradlew test`.
+- **Conformance** – run shared protocol tests, cross-language scenarios, and MassTransit interoperability scenarios when compatibility is claimed.
 - **Documentation** – update README or transport-specific docs with usage and configuration details.
 
 Refer to [configuration-patterns](../configuration-patterns.md) for examples of the factory and fluent configuration patterns used throughout transports.

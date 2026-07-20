@@ -1,0 +1,151 @@
+# Compatibility Policy
+
+## Purpose
+
+Compatibility in MyServiceBus is a set of independently testable promises. It does not mean reimplementing every MassTransit feature or reproducing its complete public API.
+
+Every compatibility claim must identify:
+
+- the compatibility level
+- the MyServiceBus client and version
+- the transport profile
+- the tested MassTransit version or version range, when applicable
+- any capability constraints or documented differences
+
+## Compatibility Levels
+
+### Level 1: Wire Compatibility
+
+Two implementations can exchange serialized messages without a custom translation layer.
+
+This level covers:
+
+- the MassTransit JSON envelope and content type
+- message type URNs
+- message, correlation, conversation, initiator, request, and response identifiers
+- source, destination, response, and fault addresses
+- headers and host metadata
+- request, response, and `Fault<T>` envelope shapes
+- serialization rules for supported contract types
+
+Wire compatibility does not by itself guarantee that a broker routes the message to the intended consumer.
+
+### Level 2: Semantic Compatibility
+
+The implementations give the same application-level meaning to the portable messaging operations.
+
+This level covers:
+
+- directed send
+- publish/subscribe
+- consume and successful settlement
+- request/response and fault responses
+- retry and terminal failure behavior
+- skipped-message and error handling
+- correlation propagation
+- cancellation and lifecycle behavior where the language and transport allow it
+
+Semantic compatibility is bounded by declared transport capabilities. An unsupported semantic must be rejected or documented; it must not be silently weakened.
+
+### Level 3: Transport-Profile Interoperability
+
+MyServiceBus and MassTransit can communicate directly through a named transport using compatible addressing, topology, native properties, and settlement behavior.
+
+Each profile defines:
+
+- URI schemes and address normalization
+- queue, exchange, topic, and subscription naming
+- send and publish topology
+- native-header mapping
+- acknowledgement, rejection, and redelivery
+- error, skipped, and fault destinations
+- temporary endpoint and request/response conventions
+- supported, emulated, and unsupported capabilities
+
+Compatibility at this level is specific. Passing the RabbitMQ profile does not imply Azure Service Bus, SQS/SNS, Kafka, or any other profile.
+
+### Level 4: API and Concept Familiarity
+
+Developers can transfer their MassTransit knowledge to MyServiceBus.
+
+For C#, the public API should remain recognizably MassTransit-like where that improves adoption: consumers, contexts, endpoints, configuration, filters, send, publish, and request clients should feel familiar.
+
+This is not a source-compatibility promise. Applications are not expected to replace a package reference and compile unchanged.
+
+For Java and future languages, concept familiarity is the target. APIs should preserve the same behavior while following the host language's conventions for builders, dependency injection, concurrency, cancellation, and errors.
+
+### Level 5: Cross-Language Parity
+
+MyServiceBus clients in different languages provide the same portable behavior and can interoperate through a shared transport profile.
+
+Parity includes:
+
+- equivalent wire representations
+- equivalent portable messaging behavior
+- equivalent configuration outcomes
+- compatible inspection and monitoring DTOs
+- shared conformance scenarios
+
+Parity does not require identical method names, type systems, dependency injection frameworks, or asynchronous programming models.
+
+## Immediate Compatibility Target
+
+The immediate target is the **RabbitMQ interoperability baseline for the C# and Java reference clients**.
+
+The target consists of:
+
+1. **Level 1 wire compatibility** between MyServiceBus C#, MyServiceBus Java, and supported MassTransit versions.
+2. **Level 2 semantic compatibility** for the portable core: send, publish, consume, request/response, correlation, retry, faults, skipped messages, and error handling.
+3. **Level 3 RabbitMQ transport-profile interoperability** in both directions between MyServiceBus and MassTransit.
+4. **Level 4 API familiarity** for C# and concept familiarity with idiomatic APIs for Java.
+5. **Level 5 C#↔Java parity** for the portable core and RabbitMQ profile.
+
+The immediate target explicitly does not include:
+
+- source compatibility with MassTransit
+- every MassTransit consumer, saga, routing-slip, persistence, scheduler, or middleware API
+- transport-profile compatibility beyond RabbitMQ
+- treating Kafka, SignalR, or serverless hosts as interchangeable queue transports
+- complete feature parity with the latest MassTransit release
+
+## Immediate Conformance Matrix
+
+The following scenarios should become required integration tests:
+
+| Producer | Consumer | Required scenarios |
+| --- | --- | --- |
+| MyServiceBus C# | MyServiceBus Java | Send, publish, request/response, fault |
+| MyServiceBus Java | MyServiceBus C# | Send, publish, request/response, fault |
+| MyServiceBus C# | MassTransit | Send, publish, request/response, fault |
+| MassTransit | MyServiceBus C# | Send, publish, request/response, fault |
+| MyServiceBus Java | MassTransit | Send, publish, request/response, fault |
+| MassTransit | MyServiceBus Java | Send, publish, request/response, fault |
+
+Each direction should verify envelope fields, message URNs, native RabbitMQ properties, topology, settlement, retries, skipped-message routing, and terminal error behavior where applicable.
+
+## Compatibility Status Labels
+
+Documentation and package metadata should use consistent labels:
+
+- **Verified**: required automated conformance scenarios pass for the named versions and profile.
+- **Compatible with limitations**: core scenarios pass, with explicitly documented unsupported or emulated capabilities.
+- **Experimental**: implemented but not yet covered by the complete conformance suite.
+- **Concept compatible**: shares the application model but does not claim direct protocol or transport interoperability.
+- **Unsupported**: no compatibility promise is made.
+
+Avoid unqualified claims such as “fully MassTransit compatible.” Prefer a statement such as:
+
+> MyServiceBus 1.x is verified for MassTransit-compatible RabbitMQ envelopes and the documented send, publish, consume, request/response, and fault scenarios across its C# and Java clients.
+
+That statement should only be published after the associated version matrix passes.
+
+## Future Targets
+
+After the immediate RabbitMQ baseline is verified:
+
+1. Add the transport capability descriptor and startup validation.
+2. Select a second durable broker profile, with Azure Service Bus as the current architectural candidate.
+3. Define a separate event-stream profile before implementing Kafka.
+4. Validate the language-neutral specification through a third language client.
+
+Every future transport or language begins as experimental and advances independently through the applicable compatibility levels.

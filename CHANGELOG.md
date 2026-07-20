@@ -99,3 +99,4 @@ Keep this file updated for significant changes. Prefer adding dated entries that
 
 - Added sample-app dashboard endpoints in the .NET and Java `TestApp` projects under `/dashboard/v1/*`, exposing stable JSON snapshots for bus overview, messages, consumers, and topology without committing those contracts to the shared libraries yet.
 - Split the programmatic inspection surface into first-party addon projects for .NET and Java, keeping the sample inspection endpoints working while removing the core bus packages' direct dependency on inspection registration.
+- Documented the long-term architecture and phased roadmap, including explicit compatibility levels, capability-aware transport profiles, event-stream and SignalR integration boundaries, cross-language conformance, and the optional inspection, monitoring, and dashboard plane.
