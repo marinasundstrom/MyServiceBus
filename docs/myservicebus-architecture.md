@@ -20,6 +20,8 @@ The in-process mediator is an alternative execution mode over reusable consumer 
 
 When an application already uses a broker-backed bus, events that represent facts other processes may observe should ordinarily be published on that bus. Applications should not create mediator and broker paths for the same event by default: doing so creates different retry, durability, observability, and failure semantics. Any dual path must express a deliberate architectural distinction.
 
+Stabilizing mediator and in-memory harness semantics in both reference clients is the first implementation priority after the broker-backed MVP foundation. The [Mediator and In-Memory Stability Gate](development/in-memory-stability-gate.md) defines the required parity and conformance work.
+
 ### Multiple bus instances
 
 The default hosting model is one application connected to one logical bus. This keeps lifecycle, endpoint ownership, topology, telemetry, and operational behavior understandable.

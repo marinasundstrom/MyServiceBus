@@ -32,6 +32,7 @@ This changelog summarizes the bigger themes in the repository history. It is int
 ### Product and hosting boundaries
 
 - Defined broker-backed, basic MassTransit replacement scenarios as the stable product scope; positioned mediator as deliberately local execution and explicitly kept multiple hosted buses outside the supported application model.
+- Made cross-language mediator and in-memory harness stability the first implementation priority before additional broker transports.
 
 ## 2026-03-24 to 2026-03-19
 

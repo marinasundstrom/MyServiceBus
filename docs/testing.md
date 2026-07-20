@@ -44,6 +44,8 @@ Ordinary test runs report these scenarios as skipped. The dedicated cross-langua
 ## Goals
 - Mirror MassTransit's `InMemoryTestHarness` so existing users feel at home.
 - Keep the C# and Java harness implementations aligned, ensuring features and default behavior remain consistent across languages.
+- Keep test observations deterministic and separate from the production mediator API.
+- Verify the shared scenarios in the [Mediator and In-Memory Stability Gate](development/in-memory-stability-gate.md) before adding another broker transport.
 
 ## Usage
 The pattern is identical in both languages: create the harness, register handlers, start it, send messages, assert consumption, and then stop the harness.
