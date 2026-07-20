@@ -11,6 +11,7 @@ import com.myservicebus.tasks.CancellationTokenSource;
 import com.myservicebus.di.ServiceCollection;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import javax.inject.Inject;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -37,6 +38,36 @@ public class MediatorTransportFactoryTest {
         @Override
         public CompletableFuture<Void> handle(TestMessage message, CancellationToken cancellationToken) {
             received.complete(message);
+            return CompletableFuture.completedFuture(null);
+        }
+    }
+
+    public static class ForwardedMessage {
+    }
+
+    public static class AsyncForwardingConsumer implements Consumer<TestMessage> {
+        private final SendEndpointProvider sendEndpointProvider;
+
+        @Inject
+        public AsyncForwardingConsumer(SendEndpointProvider sendEndpointProvider) {
+            this.sendEndpointProvider = sendEndpointProvider;
+        }
+
+        @Override
+        public CompletableFuture<Void> consume(ConsumeContext<TestMessage> context) {
+            return CompletableFuture.runAsync(() -> sendEndpointProvider
+                    .getSendEndpoint("loopback://forwarded")
+                    .send(new ForwardedMessage(), CancellationToken.none)
+                    .join());
+        }
+    }
+
+    public static class ForwardedMessageConsumer implements Consumer<ForwardedMessage> {
+        static CompletableFuture<ForwardedMessage> received = new CompletableFuture<>();
+
+        @Override
+        public CompletableFuture<Void> consume(ConsumeContext<ForwardedMessage> context) {
+            received.complete(context.getMessage());
             return CompletableFuture.completedFuture(null);
         }
     }
@@ -118,6 +149,20 @@ public class MediatorTransportFactoryTest {
         bus.publish(new TestMessage("handler"));
 
         Assertions.assertEquals("handler", TestHandler.received.join().getValue());
+    }
+
+    @Test
+    public void scopedSendEndpointProviderRetainsConsumeContextAcrossAsyncDispatch() {
+        ServiceCollection services = ServiceCollection.create();
+        MediatorBus bus = MediatorBus.configure(services, cfg -> {
+            cfg.addConsumer(AsyncForwardingConsumer.class);
+            cfg.addConsumer(ForwardedMessageConsumer.class);
+        });
+
+        ForwardedMessageConsumer.received = new CompletableFuture<>();
+        bus.publish(new TestMessage("async"));
+
+        Assertions.assertNotNull(ForwardedMessageConsumer.received.join());
     }
 
     @Test
