@@ -13,6 +13,10 @@ This changelog summarizes the bigger themes in the repository history. It is int
 - Completed the topology stability gate with a prospective extension model for saga nodes, outbox policies, and materially different durable-broker projections.
 - Made inspection consume the normalized topology snapshot and stopped inferring RabbitMQ-specific details that are not supplied by an authoritative transport projection.
 
+### MVP API stabilization
+
+- Declared profile-neutral receive-endpoint topology as the supported transport extension point and deprecated legacy C# and Java receive-transport overloads without removing compatibility.
+
 ## 2026-03-24 to 2026-03-19
 
 ### Aspire, runtime modernization, and parity cleanup
