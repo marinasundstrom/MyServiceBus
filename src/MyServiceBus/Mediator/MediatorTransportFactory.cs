@@ -12,6 +12,8 @@ public class MediatorTransportFactory : ITransportFactory
 {
     private readonly ConcurrentDictionary<string, List<Func<ReceiveContext, Task>>> _handlers = new();
 
+    public TransportCapabilityDescriptor Capabilities => TransportCapabilityDescriptors.InMemory;
+
     public Task<ISendTransport> GetSendTransport(Uri address, CancellationToken cancellationToken = default)
     {
         var exchange = ExtractExchange(address);

@@ -169,6 +169,8 @@ The cross-language tests are opt-in during ordinary local test runs because they
 
 The current RabbitMQ baseline uses RabbitMQ `4.1-alpine` and MassTransit `8.5.1`. Verification covers compatible envelope publication, consumption, correlated request/response, correlated fault responses, retry exhaustion, and MassTransit-readable `_error` and `_skipped` delivery for both reference clients.
 
+This baseline is **verified with documented limitations** for the scenarios in the matrix. It is not a claim of complete MassTransit feature or API compatibility.
+
 ## Compatibility Status Labels
 
 Documentation and package metadata should use consistent labels:

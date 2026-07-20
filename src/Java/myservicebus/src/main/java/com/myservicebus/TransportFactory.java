@@ -9,6 +9,10 @@ import java.util.function.Function;
 import com.myservicebus.topology.MessageBinding;
 
 public interface TransportFactory {
+    default TransportCapabilityDescriptor getCapabilities() {
+        return TransportCapabilityDescriptors.unknown(getClass().getSimpleName());
+    }
+
     SendTransport getSendTransport(URI address);
 
     default ReceiveTransport createReceiveTransport(String queueName, List<MessageBinding> bindings,

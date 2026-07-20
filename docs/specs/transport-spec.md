@@ -16,6 +16,42 @@ The descriptor should cover directed send, publish/subscribe, durability, compet
 
 The runtime must validate endpoint and bus configuration against the descriptor before startup. It must not silently replace a requested delivery guarantee with weaker behavior.
 
+Capability descriptors use schema version `1` and the same JSON field names in every client:
+
+```json
+{
+  "version": 1,
+  "transport": "rabbitmq",
+  "capabilities": {
+    "directedSend": "native",
+    "redelivery": "emulated",
+    "replay": "unsupported"
+  }
+}
+```
+
+Unknown capability names are treated as `unsupported`. This lets newer runtimes add capability keys without older tooling accidentally assuming support.
+
+### Version 1 Capability Names
+
+| Capability | RabbitMQ | In-memory | Meaning |
+| --- | --- | --- | --- |
+| `directedSend` | Native | Emulated | Deliver to a named destination |
+| `publishSubscribe` | Native | Emulated | Fan out published messages to subscribers |
+| `durability` | Native | Unsupported | Preserve broker state and messages across process restarts |
+| `competingConsumers` | Native | Unsupported | Share a destination across consumer instances |
+| `acknowledgement` | Native | Unsupported | Settle delivery explicitly after processing |
+| `requestResponse` | Emulated | Emulated | Compose requests from messages, correlation, and temporary endpoints |
+| `scheduling` | Unsupported | Unsupported | Enqueue messages for future delivery |
+| `redelivery` | Emulated | Emulated | Retry consumption in the pipeline; this is not broker-native delayed redelivery |
+| `errorDestinations` | Emulated | Emulated | Preserve terminal failures through MyServiceBus-managed destinations |
+| `ordering` | Native | Emulated | Retain transport ordering within its documented scope; concurrency can still affect completion order |
+| `replay` | Unsupported | Unsupported | Re-read retained history from an earlier position |
+| `temporaryEndpoints` | Native | Emulated | Create short-lived response or receive destinations |
+| `topologyProvisioning` | Native | Unsupported | Create broker entities and bindings |
+
+`native` describes a transport or broker primitive. `emulated` describes behavior composed by MyServiceBus and therefore requires its documented limitations to be considered. It does not mean the capability is lower quality for ordinary use.
+
 ## Transport Profiles
 
 A MassTransit-compatible transport profile adds concrete rules to the generic contract:

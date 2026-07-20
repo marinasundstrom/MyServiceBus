@@ -4,6 +4,8 @@ namespace MyServiceBus;
 
 public interface ITransportFactory
 {
+    TransportCapabilityDescriptor Capabilities => TransportCapabilityDescriptors.Unknown(GetType().Name);
+
     Task<ISendTransport> GetSendTransport(Uri address, CancellationToken cancellationToken = default);
 
     Task<IReceiveTransport> CreateReceiveTransport(

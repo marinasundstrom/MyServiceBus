@@ -10,6 +10,8 @@ import java.util.function.Function;
 import com.myservicebus.ReceiveTransport;
 import com.myservicebus.SendTransport;
 import com.myservicebus.TransportFactory;
+import com.myservicebus.TransportCapabilityDescriptor;
+import com.myservicebus.TransportCapabilityDescriptors;
 import com.myservicebus.TransportMessage;
 import com.myservicebus.topology.MessageBinding;
 import com.rabbitmq.client.BuiltinExchangeType;
@@ -18,6 +20,11 @@ import com.rabbitmq.client.Connection;
 import com.myservicebus.logging.LoggerFactory;
 
 public class RabbitMqTransportFactory implements TransportFactory {
+    @Override
+    public TransportCapabilityDescriptor getCapabilities() {
+        return TransportCapabilityDescriptors.RABBITMQ;
+    }
+
     private final ConnectionProvider connectionProvider;
     private final ConcurrentHashMap<String, RabbitMqSendTransport> exchangeTransports = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, RabbitMqSendTransport> queueTransports = new ConcurrentHashMap<>();

@@ -14,6 +14,8 @@ public sealed class RabbitMqTransportFactory : ITransportFactory
     private readonly ConcurrentDictionary<string, ISendTransport> _queueTransports = new();
     private readonly ushort _prefetchCount;
 
+    public TransportCapabilityDescriptor Capabilities => TransportCapabilityDescriptors.RabbitMq;
+
     public RabbitMqTransportFactory(ConnectionProvider connectionProvider, IRabbitMqFactoryConfigurator configurator)
     {
         _connectionProvider = connectionProvider;

@@ -42,6 +42,8 @@ Use these rules when accepting roadmap work:
 
 **Exit criteria:** the reference clients pass the same protocol fixtures and the RabbitMQ interoperability matrix runs repeatably in CI.
 
+**Status:** implemented. The versioned fixtures and Testcontainers matrix cover the documented C#, Java, and MassTransit RabbitMQ baseline. Release claims remain scoped to the pinned versions in the compatibility policy.
+
 The precise scope and matrix for this phase are defined in the [Compatibility Policy](compatibility.md).
 
 ## Phase 2: Transport Capability Foundation
@@ -152,8 +154,8 @@ The following work remains demand-driven and is not automatically part of the po
 
 The next coherent investment is:
 
-1. complete the C#↔Java and MassTransit RabbitMQ interoperability matrix
-2. introduce the transport capability descriptor
+1. complete startup validation against the transport capability descriptor
+2. separate any remaining RabbitMQ-specific assumptions from portable endpoint configuration
 3. stabilize the inspection addon contracts without expanding the control plane
 4. build focused monitoring state and event records
 5. validate those APIs through a read-only dashboard prototype
