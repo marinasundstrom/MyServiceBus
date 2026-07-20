@@ -89,6 +89,8 @@ Snapshot versioning is independent from package versions, the MassTransit envelo
 
 Sagas should extend the model with saga/state-machine identities, consumed and produced contracts, endpoint attachment, and persistence requirements. Outbox support should expose its configured delivery guarantee, scope, and persistence integration without leaking provider objects. New transports add projections and capability data; they do not redefine portable node identity.
 
+The [Topology Extension Model](topology-extension-model.md) validates these rules against prospective saga, outbox, and Azure Service Bus requirements and defines the boundary between portable nodes, transport projections, and runtime providers.
+
 ## Conformance
 
 C# and Java topology conformance tests must build equivalent configurations and compare canonical language-neutral snapshots. The version 1 fixtures live under `test/fixtures/topology/v1`. Tests must cover ordering, stable identities, implemented contracts, multiple consumers on one endpoint, transport extensions, and omission of runtime-only callbacks. The same fixtures become inputs for inspection and dashboard tests later.

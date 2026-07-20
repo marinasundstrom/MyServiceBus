@@ -69,6 +69,8 @@ flowchart TB
 
 The portable semantic layer owns application-visible behavior and normalized topology intent. A transport adapter owns address realization, broker topology projection, settlement, native headers, delivery constraints, and connection management. Portable topology identity is shared; broker entity shape is profile-specific.
 
+Higher-level features extend this graph through typed portable nodes. Persistence-backed behavior such as sagas and outbox policies declares stable requirements without exposing provider objects, while each broker continues to supply a separate profile projection. See the [Topology Extension Model](specs/topology-extension-model.md).
+
 ## Compatibility Model
 
 Compatibility is described at distinct levels so that claims remain precise and testable.

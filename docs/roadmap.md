@@ -78,7 +78,7 @@ The precise scope and matrix for this phase are defined in the [Compatibility Po
 
 The [Topology Model Specification](specs/topology-model-spec.md) defines the target boundary. This gate precedes expansion of inspection, dashboard, saga, outbox, and additional transport work.
 
-**Progress:** the normalized query APIs, version 1 canonical fixture, receive-endpoint intent, inspection consumption, synchronized snapshot-version constants, profile-neutral runtime endpoint topology, and named RabbitMQ receive-topology projection are implemented in C# and Java. Legacy transport overloads remain compatibility adapters. The remaining gate work is extension-model validation against saga, outbox, and a materially different durable broker.
+**Status:** implemented. The normalized query APIs, version 1 canonical fixture, receive-endpoint intent, inspection consumption, synchronized snapshot-version constants, profile-neutral runtime endpoint topology, and named RabbitMQ receive-topology projection are implemented in C# and Java. Legacy transport overloads remain compatibility adapters. The [Topology Extension Model](specs/topology-extension-model.md) validates additive saga and outbox nodes plus a materially different Azure Service Bus projection without prematurely implementing those features.
 
 ## Phase 3: Inspection and Monitoring APIs
 
@@ -175,13 +175,9 @@ The following work remains demand-driven and is not automatically part of the po
 
 The next coherent investment is:
 
-1. implement matching read-only topology query APIs and canonical snapshots in C# and Java
-2. separate registration callbacks from stable topology facts
-3. define transport-specific validation and project profile-neutral endpoint intent into RabbitMQ topology
-4. prove that the model can extend to saga, outbox, and second-transport requirements
-5. stabilize the inspection addon against that model without expanding the control plane
-6. build focused monitoring state and event records
-7. validate those APIs through a read-only dashboard prototype
-8. select the second durable broker only after demonstrated demand and capability-model validation
+1. stabilize the inspection addon DTOs against the completed topology foundation without expanding the control plane
+2. build focused monitoring state and event records
+3. validate those APIs through a read-only dashboard prototype
+4. select the second durable broker only after demonstrated demand and capability-model validation
 
 This sequence preserves current momentum while reducing the architectural risk of adding transports, languages, or dashboard behavior too early.

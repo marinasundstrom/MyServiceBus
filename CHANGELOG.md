@@ -10,6 +10,7 @@ This changelog summarizes the bigger themes in the repository history. It is int
 - Added synchronized public snapshot-version constants and explicit additive/breaking evolution rules.
 - Added corresponding RabbitMQ receive-topology projections that validate profile inputs before broker provisioning.
 - Moved the C# and Java bus runtimes onto corresponding profile-neutral receive-endpoint transport topology contracts while retaining legacy transport overload adapters.
+- Completed the topology stability gate with a prospective extension model for saga nodes, outbox policies, and materially different durable-broker projections.
 - Made inspection consume the normalized topology snapshot and stopped inferring RabbitMQ-specific details that are not supplied by an authoritative transport projection.
 
 ## 2026-03-24 to 2026-03-19
