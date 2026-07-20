@@ -22,7 +22,7 @@ public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigura
     private ServiceCollection serviceCollection;
     private TopologyRegistry topology = new TopologyRegistry();
     private PipeConfigurator<SendContext> sendConfigurator = new PipeConfigurator<>();
-    private PipeConfigurator<SendContext> publishConfigurator = new PipeConfigurator<>();
+    private PipeConfigurator<PublishContext> publishConfigurator = new PipeConfigurator<>();
     private Class<? extends com.myservicebus.serialization.MessageSerializer> serializerClass = com.myservicebus.serialization.EnvelopeMessageSerializer.class;
     private Class<? extends com.myservicebus.serialization.MessageDeserializer> deserializerClass = com.myservicebus.serialization.EnvelopeMessageDeserializer.class;
     private final Set<Class<?>> consumerTypes = new HashSet<>();
@@ -35,7 +35,7 @@ public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigura
     public BusRegistrationConfiguratorImpl(ServiceCollection serviceCollection) {
         this.serviceCollection = serviceCollection;
         sendConfigurator.useFilter(new OpenTelemetrySendFilter());
-        publishConfigurator.useFilter(new OpenTelemetrySendFilter());
+        publishConfigurator.useFilter(new OpenTelemetryPublishFilter());
     }
 
     @Override
@@ -83,7 +83,7 @@ public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigura
     }
 
     @Override
-    public void configurePublish(Consumer<PipeConfigurator<SendContext>> configure) {
+    public void configurePublish(Consumer<PipeConfigurator<PublishContext>> configure) {
         configure.accept(publishConfigurator);
     }
 

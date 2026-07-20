@@ -62,8 +62,8 @@ class MessageBusLoggingTest {
                         sp.getService(LoggerFactory.class)));
         PipeConfigurator<SendContext> sendConfigurator = new PipeConfigurator<>();
         sendConfigurator.useFilter(new OpenTelemetrySendFilter());
-        PipeConfigurator<SendContext> publishConfigurator = new PipeConfigurator<>();
-        publishConfigurator.useFilter(new OpenTelemetrySendFilter());
+        PipeConfigurator<PublishContext> publishConfigurator = new PipeConfigurator<>();
+        publishConfigurator.useFilter(new OpenTelemetryPublishFilter());
         services.addSingleton(SendPipe.class, sp -> () -> new SendPipe(sendConfigurator.build(sp)));
         services.addSingleton(PublishPipe.class, sp -> () -> new PublishPipe(publishConfigurator.build(sp)));
 

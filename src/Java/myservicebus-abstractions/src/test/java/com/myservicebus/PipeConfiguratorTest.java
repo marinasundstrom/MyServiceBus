@@ -172,6 +172,40 @@ class PipeConfiguratorTest {
     }
 
     @Test
+    void describesFilterOrderLifetimeAndConfigurationWithoutInstances() {
+        PipeConfigurator<TestContext> configurator = new PipeConfigurator<>();
+        configurator.useExecute(context -> CompletableFuture.completedFuture(null));
+        configurator.useRetry(2, java.time.Duration.ofMillis(25));
+        configurator.useScopedFilter(ScopedTestFilter.class);
+
+        PipelineDescriptor descriptor = configurator.getDescriptor();
+
+        assertEquals(PipelineDescriptor.CURRENT_VERSION, descriptor.version());
+        assertEquals(3, descriptor.filters().size());
+        FilterDescriptor execute = descriptor.filters().get(0);
+        assertEquals(0, execute.order());
+        assertEquals("execute", execute.kind());
+        assertNull(execute.implementation());
+        assertEquals(FilterLifetime.INSTANCE, execute.lifetime());
+
+        FilterDescriptor retry = descriptor.filters().get(1);
+        assertEquals(1, retry.order());
+        assertEquals("retry", retry.kind());
+        assertEquals(FilterLifetime.PIPE, retry.lifetime());
+        assertEquals("2", retry.configuration().get("retryCount"));
+        assertEquals("25", retry.configuration().get("delayMilliseconds"));
+
+        FilterDescriptor scoped = descriptor.filters().get(2);
+        assertEquals(2, scoped.order());
+        assertEquals("filter", scoped.kind());
+        assertTrue(scoped.implementation().endsWith("ScopedTestFilter"));
+        assertEquals(FilterLifetime.SCOPED, scoped.lifetime());
+
+        assertThrows(UnsupportedOperationException.class, () -> descriptor.filters().add(execute));
+        assertThrows(UnsupportedOperationException.class, () -> retry.configuration().put("changed", "true"));
+    }
+
+    @Test
     void retryFilterRetriesOnFailure() {
         PipeConfigurator<TestContext> configurator = new PipeConfigurator<>();
         AtomicInteger attempts = new AtomicInteger();

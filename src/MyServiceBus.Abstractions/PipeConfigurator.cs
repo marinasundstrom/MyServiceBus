@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Globalization;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -9,37 +10,68 @@ namespace MyServiceBus;
 public class PipeConfigurator<TContext>
     where TContext : class, PipeContext
 {
-    readonly List<Func<IServiceProvider?, IFilter<TContext>>> filters = new();
+    readonly List<FilterRegistration> filters = new();
 
     public void UseFilter(IFilter<TContext> filter)
     {
-        filters.Add(_ => filter);
+        AddFilter(
+            _ => filter,
+            "filter",
+            filter.GetType(),
+            FilterLifetime.Instance);
     }
 
     public void UseFilter<TFilter>()
         where TFilter : class, IFilter<TContext>
     {
-        filters.Add((provider) => provider != null
+        AddFilter(
+            provider => provider != null
                 ? (IFilter<TContext>)ActivatorUtilities.GetServiceOrCreateInstance(provider, typeof(TFilter))
-                : Activator.CreateInstance<TFilter>()!);
+                : Activator.CreateInstance<TFilter>()!,
+            "filter",
+            typeof(TFilter),
+            FilterLifetime.Pipe);
     }
 
     public void UseScopedFilter<TFilter>()
         where TFilter : class, IFilter<TContext>
     {
-        filters.Add(provider => provider != null
-            ? new ScopedFilter<TFilter>(provider)
-            : throw new InvalidOperationException("A service provider is required to use a scoped filter"));
+        AddFilter(
+            provider => provider != null
+                ? new ScopedFilter<TFilter>(provider)
+                : throw new InvalidOperationException("A service provider is required to use a scoped filter"),
+            "filter",
+            typeof(TFilter),
+            FilterLifetime.Scoped);
     }
 
     public void UseExecute(Func<TContext, Task> callback)
     {
-        UseFilter(new DelegateFilter(callback));
+        AddFilter(
+            _ => new DelegateFilter(callback),
+            "execute",
+            null,
+            FilterLifetime.Instance);
     }
 
     public void UseRetry(int retryCount, TimeSpan? delay = null)
     {
-        UseFilter(new RetryFilter<TContext>(retryCount, delay));
+        if (retryCount < 0)
+            throw new ArgumentOutOfRangeException(nameof(retryCount));
+
+        var configuration = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["retryCount"] = retryCount.ToString(CultureInfo.InvariantCulture)
+        };
+        if (delay.HasValue)
+            configuration["delayMilliseconds"] = delay.Value.TotalMilliseconds.ToString(CultureInfo.InvariantCulture);
+
+        AddFilter(
+            _ => new RetryFilter<TContext>(retryCount, delay),
+            "retry",
+            typeof(RetryFilter<TContext>),
+            FilterLifetime.Pipe,
+            configuration);
     }
 
     public void UseMessageRetry(Action<RetryConfigurator> configure)
@@ -54,12 +86,39 @@ public class PipeConfigurator<TContext>
         IPipe<TContext> next = Pipe.Empty<TContext>();
         for (var i = filters.Count - 1; i >= 0; i--)
         {
-            var filter = filters[i](provider);
+            var filter = filters[i].Factory(provider);
             next = new FilterPipe(filter, next);
         }
 
         return next;
     }
+
+    public PipelineDescriptor GetDescriptor()
+    {
+        return new PipelineDescriptor(
+            filters.Select(x => x.Descriptor).ToArray());
+    }
+
+    void AddFilter(
+        Func<IServiceProvider?, IFilter<TContext>> factory,
+        string kind,
+        Type? implementation,
+        FilterLifetime lifetime,
+        IReadOnlyDictionary<string, string>? configuration = null)
+    {
+        filters.Add(new FilterRegistration(
+            factory,
+            new FilterDescriptor(
+                filters.Count,
+                kind,
+                implementation?.FullName,
+                lifetime,
+                configuration)));
+    }
+
+    sealed record FilterRegistration(
+        Func<IServiceProvider?, IFilter<TContext>> Factory,
+        FilterDescriptor Descriptor);
 
     class DelegateFilter : IFilter<TContext>
     {

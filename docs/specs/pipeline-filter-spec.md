@@ -34,6 +34,8 @@ All clients must implement these rules:
 
 The portable model recognizes send, publish, and consume pipelines. Filters may be applicable to every operation of a context kind or to a specific message type where the client API supports that distinction. Equivalent client APIs must produce the same observable ordering and message outcome.
 
+Publish executes its publish pipeline to completion before entering the send pipeline used by the resolved transport endpoint. The transport is invoked only after both application pipelines complete successfully. C# and Java use distinct `PublishContext` and `SendContext` filter types for these stages.
+
 Transport-internal pipelines may add connection, topology, serialization, settlement, or acknowledgement stages. Those stages are transport capabilities and are not automatically part of the portable application-filter API.
 
 ## Failure and retry
@@ -47,6 +49,20 @@ The initial portable retry profile supports immediate and fixed-delay attempts. 
 Filter instances supplied directly by an application may be reused concurrently. Type-based filter registration may use dependency injection. Each client must expose and document whether such a filter is singleton, operation-scoped, or transient, and must dispose owned scopes predictably.
 
 `UseScopedFilter<TFilter>` in C# and `useScopedFilter(FilterClass.class)` in Java resolve a registered filter from a new operation scope. The scope remains alive until the asynchronous downstream pipeline completes and is then disposed. Ordinary type-based `UseFilter<TFilter>`/`useFilter(FilterClass.class)` registration builds one filter instance with the pipe and must not be used when per-operation lifetime is required.
+
+## Descriptor model
+
+Every pipe configurator exposes an immutable, versioned `PipelineDescriptor`. Its ordered `FilterDescriptor` entries contain only stable configuration facts:
+
+- zero-based registration order
+- portable filter kind, initially `filter`, `execute`, or `retry`
+- optional platform implementation type name for diagnostics
+- lifetime: application-supplied instance, pipe lifetime, or operation scope
+- immutable string configuration values such as retry count and delay
+
+Descriptors never expose filter instances, dependency-injection providers, callbacks, delegates, or mutable configurator state. They are safe inputs for validation and future inspection projections. A later runtime integration layer will associate descriptors with send, publish, or consume operations and topology identities; the generic pipe configurator does not guess that operational context.
+
+`PipelineDescriptor.CurrentVersion` in C# and `PipelineDescriptor.CURRENT_VERSION` in Java advance together when the serialized meaning or structure changes. Descriptor versioning is independent from topology snapshot and package versions.
 
 ## Conformance
 
