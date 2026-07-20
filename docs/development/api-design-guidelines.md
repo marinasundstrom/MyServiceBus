@@ -9,6 +9,21 @@ These guidelines outline how MyServiceBus manages its public API surface across 
 - Future clients should express the same portable operations using the conventions of their own language and ecosystem.
 - Cross-language parity is measured by behavior, configuration outcomes, wire representation, and operational contracts—not identical names, overloads, or object graphs.
 
+## Concept and Type Correspondence
+
+A portable concept should be easy to identify in every client. When C# exposes a meaningful type such as a consume context, send endpoint, request client, transport capability, or fault, Java should normally expose a recognizable counterpart, and vice versa. Corresponding types do not have to be literal translations: names may follow platform conventions, and one type may become a small group of types when the target language needs a different shape.
+
+Do not reproduce repository layout mechanically. A C# namespace or assembly is not a requirement to create a matching Java package or Gradle module. Java packages should group APIs as Java developers expect, considering discoverability, cohesion, visibility, and dependency direction. C# namespaces and projects should likewise follow .NET conventions. Preserve matching boundaries only when they are useful boundaries in both ecosystems.
+
+Language-specific facilities are legitimate design inputs. C# may use extension methods, optional parameters, delegates, records, `Task`, and `CancellationToken`; Java may use builders, factories, functional interfaces, records where appropriate, `CompletableFuture`, and Java lifecycle conventions. Each client may provide platform-only integration helpers as long as they do not change the portable semantics or create an undocumented protocol difference.
+
+For every shared public concept, reviews should answer:
+
+1. What is the corresponding concept in each client?
+2. Are behavior, wire effects, lifecycle, and failure semantics equivalent?
+3. Does each API feel native to its platform?
+4. Is any structural or behavioral difference intentional and documented?
+
 ## Java Integration Abstractions
 
 Java has no single dependency-injection or logging abstraction that is appropriate for every framework. The portable runtime therefore keeps small MyServiceBus-owned DI and logging contracts so its core behavior does not depend on Spring, Jakarta CDI, Guice, Micronaut, Quarkus, or a particular logging facade.
@@ -47,7 +62,7 @@ Keep implementation details hidden to maintain flexibility and prevent misuse:
 
 1. **Interfaces first** – Rely primarily on interfaces, not concrete types, and keep concrete implementations internal.
 2. **Minimal surface area** – Only expose what typical users need; advanced features can remain internal until stable.
-3. **Familiar terminology, idiomatic shape** – Reuse MassTransit terminology where it describes the shared concept, while expressing the API naturally on each platform.
+3. **Familiar terminology, idiomatic shape** – Reuse shared names where they aid recognition, including corresponding class names when natural, while expressing the API and organizing code naturally on each platform.
 4. **Document semantic differences** – Different syntax is expected; document differences that affect behavior, capabilities, or migration.
 5. **Prefer private by default** – It's easier to go from private to public without breaking consumers of the API.
 

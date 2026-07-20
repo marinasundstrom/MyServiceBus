@@ -111,3 +111,4 @@ Keep this file updated for significant changes. Prefer adding dated entries that
 - Added opt-in startup capability requirements in both clients, including the ability to require native support and clear failures before receive transports start.
 - Moved publish and temporary response address production behind transport factories, removing hard-coded RabbitMQ addresses from the C# request client and configured-host assumptions from Java RabbitMQ envelopes.
 - Routed bus-level and consume-context publication through transport-provided address producers in both clients, keeping broker URI structure out of portable publish behavior.
+- Defined cross-language conceptual parity as recognizable counterpart abstractions with idiomatic platform APIs and code organization, explicitly rejecting mechanical namespace/package and source translation.

@@ -26,6 +26,7 @@ Use these rules when accepting roadmap work:
 6. New language clients begin with conformance fixtures and one supported transport profile, not the full accumulated feature set.
 7. A MassTransit feature is not added solely for feature parity. It must materially improve interoperability, migration, or the focused MyServiceBus user experience.
 8. Prefer a small, coherent portable core over enterprise breadth; specialized patterns stay demand-driven.
+9. Keep shared concepts and useful counterpart types recognizable across clients, but never derive Java packages or APIs mechanically from C# namespaces and language features, or vice versa.
 
 ## Phase 1: Protocol Baseline
 
@@ -121,7 +122,7 @@ Choose the language from concrete adoption needs:
 - Go for infrastructure and operational services
 - Python for data, automation, and AI workloads
 
-Start with the portable core, canonical fixtures, and one transport profile. Generate data contracts or fixtures where useful, but keep concurrency, cancellation, lifecycle, and consumer APIs idiomatic and handwritten.
+Start with the portable core, canonical fixtures, and one transport profile. Map every shared concept to a recognizable platform counterpart, but design packages, modules, concurrency, cancellation, lifecycle, and consumer APIs idiomatically. Generate data contracts or fixtures where useful; do not generate a client by mechanically translating another implementation.
 
 **Exit criteria:** the client passes the same wire and interoperability suites and can be operated through the same introspection model.
 
