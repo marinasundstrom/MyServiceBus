@@ -4,7 +4,6 @@ import com.myservicebus.MessageUrn;
 
 import java.util.Comparator;
 import java.util.List;
-import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -73,17 +72,15 @@ final class TopologySnapshots {
                 .sorted(Comparator.comparing(TopologySnapshot.Binding::id))
                 .toList();
 
-        Map<String, List<ConsumerTopology>> endpointGroups = topology.getConsumers().stream()
-                .collect(Collectors.groupingBy(ConsumerTopology::getQueueName));
-        List<TopologySnapshot.ReceiveEndpoint> endpoints = endpointGroups.entrySet().stream()
-                .map(entry -> {
-                    String id = endpointId(entry.getKey());
+        List<TopologySnapshot.ReceiveEndpoint> endpoints = topology.getReceiveEndpoints().stream()
+                .map(endpoint -> {
+                    String id = endpointId(endpoint.name());
                     return new TopologySnapshot.ReceiveEndpoint(
                             id,
-                            entry.getKey(),
-                            "queue:" + entry.getKey(),
-                            true,
-                            false,
+                            endpoint.name(),
+                            "queue:" + endpoint.name(),
+                            endpoint.durable(),
+                            endpoint.temporary(),
                             consumers.stream().filter(x -> x.endpointId().equals(id)).map(TopologySnapshot.Consumer::id)
                                     .toList(),
                             bindings.stream().filter(x -> x.endpointId().equals(id)).map(TopologySnapshot.Binding::id)

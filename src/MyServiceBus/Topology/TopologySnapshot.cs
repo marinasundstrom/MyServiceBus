@@ -94,17 +94,16 @@ internal static class TopologySnapshotBuilder
             .OrderBy(x => x.Id, StringComparer.Ordinal)
             .ToArray();
 
-        var endpoints = topology.Consumers
-            .GroupBy(x => x.QueueName, StringComparer.Ordinal)
-            .Select(group =>
+        var endpoints = topology.ReceiveEndpoints
+            .Select(endpoint =>
             {
-                var endpointId = EndpointId(group.Key);
+                var endpointId = EndpointId(endpoint.Name);
                 return new ReceiveEndpointTopologySnapshot(
                     endpointId,
-                    group.Key,
-                    $"queue:{group.Key}",
-                    true,
-                    false,
+                    endpoint.Name,
+                    $"queue:{endpoint.Name}",
+                    endpoint.Durable,
+                    endpoint.Temporary,
                     consumers.Where(x => x.EndpointId == endpointId).Select(x => x.Id).ToArray(),
                     bindings.Where(x => x.EndpointId == endpointId).Select(x => x.Id).ToArray());
             })

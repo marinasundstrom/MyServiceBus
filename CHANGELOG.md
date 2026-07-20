@@ -119,3 +119,4 @@ Keep this file updated for significant changes. Prefer adding dated entries that
 - Completed the RabbitMQ directed-send matrix with MassTransit-to-C#, MassTransit-to-Java, and bidirectional C#↔Java queue-address delivery.
 - Defined a normalized, queryable cross-language topology model as a stability gate before inspection, dashboards, sagas, outbox support, and additional transports.
 - Added matching versioned topology snapshot APIs in C# and Java with deterministic message, endpoint, consumer, and binding identities, logical addresses, and immutable Java views.
+- Added corresponding receive-endpoint definitions to both topology registries so snapshots query normalized endpoint intent instead of embedding durability defaults in snapshot builders.

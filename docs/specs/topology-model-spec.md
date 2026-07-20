@@ -65,6 +65,8 @@ The mutable registration registry and the public query model may be separate typ
 
 The initial C# and Java query entry points are `IBusTopology.GetSnapshot()` and `BusTopology.getSnapshot()`. They return versioned immutable snapshot records with corresponding message, receive-endpoint, consumer, and binding nodes. Version 1 uses `endpoint:<name>` endpoint identities, message URNs as contract identities, and logical `queue:<name>` endpoint addresses. These logical addresses are not serialized broker addresses.
 
+The mutable registries retain corresponding `ReceiveEndpointDefinition` records as the source of normalized durability and temporary intent. Consumer registration currently creates the durable, non-temporary service-endpoint definition supported by both reference runtimes. Additional public endpoint-intent configuration must not be exposed until both transport contracts can validate and honor it.
+
 ## Evolution
 
 New portable node kinds and fields are additive and versioned. Unknown extension data must be ignorable. Removing or changing the meaning of a stable field requires an explicit model-version decision.

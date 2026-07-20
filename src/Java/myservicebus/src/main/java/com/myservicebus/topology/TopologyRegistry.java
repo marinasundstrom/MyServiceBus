@@ -11,6 +11,7 @@ import com.myservicebus.PipeConfigurator;
 public class TopologyRegistry implements BusTopology {
     private final List<MessageTopology> messages = new ArrayList<>();
     private final List<ConsumerTopology> consumers = new ArrayList<>();
+    private final List<ReceiveEndpointDefinition> receiveEndpoints = new ArrayList<>();
 
     @Override
     public List<MessageTopology> getMessages() {
@@ -20,6 +21,11 @@ public class TopologyRegistry implements BusTopology {
     @Override
     public List<ConsumerTopology> getConsumers() {
         return consumers;
+    }
+
+    @Override
+    public List<ReceiveEndpointDefinition> getReceiveEndpoints() {
+        return List.copyOf(receiveEndpoints);
     }
 
     public <T> void registerMessage(Class<T> messageType, String entityName) {
@@ -38,6 +44,7 @@ public class TopologyRegistry implements BusTopology {
     }
 
     public <TConsumer> void registerConsumer(Class<TConsumer> consumerType, String queueName, Consumer<PipeConfigurator<ConsumeContext<Object>>> configure, Class<?>... messageTypes) {
+        ensureReceiveEndpoint(queueName);
         List<MessageBinding> bindings = new ArrayList<>();
         for (Class<?> mt : messageTypes) {
             MessageTopology msg = messages.stream()
@@ -55,5 +62,12 @@ public class TopologyRegistry implements BusTopology {
         consumer.setBindings(bindings);
         consumer.setConfigure(configure);
         consumers.add(consumer);
+    }
+
+    private void ensureReceiveEndpoint(String endpointName) {
+        boolean exists = receiveEndpoints.stream().anyMatch(x -> x.name().equals(endpointName));
+        if (!exists) {
+            receiveEndpoints.add(new ReceiveEndpointDefinition(endpointName, true, false));
+        }
     }
 }
