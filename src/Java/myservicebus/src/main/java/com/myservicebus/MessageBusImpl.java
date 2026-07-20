@@ -186,7 +186,8 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
                         errorAddress,
                         CancellationToken.none,
                         provider,
-                        this.address);
+                        this.address,
+                        this::getPublishAddress);
                 if (logger != null) {
                     logger.debug("Received {}", messageTypeUrn);
                 }
@@ -257,7 +258,8 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
                 ConsumeContext<T> ctx = new ConsumeContext<>(typedMessage, headers,
                         responseAddress, faultAddress, errorAddress, CancellationToken.none,
                         provider,
-                        this.address);
+                        this.address,
+                        this::getPublishAddress);
                 if (logger != null) {
                     logger.debug("Received {}", messageTypeUrn);
                 }
@@ -281,6 +283,12 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
         ReceiveTransport transport = transportFactory.createReceiveTransport(queueName, bindings, transportHandler,
                 isRegisteredHandler, prefetchCount != null ? prefetchCount : 0, queueArguments);
         receiveTransports.add(transport);
+    }
+
+    private String getPublishAddress(String entityName) {
+        return transportFactory != null
+                ? transportFactory.getPublishAddress(entityName)
+                : address.resolve("exchange/" + entityName).toString();
     }
 
     private static Type resolveMessageType(Class<?> consumerType, Class<?> bindingType) {

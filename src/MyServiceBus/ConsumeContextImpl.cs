@@ -57,7 +57,7 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
     {
         var exchangeName = EntityNameFormatter.Format(typeof(T));
 
-        var uri = new Uri(_address, $"exchange/{exchangeName}");
+        var uri = _transportFactory.GetPublishAddress(exchangeName);
         var transport = await _transportFactory.GetSendTransport(uri, cancellationToken);
 
         var context = _publishContextFactory.Create(MessageTypeCache.GetMessageTypes(typeof(T)), _messageSerializer, cancellationToken);

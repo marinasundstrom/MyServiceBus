@@ -8,7 +8,7 @@ import java.util.function.Function;
 
 import com.myservicebus.topology.MessageBinding;
 
-public interface TransportFactory {
+public interface TransportFactory extends PublishAddressProvider {
     default TransportCapabilityDescriptor getCapabilities() {
         return TransportCapabilityDescriptors.unknown(getClass().getSimpleName());
     }

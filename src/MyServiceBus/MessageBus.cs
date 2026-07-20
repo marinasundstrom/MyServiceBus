@@ -61,7 +61,7 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
     {
         var exchangeName = EntityNameFormatter.Format(message.GetType());
 
-        var uri = new Uri(_address, $"exchange/{exchangeName}");
+        var uri = _transportFactory.GetPublishAddress(exchangeName);
         _logger?.LogDebug("Publishing {MessageType} to {DestinationAddress}", typeof(T).Name, uri);
         var transport = await _transportFactory.GetSendTransport(uri, cancellationToken);
 

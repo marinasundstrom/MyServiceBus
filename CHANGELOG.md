@@ -110,3 +110,4 @@ Keep this file updated for significant changes. Prefer adding dated entries that
 - Introduced matching versioned transport capability descriptors for C# and Java, with RabbitMQ and in-memory profiles using `native`, `emulated`, and `unsupported` classifications.
 - Added opt-in startup capability requirements in both clients, including the ability to require native support and clear failures before receive transports start.
 - Moved publish and temporary response address production behind transport factories, removing hard-coded RabbitMQ addresses from the C# request client and configured-host assumptions from Java RabbitMQ envelopes.
+- Routed bus-level and consume-context publication through transport-provided address producers in both clients, keeping broker URI structure out of portable publish behavior.
