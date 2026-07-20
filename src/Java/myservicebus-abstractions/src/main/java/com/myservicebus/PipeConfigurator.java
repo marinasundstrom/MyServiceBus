@@ -7,6 +7,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 
 import com.myservicebus.di.ServiceProvider;
+import com.myservicebus.di.ServiceScope;
 
 /**
  * Configures and builds pipes by chaining filters.
@@ -32,6 +33,30 @@ public class PipeConfigurator<TContext extends PipeContext> {
                 throw new RuntimeException("Failed to create filter " + filterClass.getName(), ex);
             }
         });
+    }
+
+    public void useScopedFilter(Class<? extends Filter<TContext>> filterClass) {
+        filters.add(provider -> {
+            if (provider == null) {
+                throw new IllegalStateException("A service provider is required to use a scoped filter");
+            }
+            return (context, next) -> {
+                ServiceScope scope = provider.createScope();
+                try {
+                    Filter<TContext> filter = providerFor(scope).getRequiredService(filterClass);
+                    CompletableFuture<Void> result = filter.send(context, next);
+                    scope.detach();
+                    return result.whenComplete((ignored, failure) -> scope.close());
+                } catch (Throwable failure) {
+                    scope.close();
+                    return CompletableFuture.failedFuture(failure);
+                }
+            };
+        });
+    }
+
+    private static ServiceProvider providerFor(ServiceScope scope) {
+        return scope.getServiceProvider();
     }
 
     public void useExecute(Function<TContext, CompletableFuture<Void>> callback) {

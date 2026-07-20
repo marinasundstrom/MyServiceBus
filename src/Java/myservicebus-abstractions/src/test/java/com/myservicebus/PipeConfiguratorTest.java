@@ -67,6 +67,30 @@ class PipeConfiguratorTest {
         }
     }
 
+    static class ScopedFilterState {
+        final CompletableFuture<Void> completion = new CompletableFuture<>();
+        boolean disposed;
+    }
+
+    static class ScopedTestFilter implements Filter<TestContext>, AutoCloseable {
+        private final ScopedFilterState state;
+
+        @Inject
+        ScopedTestFilter(ScopedFilterState state) {
+            this.state = state;
+        }
+
+        @Override
+        public CompletableFuture<Void> send(TestContext context, Pipe<TestContext> next) {
+            return state.completion.thenCompose(ignored -> next.send(context));
+        }
+
+        @Override
+        public void close() {
+            state.disposed = true;
+        }
+    }
+
     @Test
     void executesFiltersInOrder() {
         PipeConfigurator<TestContext> configurator = new PipeConfigurator<>();
@@ -203,5 +227,26 @@ class PipeConfiguratorTest {
         pipe.send(ctx).join();
         Counter counter = provider.getService(Counter.class);
         assertEquals(1, counter.count);
+    }
+
+    @Test
+    void scopedFilterIsDisposedAfterAsyncPipelineCompletion() {
+        ServiceCollection services = ServiceCollection.create();
+        services.addSingleton(ScopedFilterState.class);
+        services.addScoped(ScopedTestFilter.class);
+        ServiceProvider provider = services.buildServiceProvider();
+        ScopedFilterState state = provider.getRequiredService(ScopedFilterState.class);
+        PipeConfigurator<TestContext> configurator = new PipeConfigurator<>();
+        configurator.useScopedFilter(ScopedTestFilter.class);
+        Pipe<TestContext> pipe = configurator.build(provider);
+
+        CompletableFuture<Void> result = pipe.send(new TestContext());
+        assertFalse(result.isDone());
+        assertFalse(state.disposed);
+
+        state.completion.complete(null);
+        result.join();
+
+        assertTrue(state.disposed);
     }
 }

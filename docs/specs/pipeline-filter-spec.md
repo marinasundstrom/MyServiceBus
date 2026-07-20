@@ -46,7 +46,7 @@ The initial portable retry profile supports immediate and fixed-delay attempts. 
 
 Filter instances supplied directly by an application may be reused concurrently. Type-based filter registration may use dependency injection. Each client must expose and document whether such a filter is singleton, operation-scoped, or transient, and must dispose owned scopes predictably.
 
-Per-operation scoped filter resolution is a required follow-up to this fundamental execution contract. Until that work is complete, applications should not assume that a type-resolved filter receives a new scoped instance for every message.
+`UseScopedFilter<TFilter>` in C# and `useScopedFilter(FilterClass.class)` in Java resolve a registered filter from a new operation scope. The scope remains alive until the asynchronous downstream pipeline completes and is then disposed. Ordinary type-based `UseFilter<TFilter>`/`useFilter(FilterClass.class)` registration builds one filter instance with the pipe and must not be used when per-operation lifetime is required.
 
 ## Conformance
 
