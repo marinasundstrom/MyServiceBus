@@ -51,6 +51,8 @@ flowchart LR
 
 Transport details are additive and namespaced by profile. A RabbitMQ projection may describe exchange type and routing key; Azure Service Bus may describe topic, subscription, session, and rule details. Consumers of the portable model must remain useful when those details are absent or unknown.
 
+The initial RabbitMQ runtime seam is `RabbitMqReceiveEndpointTopology` in both reference clients. The C# adapter projects its existing receive-topology input into this type; the Java adapter projects its existing queue, binding, prefetch, and queue-argument inputs. Projection validates profile constraints before opening a broker connection, and all RabbitMQ provisioning consumes the projected value. This is an intermediate migration boundary: the next contract revision must make both projectors consume the same profile-neutral endpoint intent while retaining idiomatic construction APIs.
+
 ## API Directive
 
 Each client must provide:

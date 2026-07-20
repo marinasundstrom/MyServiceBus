@@ -145,40 +145,42 @@ public class RabbitMqTransportFactory implements TransportFactory {
             Function<TransportMessage, CompletableFuture<Void>> handler,
             Function<String, Boolean> isMessageTypeRegistered, int prefetchCount,
             Map<String, Object> queueArguments) throws Exception {
+        RabbitMqReceiveEndpointTopology topology = RabbitMqReceiveEndpointTopology.project(
+                queueName, bindings, prefetchCount, queueArguments);
         Connection connection = connectionProvider.getOrCreateConnection();
         Channel channel = connection.createChannel();
 
-        int count = prefetchCount > 0 ? prefetchCount : defaultPrefetchCount;
+        int count = topology.prefetchCount() > 0 ? topology.prefetchCount() : defaultPrefetchCount;
         if (count > 0) {
             channel.basicQos(count);
         }
 
-        for (MessageBinding binding : bindings) {
+        for (MessageBinding binding : topology.bindings()) {
             String exchangeName = binding.getEntityName();
             channel.exchangeDeclare(exchangeName, BuiltinExchangeType.FANOUT, true);
-            channel.queueDeclare(queueName, true, false, false, queueArguments);
-            channel.queueBind(queueName, exchangeName, "");
+            channel.queueDeclare(topology.queueName(), true, false, false, topology.queueArguments());
+            channel.queueBind(topology.queueName(), exchangeName, "");
         }
 
-        String errorExchange = queueName + "_error";
+        String errorExchange = topology.queueName() + "_error";
         String errorQueue = errorExchange;
         channel.exchangeDeclare(errorExchange, BuiltinExchangeType.FANOUT, true);
         channel.queueDeclare(errorQueue, true, false, false, null);
         channel.queueBind(errorQueue, errorExchange, "");
 
-        String skippedExchange = queueName + "_skipped";
+        String skippedExchange = topology.queueName() + "_skipped";
         String skippedQueue = skippedExchange;
         channel.exchangeDeclare(skippedExchange, BuiltinExchangeType.FANOUT, true);
         channel.queueDeclare(skippedQueue, true, false, false, null);
         channel.queueBind(skippedQueue, skippedExchange, "");
-        String faultExchange = queueName + "_fault";
+        String faultExchange = topology.queueName() + "_fault";
         String faultQueue = faultExchange;
         channel.exchangeDeclare(faultExchange, BuiltinExchangeType.FANOUT, true);
         channel.queueDeclare(faultQueue, true, false, false, null);
         channel.queueBind(faultQueue, faultExchange, "");
 
-        String faultAddress = getFaultAddress(queueName);
-        return new RabbitMqReceiveTransport(channel, queueName, handler, faultAddress, isMessageTypeRegistered,
+        String faultAddress = getFaultAddress(topology.queueName());
+        return new RabbitMqReceiveTransport(channel, topology.queueName(), handler, faultAddress, isMessageTypeRegistered,
                 loggerFactory);
     }
 
