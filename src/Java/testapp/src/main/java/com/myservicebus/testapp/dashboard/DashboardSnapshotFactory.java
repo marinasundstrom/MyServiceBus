@@ -1,9 +1,8 @@
 package com.myservicebus.testapp.dashboard;
 
-import com.myservicebus.MessageBus;
 import com.myservicebus.MessageUrn;
+import com.myservicebus.inspection.BusInspectionProvider;
 import com.myservicebus.inspection.BusInspectionSnapshot;
-import com.myservicebus.inspection.DefaultBusInspectionProvider;
 
 import java.time.Instant;
 import java.util.Comparator;
@@ -15,16 +14,16 @@ public final class DashboardSnapshotFactory {
     private DashboardSnapshotFactory() {
     }
 
-    public static DashboardOverviewDto createOverview(MessageBus bus, DashboardMetadata metadata) {
-        return createOverview(new DefaultBusInspectionProvider(bus).getSnapshot(), metadata);
+    public static DashboardOverviewDto createOverview(BusInspectionProvider inspectionProvider, DashboardMetadata metadata) {
+        return createOverview(inspectionProvider.getSnapshot(), metadata);
     }
 
-    public static DashboardOverviewDto createOverview(MessageBus bus, DashboardMetadata metadata, DashboardState state) {
-        return createOverview(new DefaultBusInspectionProvider(bus).getSnapshot(), metadata, state.isStarted() ? "Healthy" : "Unknown");
+    public static DashboardOverviewDto createOverview(BusInspectionProvider inspectionProvider, DashboardMetadata metadata, DashboardState state) {
+        return createOverview(inspectionProvider.getSnapshot(), metadata, state.isStarted() ? "Healthy" : "Unknown");
     }
 
-    public static DashboardMessagesDto createMessages(MessageBus bus, DashboardMetadata metadata) {
-        return createMessages(new DefaultBusInspectionProvider(bus).getSnapshot(), metadata);
+    public static DashboardMessagesDto createMessages(BusInspectionProvider inspectionProvider, DashboardMetadata metadata) {
+        return createMessages(inspectionProvider.getSnapshot(), metadata);
     }
 
     public static DashboardOverviewDto createOverview(BusInspectionSnapshot snapshot, DashboardMetadata metadata) {
@@ -62,8 +61,8 @@ public final class DashboardSnapshotFactory {
                         .toList());
     }
 
-    public static DashboardConsumersDto createConsumers(MessageBus bus, DashboardMetadata metadata) {
-        return createConsumers(new DefaultBusInspectionProvider(bus).getSnapshot(), metadata);
+    public static DashboardConsumersDto createConsumers(BusInspectionProvider inspectionProvider, DashboardMetadata metadata) {
+        return createConsumers(inspectionProvider.getSnapshot(), metadata);
     }
 
     public static DashboardConsumersDto createConsumers(BusInspectionSnapshot snapshot, DashboardMetadata metadata) {
@@ -89,8 +88,8 @@ public final class DashboardSnapshotFactory {
                         .toList());
     }
 
-    public static DashboardTopologyDto createTopology(MessageBus bus, DashboardMetadata metadata) {
-        return createTopology(new DefaultBusInspectionProvider(bus).getSnapshot(), metadata);
+    public static DashboardTopologyDto createTopology(BusInspectionProvider inspectionProvider, DashboardMetadata metadata) {
+        return createTopology(inspectionProvider.getSnapshot(), metadata);
     }
 
     public static DashboardTopologyDto createTopology(BusInspectionSnapshot snapshot, DashboardMetadata metadata) {
@@ -103,8 +102,8 @@ public final class DashboardSnapshotFactory {
                 createConsumers(snapshot, metadata).consumers());
     }
 
-    public static DashboardQueuesDto createQueues(MessageBus bus, DashboardMetadata metadata) {
-        return createQueues(new DefaultBusInspectionProvider(bus).getSnapshot(), metadata);
+    public static DashboardQueuesDto createQueues(BusInspectionProvider inspectionProvider, DashboardMetadata metadata) {
+        return createQueues(inspectionProvider.getSnapshot(), metadata);
     }
 
     public static DashboardQueuesDto createQueues(BusInspectionSnapshot snapshot, DashboardMetadata metadata) {
@@ -134,13 +133,14 @@ public final class DashboardSnapshotFactory {
                         .toList());
     }
 
-    public static DashboardMetricsDto createMetrics(MessageBus bus, DashboardMetadata metadata, DashboardState state) {
+    public static DashboardMetricsDto createMetrics(BusInspectionProvider inspectionProvider, DashboardMetadata metadata, DashboardState state) {
         Instant generatedAtUtc = Instant.now();
+        BusInspectionSnapshot inspectionSnapshot = inspectionProvider.getSnapshot();
         DashboardState.DashboardMetricsSnapshot snapshot = state.createMetricsSnapshot(generatedAtUtc);
         return new DashboardMetricsDto(
                 metadata.serviceName(),
                 metadata.transportName(),
-                bus.getAddress().toString(),
+                inspectionSnapshot.address().toString(),
                 generatedAtUtc,
                 snapshot.totals(),
                 snapshot.rates(),

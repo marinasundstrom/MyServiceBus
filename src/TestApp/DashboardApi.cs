@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
-using MyServiceBus;
+using MyServiceBus.Inspection;
 
 namespace TestApp;
 
@@ -15,23 +15,23 @@ public static class DashboardApi
         var group = endpoints.MapGroup(prefix)
             .WithTags("Dashboard");
 
-        group.MapGet("/overview", (IMessageBus bus, DashboardState state) =>
-            TypedResults.Ok(DashboardSnapshotFactory.CreateOverview(bus, metadata, state)));
+        group.MapGet("/overview", (IBusInspectionProvider inspectionProvider, DashboardState state) =>
+            TypedResults.Ok(DashboardSnapshotFactory.CreateOverview(inspectionProvider, metadata, state)));
 
-        group.MapGet("/messages", (IMessageBus bus) =>
-            TypedResults.Ok(DashboardSnapshotFactory.CreateMessages(bus, metadata)));
+        group.MapGet("/messages", (IBusInspectionProvider inspectionProvider) =>
+            TypedResults.Ok(DashboardSnapshotFactory.CreateMessages(inspectionProvider, metadata)));
 
-        group.MapGet("/consumers", (IMessageBus bus) =>
-            TypedResults.Ok(DashboardSnapshotFactory.CreateConsumers(bus, metadata)));
+        group.MapGet("/consumers", (IBusInspectionProvider inspectionProvider) =>
+            TypedResults.Ok(DashboardSnapshotFactory.CreateConsumers(inspectionProvider, metadata)));
 
-        group.MapGet("/topology", (IMessageBus bus) =>
-            TypedResults.Ok(DashboardSnapshotFactory.CreateTopology(bus, metadata)));
+        group.MapGet("/topology", (IBusInspectionProvider inspectionProvider) =>
+            TypedResults.Ok(DashboardSnapshotFactory.CreateTopology(inspectionProvider, metadata)));
 
-        group.MapGet("/queues", (IMessageBus bus) =>
-            TypedResults.Ok(DashboardSnapshotFactory.CreateQueues(bus, metadata)));
+        group.MapGet("/queues", (IBusInspectionProvider inspectionProvider) =>
+            TypedResults.Ok(DashboardSnapshotFactory.CreateQueues(inspectionProvider, metadata)));
 
-        group.MapGet("/metrics", (IMessageBus bus, DashboardState state) =>
-            TypedResults.Ok(DashboardSnapshotFactory.CreateMetrics(bus, metadata, state)));
+        group.MapGet("/metrics", (IBusInspectionProvider inspectionProvider, DashboardState state) =>
+            TypedResults.Ok(DashboardSnapshotFactory.CreateMetrics(inspectionProvider, metadata, state)));
 
         return group;
     }

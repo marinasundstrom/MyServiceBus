@@ -6,8 +6,6 @@ import java.util.function.Consumer;
 import com.myservicebus.ScopeConsumerFactory;
 import com.myservicebus.di.ServiceCollection;
 import com.myservicebus.di.ServiceCollectionDecorator;
-import com.myservicebus.inspection.BusInspectionProvider;
-import com.myservicebus.inspection.DefaultBusInspectionProvider;
 import com.myservicebus.logging.LoggerFactory;
 import com.myservicebus.logging.ConsoleLoggerFactory;
 import com.myservicebus.logging.ConsoleLoggerConfig;
@@ -57,8 +55,6 @@ public class MessageBusServices extends ServiceCollectionDecorator {
 
         inner.addSingleton(ReceiveEndpointConnector.class,
                 sp -> () -> (ReceiveEndpointConnector) sp.getService(MessageBus.class));
-        inner.addSingleton(BusInspectionProvider.class,
-                sp -> () -> new DefaultBusInspectionProvider(sp.getService(MessageBus.class)));
 
         inner.addSingleton(JobScheduler.class, sp -> () -> new DefaultJobScheduler());
         inner.addScoped(MessageScheduler.class,

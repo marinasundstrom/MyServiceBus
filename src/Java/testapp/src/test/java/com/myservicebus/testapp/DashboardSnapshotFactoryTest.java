@@ -5,6 +5,7 @@ import com.myservicebus.MessageUrn;
 import com.myservicebus.PublishContext;
 import com.myservicebus.PublishEndpoint;
 import com.myservicebus.SendEndpoint;
+import com.myservicebus.inspection.DefaultBusInspectionProvider;
 import com.myservicebus.tasks.CancellationToken;
 import com.myservicebus.testapp.dashboard.DashboardMetadata;
 import com.myservicebus.testapp.dashboard.DashboardSnapshotFactory;
@@ -30,7 +31,8 @@ class DashboardSnapshotFactoryTest {
         topology.getConsumers().get(0).setQueueArguments(Map.of("x-queue-type", "quorum"));
 
         MessageBus bus = new StubMessageBus(topology);
-        var snapshot = DashboardSnapshotFactory.createTopology(bus, new DashboardMetadata("TestApp", "rabbitmq"));
+        var inspectionProvider = new DefaultBusInspectionProvider(bus);
+        var snapshot = DashboardSnapshotFactory.createTopology(inspectionProvider, new DashboardMetadata("TestApp", "rabbitmq"));
 
         assertEquals("TestApp", snapshot.serviceName());
         assertEquals("rabbitmq", snapshot.transportName());
@@ -61,7 +63,8 @@ class DashboardSnapshotFactoryTest {
         topology.registerConsumer(TestConsumer.class, "queue-b", null, TestMessage.class);
 
         MessageBus bus = new StubMessageBus(topology);
-        var overview = DashboardSnapshotFactory.createOverview(bus, new DashboardMetadata("TestApp", "rabbitmq"));
+        var inspectionProvider = new DefaultBusInspectionProvider(bus);
+        var overview = DashboardSnapshotFactory.createOverview(inspectionProvider, new DashboardMetadata("TestApp", "rabbitmq"));
 
         assertEquals(1, overview.messageCount());
         assertEquals(2, overview.consumerCount());

@@ -1,4 +1,4 @@
-# Metrics And Event/Message Log APIs Proposal
+# Monitoring API Proposal
 
 ## Status
 
@@ -6,29 +6,38 @@ Proposed
 
 ## Summary
 
-This proposal defines first-party, opt-in metrics and event/message log APIs for MyServiceBus.
+This proposal defines a first-party, opt-in monitoring API for MyServiceBus.
 
 The feature should remain outside the core `MyServiceBus` packages and be implemented as addon packages that integrate through existing MyServiceBus extension points, primarily the pipeline/filter system.
 
 The proposal covers:
 
-- programmatic metrics APIs
+- programmatic monitoring APIs for runtime state
 - programmatic event/message log APIs
-- optional HTTP exposure of those APIs
+- optional HTTP exposure of those monitoring APIs
 - optional persistence for state hydration and flush
 - dashboard-oriented querying of recorded MyServiceBus events and message records
+
+This proposal builds on the existing inspection API rather than replacing it.
+
+The intended split is:
+
+- inspection API
+  topology, messages, consumers, endpoints, and discovery
+- monitoring API
+  runtime state, aggregate counts, and event/message logs for dashboards and operational tooling
 
 The feature is intentionally scoped to MyServiceBus-owned data. It should not attempt to become a broker management or broker inspection API.
 
 ## Goals
 
-- Expose stable, dashboard-friendly metrics and event/message log DTOs.
+- Expose stable, dashboard-friendly monitoring DTOs for runtime state and event/message logs.
 - Support programmatic querying of MyServiceBus runtime state and recorded operational records.
-- Keep HTTP endpoints as one way to expose these APIs, not the only way.
+- Keep HTTP endpoints as one way to expose the monitoring API, not the only way.
 - Keep the feature opt-in.
 - Keep the implementation transport-aware but not broker-driven.
 - Persist MyServiceBus-specific operational events such as faults, retries, skipped messages, and moves to error.
-- Allow dashboards and tools to query recorded events through the inspection API.
+- Allow dashboards and tools to query monitoring data through the monitoring API, optionally exposed through inspection-facing routes.
 - Support conditional recording of significant MyServiceBus events and messages.
 - Preserve C# and Java parity.
 - Reuse existing pipeline abstractions whenever possible.
@@ -45,7 +54,7 @@ The feature is intentionally scoped to MyServiceBus-owned data. It should not at
 
 ### Addon First
 
-Metrics and event/message log APIs should be shipped as first-party addons rather than built directly into core `MyServiceBus`.
+The monitoring API should be shipped as a first-party addon rather than built directly into core `MyServiceBus`.
 
 Core MyServiceBus should stay focused on:
 
@@ -57,13 +66,13 @@ Core MyServiceBus should stay focused on:
 Addons should own:
 
 - event recording
-- metrics aggregation
+- monitoring-state aggregation
 - HTTP exposure
 - optional persistence integrations
 
 ### Programmatic First
 
-The programmatic metrics and event/message log APIs are the primary feature.
+The programmatic monitoring and event/message log APIs are the primary feature.
 
 HTTP endpoints are adapters over those APIs. A service should be able to expose this information:
 
@@ -77,7 +86,7 @@ without coupling the feature to ASP.NET or any specific web framework.
 
 ### MyServiceBus Scope Only
 
-The metrics and event/message log APIs should expose information that MyServiceBus itself knows or decides.
+The monitoring API should expose information that MyServiceBus itself knows or decides.
 
 Examples:
 
@@ -110,12 +119,14 @@ The APIs may include transport-aware details when MyServiceBus itself models the
   Core messaging, transport, topology, pipeline
 - `MyServiceBus.Inspection`
   Programmatic inspection API and endpoint discovery
-- `MyServiceBus.Inspection.Metrics`
-  Metrics state, event/message log recording, in-memory state, query abstractions
-- `MyServiceBus.Inspection.Persistence.*`
+- `MyServiceBus.Monitoring`
+  Monitoring state, event/message log recording, in-memory state, query abstractions
+- `MyServiceBus.Monitoring.Persistence.*`
   Optional persisted stores
 - `MyServiceBus.AspNetCore.Inspection`
   HTTP endpoint mapping for inspection
+- `MyServiceBus.AspNetCore.Monitoring`
+  HTTP endpoint mapping for monitoring
 - `MyServiceBus.AspNetCore.HealthChecks`
   Health check integration, separate from inspection
 
@@ -125,12 +136,14 @@ The APIs may include transport-aware details when MyServiceBus itself models the
   Core messaging, transport, topology, pipeline
 - `myservicebus-inspection`
   Programmatic inspection API and endpoint discovery
-- `myservicebus-inspection-metrics`
-  Metrics state and event/message log recording
-- `myservicebus-inspection-persistence-*`
+- `myservicebus-monitoring`
+  Monitoring state and event/message log recording
+- `myservicebus-monitoring-persistence-*`
   Optional persisted stores
 - `myservicebus-web-inspection`
   HTTP exposure for Javalin or another chosen web framework
+- `myservicebus-web-monitoring`
+  HTTP exposure for monitoring
 - `myservicebus-health`
   Health exposure, separate from inspection
 
@@ -159,21 +172,25 @@ Not acceptable in core:
 
 - HTTP DTOs
 - dashboard models
-- persisted metrics stores
-- metrics or event log query endpoints
+- persisted monitoring stores
+- monitoring or event log query endpoints
 - broker querying logic
 
-## Inspection Exposure
+## Relationship To Inspection
 
-Inspection remains useful as an exposure and discovery surface, but it is not the primary feature described by this proposal.
+Inspection already exists and remains responsible for topology and discovery.
 
-Its role here is to expose:
+The monitoring API complements inspection by providing:
 
-- overview and capability discovery
-- metrics state
+- monitoring state
 - event/message log query endpoints
 
-The metrics and event/message log APIs must also be usable programmatically without HTTP.
+The dashboard story is:
+
+- inspection provides the graph
+- monitoring provides the runtime behavior on that graph
+
+The monitoring API must also be usable programmatically without HTTP.
 
 ## Health
 
@@ -194,24 +211,24 @@ The inspection API must not actively execute health checks or query the broker f
 
 If `status` is present in inspection, it must be derived from already-known in-process runtime state, not from a fresh health probe.
 
-## Metrics State And Recorded Events
+## Monitoring State And Recorded Events
 
-### Why Metrics Are Optional
+### Why Monitoring Is Optional
 
 Topology and inspection data are deterministic and configuration-based.
 
-Metrics state and recorded events have different semantics:
+Monitoring state and recorded events have different semantics:
 
 - they can be instance-local
 - they can be durable
 - they can be filtered
 - they may have retention and storage costs
 
-Because of that, metrics state and recorded-event capture should be an opt-in addon feature.
+Because of that, monitoring state and recorded-event capture should be an opt-in addon feature.
 
 ### Runtime Model
 
-Metrics state should always exist in memory at runtime.
+Monitoring state should always exist in memory at runtime.
 
 Default behavior:
 
@@ -248,19 +265,19 @@ With persistence enabled:
 - persisted records support traceability and dashboard history
 - durability and sharing semantics depend on the configured backend and flush strategy
 
-The inspection overview should make this explicit when it exposes metrics capabilities.
+Inspection overview or other discovery endpoints may make this explicit when they expose monitoring capabilities.
 
 Example:
 
 ```json
 {
-  "metrics": {
+  "monitoring": {
     "enabled": true,
     "mode": "in-memory",
     "persistence": "enabled",
     "scope": "instance",
-    "metricsUrl": "/inspection/v1/metrics",
-    "eventsUrl": "/inspection/v1/events"
+    "metricsUrl": "/monitoring/v1/metrics",
+    "eventsUrl": "/monitoring/v1/events"
   }
 }
 ```
@@ -363,11 +380,11 @@ Suggested fields:
 
 ### Query Surface
 
-The inspection API should be able to query recorded bus events and stored message records for dashboards.
+The monitoring API should be able to query recorded bus events and stored message records for dashboards.
 
 Recommended endpoint:
 
-- `/inspection/v1/events`
+- `/monitoring/v1/events`
 
 Suggested filters:
 
@@ -409,9 +426,9 @@ Suggested policy types:
 - consumer-type policy
 - predicate policy
 
-## Metrics State Snapshot
+## Monitoring State Snapshot
 
-The metrics API should expose aggregate state derived from the configured in-memory state, optionally hydrated and flushed through the configured persistence layer.
+The monitoring API should expose aggregate state derived from the configured in-memory state, optionally hydrated and flushed through the configured persistence layer.
 
 Recommended aggregate fields:
 
@@ -462,7 +479,7 @@ Examples:
 ```csharp
 builder.Services.AddServiceBus(x =>
 {
-    x.UseInMemoryMetrics(options =>
+    x.UseInMemoryMonitoring(options =>
     {
         options.RecordFaults();
         options.RecordRetries();
@@ -476,7 +493,7 @@ builder.Services.AddServiceBus(x =>
 ```csharp
 builder.Services.AddServiceBus(x =>
 {
-    x.UsePersistedMetrics(options =>
+    x.UsePersistedMonitoring(options =>
     {
         options.RecordFaults();
         options.RecordRetries();
@@ -509,7 +526,7 @@ Filters should emit candidate events.
 
 The recorder or policy layer should decide whether those events are recorded.
 
-The in-memory aggregate state should remain the live runtime source used by the metrics API and any inspection adapter over it.
+The in-memory aggregate state should remain the live runtime source used by the monitoring API and any inspection adapter over it.
 
 Persistence should hydrate and flush that state rather than bypass it.
 
@@ -528,18 +545,18 @@ This keeps filtering logic centralized and makes conditional recording consisten
 
 The exact API shape can evolve, but the design should include the following concepts.
 
-### Metrics State And Event/Message Logs
+### Monitoring State And Event/Message Logs
 
-- `IBusMetricsStore`
-- `IBusMetricsRecorder`
-- `IBusMetricsProvider`
-- `IBusMetricsPersistence`
+- `IBusMonitoringStore`
+- `IBusMonitorRecorder`
+- `IBusMonitorProvider`
+- `IBusMonitorPersistence`
 - `IBusEventRecordingPolicy`
 - `BusEventRecordContext`
 - `BusMetricEvent`
-- `BusMetricsSnapshot`
-- `BusMetricsQuery`
-- `BusMetricsQueryResult`
+- `BusMonitorSnapshot`
+- `BusMonitorQuery`
+- `BusMonitorQueryResult`
 
 Recommended split:
 
@@ -554,7 +571,7 @@ Recommended split:
 
 ## DTO Guidance
 
-Metrics and event/message log DTOs should follow these rules:
+Monitoring DTOs and event/message log DTOs should follow these rules:
 
 - use strings for type identity
 - no CLR or JVM runtime type serialization
@@ -574,16 +591,16 @@ Metrics and event/message log DTOs should follow these rules:
 
 ### Phase 2
 
-- add metrics addon abstractions
-- add in-memory metrics/event store
-- add `/inspection/v1/metrics`
-- add `/inspection/v1/events`
+- add monitoring addon abstractions
+- add in-memory monitoring state/event store
+- add `/monitoring/v1/metrics`
+- add `/monitoring/v1/events`
 - support query filters over recorded events
 
 ### Phase 3
 
 - add persistence abstractions and first implementation
-- support hydration of selected metrics and events on startup
+- support hydration of selected monitoring state and recorded events on startup
 - support configurable flush intervals
 - support configurable batch sizes and buffer sizes
 - support flush on shutdown and failure
@@ -614,7 +631,7 @@ Use the existing pipeline and topology seams as the primary implementation mecha
 
 Add only the smallest missing hooks to core when the addon cannot observe a MyServiceBus-owned event cleanly.
 
-Treat metrics state and event/message logs as the primary read models.
+Treat monitoring state and event/message logs as the primary read models.
 
 Treat HTTP endpoints, including inspection endpoints, as optional adapters over those read models.
 

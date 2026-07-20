@@ -6,6 +6,7 @@ using System.Linq;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Logging;
+using MyServiceBus.Inspection;
 using OpenTelemetry.Trace;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -50,6 +51,7 @@ builder.Services.AddServiceBus(x =>
 
 builder.Services.AddHealthChecks()
     .AddMyServiceBus();
+builder.Services.AddServiceBusInspection();
 
 //builder.Services.AddHostedService<HostedService>();
 

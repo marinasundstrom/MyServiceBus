@@ -16,6 +16,7 @@
 
   <ItemGroup>
     <ProjectReference Include="../AspireApp.ServiceDefaults/AspireApp.ServiceDefaults.csproj" />
+    <ProjectReference Include="../MyServiceBus.Inspection/MyServiceBus.Inspection.csproj" />
     <ProjectReference Include="../MyServiceBus.RabbitMq/MyServiceBus.RabbitMq.csproj" />
     <ProjectReference Include="../TestApp.Contracts/TestApp.Contracts.csproj" />
   </ItemGroup>

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Microsoft.Extensions.DependencyInjection;
 using MyServiceBus;
+using MyServiceBus.Inspection;
 using MyServiceBus.Serialization;
 using MyServiceBus.Topology;
 using Shouldly;
@@ -23,8 +24,9 @@ public class TestAppDashboardTests
         };
 
         var bus = CreateBus(registry);
+        var inspectionProvider = new BusInspectionProvider(bus);
 
-        var snapshot = DashboardSnapshotFactory.CreateTopology(bus, new DashboardMetadata("TestApp", "rabbitmq"));
+        var snapshot = DashboardSnapshotFactory.CreateTopology(inspectionProvider, new DashboardMetadata("TestApp", "rabbitmq"));
 
         snapshot.ServiceName.ShouldBe("TestApp");
         snapshot.TransportName.ShouldBe("rabbitmq");
@@ -56,8 +58,9 @@ public class TestAppDashboardTests
         registry.RegisterConsumer<TestConsumer>("queue-b", null, typeof(TestMessage));
 
         var bus = CreateBus(registry);
+        var inspectionProvider = new BusInspectionProvider(bus);
 
-        var overview = DashboardSnapshotFactory.CreateOverview(bus, new DashboardMetadata("TestApp", "rabbitmq"));
+        var overview = DashboardSnapshotFactory.CreateOverview(inspectionProvider, new DashboardMetadata("TestApp", "rabbitmq"));
 
         overview.MessageCount.ShouldBe(1);
         overview.ConsumerCount.ShouldBe(2);

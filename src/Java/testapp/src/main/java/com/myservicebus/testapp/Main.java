@@ -14,6 +14,8 @@ import com.myservicebus.PublishEndpoint;
 import com.myservicebus.di.ServiceCollection;
 import com.myservicebus.di.ServiceProvider;
 import com.myservicebus.di.ServiceScope;
+import com.myservicebus.inspection.BusInspectionProvider;
+import com.myservicebus.inspection.InspectionServices;
 import com.myservicebus.rabbitmq.RabbitMqFactoryConfigurator;
 import com.myservicebus.tasks.CancellationToken;
 import com.myservicebus.logging.LogLevel;
@@ -38,6 +40,9 @@ public class Main {
                     // cfg.setMinimumLevel(LogLevel.WARN);
                     cfg.setLevel("com.myservicebus", LogLevel.DEBUG);
                 }));
+
+        services.from(InspectionServices.class)
+                .addInspection();
 
         String rabbitMqHost = System.getenv().getOrDefault("RABBITMQ_HOST", "localhost");
 
@@ -86,6 +91,7 @@ public class Main {
         LoggerFactory loggerFactory = provider.getService(LoggerFactory.class);
         final Logger logger = loggerFactory != null ? loggerFactory.create(Main.class) : null;
         MessageBus serviceBus = provider.getRequiredService(MessageBus.class);
+        BusInspectionProvider inspectionProvider = provider.getRequiredService(BusInspectionProvider.class);
 
         try {
             serviceBus.start();
@@ -100,7 +106,7 @@ public class Main {
         var app = Javalin.create().start(httpPort);
         app.get("/health/live", ctx -> ctx.status(200));
         app.get("/health/ready", ctx -> ctx.status(inspectionState.isStarted() ? 200 : 503));
-        DashboardApi.register(app, serviceBus, new DashboardMetadata("TestApp", "rabbitmq"), inspectionState);
+        DashboardApi.register(app, inspectionProvider, new DashboardMetadata("TestApp", "rabbitmq"), inspectionState);
 
         app.get("/publish", ctx -> {
             try (ServiceScope scope = provider.createScope()) {

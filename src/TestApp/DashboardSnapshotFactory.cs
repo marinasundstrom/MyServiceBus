@@ -1,18 +1,17 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using MyServiceBus;
 using MyServiceBus.Inspection;
 
 namespace TestApp;
 
 public static class DashboardSnapshotFactory
 {
-    public static DashboardOverviewDto CreateOverview(IMessageBus bus, DashboardMetadata metadata)
-        => CreateOverview(new BusInspectionProvider(bus).GetSnapshot(), metadata);
+    public static DashboardOverviewDto CreateOverview(IBusInspectionProvider inspectionProvider, DashboardMetadata metadata)
+        => CreateOverview(inspectionProvider.GetSnapshot(), metadata);
 
-    public static DashboardOverviewDto CreateOverview(IMessageBus bus, DashboardMetadata metadata, DashboardState state)
-        => CreateOverview(new BusInspectionProvider(bus).GetSnapshot(), metadata, state.IsStarted ? "Healthy" : "Unknown");
+    public static DashboardOverviewDto CreateOverview(IBusInspectionProvider inspectionProvider, DashboardMetadata metadata, DashboardState state)
+        => CreateOverview(inspectionProvider.GetSnapshot(), metadata, state.IsStarted ? "Healthy" : "Unknown");
 
     public static DashboardOverviewDto CreateOverview(BusInspectionSnapshot snapshot, DashboardMetadata metadata)
         => new(
@@ -36,8 +35,8 @@ public static class DashboardSnapshotFactory
             snapshot.ReceiveEndpoints.Count,
             new DashboardHealthLinksDto("/health/ready", "/health/live", status));
 
-    public static DashboardMessagesDto CreateMessages(IMessageBus bus, DashboardMetadata metadata)
-        => CreateMessages(new BusInspectionProvider(bus).GetSnapshot(), metadata);
+    public static DashboardMessagesDto CreateMessages(IBusInspectionProvider inspectionProvider, DashboardMetadata metadata)
+        => CreateMessages(inspectionProvider.GetSnapshot(), metadata);
 
     public static DashboardMessagesDto CreateMessages(BusInspectionSnapshot snapshot, DashboardMetadata metadata)
         => new(
@@ -49,8 +48,8 @@ public static class DashboardSnapshotFactory
                 .Select(x => new DashboardMessageDto(x.MessageType, x.MessageUrn, x.EntityName, x.ImplementedMessageTypes))
                 .ToArray());
 
-    public static DashboardConsumersDto CreateConsumers(IMessageBus bus, DashboardMetadata metadata)
-        => CreateConsumers(new BusInspectionProvider(bus).GetSnapshot(), metadata);
+    public static DashboardConsumersDto CreateConsumers(IBusInspectionProvider inspectionProvider, DashboardMetadata metadata)
+        => CreateConsumers(inspectionProvider.GetSnapshot(), metadata);
 
     public static DashboardConsumersDto CreateConsumers(BusInspectionSnapshot snapshot, DashboardMetadata metadata)
         => new(
@@ -70,8 +69,8 @@ public static class DashboardSnapshotFactory
                         .ToArray()))
                 .ToArray());
 
-    public static DashboardTopologyDto CreateTopology(IMessageBus bus, DashboardMetadata metadata)
-        => CreateTopology(new BusInspectionProvider(bus).GetSnapshot(), metadata);
+    public static DashboardTopologyDto CreateTopology(IBusInspectionProvider inspectionProvider, DashboardMetadata metadata)
+        => CreateTopology(inspectionProvider.GetSnapshot(), metadata);
 
     public static DashboardTopologyDto CreateTopology(BusInspectionSnapshot snapshot, DashboardMetadata metadata)
         => new(
@@ -82,8 +81,8 @@ public static class DashboardSnapshotFactory
             CreateMessages(snapshot, metadata).Messages,
             CreateConsumers(snapshot, metadata).Consumers);
 
-    public static DashboardQueuesDto CreateQueues(IMessageBus bus, DashboardMetadata metadata)
-        => CreateQueues(new BusInspectionProvider(bus).GetSnapshot(), metadata);
+    public static DashboardQueuesDto CreateQueues(IBusInspectionProvider inspectionProvider, DashboardMetadata metadata)
+        => CreateQueues(inspectionProvider.GetSnapshot(), metadata);
 
     public static DashboardQueuesDto CreateQueues(BusInspectionSnapshot snapshot, DashboardMetadata metadata)
         => new(
@@ -105,20 +104,21 @@ public static class DashboardSnapshotFactory
                     SkippedQueueName: x.Transport?.Properties.TryGetValue("skippedQueueName", out var skippedQueueName) == true ? skippedQueueName?.ToString() ?? $"{x.EndpointName}_skipped" : $"{x.EndpointName}_skipped"))
                 .ToArray());
 
-    public static DashboardMetricsDto CreateMetrics(IMessageBus bus, DashboardMetadata metadata, DashboardState state)
+    public static DashboardMetricsDto CreateMetrics(IBusInspectionProvider inspectionProvider, DashboardMetadata metadata, DashboardState state)
     {
         var generatedAtUtc = DateTime.UtcNow;
-        var snapshot = state.CreateMetricsSnapshot(generatedAtUtc);
+        var inspectionSnapshot = inspectionProvider.GetSnapshot();
+        var metricsSnapshot = state.CreateMetricsSnapshot(generatedAtUtc);
         return new DashboardMetricsDto(
             metadata.ServiceName,
             metadata.TransportName,
-            bus.Address.ToString(),
+            inspectionSnapshot.Address.ToString(),
             generatedAtUtc,
-            snapshot.Totals,
-            snapshot.Rates,
-            snapshot.Latency,
-            snapshot.Queues,
-            snapshot.Messages);
+            metricsSnapshot.Totals,
+            metricsSnapshot.Rates,
+            metricsSnapshot.Latency,
+            metricsSnapshot.Queues,
+            metricsSnapshot.Messages);
     }
 
     public static string? ResolveMessageTypeFromDestination(Uri destinationAddress)
