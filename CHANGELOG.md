@@ -106,3 +106,4 @@ Keep this file updated for significant changes. Prefer adding dated entries that
 - Added correlated C#↔MassTransit request/response conformance and aligned C# and Java request envelopes on explicit request identifiers.
 - Completed the Java↔MassTransit request/response matrix, aligned temporary RabbitMQ endpoint addressing, and documented MyServiceBus as a focused interoperable alternative rather than an enterprise feature-parity competitor.
 - Completed bidirectional C# and Java fault-response conformance with MassTransit, including canonical generic fault URNs, correlated routing, strict response-type discrimination, and MassTransit fault field names.
+- Added live RabbitMQ conformance coverage for C# retry exhaustion and MassTransit-readable `_error` and `_skipped` queue delivery.

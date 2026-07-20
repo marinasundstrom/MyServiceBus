@@ -99,6 +99,118 @@ public class MassTransitInteropTests
     }
 
     [Fact]
+    public async Task MassTransit_message_is_moved_to_MyServiceBus_skipped_queue_when_unrecognized()
+    {
+        await using var container = new RabbitMqBuilder("rabbitmq:4.1-alpine").Build();
+        await container.StartAsync();
+
+        var skipped = new TaskCompletionSource<CrossLanguageMessage>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var queueName = $"masstransit-to-myservicebus-skipped-{Guid.NewGuid():N}";
+        var bus = MassTransit.Bus.Factory.CreateUsingRabbitMq(configurator =>
+        {
+            configurator.Host(new Uri(container.GetConnectionString()));
+            configurator.ReceiveEndpoint($"{queueName}_skipped", endpoint =>
+            {
+                endpoint.ConfigureConsumeTopology = false;
+                endpoint.Consumer(() => new MassTransitConsumer(skipped));
+            });
+        });
+
+        await bus.StartAsync();
+        var receiveTransport = await CreateTransportFactory(container).CreateReceiveTransport(
+            new ReceiveEndpointTopology
+            {
+                QueueName = queueName,
+                ExchangeName = MyServiceBus.EntityNameFormatter.Format(typeof(CrossLanguageMessage)),
+                Durable = true,
+                AutoDelete = false
+            },
+            _ => throw new InvalidOperationException("An unrecognized message must not reach the handler."),
+            _ => false);
+
+        await receiveTransport.Start();
+        try
+        {
+            await bus.Publish(new CrossLanguageMessage { Value = "skipped-by-myservicebus" });
+
+            var message = await skipped.Task.WaitAsync(TimeSpan.FromSeconds(20));
+            Assert.Equal("skipped-by-myservicebus", message.Value);
+        }
+        finally
+        {
+            await receiveTransport.Stop();
+            await bus.StopAsync();
+        }
+    }
+
+    [Fact]
+    public async Task MassTransit_message_is_retried_then_moved_to_MyServiceBus_error_queue()
+    {
+        await using var container = new RabbitMqBuilder("rabbitmq:4.1-alpine").Build();
+        await container.StartAsync();
+
+        var error = new TaskCompletionSource<CrossLanguageMessage>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var queueName = $"masstransit-to-myservicebus-error-{Guid.NewGuid():N}";
+        var bus = MassTransit.Bus.Factory.CreateUsingRabbitMq(configurator =>
+        {
+            configurator.Host(new Uri(container.GetConnectionString()));
+            configurator.ReceiveEndpoint($"{queueName}_error", endpoint =>
+            {
+                endpoint.ConfigureConsumeTopology = false;
+                endpoint.Consumer(() => new MassTransitConsumer(error));
+            });
+        });
+
+        await bus.StartAsync();
+        var transportFactory = CreateTransportFactory(container);
+        var attempts = 0;
+        var pipeConfigurator = new PipeConfigurator<ConsumeContext<CrossLanguageMessage>>();
+        pipeConfigurator.UseFilter(new ErrorTransportFilter<CrossLanguageMessage>());
+        pipeConfigurator.UseRetry(2);
+        pipeConfigurator.UseExecute(_ =>
+        {
+            Interlocked.Increment(ref attempts);
+            throw new InvalidOperationException("retry-exhausted");
+        });
+        var pipe = pipeConfigurator.Build();
+        var receiveTransport = await transportFactory.CreateReceiveTransport(
+            new ReceiveEndpointTopology
+            {
+                QueueName = queueName,
+                ExchangeName = MyServiceBus.EntityNameFormatter.Format(typeof(CrossLanguageMessage)),
+                Durable = true,
+                AutoDelete = false
+            },
+            receiveContext => pipe.Send(new ConsumeContextImpl<CrossLanguageMessage>(
+                receiveContext,
+                transportFactory,
+                new SendPipe(Pipe.Empty<SendContext>()),
+                new PublishPipe(Pipe.Empty<PublishContext>()),
+                new EnvelopeMessageSerializer(),
+                new Uri(container.GetConnectionString()),
+                new SendContextFactory(),
+                new PublishContextFactory())),
+            messageType => messageType == MessageUrn.For(typeof(CrossLanguageMessage)));
+
+        await receiveTransport.Start();
+        try
+        {
+            await bus.Publish(new CrossLanguageMessage { Value = "error-from-myservicebus" });
+
+            var message = await error.Task.WaitAsync(TimeSpan.FromSeconds(20));
+            Assert.Equal("error-from-myservicebus", message.Value);
+            Assert.Equal(3, Volatile.Read(ref attempts));
+        }
+        finally
+        {
+            await receiveTransport.Stop();
+            await bus.StopAsync();
+        }
+    }
+
+    [Fact]
     public async Task MyServiceBus_request_client_receives_MassTransit_response()
     {
         await using var container = new RabbitMqBuilder("rabbitmq:4.1-alpine").Build();
