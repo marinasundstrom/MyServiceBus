@@ -7,6 +7,7 @@ Start with:
 - [MVP API Surface](mvp-api-surface.md)
 - [MVP Release Gate](mvp-release-gate.md)
 - [Mediator and In-Memory Stability Gate](in-memory-stability-gate.md)
+- [Mediator and In-Memory Conformance Matrix](in-memory-conformance-matrix.md)
 - [Design Goals](design-goals.md)
 - [MyServiceBus Architecture](../myservicebus-architecture.md)
 - [Compatibility Policy](../compatibility.md)

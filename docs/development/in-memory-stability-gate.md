@@ -15,6 +15,8 @@ The harness may build on shared in-memory delivery machinery, but production cod
 
 ## Required conformance scenarios
 
+Implementation status and concrete test mappings are maintained in the [Mediator and In-Memory Conformance Matrix](in-memory-conformance-matrix.md).
+
 Matching C# and Java tests must define and verify:
 
 1. start, stop, repeated lifecycle calls, and operations attempted outside the valid lifecycle
