@@ -177,12 +177,16 @@ public class InMemoryHarnessDiTest {
     }
 
     @Test
-    void consumerPublishInheritsHeadersCorrelationAndCancellation() {
+    void consumerPublishInheritsCancellationAndKeepsMetadataExplicit() {
         InMemoryTestHarness harness = new InMemoryTestHarness();
         AtomicReference<Object> header = new AtomicReference<>();
         AtomicReference<UUID> correlation = new AtomicReference<>();
         AtomicReference<CancellationToken> cancellation = new AtomicReference<>();
-        harness.registerHandler(ParentEvent.class, context -> context.publish(new ChildEvent()));
+        UUID childCorrelationId = UUID.randomUUID();
+        harness.registerHandler(ParentEvent.class, context -> context.publish(new ChildEvent(), outbound -> {
+            outbound.getHeaders().put("trace-id", "child");
+            outbound.setCorrelationId(childCorrelationId);
+        }));
         harness.registerHandler(ChildEvent.class, context -> {
             header.set(context.getHeaders().get("trace-id"));
             correlation.set(context.getCorrelationId());
@@ -191,15 +195,15 @@ public class InMemoryHarnessDiTest {
         });
         harness.start().join();
         com.myservicebus.tasks.CancellationTokenSource source = new com.myservicebus.tasks.CancellationTokenSource();
-        UUID correlationId = UUID.randomUUID();
+        UUID parentCorrelationId = UUID.randomUUID();
         SendContext context = new SendContext(new ParentEvent(), source.token());
-        context.getHeaders().put("trace-id", "abc");
-        context.setCorrelationId(correlationId);
+        context.getHeaders().put("trace-id", "parent");
+        context.setCorrelationId(parentCorrelationId);
 
         harness.send(context).join();
 
-        assertEquals("abc", header.get());
-        assertEquals(correlationId, correlation.get());
+        assertEquals("child", header.get());
+        assertEquals(childCorrelationId, correlation.get());
         assertEquals(source.token(), cancellation.get());
         harness.stop().join();
     }

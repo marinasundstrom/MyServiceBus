@@ -172,12 +172,18 @@ public class InMemoryHarnessDiTests
     }
 
     [Fact]
-    public async Task Consumer_publish_inherits_headers_correlation_and_cancellation()
+    public async Task Consumer_publish_inherits_cancellation_and_keeps_metadata_explicit()
     {
         var harness = new InMemoryTestHarness();
+        var parentCorrelationId = Guid.NewGuid();
+        var childCorrelationId = Guid.NewGuid();
         var observed = new TaskCompletionSource<(object? Header, Guid? CorrelationId, CancellationToken Token)>(
             TaskCreationOptions.RunContinuationsAsynchronously);
-        harness.RegisterHandler<ParentEvent>(context => context.Publish(new ChildEvent()));
+        harness.RegisterHandler<ParentEvent>(context => context.Publish(new ChildEvent(), outbound =>
+        {
+            outbound.Headers["trace-id"] = "child";
+            outbound.CorrelationId = childCorrelationId.ToString();
+        }));
         harness.RegisterHandler<ChildEvent>(context =>
         {
             context.Headers.TryGetValue("trace-id", out var header);
@@ -186,17 +192,16 @@ public class InMemoryHarnessDiTests
         });
         await harness.Start();
         using var cancellationSource = new CancellationTokenSource();
-        var correlationId = Guid.NewGuid();
 
         await harness.Publish(new ParentEvent(), context =>
         {
-            context.Headers["trace-id"] = "abc";
-            context.CorrelationId = correlationId.ToString();
+            context.Headers["trace-id"] = "parent";
+            context.CorrelationId = parentCorrelationId.ToString();
         }, cancellationSource.Token);
 
         var result = await observed.Task;
-        Assert.Equal("abc", result.Header);
-        Assert.Equal(correlationId, result.CorrelationId);
+        Assert.Equal("child", result.Header);
+        Assert.Equal(childCorrelationId, result.CorrelationId);
         Assert.Equal(cancellationSource.Token, result.Token);
         await harness.Stop();
     }

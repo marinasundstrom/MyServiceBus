@@ -238,9 +238,6 @@ public class InMemoryTestHarness : IMessageBus, ITransportFactory, IReceiveEndpo
                 : receiveContext.CancellationToken;
             return harness.Publish(message, context =>
             {
-                foreach (var header in receiveContext.Headers)
-                    context.Headers[header.Key] = header.Value;
-                context.CorrelationId = receiveContext.CorrelationId?.ToString();
                 contextCallback?.Invoke(context);
             }, effectiveCancellationToken);
         }
