@@ -44,6 +44,7 @@ This changelog summarizes the bigger themes in the repository history. It is int
 - Verified matching mediator consume-filter wrapping and downstream-only retry re-entry in C# and Java.
 - Verified matching mediator retry-exhaustion attempt counts, filter observations, and terminal failure propagation.
 - Made Java fixed-delay retries react immediately to cancellation, matching C# behavior and preventing another attempt.
+- Verified that mediator consumer failures are attempted once and propagate immediately when retry is not configured.
 
 ## 2026-03-24 to 2026-03-19
 

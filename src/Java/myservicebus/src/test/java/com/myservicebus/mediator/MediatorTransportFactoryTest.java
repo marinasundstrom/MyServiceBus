@@ -245,6 +245,27 @@ public class MediatorTransportFactoryTest {
     }
 
     @Test
+    public void consumerFailureWithoutRetryIsAttemptedOnceAndPropagated() {
+        FailingConsumer.attempts = 0;
+        FailingConsumer.calls = new ArrayList<>();
+        ServiceCollection services = ServiceCollection.create();
+        MediatorBus bus = MediatorBus.configure(services, cfg ->
+                cfg.addConsumer(FailingConsumer.class, TestMessage.class, pipe ->
+                        pipe.useFilter(new RecordingConsumeFilter("filter", FailingConsumer.calls))));
+
+        CompletionException exception = Assertions.assertThrows(
+                CompletionException.class,
+                () -> bus.publish(new TestMessage("fail")));
+
+        Assertions.assertInstanceOf(IllegalStateException.class, exception.getCause());
+        Assertions.assertEquals("exhausted", exception.getCause().getMessage());
+        Assertions.assertEquals(1, FailingConsumer.attempts);
+        Assertions.assertEquals(
+                List.of("filter:before", "consumer:1", "filter:fault"),
+                FailingConsumer.calls);
+    }
+
+    @Test
     public void publishDeliversMessageToHandler() {
         ServiceCollection services = ServiceCollection.create();
         MediatorBus bus = MediatorBus.configure(services, cfg -> {

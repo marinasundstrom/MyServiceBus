@@ -46,6 +46,8 @@ Application filters registered before a retry filter are entered once and observ
 
 When every attempt fails, the last underlying consumer failure remains the terminal failure. Upstream filters observe that failure once after retry is exhausted; downstream filters observe every failed attempt. Java exposes the terminal failure through its idiomatic `CompletionException` wrapper when a `CompletableFuture` is joined, while C# `await` surfaces the underlying exception directly.
 
+Retry remains opt-in. Without a configured retry filter, a failing mediator consumer is invoked exactly once and its failure propagates immediately through the surrounding consume filters.
+
 The initial portable retry profile supports immediate and fixed-delay attempts. Exception selection, attempt metadata, scope behavior, and redelivery are separate compatibility requirements and must not be implied until specified and tested.
 
 Cancellation while waiting for a fixed-delay retry completes the operation promptly with the platform's cancellation exception and prevents another attempt. Java cancellation tokens support unregisterable callbacks so delayed pipeline work can provide the same observable behavior as cancellation-aware .NET tasks.
