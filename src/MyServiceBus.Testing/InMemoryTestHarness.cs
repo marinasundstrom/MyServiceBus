@@ -193,9 +193,6 @@ public class InMemoryTestHarness : IMessageBus, ITransportFactory, IReceiveEndpo
         lock (receiveHandlers)
             snapshot = receiveHandlers.ToList();
 
-        foreach (var handler in snapshot)
-            await handler(receiveContext).ConfigureAwait(false);
-
         List<Func<ReceiveContext, Task>> messageHandlers;
         lock (handlerLock)
             messageHandlers = handlers
@@ -204,9 +201,23 @@ public class InMemoryTestHarness : IMessageBus, ITransportFactory, IReceiveEndpo
                 .Distinct()
                 .ToList();
 
-        foreach (var h in messageHandlers)
+        var deliveries = snapshot
+            .Concat(messageHandlers)
+            .Select(handler => InvokeHandler(handler, receiveContext))
+            .ToArray();
+
+        await Task.WhenAll(deliveries).ConfigureAwait(false);
+    }
+
+    static Task InvokeHandler(Func<ReceiveContext, Task> handler, ReceiveContext receiveContext)
+    {
+        try
         {
-            await h(receiveContext).ConfigureAwait(false);
+            return handler(receiveContext);
+        }
+        catch (Exception exception)
+        {
+            return Task.FromException(exception);
         }
     }
 

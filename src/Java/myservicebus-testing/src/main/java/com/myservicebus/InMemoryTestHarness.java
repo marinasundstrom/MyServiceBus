@@ -105,7 +105,7 @@ public class InMemoryTestHarness implements RequestClientTransport, TransportSen
             messageType = messageType.getInterfaces()[0];
         }
         final Class<?> mt = messageType;
-        CompletableFuture<Void> future = CompletableFuture.completedFuture(null);
+        List<CompletableFuture<Void>> deliveries = new ArrayList<>();
 
         List<com.myservicebus.Consumer<?>> list = handlers.entrySet().stream()
                 .filter(entry -> entry.getKey().isAssignableFrom(mt))
@@ -120,24 +120,22 @@ public class InMemoryTestHarness implements RequestClientTransport, TransportSen
                     faultAddress, null, context.getCancellationToken(), this, java.net.URI.create("inmemory:bus"),
                     entityName -> "inmemory:" + entityName, context.getRequestId(), context.getCorrelationId(),
                     context.getConversationId(), context.getInitiatorId());
-            future = future.thenCompose(v -> {
+            try {
+                CompletableFuture<Void> delivery;
                 try {
                     if (consumeContextProvider != null) {
                         consumeContextProvider.setContext(consumeContext);
                     }
-                    try {
-                        return handler.consume(consumeContext).thenRun(() -> consumed.add(message));
-                    } finally {
-                        if (consumeContextProvider != null) {
-                            consumeContextProvider.clear();
-                        }
+                    delivery = handler.consume(consumeContext).thenRun(() -> consumed.add(message));
+                } finally {
+                    if (consumeContextProvider != null) {
+                        consumeContextProvider.clear();
                     }
-                } catch (Exception e) {
-                    CompletableFuture<Void> failed = new CompletableFuture<>();
-                    failed.completeExceptionally(e);
-                    return failed;
                 }
-            });
+                deliveries.add(delivery);
+            } catch (Throwable failure) {
+                deliveries.add(CompletableFuture.failedFuture(failure));
+            }
         }
 
         if (serviceProvider != null) {
@@ -149,41 +147,37 @@ public class InMemoryTestHarness implements RequestClientTransport, TransportSen
                     if (!handles) {
                         continue;
                     }
-                    future = future.thenCompose(v -> {
-                        ServiceScope scope = serviceProvider.createScope();
+                    ServiceScope scope = serviceProvider.createScope();
+                    try {
+                        ServiceProvider scoped = scope.getServiceProvider();
+                        @SuppressWarnings("unchecked")
+                        com.myservicebus.Consumer<Object> consumer = (com.myservicebus.Consumer<Object>) scoped
+                                .getService(ct.getConsumerType());
+                        @SuppressWarnings("unchecked")
+                        ConsumeContext<Object> consumeContext = new ConsumeContext<>(message, context.getHeaders(),
+                                responseAddress, faultAddress, null, context.getCancellationToken(),
+                                InMemoryTestHarness.this, java.net.URI.create("inmemory:bus"),
+                                entityName -> "inmemory:" + entityName, context.getRequestId(),
+                                context.getCorrelationId(), context.getConversationId(), context.getInitiatorId());
+                        ConsumeContextProvider ctxProvider = scoped.getService(ConsumeContextProvider.class);
+                        ctxProvider.setContext(consumeContext);
+                        CompletableFuture<Void> result;
                         try {
-                            ServiceProvider scoped = scope.getServiceProvider();
-                            @SuppressWarnings("unchecked")
-                            com.myservicebus.Consumer<Object> consumer = (com.myservicebus.Consumer<Object>) scoped
-                                    .getService(ct.getConsumerType());
-                            @SuppressWarnings("unchecked")
-                            ConsumeContext<Object> consumeContext = new ConsumeContext<>(message, context.getHeaders(),
-                                    responseAddress, faultAddress, null, context.getCancellationToken(),
-                                    InMemoryTestHarness.this, java.net.URI.create("inmemory:bus"),
-                                    entityName -> "inmemory:" + entityName, context.getRequestId(),
-                                    context.getCorrelationId(), context.getConversationId(), context.getInitiatorId());
-                            ConsumeContextProvider ctxProvider = scoped.getService(ConsumeContextProvider.class);
-                            ctxProvider.setContext(consumeContext);
-                            try {
-                                CompletableFuture<Void> result = consumer.consume(consumeContext)
-                                        .thenRun(() -> consumed.add(message));
-                                scope.detach();
-                                return result.whenComplete((ignored, failure) -> scope.close());
-                            } finally {
-                                ctxProvider.clear();
-                            }
-                        } catch (Throwable e) {
-                            scope.close();
-                            CompletableFuture<Void> failed = new CompletableFuture<>();
-                            failed.completeExceptionally(e);
-                            return failed;
+                            result = consumer.consume(consumeContext).thenRun(() -> consumed.add(message));
+                        } finally {
+                            ctxProvider.clear();
                         }
-                    });
+                        scope.detach();
+                        deliveries.add(result.whenComplete((ignored, failure) -> scope.close()));
+                    } catch (Throwable failure) {
+                        scope.close();
+                        deliveries.add(CompletableFuture.failedFuture(failure));
+                    }
                 }
             }
         }
 
-        return future;
+        return CompletableFuture.allOf(deliveries.toArray(new CompletableFuture[0]));
     }
 
     private static <T> CompletableFuture<T> notStartedFuture() {

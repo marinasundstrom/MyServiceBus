@@ -239,7 +239,7 @@ Define consumers to handle messages. The consume context provides the message, h
 
 Consumers can bind to the same topic or exchange to subscribe to notifications or events. Multiple replicas of a service may bind to the same queue; the first instance to dequeue a message processes it, supporting scaling and resilience.
 
-Multiple consumer types can handle the same message. MyServiceBus invokes them one at a time; if any consumer throws, remaining consumers are skipped and failure handling applies (retries → faults → potential error queue). Consumers can also bind to different queues for the same message type, such as processing an `_error` queue alongside the primary endpoint.
+Multiple consumer types can handle the same message. Each matched consumer is an independent delivery: MyServiceBus invokes all of them and waits for all deliveries to settle. If any consumer fails, the overall dispatch fails, but that failure does not prevent the other matched consumers from being invoked. No registration, start, or completion order is guaranteed between independent consumers. Filters inside one consumer pipeline still follow their configured order. Consumers can also bind to different queues for the same message type, such as processing an `_error` queue alongside the primary endpoint.
 
 #### C#
 
