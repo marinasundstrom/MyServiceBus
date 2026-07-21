@@ -152,6 +152,7 @@ This changelog summarizes the bigger themes in the repository history. It is int
 Keep this file updated for significant changes. Prefer adding dated entries that summarize the main themes of a change set instead of listing every commit.
 # Unreleased
 
+- Added clean C# and Java consumer smoke projects that restore and run exclusively from the staged NuGet and Maven publications.
 - Added CI package verification for the four preview NuGet packages and seven Maven publications, validating exact artifact sets plus package identity, licensing, repository, symbols, sources, and Javadocs.
 - Completed the mediator and in-memory stability matrix with matching directed-send and publish fan-out scenarios, added the missing Java local APIs, and fixed duplicate C# consumer delivery by sharing one receive transport per logical endpoint.
 - Added deterministic C# and Java scheduling conformance for both publish and directed send using injectable manual job schedulers, including cancellation without wall-clock sleeps and an explicit absence of same-time ordering guarantees.
