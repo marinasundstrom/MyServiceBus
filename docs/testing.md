@@ -50,6 +50,10 @@ Ordinary test runs report these scenarios as skipped. The dedicated cross-langua
 ## Usage
 The pattern is identical in both languages: create the harness, register handlers, start it, send messages, assert consumption, and then stop the harness.
 
+The harness starts in the stopped state. `Start`/`start` and `Stop`/`stop` are idempotent, and a stopped harness may be started again. Send, publish, and request operations before start or after stop fail with the platform's invalid-state exception. Handler and consumer registration remains valid while stopped so a test can be fully configured before it starts delivery.
+
+The standalone mediator has a different responsibility: it is immediately usable after construction and does not model a hosted transport lifecycle. A hosted broker-backed bus still follows its host or explicit bus lifecycle.
+
 ### C#
 ```csharp
 var harness = new InMemoryTestHarness();

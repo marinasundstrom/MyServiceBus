@@ -46,6 +46,7 @@ This changelog summarizes the bigger themes in the repository history. It is int
 - Made Java fixed-delay retries react immediately to cancellation, matching C# behavior and preventing another attempt.
 - Verified that mediator consumer failures are attempted once and propagate immediately when retry is not configured.
 - Added the shared C# and Java mediator/in-memory conformance matrix, identifying verified behavior and the remaining stability gaps.
+- Defined matching explicit, idempotent lifecycle behavior for the C# and Java in-memory test harnesses while keeping standalone mediators immediately usable.
 
 ## 2026-03-24 to 2026-03-19
 

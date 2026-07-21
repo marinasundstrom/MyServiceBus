@@ -107,11 +107,40 @@ public class InMemoryHarnessDiTests
             return Task.CompletedTask;
         });
 
+        await harness.Start();
+
         await Task.WhenAll(Enumerable.Range(0, 200)
             .Select(sequence => harness.Publish(new ConcurrentMessage(sequence))));
 
         Assert.Equal(200, received.Count);
         Assert.Equal(200, received.Distinct().Count());
         Assert.Equal(200, harness.Consumed.OfType<ConcurrentMessage>().Count());
+
+        await harness.Stop();
+    }
+
+    [Fact]
+    public async Task Lifecycle_is_idempotent_and_operations_require_started_state()
+    {
+        var harness = new InMemoryTestHarness();
+        harness.RegisterHandler<SubmitOrder>(_ => Task.CompletedTask);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            harness.Publish(new SubmitOrder(Guid.NewGuid())));
+
+        await harness.Start();
+        await harness.Start();
+        await harness.Publish(new SubmitOrder(Guid.NewGuid()));
+
+        await harness.Stop();
+        await harness.Stop();
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            harness.Publish(new SubmitOrder(Guid.NewGuid())));
+
+        await harness.Start();
+        await harness.Publish(new SubmitOrder(Guid.NewGuid()));
+        Assert.Equal(2, harness.Consumed.OfType<SubmitOrder>().Count());
+
+        await harness.Stop();
     }
 }

@@ -530,6 +530,8 @@ bus.publish(new SubmitOrder(UUID.randomUUID()));
 
 The mediator dispatches messages in-memory, making it useful for tests, local tools, modular-monolith boundaries, and interactions that are intentionally confined to the current process. It reuses the consumer model and pipelines, but it does not provide broker durability or independent delivery.
 
+The standalone mediator is ready for local dispatch immediately after construction. The in-memory test harness is intentionally different: tests configure it while stopped, call `Start`/`start` before messaging operations, and call `Stop`/`stop` when finished. Repeated lifecycle calls are safe, and operations while the harness is stopped fail explicitly.
+
 When an application also has a broker-backed bus, publish events that represent externally observable facts through that bus. Avoid publishing the same event through both the mediator and the bus as interchangeable paths: they have different retry, durability, observability, and failure semantics. Use both only when the local and distributed interactions are deliberately different.
 
 ---
