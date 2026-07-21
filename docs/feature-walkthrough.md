@@ -257,7 +257,7 @@ class SubmitOrderConsumer : IConsumer<SubmitOrder>
 class SubmitOrderConsumer implements Consumer<SubmitOrder> {
     @Override
     public CompletableFuture<Void> consume(ConsumeContext<SubmitOrder> context) {
-        return context.publish(new OrderSubmitted(context.getMessage().getOrderId()), CancellationToken.none);
+        return context.publish(new OrderSubmitted(context.getMessage().getOrderId()));
     }
 }
 ```
@@ -382,13 +382,13 @@ Console.WriteLine(response.Message.Status);
 class CheckOrderStatusConsumer implements Consumer<CheckOrderStatus> {
     @Override
     public CompletableFuture<Void> consume(ConsumeContext<CheckOrderStatus> context) {
-        return context.respond(new OrderStatus(context.getMessage().getOrderId(), "Pending"), CancellationToken.none);
+        return context.respond(new OrderStatus(context.getMessage().getOrderId(), "Pending"));
     }
 }
 
 RequestClientFactory factory = serviceProvider.getService(RequestClientFactory.class);
 RequestClient<CheckOrderStatus> client = factory.create(CheckOrderStatus.class);
-OrderStatus response = client.getResponse(new CheckOrderStatus(UUID.randomUUID()), OrderStatus.class, CancellationToken.none).join();
+OrderStatus response = client.getResponse(new CheckOrderStatus(UUID.randomUUID()), OrderStatus.class).join();
 System.out.println(response.getStatus());
 ```
 
@@ -420,7 +420,7 @@ RequestClientFactory factory = serviceProvider.getService(RequestClientFactory.c
 RequestClient<CheckOrderStatus> client = factory.create(CheckOrderStatus.class);
 Response2<OrderStatus, Fault<?>> response =
     client.getResponse(new CheckOrderStatus(UUID.randomUUID()),
-        OrderStatus.class, Fault.class, CancellationToken.none).join();
+        OrderStatus.class, Fault.class).join();
 
 response.as(OrderStatus.class)
     .ifPresent(r -> System.out.println(r.getMessage().getStatus()));
@@ -481,8 +481,7 @@ RequestClient<CheckOrderStatus> client = factory.create(CheckOrderStatus.class);
 OrderStatus response = client.getResponse(
     new CheckOrderStatus(UUID.randomUUID()),
     OrderStatus.class,
-    ctx -> ctx.getHeaders().put("trace-id", UUID.randomUUID()),
-    CancellationToken.none).join();
+    ctx -> ctx.getHeaders().put("trace-id", UUID.randomUUID())).join();
 ```
 
 ---
@@ -707,7 +706,7 @@ public class MyService {
     }
 
     public CompletableFuture<Void> doWork(MyEvent event) {
-        return publishEndpoint.publish(event, CancellationToken.none);
+        return publishEndpoint.publish(event);
     }
 }
 ```
@@ -992,7 +991,7 @@ public void publishesOrderSubmitted() {
     harness.start().join();
 
     harness.registerHandler(SubmitOrder.class, ctx ->
-        ctx.publish(new OrderSubmitted(ctx.getMessage().getOrderId()), CancellationToken.none)
+        ctx.publish(new OrderSubmitted(ctx.getMessage().getOrderId()))
     );
 
     harness.send(new SubmitOrder(UUID.randomUUID())).join();

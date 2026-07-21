@@ -29,7 +29,7 @@ public class ConsumeContextTest {
     @Test
     public void consumeContextUsesProvidedCancellationToken() {
         CancellationTokenSource cts = new CancellationTokenSource();
-        CancellationToken token = cts.getToken();
+        CancellationToken token = cts.token();
         ConsumeContext<String> ctx = new ConsumeContext<>(
                 "hello",
                 Map.of(),
@@ -60,12 +60,12 @@ public class ConsumeContextTest {
                 null,
                 null,
                 null,
-                CancellationToken.none,
+                CancellationToken.none(),
                 provider,
                 URI.create("custom://source/"),
                 entityName -> "custom://publish/" + entityName);
 
-        ctx.publish(new FakeMessage(), CancellationToken.none).join();
+        ctx.publish(new FakeMessage(), CancellationToken.none()).join();
 
         Assertions.assertEquals(
                 "custom://publish/TestApp:FakeMessage",
@@ -87,7 +87,7 @@ public class ConsumeContextTest {
         CapturingProvider provider = new CapturingProvider();
         ConsumeContext<FakeMessage> ctx = new ConsumeContext<>(new FakeMessage(), Map.of(), provider);
 
-        ctx.forward("queue:forward-queue", new FakeMessage(), CancellationToken.none).join();
+        ctx.forward("queue:forward-queue", new FakeMessage(), CancellationToken.none()).join();
 
         Assertions.assertEquals("queue:forward-queue", provider.uri);
     }
@@ -107,7 +107,7 @@ public class ConsumeContextTest {
         CapturingProvider provider = new CapturingProvider();
         ConsumeContext<FakeMessage> ctx = new ConsumeContext<>(new FakeMessage(), Map.of(), provider);
 
-        ctx.send("queue:send-queue", new FakeMessage(), CancellationToken.none).join();
+        ctx.send("queue:send-queue", new FakeMessage(), CancellationToken.none()).join();
 
         Assertions.assertEquals("queue:send-queue", provider.uri);
     }
@@ -131,7 +131,7 @@ public class ConsumeContextTest {
         Map<String, Object> headers = Map.of("foo", "bar");
         ConsumeContext<FakeMessage> ctx = new ConsumeContext<>(new FakeMessage(), headers, provider);
 
-        ctx.forward("queue:forward-queue", new FakeMessage(), CancellationToken.none).join();
+        ctx.forward("queue:forward-queue", new FakeMessage(), CancellationToken.none()).join();
 
         Assertions.assertEquals("bar", captured.get().getHeaders().get("foo"));
     }
@@ -176,7 +176,7 @@ public class ConsumeContextTest {
             }
         };
 
-        ConsumeContext<FakeMessage> ctx = new ConsumeContext<>(new FakeMessage(), Map.of(), "queue:response", null, CancellationToken.none, provider);
+        ConsumeContext<FakeMessage> ctx = new ConsumeContext<>(new FakeMessage(), Map.of(), "queue:response", null, CancellationToken.none(), provider);
 
         ctx.respond(new FakeMessage()).join();
 

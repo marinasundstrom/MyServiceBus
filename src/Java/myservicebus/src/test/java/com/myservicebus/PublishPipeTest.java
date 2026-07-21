@@ -16,7 +16,7 @@ class PublishPipeTest {
         AtomicBoolean called = new AtomicBoolean(false);
         cfg.useExecute(ctx -> { called.set(true); return CompletableFuture.completedFuture(null); });
         PublishPipe publishPipe = new PublishPipe(cfg.build());
-        PublishContext context = new PublishContext("hi", CancellationToken.none);
+        PublishContext context = new PublishContext("hi", CancellationToken.none());
         publishPipe.send(context).join();
         assertTrue(called.get());
     }

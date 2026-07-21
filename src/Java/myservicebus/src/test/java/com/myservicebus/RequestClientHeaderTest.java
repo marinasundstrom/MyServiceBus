@@ -30,7 +30,7 @@ class RequestClientHeaderTest {
         };
 
         RequestClient<MyRequest> client = new GenericRequestClient<>(MyRequest.class, transport);
-        client.getResponse(new MyRequest(), Void.class, c -> c.getHeaders().put("trace-id", "abc"), CancellationToken.none).join();
+        client.getResponse(new MyRequest(), Void.class, c -> c.getHeaders().put("trace-id", "abc"), CancellationToken.none()).join();
 
         assertEquals("abc", header.get());
     }

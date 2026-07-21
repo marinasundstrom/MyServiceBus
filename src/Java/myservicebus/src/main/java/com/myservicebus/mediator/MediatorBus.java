@@ -31,7 +31,7 @@ public class MediatorBus {
         try (ServiceScope scope = serviceProvider.createScope()) {
             SendEndpointProvider provider = scope.getServiceProvider().getService(SendEndpointProvider.class);
             provider.getSendEndpoint("loopback://" + exchange)
-                    .send(message, CancellationToken.none).join();
+                    .send(message, CancellationToken.none()).join();
         }
     }
 }

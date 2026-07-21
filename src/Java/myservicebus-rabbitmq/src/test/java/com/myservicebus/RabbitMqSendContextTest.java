@@ -10,7 +10,7 @@ import com.myservicebus.tasks.CancellationToken;
 class RabbitMqSendContextTest {
     @Test
     void exposesBasicProperties() {
-        RabbitMqSendContext ctx = new RabbitMqSendContext("hi", CancellationToken.none);
+        RabbitMqSendContext ctx = new RabbitMqSendContext("hi", CancellationToken.none());
         assertEquals(2, ctx.getProperties().build().getDeliveryMode().intValue());
     }
 }

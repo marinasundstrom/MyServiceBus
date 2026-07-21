@@ -29,7 +29,7 @@ class SendPipeTest {
                 return sendPipe.send(sc).thenCompose(v -> endpoint.send((T) sc.getMessage(), token));
             }
         };
-        wrapped.send("hi", CancellationToken.none).join();
+        wrapped.send("hi", CancellationToken.none()).join();
         assertTrue(called.get());
     }
 }

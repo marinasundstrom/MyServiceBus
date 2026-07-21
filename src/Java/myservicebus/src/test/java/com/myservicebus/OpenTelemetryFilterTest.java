@@ -37,7 +37,7 @@ class OpenTelemetryFilterTest {
         PipeConfigurator<SendContext> cfg = new PipeConfigurator<>();
         cfg.useFilter(new OpenTelemetrySendFilter());
         Pipe<SendContext> pipe = cfg.build();
-        SendContext ctx = new SendContext("hi", com.myservicebus.tasks.CancellationToken.none);
+        SendContext ctx = new SendContext("hi", com.myservicebus.tasks.CancellationToken.none());
         pipe.send(ctx).join();
         assertTrue(ctx.getHeaders().containsKey("traceparent"));
     }

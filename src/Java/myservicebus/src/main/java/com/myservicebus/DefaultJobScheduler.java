@@ -44,7 +44,7 @@ public class DefaultJobScheduler implements JobScheduler {
                 if (cancellationToken.isCancelled() || cts.isCancelled()) {
                     return;
                 }
-                callback.apply(cts.getToken()).whenComplete((r, e) -> {
+                callback.apply(cts.token()).whenComplete((r, e) -> {
                     jobs.remove(id);
                 });
             } catch (Throwable t) {

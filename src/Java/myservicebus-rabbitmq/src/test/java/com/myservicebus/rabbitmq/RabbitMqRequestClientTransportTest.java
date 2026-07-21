@@ -63,7 +63,7 @@ class RabbitMqRequestClientTransportTest {
 
         RabbitMqRequestClientTransport transport = new RabbitMqRequestClientTransport(new StubConnectionProvider(connection));
 
-        SendContext ctx = new SendContext(new Ping("hi"), CancellationToken.none);
+        SendContext ctx = new SendContext(new Ping("hi"), CancellationToken.none());
         transport.sendRequest(Ping.class, ctx, String.class);
 
         ArgumentCaptor<byte[]> body = ArgumentCaptor.forClass(byte[].class);
@@ -92,7 +92,7 @@ class RabbitMqRequestClientTransportTest {
         RabbitMqRequestClientTransport transport = new RabbitMqRequestClientTransport(
                 new StubConnectionProvider(connection));
 
-        SendContext context = new SendContext(new Ping("hi"), CancellationToken.none);
+        SendContext context = new SendContext(new Ping("hi"), CancellationToken.none());
         context.setDestinationAddress(java.net.URI.create(
                 "rabbitmq://custom.example:5679/exchange/custom-requests"));
         transport.sendRequest(Ping.class, context, String.class);

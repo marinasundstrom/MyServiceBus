@@ -19,10 +19,10 @@ public interface MessageConsumeContext {
     }
 
     default <T> CompletableFuture<Void> respond(T message, Consumer<SendContext> contextCallback) {
-        return respond(message, contextCallback, CancellationToken.none);
+        return respond(message, contextCallback, CancellationToken.none());
     }
 
     default <T> CompletableFuture<Void> respond(T message) {
-        return respond(message, CancellationToken.none);
+        return respond(message, CancellationToken.none());
     }
 }

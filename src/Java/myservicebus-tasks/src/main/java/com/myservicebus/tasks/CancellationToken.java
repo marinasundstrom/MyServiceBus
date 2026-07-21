@@ -3,13 +3,24 @@ package com.myservicebus.tasks;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.CancellationException;
 
-// Read-only token
-public class CancellationToken {
+/**
+ * A read-only signal for cooperative cancellation of an asynchronous operation.
+ */
+public final class CancellationToken {
+    private static final CancellationToken NONE = new CancellationToken(new State());
     private final State state;
 
-    protected CancellationToken(State state) {
+    CancellationToken(State state) {
         this.state = state;
+    }
+
+    /**
+     * Returns a token that is never cancelled.
+     */
+    public static CancellationToken none() {
+        return NONE;
     }
 
     public boolean isCancelled() {
@@ -17,19 +28,26 @@ public class CancellationToken {
     }
 
     /**
+     * Throws {@link CancellationException} when cancellation has been requested.
+     */
+    public void throwIfCancelled() {
+        if (isCancelled()) {
+            throw new CancellationException();
+        }
+    }
+
+    /**
      * Registers a callback that runs once when cancellation is requested.
      * Closing the returned registration prevents invocation when cancellation
      * has not already occurred.
      */
-    public CancellationRegistration register(Runnable callback) {
+    public CancellationRegistration onCancel(Runnable callback) {
         return state.register(Objects.requireNonNull(callback, "callback"));
     }
 
-    protected void cancel() {
+    void cancel() {
         state.cancel();
     }
-
-    public static final CancellationToken none = new CancellationToken(new State());
 
     protected static final class State {
         private boolean cancelled;

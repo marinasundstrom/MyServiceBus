@@ -23,9 +23,9 @@ class ConsumeContextFaultTest {
     void respondFaultSendsFault() {
         CaptureSendEndpoint endpoint = new CaptureSendEndpoint();
         SendEndpointProvider provider = uri -> endpoint;
-        ConsumeContext<String> ctx = new ConsumeContext<>("hi", Collections.emptyMap(), "queue", null, CancellationToken.none, provider);
+        ConsumeContext<String> ctx = new ConsumeContext<>("hi", Collections.emptyMap(), "queue", null, CancellationToken.none(), provider);
 
-        ctx.respondFault(new RuntimeException("boom"), CancellationToken.none);
+        ctx.respondFault(new RuntimeException("boom"), CancellationToken.none());
 
         assertNotNull(endpoint.sent);
         assertTrue(endpoint.sent instanceof Fault);

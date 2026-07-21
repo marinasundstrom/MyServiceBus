@@ -73,7 +73,7 @@ public class RabbitMqTestcontainerTest {
             try {
                 CompatibilityMessage message = new CompatibilityMessage();
                 message.setValue("from-java");
-                SendContext context = new SendContext(message, CancellationToken.none);
+                SendContext context = new SendContext(message, CancellationToken.none());
                 byte[] body = context.serialize(new EnvelopeMessageSerializer());
                 SendTransport sendTransport = transportFactory.getSendTransport(exchangeName, true, false);
 

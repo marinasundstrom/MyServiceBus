@@ -65,7 +65,7 @@ public class Main {
 ```java
 RequestClient<SubmitOrder> client = serviceProvider.getService(RequestClient.class);
 OrderSubmitted response = client
-        .getResponse(new SubmitOrder(UUID.randomUUID(), "demo"), OrderSubmitted.class, CancellationToken.none)
+        .getResponse(new SubmitOrder(UUID.randomUUID(), "demo"), OrderSubmitted.class)
         .get();
 ```
 
@@ -151,7 +151,7 @@ class SubmitOrderConsumer implements Consumer<SubmitOrder> {
 
         System.out.println("Hello, World!");
 
-        return context.publish(new OrderSubmitted(orderId), CancellationToken.none);
+        return context.publish(new OrderSubmitted(orderId));
     }
 }
 ```

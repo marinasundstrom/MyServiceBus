@@ -41,12 +41,12 @@ public class FaultHandlingTest {
                 null,
                 "fault-queue",
                 null,
-                CancellationToken.none,
+                CancellationToken.none(),
                 provider,
                 URI.create("rabbitmq://localhost/"));
 
         RuntimeException ex = new RuntimeException("boom");
-        ctx.respondFault(ex, CancellationToken.none).join();
+        ctx.respondFault(ex, CancellationToken.none()).join();
 
         Assertions.assertTrue(provider.endpoint.sent instanceof Fault<?>);
         Assertions.assertEquals("fault-queue", provider.lastAddress);

@@ -23,7 +23,7 @@ class PipeConfiguratorTest {
         final List<String> calls = new ArrayList<>();
 
         TestContext() {
-            this(CancellationToken.none);
+            this(CancellationToken.none());
         }
 
         TestContext(CancellationToken token) {
@@ -165,12 +165,12 @@ class PipeConfiguratorTest {
         source.cancel();
         PipeConfigurator<TestContext> configurator = new PipeConfigurator<>();
         configurator.useExecute(context -> {
-            assertSame(source.getToken(), context.getCancellationToken());
+            assertSame(source.token(), context.getCancellationToken());
             assertTrue(context.getCancellationToken().isCancelled());
             return CompletableFuture.completedFuture(null);
         });
 
-        configurator.build().send(new TestContext(source.getToken())).join();
+        configurator.build().send(new TestContext(source.token())).join();
     }
 
     @Test
@@ -261,7 +261,7 @@ class PipeConfiguratorTest {
             return CompletableFuture.failedFuture(new IllegalStateException("retry"));
         });
 
-        CompletableFuture<Void> operation = configurator.build().send(new TestContext(source.getToken()));
+        CompletableFuture<Void> operation = configurator.build().send(new TestContext(source.token()));
 
         assertThrows(CancellationException.class, () -> operation.orTimeout(1, TimeUnit.SECONDS).join());
         assertEquals(1, attempts.get());
@@ -271,11 +271,11 @@ class PipeConfiguratorTest {
     void cancellationRegistrationsCanBeRemovedAndLateRegistrationsRunImmediately() {
         CancellationTokenSource source = new CancellationTokenSource();
         AtomicInteger calls = new AtomicInteger();
-        var removed = source.getToken().register(calls::incrementAndGet);
+        var removed = source.token().onCancel(calls::incrementAndGet);
         removed.close();
 
         source.cancel();
-        source.getToken().register(calls::incrementAndGet);
+        source.token().onCancel(calls::incrementAndGet);
 
         assertEquals(1, calls.get());
     }
