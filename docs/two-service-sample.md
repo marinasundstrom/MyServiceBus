@@ -2,6 +2,18 @@
 
 This sample runs the .NET and Java test apps together using MyServiceBus. Both apps expose the same demo endpoints and use the same message patterns so you can compare logs, faults, and traces directly.
 
+## Run with Aspire
+
+From the repository root:
+
+```bash
+dotnet run --project src/AspireApp
+```
+
+The AppHost starts a disposable instance of the pinned RabbitMQ broker, runs the Java application through its Gradle task, and injects the broker host and dynamically resolved port into both services. The Aspire dashboard links to the .NET and Java HTTP endpoints and collects their OpenTelemetry data.
+
+The manual steps below remain useful when you do not want to run Aspire.
+
 ## 1. Start RabbitMQ
 
 Use the provided compose file to start RabbitMQ:
