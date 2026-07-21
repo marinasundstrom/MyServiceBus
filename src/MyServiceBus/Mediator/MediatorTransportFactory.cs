@@ -37,17 +37,24 @@ public class MediatorTransportFactory : ITransportFactory
     }
 
     internal Task Dispatch(string exchange, ReceiveContext context)
-    {
-        if (_handlers.TryGetValue(exchange, out var handlers))
-        {
-            List<Func<ReceiveContext, Task>> snapshot;
-            lock (handlers)
-                snapshot = handlers.ToList();
+        => Dispatch(new[] { exchange }, context);
 
-            var tasks = snapshot.Select(h => h(context));
-            return Task.WhenAll(tasks);
+    internal Task Dispatch(IEnumerable<string> exchanges, ReceiveContext context)
+    {
+        var matchingHandlers = new HashSet<Func<ReceiveContext, Task>>();
+        foreach (var exchange in exchanges.Distinct(StringComparer.Ordinal))
+        {
+            if (!_handlers.TryGetValue(exchange, out var handlers))
+                continue;
+
+            lock (handlers)
+            {
+                foreach (var handler in handlers)
+                    matchingHandlers.Add(handler);
+            }
         }
-        return Task.CompletedTask;
+
+        return Task.WhenAll(matchingHandlers.Select(handler => handler(context)));
     }
 
     internal void Register(string exchange, Func<ReceiveContext, Task> handler)
@@ -151,7 +158,10 @@ public class MediatorTransportFactory : ITransportFactory
                 DateTimeOffset.UtcNow);
 
             var receiveContext = new ReceiveContextImpl(msgContext, null);
-            return _factory.Dispatch(_exchange, receiveContext);
+            var exchanges = MessageTypeCache.GetMessageTypes(typeof(T))
+                .Select(EntityNameFormatter.Format)
+                .Append(_exchange);
+            return _factory.Dispatch(exchanges, receiveContext);
         }
     }
 

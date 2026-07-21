@@ -20,6 +20,9 @@ public class InMemoryHarnessDiTests
     record CheckOrder(Guid OrderId);
     record OrderStatus(Guid OrderId);
     record ConcurrentMessage(int Sequence);
+    interface IAssignableEvent { }
+    class AssignableEvent { }
+    class DerivedAssignableEvent : AssignableEvent, IAssignableEvent { }
 
     class ScopedConsumerState
     {
@@ -172,6 +175,26 @@ public class InMemoryHarnessDiTests
         Assert.Equal(200, received.Distinct().Count());
         Assert.Equal(200, harness.Consumed.OfType<ConcurrentMessage>().Count());
 
+        await harness.Stop();
+    }
+
+    [Fact]
+    public async Task Dispatches_concrete_messages_to_interface_and_base_handlers_once()
+    {
+        var harness = new InMemoryTestHarness();
+        var concrete = 0;
+        var inherited = 0;
+        var interfaceCount = 0;
+        harness.RegisterHandler<DerivedAssignableEvent>(_ => { concrete++; return Task.CompletedTask; });
+        harness.RegisterHandler<AssignableEvent>(_ => { inherited++; return Task.CompletedTask; });
+        harness.RegisterHandler<IAssignableEvent>(_ => { interfaceCount++; return Task.CompletedTask; });
+        await harness.Start();
+
+        await harness.Publish(new DerivedAssignableEvent());
+
+        Assert.Equal(1, concrete);
+        Assert.Equal(1, inherited);
+        Assert.Equal(1, interfaceCount);
         await harness.Stop();
     }
 

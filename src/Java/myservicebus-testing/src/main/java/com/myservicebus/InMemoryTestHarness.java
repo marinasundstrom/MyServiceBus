@@ -106,7 +106,11 @@ public class InMemoryTestHarness implements RequestClientTransport, TransportSen
         final Class<?> mt = messageType;
         CompletableFuture<Void> future = CompletableFuture.completedFuture(null);
 
-        List<com.myservicebus.Consumer<?>> list = handlers.getOrDefault(mt, List.of());
+        List<com.myservicebus.Consumer<?>> list = handlers.entrySet().stream()
+                .filter(entry -> entry.getKey().isAssignableFrom(mt))
+                .flatMap(entry -> entry.getValue().stream())
+                .distinct()
+                .toList();
         for (com.myservicebus.Consumer<?> raw : list) {
             @SuppressWarnings("unchecked")
             com.myservicebus.Consumer<Object> handler = (com.myservicebus.Consumer<Object>) raw;
@@ -138,7 +142,7 @@ public class InMemoryTestHarness implements RequestClientTransport, TransportSen
             if (registry != null) {
                 for (ConsumerTopology ct : registry.getConsumers()) {
                     boolean handles = ct.getBindings().stream()
-                            .anyMatch(b -> b.getMessageType().equals(mt));
+                            .anyMatch(b -> b.getMessageType().isAssignableFrom(mt));
                     if (!handles) {
                         continue;
                     }

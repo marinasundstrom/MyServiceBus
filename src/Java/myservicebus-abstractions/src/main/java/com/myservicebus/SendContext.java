@@ -87,7 +87,7 @@ public class SendContext implements PipeContext, ScheduledMessage {
         context.setMessageId(UUID.randomUUID());
         context.setRequestId(requestId);
         context.setCorrelationId(null);
-        context.setMessageType(messageTypes != null ? messageTypes : List.of(MessageUrn.forClass(message.getClass())));
+        context.setMessageType(messageTypes != null ? messageTypes : MessageUrn.forMessageTypes(message.getClass()));
         context.setResponseAddress(null);
         context.setFaultAddress(null);
         context.setSourceAddress(sourceAddress != null ? sourceAddress : URI.create("loopback://localhost/source"));

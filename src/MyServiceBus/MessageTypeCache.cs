@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace MyServiceBus;
 
@@ -12,6 +14,11 @@ public static class MessageTypeCache
             return new[] { messageType, inner };
         }
 
-        return new[] { messageType };
+        var types = new List<Type> { messageType };
+        for (var baseType = messageType.BaseType; baseType is not null && baseType != typeof(object); baseType = baseType.BaseType)
+            types.Add(baseType);
+
+        types.AddRange(messageType.GetInterfaces().OrderBy(type => type.FullName, StringComparer.Ordinal));
+        return types.Distinct().ToArray();
     }
 }

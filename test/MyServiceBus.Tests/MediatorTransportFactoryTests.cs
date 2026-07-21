@@ -30,6 +30,40 @@ public class MediatorTransportFactoryTests
         public string Value { get; set; } = string.Empty;
     }
 
+    interface IAssignableEvent { }
+    class AssignableEvent { }
+    class DerivedAssignableEvent : AssignableEvent, IAssignableEvent { }
+
+    class ConcreteAssignableConsumer : IConsumer<DerivedAssignableEvent>
+    {
+        public static int Count;
+        public Task Consume(ConsumeContext<DerivedAssignableEvent> context)
+        {
+            Count++;
+            return Task.CompletedTask;
+        }
+    }
+
+    class BaseAssignableConsumer : IConsumer<AssignableEvent>
+    {
+        public static int Count;
+        public Task Consume(ConsumeContext<AssignableEvent> context)
+        {
+            Count++;
+            return Task.CompletedTask;
+        }
+    }
+
+    class InterfaceAssignableConsumer : IConsumer<IAssignableEvent>
+    {
+        public static int Count;
+        public Task Consume(ConsumeContext<IAssignableEvent> context)
+        {
+            Count++;
+            return Task.CompletedTask;
+        }
+    }
+
     class SampleConsumer : IConsumer<ConsumerMessage>
     {
         public static TaskCompletionSource<ConsumerMessage> Received = new();
@@ -218,6 +252,33 @@ public class MediatorTransportFactoryTests
         var message = await SampleConsumer.Received.Task;
         Assert.Equal("hello", message.Value);
 
+        await hosted.StopAsync(CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task Publish_dispatches_to_concrete_interface_and_base_consumers_once()
+    {
+        ConcreteAssignableConsumer.Count = 0;
+        BaseAssignableConsumer.Count = 0;
+        InterfaceAssignableConsumer.Count = 0;
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddServiceBus(cfg =>
+        {
+            cfg.UsingMediator();
+            cfg.AddConsumer<ConcreteAssignableConsumer>();
+            cfg.AddConsumer<BaseAssignableConsumer>();
+            cfg.AddConsumer<InterfaceAssignableConsumer>();
+        });
+        using var provider = services.BuildServiceProvider();
+        var hosted = provider.GetRequiredService<IHostedService>();
+        await hosted.StartAsync(CancellationToken.None);
+
+        await provider.GetRequiredService<IMessageBus>().Publish(new DerivedAssignableEvent());
+
+        Assert.Equal(1, ConcreteAssignableConsumer.Count);
+        Assert.Equal(1, BaseAssignableConsumer.Count);
+        Assert.Equal(1, InterfaceAssignableConsumer.Count);
         await hosted.StopAsync(CancellationToken.None);
     }
 
