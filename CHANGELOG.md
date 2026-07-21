@@ -152,6 +152,7 @@ This changelog summarizes the bigger themes in the repository history. It is int
 Keep this file updated for significant changes. Prefer adding dated entries that summarize the main themes of a change set instead of listing every commit.
 # Unreleased
 
+- Fixed the Aspire two-service sample by aligning Aspire package versions, supervising the Java Gradle task, using dynamic external endpoints, and injecting the orchestrated RabbitMQ endpoint into both clients.
 - Declared and CI-checked the MVP runtime and interoperability baseline, including exact .NET SDK, RabbitMQ, MassTransit, Gradle, and client-library versions plus the preview support window.
 - Added clean C# and Java consumer smoke projects that restore and run exclusively from the staged NuGet and Maven publications.
 - Added CI package verification for the four preview NuGet packages and seven Maven publications, validating exact artifact sets plus package identity, licensing, repository, symbols, sources, and Javadocs.
