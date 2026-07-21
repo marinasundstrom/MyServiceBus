@@ -33,7 +33,8 @@ internal class SendEndpointProvider : ISendEndpointProvider
             return _contextProvider.Context.GetSendEndpoint(uri);
 
         var logger = _loggerFactory?.CreateLogger<TransportSendEndpoint>();
-        ISendEndpoint endpoint = new TransportSendEndpoint(_transportFactory, _sendPipe, _serializer, uri, _bus.Address, _sendContextFactory, logger);
+        Action? ensureStarted = _bus is MessageBus messageBus ? messageBus.EnsureStarted : null;
+        ISendEndpoint endpoint = new TransportSendEndpoint(_transportFactory, _sendPipe, _serializer, uri, _bus.Address, _sendContextFactory, logger, ensureStarted);
         return Task.FromResult(endpoint);
     }
 }

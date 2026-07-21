@@ -56,6 +56,7 @@ public class TransportCapabilityTests
 
         Assert.Equal("in-memory", exception.Transport);
         Assert.Equal(TransportCapabilities.Durability, exception.Capability);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => bus.Publish(new object()));
     }
 
     [Fact]

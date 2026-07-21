@@ -81,7 +81,12 @@ class PublishContextAddressTest {
 
         MessageBus bus = new MessageBusImpl(services.buildServiceProvider());
 
-        bus.publish(new TestMessage());
+        bus.start();
+        try {
+            bus.publish(new TestMessage()).join();
+        } finally {
+            bus.stop();
+        }
 
         assertEquals(URI.create("rabbitmq://localhost/"), captured.get().getSourceAddress());
         assertEquals(URI.create("rabbitmq://localhost/exchange/TestApp:TestMessage"),

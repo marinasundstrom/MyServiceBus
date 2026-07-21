@@ -222,6 +222,39 @@ public class MediatorTransportFactoryTests
     }
 
     [Fact]
+    public async Task Hosted_bus_lifecycle_is_idempotent_and_operations_require_started_state()
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddServiceBus(cfg => cfg.UsingMediator());
+
+        using var provider = services.BuildServiceProvider();
+        var hosted = provider.GetRequiredService<IHostedService>();
+        var bus = provider.GetRequiredService<IMessageBus>();
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            bus.Publish(new ConsumerMessage { Value = "before" }));
+        var endpoint = await bus.GetSendEndpoint(new Uri("loopback://localhost/consumer-message"));
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            endpoint.Send(new ConsumerMessage { Value = "before" }));
+
+        await hosted.StartAsync(CancellationToken.None);
+        await hosted.StartAsync(CancellationToken.None);
+        await bus.Publish(new ConsumerMessage { Value = "started" });
+
+        await hosted.StopAsync(CancellationToken.None);
+        await hosted.StopAsync(CancellationToken.None);
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            bus.Publish(new ConsumerMessage { Value = "stopped" }));
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            endpoint.Send(new ConsumerMessage { Value = "stopped" }));
+
+        await hosted.StartAsync(CancellationToken.None);
+        await bus.Publish(new ConsumerMessage { Value = "restarted" });
+        await hosted.StopAsync(CancellationToken.None);
+    }
+
+    [Fact]
     public async Task Consume_filters_wrap_retry_and_only_downstream_filters_are_reentered()
     {
         RetryingConsumer.Attempts = 0;
