@@ -20,7 +20,7 @@ public class MultipleConsumersTests
     }
 
     [Fact]
-    public async Task Should_invoke_all_consumers()
+    public async Task Publish_should_invoke_all_consumers()
     {
         var services = new ServiceCollection();
         services.AddServiceBusTestHarness(x =>
@@ -37,6 +37,27 @@ public class MultipleConsumersTests
 
         Assert.True(harness.Consumed.OfType<SubmitOrder>().Count() == 2);
 
+        await harness.Stop();
+    }
+
+    [Fact]
+    public async Task Directed_send_should_invoke_all_consumers()
+    {
+        var services = new ServiceCollection();
+        services.AddServiceBusTestHarness(x =>
+        {
+            x.AddConsumer<FirstConsumer>();
+            x.AddConsumer<SecondConsumer>();
+        });
+
+        var provider = services.BuildServiceProvider();
+        var harness = provider.GetRequiredService<InMemoryTestHarness>();
+        await harness.Start();
+
+        var endpoint = await harness.GetSendEndpoint(new Uri("queue:submit-order"));
+        await endpoint.Send(new SubmitOrder(Guid.NewGuid()));
+
+        Assert.Equal(2, harness.Consumed.OfType<SubmitOrder>().Count());
         await harness.Stop();
     }
 }

@@ -20,7 +20,7 @@ import com.myservicebus.topology.ConsumerTopology;
 import com.myservicebus.topology.TopologyRegistry;
 import com.myservicebus.serialization.MessageSerializer;
 
-public class InMemoryTestHarness implements RequestClientTransport, TransportSendEndpointProvider {
+public class InMemoryTestHarness implements RequestClientTransport, TransportSendEndpointProvider, PublishEndpoint {
     private final Map<Class<?>, List<com.myservicebus.Consumer<?>>> handlers = new ConcurrentHashMap<>();
     private final List<Object> consumed = Collections.synchronizedList(new ArrayList<>());
     private final Object observationLock = new Object();
@@ -62,6 +62,11 @@ public class InMemoryTestHarness implements RequestClientTransport, TransportSen
 
     public <T> CompletableFuture<Void> send(T message) {
         return send(new SendContext(message, CancellationToken.none()));
+    }
+
+    @Override
+    public <T> CompletableFuture<Void> publish(T message, CancellationToken cancellationToken) {
+        return send(new SendContext(message, cancellationToken));
     }
 
     public <T> CompletableFuture<Void> send(T message, Consumer<SendContext> contextCallback) {

@@ -6,6 +6,8 @@ Before adding another broker transport, MyServiceBus will stabilize its in-proce
 
 This work targets MassTransit semantic and API familiarity where those promises make sense in process. It does not claim MassTransit wire or broker-topology interoperability, durability, acknowledgement, competing consumers, or redelivery.
 
+**Status:** complete for the current preview scope. All scenarios in the shared conformance matrix have matching C# and Java coverage.
+
 ## Separate responsibilities
 
 - The **mediator** is an application runtime for deliberately local dispatch. It invokes configured consumers and pipelines without serialization or broker delivery unless a documented option explicitly requests those boundaries.
