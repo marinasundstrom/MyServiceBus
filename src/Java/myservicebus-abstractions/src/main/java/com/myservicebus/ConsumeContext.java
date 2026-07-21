@@ -123,16 +123,23 @@ public class ConsumeContext<T>
 
     @Override
     public CompletableFuture<Void> publish(PublishContext context) {
-        headers.forEach(context.getHeaders()::putIfAbsent);
-        if (context.getCorrelationId() == null) {
-            context.setCorrelationId(correlationId);
-        }
         String exchange = EntityNameFormatter.format(context.getMessage().getClass());
         URI dest = URI.create(publishAddressProvider.getPublishAddress(exchange));
         context.setSourceAddress(busAddress);
         context.setDestinationAddress(dest);
         SendEndpoint endpoint = getSendEndpoint(dest.toString());
         return endpoint.send(context);
+    }
+
+    @Override
+    public <TMessage> CompletableFuture<Void> publish(TMessage message,
+            Consumer<PublishContext> contextCallback, CancellationToken cancellationToken) {
+        CancellationToken effectiveToken = cancellationToken == CancellationToken.none()
+                ? this.cancellationToken
+                : cancellationToken;
+        PublishContext context = new PublishContext(message, effectiveToken);
+        contextCallback.accept(context);
+        return publish(context);
     }
 
     @Override

@@ -68,9 +68,6 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
 
         var context = _publishContextFactory.Create(MessageTypeCache.GetMessageTypes(typeof(T)), _messageSerializer, effectiveCancellationToken);
         context.MessageId = Guid.NewGuid().ToString();
-        foreach (var header in receiveContext.Headers)
-            context.Headers[header.Key] = header.Value;
-        context.CorrelationId = receiveContext.CorrelationId?.ToString();
         context.SourceAddress = _address;
         context.DestinationAddress = uri;
         context.RoutingKey = exchangeName;
