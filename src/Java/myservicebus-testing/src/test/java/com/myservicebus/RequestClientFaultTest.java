@@ -54,6 +54,8 @@ public class RequestClientFaultTest {
         });
 
         ServiceProvider provider = services.buildServiceProvider();
+        InMemoryTestHarness harness = provider.getService(InMemoryTestHarness.class);
+        harness.start().join();
         try (ServiceScope scope = provider.createScope()) {
             ServiceProvider scoped = scope.getServiceProvider();
             ScopedClientFactory factory = scoped.getService(ScopedClientFactory.class);
@@ -65,5 +67,6 @@ public class RequestClientFaultTest {
             RequestFaultException rfe = (RequestFaultException) ex.getCause();
             assertEquals("nope", rfe.getFault().getExceptions().get(0).getMessage());
         }
+        harness.stop().join();
     }
 }

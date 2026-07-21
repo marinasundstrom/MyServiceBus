@@ -40,7 +40,7 @@ class MediatorSendEndpointTest {
         MediatorSendEndpoint endpoint = new MediatorSendEndpoint(provider, new MediatorSendEndpointProvider(provider));
 
         RetryConsumer.attempts = 0;
-        CompletableFuture<Void> future = endpoint.send(new TestMessage(), CancellationToken.none);
+        CompletableFuture<Void> future = endpoint.send(new TestMessage(), CancellationToken.none());
         Assertions.assertThrows(CompletionException.class, future::join);
         Assertions.assertEquals(1, RetryConsumer.attempts);
     }
@@ -59,7 +59,7 @@ class MediatorSendEndpointTest {
         MediatorSendEndpoint endpoint = new MediatorSendEndpoint(provider, new MediatorSendEndpointProvider(provider));
 
         RetryConsumer.attempts = 0;
-        endpoint.send(new TestMessage(), CancellationToken.none).join();
+        endpoint.send(new TestMessage(), CancellationToken.none()).join();
         Assertions.assertEquals(2, RetryConsumer.attempts);
     }
 }

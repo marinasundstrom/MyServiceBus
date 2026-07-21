@@ -13,7 +13,7 @@ public class MassTransitInteropTests
     [Fact]
     public async Task MyServiceBus_direct_send_delivers_to_MassTransit_consumer()
     {
-        await using var container = new RabbitMqBuilder("rabbitmq:4.1-alpine").Build();
+        await using var container = new RabbitMqBuilder("rabbitmq:4.1.8-alpine").Build();
         await container.StartAsync();
 
         var received = new TaskCompletionSource<CrossLanguageMessage>(
@@ -53,7 +53,7 @@ public class MassTransitInteropTests
     [Fact]
     public async Task MassTransit_direct_send_delivers_to_MyServiceBus_consumer()
     {
-        await using var container = new RabbitMqBuilder("rabbitmq:4.1-alpine").Build();
+        await using var container = new RabbitMqBuilder("rabbitmq:4.1.8-alpine").Build();
         await container.StartAsync();
 
         var transportFactory = CreateTransportFactory(container);
@@ -101,7 +101,7 @@ public class MassTransitInteropTests
     [Fact]
     public async Task MyServiceBus_producer_delivers_to_MassTransit_consumer()
     {
-        await using var container = new RabbitMqBuilder("rabbitmq:4.1-alpine").Build();
+        await using var container = new RabbitMqBuilder("rabbitmq:4.1.8-alpine").Build();
         await container.StartAsync();
 
         var received = new TaskCompletionSource<CrossLanguageMessage>(
@@ -141,7 +141,7 @@ public class MassTransitInteropTests
     [Fact]
     public async Task MassTransit_producer_delivers_to_MyServiceBus_consumer()
     {
-        await using var container = new RabbitMqBuilder("rabbitmq:4.1-alpine").Build();
+        await using var container = new RabbitMqBuilder("rabbitmq:4.1.8-alpine").Build();
         await container.StartAsync();
 
         var transportFactory = CreateTransportFactory(container);
@@ -189,7 +189,7 @@ public class MassTransitInteropTests
     [Fact]
     public async Task MassTransit_message_is_moved_to_MyServiceBus_skipped_queue_when_unrecognized()
     {
-        await using var container = new RabbitMqBuilder("rabbitmq:4.1-alpine").Build();
+        await using var container = new RabbitMqBuilder("rabbitmq:4.1.8-alpine").Build();
         await container.StartAsync();
 
         var skipped = new TaskCompletionSource<CrossLanguageMessage>(
@@ -235,7 +235,7 @@ public class MassTransitInteropTests
     [Fact]
     public async Task MassTransit_message_is_retried_then_moved_to_MyServiceBus_error_queue()
     {
-        await using var container = new RabbitMqBuilder("rabbitmq:4.1-alpine").Build();
+        await using var container = new RabbitMqBuilder("rabbitmq:4.1.8-alpine").Build();
         await container.StartAsync();
 
         var error = new TaskCompletionSource<CrossLanguageMessage>(
@@ -301,7 +301,7 @@ public class MassTransitInteropTests
     [Fact]
     public async Task MyServiceBus_request_client_receives_MassTransit_response()
     {
-        await using var container = new RabbitMqBuilder("rabbitmq:4.1-alpine").Build();
+        await using var container = new RabbitMqBuilder("rabbitmq:4.1.8-alpine").Build();
         await container.StartAsync();
 
         var observedRequestId = new TaskCompletionSource<Guid>(
@@ -340,7 +340,7 @@ public class MassTransitInteropTests
     [Fact]
     public async Task MassTransit_request_client_receives_MyServiceBus_response()
     {
-        await using var container = new RabbitMqBuilder("rabbitmq:4.1-alpine").Build();
+        await using var container = new RabbitMqBuilder("rabbitmq:4.1.8-alpine").Build();
         await container.StartAsync();
 
         var transportFactory = CreateTransportFactory(container);
@@ -395,7 +395,7 @@ public class MassTransitInteropTests
     [Fact]
     public async Task MyServiceBus_request_client_receives_MassTransit_fault()
     {
-        await using var container = new RabbitMqBuilder("rabbitmq:4.1-alpine").Build();
+        await using var container = new RabbitMqBuilder("rabbitmq:4.1.8-alpine").Build();
         await container.StartAsync();
 
         var queueName = $"myservicebus-request-to-masstransit-fault-{Guid.NewGuid():N}";
@@ -432,7 +432,7 @@ public class MassTransitInteropTests
     [Fact]
     public async Task MassTransit_request_client_receives_MyServiceBus_fault()
     {
-        await using var container = new RabbitMqBuilder("rabbitmq:4.1-alpine").Build();
+        await using var container = new RabbitMqBuilder("rabbitmq:4.1.8-alpine").Build();
         await container.StartAsync();
 
         var transportFactory = CreateTransportFactory(container);
@@ -502,7 +502,7 @@ public class MassTransitInteropTests
     [CrossLanguageFact]
     public async Task Java_MyServiceBus_request_client_receives_MassTransit_response()
     {
-        await using var container = new RabbitMqBuilder("rabbitmq:4.1-alpine").Build();
+        await using var container = new RabbitMqBuilder("rabbitmq:4.1.8-alpine").Build();
         await container.StartAsync();
 
         var observedRequestId = new TaskCompletionSource<Guid>(
@@ -538,7 +538,7 @@ public class MassTransitInteropTests
     [CrossLanguageFact]
     public async Task MassTransit_request_client_receives_Java_MyServiceBus_response()
     {
-        await using var container = new RabbitMqBuilder("rabbitmq:4.1-alpine").Build();
+        await using var container = new RabbitMqBuilder("rabbitmq:4.1.8-alpine").Build();
         await container.StartAsync();
 
         var exchangeName = MyServiceBus.EntityNameFormatter.Format(typeof(InteropRequest));
@@ -573,7 +573,7 @@ public class MassTransitInteropTests
     [CrossLanguageFact]
     public async Task Java_MyServiceBus_request_client_receives_MassTransit_fault()
     {
-        await using var container = new RabbitMqBuilder("rabbitmq:4.1-alpine").Build();
+        await using var container = new RabbitMqBuilder("rabbitmq:4.1.8-alpine").Build();
         await container.StartAsync();
 
         var exchangeName = MyServiceBus.EntityNameFormatter.Format(typeof(InteropRequest));
@@ -605,7 +605,7 @@ public class MassTransitInteropTests
     [CrossLanguageFact]
     public async Task MassTransit_request_client_receives_Java_MyServiceBus_fault()
     {
-        await using var container = new RabbitMqBuilder("rabbitmq:4.1-alpine").Build();
+        await using var container = new RabbitMqBuilder("rabbitmq:4.1.8-alpine").Build();
         await container.StartAsync();
 
         var exchangeName = MyServiceBus.EntityNameFormatter.Format(typeof(InteropRequest));
@@ -642,7 +642,7 @@ public class MassTransitInteropTests
     [CrossLanguageFact]
     public async Task Java_MyServiceBus_producer_delivers_to_MassTransit_consumer()
     {
-        await using var container = new RabbitMqBuilder("rabbitmq:4.1-alpine").Build();
+        await using var container = new RabbitMqBuilder("rabbitmq:4.1.8-alpine").Build();
         await container.StartAsync();
 
         var received = new TaskCompletionSource<CrossLanguageMessage>(
@@ -679,7 +679,7 @@ public class MassTransitInteropTests
     [CrossLanguageFact]
     public async Task Java_MyServiceBus_direct_send_delivers_to_MassTransit_consumer()
     {
-        await using var container = new RabbitMqBuilder("rabbitmq:4.1-alpine").Build();
+        await using var container = new RabbitMqBuilder("rabbitmq:4.1.8-alpine").Build();
         await container.StartAsync();
 
         var received = new TaskCompletionSource<CrossLanguageMessage>(
@@ -715,7 +715,7 @@ public class MassTransitInteropTests
     [CrossLanguageFact]
     public async Task MassTransit_direct_send_delivers_to_Java_MyServiceBus_consumer()
     {
-        await using var container = new RabbitMqBuilder("rabbitmq:4.1-alpine").Build();
+        await using var container = new RabbitMqBuilder("rabbitmq:4.1.8-alpine").Build();
         await container.StartAsync();
 
         var queueName = $"masstransit-send-to-java-{Guid.NewGuid():N}";
@@ -747,7 +747,7 @@ public class MassTransitInteropTests
     [CrossLanguageFact]
     public async Task MassTransit_producer_delivers_to_Java_MyServiceBus_consumer()
     {
-        await using var container = new RabbitMqBuilder("rabbitmq:4.1-alpine").Build();
+        await using var container = new RabbitMqBuilder("rabbitmq:4.1.8-alpine").Build();
         await container.StartAsync();
 
         var exchangeName = MyServiceBus.EntityNameFormatter.Format(typeof(CrossLanguageMessage));
@@ -778,7 +778,7 @@ public class MassTransitInteropTests
     [CrossLanguageFact]
     public async Task MassTransit_message_is_moved_to_Java_MyServiceBus_skipped_queue_when_unrecognized()
     {
-        await using var container = new RabbitMqBuilder("rabbitmq:4.1-alpine").Build();
+        await using var container = new RabbitMqBuilder("rabbitmq:4.1.8-alpine").Build();
         await container.StartAsync();
 
         var skipped = new TaskCompletionSource<CrossLanguageMessage>(
@@ -817,7 +817,7 @@ public class MassTransitInteropTests
     [CrossLanguageFact]
     public async Task MassTransit_message_is_retried_then_moved_to_Java_MyServiceBus_error_queue()
     {
-        await using var container = new RabbitMqBuilder("rabbitmq:4.1-alpine").Build();
+        await using var container = new RabbitMqBuilder("rabbitmq:4.1.8-alpine").Build();
         await container.StartAsync();
 
         var error = new TaskCompletionSource<CrossLanguageMessage>(

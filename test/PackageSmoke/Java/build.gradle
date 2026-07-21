@@ -1,0 +1,41 @@
+plugins {
+    id 'application'
+}
+
+repositories {
+    def stagingRepositoryRoot = providers.gradleProperty('stagingRepositoryRoot').get()
+    [
+        'myservicebus-abstractions',
+        'myservicebus-di',
+        'myservicebus-logging',
+        'myservicebus-tasks',
+        'myservicebus',
+        'myservicebus-rabbitmq',
+        'myservicebus-testing'
+    ].each { module ->
+        maven {
+            url = uri("${stagingRepositoryRoot}/${module}/build/repository")
+        }
+    }
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'com.myservicebus:myservicebus-abstractions:0.1.0-preview.1'
+    implementation 'com.myservicebus:myservicebus-di:0.1.0-preview.1'
+    implementation 'com.myservicebus:myservicebus-logging:0.1.0-preview.1'
+    implementation 'com.myservicebus:myservicebus-tasks:0.1.0-preview.1'
+    implementation 'com.myservicebus:myservicebus:0.1.0-preview.1'
+    implementation 'com.myservicebus:myservicebus-rabbitmq:0.1.0-preview.1'
+    implementation 'com.myservicebus:myservicebus-testing:0.1.0-preview.1'
+}
+
+application {
+    mainClass = 'com.myservicebus.packagesmoke.PackageSmoke'
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(17)
+    }
+}

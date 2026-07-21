@@ -24,6 +24,8 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
     private readonly ILogger<MessageBus>? _logger;
     private readonly ISendContextFactory _sendContextFactory;
     private readonly IPublishContextFactory _publishContextFactory;
+    private readonly SemaphoreSlim _lifecycleLock = new(1, 1);
+    private volatile BusState _state = BusState.Stopped;
 
     private readonly List<IReceiveTransport> _activeTransports = new();
 
@@ -59,6 +61,7 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
 
     public async Task Publish<T>(T message, Action<IPublishContext>? contextCallback = null, CancellationToken cancellationToken = default) where T : class
     {
+        EnsureStarted();
         var exchangeName = EntityNameFormatter.Format(message.GetType());
 
         var uri = _transportFactory.GetPublishAddress(exchangeName);
@@ -90,7 +93,7 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
     {
         var loggerFactory = _serviceProvider.GetService<ILoggerFactory>();
         var logger = loggerFactory?.CreateLogger<TransportSendEndpoint>();
-        ISendEndpoint endpoint = new TransportSendEndpoint(_transportFactory, _sendPipe, _messageSerializer, uri, _address, _sendContextFactory, logger);
+        ISendEndpoint endpoint = new TransportSendEndpoint(_transportFactory, _sendPipe, _messageSerializer, uri, _address, _sendContextFactory, logger, EnsureStarted);
         return Task.FromResult(endpoint);
     }
 
@@ -159,11 +162,15 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
             && (mt == null
                 ? regs.Any(r => IsRawSerializer(r.Serializer))
                 : regs.Any(r => r.MessageUrn == mt));
-        var receiveTransport = await _transportFactory.CreateReceiveTransport(
-            topology,
-            (ctx) => HandleMessageAsync(queueName, ctx),
-            isRegistered,
-            cancellationToken);
+        IReceiveTransport? receiveTransport = null;
+        if (!_consumers.ContainsKey(queueName))
+        {
+            receiveTransport = await _transportFactory.CreateReceiveTransport(
+                topology,
+                (ctx) => HandleMessageAsync(queueName, ctx),
+                isRegistered,
+                cancellationToken);
+        }
 
         var configurator = new PipeConfigurator<ConsumeContext<TMessage>>();
         configurator.UseFilter<OpenTelemetryConsumeFilter<TMessage>>();
@@ -184,25 +191,100 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
             registrations = _consumers[queueName] = new List<(string, Type, IConsumePipe, IMessageSerializer)>();
         registrations.Add((messageUrn, messageType, pipe, serializer));
         _consumerTypes.Add(typeof(TConsumer));
-        _activeTransports.Add(receiveTransport);
+        if (receiveTransport is not null)
+            _activeTransports.Add(receiveTransport);
     }
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
-        var requirements = _serviceProvider.GetService<TransportCapabilityRequirements>();
-        if (requirements is not null)
-            TransportCapabilityValidator.Validate(_transportFactory.Capabilities, requirements.Items);
+        await _lifecycleLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            if (_state == BusState.Started)
+                return;
 
-        await Task.WhenAll(_activeTransports.Select(async transport => await transport.Start(cancellationToken)));
+            _state = BusState.Starting;
+            var startedTransports = new List<IReceiveTransport>();
+            try
+            {
+                var requirements = _serviceProvider.GetService<TransportCapabilityRequirements>();
+                if (requirements is not null)
+                    TransportCapabilityValidator.Validate(_transportFactory.Capabilities, requirements.Items);
+
+                foreach (var transport in _activeTransports)
+                {
+                    await transport.Start(cancellationToken).ConfigureAwait(false);
+                    startedTransports.Add(transport);
+                }
+
+                _state = BusState.Started;
+            }
+            catch
+            {
+                foreach (var transport in startedTransports.AsEnumerable().Reverse())
+                {
+                    try
+                    {
+                        await transport.Stop(CancellationToken.None).ConfigureAwait(false);
+                    }
+                    catch
+                    {
+                        // Preserve the startup failure while making a best effort to roll back.
+                    }
+                }
+
+                _state = BusState.Stopped;
+                throw;
+            }
+        }
+        finally
+        {
+            _lifecycleLock.Release();
+        }
     }
 
     public async Task StopAsync(CancellationToken cancellationToken)
     {
-        await Task.WhenAll(_activeTransports.Select(async transport => await transport.Stop(cancellationToken)));
+        await _lifecycleLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            if (_state == BusState.Stopped)
+                return;
+
+            _state = BusState.Stopping;
+            try
+            {
+                foreach (var transport in _activeTransports.AsEnumerable().Reverse())
+                    await transport.Stop(cancellationToken).ConfigureAwait(false);
+            }
+            finally
+            {
+                _state = BusState.Stopped;
+            }
+        }
+        finally
+        {
+            _lifecycleLock.Release();
+        }
+    }
+
+    internal void EnsureStarted()
+    {
+        if (_state != BusState.Started)
+            throw new InvalidOperationException("The service bus is not started.");
+    }
+
+    enum BusState
+    {
+        Stopped,
+        Starting,
+        Started,
+        Stopping
     }
 
     private async Task HandleMessageAsync(string queueName, ReceiveContext context)
     {
+        var messageTypeNames = context.MessageType.ToHashSet(StringComparer.Ordinal);
         var messageTypeName = context.MessageType.FirstOrDefault();
         if (!_consumers.TryGetValue(queueName, out var registrations))
         {
@@ -212,7 +294,7 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
 
         var matches = messageTypeName == null
             ? registrations.Where(r => IsRawSerializer(r.Serializer)).ToList()
-            : registrations.Where(r => r.MessageUrn == messageTypeName).ToList();
+            : registrations.Where(r => messageTypeNames.Contains(r.MessageUrn)).ToList();
         if (matches.Count == 0)
         {
             _logger?.LogWarning("Received message with unregistered type {MessageType}", messageTypeName);

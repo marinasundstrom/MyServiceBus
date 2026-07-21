@@ -9,14 +9,22 @@ public class DefaultConsumeContext<TMessage> : BasePipeContext, ConsumeContext<T
 {
     readonly ISendEndpointProvider? sendEndpointProvider;
 
-    public DefaultConsumeContext(TMessage message, ISendEndpointProvider? sendEndpointProvider = null, CancellationToken cancellationToken = default)
+    public DefaultConsumeContext(TMessage message, ISendEndpointProvider? sendEndpointProvider = null,
+        CancellationToken cancellationToken = default, Guid? requestId = null, Guid? correlationId = null)
         : base(cancellationToken)
     {
         Message = message;
         this.sendEndpointProvider = sendEndpointProvider;
+        RequestId = requestId;
+        CorrelationId = correlationId;
     }
 
     public TMessage Message { get; }
+    public Guid? RequestId { get; }
+    public Guid? CorrelationId { get; }
+    public Guid? ConversationId { get; }
+    public Guid? InitiatorId { get; }
+    public System.Collections.Generic.IDictionary<string, object> Headers { get; } = new System.Collections.Generic.Dictionary<string, object>();
 
     public Task RespondAsync<T>(T message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default) where T : class
     {

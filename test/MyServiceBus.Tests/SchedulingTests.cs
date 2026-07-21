@@ -43,6 +43,38 @@ public class SchedulingTests
         public Task Cancel(Guid tokenId) => Task.CompletedTask;
     }
 
+    class ManualJobScheduler : IJobScheduler
+    {
+        readonly Dictionary<Guid, Func<CancellationToken, Task>> jobs = new();
+
+        public Task<Guid> Schedule(DateTime scheduledTime, Func<CancellationToken, Task> callback,
+            CancellationToken cancellationToken = default)
+        {
+            var id = Guid.NewGuid();
+            jobs.Add(id, callback);
+            return Task.FromResult(id);
+        }
+
+        public Task<Guid> Schedule(TimeSpan delay, Func<CancellationToken, Task> callback,
+            CancellationToken cancellationToken = default)
+            => Schedule(DateTime.UtcNow + delay, callback, cancellationToken);
+
+        public Task Cancel(Guid tokenId)
+        {
+            jobs.Remove(tokenId);
+            return Task.CompletedTask;
+        }
+
+        public async Task Run(Guid tokenId)
+        {
+            var callback = jobs[tokenId];
+            jobs.Remove(tokenId);
+            await callback(CancellationToken.None);
+        }
+
+        public bool Contains(Guid tokenId) => jobs.ContainsKey(tokenId);
+    }
+
     class StubSendContext : IPublishContext
     {
         public string MessageId { get; set; } = string.Empty;
@@ -50,6 +82,8 @@ public class SchedulingTests
         public string RoutingKey { get; set; } = string.Empty;
         public IDictionary<string, object> Headers { get; } = new Dictionary<string, object>();
         public string? CorrelationId { get; set; }
+        public Guid? ConversationId { get; set; }
+        public Guid? InitiatorId { get; set; }
         public Uri? ResponseAddress { get; set; }
         public Uri? FaultAddress { get; set; }
         public DateTime? ScheduledEnqueueTime { get; set; }
@@ -177,6 +211,37 @@ public class SchedulingTests
     }
 
     [Fact]
+    public async Task Manual_scheduler_controls_publish_and_send_delivery()
+    {
+        var manual = new ManualJobScheduler();
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddSingleton<IJobScheduler>(manual);
+        services.AddServiceBus(cfg =>
+        {
+            cfg.UsingMediator();
+            cfg.AddConsumer<TestConsumer>();
+        });
+
+        await using var provider = services.BuildServiceProvider();
+        var hosted = provider.GetRequiredService<IHostedService>();
+        await hosted.StartAsync(CancellationToken.None);
+        var scheduler = provider.GetRequiredService<IMessageScheduler>();
+        TestConsumer.Received = 0;
+
+        var publish = await scheduler.SchedulePublish(new TestMessage(), TimeSpan.FromDays(1));
+        var send = await scheduler.ScheduleSend(new Uri("queue:test"), new TestMessage(), TimeSpan.FromDays(1));
+
+        Assert.Equal(0, TestConsumer.Received);
+        await manual.Run(publish.TokenId);
+        Assert.Equal(1, TestConsumer.Received);
+        await manual.Run(send.TokenId);
+        Assert.Equal(2, TestConsumer.Received);
+
+        await hosted.StopAsync(CancellationToken.None);
+    }
+
+    [Fact]
     public async Task Publish_extension_sets_scheduled_time()
     {
         var endpoint = new StubPublishEndpoint();
@@ -207,8 +272,10 @@ public class SchedulingTests
     [Fact]
     public async Task Cancel_prevents_scheduled_publish()
     {
+        var manual = new ManualJobScheduler();
         var services = new ServiceCollection();
         services.AddLogging();
+        services.AddSingleton<IJobScheduler>(manual);
         services.AddServiceBus(cfg =>
         {
             cfg.UsingMediator();
@@ -221,10 +288,10 @@ public class SchedulingTests
 
         var scheduler = provider.GetRequiredService<IMessageScheduler>();
         TestConsumer.Received = 0;
-        var delay = TimeSpan.FromMilliseconds(200);
+        var delay = TimeSpan.FromDays(1);
         var handle = await scheduler.SchedulePublish(new TestMessage(), delay);
         await scheduler.CancelScheduledPublish(handle);
-        await Task.Delay(delay + TimeSpan.FromMilliseconds(50));
+        Assert.False(manual.Contains(handle.TokenId));
         Assert.Equal(0, TestConsumer.Received);
 
         await hosted.StopAsync(CancellationToken.None);

@@ -45,6 +45,8 @@ public class EnvelopeMessageSerializer implements MessageSerializer {
         envelope.setMessageId(context.getMessageId());
         envelope.setRequestId(context.getRequestId());
         envelope.setCorrelationId(context.getCorrelationId());
+        envelope.setConversationId(context.getConversationId());
+        envelope.setInitiatorId(context.getInitiatorId());
         envelope.setSourceAddress(
                 context.getSourceAddress() != null ? context.getSourceAddress().toString() : null);
         envelope.setDestinationAddress(

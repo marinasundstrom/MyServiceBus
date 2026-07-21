@@ -36,13 +36,17 @@ public class ConsumeContext<T>
     private final SendEndpointProvider sendEndpointProvider;
     private final URI busAddress;
     private final PublishAddressProvider publishAddressProvider;
+    private final UUID requestId;
+    private final UUID correlationId;
+    private final UUID conversationId;
+    private final UUID initiatorId;
 
     public ConsumeContext(T message, Map<String, Object> headers, SendEndpointProvider provider) {
-        this(message, headers, null, null, null, CancellationToken.none, provider, URI.create("loopback://localhost/"));
+        this(message, headers, null, null, null, CancellationToken.none(), provider, URI.create("loopback://localhost/"));
     }
 
     public ConsumeContext(T message, Map<String, Object> headers, SendEndpointProvider provider, URI busAddress) {
-        this(message, headers, null, null, null, CancellationToken.none, provider, busAddress);
+        this(message, headers, null, null, null, CancellationToken.none(), provider, busAddress);
     }
 
     public ConsumeContext(T message, Map<String, Object> headers, String responseAddress, String faultAddress,
@@ -64,6 +68,21 @@ public class ConsumeContext<T>
     public ConsumeContext(T message, Map<String, Object> headers, String responseAddress, String faultAddress,
             String errorAddress, CancellationToken cancellationToken, SendEndpointProvider provider, URI busAddress,
             PublishAddressProvider publishAddressProvider) {
+        this(message, headers, responseAddress, faultAddress, errorAddress, cancellationToken, provider, busAddress,
+                publishAddressProvider, null, null);
+    }
+
+    public ConsumeContext(T message, Map<String, Object> headers, String responseAddress, String faultAddress,
+            String errorAddress, CancellationToken cancellationToken, SendEndpointProvider provider, URI busAddress,
+            PublishAddressProvider publishAddressProvider, UUID requestId, UUID correlationId) {
+        this(message, headers, responseAddress, faultAddress, errorAddress, cancellationToken, provider, busAddress,
+                publishAddressProvider, requestId, correlationId, null, null);
+    }
+
+    public ConsumeContext(T message, Map<String, Object> headers, String responseAddress, String faultAddress,
+            String errorAddress, CancellationToken cancellationToken, SendEndpointProvider provider, URI busAddress,
+            PublishAddressProvider publishAddressProvider, UUID requestId, UUID correlationId, UUID conversationId,
+            UUID initiatorId) {
         this.message = message;
         this.headers = headers;
         this.responseAddress = responseAddress;
@@ -73,6 +92,10 @@ public class ConsumeContext<T>
         this.sendEndpointProvider = provider;
         this.busAddress = busAddress;
         this.publishAddressProvider = publishAddressProvider;
+        this.requestId = requestId;
+        this.correlationId = correlationId;
+        this.conversationId = conversationId;
+        this.initiatorId = initiatorId;
     }
 
     public T getMessage() {
@@ -92,19 +115,59 @@ public class ConsumeContext<T>
     }
 
     @Override
+    public UUID getRequestId() {
+        return requestId;
+    }
+
+    @Override
+    public UUID getCorrelationId() {
+        return correlationId;
+    }
+
+    @Override
+    public UUID getConversationId() {
+        return conversationId;
+    }
+
+    @Override
+    public UUID getInitiatorId() {
+        return initiatorId;
+    }
+
+    @Override
     public <TMessage> CompletableFuture<Void> publish(TMessage message, CancellationToken cancellationToken) {
-        PublishContext ctx = new PublishContext(message, cancellationToken);
+        CancellationToken effectiveToken = cancellationToken == CancellationToken.none()
+                ? this.cancellationToken
+                : cancellationToken;
+        PublishContext ctx = new PublishContext(message, effectiveToken);
         return publish(ctx);
     }
 
     @Override
     public CompletableFuture<Void> publish(PublishContext context) {
+        if (conversationId != null) {
+            context.setConversationId(conversationId);
+        }
+        if (context.getInitiatorId() == null) {
+            context.setInitiatorId(correlationId);
+        }
         String exchange = EntityNameFormatter.format(context.getMessage().getClass());
         URI dest = URI.create(publishAddressProvider.getPublishAddress(exchange));
         context.setSourceAddress(busAddress);
         context.setDestinationAddress(dest);
         SendEndpoint endpoint = getSendEndpoint(dest.toString());
         return endpoint.send(context);
+    }
+
+    @Override
+    public <TMessage> CompletableFuture<Void> publish(TMessage message,
+            Consumer<PublishContext> contextCallback, CancellationToken cancellationToken) {
+        CancellationToken effectiveToken = cancellationToken == CancellationToken.none()
+                ? this.cancellationToken
+                : cancellationToken;
+        PublishContext context = new PublishContext(message, effectiveToken);
+        contextCallback.accept(context);
+        return publish(context);
     }
 
     @Override
@@ -121,7 +184,7 @@ public class ConsumeContext<T>
     }
 
     public <TMessage> CompletableFuture<Void> respond(TMessage message) {
-        return respond(message, CancellationToken.none);
+        return respond(message, CancellationToken.none());
     }
 
     public <TMessage> CompletableFuture<Void> respond(Class<TMessage> messageType, Object message,
@@ -131,7 +194,7 @@ public class ConsumeContext<T>
     }
 
     public <TMessage> CompletableFuture<Void> respond(Class<TMessage> messageType, Object message) {
-        return respond(messageType, message, CancellationToken.none);
+        return respond(messageType, message, CancellationToken.none());
     }
 
     public <TMessage> CompletableFuture<Void> respond(TMessage message, Consumer<SendContext> contextCallback,
@@ -142,7 +205,7 @@ public class ConsumeContext<T>
     }
 
     public <TMessage> CompletableFuture<Void> respond(TMessage message, Consumer<SendContext> contextCallback) {
-        return respond(message, contextCallback, CancellationToken.none);
+        return respond(message, contextCallback, CancellationToken.none());
     }
 
     public <TMessage> CompletableFuture<Void> respond(Class<TMessage> messageType, Object message,
@@ -153,7 +216,7 @@ public class ConsumeContext<T>
 
     public <TMessage> CompletableFuture<Void> respond(Class<TMessage> messageType, Object message,
             Consumer<SendContext> contextCallback) {
-        return respond(messageType, message, contextCallback, CancellationToken.none);
+        return respond(messageType, message, contextCallback, CancellationToken.none());
     }
 
     @Override
@@ -163,49 +226,72 @@ public class ConsumeContext<T>
         }
         context.setSourceAddress(busAddress);
         context.setDestinationAddress(URI.create(responseAddress));
+        context.setRequestId(requestId);
+        if (conversationId != null) {
+            context.setConversationId(conversationId);
+        }
+        context.setInitiatorId(correlationId);
         SendEndpoint endpoint = getSendEndpoint(responseAddress);
         return endpoint.send(context);
     }
 
     public <TMessage> CompletableFuture<Void> send(String destination, TMessage message, CancellationToken cancellationToken) {
-        SendEndpoint endpoint = getSendEndpoint(destination);
-        return endpoint.send(message, cancellationToken);
+        return send(destination, message, context -> { }, cancellationToken);
     }
 
     public <TMessage> CompletableFuture<Void> send(String destination, TMessage message,
             Consumer<SendContext> contextCallback, CancellationToken cancellationToken) {
         SendEndpoint endpoint = getSendEndpoint(destination);
-        return endpoint.send(message, contextCallback, cancellationToken);
+        CancellationToken effectiveToken = cancellationToken == CancellationToken.none()
+                ? this.cancellationToken
+                : cancellationToken;
+        SendContext context = new SendContext(message, effectiveToken);
+        applyConsumerMetadata(context);
+        contextCallback.accept(context);
+        return endpoint.send(context);
     }
 
     public <TMessage> CompletableFuture<Void> send(String destination, TMessage message,
             Consumer<SendContext> contextCallback) {
-        return send(destination, message, contextCallback, CancellationToken.none);
+        return send(destination, message, contextCallback, CancellationToken.none());
     }
 
     public <TMessage> CompletableFuture<Void> send(String destination, TMessage message) {
-        return send(destination, message, CancellationToken.none);
+        return send(destination, message, CancellationToken.none());
     }
 
     public <TMessage> CompletableFuture<Void> send(String destination, Class<TMessage> messageType, Object message,
             CancellationToken cancellationToken) {
-        SendEndpoint endpoint = getSendEndpoint(destination);
-        return endpoint.send(messageType, message, cancellationToken);
+        return send(destination, messageType, message, context -> { }, cancellationToken);
     }
 
     public <TMessage> CompletableFuture<Void> send(String destination, Class<TMessage> messageType, Object message,
             Consumer<SendContext> contextCallback, CancellationToken cancellationToken) {
         SendEndpoint endpoint = getSendEndpoint(destination);
-        return endpoint.send(messageType, message, contextCallback, cancellationToken);
+        CancellationToken effectiveToken = cancellationToken == CancellationToken.none()
+                ? this.cancellationToken
+                : cancellationToken;
+        TMessage proxy = MessageProxy.create(messageType, message);
+        SendContext context = new SendContext(proxy, effectiveToken);
+        applyConsumerMetadata(context);
+        contextCallback.accept(context);
+        return endpoint.send(context);
     }
 
     public <TMessage> CompletableFuture<Void> send(String destination, Class<TMessage> messageType, Object message,
             Consumer<SendContext> contextCallback) {
-        return send(destination, messageType, message, contextCallback, CancellationToken.none);
+        return send(destination, messageType, message, contextCallback, CancellationToken.none());
     }
 
     public <TMessage> CompletableFuture<Void> send(String destination, Class<TMessage> messageType, Object message) {
-        return send(destination, messageType, message, CancellationToken.none);
+        return send(destination, messageType, message, CancellationToken.none());
+    }
+
+    private void applyConsumerMetadata(SendContext context) {
+        if (conversationId != null) {
+            context.setConversationId(conversationId);
+        }
+        context.setInitiatorId(correlationId);
     }
 
 
@@ -215,7 +301,7 @@ public class ConsumeContext<T>
     }
 
     public <TMessage> CompletableFuture<Void> forward(String destination, TMessage message) {
-        return forward(destination, message, CancellationToken.none);
+        return forward(destination, message, CancellationToken.none());
     }
 
     public CompletableFuture<Void> respondFault(Exception exception, CancellationToken cancellationToken) {
@@ -244,7 +330,14 @@ public class ConsumeContext<T>
         SendEndpoint endpoint = getSendEndpoint(address);
         return endpoint.send(
                 fault,
-                context -> context.setMessageTypes(Collections.singletonList(MessageUrn.forFault(message.getClass()))),
+                context -> {
+                    context.setMessageTypes(Collections.singletonList(MessageUrn.forFault(message.getClass())));
+                    context.setRequestId(requestId);
+                    if (conversationId != null) {
+                        context.setConversationId(conversationId);
+                    }
+                    context.setInitiatorId(correlationId);
+                },
                 cancellationToken);
     }
 

@@ -36,7 +36,7 @@ public class RabbitMqHeaderEncodingTest {
         RabbitMqSendEndpoint endpoint = new RabbitMqSendEndpoint(transport, new EnvelopeMessageSerializer(), loggerFactory);
 
         class Dummy { public String text = "hi"; }
-        SendContext ctx = new SendContext(new Dummy(), CancellationToken.none);
+        SendContext ctx = new SendContext(new Dummy(), CancellationToken.none());
         ctx.getHeaders().put(MessageHeaders.HOST_MACHINE, "machine");
         ctx.getHeaders().put("content_type", "application/vnd.masstransit+json");
 

@@ -88,22 +88,17 @@ public sealed class GenericRequestClient<TRequest> : IRequestClient<TRequest>, I
 
         await requestSendTransport.Send(request, sendContext, cancellationToken);
 
-        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         var actualTimeout = timeout.TimeSpan == default ? _timeout.TimeSpan : timeout.TimeSpan;
-        timeoutCts.CancelAfter(actualTimeout);
-
-        await using var registration = timeoutCts.Token.Register(() =>
-        {
-            taskCompletionSource.TrySetException(new TimeoutException("Request timed out."));
-        });
 
         try
         {
-            return await taskCompletionSource.Task;
+            return actualTimeout == RequestTimeout.None.TimeSpan
+                ? await taskCompletionSource.Task.WaitAsync(cancellationToken)
+                : await taskCompletionSource.Task.WaitAsync(actualTimeout, cancellationToken);
         }
         finally
         {
-            await responseReceiveTransport.Stop(cancellationToken);
+            await responseReceiveTransport.Stop(CancellationToken.None);
         }
     }
 
@@ -173,22 +168,17 @@ public sealed class GenericRequestClient<TRequest> : IRequestClient<TRequest>, I
 
         await requestSendTransport.Send(request, sendContext, cancellationToken);
 
-        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         var actualTimeout = timeout.TimeSpan == default ? _timeout.TimeSpan : timeout.TimeSpan;
-        timeoutCts.CancelAfter(actualTimeout);
-
-        await using var registration = timeoutCts.Token.Register(() =>
-        {
-            taskCompletionSource.TrySetException(new TimeoutException("Request timed out."));
-        });
 
         try
         {
-            return await taskCompletionSource.Task;
+            return actualTimeout == RequestTimeout.None.TimeSpan
+                ? await taskCompletionSource.Task.WaitAsync(cancellationToken)
+                : await taskCompletionSource.Task.WaitAsync(actualTimeout, cancellationToken);
         }
         finally
         {
-            await responseReceiveTransport.Stop(cancellationToken);
+            await responseReceiveTransport.Stop(CancellationToken.None);
         }
     }
 }

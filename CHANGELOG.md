@@ -15,7 +15,12 @@ This changelog summarizes the bigger themes in the repository history. It is int
 
 ### MVP API stabilization
 
+- Added MassTransit-compatible conversation and initiator identifiers across C#, Java, local runtimes, and serialized envelopes.
+- Aligned consumer-initiated publish cancellation inheritance across C# and Java while keeping arbitrary headers and outbound correlation explicit, matching MassTransit semantics.
+- Exposed request and correlation identifiers to consumers, preserved request identifiers through responses, and isolated Java response matching by request identifier.
+- Aligned C# and Java request timeout and caller-cancellation behavior, including deadline-free requests.
 - Declared profile-neutral receive-endpoint topology as the supported transport extension point and deprecated legacy C# and Java receive-transport overloads without removing compatibility.
+- Made Java cancellation APIs idiomatic with method-based accessors, tokenless context construction, and a standard `CancellationException` guard while retaining the shared cancellation-policy concept.
 
 ### MVP dependency hygiene
 
@@ -28,6 +33,7 @@ This changelog summarizes the bigger themes in the repository history. It is int
 - Defined seven foundational Java modules as `0.1.0-preview.1` Maven publications with source, Javadoc, license, project, developer, and source-control metadata; preview inspection and sample applications remain unpublished.
 - Scoped Java production dependencies to the modules that own them so published POMs do not expose unrelated broker, serialization, dependency-injection, logging, or telemetry libraries.
 - Added NuGet and Maven package construction to the regular .NET and Java CI workflows.
+- Declared the sample application's fat-JAR inputs as task dependencies so the aggregate Gradle build remains valid under Gradle 9.
 
 ### Product and hosting boundaries
 
@@ -42,6 +48,14 @@ This changelog summarizes the bigger themes in the repository history. It is int
 - Added matching immutable pipeline and filter descriptors for validation and future inspection without exposing runtime middleware objects.
 - Corrected Java publish filters to use `PublishContext` and verified matching publish-then-send-then-transport ordering in both clients.
 - Verified matching mediator consume-filter wrapping and downstream-only retry re-entry in C# and Java.
+- Verified matching mediator retry-exhaustion attempt counts, filter observations, and terminal failure propagation.
+- Made Java fixed-delay retries react immediately to cancellation, matching C# behavior and preventing another attempt.
+- Verified that mediator consumer failures are attempted once and propagate immediately when retry is not configured.
+- Added the shared C# and Java mediator/in-memory conformance matrix, identifying verified behavior and the remaining stability gaps.
+- Defined matching explicit, idempotent lifecycle behavior for the C# and Java in-memory test harnesses while keeping standalone mediators immediately usable.
+- Defined the same stopped, started, restart, and failed-start recovery semantics for hosted C# and Java buses, including explicit rejection of outbound work while stopped.
+- Verified distinct dependency-injection scopes per consumer delivery in both in-memory harnesses and kept scoped resources alive through asynchronous completion and disposal.
+- Aligned polymorphic mediator and in-memory dispatch so concrete messages reach concrete, interface, and non-root base contracts once in both clients.
 
 ## 2026-03-24 to 2026-03-19
 
@@ -138,6 +152,13 @@ This changelog summarizes the bigger themes in the repository history. It is int
 Keep this file updated for significant changes. Prefer adding dated entries that summarize the main themes of a change set instead of listing every commit.
 # Unreleased
 
+- Declared and CI-checked the MVP runtime and interoperability baseline, including exact .NET SDK, RabbitMQ, MassTransit, Gradle, and client-library versions plus the preview support window.
+- Added clean C# and Java consumer smoke projects that restore and run exclusively from the staged NuGet and Maven publications.
+- Added CI package verification for the four preview NuGet packages and seven Maven publications, validating exact artifact sets plus package identity, licensing, repository, symbols, sources, and Javadocs.
+- Completed the mediator and in-memory stability matrix with matching directed-send and publish fan-out scenarios, added the missing Java local APIs, and fixed duplicate C# consumer delivery by sharing one receive transport per logical endpoint.
+- Added deterministic C# and Java scheduling conformance for both publish and directed send using injectable manual job schedulers, including cancellation without wall-clock sleeps and an explicit absence of same-time ordering guarantees.
+- Added matching eventual consumed-type observations to the C# and Java in-memory harnesses with explicit timeouts, successful-consumer-completion cardinality, and idiomatic cancellation behavior.
+- Aligned C# and Java local multiple-consumer dispatch so every matched consumer is attempted independently, dispatch waits for all deliveries, failures propagate without suppressing sibling consumers, and no inter-consumer ordering is promised.
 - Added sample-app dashboard endpoints in the .NET and Java `TestApp` projects under `/dashboard/v1/*`, exposing stable JSON snapshots for bus overview, messages, consumers, and topology without committing those contracts to the shared libraries yet.
 - Split the programmatic inspection surface into first-party addon projects for .NET and Java, keeping the sample inspection endpoints working while removing the core bus packages' direct dependency on inspection registration.
 - Documented the long-term architecture and phased roadmap, including explicit compatibility levels, capability-aware transport profiles, event-stream and SignalR integration boundaries, cross-language conformance, and the optional inspection, monitoring, and dashboard plane.

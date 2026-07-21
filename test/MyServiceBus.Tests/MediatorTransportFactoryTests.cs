@@ -20,6 +20,28 @@ public class MediatorTransportFactoryTests
         public string Value { get; set; } = string.Empty;
     }
 
+    class FanoutMessage { }
+
+    class FirstFanoutConsumer : IConsumer<FanoutMessage>
+    {
+        public static int Count;
+        public Task Consume(ConsumeContext<FanoutMessage> context)
+        {
+            Count++;
+            return Task.CompletedTask;
+        }
+    }
+
+    class SecondFanoutConsumer : IConsumer<FanoutMessage>
+    {
+        public static int Count;
+        public Task Consume(ConsumeContext<FanoutMessage> context)
+        {
+            Count++;
+            return Task.CompletedTask;
+        }
+    }
+
     class RequestMessage
     {
         public string Value { get; set; } = string.Empty;
@@ -28,6 +50,40 @@ public class MediatorTransportFactoryTests
     class ResponseMessage
     {
         public string Value { get; set; } = string.Empty;
+    }
+
+    interface IAssignableEvent { }
+    class AssignableEvent { }
+    class DerivedAssignableEvent : AssignableEvent, IAssignableEvent { }
+
+    class ConcreteAssignableConsumer : IConsumer<DerivedAssignableEvent>
+    {
+        public static int Count;
+        public Task Consume(ConsumeContext<DerivedAssignableEvent> context)
+        {
+            Count++;
+            return Task.CompletedTask;
+        }
+    }
+
+    class BaseAssignableConsumer : IConsumer<AssignableEvent>
+    {
+        public static int Count;
+        public Task Consume(ConsumeContext<AssignableEvent> context)
+        {
+            Count++;
+            return Task.CompletedTask;
+        }
+    }
+
+    class InterfaceAssignableConsumer : IConsumer<IAssignableEvent>
+    {
+        public static int Count;
+        public Task Consume(ConsumeContext<IAssignableEvent> context)
+        {
+            Count++;
+            return Task.CompletedTask;
+        }
     }
 
     class SampleConsumer : IConsumer<ConsumerMessage>
@@ -52,6 +108,18 @@ public class MediatorTransportFactoryTests
             return Attempts == 1
                 ? Task.FromException(new InvalidOperationException("retry"))
                 : Task.CompletedTask;
+        }
+    }
+
+    class FailingConsumer : IConsumer<ConsumerMessage>
+    {
+        public static int Attempts;
+        public static IList<string> Calls = new List<string>();
+
+        public Task Consume(ConsumeContext<ConsumerMessage> context)
+        {
+            Calls.Add($"consumer:{++Attempts}");
+            return Task.FromException(new InvalidOperationException("exhausted"));
         }
     }
 
@@ -210,6 +278,96 @@ public class MediatorTransportFactoryTests
     }
 
     [Fact]
+    public async Task Directed_send_and_publish_reach_all_compatible_consumers()
+    {
+        FirstFanoutConsumer.Count = 0;
+        SecondFanoutConsumer.Count = 0;
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddServiceBus(cfg =>
+        {
+            cfg.UsingMediator();
+            cfg.AddConsumer<FirstFanoutConsumer>();
+            cfg.AddConsumer<SecondFanoutConsumer>();
+        });
+
+        await using var provider = services.BuildServiceProvider();
+        var hosted = provider.GetRequiredService<IHostedService>();
+        await hosted.StartAsync(CancellationToken.None);
+        var bus = provider.GetRequiredService<IMessageBus>();
+
+        var endpoint = await bus.GetSendEndpoint(new Uri("queue:fanout"));
+        await endpoint.Send(new FanoutMessage());
+        Assert.Equal(1, FirstFanoutConsumer.Count);
+        Assert.Equal(1, SecondFanoutConsumer.Count);
+
+        await bus.Publish(new FanoutMessage());
+        Assert.Equal(2, FirstFanoutConsumer.Count);
+        Assert.Equal(2, SecondFanoutConsumer.Count);
+        await hosted.StopAsync(CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task Publish_dispatches_to_concrete_interface_and_base_consumers_once()
+    {
+        ConcreteAssignableConsumer.Count = 0;
+        BaseAssignableConsumer.Count = 0;
+        InterfaceAssignableConsumer.Count = 0;
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddServiceBus(cfg =>
+        {
+            cfg.UsingMediator();
+            cfg.AddConsumer<ConcreteAssignableConsumer>();
+            cfg.AddConsumer<BaseAssignableConsumer>();
+            cfg.AddConsumer<InterfaceAssignableConsumer>();
+        });
+        using var provider = services.BuildServiceProvider();
+        var hosted = provider.GetRequiredService<IHostedService>();
+        await hosted.StartAsync(CancellationToken.None);
+
+        await provider.GetRequiredService<IMessageBus>().Publish(new DerivedAssignableEvent());
+
+        Assert.Equal(1, ConcreteAssignableConsumer.Count);
+        Assert.Equal(1, BaseAssignableConsumer.Count);
+        Assert.Equal(1, InterfaceAssignableConsumer.Count);
+        await hosted.StopAsync(CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task Hosted_bus_lifecycle_is_idempotent_and_operations_require_started_state()
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddServiceBus(cfg => cfg.UsingMediator());
+
+        using var provider = services.BuildServiceProvider();
+        var hosted = provider.GetRequiredService<IHostedService>();
+        var bus = provider.GetRequiredService<IMessageBus>();
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            bus.Publish(new ConsumerMessage { Value = "before" }));
+        var endpoint = await bus.GetSendEndpoint(new Uri("loopback://localhost/consumer-message"));
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            endpoint.Send(new ConsumerMessage { Value = "before" }));
+
+        await hosted.StartAsync(CancellationToken.None);
+        await hosted.StartAsync(CancellationToken.None);
+        await bus.Publish(new ConsumerMessage { Value = "started" });
+
+        await hosted.StopAsync(CancellationToken.None);
+        await hosted.StopAsync(CancellationToken.None);
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            bus.Publish(new ConsumerMessage { Value = "stopped" }));
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            endpoint.Send(new ConsumerMessage { Value = "stopped" }));
+
+        await hosted.StartAsync(CancellationToken.None);
+        await bus.Publish(new ConsumerMessage { Value = "restarted" });
+        await hosted.StopAsync(CancellationToken.None);
+    }
+
+    [Fact]
     public async Task Consume_filters_wrap_retry_and_only_downstream_filters_are_reentered()
     {
         RetryingConsumer.Attempts = 0;
@@ -247,6 +405,80 @@ public class MediatorTransportFactoryTests
                 "outer:after"
             },
             RetryingConsumer.Calls);
+
+        await hosted.StopAsync(CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task Retry_exhaustion_propagates_terminal_failure_through_upstream_filters_once()
+    {
+        FailingConsumer.Attempts = 0;
+        FailingConsumer.Calls = new List<string>();
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddServiceBus(cfg =>
+        {
+            cfg.UsingMediator();
+            cfg.AddConsumer<FailingConsumer, ConsumerMessage>(pipe =>
+            {
+                pipe.UseFilter(new RecordingConsumeFilter("outer", FailingConsumer.Calls));
+                pipe.UseMessageRetry(retry => retry.Immediate(1));
+                pipe.UseFilter(new RecordingConsumeFilter("inner", FailingConsumer.Calls));
+            });
+        });
+
+        using var provider = services.BuildServiceProvider();
+        var hosted = provider.GetRequiredService<IHostedService>();
+        await hosted.StartAsync(CancellationToken.None);
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            provider.GetRequiredService<IMessageBus>().Publish(new ConsumerMessage { Value = "fail" }));
+
+        Assert.Equal("exhausted", exception.Message);
+        Assert.Equal(2, FailingConsumer.Attempts);
+        Assert.Equal(
+            new[]
+            {
+                "outer:before",
+                "inner:before",
+                "consumer:1",
+                "inner:fault",
+                "inner:before",
+                "consumer:2",
+                "inner:fault",
+                "outer:fault"
+            },
+            FailingConsumer.Calls);
+
+        await hosted.StopAsync(CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task Consumer_failure_without_retry_is_attempted_once_and_propagated()
+    {
+        FailingConsumer.Attempts = 0;
+        FailingConsumer.Calls = new List<string>();
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddServiceBus(cfg =>
+        {
+            cfg.UsingMediator();
+            cfg.AddConsumer<FailingConsumer, ConsumerMessage>(pipe =>
+                pipe.UseFilter(new RecordingConsumeFilter("filter", FailingConsumer.Calls)));
+        });
+
+        using var provider = services.BuildServiceProvider();
+        var hosted = provider.GetRequiredService<IHostedService>();
+        await hosted.StartAsync(CancellationToken.None);
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            provider.GetRequiredService<IMessageBus>().Publish(new ConsumerMessage { Value = "fail" }));
+
+        Assert.Equal("exhausted", exception.Message);
+        Assert.Equal(1, FailingConsumer.Attempts);
+        Assert.Equal(
+            new[] { "filter:before", "consumer:1", "filter:fault" },
+            FailingConsumer.Calls);
 
         await hosted.StopAsync(CancellationToken.None);
     }

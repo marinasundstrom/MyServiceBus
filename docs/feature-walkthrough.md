@@ -151,6 +151,8 @@ Java accepts this self-contained model because the runtime lacks a standard depe
 
 Publish raises an event 🎉 to all interested consumers. It is fan-out by message type and does not target a specific queue. Use it for domain events or notifications. Multiple queues can listen to the same exchange or topic to receive the event. See [Adding Headers](#adding-headers) to attach tracing or other metadata.
 
+Publication is polymorphic in both clients. Publishing a concrete class reaches consumers of that class, its implemented message interfaces, and its non-root base classes. Each registered consumer runs at most once for a delivery even if more than one of its contracts is assignable from the message.
+
 `IMessageBus` is a singleton and implements `IPublishEndpoint`, so you can publish directly from the bus as shown. In scoped code paths (such as an ASP.NET request or inside a consumer), prefer resolving `IPublishEndpoint` from the scope so headers and cancellation tokens flow automatically.
 
 #### C#
@@ -237,7 +239,7 @@ Define consumers to handle messages. The consume context provides the message, h
 
 Consumers can bind to the same topic or exchange to subscribe to notifications or events. Multiple replicas of a service may bind to the same queue; the first instance to dequeue a message processes it, supporting scaling and resilience.
 
-Multiple consumer types can handle the same message. MyServiceBus invokes them one at a time; if any consumer throws, remaining consumers are skipped and failure handling applies (retries → faults → potential error queue). Consumers can also bind to different queues for the same message type, such as processing an `_error` queue alongside the primary endpoint.
+Multiple consumer types can handle the same message. Each matched consumer is an independent delivery: MyServiceBus invokes all of them and waits for all deliveries to settle. If any consumer fails, the overall dispatch fails, but that failure does not prevent the other matched consumers from being invoked. No registration, start, or completion order is guaranteed between independent consumers. Filters inside one consumer pipeline still follow their configured order. Consumers can also bind to different queues for the same message type, such as processing an `_error` queue alongside the primary endpoint.
 
 #### C#
 
@@ -257,7 +259,7 @@ class SubmitOrderConsumer : IConsumer<SubmitOrder>
 class SubmitOrderConsumer implements Consumer<SubmitOrder> {
     @Override
     public CompletableFuture<Void> consume(ConsumeContext<SubmitOrder> context) {
-        return context.publish(new OrderSubmitted(context.getMessage().getOrderId()), CancellationToken.none);
+        return context.publish(new OrderSubmitted(context.getMessage().getOrderId()));
     }
 }
 ```
@@ -360,6 +362,8 @@ Inspect and process the error queue with a dedicated consumer or tool, then send
 
 Use request/response for RPC-style interactions over the bus. A consumer responds to a request, and the client correlates replies, propagates headers, and manages timeouts.
 
+Request clients apply a default 30-second deadline. Configure `RequestTimeout.After(...)` when creating a client to use another deadline, or `RequestTimeout.None` to wait without a deadline. An elapsed deadline completes with a timeout error; caller cancellation remains cancellation. In Java, cancelling the supplied token cancels the returned `CompletableFuture` and allows transport-specific temporary request resources to be released.
+
 #### C#
 
 ```csharp
@@ -382,13 +386,13 @@ Console.WriteLine(response.Message.Status);
 class CheckOrderStatusConsumer implements Consumer<CheckOrderStatus> {
     @Override
     public CompletableFuture<Void> consume(ConsumeContext<CheckOrderStatus> context) {
-        return context.respond(new OrderStatus(context.getMessage().getOrderId(), "Pending"), CancellationToken.none);
+        return context.respond(new OrderStatus(context.getMessage().getOrderId(), "Pending"));
     }
 }
 
 RequestClientFactory factory = serviceProvider.getService(RequestClientFactory.class);
 RequestClient<CheckOrderStatus> client = factory.create(CheckOrderStatus.class);
-OrderStatus response = client.getResponse(new CheckOrderStatus(UUID.randomUUID()), OrderStatus.class, CancellationToken.none).join();
+OrderStatus response = client.getResponse(new CheckOrderStatus(UUID.randomUUID()), OrderStatus.class).join();
 System.out.println(response.getStatus());
 ```
 
@@ -420,7 +424,7 @@ RequestClientFactory factory = serviceProvider.getService(RequestClientFactory.c
 RequestClient<CheckOrderStatus> client = factory.create(CheckOrderStatus.class);
 Response2<OrderStatus, Fault<?>> response =
     client.getResponse(new CheckOrderStatus(UUID.randomUUID()),
-        OrderStatus.class, Fault.class, CancellationToken.none).join();
+        OrderStatus.class, Fault.class).join();
 
 response.as(OrderStatus.class)
     .ifPresent(r -> System.out.println(r.getMessage().getStatus()));
@@ -481,8 +485,7 @@ RequestClient<CheckOrderStatus> client = factory.create(CheckOrderStatus.class);
 OrderStatus response = client.getResponse(
     new CheckOrderStatus(UUID.randomUUID()),
     OrderStatus.class,
-    ctx -> ctx.getHeaders().put("trace-id", UUID.randomUUID()),
-    CancellationToken.none).join();
+    ctx -> ctx.getHeaders().put("trace-id", UUID.randomUUID())).join();
 ```
 
 ---
@@ -526,9 +529,14 @@ MediatorBus bus = MediatorBus.configure(services, cfg -> {
 });
 
 bus.publish(new SubmitOrder(UUID.randomUUID()));
+bus.send("queue:submit-order", new SubmitOrder(UUID.randomUUID()));
 ```
 
+The Java in-memory test harness also implements `PublishEndpoint`, so tests can use `publish` for fan-out semantics and `getSendEndpoint(...).send(...)` for directed-send semantics without treating the two operations as interchangeable.
+
 The mediator dispatches messages in-memory, making it useful for tests, local tools, modular-monolith boundaries, and interactions that are intentionally confined to the current process. It reuses the consumer model and pipelines, but it does not provide broker durability or independent delivery.
+
+The standalone mediator is ready for local dispatch immediately after construction. Hosted buses and the in-memory test harness are intentionally different: they are created stopped, require `Start`/`start` before publish or send operations, and reject those operations after `Stop`/`stop`. Repeated start and stop calls are safe, a stopped bus can be restarted, and a failed start returns the bus to the stopped state after rolling back transports that were already started.
 
 When an application also has a broker-backed bus, publish events that represent externally observable facts through that bus. Avoid publishing the same event through both the mediator and the bus as interchangeable paths: they have different retry, durability, observability, and failure semantics. Use both only when the local and distributed interactions are deliberately different.
 
@@ -705,7 +713,7 @@ public class MyService {
     }
 
     public CompletableFuture<Void> doWork(MyEvent event) {
-        return publishEndpoint.publish(event, CancellationToken.none);
+        return publishEndpoint.publish(event);
     }
 }
 ```
@@ -990,7 +998,7 @@ public void publishesOrderSubmitted() {
     harness.start().join();
 
     harness.registerHandler(SubmitOrder.class, ctx ->
-        ctx.publish(new OrderSubmitted(ctx.getMessage().getOrderId()), CancellationToken.none)
+        ctx.publish(new OrderSubmitted(ctx.getMessage().getOrderId()))
     );
 
     harness.send(new SubmitOrder(UUID.randomUUID())).join();

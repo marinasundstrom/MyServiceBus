@@ -15,8 +15,9 @@ internal class TransportSendEndpoint : ISendEndpoint
     readonly Uri _sourceAddress;
     readonly ISendContextFactory _contextFactory;
     readonly ILogger<TransportSendEndpoint>? _logger;
+    readonly Action? _ensureStarted;
 
-    public TransportSendEndpoint(ITransportFactory transportFactory, ISendPipe sendPipe, IMessageSerializer serializer, Uri address, Uri sourceAddress, ISendContextFactory contextFactory, ILogger<TransportSendEndpoint>? logger = null)
+    public TransportSendEndpoint(ITransportFactory transportFactory, ISendPipe sendPipe, IMessageSerializer serializer, Uri address, Uri sourceAddress, ISendContextFactory contextFactory, ILogger<TransportSendEndpoint>? logger = null, Action? ensureStarted = null)
     {
         _transportFactory = transportFactory;
         _sendPipe = sendPipe;
@@ -25,6 +26,7 @@ internal class TransportSendEndpoint : ISendEndpoint
         _sourceAddress = sourceAddress;
         _contextFactory = contextFactory;
         _logger = logger;
+        _ensureStarted = ensureStarted;
     }
 
     public Task Send<T>(T message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default) where T : class
@@ -32,6 +34,7 @@ internal class TransportSendEndpoint : ISendEndpoint
 
     public async Task Send<T>(object message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default) where T : class
     {
+        _ensureStarted?.Invoke();
         _logger?.LogDebug("Sending {MessageType} to {DestinationAddress}", typeof(T).Name, _address);
 
         var transport = await _transportFactory.GetSendTransport(_address, cancellationToken);

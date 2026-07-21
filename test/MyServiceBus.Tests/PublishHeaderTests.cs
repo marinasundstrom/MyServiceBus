@@ -39,6 +39,7 @@ public class PublishHeaderTests
         var bus = new MyServiceBus.MessageBus(factory, new ServiceCollection().BuildServiceProvider(),
             new SendPipe(Pipe.Empty<SendContext>()), new PublishPipe(Pipe.Empty<PublishContext>()), new EnvelopeMessageSerializer(),
             new Uri("loopback://localhost/"), new SendContextFactory(), new PublishContextFactory());
+        await bus.StartAsync(default);
 
         await bus.Publish(new TestMessage(), (ctx) => ctx.Headers["foo"] = "bar");
 

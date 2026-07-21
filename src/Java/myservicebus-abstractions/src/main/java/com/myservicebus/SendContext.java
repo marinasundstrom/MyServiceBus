@@ -21,7 +21,14 @@ public class SendContext implements PipeContext, ScheduledMessage {
     private URI destinationAddress;
     private Instant scheduledEnqueueTime;
     private UUID requestId;
+    private UUID correlationId;
+    private UUID conversationId = UUID.randomUUID();
+    private UUID initiatorId;
     private List<String> messageTypes;
+
+    public SendContext(Object message) {
+        this(message, CancellationToken.none());
+    }
 
     public SendContext(Object message, CancellationToken cancellationToken) {
         this.message = message;
@@ -64,6 +71,30 @@ public class SendContext implements PipeContext, ScheduledMessage {
         this.requestId = requestId;
     }
 
+    public UUID getCorrelationId() {
+        return correlationId;
+    }
+
+    public void setCorrelationId(UUID correlationId) {
+        this.correlationId = correlationId;
+    }
+
+    public UUID getConversationId() {
+        return conversationId;
+    }
+
+    public void setConversationId(UUID conversationId) {
+        this.conversationId = conversationId;
+    }
+
+    public UUID getInitiatorId() {
+        return initiatorId;
+    }
+
+    public void setInitiatorId(UUID initiatorId) {
+        this.initiatorId = initiatorId;
+    }
+
     public void setMessageTypes(List<String> messageTypes) {
         this.messageTypes = messageTypes;
     }
@@ -82,8 +113,10 @@ public class SendContext implements PipeContext, ScheduledMessage {
         MessageSerializationContext<Object> context = new MessageSerializationContext<>(message);
         context.setMessageId(UUID.randomUUID());
         context.setRequestId(requestId);
-        context.setCorrelationId(null);
-        context.setMessageType(messageTypes != null ? messageTypes : List.of(MessageUrn.forClass(message.getClass())));
+        context.setCorrelationId(correlationId);
+        context.setConversationId(conversationId);
+        context.setInitiatorId(initiatorId);
+        context.setMessageType(messageTypes != null ? messageTypes : MessageUrn.forMessageTypes(message.getClass()));
         context.setResponseAddress(null);
         context.setFaultAddress(null);
         context.setSourceAddress(sourceAddress != null ? sourceAddress : URI.create("loopback://localhost/source"));

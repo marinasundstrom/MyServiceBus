@@ -17,6 +17,7 @@ public class SendContext : BasePipeContext, ISendContext
     {
         this.messageTypes = messageTypes;
         this.messageSerializer = messageSerializer;
+        ConversationId = Guid.NewGuid();
     }
 
     public string MessageId { get; set; }
@@ -24,6 +25,8 @@ public class SendContext : BasePipeContext, ISendContext
     public string RoutingKey { get; set; } = ""; // Defaults to empty
     public IDictionary<string, object> Headers { get; } = new Dictionary<string, object>();
     public string? CorrelationId { get; set; }
+    public Guid? ConversationId { get; set; }
+    public Guid? InitiatorId { get; set; }
     public Uri? ResponseAddress { get; set; }
     public Uri? FaultAddress { get; set; }
     public Uri? SourceAddress { get; set; }
@@ -38,7 +41,9 @@ public class SendContext : BasePipeContext, ISendContext
         {
             MessageId = Guid.NewGuid(),
             RequestId = RequestId,
-            CorrelationId = null,
+            CorrelationId = Guid.TryParse(CorrelationId, out var correlationId) ? correlationId : null,
+            ConversationId = ConversationId,
+            InitiatorId = InitiatorId,
             MessageType = [.. messageTypes.Select(x => MessageUrn.For(x))],
             ResponseAddress = ResponseAddress,
             FaultAddress = FaultAddress,

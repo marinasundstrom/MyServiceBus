@@ -18,6 +18,11 @@ public class ConsumerConsumeContextImpl<TConsumer, TMessage> : ConsumerConsumeCo
 
     public TConsumer Consumer { get; }
     public TMessage Message => context.Message;
+    public Guid? RequestId => context.RequestId;
+    public Guid? CorrelationId => context.CorrelationId;
+    public Guid? ConversationId => context.ConversationId;
+    public Guid? InitiatorId => context.InitiatorId;
+    public System.Collections.Generic.IDictionary<string, object> Headers => context.Headers;
     CancellationToken PipeContext.CancellationToken => context.CancellationToken;
 
     public Task Publish<T>(object message, Action<IPublishContext>? contextCallback = null, CancellationToken cancellationToken = default)

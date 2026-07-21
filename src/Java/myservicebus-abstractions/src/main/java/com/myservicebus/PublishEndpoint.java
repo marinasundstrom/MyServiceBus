@@ -45,11 +45,11 @@ public interface PublishEndpoint {
     }
 
     default <T> CompletableFuture<Void> publish(T message, Consumer<PublishContext> contextCallback) {
-        return publish(message, contextCallback, CancellationToken.none);
+        return publish(message, contextCallback, CancellationToken.none());
     }
 
     default <T> CompletableFuture<Void> publish(T message) {
-        return publish(message, CancellationToken.none);
+        return publish(message, CancellationToken.none());
     }
 
     default <T> CompletableFuture<Void> publish(Class<T> messageType, Object message,
@@ -60,11 +60,11 @@ public interface PublishEndpoint {
 
     default <T> CompletableFuture<Void> publish(Class<T> messageType, Object message,
             Consumer<PublishContext> contextCallback) {
-        return publish(messageType, message, contextCallback, CancellationToken.none);
+        return publish(messageType, message, contextCallback, CancellationToken.none());
     }
 
     default <T> CompletableFuture<Void> publish(Class<T> messageType, Object message) {
-        return publish(messageType, message, CancellationToken.none);
+        return publish(messageType, message, CancellationToken.none());
     }
 
 }

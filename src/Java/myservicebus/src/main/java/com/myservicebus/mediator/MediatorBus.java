@@ -28,10 +28,14 @@ public class MediatorBus {
 
     public void publish(Object message) {
         String exchange = EntityNameFormatter.format(message.getClass());
+        send("loopback://" + exchange, message);
+    }
+
+    public void send(String destination, Object message) {
         try (ServiceScope scope = serviceProvider.createScope()) {
             SendEndpointProvider provider = scope.getServiceProvider().getService(SendEndpointProvider.class);
-            provider.getSendEndpoint("loopback://" + exchange)
-                    .send(message, CancellationToken.none).join();
+            provider.getSendEndpoint(destination)
+                    .send(message, CancellationToken.none()).join();
         }
     }
 }

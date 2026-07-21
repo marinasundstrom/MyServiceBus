@@ -25,12 +25,12 @@ public interface RequestClient<TRequest> {
 
         default <TResponse> CompletableFuture<TResponse> getResponse(TRequest request, Class<TResponse> responseType,
                         Consumer<SendContext> contextCallback) {
-                return getResponse(request, responseType, contextCallback, CancellationToken.none);
+                return getResponse(request, responseType, contextCallback, CancellationToken.none());
         }
 
         default <TResponse> CompletableFuture<TResponse> getResponse(TRequest request, Class<TResponse> responseType)
                         {
-                return getResponse(request, responseType, CancellationToken.none);
+                return getResponse(request, responseType, CancellationToken.none());
         }
 
         default <T1, T2> CompletableFuture<Response2<T1, T2>> getResponse(TRequest request, Class<T1> responseType1,
@@ -48,11 +48,11 @@ public interface RequestClient<TRequest> {
 
         default <T1, T2> CompletableFuture<Response2<T1, T2>> getResponse(TRequest request, Class<T1> responseType1,
                         Class<T2> responseType2, Consumer<SendContext> contextCallback) {
-                return getResponse(request, responseType1, responseType2, contextCallback, CancellationToken.none);
+                return getResponse(request, responseType1, responseType2, contextCallback, CancellationToken.none());
         }
 
         default <T1, T2> CompletableFuture<Response2<T1, T2>> getResponse(TRequest request, Class<T1> responseType1,
                         Class<T2> responseType2) {
-                return getResponse(request, responseType1, responseType2, CancellationToken.none);
+                return getResponse(request, responseType1, responseType2, CancellationToken.none());
         }
 }

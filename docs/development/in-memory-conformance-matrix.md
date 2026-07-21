@@ -1,0 +1,36 @@
+# Mediator and In-Memory Conformance Matrix
+
+## Purpose
+
+This matrix tracks the matching C# and Java scenarios required by the [Mediator and In-Memory Stability Gate](in-memory-stability-gate.md). It is the working compatibility checklist for the local mediator runtime and the in-memory test harness.
+
+Status meanings:
+
+- **Verified** — matching observable behavior is covered in both reference clients.
+- **Partial** — both clients cover part of the contract, but a shared scenario is still missing.
+- **Gap** — the portable behavior must be decided or implemented before the gate can close.
+
+Platform-specific syntax and asynchronous wrappers are not parity gaps when the underlying behavior is equivalent and documented.
+
+## Shared scenario matrix
+
+| # | Portable scenario | C# coverage | Java coverage | Status | Remaining work |
+|---|---|---|---|---|---|
+| 1 | Start, stop, repeated lifecycle calls, and operations outside the valid lifecycle | `InMemoryHarnessDiTests.Lifecycle_is_idempotent_and_operations_require_started_state`; `MediatorTransportFactoryTests.Hosted_bus_lifecycle_is_idempotent_and_operations_require_started_state`; failed-start state assertion in `TransportCapabilityTests` | `InMemoryHarnessDiTest.lifecycleIsIdempotentAndOperationsRequireStartedState`; hosted lifecycle coverage in `MessageBusLoggingTest`; failed-start state assertion in `TransportCapabilityTest`; standalone mediator dispatch remains immediately usable | **Verified** | Preserve the distinction between immediately usable standalone mediators and explicitly started hosted buses. |
+| 2 | Directed send and publish fan-out | `MediatorTransportFactoryTests.Directed_send_and_publish_reach_all_compatible_consumers`; `MultipleConsumersTests` | `MediatorTransportFactoryTest.directedSendAndPublishReachAllCompatibleConsumers`; `MultipleConsumersTest` | **Verified** | Preserve one delivery per compatible consumer for both operations and one receive transport per logical endpoint. |
+| 3 | Consumer scope creation and disposal per delivery | `InMemoryHarnessDiTests.Creates_and_disposes_a_consumer_scope_per_delivery`; `FilterDiTests` | `InMemoryHarnessDiTest.createsAndDisposesAConsumerScopePerDelivery`; `MediatorTransportFactoryTest.scopedSendEndpointProviderRetainsConsumeContextAcrossAsyncDispatch`; `ScopeConsumerFactory` tests | **Verified** | Preserve per-delivery scope identity and keep each scope alive through asynchronous consumer completion. |
+| 4 | Request/response correlation, timeout, cancellation, and fault response | `GenericRequestClientTests`, including timeout/cancellation distinction; `InMemoryHarnessDiTests.Request_and_correlation_identifiers_flow_through_response`; `RequestFaultExceptionTests` | `GenericRequestClientPolicyTest`; `InMemoryHarnessDiTest.requestAndCorrelationIdentifiersFlowThroughResponse` and `concurrentRequestsMatchOnlyResponsesWithTheirRequestIdentifier`; `RequestClientFaultTest`; `RequestClientHeaderTest` | **Verified** | Preserve request-specific response matching and distinguish elapsed deadlines, caller cancellation, and fault responses. |
+| 5 | Retry attempts, delay, terminal failure, and no-retry behavior | `PipeTests`; mediator retry-order, exhaustion, and no-retry scenarios | `PipeConfiguratorTest`; matching mediator retry-order, exhaustion, and no-retry scenarios | **Verified** | Exception selection, attempt metadata, and redelivery remain separate future features. |
+| 6 | Send, publish, and consume filter order | `PipeTests`; `OutboundFilterOrderingTests`; `MediatorTransportFactoryTests` | `PipeConfiguratorTest`; `ServiceBusPublishFilterTest`; `MediatorTransportFactoryTest` | **Verified** | Extend only when another runtime pipeline stage becomes public. |
+| 7 | Headers, correlation, cancellation, and telemetry context | `InMemoryHarnessDiTests.Consumer_publish_inherits_cancellation_and_keeps_metadata_explicit`; `PublishHeaderTests`; `OpenTelemetryFilterTests`; `PipeTests` | `InMemoryHarnessDiTest.consumerPublishInheritsCancellationAndKeepsMetadataExplicit`; `PublishHeaderTest`; `OpenTelemetryFilterTest`; `PipeConfiguratorTest` | **Verified** | Preserve `ConversationId`, map consumed `CorrelationId` to outbound `InitiatorId`, and keep arbitrary headers and outbound `CorrelationId` explicit. |
+| 8 | Interface and inherited message-type dispatch | `MediatorTransportFactoryTests.Publish_dispatches_to_concrete_interface_and_base_consumers_once`; `InMemoryHarnessDiTests.Dispatches_concrete_messages_to_interface_and_base_handlers_once`; anonymous interface tests | `MediatorTransportFactoryTest.publishDispatchesToConcreteInterfaceAndBaseConsumersOnce`; `InMemoryHarnessDiTest.dispatchesConcreteMessagesToInterfaceAndBaseHandlersOnce` | **Verified** | Preserve concrete, implemented-interface, and non-root-base dispatch with at-most-once consumer invocation. |
+| 9 | Scheduled delivery and cancellation | `SchedulingTests.Manual_scheduler_controls_publish_and_send_delivery`; `Cancel_prevents_scheduled_publish`; context-delay coverage | `SchedulingTest.manualSchedulerControlsPublishAndSendDelivery`; `cancelScheduledSend_prevents_delivery`; context-delay coverage | **Verified** | Preserve injectable job scheduling, publish/send delivery after manual release, cancellation before release, and no same-time ordering guarantee. |
+| 10 | Concurrent dispatch, ordering, and handler failure | `InMemoryHarnessDiTests.Should_record_concurrent_delivery_deterministically`; `MultipleConsumersFaultTests.Should_attempt_all_consumers_when_one_faults` | `InMemoryHarnessDiTest.records_concurrent_delivery_deterministically`; `MultipleConsumersTest.allConsumersAreAttemptedWhenOneFails` | **Verified** | Preserve independent delivery: await all matched consumers, fail dispatch if any fail, and promise no ordering between consumers. |
+| 11 | Stable topology snapshots and truthful capabilities | `TopologySnapshotTests`; `TransportCapabilityTests.InMemory_factory_exposes_its_descriptor` | `TopologySnapshotTest`; `TransportCapabilityTest.mediatorExposesItsDescriptor` | **Verified** | Keep descriptors synchronized when local-runtime behavior changes. |
+| 12 | Equivalent harness observations and assertion timing | `InMemoryHarnessObservationTests`; concurrent consumed-record assertions in `InMemoryHarnessDiTests` | `InMemoryHarnessObservationTest`; concurrent consumed-record assertions in `InMemoryHarnessDiTest` | **Verified** | Preserve successful-completion cardinality, existing-or-future matching, explicit timeout, and idiomatic cancellation. Add other observation categories only with matching contracts. |
+
+## Gate status
+
+All current mediator and in-memory stability scenarios are verified in both reference clients. New rows should be added before expanding local-runtime behavior, and existing rows remain regression contracts for package releases.
+
+A row moves to **Verified** only when both implementations have matching behavioral tests and the public documentation states any intentional platform distinction.

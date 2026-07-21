@@ -47,6 +47,7 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
     private final Set<String> consumerRegistrations = new HashSet<>();
     private final Set<String> messageTypes = new HashSet<>();
     private final Function<Class<?>, ConsumerFactory> consumerFactoryFactory;
+    private volatile BusState state = BusState.STOPPED;
 
     public MessageBusImpl(ServiceProvider serviceProvider) {
         this(serviceProvider, type -> new ScopeConsumerFactory(serviceProvider));
@@ -85,31 +86,51 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
         return new MessageBusImpl(services.buildServiceProvider());
     }
 
-    public void start() throws Exception {
-        TransportCapabilityRequirements requirements = serviceProvider.getService(TransportCapabilityRequirements.class);
-        TransportCapabilityDescriptor descriptor = serviceProvider.getService(TransportCapabilityDescriptor.class);
-        if (requirements != null && !requirements.items().isEmpty()) {
-            if (descriptor == null && transportFactory != null) {
-                descriptor = transportFactory.getCapabilities();
+    public synchronized void start() throws Exception {
+        if (state == BusState.STARTED) {
+            return;
+        }
+
+        state = BusState.STARTING;
+        List<ReceiveTransport> startedTransports = new ArrayList<>();
+        try {
+            TransportCapabilityRequirements requirements = serviceProvider.getService(TransportCapabilityRequirements.class);
+            TransportCapabilityDescriptor descriptor = serviceProvider.getService(TransportCapabilityDescriptor.class);
+            if (requirements != null && !requirements.items().isEmpty()) {
+                if (descriptor == null && transportFactory != null) {
+                    descriptor = transportFactory.getCapabilities();
+                }
+                if (descriptor == null) {
+                    descriptor = TransportCapabilityDescriptors.unknown("unregistered");
+                }
+                TransportCapabilityValidator.validate(descriptor, requirements.items());
             }
-            if (descriptor == null) {
-                descriptor = TransportCapabilityDescriptors.unknown("unregistered");
+
+            TopologyRegistry topology = serviceProvider.getService(TopologyRegistry.class);
+
+            for (ConsumerTopology consumerDef : topology.getConsumers()) {
+                addConsumer(consumerDef);
             }
-            TransportCapabilityValidator.validate(descriptor, requirements.items());
-        }
 
-        TopologyRegistry topology = serviceProvider.getService(TopologyRegistry.class);
+            for (ReceiveTransport transport : receiveTransports) {
+                transport.start();
+                startedTransports.add(transport);
+            }
 
-        for (ConsumerTopology consumerDef : topology.getConsumers()) {
-            addConsumer(consumerDef);
-        }
-
-        for (ReceiveTransport transport : receiveTransports) {
-            transport.start();
-        }
-
-        if (logger != null) {
-            logger.info("Service bus started");
+            state = BusState.STARTED;
+            if (logger != null) {
+                logger.info("Service bus started");
+            }
+        } catch (Exception startupFailure) {
+            for (int i = startedTransports.size() - 1; i >= 0; i--) {
+                try {
+                    startedTransports.get(i).stop();
+                } catch (Exception ignored) {
+                    // Preserve the startup failure while making a best effort to roll back.
+                }
+            }
+            state = BusState.STOPPED;
+            throw startupFailure;
         }
     }
 
@@ -185,10 +206,14 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
                         responseAddress,
                         faultAddress,
                         errorAddress,
-                        CancellationToken.none,
+                        CancellationToken.none(),
                         provider,
                         this.address,
-                        this::getPublishAddress);
+                        this::getPublishAddress,
+                        inboundMessage.getRequestId(),
+                        inboundMessage.getCorrelationId(),
+                        inboundMessage.getConversationId(),
+                        inboundMessage.getInitiatorId());
                 if (logger != null) {
                     logger.debug("Received {}", messageTypeUrn);
                 }
@@ -261,10 +286,14 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
                 String faultAddress = inboundMessage.getFaultAddress();
                 String errorAddress = transportFactory.getErrorAddress(queueName);
                 ConsumeContext<T> ctx = new ConsumeContext<>(typedMessage, headers,
-                        responseAddress, faultAddress, errorAddress, CancellationToken.none,
+                        responseAddress, faultAddress, errorAddress, CancellationToken.none(),
                         provider,
                         this.address,
-                        this::getPublishAddress);
+                        this::getPublishAddress,
+                        inboundMessage.getRequestId(),
+                        inboundMessage.getCorrelationId(),
+                        inboundMessage.getConversationId(),
+                        inboundMessage.getInitiatorId());
                 if (logger != null) {
                     logger.debug("Received {}", messageTypeUrn);
                 }
@@ -326,9 +355,18 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
         return serializer != null && serializer.getEnvelopeMode() == MessageEnvelopeMode.RAW;
     }
 
-    public void stop() throws Exception {
-        for (ReceiveTransport transport : receiveTransports) {
-            transport.stop();
+    public synchronized void stop() throws Exception {
+        if (state == BusState.STOPPED) {
+            return;
+        }
+
+        state = BusState.STOPPING;
+        try {
+            for (int i = receiveTransports.size() - 1; i >= 0; i--) {
+                receiveTransports.get(i).stop();
+            }
+        } finally {
+            state = BusState.STOPPED;
         }
 
         if (logger != null) {
@@ -348,6 +386,8 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
 
     @Override
     public <T> CompletableFuture<Void> publish(T message, CancellationToken cancellationToken) {
+        if (state != BusState.STARTED)
+            return notStartedFuture();
         if (message == null)
             return CompletableFuture.failedFuture(new IllegalArgumentException("Message cannot be null"));
         PublishContext ctx = publishContextFactory.create(message, cancellationToken);
@@ -357,6 +397,8 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
     @Override
     public <T> CompletableFuture<Void> publish(T message, java.util.function.Consumer<PublishContext> contextCallback,
             CancellationToken cancellationToken) {
+        if (state != BusState.STARTED)
+            return notStartedFuture();
         PublishContext ctx = publishContextFactory.create(message, cancellationToken);
         contextCallback.accept(ctx);
         return publish(ctx);
@@ -364,6 +406,8 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
 
     @Override
     public CompletableFuture<Void> publish(PublishContext context) {
+        if (state != BusState.STARTED)
+            return notStartedFuture();
         String exchange = EntityNameFormatter.format(context.getMessage().getClass());
         String address = transportFactory.getPublishAddress(exchange);
         context.setSourceAddress(this.address);
@@ -395,7 +439,7 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
     }
 
     public <T> CompletableFuture<Void> publish(T message) {
-        return publish(message, CancellationToken.none);
+        return publish(message, CancellationToken.none());
     }
 
     @Override
@@ -406,6 +450,29 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
     @Override
     public SendEndpoint getSendEndpoint(String uri) {
         SendEndpointProvider provider = serviceProvider.getService(SendEndpointProvider.class);
-        return provider.getSendEndpoint(uri);
+        SendEndpoint endpoint = provider.getSendEndpoint(uri);
+        return new SendEndpoint() {
+            @Override
+            public <T> CompletableFuture<Void> send(T message, CancellationToken cancellationToken) {
+                return state == BusState.STARTED
+                        ? endpoint.send(message, cancellationToken)
+                        : notStartedFuture();
+            }
+        };
+    }
+
+    boolean isStarted() {
+        return state == BusState.STARTED;
+    }
+
+    static <T> CompletableFuture<T> notStartedFuture() {
+        return CompletableFuture.failedFuture(new IllegalStateException("The service bus is not started."));
+    }
+
+    private enum BusState {
+        STOPPED,
+        STARTING,
+        STARTED,
+        STOPPING
     }
 }

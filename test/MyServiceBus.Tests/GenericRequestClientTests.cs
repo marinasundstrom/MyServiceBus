@@ -209,4 +209,27 @@ public class GenericRequestClientTests
         await receive.Stop();
     }
 
+    [Fact]
+    public async Task Distinguishes_request_timeout_from_caller_cancellation()
+    {
+        var transportFactory = new MediatorTransportFactory();
+        var client = new GenericRequestClient<OrderRequest>(
+            transportFactory,
+            new EnvelopeMessageSerializer(),
+            new SendContextFactory(),
+            timeout: RequestTimeout.After(TimeSpan.FromMilliseconds(25)));
+
+        await Assert.ThrowsAsync<TimeoutException>(() =>
+            client.GetResponseAsync<OrderAccepted>(new OrderRequest()));
+
+        using var cancellationSource = new CancellationTokenSource();
+        var response = client.GetResponseAsync<OrderAccepted>(
+            new OrderRequest(),
+            cancellationToken: cancellationSource.Token,
+            timeout: RequestTimeout.None);
+        cancellationSource.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => response);
+    }
+
 }

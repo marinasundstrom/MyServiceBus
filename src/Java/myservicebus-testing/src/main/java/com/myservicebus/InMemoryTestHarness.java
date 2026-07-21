@@ -11,6 +11,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
+import java.util.Objects;
 
 import com.myservicebus.di.ServiceProvider;
 import com.myservicebus.di.ServiceScope;
@@ -19,11 +20,14 @@ import com.myservicebus.topology.ConsumerTopology;
 import com.myservicebus.topology.TopologyRegistry;
 import com.myservicebus.serialization.MessageSerializer;
 
-public class InMemoryTestHarness implements RequestClientTransport, TransportSendEndpointProvider {
+public class InMemoryTestHarness implements RequestClientTransport, TransportSendEndpointProvider, PublishEndpoint {
     private final Map<Class<?>, List<com.myservicebus.Consumer<?>>> handlers = new ConcurrentHashMap<>();
     private final List<Object> consumed = Collections.synchronizedList(new ArrayList<>());
+    private final Object observationLock = new Object();
+    private final List<ConsumedWaiter> consumedWaiters = new ArrayList<>();
     private final ServiceProvider serviceProvider;
     private final ConsumeContextProvider consumeContextProvider;
+    private volatile boolean started;
 
     public InMemoryTestHarness() {
         this(null);
@@ -42,11 +46,13 @@ public class InMemoryTestHarness implements RequestClientTransport, TransportSen
         this.consumeContextProvider = provider;
     }
 
-    public CompletableFuture<Void> start() {
+    public synchronized CompletableFuture<Void> start() {
+        started = true;
         return CompletableFuture.completedFuture(null);
     }
 
-    public CompletableFuture<Void> stop() {
+    public synchronized CompletableFuture<Void> stop() {
+        started = false;
         return CompletableFuture.completedFuture(null);
     }
 
@@ -55,16 +61,25 @@ public class InMemoryTestHarness implements RequestClientTransport, TransportSen
     }
 
     public <T> CompletableFuture<Void> send(T message) {
-        return send(new SendContext(message, CancellationToken.none));
+        return send(new SendContext(message, CancellationToken.none()));
+    }
+
+    @Override
+    public <T> CompletableFuture<Void> publish(T message, CancellationToken cancellationToken) {
+        return send(new SendContext(message, cancellationToken));
     }
 
     public <T> CompletableFuture<Void> send(T message, Consumer<SendContext> contextCallback) {
-        SendContext ctx = new SendContext(message, CancellationToken.none);
+        SendContext ctx = new SendContext(message, CancellationToken.none());
         contextCallback.accept(ctx);
         return send(ctx);
     }
 
     public <T> CompletableFuture<Void> send(SendContext context) {
+        if (!started) {
+            return notStartedFuture();
+        }
+
         Instant scheduled = context.getScheduledEnqueueTime();
         if (scheduled != null) {
             Duration delay = Duration.between(Instant.now(), scheduled);
@@ -87,39 +102,47 @@ public class InMemoryTestHarness implements RequestClientTransport, TransportSen
     }
 
     private CompletableFuture<Void> sendInternal(SendContext context, String responseAddress, String faultAddress) {
+        if (!started) {
+            return notStartedFuture();
+        }
+
         Object message = context.getMessage();
         Class<?> messageType = message.getClass();
         if (java.lang.reflect.Proxy.isProxyClass(messageType) && messageType.getInterfaces().length > 0) {
             messageType = messageType.getInterfaces()[0];
         }
         final Class<?> mt = messageType;
-        CompletableFuture<Void> future = CompletableFuture.completedFuture(null);
+        List<CompletableFuture<Void>> deliveries = new ArrayList<>();
 
-        List<com.myservicebus.Consumer<?>> list = handlers.getOrDefault(mt, List.of());
+        List<com.myservicebus.Consumer<?>> list = handlers.entrySet().stream()
+                .filter(entry -> entry.getKey().isAssignableFrom(mt))
+                .flatMap(entry -> entry.getValue().stream())
+                .distinct()
+                .toList();
         for (com.myservicebus.Consumer<?> raw : list) {
             @SuppressWarnings("unchecked")
             com.myservicebus.Consumer<Object> handler = (com.myservicebus.Consumer<Object>) raw;
             @SuppressWarnings("unchecked")
             ConsumeContext<Object> consumeContext = new ConsumeContext<>(message, context.getHeaders(), responseAddress,
-                    faultAddress, context.getCancellationToken(), this);
-            future = future.thenCompose(v -> {
+                    faultAddress, null, context.getCancellationToken(), this, java.net.URI.create("inmemory:bus"),
+                    entityName -> "inmemory:" + entityName, context.getRequestId(), context.getCorrelationId(),
+                    context.getConversationId(), context.getInitiatorId());
+            try {
+                CompletableFuture<Void> delivery;
                 try {
                     if (consumeContextProvider != null) {
                         consumeContextProvider.setContext(consumeContext);
                     }
-                    try {
-                        return handler.consume(consumeContext).thenRun(() -> consumed.add(message));
-                    } finally {
-                        if (consumeContextProvider != null) {
-                            consumeContextProvider.clear();
-                        }
+                    delivery = handler.consume(consumeContext).thenRun(() -> recordConsumed(message));
+                } finally {
+                    if (consumeContextProvider != null) {
+                        consumeContextProvider.clear();
                     }
-                } catch (Exception e) {
-                    CompletableFuture<Void> failed = new CompletableFuture<>();
-                    failed.completeExceptionally(e);
-                    return failed;
                 }
-            });
+                deliveries.add(delivery);
+            } catch (Throwable failure) {
+                deliveries.add(CompletableFuture.failedFuture(failure));
+            }
         }
 
         if (serviceProvider != null) {
@@ -127,38 +150,46 @@ public class InMemoryTestHarness implements RequestClientTransport, TransportSen
             if (registry != null) {
                 for (ConsumerTopology ct : registry.getConsumers()) {
                     boolean handles = ct.getBindings().stream()
-                            .anyMatch(b -> b.getMessageType().equals(mt));
+                            .anyMatch(b -> b.getMessageType().isAssignableFrom(mt));
                     if (!handles) {
                         continue;
                     }
-                    future = future.thenCompose(v -> {
-                        try (ServiceScope scope = serviceProvider.createScope()) {
-                            ServiceProvider scoped = scope.getServiceProvider();
-                            @SuppressWarnings("unchecked")
-                            com.myservicebus.Consumer<Object> consumer = (com.myservicebus.Consumer<Object>) scoped
-                                    .getService(ct.getConsumerType());
-                            @SuppressWarnings("unchecked")
-                            ConsumeContext<Object> consumeContext = new ConsumeContext<>(message, context.getHeaders(),
-                                    responseAddress, faultAddress, context.getCancellationToken(),
-                                    InMemoryTestHarness.this);
-                            ConsumeContextProvider ctxProvider = scoped.getService(ConsumeContextProvider.class);
-                            ctxProvider.setContext(consumeContext);
-                            try {
-                                return consumer.consume(consumeContext).thenRun(() -> consumed.add(message));
-                            } finally {
-                                ctxProvider.clear();
-                            }
-                        } catch (Exception e) {
-                            CompletableFuture<Void> failed = new CompletableFuture<>();
-                            failed.completeExceptionally(e);
-                            return failed;
+                    ServiceScope scope = serviceProvider.createScope();
+                    try {
+                        ServiceProvider scoped = scope.getServiceProvider();
+                        @SuppressWarnings("unchecked")
+                        com.myservicebus.Consumer<Object> consumer = (com.myservicebus.Consumer<Object>) scoped
+                                .getService(ct.getConsumerType());
+                        @SuppressWarnings("unchecked")
+                        ConsumeContext<Object> consumeContext = new ConsumeContext<>(message, context.getHeaders(),
+                                responseAddress, faultAddress, null, context.getCancellationToken(),
+                                InMemoryTestHarness.this, java.net.URI.create("inmemory:bus"),
+                                entityName -> "inmemory:" + entityName, context.getRequestId(),
+                                context.getCorrelationId(), context.getConversationId(), context.getInitiatorId());
+                        ConsumeContextProvider ctxProvider = scoped.getService(ConsumeContextProvider.class);
+                        ctxProvider.setContext(consumeContext);
+                        CompletableFuture<Void> result;
+                        try {
+                            result = consumer.consume(consumeContext).thenRun(() -> recordConsumed(message));
+                        } finally {
+                            ctxProvider.clear();
                         }
-                    });
+                        scope.detach();
+                        deliveries.add(result.whenComplete((ignored, failure) -> scope.close()));
+                    } catch (Throwable failure) {
+                        scope.close();
+                        deliveries.add(CompletableFuture.failedFuture(failure));
+                    }
                 }
             }
         }
 
-        return future;
+        return CompletableFuture.allOf(deliveries.toArray(new CompletableFuture[0]));
+    }
+
+    private static <T> CompletableFuture<T> notStartedFuture() {
+        return CompletableFuture.failedFuture(
+                new IllegalStateException("The in-memory test harness is not started."));
     }
 
     @Override
@@ -167,13 +198,17 @@ public class InMemoryTestHarness implements RequestClientTransport, TransportSen
             Class<TResponse> responseType) {
         CompletableFuture<TResponse> future = new CompletableFuture<>();
         com.myservicebus.Consumer<TResponse> handler = ctx -> {
-            future.complete(responseType.cast(ctx.getMessage()));
+            if (Objects.equals(context.getRequestId(), ctx.getRequestId())) {
+                future.complete(responseType.cast(ctx.getMessage()));
+            }
             return CompletableFuture.completedFuture(null);
         };
         com.myservicebus.Consumer<Fault> faultHandler = ctx -> {
             @SuppressWarnings("unchecked")
             Fault<TRequest> fault = (Fault<TRequest>) ctx.getMessage();
-            future.completeExceptionally(new RequestFaultException(requestType.getSimpleName(), fault));
+            if (Objects.equals(context.getRequestId(), ctx.getRequestId())) {
+                future.completeExceptionally(new RequestFaultException(requestType.getSimpleName(), fault));
+            }
             return CompletableFuture.completedFuture(null);
         };
         registerHandler(responseType, handler);
@@ -200,18 +235,24 @@ public class InMemoryTestHarness implements RequestClientTransport, TransportSen
         CompletableFuture<Response2<T1, T2>> future = new CompletableFuture<>();
 
         com.myservicebus.Consumer<T1> h1 = ctx -> {
-            future.complete(Response2.fromT1(responseType1.cast(ctx.getMessage())));
+            if (Objects.equals(context.getRequestId(), ctx.getRequestId())) {
+                future.complete(Response2.fromT1(responseType1.cast(ctx.getMessage())));
+            }
             return CompletableFuture.completedFuture(null);
         };
         com.myservicebus.Consumer<T2> h2 = ctx -> {
-            future.complete(Response2.fromT2(responseType2.cast(ctx.getMessage())));
+            if (Objects.equals(context.getRequestId(), ctx.getRequestId())) {
+                future.complete(Response2.fromT2(responseType2.cast(ctx.getMessage())));
+            }
             return CompletableFuture.completedFuture(null);
         };
 
         com.myservicebus.Consumer<Fault> faultHandler = ctx -> {
             @SuppressWarnings("unchecked")
             Fault<TRequest> fault = (Fault<TRequest>) ctx.getMessage();
-            future.completeExceptionally(new RequestFaultException(requestType.getSimpleName(), fault));
+            if (Objects.equals(context.getRequestId(), ctx.getRequestId())) {
+                future.completeExceptionally(new RequestFaultException(requestType.getSimpleName(), fault));
+            }
             return CompletableFuture.completedFuture(null);
         };
 
@@ -243,6 +284,53 @@ public class InMemoryTestHarness implements RequestClientTransport, TransportSen
     public boolean wasConsumed(Class<?> type) {
         synchronized (consumed) {
             return consumed.stream().anyMatch(type::isInstance);
+        }
+    }
+
+    public CompletableFuture<Boolean> waitForConsumed(Class<?> type, Duration timeout) {
+        Objects.requireNonNull(type, "type");
+        Objects.requireNonNull(timeout, "timeout");
+        if (timeout.isNegative()) {
+            throw new IllegalArgumentException("timeout must not be negative");
+        }
+
+        ConsumedWaiter waiter;
+        synchronized (observationLock) {
+            if (wasConsumed(type)) {
+                return CompletableFuture.completedFuture(true);
+            }
+            waiter = new ConsumedWaiter(type);
+            consumedWaiters.add(waiter);
+        }
+
+        CompletableFuture.delayedExecutor(timeout.toMillis(), TimeUnit.MILLISECONDS)
+                .execute(() -> waiter.completion.complete(false));
+        waiter.completion.whenComplete((result, failure) -> {
+            synchronized (observationLock) {
+                consumedWaiters.remove(waiter);
+            }
+        });
+        return waiter.completion;
+    }
+
+    private void recordConsumed(Object message) {
+        consumed.add(message);
+
+        List<ConsumedWaiter> matching;
+        synchronized (observationLock) {
+            matching = consumedWaiters.stream()
+                    .filter(waiter -> waiter.messageType.isInstance(message))
+                    .toList();
+        }
+        matching.forEach(waiter -> waiter.completion.complete(true));
+    }
+
+    private static final class ConsumedWaiter {
+        private final Class<?> messageType;
+        private final CompletableFuture<Boolean> completion = new CompletableFuture<>();
+
+        private ConsumedWaiter(Class<?> messageType) {
+            this.messageType = messageType;
         }
     }
 

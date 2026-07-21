@@ -14,6 +14,8 @@ The ServiceBus Java client mirrors the C# design by providing an asynchronous me
 ### Publishing
 - `publish` uses `EntityNameFormatter.format` to derive an exchange name and sends the message via a resolved endpoint backed by the RabbitMQ transport.
 - Publish filters use the dedicated `PublishContext` and `PipeConfigurator<PublishContext>`, corresponding to the C# publish pipeline rather than reusing the broader send-filter type.
+- Routine operations provide tokenless overloads. Advanced overloads accept a read-only `CancellationToken`; `CancellationTokenSource.token()` exposes the signal and `CancellationToken.none()` represents the absence of a cancellation policy.
+- `CancellationToken.onCancel` returns an unregisterable `CancellationRegistration`; callbacks registered after cancellation run immediately, and `throwIfCancelled()` uses Java's standard `CancellationException`.
 
 ### Responding
 - `respond` forwards messages to the `responseAddress` when available; otherwise it completes immediately.

@@ -24,5 +24,13 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '17'
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.0.0'
       - name: Build with Gradle
-        run: ./gradlew test publish
+        run: gradle test publish
+      - name: Verify Maven packages
+        run: ./eng/verify-maven-packages.sh
+      - name: Verify Maven package consumer
+        run: ./eng/verify-maven-package-consumer.sh

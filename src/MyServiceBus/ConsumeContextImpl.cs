@@ -40,6 +40,11 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
     internal ReceiveContext ReceiveContext => receiveContext;
 
     public TMessage Message => message is null ? (receiveContext.TryGetMessage(out message) ? message : default) : message;
+    public Guid? RequestId => receiveContext.RequestId;
+    public Guid? CorrelationId => receiveContext.CorrelationId;
+    public Guid? ConversationId => receiveContext.ConversationId;
+    public Guid? InitiatorId => receiveContext.InitiatorId;
+    public IDictionary<string, object> Headers => receiveContext.Headers;
 
     public Task<ISendEndpoint> GetSendEndpoint(Uri uri)
     {
@@ -55,13 +60,18 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
 
     public async Task Publish<T>(object message, Action<IPublishContext>? contextCallback = null, CancellationToken cancellationToken = default) where T : class
     {
+        var effectiveCancellationToken = cancellationToken.CanBeCanceled
+            ? cancellationToken
+            : receiveContext.CancellationToken;
         var exchangeName = EntityNameFormatter.Format(typeof(T));
 
         var uri = _transportFactory.GetPublishAddress(exchangeName);
-        var transport = await _transportFactory.GetSendTransport(uri, cancellationToken);
+        var transport = await _transportFactory.GetSendTransport(uri, effectiveCancellationToken);
 
-        var context = _publishContextFactory.Create(MessageTypeCache.GetMessageTypes(typeof(T)), _messageSerializer, cancellationToken);
+        var context = _publishContextFactory.Create(MessageTypeCache.GetMessageTypes(typeof(T)), _messageSerializer, effectiveCancellationToken);
         context.MessageId = Guid.NewGuid().ToString();
+        context.ConversationId = receiveContext.ConversationId;
+        context.InitiatorId = receiveContext.CorrelationId;
         context.SourceAddress = _address;
         context.DestinationAddress = uri;
         context.RoutingKey = exchangeName;
@@ -71,7 +81,7 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
         await _publishPipe.Send(context);
         await _sendPipe.Send(context);
         var typed = message is T t ? t : (T)MessageProxy.Create(typeof(T), message);
-        await transport.Send(typed, context, cancellationToken);
+        await transport.Send(typed, context, effectiveCancellationToken);
     }
 
     public async Task RespondAsync<T>(T message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default) where T : class
@@ -89,6 +99,8 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
         var context = _sendContextFactory.Create(MessageTypeCache.GetMessageTypes(typeof(T)), _messageSerializer, cancellationToken);
         context.MessageId = Guid.NewGuid().ToString();
         context.RequestId = receiveContext.RequestId;
+        context.ConversationId = receiveContext.ConversationId;
+        context.InitiatorId = receiveContext.CorrelationId;
         context.SourceAddress = _address;
         context.DestinationAddress = address;
 
@@ -119,6 +131,8 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
         var context = _sendContextFactory.Create(MessageTypeCache.GetMessageTypes(typeof(Fault<TMessage>)), _messageSerializer, cancellationToken);
         context.MessageId = Guid.NewGuid().ToString();
         context.RequestId = receiveContext.RequestId;
+        context.ConversationId = receiveContext.ConversationId;
+        context.InitiatorId = receiveContext.CorrelationId;
         context.SourceAddress = _address;
         context.DestinationAddress = address;
 
@@ -133,9 +147,17 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
     public async Task Send<T>(Uri address, object message, Action<ISendContext>? contextCallback = null,
         CancellationToken cancellationToken = default) where T : class
     {
+        var effectiveCancellationToken = cancellationToken.CanBeCanceled
+            ? cancellationToken
+            : receiveContext.CancellationToken;
         var endpoint = await GetSendEndpoint(address).ConfigureAwait(false);
         var typed = message is T t ? t : (T)MessageProxy.Create(typeof(T), message);
-        await endpoint.Send<T>(typed, contextCallback, cancellationToken).ConfigureAwait(false);
+        await endpoint.Send<T>(typed, context =>
+        {
+            context.ConversationId = receiveContext.ConversationId;
+            context.InitiatorId = receiveContext.CorrelationId;
+            contextCallback?.Invoke(context);
+        }, effectiveCancellationToken).ConfigureAwait(false);
     }
 
     public Task Forward<T>(Uri address, T message, CancellationToken cancellationToken = default) where T : class

@@ -14,7 +14,7 @@ RabbitMQ transport tests use Testcontainers to start a disposable broker. Docker
 
 The tests:
 
-- pin the RabbitMQ image version
+- pin the RabbitMQ image to the exact version declared in [Supported Versions](supported-versions.md)
 - use dynamically mapped ports
 - create unique exchanges and queues
 - exercise the real send and receive transports
@@ -50,29 +50,44 @@ Ordinary test runs report these scenarios as skipped. The dedicated cross-langua
 ## Usage
 The pattern is identical in both languages: create the harness, register handlers, start it, send messages, assert consumption, and then stop the harness.
 
+The harness starts in the stopped state. `Start`/`start` and `Stop`/`stop` are idempotent, and a stopped harness may be started again. Send, publish, and request operations before start or after stop fail with the platform's invalid-state exception. Handler and consumer registration remains valid while stopped so a test can be fully configured before it starts delivery.
+
+The standalone mediator has a different responsibility: it is immediately usable after construction and does not model a hosted transport lifecycle. A hosted broker-backed bus still follows its host or explicit bus lifecycle.
+
+Consumers registered through the dependency-injection configuration receive a new service scope for every delivery. That scope remains alive until the consumer's asynchronous operation completes and is then disposed, including asynchronous disposal in C#. Direct handler delegates are application-owned callbacks and do not create a dependency-injection scope.
+
 ### C#
 ```csharp
 var harness = new InMemoryTestHarness();
-harness.Handler<SomeMessage>(ctx => Task.CompletedTask);
+harness.RegisterHandler<SomeMessage>(ctx => Task.CompletedTask);
 
 await harness.Start();
-await harness.InputQueueSendEndpoint.Send(new SomeMessage());
-Assert.True(await harness.Consumed.Any<SomeMessage>());
+var consumed = harness.WaitForConsumed<SomeMessage>(TimeSpan.FromSeconds(1));
+await harness.Publish(new SomeMessage());
+Assert.True(await consumed);
 await harness.Stop();
 ```
 
 ### Java
 ```java
 InMemoryTestHarness harness = new InMemoryTestHarness();
-harness.handler(SomeMessage.class, ctx -> CompletableFuture.completedFuture(null));
+harness.registerHandler(SomeMessage.class, ctx -> CompletableFuture.completedFuture(null));
 
-harness.start();
-harness.inputQueueSendEndpoint().send(new SomeMessage());
-assertTrue(harness.consumed().any(SomeMessage.class));
-harness.stop();
+harness.start().join();
+CompletableFuture<Boolean> consumed = harness.waitForConsumed(
+        SomeMessage.class, Duration.ofSeconds(1));
+harness.send(new SomeMessage()).join();
+assertTrue(consumed.join());
+harness.stop().join();
 ```
 
 These helpers enable fast, isolated tests and provide the same API surface in both languages, supporting the project's alignment goals.
+
+`WaitForConsumed<T>` and `waitForConsumed` first inspect existing observations and then wait for a future successful consumer completion until the explicit timeout. They return `false` when the timeout elapses. C# caller cancellation remains distinct and throws `OperationCanceledException`; Java callers may cancel the returned `CompletableFuture` using the normal Java future API.
+
+The current shared observation category is **consumed**, recorded once for each consumer pipeline that completes successfully. A single message therefore creates multiple consumed observations when multiple compatible consumers succeed. Failed attempts are not consumed observations. Sent, published, faulted, and scheduled observation collections remain future testing features and are not implied by the current harness API.
+
+Scheduling tests can replace `IJobScheduler` or `JobScheduler` with a manually controlled implementation. This lets a test verify scheduled publish, directed send, and cancellation by explicitly releasing or removing a pending callback instead of sleeping against wall-clock time. The callback completes only after the resulting local delivery completes. The local scheduler does not promise ordering between messages with the same due time.
 
 ## Publishing from a service class
 Classes can inject `IPublishEndpoint` (C#) or `PublishEndpoint` (Java) and be verified with the in-memory harness.

@@ -15,6 +15,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import javax.inject.Inject;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -36,6 +37,52 @@ public class MediatorTransportFactoryTest {
         }
     }
 
+    public static class SecondTestConsumer implements Consumer<TestMessage> {
+        static int count;
+
+        @Override
+        public CompletableFuture<Void> consume(ConsumeContext<TestMessage> context) {
+            count++;
+            return CompletableFuture.completedFuture(null);
+        }
+    }
+
+    interface AssignableEvent {
+    }
+
+    static class BaseAssignableEvent {
+    }
+
+    static class DerivedAssignableEvent extends BaseAssignableEvent implements AssignableEvent {
+    }
+
+    public static class ConcreteAssignableConsumer implements Consumer<DerivedAssignableEvent> {
+        static int count;
+        @Override
+        public CompletableFuture<Void> consume(ConsumeContext<DerivedAssignableEvent> context) {
+            count++;
+            return CompletableFuture.completedFuture(null);
+        }
+    }
+
+    public static class BaseAssignableConsumer implements Consumer<BaseAssignableEvent> {
+        static int count;
+        @Override
+        public CompletableFuture<Void> consume(ConsumeContext<BaseAssignableEvent> context) {
+            count++;
+            return CompletableFuture.completedFuture(null);
+        }
+    }
+
+    public static class InterfaceAssignableConsumer implements Consumer<AssignableEvent> {
+        static int count;
+        @Override
+        public CompletableFuture<Void> consume(ConsumeContext<AssignableEvent> context) {
+            count++;
+            return CompletableFuture.completedFuture(null);
+        }
+    }
+
     public static class RetryingConsumer implements Consumer<TestMessage> {
         static int attempts;
         static List<String> calls = new ArrayList<>();
@@ -46,6 +93,17 @@ public class MediatorTransportFactoryTest {
             return attempts == 1
                     ? CompletableFuture.failedFuture(new IllegalStateException("retry"))
                     : CompletableFuture.completedFuture(null);
+        }
+    }
+
+    public static class FailingConsumer implements Consumer<TestMessage> {
+        static int attempts;
+        static List<String> calls = new ArrayList<>();
+
+        @Override
+        public CompletableFuture<Void> consume(ConsumeContext<TestMessage> context) {
+            calls.add("consumer:" + ++attempts);
+            return CompletableFuture.failedFuture(new IllegalStateException("exhausted"));
         }
     }
 
@@ -91,7 +149,7 @@ public class MediatorTransportFactoryTest {
         public CompletableFuture<Void> consume(ConsumeContext<TestMessage> context) {
             return CompletableFuture.runAsync(() -> sendEndpointProvider
                     .getSendEndpoint("loopback://forwarded")
-                    .send(new ForwardedMessage(), CancellationToken.none)
+                    .send(new ForwardedMessage(), CancellationToken.none())
                     .join());
         }
     }
@@ -173,6 +231,45 @@ public class MediatorTransportFactoryTest {
     }
 
     @Test
+    public void directedSendAndPublishReachAllCompatibleConsumers() {
+        SecondTestConsumer.count = 0;
+        TestConsumer.received = new CompletableFuture<>();
+        ServiceCollection services = ServiceCollection.create();
+        MediatorBus bus = MediatorBus.configure(services, cfg -> {
+            cfg.addConsumer(TestConsumer.class);
+            cfg.addConsumer(SecondTestConsumer.class);
+        });
+
+        bus.send("queue:test", new TestMessage("sent"));
+        Assertions.assertEquals("sent", TestConsumer.received.join().getValue());
+        Assertions.assertEquals(1, SecondTestConsumer.count);
+
+        TestConsumer.received = new CompletableFuture<>();
+        bus.publish(new TestMessage("published"));
+        Assertions.assertEquals("published", TestConsumer.received.join().getValue());
+        Assertions.assertEquals(2, SecondTestConsumer.count);
+    }
+
+    @Test
+    public void publishDispatchesToConcreteInterfaceAndBaseConsumersOnce() {
+        ConcreteAssignableConsumer.count = 0;
+        BaseAssignableConsumer.count = 0;
+        InterfaceAssignableConsumer.count = 0;
+        ServiceCollection services = ServiceCollection.create();
+        MediatorBus bus = MediatorBus.configure(services, cfg -> {
+            cfg.addConsumer(ConcreteAssignableConsumer.class);
+            cfg.addConsumer(BaseAssignableConsumer.class);
+            cfg.addConsumer(InterfaceAssignableConsumer.class);
+        });
+
+        bus.publish(new DerivedAssignableEvent());
+
+        Assertions.assertEquals(1, ConcreteAssignableConsumer.count);
+        Assertions.assertEquals(1, BaseAssignableConsumer.count);
+        Assertions.assertEquals(1, InterfaceAssignableConsumer.count);
+    }
+
+    @Test
     public void consumeFiltersWrapRetryAndOnlyDownstreamFiltersAreReentered() {
         RetryingConsumer.attempts = 0;
         RetryingConsumer.calls = new ArrayList<>();
@@ -198,6 +295,59 @@ public class MediatorTransportFactoryTest {
                         "inner:after",
                         "outer:after"),
                 RetryingConsumer.calls);
+    }
+
+    @Test
+    public void retryExhaustionPropagatesTerminalFailureThroughUpstreamFiltersOnce() {
+        FailingConsumer.attempts = 0;
+        FailingConsumer.calls = new ArrayList<>();
+        ServiceCollection services = ServiceCollection.create();
+        MediatorBus bus = MediatorBus.configure(services, cfg ->
+                cfg.addConsumer(FailingConsumer.class, TestMessage.class, pipe -> {
+                    pipe.useFilter(new RecordingConsumeFilter("outer", FailingConsumer.calls));
+                    pipe.useMessageRetry(retry -> retry.immediate(1));
+                    pipe.useFilter(new RecordingConsumeFilter("inner", FailingConsumer.calls));
+                }));
+
+        CompletionException exception = Assertions.assertThrows(
+                CompletionException.class,
+                () -> bus.publish(new TestMessage("fail")));
+
+        Assertions.assertInstanceOf(IllegalStateException.class, exception.getCause());
+        Assertions.assertEquals("exhausted", exception.getCause().getMessage());
+        Assertions.assertEquals(2, FailingConsumer.attempts);
+        Assertions.assertEquals(
+                List.of(
+                        "outer:before",
+                        "inner:before",
+                        "consumer:1",
+                        "inner:fault",
+                        "inner:before",
+                        "consumer:2",
+                        "inner:fault",
+                        "outer:fault"),
+                FailingConsumer.calls);
+    }
+
+    @Test
+    public void consumerFailureWithoutRetryIsAttemptedOnceAndPropagated() {
+        FailingConsumer.attempts = 0;
+        FailingConsumer.calls = new ArrayList<>();
+        ServiceCollection services = ServiceCollection.create();
+        MediatorBus bus = MediatorBus.configure(services, cfg ->
+                cfg.addConsumer(FailingConsumer.class, TestMessage.class, pipe ->
+                        pipe.useFilter(new RecordingConsumeFilter("filter", FailingConsumer.calls))));
+
+        CompletionException exception = Assertions.assertThrows(
+                CompletionException.class,
+                () -> bus.publish(new TestMessage("fail")));
+
+        Assertions.assertInstanceOf(IllegalStateException.class, exception.getCause());
+        Assertions.assertEquals("exhausted", exception.getCause().getMessage());
+        Assertions.assertEquals(1, FailingConsumer.attempts);
+        Assertions.assertEquals(
+                List.of("filter:before", "consumer:1", "filter:fault"),
+                FailingConsumer.calls);
     }
 
     @Test
@@ -238,13 +388,13 @@ public class MediatorTransportFactoryTest {
                 Map.of(),
                 "queue:response",
                 null,
-                cts.getToken(),
+                cts.token(),
                 new CapturingProvider());
 
         new ResultHandler().consume(context).join();
 
         ResponseMessage response = (ResponseMessage) CapturingSendEndpoint.sent.join();
         Assertions.assertEquals("hi-response", response.getValue());
-        Assertions.assertEquals(cts.getToken(), ResultHandler.token.join());
+        Assertions.assertEquals(cts.token(), ResultHandler.token.join());
     }
 }

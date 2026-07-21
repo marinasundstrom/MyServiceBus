@@ -2,10 +2,12 @@ package com.myservicebus;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 
 import org.junit.jupiter.api.Test;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.concurrent.CompletionException;
 import com.myservicebus.mediator.MediatorTransport;
 import com.myservicebus.di.ServiceCollection;
 
@@ -55,6 +57,10 @@ class TransportCapabilityTest {
 
         assertEquals("in-memory", exception.getTransport());
         assertEquals(TransportCapabilities.DURABILITY, exception.getCapability());
+        CompletionException publishFailure = org.junit.jupiter.api.Assertions.assertThrows(
+                CompletionException.class,
+                () -> bus.publish(new Object()).join());
+        assertInstanceOf(IllegalStateException.class, publishFailure.getCause());
     }
 
     @Test

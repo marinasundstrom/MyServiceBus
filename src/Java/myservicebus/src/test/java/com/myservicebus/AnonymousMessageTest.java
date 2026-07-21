@@ -53,7 +53,7 @@ class AnonymousMessageTest {
     @Test
     void respondAnonymous() {
         CaptureSendEndpointProvider provider = new CaptureSendEndpointProvider();
-        ConsumeContext<Object> ctx = new ConsumeContext<>(new Object(), Map.of(), "queue:response", null, CancellationToken.none, provider, URI.create("loopback://localhost/"));
+        ConsumeContext<Object> ctx = new ConsumeContext<>(new Object(), Map.of(), "queue:response", null, CancellationToken.none(), provider, URI.create("loopback://localhost/"));
         ctx.respond(Order.class, Map.of("id", 42)).join();
         Order order = (Order) provider.endpoint.captured;
         assertEquals(42, order.getId());

@@ -171,7 +171,7 @@ RabbitMQ transport integration tests use a pinned RabbitMQ image through Testcon
 
 The cross-language tests are opt-in during ordinary local test runs because they start both runtimes. CI runs them in a dedicated interoperability job. Set `RUN_CROSS_LANGUAGE_TESTS=1` to execute them locally.
 
-The current RabbitMQ baseline uses RabbitMQ `4.1-alpine` and MassTransit `8.5.1`. Verification covers compatible envelope publication, directed send in every C#, Java, and MassTransit direction, consumption, correlated request/response, correlated fault responses, retry exhaustion, and MassTransit-readable `_error` and `_skipped` delivery.
+The current RabbitMQ baseline uses RabbitMQ `4.1.8-alpine` and MassTransit `8.5.1`. Verification covers compatible envelope publication, directed send in every C#, Java, and MassTransit direction, consumption, correlated request/response, correlated fault responses, retry exhaustion, and MassTransit-readable `_error` and `_skipped` delivery. The complete runtime, tooling, client-library, and preview support contract is recorded in [Supported Versions](supported-versions.md).
 
 This baseline is **verified with documented limitations** for the scenarios in the matrix. It is not a claim of complete MassTransit feature or API compatibility.
 

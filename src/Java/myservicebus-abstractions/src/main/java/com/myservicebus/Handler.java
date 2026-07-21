@@ -19,13 +19,13 @@ public interface Handler<T> extends Consumer<T> {
     CompletableFuture<Void> handle(T message, CancellationToken cancellationToken) throws Exception;
 
     /**
-     * Handle the incoming message using {@link CancellationToken#none}.
+     * Handle the incoming message using {@link CancellationToken#none()}.
      *
      * @param message the message instance
      * @return a future that completes when handling is done
      */
     default CompletableFuture<Void> handle(T message) throws Exception {
-        return handle(message, CancellationToken.none);
+        return handle(message, CancellationToken.none());
     }
 
     @Override
@@ -33,4 +33,3 @@ public interface Handler<T> extends Consumer<T> {
         return handle(context.getMessage(), context.getCancellationToken());
     }
 }
-

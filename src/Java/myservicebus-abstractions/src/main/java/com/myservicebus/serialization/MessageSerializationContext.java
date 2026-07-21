@@ -11,6 +11,8 @@ public class MessageSerializationContext<T> {
     private UUID messageId;
     private UUID requestId;
     private UUID correlationId;
+    private UUID conversationId;
+    private UUID initiatorId;
     private List<String> messageType;
     private URI responseAddress;
     private URI faultAddress;
@@ -47,6 +49,22 @@ public class MessageSerializationContext<T> {
 
     public void setCorrelationId(UUID correlationId) {
         this.correlationId = correlationId;
+    }
+
+    public UUID getConversationId() {
+        return conversationId;
+    }
+
+    public void setConversationId(UUID conversationId) {
+        this.conversationId = conversationId;
+    }
+
+    public UUID getInitiatorId() {
+        return initiatorId;
+    }
+
+    public void setInitiatorId(UUID initiatorId) {
+        this.initiatorId = initiatorId;
     }
 
     public List<String> getMessageType() {

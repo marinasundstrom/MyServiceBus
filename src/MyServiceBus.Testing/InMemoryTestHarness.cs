@@ -16,11 +16,15 @@ public class InMemoryTestHarness : IMessageBus, ITransportFactory, IReceiveEndpo
     readonly object handlerLock = new();
     readonly List<Func<ReceiveContext, Task>> receiveHandlers = new();
     readonly ConcurrentQueue<object> consumed = new();
+    readonly object observationLock = new();
+    readonly List<ConsumedWaiter> consumedWaiters = new();
     readonly HashSet<Type> consumerTypes = new();
     readonly IServiceProvider? provider;
     readonly IBusTopology topology;
     readonly ISendContextFactory _sendContextFactory;
     readonly IPublishContextFactory _publishContextFactory;
+    readonly object lifecycleLock = new();
+    int started;
 
     public Uri Address => new("loopback://localhost/");
     public IBusTopology Topology => topology;
@@ -48,18 +52,31 @@ public class InMemoryTestHarness : IMessageBus, ITransportFactory, IReceiveEndpo
 
     public Task StartAsync(CancellationToken cancellationToken)
     {
-        if (provider != null)
+        lock (lifecycleLock)
         {
-            foreach (var action in provider.GetServices<IPostBuildAction>())
+            if (started == 1)
+                return Task.CompletedTask;
+
+            if (provider != null)
             {
-                action.Execute(provider);
+                foreach (var action in provider.GetServices<IPostBuildAction>())
+                {
+                    action.Execute(provider);
+                }
             }
+
+            Volatile.Write(ref started, 1);
         }
 
         return Task.CompletedTask;
     }
 
-    public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+    public Task StopAsync(CancellationToken cancellationToken)
+    {
+        lock (lifecycleLock)
+            Volatile.Write(ref started, 0);
+        return Task.CompletedTask;
+    }
 
     public void RegisterHandler<T>(Func<ConsumeContext<T>, Task> handler) where T : class
     {
@@ -77,13 +94,63 @@ public class InMemoryTestHarness : IMessageBus, ITransportFactory, IReceiveEndpo
                 {
                     var consumeContext = new TestConsumeContext<T>(this, msg!, ctx);
                     await handler(consumeContext).ConfigureAwait(false);
-                    consumed.Enqueue(msg!);
+                    RecordConsumed(msg!);
                 }
             });
         }
     }
 
     public bool WasConsumed<T>() where T : class => consumed.OfType<T>().Any();
+
+    public async Task<bool> WaitForConsumed<T>(TimeSpan timeout, CancellationToken cancellationToken = default)
+        where T : class
+    {
+        if (timeout < TimeSpan.Zero && timeout != Timeout.InfiniteTimeSpan)
+            throw new ArgumentOutOfRangeException(nameof(timeout));
+
+        ConsumedWaiter waiter;
+        lock (observationLock)
+        {
+            if (WasConsumed<T>())
+                return true;
+
+            waiter = new ConsumedWaiter(typeof(T));
+            consumedWaiters.Add(waiter);
+        }
+
+        try
+        {
+            await waiter.Completion.Task.WaitAsync(timeout, cancellationToken).ConfigureAwait(false);
+            return true;
+        }
+        catch (TimeoutException)
+        {
+            return false;
+        }
+        finally
+        {
+            lock (observationLock)
+                consumedWaiters.Remove(waiter);
+        }
+    }
+
+    void RecordConsumed(object message)
+    {
+        consumed.Enqueue(message);
+
+        ConsumedWaiter[] matching;
+        lock (observationLock)
+            matching = consumedWaiters.Where(waiter => waiter.MessageType.IsInstanceOfType(message)).ToArray();
+
+        foreach (var waiter in matching)
+            waiter.Completion.TrySetResult();
+    }
+
+    sealed record ConsumedWaiter(Type MessageType)
+    {
+        public TaskCompletionSource Completion { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+    }
 
     public Task Publish<TMessage>(object message, Action<IPublishContext>? contextCallback = null, CancellationToken cancellationToken = default) where TMessage : class
         => Publish((TMessage)message, contextCallback, cancellationToken);
@@ -146,6 +213,9 @@ public class InMemoryTestHarness : IMessageBus, ITransportFactory, IReceiveEndpo
 
     internal async Task InternalSend<T>(T message, SendContext context) where T : class
     {
+        if (Volatile.Read(ref started) == 0)
+            throw new InvalidOperationException("The in-memory test harness is not started.");
+
         var messageId = Guid.TryParse(context.MessageId, out var id) ? id : Guid.NewGuid();
         Guid? correlationId = context.CorrelationId != null && Guid.TryParse(context.CorrelationId, out var cId) ? cId : null;
 
@@ -159,7 +229,10 @@ public class InMemoryTestHarness : IMessageBus, ITransportFactory, IReceiveEndpo
         var msgContext = new InMemoryMessageContext(
             message!,
             messageId,
+            context.RequestId,
             correlationId,
+            context.ConversationId,
+            context.InitiatorId,
             messageTypes,
             headers,
             context.ResponseAddress,
@@ -172,18 +245,31 @@ public class InMemoryTestHarness : IMessageBus, ITransportFactory, IReceiveEndpo
         lock (receiveHandlers)
             snapshot = receiveHandlers.ToList();
 
-        foreach (var handler in snapshot)
-            await handler(receiveContext).ConfigureAwait(false);
-
         List<Func<ReceiveContext, Task>> messageHandlers;
         lock (handlerLock)
-            messageHandlers = handlers.TryGetValue(message!.GetType(), out var list)
-                ? list.ToList()
-                : new List<Func<ReceiveContext, Task>>();
+            messageHandlers = handlers
+                .Where(entry => entry.Key.IsAssignableFrom(message!.GetType()))
+                .SelectMany(entry => entry.Value)
+                .Distinct()
+                .ToList();
 
-        foreach (var h in messageHandlers)
+        var deliveries = snapshot
+            .Concat(messageHandlers)
+            .Select(handler => InvokeHandler(handler, receiveContext))
+            .ToArray();
+
+        await Task.WhenAll(deliveries).ConfigureAwait(false);
+    }
+
+    static Task InvokeHandler(Func<ReceiveContext, Task> handler, ReceiveContext receiveContext)
+    {
+        try
         {
-            await h(receiveContext).ConfigureAwait(false);
+            return handler(receiveContext);
+        }
+        catch (Exception exception)
+        {
+            return Task.FromException(exception);
         }
     }
 
@@ -200,21 +286,50 @@ public class InMemoryTestHarness : IMessageBus, ITransportFactory, IReceiveEndpo
         }
 
         public T Message { get; }
+        public Guid? RequestId => receiveContext.RequestId;
+        public Guid? CorrelationId => receiveContext.CorrelationId;
+        public Guid? ConversationId => receiveContext.ConversationId;
+        public Guid? InitiatorId => receiveContext.InitiatorId;
+        public IDictionary<string, object> Headers => receiveContext.Headers;
 
         public CancellationToken CancellationToken => receiveContext.CancellationToken;
 
         public Task<ISendEndpoint> GetSendEndpoint(Uri uri) => Task.FromResult<ISendEndpoint>(new HarnessSendEndpoint(harness));
         public Task Publish<TMessage>(object message, Action<IPublishContext>? contextCallback = null, CancellationToken cancellationToken = default) where TMessage : class
-            => harness.Publish((TMessage)message, contextCallback, cancellationToken);
+            => Publish((TMessage)message, contextCallback, cancellationToken);
 
         public Task Publish<TMessage>(TMessage message, Action<IPublishContext>? contextCallback = null, CancellationToken cancellationToken = default) where TMessage : class
-            => harness.Publish(message, contextCallback, cancellationToken);
+        {
+            var effectiveCancellationToken = cancellationToken.CanBeCanceled
+                ? cancellationToken
+                : receiveContext.CancellationToken;
+            return harness.Publish(message, context =>
+            {
+                context.ConversationId = ConversationId;
+                context.InitiatorId = CorrelationId;
+                contextCallback?.Invoke(context);
+            }, effectiveCancellationToken);
+        }
 
         public Task RespondAsync<TMessage>(TMessage message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default) where TMessage : class
-            => harness.Publish((dynamic)message!, contextCallback != null ? new Action<IPublishContext>(ctx => contextCallback(ctx)) : null, cancellationToken);
+            => Respond<TMessage>(message!, contextCallback, cancellationToken);
 
         public Task RespondAsync<TMessage>(object message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default) where TMessage : class
-            => harness.Publish((dynamic)message!, contextCallback != null ? new Action<IPublishContext>(ctx => contextCallback(ctx)) : null, cancellationToken);
+            => Respond<TMessage>(message, contextCallback, cancellationToken);
+
+        async Task Respond<TMessage>(object message, Action<ISendContext>? contextCallback, CancellationToken cancellationToken)
+            where TMessage : class
+        {
+            var serializer = harness.provider?.GetService<IMessageSerializer>() ?? new EnvelopeMessageSerializer();
+            var context = harness._sendContextFactory.Create(MessageTypeCache.GetMessageTypes(typeof(TMessage)), serializer, cancellationToken);
+            context.MessageId = Guid.NewGuid().ToString();
+            context.RequestId = RequestId;
+            context.ConversationId = ConversationId;
+            context.InitiatorId = CorrelationId;
+            contextCallback?.Invoke(context);
+            var typed = message is TMessage value ? value : (TMessage)MessageProxy.Create(typeof(TMessage), message);
+            await harness.InternalSend(typed, context).ConfigureAwait(false);
+        }
 
         public Task Send<TMessage>(Uri address, TMessage message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default) where TMessage : class
             => Send<TMessage>(address, (object)message!, contextCallback, cancellationToken);
@@ -290,7 +405,10 @@ public class InMemoryTestHarness : IMessageBus, ITransportFactory, IReceiveEndpo
         public InMemoryMessageContext(
             object message,
             Guid messageId,
+            Guid? requestId,
             Guid? correlationId,
+            Guid? conversationId,
+            Guid? initiatorId,
             IList<string> messageType,
             IDictionary<string, object> headers,
             Uri? responseAddress,
@@ -299,7 +417,10 @@ public class InMemoryTestHarness : IMessageBus, ITransportFactory, IReceiveEndpo
         {
             this.message = message;
             MessageId = messageId;
+            RequestId = requestId;
             CorrelationId = correlationId;
+            ConversationId = conversationId;
+            InitiatorId = initiatorId;
             MessageType = messageType;
             Headers = headers;
             ResponseAddress = responseAddress;
@@ -308,7 +429,10 @@ public class InMemoryTestHarness : IMessageBus, ITransportFactory, IReceiveEndpo
         }
 
         public Guid MessageId { get; }
+        public Guid? RequestId { get; }
         public Guid? CorrelationId { get; }
+        public Guid? ConversationId { get; }
+        public Guid? InitiatorId { get; }
         public IList<string> MessageType { get; }
         public Uri? ResponseAddress { get; }
         public Uri? FaultAddress { get; }

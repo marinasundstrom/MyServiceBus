@@ -45,11 +45,11 @@ public interface SendEndpoint {
     }
 
     default <T> CompletableFuture<Void> send(T message, Consumer<SendContext> contextCallback) {
-        return send(message, contextCallback, CancellationToken.none);
+        return send(message, contextCallback, CancellationToken.none());
     }
 
     default <T> CompletableFuture<Void> send(T message) {
-        return send(message, CancellationToken.none);
+        return send(message, CancellationToken.none());
     }
 
     default <T> CompletableFuture<Void> send(Class<T> messageType, Object message,
@@ -60,11 +60,11 @@ public interface SendEndpoint {
 
     default <T> CompletableFuture<Void> send(Class<T> messageType, Object message,
             Consumer<SendContext> contextCallback) {
-        return send(messageType, message, contextCallback, CancellationToken.none);
+        return send(messageType, message, contextCallback, CancellationToken.none());
     }
 
     default <T> CompletableFuture<Void> send(Class<T> messageType, Object message) {
-        return send(messageType, message, CancellationToken.none);
+        return send(messageType, message, CancellationToken.none());
     }
 
 }

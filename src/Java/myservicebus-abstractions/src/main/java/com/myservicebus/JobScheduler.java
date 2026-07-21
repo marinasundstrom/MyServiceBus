@@ -15,7 +15,7 @@ public interface JobScheduler {
 
     default CompletionStage<UUID> schedule(Instant scheduledTime,
             Function<CancellationToken, CompletionStage<Void>> callback) {
-        return schedule(scheduledTime, callback, CancellationToken.none);
+        return schedule(scheduledTime, callback, CancellationToken.none());
     }
 
     default CompletionStage<UUID> schedule(Duration delay,
@@ -26,7 +26,7 @@ public interface JobScheduler {
 
     default CompletionStage<UUID> schedule(Duration delay,
             Function<CancellationToken, CompletionStage<Void>> callback) {
-        return schedule(delay, callback, CancellationToken.none);
+        return schedule(delay, callback, CancellationToken.none());
     }
 
     CompletionStage<Void> cancel(UUID tokenId);

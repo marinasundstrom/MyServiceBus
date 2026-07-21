@@ -210,7 +210,7 @@ public final class InteropTestPeer {
             throws Exception {
         CrossLanguageMessage message = new CrossLanguageMessage();
         message.setValue(value);
-        SendContext context = new SendContext(message, CancellationToken.none);
+        SendContext context = new SendContext(message, CancellationToken.none());
         byte[] body = context.serialize(new EnvelopeMessageSerializer());
         SendTransport sendTransport = transportFactory.getSendTransport(exchangeName, durableExchange, !durableExchange);
         sendTransport.send(body);
@@ -223,7 +223,7 @@ public final class InteropTestPeer {
             throws Exception {
         CrossLanguageMessage message = new CrossLanguageMessage();
         message.setValue(value);
-        SendContext context = new SendContext(message, CancellationToken.none);
+        SendContext context = new SendContext(message, CancellationToken.none());
         byte[] body = context.serialize(new EnvelopeMessageSerializer());
         transportFactory.getQueueTransport(queueName).send(body);
         System.out.println("SENT");
@@ -234,7 +234,7 @@ public final class InteropTestPeer {
     private static void request(ConnectionProvider connectionProvider, String value) throws Exception {
         InteropRequest request = new InteropRequest();
         request.setValue(value);
-        SendContext context = new SendContext(request, CancellationToken.none);
+        SendContext context = new SendContext(request, CancellationToken.none());
         RabbitMqRequestClientTransport transport = new RabbitMqRequestClientTransport(connectionProvider);
         InteropResponse response = transport.sendRequest(InteropRequest.class, context, InteropResponse.class)
                 .get(20, TimeUnit.SECONDS);
@@ -249,7 +249,7 @@ public final class InteropTestPeer {
     private static void requestFault(ConnectionProvider connectionProvider, String value) throws Exception {
         InteropRequest request = new InteropRequest();
         request.setValue(value);
-        SendContext context = new SendContext(request, CancellationToken.none);
+        SendContext context = new SendContext(request, CancellationToken.none());
         RabbitMqRequestClientTransport transport = new RabbitMqRequestClientTransport(connectionProvider);
         try {
             transport.sendRequest(InteropRequest.class, context, InteropResponse.class)
@@ -318,7 +318,7 @@ public final class InteropTestPeer {
     private static byte[] createResponseEnvelope(Envelope<InteropRequest> requestEnvelope) throws Exception {
         InteropResponse response = new InteropResponse();
         response.setValue("response-from-java");
-        SendContext responseContext = new SendContext(response, CancellationToken.none);
+        SendContext responseContext = new SendContext(response, CancellationToken.none());
         responseContext.setRequestId(requestEnvelope.getRequestId());
         responseContext.setDestinationAddress(URI.create(requestEnvelope.getResponseAddress()));
         return responseContext.serialize(new EnvelopeMessageSerializer());

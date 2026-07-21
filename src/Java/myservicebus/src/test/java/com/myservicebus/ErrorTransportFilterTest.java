@@ -64,7 +64,7 @@ class ErrorTransportFilterTest {
                 null,
                 null,
                 "error-queue",
-                CancellationToken.none,
+                CancellationToken.none(),
                 sendProvider,
                 URI.create("rabbitmq://localhost/"));
 
