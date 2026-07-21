@@ -87,6 +87,8 @@ These helpers enable fast, isolated tests and provide the same API surface in bo
 
 The current shared observation category is **consumed**, recorded once for each consumer pipeline that completes successfully. A single message therefore creates multiple consumed observations when multiple compatible consumers succeed. Failed attempts are not consumed observations. Sent, published, faulted, and scheduled observation collections remain future testing features and are not implied by the current harness API.
 
+Scheduling tests can replace `IJobScheduler` or `JobScheduler` with a manually controlled implementation. This lets a test verify scheduled publish, directed send, and cancellation by explicitly releasing or removing a pending callback instead of sleeping against wall-clock time. The callback completes only after the resulting local delivery completes. The local scheduler does not promise ordering between messages with the same due time.
+
 ## Publishing from a service class
 Classes can inject `IPublishEndpoint` (C#) or `PublishEndpoint` (Java) and be verified with the in-memory harness.
 
