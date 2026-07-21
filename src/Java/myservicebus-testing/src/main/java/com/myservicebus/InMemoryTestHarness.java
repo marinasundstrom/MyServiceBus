@@ -24,6 +24,7 @@ public class InMemoryTestHarness implements RequestClientTransport, TransportSen
     private final List<Object> consumed = Collections.synchronizedList(new ArrayList<>());
     private final ServiceProvider serviceProvider;
     private final ConsumeContextProvider consumeContextProvider;
+    private volatile boolean started;
 
     public InMemoryTestHarness() {
         this(null);
@@ -42,11 +43,13 @@ public class InMemoryTestHarness implements RequestClientTransport, TransportSen
         this.consumeContextProvider = provider;
     }
 
-    public CompletableFuture<Void> start() {
+    public synchronized CompletableFuture<Void> start() {
+        started = true;
         return CompletableFuture.completedFuture(null);
     }
 
-    public CompletableFuture<Void> stop() {
+    public synchronized CompletableFuture<Void> stop() {
+        started = false;
         return CompletableFuture.completedFuture(null);
     }
 
@@ -65,6 +68,10 @@ public class InMemoryTestHarness implements RequestClientTransport, TransportSen
     }
 
     public <T> CompletableFuture<Void> send(SendContext context) {
+        if (!started) {
+            return notStartedFuture();
+        }
+
         Instant scheduled = context.getScheduledEnqueueTime();
         if (scheduled != null) {
             Duration delay = Duration.between(Instant.now(), scheduled);
@@ -87,6 +94,10 @@ public class InMemoryTestHarness implements RequestClientTransport, TransportSen
     }
 
     private CompletableFuture<Void> sendInternal(SendContext context, String responseAddress, String faultAddress) {
+        if (!started) {
+            return notStartedFuture();
+        }
+
         Object message = context.getMessage();
         Class<?> messageType = message.getClass();
         if (java.lang.reflect.Proxy.isProxyClass(messageType) && messageType.getInterfaces().length > 0) {
@@ -159,6 +170,11 @@ public class InMemoryTestHarness implements RequestClientTransport, TransportSen
         }
 
         return future;
+    }
+
+    private static <T> CompletableFuture<T> notStartedFuture() {
+        return CompletableFuture.failedFuture(
+                new IllegalStateException("The in-memory test harness is not started."));
     }
 
     @Override

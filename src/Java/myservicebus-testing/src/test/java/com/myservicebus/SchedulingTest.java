@@ -24,6 +24,7 @@ public class SchedulingTest {
             handled.complete(null);
             return CompletableFuture.completedFuture(null);
         });
+        harness.start().join();
 
         MessageScheduler scheduler = new MessageSchedulerImpl(
                 new PublishEndpoint() {
@@ -43,6 +44,7 @@ public class SchedulingTest {
         Duration tolerance = Duration.ofMillis(20);
         assertTrue(elapsed.toMillis() >= delay.minus(tolerance).toMillis());
         assertTrue(harness.wasConsumed(String.class));
+        harness.stop().join();
     }
 
     @Test
@@ -53,6 +55,7 @@ public class SchedulingTest {
             handled.complete(null);
             return CompletableFuture.completedFuture(null);
         });
+        harness.start().join();
 
         Instant start = Instant.now();
         Duration delay = Duration.ofMillis(100);
@@ -63,6 +66,7 @@ public class SchedulingTest {
         assertTrue(elapsed.toMillis() >= delay.minus(tolerance).toMillis());
         assertTrue(harness.wasConsumed(String.class));
         handled.join();
+        harness.stop().join();
     }
 
     @Test
@@ -73,6 +77,7 @@ public class SchedulingTest {
             handled.complete(null);
             return CompletableFuture.completedFuture(null);
         });
+        harness.start().join();
 
         JobScheduler immediate = new JobScheduler() {
             
@@ -102,12 +107,14 @@ public class SchedulingTest {
         assertTrue(Duration.between(start, end).toMillis() < 100);
         assertTrue(harness.wasConsumed(String.class));
         handled.join();
+        harness.stop().join();
     }
 
     @Test
     void cancelScheduledSend_prevents_delivery() throws Exception {
         InMemoryTestHarness harness = new InMemoryTestHarness();
         harness.registerHandler(String.class, ctx -> CompletableFuture.completedFuture(null));
+        harness.start().join();
 
         MessageScheduler scheduler = new MessageSchedulerImpl(
                 new PublishEndpoint() {
@@ -125,5 +132,6 @@ public class SchedulingTest {
 
         TimeUnit.MILLISECONDS.sleep(300);
         assertFalse(harness.wasConsumed(String.class));
+        harness.stop().join();
     }
 }

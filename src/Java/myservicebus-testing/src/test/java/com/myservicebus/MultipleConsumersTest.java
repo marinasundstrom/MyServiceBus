@@ -47,5 +47,6 @@ public class MultipleConsumersTest {
 
         long count = harness.getConsumed().stream().filter(Ping.class::isInstance).count();
         assertEquals(2, count);
+        harness.stop().join();
     }
 }

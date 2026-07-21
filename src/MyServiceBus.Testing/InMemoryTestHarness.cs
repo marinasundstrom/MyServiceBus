@@ -21,6 +21,8 @@ public class InMemoryTestHarness : IMessageBus, ITransportFactory, IReceiveEndpo
     readonly IBusTopology topology;
     readonly ISendContextFactory _sendContextFactory;
     readonly IPublishContextFactory _publishContextFactory;
+    readonly object lifecycleLock = new();
+    int started;
 
     public Uri Address => new("loopback://localhost/");
     public IBusTopology Topology => topology;
@@ -48,18 +50,31 @@ public class InMemoryTestHarness : IMessageBus, ITransportFactory, IReceiveEndpo
 
     public Task StartAsync(CancellationToken cancellationToken)
     {
-        if (provider != null)
+        lock (lifecycleLock)
         {
-            foreach (var action in provider.GetServices<IPostBuildAction>())
+            if (started == 1)
+                return Task.CompletedTask;
+
+            if (provider != null)
             {
-                action.Execute(provider);
+                foreach (var action in provider.GetServices<IPostBuildAction>())
+                {
+                    action.Execute(provider);
+                }
             }
+
+            Volatile.Write(ref started, 1);
         }
 
         return Task.CompletedTask;
     }
 
-    public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+    public Task StopAsync(CancellationToken cancellationToken)
+    {
+        lock (lifecycleLock)
+            Volatile.Write(ref started, 0);
+        return Task.CompletedTask;
+    }
 
     public void RegisterHandler<T>(Func<ConsumeContext<T>, Task> handler) where T : class
     {
@@ -146,6 +161,9 @@ public class InMemoryTestHarness : IMessageBus, ITransportFactory, IReceiveEndpo
 
     internal async Task InternalSend<T>(T message, SendContext context) where T : class
     {
+        if (Volatile.Read(ref started) == 0)
+            throw new InvalidOperationException("The in-memory test harness is not started.");
+
         var messageId = Guid.TryParse(context.MessageId, out var id) ? id : Guid.NewGuid();
         Guid? correlationId = context.CorrelationId != null && Guid.TryParse(context.CorrelationId, out var cId) ? cId : null;
 

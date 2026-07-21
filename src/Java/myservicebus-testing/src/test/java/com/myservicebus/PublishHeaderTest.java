@@ -14,7 +14,9 @@ public class PublishHeaderTest {
             assertEquals("123", ctx.getHeaders().get("trace-id"));
             return CompletableFuture.completedFuture(null);
         });
+        harness.start().join();
 
         harness.send("hi", c -> c.getHeaders().put("trace-id", "123")).join();
+        harness.stop().join();
     }
 }
