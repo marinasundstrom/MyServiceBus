@@ -36,6 +36,8 @@ public class ConsumeContext<T>
     private final SendEndpointProvider sendEndpointProvider;
     private final URI busAddress;
     private final PublishAddressProvider publishAddressProvider;
+    private final UUID requestId;
+    private final UUID correlationId;
 
     public ConsumeContext(T message, Map<String, Object> headers, SendEndpointProvider provider) {
         this(message, headers, null, null, null, CancellationToken.none(), provider, URI.create("loopback://localhost/"));
@@ -64,6 +66,13 @@ public class ConsumeContext<T>
     public ConsumeContext(T message, Map<String, Object> headers, String responseAddress, String faultAddress,
             String errorAddress, CancellationToken cancellationToken, SendEndpointProvider provider, URI busAddress,
             PublishAddressProvider publishAddressProvider) {
+        this(message, headers, responseAddress, faultAddress, errorAddress, cancellationToken, provider, busAddress,
+                publishAddressProvider, null, null);
+    }
+
+    public ConsumeContext(T message, Map<String, Object> headers, String responseAddress, String faultAddress,
+            String errorAddress, CancellationToken cancellationToken, SendEndpointProvider provider, URI busAddress,
+            PublishAddressProvider publishAddressProvider, UUID requestId, UUID correlationId) {
         this.message = message;
         this.headers = headers;
         this.responseAddress = responseAddress;
@@ -73,6 +82,8 @@ public class ConsumeContext<T>
         this.sendEndpointProvider = provider;
         this.busAddress = busAddress;
         this.publishAddressProvider = publishAddressProvider;
+        this.requestId = requestId;
+        this.correlationId = correlationId;
     }
 
     public T getMessage() {
@@ -89,6 +100,16 @@ public class ConsumeContext<T>
 
     public String getErrorAddress() {
         return errorAddress;
+    }
+
+    @Override
+    public UUID getRequestId() {
+        return requestId;
+    }
+
+    @Override
+    public UUID getCorrelationId() {
+        return correlationId;
     }
 
     @Override
@@ -163,6 +184,7 @@ public class ConsumeContext<T>
         }
         context.setSourceAddress(busAddress);
         context.setDestinationAddress(URI.create(responseAddress));
+        context.setRequestId(requestId);
         SendEndpoint endpoint = getSendEndpoint(responseAddress);
         return endpoint.send(context);
     }
@@ -244,7 +266,10 @@ public class ConsumeContext<T>
         SendEndpoint endpoint = getSendEndpoint(address);
         return endpoint.send(
                 fault,
-                context -> context.setMessageTypes(Collections.singletonList(MessageUrn.forFault(message.getClass()))),
+                context -> {
+                    context.setMessageTypes(Collections.singletonList(MessageUrn.forFault(message.getClass())));
+                    context.setRequestId(requestId);
+                },
                 cancellationToken);
     }
 

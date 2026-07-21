@@ -38,7 +38,7 @@ public class SendContext : BasePipeContext, ISendContext
         {
             MessageId = Guid.NewGuid(),
             RequestId = RequestId,
-            CorrelationId = null,
+            CorrelationId = Guid.TryParse(CorrelationId, out var correlationId) ? correlationId : null,
             MessageType = [.. messageTypes.Select(x => MessageUrn.For(x))],
             ResponseAddress = ResponseAddress,
             FaultAddress = FaultAddress,

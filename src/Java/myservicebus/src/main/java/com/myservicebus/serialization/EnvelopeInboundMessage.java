@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.UUID;
 
 import com.myservicebus.Envelope;
 
@@ -76,6 +77,16 @@ public class EnvelopeInboundMessage implements InboundMessage {
         }
 
         return value != null ? value.toString() : null;
+    }
+
+    @Override
+    public UUID getRequestId() {
+        return metadataEnvelope.getRequestId();
+    }
+
+    @Override
+    public UUID getCorrelationId() {
+        return metadataEnvelope.getCorrelationId();
     }
 
     @SuppressWarnings("unchecked")

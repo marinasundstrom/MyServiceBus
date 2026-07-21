@@ -40,6 +40,8 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
     internal ReceiveContext ReceiveContext => receiveContext;
 
     public TMessage Message => message is null ? (receiveContext.TryGetMessage(out message) ? message : default) : message;
+    public Guid? RequestId => receiveContext.RequestId;
+    public Guid? CorrelationId => receiveContext.CorrelationId;
 
     public Task<ISendEndpoint> GetSendEndpoint(Uri uri)
     {

@@ -12,6 +12,7 @@ import com.myservicebus.OpenTelemetryConsumeFilter;
 import com.myservicebus.Pipe;
 import com.myservicebus.PipeConfigurator;
 import com.myservicebus.SendEndpoint;
+import com.myservicebus.SendContext;
 import com.myservicebus.di.ServiceProvider;
 import com.myservicebus.tasks.CancellationToken;
 import com.myservicebus.topology.ConsumerTopology;
@@ -40,6 +41,16 @@ public class MediatorSendEndpoint implements SendEndpoint {
     @Override
     @SuppressWarnings({"unchecked", "rawtypes"})
     public <T> CompletableFuture<Void> send(T message, CancellationToken cancellationToken) {
+        return dispatch(new SendContext(message, cancellationToken));
+    }
+
+    @Override
+    public CompletableFuture<Void> send(SendContext context) {
+        return dispatch(context);
+    }
+
+    private CompletableFuture<Void> dispatch(SendContext context) {
+        Object message = context.getMessage();
         TopologyRegistry registry = serviceProvider.getService(TopologyRegistry.class);
         List<ConsumerTopology> consumerTopologies = registry.getConsumers();
         List<CompletableFuture<Void>> tasks = new ArrayList<>();
@@ -69,8 +80,13 @@ public class MediatorSendEndpoint implements SendEndpoint {
                         new HashMap<>(),
                         null,
                         null,
-                        cancellationToken,
-                        provider);
+                        null,
+                        context.getCancellationToken(),
+                        provider,
+                        java.net.URI.create("loopback://localhost/"),
+                        entityName -> "exchange:" + entityName,
+                        context.getRequestId(),
+                        context.getCorrelationId());
 
                 tasks.add(pipe.send(ctx));
             }
@@ -79,4 +95,3 @@ public class MediatorSendEndpoint implements SendEndpoint {
         return CompletableFuture.allOf(tasks.toArray(new CompletableFuture[0]));
     }
 }
-

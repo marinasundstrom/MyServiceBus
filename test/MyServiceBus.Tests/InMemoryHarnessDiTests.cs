@@ -131,6 +131,45 @@ public class InMemoryHarnessDiTests
     }
 
     [Fact]
+    public async Task Request_and_correlation_identifiers_flow_through_response()
+    {
+        var services = new ServiceCollection();
+        services.AddServiceBusTestHarness(x => x.AddConsumer<CheckOrderConsumer>());
+        var provider = services.BuildServiceProvider();
+        var harness = provider.GetRequiredService<InMemoryTestHarness>();
+        var requestMetadata = new TaskCompletionSource<(Guid? RequestId, Guid? CorrelationId)>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var responseMetadata = new TaskCompletionSource<(Guid? RequestId, Guid? CorrelationId)>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        harness.RegisterHandler<CheckOrder>(context =>
+        {
+            requestMetadata.TrySetResult((context.RequestId, context.CorrelationId));
+            return Task.CompletedTask;
+        });
+        harness.RegisterHandler<OrderStatus>(context =>
+        {
+            responseMetadata.TrySetResult((context.RequestId, context.CorrelationId));
+            return Task.CompletedTask;
+        });
+        await harness.Start();
+
+        var correlationId = Guid.NewGuid();
+        var client = provider.GetRequiredService<IRequestClient<CheckOrder>>();
+        await client.GetResponseAsync<OrderStatus>(
+            new CheckOrder(Guid.NewGuid()),
+            context => context.CorrelationId = correlationId.ToString());
+
+        var request = await requestMetadata.Task;
+        var response = await responseMetadata.Task;
+        Assert.NotNull(request.RequestId);
+        Assert.Equal(request.RequestId, response.RequestId);
+        Assert.Equal(correlationId, request.CorrelationId);
+        Assert.Null(response.CorrelationId);
+
+        await harness.Stop();
+    }
+
+    [Fact]
     public async Task Should_create_request_client_from_factory()
     {
         var services = new ServiceCollection();

@@ -4,6 +4,7 @@ import java.net.URI;
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.UUID;
 
 import com.myservicebus.tasks.CancellationRegistration;
 import com.myservicebus.tasks.CancellationToken;
@@ -49,6 +50,9 @@ public class GenericRequestClient<TRequest> implements RequestClient<TRequest> {
     }
 
     private void applyDestination(SendContext context) {
+        if (context.getRequestId() == null) {
+            context.setRequestId(UUID.randomUUID());
+        }
         if (destinationAddress != null) {
             context.setDestinationAddress(destinationAddress);
         }
