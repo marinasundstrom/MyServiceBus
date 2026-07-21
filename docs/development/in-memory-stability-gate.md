@@ -34,6 +34,12 @@ Matching C# and Java tests must define and verify:
 
 Every unsupported MassTransit mediator or in-memory feature must be documented rather than approximated silently.
 
+## Multiple-consumer delivery contract
+
+Each compatible consumer registration is an independent local delivery. The mediator and in-memory harness invoke every matched consumer and complete the dispatch only after all matched deliveries settle. A failure from one consumer fails the overall dispatch, but it does not suppress invocation of the other matched consumers.
+
+No ordering is promised between independent consumers, including registration order, start order, or completion order. Filters within one consumer pipeline remain ordered according to their pipeline registration contract. Harness consumed observations represent successful consumer completions, so one message may produce multiple consumed records when multiple consumers succeed.
+
 ## Exit criteria
 
 The gate is complete when:

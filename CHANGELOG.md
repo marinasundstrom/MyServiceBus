@@ -152,6 +152,7 @@ This changelog summarizes the bigger themes in the repository history. It is int
 Keep this file updated for significant changes. Prefer adding dated entries that summarize the main themes of a change set instead of listing every commit.
 # Unreleased
 
+- Aligned C# and Java local multiple-consumer dispatch so every matched consumer is attempted independently, dispatch waits for all deliveries, failures propagate without suppressing sibling consumers, and no inter-consumer ordering is promised.
 - Added sample-app dashboard endpoints in the .NET and Java `TestApp` projects under `/dashboard/v1/*`, exposing stable JSON snapshots for bus overview, messages, consumers, and topology without committing those contracts to the shared libraries yet.
 - Split the programmatic inspection surface into first-party addon projects for .NET and Java, keeping the sample inspection endpoints working while removing the core bus packages' direct dependency on inspection registration.
 - Documented the long-term architecture and phased roadmap, including explicit compatibility levels, capability-aware transport profiles, event-stream and SignalR integration boundaries, cross-language conformance, and the optional inspection, monitoring, and dashboard plane.

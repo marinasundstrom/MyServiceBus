@@ -1,8 +1,11 @@
 package com.myservicebus;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.jupiter.api.Test;
 
@@ -47,6 +50,25 @@ public class MultipleConsumersTest {
 
         long count = harness.getConsumed().stream().filter(Ping.class::isInstance).count();
         assertEquals(2, count);
+        harness.stop().join();
+    }
+
+    @Test
+    void allConsumersAreAttemptedWhenOneFails() {
+        InMemoryTestHarness harness = new InMemoryTestHarness();
+        AtomicInteger successfulCalls = new AtomicInteger();
+        harness.registerHandler(Ping.class,
+                context -> CompletableFuture.failedFuture(new IllegalStateException("boom")));
+        harness.registerHandler(Ping.class, context -> {
+            successfulCalls.incrementAndGet();
+            return CompletableFuture.completedFuture(null);
+        });
+
+        harness.start().join();
+
+        assertThrows(CompletionException.class, () -> harness.send(new Ping("hi")).join());
+        assertEquals(1, successfulCalls.get());
+        assertEquals(1, harness.getConsumed().stream().filter(Ping.class::isInstance).count());
         harness.stop().join();
     }
 }

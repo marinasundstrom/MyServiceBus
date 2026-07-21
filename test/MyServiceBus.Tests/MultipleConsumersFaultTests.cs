@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
@@ -29,7 +30,7 @@ public class MultipleConsumersFaultTests
     }
 
     [Fact]
-    public async Task Should_stop_after_first_consumer_faults()
+    public async Task Should_attempt_all_consumers_when_one_faults()
     {
         FirstConsumer.Calls = 0;
         SecondConsumer.Calls = 0;
@@ -48,7 +49,8 @@ public class MultipleConsumersFaultTests
         await Assert.ThrowsAsync<InvalidOperationException>(() => harness.Publish(new SubmitOrder(Guid.NewGuid())));
 
         Assert.Equal(1, FirstConsumer.Calls);
-        Assert.Equal(0, SecondConsumer.Calls);
+        Assert.Equal(1, SecondConsumer.Calls);
+        Assert.Single(harness.Consumed.OfType<SubmitOrder>());
 
         await harness.Stop();
     }
