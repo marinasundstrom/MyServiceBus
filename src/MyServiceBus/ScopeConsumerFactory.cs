@@ -17,7 +17,7 @@ public class ScopeConsumerFactory<TConsumer> : IConsumerFactory<TConsumer>
     public async Task Send<TMessage>(ConsumeContext<TMessage> context,
         IPipe<ConsumerConsumeContext<TConsumer, TMessage>> next) where TMessage : class
     {
-        using var scope = provider.CreateScope();
+        await using var scope = provider.CreateAsyncScope();
         var contextProvider = scope.ServiceProvider.GetService<ConsumeContextProvider>();
         if (contextProvider != null)
             contextProvider.Context = context;

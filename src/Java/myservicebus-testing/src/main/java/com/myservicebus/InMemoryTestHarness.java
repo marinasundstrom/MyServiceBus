@@ -143,7 +143,8 @@ public class InMemoryTestHarness implements RequestClientTransport, TransportSen
                         continue;
                     }
                     future = future.thenCompose(v -> {
-                        try (ServiceScope scope = serviceProvider.createScope()) {
+                        ServiceScope scope = serviceProvider.createScope();
+                        try {
                             ServiceProvider scoped = scope.getServiceProvider();
                             @SuppressWarnings("unchecked")
                             com.myservicebus.Consumer<Object> consumer = (com.myservicebus.Consumer<Object>) scoped
@@ -155,11 +156,15 @@ public class InMemoryTestHarness implements RequestClientTransport, TransportSen
                             ConsumeContextProvider ctxProvider = scoped.getService(ConsumeContextProvider.class);
                             ctxProvider.setContext(consumeContext);
                             try {
-                                return consumer.consume(consumeContext).thenRun(() -> consumed.add(message));
+                                CompletableFuture<Void> result = consumer.consume(consumeContext)
+                                        .thenRun(() -> consumed.add(message));
+                                scope.detach();
+                                return result.whenComplete((ignored, failure) -> scope.close());
                             } finally {
                                 ctxProvider.clear();
                             }
-                        } catch (Exception e) {
+                        } catch (Throwable e) {
+                            scope.close();
                             CompletableFuture<Void> failed = new CompletableFuture<>();
                             failed.completeExceptionally(e);
                             return failed;

@@ -18,7 +18,7 @@ Platform-specific syntax and asynchronous wrappers are not parity gaps when the 
 |---|---|---|---|---|---|
 | 1 | Start, stop, repeated lifecycle calls, and operations outside the valid lifecycle | `InMemoryHarnessDiTests.Lifecycle_is_idempotent_and_operations_require_started_state`; `MediatorTransportFactoryTests.Hosted_bus_lifecycle_is_idempotent_and_operations_require_started_state`; failed-start state assertion in `TransportCapabilityTests` | `InMemoryHarnessDiTest.lifecycleIsIdempotentAndOperationsRequireStartedState`; hosted lifecycle coverage in `MessageBusLoggingTest`; failed-start state assertion in `TransportCapabilityTest`; standalone mediator dispatch remains immediately usable | **Verified** | Preserve the distinction between immediately usable standalone mediators and explicitly started hosted buses. |
 | 2 | Directed send and publish fan-out | `MediatorTransportFactoryTests.Send_Invokes_RegisteredHandler`; `MultipleConsumersTests` | `MediatorTransportFactoryTest.publishDeliversMessageToConsumer`; `MultipleConsumersTest` in runtime and testing modules | **Partial** | Add one shared directed-send scenario and one explicit publish fan-out scenario against each local runtime. |
-| 3 | Consumer scope creation and disposal per delivery | `InMemoryHarnessDiTests.Should_resolve_consumer_from_di`; `FilterDiTests` | `MediatorTransportFactoryTest.scopedSendEndpointProviderRetainsConsumeContextAcrossAsyncDispatch`; `ScopeConsumerFactory` tests | **Partial** | Assert a distinct consumer scope for every message and disposal after asynchronous completion in the harness as well as mediator. |
+| 3 | Consumer scope creation and disposal per delivery | `InMemoryHarnessDiTests.Creates_and_disposes_a_consumer_scope_per_delivery`; `FilterDiTests` | `InMemoryHarnessDiTest.createsAndDisposesAConsumerScopePerDelivery`; `MediatorTransportFactoryTest.scopedSendEndpointProviderRetainsConsumeContextAcrossAsyncDispatch`; `ScopeConsumerFactory` tests | **Verified** | Preserve per-delivery scope identity and keep each scope alive through asynchronous consumer completion. |
 | 4 | Request/response correlation, timeout, cancellation, and fault response | `GenericRequestClientTests`; `InMemoryHarnessDiTests.Should_resolve_request_client`; `RequestFaultExceptionTests` | `InMemoryHarnessDiTest.request_client_round_trip`; `RequestClientFaultTest`; `RequestClientHeaderTest` | **Partial** | Add matching local-runtime timeout and cancellation scenarios and assert correlation identifiers end to end. |
 | 5 | Retry attempts, delay, terminal failure, and no-retry behavior | `PipeTests`; mediator retry-order, exhaustion, and no-retry scenarios | `PipeConfiguratorTest`; matching mediator retry-order, exhaustion, and no-retry scenarios | **Verified** | Exception selection, attempt metadata, and redelivery remain separate future features. |
 | 6 | Send, publish, and consume filter order | `PipeTests`; `OutboundFilterOrderingTests`; `MediatorTransportFactoryTests` | `PipeConfiguratorTest`; `ServiceBusPublishFilterTest`; `MediatorTransportFactoryTest` | **Verified** | Extend only when another runtime pipeline stage becomes public. |
@@ -33,11 +33,10 @@ Platform-specific syntax and asynchronous wrappers are not parity gaps when the 
 
 Work should close the remaining rows in dependency order:
 
-1. verify per-message scope identity and asynchronous disposal in both harnesses
-2. specify interface and inherited-type dispatch
-3. complete request timeout, cancellation, and correlation scenarios
-4. integrate header, correlation, cancellation, and telemetry propagation
-5. define concurrency, ordering, failure, and harness observation guarantees
-6. align scheduled send/publish scenarios using deterministic time controls
+1. specify interface and inherited-type dispatch
+2. complete request timeout, cancellation, and correlation scenarios
+3. integrate header, correlation, cancellation, and telemetry propagation
+4. define concurrency, ordering, failure, and harness observation guarantees
+5. align scheduled send/publish scenarios using deterministic time controls
 
 A row moves to **Verified** only when both implementations have matching behavioral tests and the public documentation states any intentional platform distinction.

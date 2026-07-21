@@ -1,12 +1,17 @@
 package com.myservicebus;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
+
+import com.google.inject.Inject;
 
 import org.junit.jupiter.api.Test;
 
@@ -43,6 +48,33 @@ public class InMemoryHarnessDiTest {
     record ConcurrentMessage(int sequence) {
     }
 
+    static class ScopedConsumerState {
+        final CompletableFuture<Void> completion = new CompletableFuture<>();
+        final CopyOnWriteArrayList<Object> instanceIds = new CopyOnWriteArrayList<>();
+        final AtomicInteger disposeCount = new AtomicInteger();
+    }
+
+    static class ScopedAsyncConsumer implements Consumer<Ping>, AutoCloseable {
+        private final ScopedConsumerState state;
+        private final Object instanceId = new Object();
+
+        @Inject
+        ScopedAsyncConsumer(ScopedConsumerState state) {
+            this.state = state;
+        }
+
+        @Override
+        public CompletableFuture<Void> consume(ConsumeContext<Ping> context) {
+            state.instanceIds.add(instanceId);
+            return state.completion;
+        }
+
+        @Override
+        public void close() {
+            state.disposeCount.incrementAndGet();
+        }
+    }
+
     static class PingConsumer implements HandlerWithResult<Ping, Pong> {
         @Override
         public CompletableFuture<Pong> handle(Ping message, CancellationToken cancellationToken) {
@@ -67,6 +99,34 @@ public class InMemoryHarnessDiTest {
             Pong response = client.getResponse(new Ping("hi"), Pong.class).join();
             assertEquals("hi", response.getValue());
         }
+        harness.stop().join();
+    }
+
+    @Test
+    void createsAndDisposesAConsumerScopePerDelivery() {
+        ServiceCollection services = ServiceCollection.create();
+        services.addSingleton(ScopedConsumerState.class);
+        TestingServiceExtensions.addServiceBusTestHarness(services, cfg -> {
+            cfg.addConsumer(ScopedAsyncConsumer.class);
+        });
+
+        ServiceProvider provider = services.buildServiceProvider();
+        InMemoryTestHarness harness = provider.getService(InMemoryTestHarness.class);
+        ScopedConsumerState state = provider.getRequiredService(ScopedConsumerState.class);
+        harness.start().join();
+
+        CompletableFuture<Void> firstDelivery = harness.send(new Ping("first"));
+        assertFalse(firstDelivery.isDone());
+        assertEquals(0, state.disposeCount.get());
+
+        state.completion.complete(null);
+        firstDelivery.join();
+        assertEquals(1, state.disposeCount.get());
+
+        harness.send(new Ping("second")).join();
+        assertEquals(2, state.disposeCount.get());
+        assertEquals(2, state.instanceIds.stream().distinct().count());
+
         harness.stop().join();
     }
 
