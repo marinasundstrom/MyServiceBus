@@ -50,6 +50,12 @@ public class InMemoryHarnessDiTest {
     record ConcurrentMessage(int sequence) {
     }
 
+    record ParentEvent() {
+    }
+
+    record ChildEvent() {
+    }
+
     interface AssignableEvent {
     }
 
@@ -167,6 +173,34 @@ public class InMemoryHarnessDiTest {
 
         assertEquals("first", first.join().getValue());
         assertEquals("second", second.join().getValue());
+        harness.stop().join();
+    }
+
+    @Test
+    void consumerPublishInheritsHeadersCorrelationAndCancellation() {
+        InMemoryTestHarness harness = new InMemoryTestHarness();
+        AtomicReference<Object> header = new AtomicReference<>();
+        AtomicReference<UUID> correlation = new AtomicReference<>();
+        AtomicReference<CancellationToken> cancellation = new AtomicReference<>();
+        harness.registerHandler(ParentEvent.class, context -> context.publish(new ChildEvent()));
+        harness.registerHandler(ChildEvent.class, context -> {
+            header.set(context.getHeaders().get("trace-id"));
+            correlation.set(context.getCorrelationId());
+            cancellation.set(context.getCancellationToken());
+            return CompletableFuture.completedFuture(null);
+        });
+        harness.start().join();
+        com.myservicebus.tasks.CancellationTokenSource source = new com.myservicebus.tasks.CancellationTokenSource();
+        UUID correlationId = UUID.randomUUID();
+        SendContext context = new SendContext(new ParentEvent(), source.token());
+        context.getHeaders().put("trace-id", "abc");
+        context.setCorrelationId(correlationId);
+
+        harness.send(context).join();
+
+        assertEquals("abc", header.get());
+        assertEquals(correlationId, correlation.get());
+        assertEquals(source.token(), cancellation.get());
         harness.stop().join();
     }
 

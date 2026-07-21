@@ -223,15 +223,27 @@ public class InMemoryTestHarness : IMessageBus, ITransportFactory, IReceiveEndpo
         public T Message { get; }
         public Guid? RequestId => receiveContext.RequestId;
         public Guid? CorrelationId => receiveContext.CorrelationId;
+        public IDictionary<string, object> Headers => receiveContext.Headers;
 
         public CancellationToken CancellationToken => receiveContext.CancellationToken;
 
         public Task<ISendEndpoint> GetSendEndpoint(Uri uri) => Task.FromResult<ISendEndpoint>(new HarnessSendEndpoint(harness));
         public Task Publish<TMessage>(object message, Action<IPublishContext>? contextCallback = null, CancellationToken cancellationToken = default) where TMessage : class
-            => harness.Publish((TMessage)message, contextCallback, cancellationToken);
+            => Publish((TMessage)message, contextCallback, cancellationToken);
 
         public Task Publish<TMessage>(TMessage message, Action<IPublishContext>? contextCallback = null, CancellationToken cancellationToken = default) where TMessage : class
-            => harness.Publish(message, contextCallback, cancellationToken);
+        {
+            var effectiveCancellationToken = cancellationToken.CanBeCanceled
+                ? cancellationToken
+                : receiveContext.CancellationToken;
+            return harness.Publish(message, context =>
+            {
+                foreach (var header in receiveContext.Headers)
+                    context.Headers[header.Key] = header.Value;
+                context.CorrelationId = receiveContext.CorrelationId?.ToString();
+                contextCallback?.Invoke(context);
+            }, effectiveCancellationToken);
+        }
 
         public Task RespondAsync<TMessage>(TMessage message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default) where TMessage : class
             => Respond<TMessage>(message!, contextCallback, cancellationToken);

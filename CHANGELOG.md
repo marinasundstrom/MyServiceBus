@@ -15,6 +15,7 @@ This changelog summarizes the bigger themes in the repository history. It is int
 
 ### MVP API stabilization
 
+- Aligned consumer-initiated publish inheritance for headers, correlation, and cancellation across C# and Java local runtimes.
 - Exposed request and correlation identifiers to consumers, preserved request identifiers through responses, and isolated Java response matching by request identifier.
 - Aligned C# and Java request timeout and caller-cancellation behavior, including deadline-free requests.
 - Declared profile-neutral receive-endpoint topology as the supported transport extension point and deprecated legacy C# and Java receive-transport overloads without removing compatibility.

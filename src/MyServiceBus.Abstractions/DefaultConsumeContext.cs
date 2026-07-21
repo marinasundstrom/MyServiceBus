@@ -22,6 +22,7 @@ public class DefaultConsumeContext<TMessage> : BasePipeContext, ConsumeContext<T
     public TMessage Message { get; }
     public Guid? RequestId { get; }
     public Guid? CorrelationId { get; }
+    public System.Collections.Generic.IDictionary<string, object> Headers { get; } = new System.Collections.Generic.Dictionary<string, object>();
 
     public Task RespondAsync<T>(T message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default) where T : class
     {
