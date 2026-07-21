@@ -179,6 +179,8 @@ public class InMemoryTestHarness : IMessageBus, ITransportFactory, IReceiveEndpo
             messageId,
             context.RequestId,
             correlationId,
+            context.ConversationId,
+            context.InitiatorId,
             messageTypes,
             headers,
             context.ResponseAddress,
@@ -223,6 +225,8 @@ public class InMemoryTestHarness : IMessageBus, ITransportFactory, IReceiveEndpo
         public T Message { get; }
         public Guid? RequestId => receiveContext.RequestId;
         public Guid? CorrelationId => receiveContext.CorrelationId;
+        public Guid? ConversationId => receiveContext.ConversationId;
+        public Guid? InitiatorId => receiveContext.InitiatorId;
         public IDictionary<string, object> Headers => receiveContext.Headers;
 
         public CancellationToken CancellationToken => receiveContext.CancellationToken;
@@ -238,6 +242,8 @@ public class InMemoryTestHarness : IMessageBus, ITransportFactory, IReceiveEndpo
                 : receiveContext.CancellationToken;
             return harness.Publish(message, context =>
             {
+                context.ConversationId = ConversationId;
+                context.InitiatorId = CorrelationId;
                 contextCallback?.Invoke(context);
             }, effectiveCancellationToken);
         }
@@ -255,6 +261,8 @@ public class InMemoryTestHarness : IMessageBus, ITransportFactory, IReceiveEndpo
             var context = harness._sendContextFactory.Create(MessageTypeCache.GetMessageTypes(typeof(TMessage)), serializer, cancellationToken);
             context.MessageId = Guid.NewGuid().ToString();
             context.RequestId = RequestId;
+            context.ConversationId = ConversationId;
+            context.InitiatorId = CorrelationId;
             contextCallback?.Invoke(context);
             var typed = message is TMessage value ? value : (TMessage)MessageProxy.Create(typeof(TMessage), message);
             await harness.InternalSend(typed, context).ConfigureAwait(false);
@@ -336,6 +344,8 @@ public class InMemoryTestHarness : IMessageBus, ITransportFactory, IReceiveEndpo
             Guid messageId,
             Guid? requestId,
             Guid? correlationId,
+            Guid? conversationId,
+            Guid? initiatorId,
             IList<string> messageType,
             IDictionary<string, object> headers,
             Uri? responseAddress,
@@ -346,6 +356,8 @@ public class InMemoryTestHarness : IMessageBus, ITransportFactory, IReceiveEndpo
             MessageId = messageId;
             RequestId = requestId;
             CorrelationId = correlationId;
+            ConversationId = conversationId;
+            InitiatorId = initiatorId;
             MessageType = messageType;
             Headers = headers;
             ResponseAddress = responseAddress;
@@ -356,6 +368,8 @@ public class InMemoryTestHarness : IMessageBus, ITransportFactory, IReceiveEndpo
         public Guid MessageId { get; }
         public Guid? RequestId { get; }
         public Guid? CorrelationId { get; }
+        public Guid? ConversationId { get; }
+        public Guid? InitiatorId { get; }
         public IList<string> MessageType { get; }
         public Uri? ResponseAddress { get; }
         public Uri? FaultAddress { get; }

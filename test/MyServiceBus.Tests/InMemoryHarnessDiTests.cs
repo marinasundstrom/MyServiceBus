@@ -177,17 +177,22 @@ public class InMemoryHarnessDiTests
         var harness = new InMemoryTestHarness();
         var parentCorrelationId = Guid.NewGuid();
         var childCorrelationId = Guid.NewGuid();
-        var observed = new TaskCompletionSource<(object? Header, Guid? CorrelationId, CancellationToken Token)>(
+        Guid? parentConversationId = null;
+        var observed = new TaskCompletionSource<(object? Header, Guid? CorrelationId, Guid? ConversationId, Guid? InitiatorId, CancellationToken Token)>(
             TaskCreationOptions.RunContinuationsAsynchronously);
-        harness.RegisterHandler<ParentEvent>(context => context.Publish(new ChildEvent(), outbound =>
+        harness.RegisterHandler<ParentEvent>(context =>
         {
-            outbound.Headers["trace-id"] = "child";
-            outbound.CorrelationId = childCorrelationId.ToString();
-        }));
+            parentConversationId = context.ConversationId;
+            return context.Publish(new ChildEvent(), outbound =>
+            {
+                outbound.Headers["trace-id"] = "child";
+                outbound.CorrelationId = childCorrelationId.ToString();
+            });
+        });
         harness.RegisterHandler<ChildEvent>(context =>
         {
             context.Headers.TryGetValue("trace-id", out var header);
-            observed.TrySetResult((header, context.CorrelationId, context.CancellationToken));
+            observed.TrySetResult((header, context.CorrelationId, context.ConversationId, context.InitiatorId, context.CancellationToken));
             return Task.CompletedTask;
         });
         await harness.Start();
@@ -202,6 +207,9 @@ public class InMemoryHarnessDiTests
         var result = await observed.Task;
         Assert.Equal("child", result.Header);
         Assert.Equal(childCorrelationId, result.CorrelationId);
+        Assert.NotNull(parentConversationId);
+        Assert.Equal(parentConversationId, result.ConversationId);
+        Assert.Equal(parentCorrelationId, result.InitiatorId);
         Assert.Equal(cancellationSource.Token, result.Token);
         await harness.Stop();
     }

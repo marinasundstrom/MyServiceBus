@@ -152,6 +152,8 @@ public class MediatorTransportFactory : ITransportFactory
                 messageId,
                 context.RequestId,
                 correlationId,
+                context.ConversationId,
+                context.InitiatorId,
                 messageTypes,
                 headers,
                 context.ResponseAddress,
@@ -175,6 +177,8 @@ public class MediatorTransportFactory : ITransportFactory
             Guid messageId,
             Guid? requestId,
             Guid? correlationId,
+            Guid? conversationId,
+            Guid? initiatorId,
             IList<string> messageType,
             IDictionary<string, object> headers,
             Uri? responseAddress,
@@ -185,6 +189,8 @@ public class MediatorTransportFactory : ITransportFactory
             MessageId = messageId;
             RequestId = requestId;
             CorrelationId = correlationId;
+            ConversationId = conversationId;
+            InitiatorId = initiatorId;
             MessageType = messageType;
             Headers = headers;
             ResponseAddress = responseAddress;
@@ -195,6 +201,8 @@ public class MediatorTransportFactory : ITransportFactory
         public Guid MessageId { get; }
         public Guid? RequestId { get; }
         public Guid? CorrelationId { get; }
+        public Guid? ConversationId { get; }
+        public Guid? InitiatorId { get; }
         public IList<string> MessageType { get; }
         public Uri? ResponseAddress { get; }
         public Uri? FaultAddress { get; }

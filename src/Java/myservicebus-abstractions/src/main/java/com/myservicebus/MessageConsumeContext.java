@@ -11,6 +11,10 @@ public interface MessageConsumeContext {
 
     UUID getCorrelationId();
 
+    UUID getConversationId();
+
+    UUID getInitiatorId();
+
     <T> CompletableFuture<Void> respond(T message, CancellationToken cancellationToken);
 
     default CompletableFuture<Void> respond(SendContext context) {

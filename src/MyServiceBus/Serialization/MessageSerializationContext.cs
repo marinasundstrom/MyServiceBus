@@ -13,6 +13,8 @@ public class MessageSerializationContext<T>
     public Guid? RequestId { get; set; }
 
     public Guid? CorrelationId { get; set; }
+    public Guid? ConversationId { get; set; }
+    public Guid? InitiatorId { get; set; }
 
     public IList<string> MessageType { get; set; }
 

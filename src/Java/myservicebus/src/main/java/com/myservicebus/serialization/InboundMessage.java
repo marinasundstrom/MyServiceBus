@@ -28,5 +28,13 @@ public interface InboundMessage {
         return null;
     }
 
+    default UUID getConversationId() {
+        return null;
+    }
+
+    default UUID getInitiatorId() {
+        return null;
+    }
+
     <T> T getMessage(Type type) throws Exception;
 }

@@ -13,6 +13,8 @@ public class EnvelopeMessageContext : IMessageContext
     private Guid? _messageId;
     private Guid? _correlationId;
     private Guid? _requestId;
+    private Guid? _conversationId;
+    private Guid? _initiatorId;
     private List<string>? _messageType;
     private Dictionary<string, object>? _headers;
     private DateTimeOffset? _sentTime;
@@ -27,13 +29,19 @@ public class EnvelopeMessageContext : IMessageContext
     }
 
     public Guid MessageId =>
-        (_messageId ??= TryGetProperty("messageId")?.GetGuid()).GetValueOrDefault();
+        (_messageId ??= TryGetGuidProperty("messageId")).GetValueOrDefault();
 
     public Guid? CorrelationId =>
-        _correlationId ??= TryGetProperty("correlationId")?.GetGuid();
+        _correlationId ??= TryGetGuidProperty("correlationId");
 
     public Guid? RequestId =>
-        _requestId ??= TryGetProperty("requestId")?.GetGuid();
+        _requestId ??= TryGetGuidProperty("requestId");
+
+    public Guid? ConversationId =>
+        _conversationId ??= TryGetGuidProperty("conversationId");
+
+    public Guid? InitiatorId =>
+        _initiatorId ??= TryGetGuidProperty("initiatorId");
 
     public IList<string> MessageType =>
         _messageType ??= TryGetProperty("messageType")?.Deserialize<List<string>>() ?? new();
@@ -119,6 +127,14 @@ public class EnvelopeMessageContext : IMessageContext
     private JsonElement? TryGetProperty(string propertyName)
     {
         return _jsonDocument.RootElement.TryGetProperty(propertyName, out var value) ? value : null;
+    }
+
+    private Guid? TryGetGuidProperty(string propertyName)
+    {
+        var value = TryGetProperty(propertyName);
+        return value is { ValueKind: JsonValueKind.String } && value.Value.TryGetGuid(out var parsed)
+            ? parsed
+            : null;
     }
 
     private Dictionary<string, object> MergeHeaders()

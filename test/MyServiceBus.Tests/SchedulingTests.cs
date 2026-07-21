@@ -50,6 +50,8 @@ public class SchedulingTests
         public string RoutingKey { get; set; } = string.Empty;
         public IDictionary<string, object> Headers { get; } = new Dictionary<string, object>();
         public string? CorrelationId { get; set; }
+        public Guid? ConversationId { get; set; }
+        public Guid? InitiatorId { get; set; }
         public Uri? ResponseAddress { get; set; }
         public Uri? FaultAddress { get; set; }
         public DateTime? ScheduledEnqueueTime { get; set; }
