@@ -21,6 +21,36 @@ public class InMemoryHarnessDiTests
     record OrderStatus(Guid OrderId);
     record ConcurrentMessage(int Sequence);
 
+    class ScopedConsumerState
+    {
+        public readonly TaskCompletionSource Completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public readonly ConcurrentBag<Guid> InstanceIds = new();
+        public int DisposeCount;
+    }
+
+    class ScopedAsyncConsumer : IConsumer<SubmitOrder>, IAsyncDisposable
+    {
+        readonly ScopedConsumerState state;
+        readonly Guid instanceId = Guid.NewGuid();
+
+        public ScopedAsyncConsumer(ScopedConsumerState state)
+        {
+            this.state = state;
+        }
+
+        public async Task Consume(ConsumeContext<SubmitOrder> context)
+        {
+            state.InstanceIds.Add(instanceId);
+            await state.Completion.Task;
+        }
+
+        public ValueTask DisposeAsync()
+        {
+            Interlocked.Increment(ref state.DisposeCount);
+            return ValueTask.CompletedTask;
+        }
+    }
+
     class CheckOrderConsumer : IConsumer<CheckOrder>
     {
         public Task Consume(ConsumeContext<CheckOrder> context)
@@ -44,6 +74,32 @@ public class InMemoryHarnessDiTests
         await harness.Publish(new SubmitOrder(Guid.NewGuid()));
 
         Assert.True(harness.WasConsumed<SubmitOrder>());
+
+        await harness.Stop();
+    }
+
+    [Fact]
+    public async Task Creates_and_disposes_a_consumer_scope_per_delivery()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton<ScopedConsumerState>();
+        services.AddServiceBusTestHarness(x => x.AddConsumer<ScopedAsyncConsumer>());
+        await using var provider = services.BuildServiceProvider();
+        var harness = provider.GetRequiredService<InMemoryTestHarness>();
+        var state = provider.GetRequiredService<ScopedConsumerState>();
+        await harness.Start();
+
+        var firstDelivery = harness.Publish(new SubmitOrder(Guid.NewGuid()));
+        Assert.False(firstDelivery.IsCompleted);
+        Assert.Equal(0, state.DisposeCount);
+
+        state.Completion.SetResult();
+        await firstDelivery;
+        Assert.Equal(1, state.DisposeCount);
+
+        await harness.Publish(new SubmitOrder(Guid.NewGuid()));
+        Assert.Equal(2, state.DisposeCount);
+        Assert.Equal(2, state.InstanceIds.Distinct().Count());
 
         await harness.Stop();
     }

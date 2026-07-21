@@ -48,6 +48,7 @@ This changelog summarizes the bigger themes in the repository history. It is int
 - Added the shared C# and Java mediator/in-memory conformance matrix, identifying verified behavior and the remaining stability gaps.
 - Defined matching explicit, idempotent lifecycle behavior for the C# and Java in-memory test harnesses while keeping standalone mediators immediately usable.
 - Defined the same stopped, started, restart, and failed-start recovery semantics for hosted C# and Java buses, including explicit rejection of outbound work while stopped.
+- Verified distinct dependency-injection scopes per consumer delivery in both in-memory harnesses and kept scoped resources alive through asynchronous completion and disposal.
 
 ## 2026-03-24 to 2026-03-19
 

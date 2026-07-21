@@ -54,6 +54,8 @@ The harness starts in the stopped state. `Start`/`start` and `Stop`/`stop` are i
 
 The standalone mediator has a different responsibility: it is immediately usable after construction and does not model a hosted transport lifecycle. A hosted broker-backed bus still follows its host or explicit bus lifecycle.
 
+Consumers registered through the dependency-injection configuration receive a new service scope for every delivery. That scope remains alive until the consumer's asynchronous operation completes and is then disposed, including asynchronous disposal in C#. Direct handler delegates are application-owned callbacks and do not create a dependency-injection scope.
+
 ### C#
 ```csharp
 var harness = new InMemoryTestHarness();
