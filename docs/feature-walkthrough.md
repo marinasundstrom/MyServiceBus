@@ -362,6 +362,8 @@ Inspect and process the error queue with a dedicated consumer or tool, then send
 
 Use request/response for RPC-style interactions over the bus. A consumer responds to a request, and the client correlates replies, propagates headers, and manages timeouts.
 
+Request clients apply a default 30-second deadline. Configure `RequestTimeout.After(...)` when creating a client to use another deadline, or `RequestTimeout.None` to wait without a deadline. An elapsed deadline completes with a timeout error; caller cancellation remains cancellation. In Java, cancelling the supplied token cancels the returned `CompletableFuture` and allows transport-specific temporary request resources to be released.
+
 #### C#
 
 ```csharp

@@ -15,6 +15,7 @@ This changelog summarizes the bigger themes in the repository history. It is int
 
 ### MVP API stabilization
 
+- Aligned C# and Java request timeout and caller-cancellation behavior, including deadline-free requests.
 - Declared profile-neutral receive-endpoint topology as the supported transport extension point and deprecated legacy C# and Java receive-transport overloads without removing compatibility.
 - Made Java cancellation APIs idiomatic with method-based accessors, tokenless context construction, and a standard `CancellationException` guard while retaining the shared cancellation-policy concept.
 
