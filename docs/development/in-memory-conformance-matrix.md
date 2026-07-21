@@ -27,13 +27,13 @@ Platform-specific syntax and asynchronous wrappers are not parity gaps when the 
 | 9 | Scheduled delivery and cancellation | `SchedulingTests.SchedulePublish_delays_message` and `Cancel_prevents_scheduled_publish` | `SchedulingTest.scheduleSend_delays_message` and `cancelScheduledSend_preventsDelivery` | **Partial** | Align send-versus-publish scenarios and introduce deterministic timing control before claiming ordering guarantees. |
 | 10 | Concurrent dispatch, ordering, and handler failure | `InMemoryHarnessDiTests.Should_record_concurrent_delivery_deterministically`; `MultipleConsumersFaultTests.Should_attempt_all_consumers_when_one_faults` | `InMemoryHarnessDiTest.records_concurrent_delivery_deterministically`; `MultipleConsumersTest.allConsumersAreAttemptedWhenOneFails` | **Verified** | Preserve independent delivery: await all matched consumers, fail dispatch if any fail, and promise no ordering between consumers. |
 | 11 | Stable topology snapshots and truthful capabilities | `TopologySnapshotTests`; `TransportCapabilityTests.InMemory_factory_exposes_its_descriptor` | `TopologySnapshotTest`; `TransportCapabilityTest.mediatorExposesItsDescriptor` | **Verified** | Keep descriptors synchronized when local-runtime behavior changes. |
-| 12 | Equivalent harness observations and assertion timing | Concurrent consumed-record assertions and request-client tests in `InMemoryHarnessDiTests` | Concurrent consumed-record assertions and request-client tests in `InMemoryHarnessDiTest` | **Partial** | Define observation categories and eventual-assertion timeout behavior as a shared testing contract. |
+| 12 | Equivalent harness observations and assertion timing | `InMemoryHarnessObservationTests`; concurrent consumed-record assertions in `InMemoryHarnessDiTests` | `InMemoryHarnessObservationTest`; concurrent consumed-record assertions in `InMemoryHarnessDiTest` | **Verified** | Preserve successful-completion cardinality, existing-or-future matching, explicit timeout, and idiomatic cancellation. Add other observation categories only with matching contracts. |
 
 ## Next compatibility slices
 
 Work should close the remaining rows in dependency order:
 
-1. define the remaining harness observation and eventual-assertion guarantees
-2. align scheduled send/publish scenarios using deterministic time controls
+1. align scheduled send/publish scenarios using deterministic time controls
+2. add matching directed-send and explicit publish fan-out scenarios to each local runtime
 
 A row moves to **Verified** only when both implementations have matching behavioral tests and the public documentation states any intentional platform distinction.

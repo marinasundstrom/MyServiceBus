@@ -16,6 +16,8 @@ public class InMemoryTestHarness : IMessageBus, ITransportFactory, IReceiveEndpo
     readonly object handlerLock = new();
     readonly List<Func<ReceiveContext, Task>> receiveHandlers = new();
     readonly ConcurrentQueue<object> consumed = new();
+    readonly object observationLock = new();
+    readonly List<ConsumedWaiter> consumedWaiters = new();
     readonly HashSet<Type> consumerTypes = new();
     readonly IServiceProvider? provider;
     readonly IBusTopology topology;
@@ -92,13 +94,63 @@ public class InMemoryTestHarness : IMessageBus, ITransportFactory, IReceiveEndpo
                 {
                     var consumeContext = new TestConsumeContext<T>(this, msg!, ctx);
                     await handler(consumeContext).ConfigureAwait(false);
-                    consumed.Enqueue(msg!);
+                    RecordConsumed(msg!);
                 }
             });
         }
     }
 
     public bool WasConsumed<T>() where T : class => consumed.OfType<T>().Any();
+
+    public async Task<bool> WaitForConsumed<T>(TimeSpan timeout, CancellationToken cancellationToken = default)
+        where T : class
+    {
+        if (timeout < TimeSpan.Zero && timeout != Timeout.InfiniteTimeSpan)
+            throw new ArgumentOutOfRangeException(nameof(timeout));
+
+        ConsumedWaiter waiter;
+        lock (observationLock)
+        {
+            if (WasConsumed<T>())
+                return true;
+
+            waiter = new ConsumedWaiter(typeof(T));
+            consumedWaiters.Add(waiter);
+        }
+
+        try
+        {
+            await waiter.Completion.Task.WaitAsync(timeout, cancellationToken).ConfigureAwait(false);
+            return true;
+        }
+        catch (TimeoutException)
+        {
+            return false;
+        }
+        finally
+        {
+            lock (observationLock)
+                consumedWaiters.Remove(waiter);
+        }
+    }
+
+    void RecordConsumed(object message)
+    {
+        consumed.Enqueue(message);
+
+        ConsumedWaiter[] matching;
+        lock (observationLock)
+            matching = consumedWaiters.Where(waiter => waiter.MessageType.IsInstanceOfType(message)).ToArray();
+
+        foreach (var waiter in matching)
+            waiter.Completion.TrySetResult();
+    }
+
+    sealed record ConsumedWaiter(Type MessageType)
+    {
+        public TaskCompletionSource Completion { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+    }
 
     public Task Publish<TMessage>(object message, Action<IPublishContext>? contextCallback = null, CancellationToken cancellationToken = default) where TMessage : class
         => Publish((TMessage)message, contextCallback, cancellationToken);

@@ -40,6 +40,8 @@ Each compatible consumer registration is an independent local delivery. The medi
 
 No ordering is promised between independent consumers, including registration order, start order, or completion order. Filters within one consumer pipeline remain ordered according to their pipeline registration contract. Harness consumed observations represent successful consumer completions, so one message may produce multiple consumed records when multiple consumers succeed.
 
+The shared harness exposes an eventual consumed-type observation with an explicit timeout. It checks already-recorded completions before waiting for a future completion, returns false on timeout, and preserves the platform's normal cancellation convention. This is the only shared observation category at present; sent, published, faulted, and scheduled collections require separate contracts before they are added.
+
 ## Exit criteria
 
 The gate is complete when:

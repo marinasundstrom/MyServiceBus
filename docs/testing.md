@@ -59,26 +59,33 @@ Consumers registered through the dependency-injection configuration receive a ne
 ### C#
 ```csharp
 var harness = new InMemoryTestHarness();
-harness.Handler<SomeMessage>(ctx => Task.CompletedTask);
+harness.RegisterHandler<SomeMessage>(ctx => Task.CompletedTask);
 
 await harness.Start();
-await harness.InputQueueSendEndpoint.Send(new SomeMessage());
-Assert.True(await harness.Consumed.Any<SomeMessage>());
+var consumed = harness.WaitForConsumed<SomeMessage>(TimeSpan.FromSeconds(1));
+await harness.Publish(new SomeMessage());
+Assert.True(await consumed);
 await harness.Stop();
 ```
 
 ### Java
 ```java
 InMemoryTestHarness harness = new InMemoryTestHarness();
-harness.handler(SomeMessage.class, ctx -> CompletableFuture.completedFuture(null));
+harness.registerHandler(SomeMessage.class, ctx -> CompletableFuture.completedFuture(null));
 
-harness.start();
-harness.inputQueueSendEndpoint().send(new SomeMessage());
-assertTrue(harness.consumed().any(SomeMessage.class));
-harness.stop();
+harness.start().join();
+CompletableFuture<Boolean> consumed = harness.waitForConsumed(
+        SomeMessage.class, Duration.ofSeconds(1));
+harness.send(new SomeMessage()).join();
+assertTrue(consumed.join());
+harness.stop().join();
 ```
 
 These helpers enable fast, isolated tests and provide the same API surface in both languages, supporting the project's alignment goals.
+
+`WaitForConsumed<T>` and `waitForConsumed` first inspect existing observations and then wait for a future successful consumer completion until the explicit timeout. They return `false` when the timeout elapses. C# caller cancellation remains distinct and throws `OperationCanceledException`; Java callers may cancel the returned `CompletableFuture` using the normal Java future API.
+
+The current shared observation category is **consumed**, recorded once for each consumer pipeline that completes successfully. A single message therefore creates multiple consumed observations when multiple compatible consumers succeed. Failed attempts are not consumed observations. Sent, published, faulted, and scheduled observation collections remain future testing features and are not implied by the current harness API.
 
 ## Publishing from a service class
 Classes can inject `IPublishEndpoint` (C#) or `PublishEndpoint` (Java) and be verified with the in-memory harness.
