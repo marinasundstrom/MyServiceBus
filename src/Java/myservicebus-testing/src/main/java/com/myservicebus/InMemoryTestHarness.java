@@ -23,6 +23,8 @@ import com.myservicebus.serialization.MessageSerializer;
 public class InMemoryTestHarness implements RequestClientTransport, TransportSendEndpointProvider {
     private final Map<Class<?>, List<com.myservicebus.Consumer<?>>> handlers = new ConcurrentHashMap<>();
     private final List<Object> consumed = Collections.synchronizedList(new ArrayList<>());
+    private final Object observationLock = new Object();
+    private final List<ConsumedWaiter> consumedWaiters = new ArrayList<>();
     private final ServiceProvider serviceProvider;
     private final ConsumeContextProvider consumeContextProvider;
     private volatile boolean started;
@@ -126,7 +128,7 @@ public class InMemoryTestHarness implements RequestClientTransport, TransportSen
                     if (consumeContextProvider != null) {
                         consumeContextProvider.setContext(consumeContext);
                     }
-                    delivery = handler.consume(consumeContext).thenRun(() -> consumed.add(message));
+                    delivery = handler.consume(consumeContext).thenRun(() -> recordConsumed(message));
                 } finally {
                     if (consumeContextProvider != null) {
                         consumeContextProvider.clear();
@@ -163,7 +165,7 @@ public class InMemoryTestHarness implements RequestClientTransport, TransportSen
                         ctxProvider.setContext(consumeContext);
                         CompletableFuture<Void> result;
                         try {
-                            result = consumer.consume(consumeContext).thenRun(() -> consumed.add(message));
+                            result = consumer.consume(consumeContext).thenRun(() -> recordConsumed(message));
                         } finally {
                             ctxProvider.clear();
                         }
@@ -277,6 +279,53 @@ public class InMemoryTestHarness implements RequestClientTransport, TransportSen
     public boolean wasConsumed(Class<?> type) {
         synchronized (consumed) {
             return consumed.stream().anyMatch(type::isInstance);
+        }
+    }
+
+    public CompletableFuture<Boolean> waitForConsumed(Class<?> type, Duration timeout) {
+        Objects.requireNonNull(type, "type");
+        Objects.requireNonNull(timeout, "timeout");
+        if (timeout.isNegative()) {
+            throw new IllegalArgumentException("timeout must not be negative");
+        }
+
+        ConsumedWaiter waiter;
+        synchronized (observationLock) {
+            if (wasConsumed(type)) {
+                return CompletableFuture.completedFuture(true);
+            }
+            waiter = new ConsumedWaiter(type);
+            consumedWaiters.add(waiter);
+        }
+
+        CompletableFuture.delayedExecutor(timeout.toMillis(), TimeUnit.MILLISECONDS)
+                .execute(() -> waiter.completion.complete(false));
+        waiter.completion.whenComplete((result, failure) -> {
+            synchronized (observationLock) {
+                consumedWaiters.remove(waiter);
+            }
+        });
+        return waiter.completion;
+    }
+
+    private void recordConsumed(Object message) {
+        consumed.add(message);
+
+        List<ConsumedWaiter> matching;
+        synchronized (observationLock) {
+            matching = consumedWaiters.stream()
+                    .filter(waiter -> waiter.messageType.isInstance(message))
+                    .toList();
+        }
+        matching.forEach(waiter -> waiter.completion.complete(true));
+    }
+
+    private static final class ConsumedWaiter {
+        private final Class<?> messageType;
+        private final CompletableFuture<Boolean> completion = new CompletableFuture<>();
+
+        private ConsumedWaiter(Class<?> messageType) {
+            this.messageType = messageType;
         }
     }
 
