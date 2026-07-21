@@ -48,6 +48,15 @@ public class InMemoryHarnessDiTest {
     record ConcurrentMessage(int sequence) {
     }
 
+    interface AssignableEvent {
+    }
+
+    static class BaseAssignableEvent {
+    }
+
+    static class DerivedAssignableEvent extends BaseAssignableEvent implements AssignableEvent {
+    }
+
     static class ScopedConsumerState {
         final CompletableFuture<Void> completion = new CompletableFuture<>();
         final CopyOnWriteArrayList<Object> instanceIds = new CopyOnWriteArrayList<>();
@@ -144,6 +153,28 @@ public class InMemoryHarnessDiTest {
         assertEquals(200, harness.getConsumed().stream()
                 .filter(ConcurrentMessage.class::isInstance)
                 .count());
+        harness.stop().join();
+    }
+
+    @Test
+    void dispatchesConcreteMessagesToInterfaceAndBaseHandlersOnce() {
+        InMemoryTestHarness harness = new InMemoryTestHarness();
+        AtomicInteger concrete = new AtomicInteger();
+        AtomicInteger inherited = new AtomicInteger();
+        AtomicInteger interfaceCount = new AtomicInteger();
+        harness.registerHandler(DerivedAssignableEvent.class,
+                context -> CompletableFuture.completedFuture(concrete.incrementAndGet()).thenApply(ignored -> null));
+        harness.registerHandler(BaseAssignableEvent.class,
+                context -> CompletableFuture.completedFuture(inherited.incrementAndGet()).thenApply(ignored -> null));
+        harness.registerHandler(AssignableEvent.class,
+                context -> CompletableFuture.completedFuture(interfaceCount.incrementAndGet()).thenApply(ignored -> null));
+        harness.start().join();
+
+        harness.send(new DerivedAssignableEvent()).join();
+
+        assertEquals(1, concrete.get());
+        assertEquals(1, inherited.get());
+        assertEquals(1, interfaceCount.get());
         harness.stop().join();
     }
 

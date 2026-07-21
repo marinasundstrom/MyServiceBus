@@ -23,7 +23,7 @@ Platform-specific syntax and asynchronous wrappers are not parity gaps when the 
 | 5 | Retry attempts, delay, terminal failure, and no-retry behavior | `PipeTests`; mediator retry-order, exhaustion, and no-retry scenarios | `PipeConfiguratorTest`; matching mediator retry-order, exhaustion, and no-retry scenarios | **Verified** | Exception selection, attempt metadata, and redelivery remain separate future features. |
 | 6 | Send, publish, and consume filter order | `PipeTests`; `OutboundFilterOrderingTests`; `MediatorTransportFactoryTests` | `PipeConfiguratorTest`; `ServiceBusPublishFilterTest`; `MediatorTransportFactoryTest` | **Verified** | Extend only when another runtime pipeline stage becomes public. |
 | 7 | Headers, correlation, cancellation, and telemetry context | `PublishHeaderTests`; `GenericRequestClientTests`; `OpenTelemetryFilterTests`; `PipeTests` | `PublishHeaderTest`; `RequestClientHeaderTest`; `OpenTelemetryFilterTest`; `PipeConfiguratorTest` | **Partial** | Add one integrated mediator/harness scenario that carries headers, correlation, and cancellation into the consumer together. |
-| 8 | Interface and inherited message-type dispatch | Anonymous interface send, publish, and consume-context tests | Assignable-type dispatch exists in the runtime but lacks matching local-runtime conformance tests | **Gap** | Specify the portable assignability rules and add Java interface/inheritance scenarios with C# counterparts. |
+| 8 | Interface and inherited message-type dispatch | `MediatorTransportFactoryTests.Publish_dispatches_to_concrete_interface_and_base_consumers_once`; `InMemoryHarnessDiTests.Dispatches_concrete_messages_to_interface_and_base_handlers_once`; anonymous interface tests | `MediatorTransportFactoryTest.publishDispatchesToConcreteInterfaceAndBaseConsumersOnce`; `InMemoryHarnessDiTest.dispatchesConcreteMessagesToInterfaceAndBaseHandlersOnce` | **Verified** | Preserve concrete, implemented-interface, and non-root-base dispatch with at-most-once consumer invocation. |
 | 9 | Scheduled delivery and cancellation | `SchedulingTests.SchedulePublish_delays_message` and `Cancel_prevents_scheduled_publish` | `SchedulingTest.scheduleSend_delays_message` and `cancelScheduledSend_preventsDelivery` | **Partial** | Align send-versus-publish scenarios and introduce deterministic timing control before claiming ordering guarantees. |
 | 10 | Concurrent dispatch, ordering, and handler failure | `InMemoryHarnessDiTests.Should_record_concurrent_delivery_deterministically`; `MultipleConsumersFaultTests` | `InMemoryHarnessDiTest.records_concurrent_delivery_deterministically`; multiple-consumer tests | **Partial** | Define ordering and multi-handler failure guarantees, then verify the same outcome in both harnesses. |
 | 11 | Stable topology snapshots and truthful capabilities | `TopologySnapshotTests`; `TransportCapabilityTests.InMemory_factory_exposes_its_descriptor` | `TopologySnapshotTest`; `TransportCapabilityTest.mediatorExposesItsDescriptor` | **Verified** | Keep descriptors synchronized when local-runtime behavior changes. |
@@ -33,10 +33,9 @@ Platform-specific syntax and asynchronous wrappers are not parity gaps when the 
 
 Work should close the remaining rows in dependency order:
 
-1. specify interface and inherited-type dispatch
-2. complete request timeout, cancellation, and correlation scenarios
-3. integrate header, correlation, cancellation, and telemetry propagation
-4. define concurrency, ordering, failure, and harness observation guarantees
-5. align scheduled send/publish scenarios using deterministic time controls
+1. complete request timeout, cancellation, and correlation scenarios
+2. integrate header, correlation, cancellation, and telemetry propagation
+3. define concurrency, ordering, failure, and harness observation guarantees
+4. align scheduled send/publish scenarios using deterministic time controls
 
 A row moves to **Verified** only when both implementations have matching behavioral tests and the public documentation states any intentional platform distinction.

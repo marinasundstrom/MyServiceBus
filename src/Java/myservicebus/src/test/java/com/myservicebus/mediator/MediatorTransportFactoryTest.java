@@ -37,6 +37,42 @@ public class MediatorTransportFactoryTest {
         }
     }
 
+    interface AssignableEvent {
+    }
+
+    static class BaseAssignableEvent {
+    }
+
+    static class DerivedAssignableEvent extends BaseAssignableEvent implements AssignableEvent {
+    }
+
+    public static class ConcreteAssignableConsumer implements Consumer<DerivedAssignableEvent> {
+        static int count;
+        @Override
+        public CompletableFuture<Void> consume(ConsumeContext<DerivedAssignableEvent> context) {
+            count++;
+            return CompletableFuture.completedFuture(null);
+        }
+    }
+
+    public static class BaseAssignableConsumer implements Consumer<BaseAssignableEvent> {
+        static int count;
+        @Override
+        public CompletableFuture<Void> consume(ConsumeContext<BaseAssignableEvent> context) {
+            count++;
+            return CompletableFuture.completedFuture(null);
+        }
+    }
+
+    public static class InterfaceAssignableConsumer implements Consumer<AssignableEvent> {
+        static int count;
+        @Override
+        public CompletableFuture<Void> consume(ConsumeContext<AssignableEvent> context) {
+            count++;
+            return CompletableFuture.completedFuture(null);
+        }
+    }
+
     public static class RetryingConsumer implements Consumer<TestMessage> {
         static int attempts;
         static List<String> calls = new ArrayList<>();
@@ -182,6 +218,25 @@ public class MediatorTransportFactoryTest {
         bus.publish(new TestMessage("hello"));
 
         Assertions.assertEquals("hello", TestConsumer.received.join().getValue());
+    }
+
+    @Test
+    public void publishDispatchesToConcreteInterfaceAndBaseConsumersOnce() {
+        ConcreteAssignableConsumer.count = 0;
+        BaseAssignableConsumer.count = 0;
+        InterfaceAssignableConsumer.count = 0;
+        ServiceCollection services = ServiceCollection.create();
+        MediatorBus bus = MediatorBus.configure(services, cfg -> {
+            cfg.addConsumer(ConcreteAssignableConsumer.class);
+            cfg.addConsumer(BaseAssignableConsumer.class);
+            cfg.addConsumer(InterfaceAssignableConsumer.class);
+        });
+
+        bus.publish(new DerivedAssignableEvent());
+
+        Assertions.assertEquals(1, ConcreteAssignableConsumer.count);
+        Assertions.assertEquals(1, BaseAssignableConsumer.count);
+        Assertions.assertEquals(1, InterfaceAssignableConsumer.count);
     }
 
     @Test

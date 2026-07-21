@@ -20,7 +20,7 @@ MyServiceBus composes a distributed bus from a small set of building blocks:
 - **Pipes** – Send, publish and consume operations execute through the portable [pipeline and filter contract](pipeline-filter-spec.md), including ordered wrapping, short-circuiting, failure propagation, retry re-entry, and cancellation propagation.
 - **Transports** – Serialized envelopes move between endpoints via pluggable transports. See the [ServiceBus Transport Specification](transport-spec.md).
 - **Send** – Consumers resolve send endpoints by URI and deliver messages to specific destinations.
-- **Publish** – Published messages are routed using message type conventions.
+- **Publish** – Published messages are routed using message type conventions. A concrete message is eligible for its concrete contract, implemented interfaces, and non-root base classes; a registered consumer is invoked at most once for one delivery even when several contracts match.
 - **Request–response** – `GenericRequestClient` uses temporary endpoints to await replies or `Fault<T>` messages.
 - **Faults** – Exceptions during consumption generate `Fault<T>` messages identical to MassTransit's and are forwarded to `<queue>_error` endpoints.
 - **Headers** – Headers prefixed with `_` map to native transport properties (e.g., `_correlation_id`).

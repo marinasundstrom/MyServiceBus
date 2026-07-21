@@ -195,9 +195,11 @@ public class InMemoryTestHarness : IMessageBus, ITransportFactory, IReceiveEndpo
 
         List<Func<ReceiveContext, Task>> messageHandlers;
         lock (handlerLock)
-            messageHandlers = handlers.TryGetValue(message!.GetType(), out var list)
-                ? list.ToList()
-                : new List<Func<ReceiveContext, Task>>();
+            messageHandlers = handlers
+                .Where(entry => entry.Key.IsAssignableFrom(message!.GetType()))
+                .SelectMany(entry => entry.Value)
+                .Distinct()
+                .ToList();
 
         foreach (var h in messageHandlers)
         {

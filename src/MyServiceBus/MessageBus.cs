@@ -279,6 +279,7 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
 
     private async Task HandleMessageAsync(string queueName, ReceiveContext context)
     {
+        var messageTypeNames = context.MessageType.ToHashSet(StringComparer.Ordinal);
         var messageTypeName = context.MessageType.FirstOrDefault();
         if (!_consumers.TryGetValue(queueName, out var registrations))
         {
@@ -288,7 +289,7 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
 
         var matches = messageTypeName == null
             ? registrations.Where(r => IsRawSerializer(r.Serializer)).ToList()
-            : registrations.Where(r => r.MessageUrn == messageTypeName).ToList();
+            : registrations.Where(r => messageTypeNames.Contains(r.MessageUrn)).ToList();
         if (matches.Count == 0)
         {
             _logger?.LogWarning("Received message with unregistered type {MessageType}", messageTypeName);

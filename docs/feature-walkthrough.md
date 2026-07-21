@@ -151,6 +151,8 @@ Java accepts this self-contained model because the runtime lacks a standard depe
 
 Publish raises an event 🎉 to all interested consumers. It is fan-out by message type and does not target a specific queue. Use it for domain events or notifications. Multiple queues can listen to the same exchange or topic to receive the event. See [Adding Headers](#adding-headers) to attach tracing or other metadata.
 
+Publication is polymorphic in both clients. Publishing a concrete class reaches consumers of that class, its implemented message interfaces, and its non-root base classes. Each registered consumer runs at most once for a delivery even if more than one of its contracts is assignable from the message.
+
 `IMessageBus` is a singleton and implements `IPublishEndpoint`, so you can publish directly from the bus as shown. In scoped code paths (such as an ASP.NET request or inside a consumer), prefer resolving `IPublishEndpoint` from the scope so headers and cancellation tokens flow automatically.
 
 #### C#
