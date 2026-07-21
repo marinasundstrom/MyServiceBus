@@ -10,7 +10,7 @@ public class RabbitMqTestcontainerTests
     [Fact]
     public async Task Transport_round_trips_an_envelope_through_rabbitmq()
     {
-        await using var container = new RabbitMqBuilder("rabbitmq:4.1-alpine").Build();
+        await using var container = new RabbitMqBuilder("rabbitmq:4.1.8-alpine").Build();
         await container.StartAsync();
 
         var connectionFactory = new ConnectionFactory

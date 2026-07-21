@@ -12,7 +12,7 @@ public class CrossLanguageRabbitMqTests
     [CrossLanguageFact]
     public async Task Csharp_direct_send_delivers_to_java_consumer()
     {
-        await using var container = new RabbitMqBuilder("rabbitmq:4.1-alpine").Build();
+        await using var container = new RabbitMqBuilder("rabbitmq:4.1.8-alpine").Build();
         await container.StartAsync();
 
         var suffix = Guid.NewGuid().ToString("N");
@@ -37,7 +37,7 @@ public class CrossLanguageRabbitMqTests
     [CrossLanguageFact]
     public async Task Csharp_producer_delivers_to_java_consumer()
     {
-        await using var container = new RabbitMqBuilder("rabbitmq:4.1-alpine").Build();
+        await using var container = new RabbitMqBuilder("rabbitmq:4.1.8-alpine").Build();
         await container.StartAsync();
 
         var suffix = Guid.NewGuid().ToString("N");
@@ -63,7 +63,7 @@ public class CrossLanguageRabbitMqTests
     [CrossLanguageFact]
     public async Task Java_producer_delivers_to_csharp_consumer()
     {
-        await using var container = new RabbitMqBuilder("rabbitmq:4.1-alpine").Build();
+        await using var container = new RabbitMqBuilder("rabbitmq:4.1.8-alpine").Build();
         await container.StartAsync();
 
         var suffix = Guid.NewGuid().ToString("N");
@@ -110,7 +110,7 @@ public class CrossLanguageRabbitMqTests
     [CrossLanguageFact]
     public async Task Java_direct_send_delivers_to_csharp_consumer()
     {
-        await using var container = new RabbitMqBuilder("rabbitmq:4.1-alpine").Build();
+        await using var container = new RabbitMqBuilder("rabbitmq:4.1.8-alpine").Build();
         await container.StartAsync();
 
         var suffix = Guid.NewGuid().ToString("N");
