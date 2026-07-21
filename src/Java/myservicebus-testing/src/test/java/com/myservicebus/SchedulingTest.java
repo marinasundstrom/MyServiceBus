@@ -6,16 +6,44 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.CompletionStage;
 import java.util.function.Function;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeUnit;
 
 import org.junit.jupiter.api.Test;
 
 import com.myservicebus.tasks.CancellationToken;
 
 public class SchedulingTest {
+    static class ManualJobScheduler implements JobScheduler {
+        private final Map<UUID, Function<CancellationToken, CompletionStage<Void>>> jobs = new HashMap<>();
+
+        @Override
+        public CompletionStage<UUID> schedule(Instant time,
+                Function<CancellationToken, CompletionStage<Void>> callback,
+                CancellationToken token) {
+            UUID id = UUID.randomUUID();
+            jobs.put(id, callback);
+            return CompletableFuture.completedFuture(id);
+        }
+
+        @Override
+        public CompletionStage<Void> cancel(UUID tokenId) {
+            jobs.remove(tokenId);
+            return CompletableFuture.completedFuture(null);
+        }
+
+        CompletionStage<Void> run(UUID tokenId) {
+            return jobs.remove(tokenId).apply(CancellationToken.none());
+        }
+
+        boolean contains(UUID tokenId) {
+            return jobs.containsKey(tokenId);
+        }
+    }
+
     @Test
     void scheduleSend_delays_message() throws Exception {
         InMemoryTestHarness harness = new InMemoryTestHarness();
@@ -111,11 +139,11 @@ public class SchedulingTest {
     }
 
     @Test
-    void cancelScheduledSend_prevents_delivery() throws Exception {
+    void manualSchedulerControlsPublishAndSendDelivery() {
         InMemoryTestHarness harness = new InMemoryTestHarness();
         harness.registerHandler(String.class, ctx -> CompletableFuture.completedFuture(null));
         harness.start().join();
-
+        ManualJobScheduler manual = new ManualJobScheduler();
         MessageScheduler scheduler = new MessageSchedulerImpl(
                 new PublishEndpoint() {
                     @Override
@@ -124,13 +152,44 @@ public class SchedulingTest {
                     }
                 },
                 uri -> harness.getSendEndpoint(uri),
-                new DefaultJobScheduler());
+                manual);
+
+        ScheduledMessageHandle publish = scheduler.schedulePublish("published", Duration.ofDays(1))
+                .toCompletableFuture().join();
+        ScheduledMessageHandle send = scheduler.scheduleSend("loopback://localhost/queue", "sent", Duration.ofDays(1))
+                .toCompletableFuture().join();
+
+        assertFalse(harness.wasConsumed(String.class));
+        manual.run(publish.getTokenId()).toCompletableFuture().join();
+        assertTrue(harness.wasConsumed(String.class));
+        assertTrue(harness.getConsumed().size() == 1);
+        manual.run(send.getTokenId()).toCompletableFuture().join();
+        assertTrue(harness.getConsumed().size() == 2);
+        harness.stop().join();
+    }
+
+    @Test
+    void cancelScheduledSend_prevents_delivery() throws Exception {
+        InMemoryTestHarness harness = new InMemoryTestHarness();
+        harness.registerHandler(String.class, ctx -> CompletableFuture.completedFuture(null));
+        harness.start().join();
+
+        ManualJobScheduler manual = new ManualJobScheduler();
+        MessageScheduler scheduler = new MessageSchedulerImpl(
+                new PublishEndpoint() {
+                    @Override
+                    public <T> CompletableFuture<Void> publish(T message, CancellationToken token) {
+                        return harness.send(message);
+                    }
+                },
+                uri -> harness.getSendEndpoint(uri),
+                manual);
         ScheduledMessageHandle handle = scheduler
-                .scheduleSend("loopback://localhost/queue", "hi", Duration.ofMillis(200))
+                .scheduleSend("loopback://localhost/queue", "hi", Duration.ofDays(1))
                 .toCompletableFuture().get();
         scheduler.cancelScheduledSend(handle).toCompletableFuture().get();
 
-        TimeUnit.MILLISECONDS.sleep(300);
+        assertFalse(manual.contains(handle.getTokenId()));
         assertFalse(harness.wasConsumed(String.class));
         harness.stop().join();
     }

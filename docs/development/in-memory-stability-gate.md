@@ -9,7 +9,7 @@ This work targets MassTransit semantic and API familiarity where those promises 
 ## Separate responsibilities
 
 - The **mediator** is an application runtime for deliberately local dispatch. It invokes configured consumers and pipelines without serialization or broker delivery unless a documented option explicitly requests those boundaries.
-- The **in-memory test harness** is a testing runtime. It exposes deterministic observations of sent, published, consumed, faulted, and scheduled activity while exercising the same application-visible behavior.
+- The **in-memory test harness** is a testing runtime. It exercises the same application-visible behavior and grows deterministic observation categories only when their contracts are defined; consumed observations are the current shared baseline.
 
 The harness may build on shared in-memory delivery machinery, but production code must not depend on test observation APIs. The two surfaces must not drift into different dispatch semantics accidentally.
 
@@ -41,6 +41,8 @@ Each compatible consumer registration is an independent local delivery. The medi
 No ordering is promised between independent consumers, including registration order, start order, or completion order. Filters within one consumer pipeline remain ordered according to their pipeline registration contract. Harness consumed observations represent successful consumer completions, so one message may produce multiple consumed records when multiple consumers succeed.
 
 The shared harness exposes an eventual consumed-type observation with an explicit timeout. It checks already-recorded completions before waiting for a future completion, returns false on timeout, and preserves the platform's normal cancellation convention. This is the only shared observation category at present; sent, published, faulted, and scheduled collections require separate contracts before they are added.
+
+Local scheduling supports both publish and directed send through the platform's message scheduler. Scheduling does not deliver before the configured job callback runs, completion of that callback includes completion of message delivery, and cancelling the handle before the callback removes the pending job. Tests use injected manual job schedulers to verify these guarantees without wall-clock sleeps. Messages with a scheduled enqueue time on their send or publish context retain timer-based local behavior; no relative ordering is promised for messages due at the same time.
 
 ## Exit criteria
 
