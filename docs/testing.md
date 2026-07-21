@@ -14,7 +14,7 @@ RabbitMQ transport tests use Testcontainers to start a disposable broker. Docker
 
 The tests:
 
-- pin the RabbitMQ image version
+- pin the RabbitMQ image to the exact version declared in [Supported Versions](supported-versions.md)
 - use dynamically mapped ports
 - create unique exchanges and queues
 - exercise the real send and receive transports

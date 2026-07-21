@@ -26,7 +26,7 @@ public class RabbitMqTestcontainerTest {
     @Test
     public void transportRoundTripsAnEnvelopeThroughRabbitMq() throws Exception {
         try (RabbitMQContainer container = new RabbitMQContainer(
-                DockerImageName.parse("rabbitmq:4.1-alpine"))) {
+                DockerImageName.parse("rabbitmq:4.1.8-alpine"))) {
             container.start();
 
             ConnectionFactory connectionFactory = new ConnectionFactory();
