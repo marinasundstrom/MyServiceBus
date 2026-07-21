@@ -206,7 +206,7 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
                         responseAddress,
                         faultAddress,
                         errorAddress,
-                        CancellationToken.none,
+                        CancellationToken.none(),
                         provider,
                         this.address,
                         this::getPublishAddress);
@@ -282,7 +282,7 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
                 String faultAddress = inboundMessage.getFaultAddress();
                 String errorAddress = transportFactory.getErrorAddress(queueName);
                 ConsumeContext<T> ctx = new ConsumeContext<>(typedMessage, headers,
-                        responseAddress, faultAddress, errorAddress, CancellationToken.none,
+                        responseAddress, faultAddress, errorAddress, CancellationToken.none(),
                         provider,
                         this.address,
                         this::getPublishAddress);
@@ -431,7 +431,7 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
     }
 
     public <T> CompletableFuture<Void> publish(T message) {
-        return publish(message, CancellationToken.none);
+        return publish(message, CancellationToken.none());
     }
 
     @Override

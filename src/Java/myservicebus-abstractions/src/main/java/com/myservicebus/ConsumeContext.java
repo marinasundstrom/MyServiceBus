@@ -38,11 +38,11 @@ public class ConsumeContext<T>
     private final PublishAddressProvider publishAddressProvider;
 
     public ConsumeContext(T message, Map<String, Object> headers, SendEndpointProvider provider) {
-        this(message, headers, null, null, null, CancellationToken.none, provider, URI.create("loopback://localhost/"));
+        this(message, headers, null, null, null, CancellationToken.none(), provider, URI.create("loopback://localhost/"));
     }
 
     public ConsumeContext(T message, Map<String, Object> headers, SendEndpointProvider provider, URI busAddress) {
-        this(message, headers, null, null, null, CancellationToken.none, provider, busAddress);
+        this(message, headers, null, null, null, CancellationToken.none(), provider, busAddress);
     }
 
     public ConsumeContext(T message, Map<String, Object> headers, String responseAddress, String faultAddress,
@@ -121,7 +121,7 @@ public class ConsumeContext<T>
     }
 
     public <TMessage> CompletableFuture<Void> respond(TMessage message) {
-        return respond(message, CancellationToken.none);
+        return respond(message, CancellationToken.none());
     }
 
     public <TMessage> CompletableFuture<Void> respond(Class<TMessage> messageType, Object message,
@@ -131,7 +131,7 @@ public class ConsumeContext<T>
     }
 
     public <TMessage> CompletableFuture<Void> respond(Class<TMessage> messageType, Object message) {
-        return respond(messageType, message, CancellationToken.none);
+        return respond(messageType, message, CancellationToken.none());
     }
 
     public <TMessage> CompletableFuture<Void> respond(TMessage message, Consumer<SendContext> contextCallback,
@@ -142,7 +142,7 @@ public class ConsumeContext<T>
     }
 
     public <TMessage> CompletableFuture<Void> respond(TMessage message, Consumer<SendContext> contextCallback) {
-        return respond(message, contextCallback, CancellationToken.none);
+        return respond(message, contextCallback, CancellationToken.none());
     }
 
     public <TMessage> CompletableFuture<Void> respond(Class<TMessage> messageType, Object message,
@@ -153,7 +153,7 @@ public class ConsumeContext<T>
 
     public <TMessage> CompletableFuture<Void> respond(Class<TMessage> messageType, Object message,
             Consumer<SendContext> contextCallback) {
-        return respond(messageType, message, contextCallback, CancellationToken.none);
+        return respond(messageType, message, contextCallback, CancellationToken.none());
     }
 
     @Override
@@ -180,11 +180,11 @@ public class ConsumeContext<T>
 
     public <TMessage> CompletableFuture<Void> send(String destination, TMessage message,
             Consumer<SendContext> contextCallback) {
-        return send(destination, message, contextCallback, CancellationToken.none);
+        return send(destination, message, contextCallback, CancellationToken.none());
     }
 
     public <TMessage> CompletableFuture<Void> send(String destination, TMessage message) {
-        return send(destination, message, CancellationToken.none);
+        return send(destination, message, CancellationToken.none());
     }
 
     public <TMessage> CompletableFuture<Void> send(String destination, Class<TMessage> messageType, Object message,
@@ -201,11 +201,11 @@ public class ConsumeContext<T>
 
     public <TMessage> CompletableFuture<Void> send(String destination, Class<TMessage> messageType, Object message,
             Consumer<SendContext> contextCallback) {
-        return send(destination, messageType, message, contextCallback, CancellationToken.none);
+        return send(destination, messageType, message, contextCallback, CancellationToken.none());
     }
 
     public <TMessage> CompletableFuture<Void> send(String destination, Class<TMessage> messageType, Object message) {
-        return send(destination, messageType, message, CancellationToken.none);
+        return send(destination, messageType, message, CancellationToken.none());
     }
 
 
@@ -215,7 +215,7 @@ public class ConsumeContext<T>
     }
 
     public <TMessage> CompletableFuture<Void> forward(String destination, TMessage message) {
-        return forward(destination, message, CancellationToken.none);
+        return forward(destination, message, CancellationToken.none());
     }
 
     public CompletableFuture<Void> respondFault(Exception exception, CancellationToken cancellationToken) {

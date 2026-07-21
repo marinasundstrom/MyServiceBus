@@ -57,7 +57,7 @@ public class RetryFilter<TContext extends PipeContext> implements Filter<TContex
                             scheduler.shutdown();
                         }
                     }, Math.max(1, delay.toMillis()), TimeUnit.MILLISECONDS);
-                    CancellationRegistration registration = context.getCancellationToken().register(() -> {
+                    CancellationRegistration registration = context.getCancellationToken().onCancel(() -> {
                         scheduled.cancel(false);
                         promise.completeExceptionally(new CancellationException());
                         scheduler.shutdown();

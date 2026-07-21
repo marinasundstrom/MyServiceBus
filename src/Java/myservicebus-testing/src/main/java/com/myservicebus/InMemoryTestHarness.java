@@ -58,11 +58,11 @@ public class InMemoryTestHarness implements RequestClientTransport, TransportSen
     }
 
     public <T> CompletableFuture<Void> send(T message) {
-        return send(new SendContext(message, CancellationToken.none));
+        return send(new SendContext(message, CancellationToken.none()));
     }
 
     public <T> CompletableFuture<Void> send(T message, Consumer<SendContext> contextCallback) {
-        SendContext ctx = new SendContext(message, CancellationToken.none);
+        SendContext ctx = new SendContext(message, CancellationToken.none());
         contextCallback.accept(ctx);
         return send(ctx);
     }

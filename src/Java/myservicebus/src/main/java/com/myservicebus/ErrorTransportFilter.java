@@ -61,7 +61,7 @@ public class ErrorTransportFilter<T> implements Filter<ConsumeContext<T>> {
                         sendCtx.getHeaders().put(MessageHeaders.HOST_FRAMEWORK_VERSION, host.getFrameworkVersion());
                         sendCtx.getHeaders().put(MessageHeaders.HOST_MASS_TRANSIT_VERSION, host.getMassTransitVersion());
                         sendCtx.getHeaders().put(MessageHeaders.HOST_OS_VERSION, host.getOperatingSystemVersion());
-                    }, CancellationToken.none).join();
+                    }, CancellationToken.none()).join();
                 }
                 throw new CompletionException(cause);
             }

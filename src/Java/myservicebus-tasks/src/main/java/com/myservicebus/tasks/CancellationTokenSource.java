@@ -1,14 +1,16 @@
 package com.myservicebus.tasks;
 
-// Source to trigger cancellation
-public class CancellationTokenSource {
+/**
+ * Owns and triggers a cooperative cancellation signal.
+ */
+public final class CancellationTokenSource {
     private final CancellationToken token = new CancellationToken(new CancellationToken.State());
 
     public void cancel() {
         token.cancel();
     }
 
-    public CancellationToken getToken() {
+    public CancellationToken token() {
         return token;
     }
 

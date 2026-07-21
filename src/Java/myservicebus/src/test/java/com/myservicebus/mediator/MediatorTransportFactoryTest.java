@@ -103,7 +103,7 @@ public class MediatorTransportFactoryTest {
         public CompletableFuture<Void> consume(ConsumeContext<TestMessage> context) {
             return CompletableFuture.runAsync(() -> sendEndpointProvider
                     .getSendEndpoint("loopback://forwarded")
-                    .send(new ForwardedMessage(), CancellationToken.none)
+                    .send(new ForwardedMessage(), CancellationToken.none())
                     .join());
         }
     }
@@ -303,13 +303,13 @@ public class MediatorTransportFactoryTest {
                 Map.of(),
                 "queue:response",
                 null,
-                cts.getToken(),
+                cts.token(),
                 new CapturingProvider());
 
         new ResultHandler().consume(context).join();
 
         ResponseMessage response = (ResponseMessage) CapturingSendEndpoint.sent.join();
         Assertions.assertEquals("hi-response", response.getValue());
-        Assertions.assertEquals(cts.getToken(), ResultHandler.token.join());
+        Assertions.assertEquals(cts.token(), ResultHandler.token.join());
     }
 }

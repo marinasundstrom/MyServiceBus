@@ -47,7 +47,7 @@ class RawMessageFormatTest {
         provider.getSendEndpoint("queue:test").send(
                 new TestMessage("hi"),
                 ctx -> ctx.getHeaders().put("NServiceBus.EnclosedMessageTypes", "Contracts:TestMessage"),
-                com.myservicebus.tasks.CancellationToken.none).join();
+                com.myservicebus.tasks.CancellationToken.none()).join();
 
         assertEquals("application/json", factory.contentType);
         assertTrue(new String(factory.body, StandardCharsets.UTF_8).contains("\"text\":\"hi\""));
@@ -57,7 +57,7 @@ class RawMessageFormatTest {
     @Test
     void publish_pipe_can_emit_raw_json_payload() {
         RawJsonMessageSerializer serializer = new RawJsonMessageSerializer();
-        SendContext context = new SendContext(new TestMessage("hi"), com.myservicebus.tasks.CancellationToken.none);
+        SendContext context = new SendContext(new TestMessage("hi"), com.myservicebus.tasks.CancellationToken.none());
         context.getHeaders().put("NServiceBus.EnclosedMessageTypes", "Contracts:TestMessage");
 
         byte[] body;

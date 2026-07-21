@@ -30,7 +30,7 @@ public class EnvelopeMessageSerializerTest {
         message.setValue("Test");
 
         MessageSerializer serializer = new EnvelopeMessageSerializer();
-        SendContext context = new SendContext(message, CancellationToken.none);
+        SendContext context = new SendContext(message, CancellationToken.none());
 
         byte[] bytes = context.serialize(serializer);
 
@@ -52,7 +52,7 @@ public class EnvelopeMessageSerializerTest {
         message.setValue("Test");
 
         MessageSerializer serializer = new EnvelopeMessageSerializer();
-        SendContext context = new SendContext(message, CancellationToken.none);
+        SendContext context = new SendContext(message, CancellationToken.none());
         context.getHeaders().put(MessageHeaders.HOST_MACHINE, "machine");
 
         byte[] bytes = context.serialize(serializer);

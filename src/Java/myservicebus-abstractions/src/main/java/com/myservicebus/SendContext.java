@@ -23,6 +23,10 @@ public class SendContext implements PipeContext, ScheduledMessage {
     private UUID requestId;
     private List<String> messageTypes;
 
+    public SendContext(Object message) {
+        this(message, CancellationToken.none());
+    }
+
     public SendContext(Object message, CancellationToken cancellationToken) {
         this.message = message;
         this.cancellationToken = cancellationToken;

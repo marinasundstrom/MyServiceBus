@@ -83,7 +83,7 @@ class ConsumerMessageFilterTest {
                 Map.of("messageId", id),
                 "queue",
                 null,
-                CancellationToken.none,
+                CancellationToken.none(),
                 sendProvider);
 
         PipeConfigurator<ConsumeContext<TestMessage>> configurator = new PipeConfigurator<>();
