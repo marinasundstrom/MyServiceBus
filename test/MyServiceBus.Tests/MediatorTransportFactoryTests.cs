@@ -308,6 +308,36 @@ public class MediatorTransportFactoryTests
     }
 
     [Fact]
+    public async Task Consumer_failure_without_retry_is_attempted_once_and_propagated()
+    {
+        FailingConsumer.Attempts = 0;
+        FailingConsumer.Calls = new List<string>();
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddServiceBus(cfg =>
+        {
+            cfg.UsingMediator();
+            cfg.AddConsumer<FailingConsumer, ConsumerMessage>(pipe =>
+                pipe.UseFilter(new RecordingConsumeFilter("filter", FailingConsumer.Calls)));
+        });
+
+        using var provider = services.BuildServiceProvider();
+        var hosted = provider.GetRequiredService<IHostedService>();
+        await hosted.StartAsync(CancellationToken.None);
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            provider.GetRequiredService<IMessageBus>().Publish(new ConsumerMessage { Value = "fail" }));
+
+        Assert.Equal("exhausted", exception.Message);
+        Assert.Equal(1, FailingConsumer.Attempts);
+        Assert.Equal(
+            new[] { "filter:before", "consumer:1", "filter:fault" },
+            FailingConsumer.Calls);
+
+        await hosted.StopAsync(CancellationToken.None);
+    }
+
+    [Fact]
     public async Task Publish_delivers_message_to_registered_handler()
     {
         var services = new ServiceCollection();
