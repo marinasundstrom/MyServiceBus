@@ -1,0 +1,44 @@
+# Mediator and In-Memory Conformance Matrix
+
+## Purpose
+
+This matrix tracks the matching C# and Java scenarios required by the [Mediator and In-Memory Stability Gate](in-memory-stability-gate.md). It is the working compatibility checklist for the local mediator runtime and the in-memory test harness.
+
+Status meanings:
+
+- **Verified** — matching observable behavior is covered in both reference clients.
+- **Partial** — both clients cover part of the contract, but a shared scenario is still missing.
+- **Gap** — the portable behavior must be decided or implemented before the gate can close.
+
+Platform-specific syntax and asynchronous wrappers are not parity gaps when the underlying behavior is equivalent and documented.
+
+## Shared scenario matrix
+
+| # | Portable scenario | C# coverage | Java coverage | Status | Remaining work |
+|---|---|---|---|---|---|
+| 1 | Start, stop, repeated lifecycle calls, and operations outside the valid lifecycle | Hosted mediator startup appears in `MediatorTransportFactoryTests`; harness startup is exercised by `InMemoryHarnessDiTests` | Mediator construction and harness use are covered, but lifecycle transitions are not asserted | **Gap** | Define valid states for mediator and harness, then add matching idempotency and invalid-operation scenarios. |
+| 2 | Directed send and publish fan-out | `MediatorTransportFactoryTests.Send_Invokes_RegisteredHandler`; `MultipleConsumersTests` | `MediatorTransportFactoryTest.publishDeliversMessageToConsumer`; `MultipleConsumersTest` in runtime and testing modules | **Partial** | Add one shared directed-send scenario and one explicit publish fan-out scenario against each local runtime. |
+| 3 | Consumer scope creation and disposal per delivery | `InMemoryHarnessDiTests.Should_resolve_consumer_from_di`; `FilterDiTests` | `MediatorTransportFactoryTest.scopedSendEndpointProviderRetainsConsumeContextAcrossAsyncDispatch`; `ScopeConsumerFactory` tests | **Partial** | Assert a distinct consumer scope for every message and disposal after asynchronous completion in the harness as well as mediator. |
+| 4 | Request/response correlation, timeout, cancellation, and fault response | `GenericRequestClientTests`; `InMemoryHarnessDiTests.Should_resolve_request_client`; `RequestFaultExceptionTests` | `InMemoryHarnessDiTest.request_client_round_trip`; `RequestClientFaultTest`; `RequestClientHeaderTest` | **Partial** | Add matching local-runtime timeout and cancellation scenarios and assert correlation identifiers end to end. |
+| 5 | Retry attempts, delay, terminal failure, and no-retry behavior | `PipeTests`; mediator retry-order, exhaustion, and no-retry scenarios | `PipeConfiguratorTest`; matching mediator retry-order, exhaustion, and no-retry scenarios | **Verified** | Exception selection, attempt metadata, and redelivery remain separate future features. |
+| 6 | Send, publish, and consume filter order | `PipeTests`; `OutboundFilterOrderingTests`; `MediatorTransportFactoryTests` | `PipeConfiguratorTest`; `ServiceBusPublishFilterTest`; `MediatorTransportFactoryTest` | **Verified** | Extend only when another runtime pipeline stage becomes public. |
+| 7 | Headers, correlation, cancellation, and telemetry context | `PublishHeaderTests`; `GenericRequestClientTests`; `OpenTelemetryFilterTests`; `PipeTests` | `PublishHeaderTest`; `RequestClientHeaderTest`; `OpenTelemetryFilterTest`; `PipeConfiguratorTest` | **Partial** | Add one integrated mediator/harness scenario that carries headers, correlation, and cancellation into the consumer together. |
+| 8 | Interface and inherited message-type dispatch | Anonymous interface send, publish, and consume-context tests | Assignable-type dispatch exists in the runtime but lacks matching local-runtime conformance tests | **Gap** | Specify the portable assignability rules and add Java interface/inheritance scenarios with C# counterparts. |
+| 9 | Scheduled delivery and cancellation | `SchedulingTests.SchedulePublish_delays_message` and `Cancel_prevents_scheduled_publish` | `SchedulingTest.scheduleSend_delays_message` and `cancelScheduledSend_preventsDelivery` | **Partial** | Align send-versus-publish scenarios and introduce deterministic timing control before claiming ordering guarantees. |
+| 10 | Concurrent dispatch, ordering, and handler failure | `InMemoryHarnessDiTests.Should_record_concurrent_delivery_deterministically`; `MultipleConsumersFaultTests` | `InMemoryHarnessDiTest.records_concurrent_delivery_deterministically`; multiple-consumer tests | **Partial** | Define ordering and multi-handler failure guarantees, then verify the same outcome in both harnesses. |
+| 11 | Stable topology snapshots and truthful capabilities | `TopologySnapshotTests`; `TransportCapabilityTests.InMemory_factory_exposes_its_descriptor` | `TopologySnapshotTest`; `TransportCapabilityTest.mediatorExposesItsDescriptor` | **Verified** | Keep descriptors synchronized when local-runtime behavior changes. |
+| 12 | Equivalent harness observations and assertion timing | Concurrent consumed-record assertions and request-client tests in `InMemoryHarnessDiTests` | Concurrent consumed-record assertions and request-client tests in `InMemoryHarnessDiTest` | **Partial** | Define observation categories and eventual-assertion timeout behavior as a shared testing contract. |
+
+## Next compatibility slices
+
+Work should close the remaining rows in dependency order:
+
+1. define and verify local-runtime lifecycle states
+2. verify per-message scope identity and asynchronous disposal in both harnesses
+3. specify interface and inherited-type dispatch
+4. complete request timeout, cancellation, and correlation scenarios
+5. integrate header, correlation, cancellation, and telemetry propagation
+6. define concurrency, ordering, failure, and harness observation guarantees
+7. align scheduled send/publish scenarios using deterministic time controls
+
+A row moves to **Verified** only when both implementations have matching behavioral tests and the public documentation states any intentional platform distinction.
