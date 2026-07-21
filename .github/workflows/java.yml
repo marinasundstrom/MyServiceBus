@@ -26,3 +26,5 @@ jobs:
           java-version: '17'
       - name: Build with Gradle
         run: ./gradlew test publish
+      - name: Verify Maven packages
+        run: ./eng/verify-maven-packages.sh
