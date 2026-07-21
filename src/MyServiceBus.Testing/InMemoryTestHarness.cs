@@ -177,6 +177,7 @@ public class InMemoryTestHarness : IMessageBus, ITransportFactory, IReceiveEndpo
         var msgContext = new InMemoryMessageContext(
             message!,
             messageId,
+            context.RequestId,
             correlationId,
             messageTypes,
             headers,
@@ -220,6 +221,8 @@ public class InMemoryTestHarness : IMessageBus, ITransportFactory, IReceiveEndpo
         }
 
         public T Message { get; }
+        public Guid? RequestId => receiveContext.RequestId;
+        public Guid? CorrelationId => receiveContext.CorrelationId;
 
         public CancellationToken CancellationToken => receiveContext.CancellationToken;
 
@@ -231,10 +234,22 @@ public class InMemoryTestHarness : IMessageBus, ITransportFactory, IReceiveEndpo
             => harness.Publish(message, contextCallback, cancellationToken);
 
         public Task RespondAsync<TMessage>(TMessage message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default) where TMessage : class
-            => harness.Publish((dynamic)message!, contextCallback != null ? new Action<IPublishContext>(ctx => contextCallback(ctx)) : null, cancellationToken);
+            => Respond<TMessage>(message!, contextCallback, cancellationToken);
 
         public Task RespondAsync<TMessage>(object message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default) where TMessage : class
-            => harness.Publish((dynamic)message!, contextCallback != null ? new Action<IPublishContext>(ctx => contextCallback(ctx)) : null, cancellationToken);
+            => Respond<TMessage>(message, contextCallback, cancellationToken);
+
+        async Task Respond<TMessage>(object message, Action<ISendContext>? contextCallback, CancellationToken cancellationToken)
+            where TMessage : class
+        {
+            var serializer = harness.provider?.GetService<IMessageSerializer>() ?? new EnvelopeMessageSerializer();
+            var context = harness._sendContextFactory.Create(MessageTypeCache.GetMessageTypes(typeof(TMessage)), serializer, cancellationToken);
+            context.MessageId = Guid.NewGuid().ToString();
+            context.RequestId = RequestId;
+            contextCallback?.Invoke(context);
+            var typed = message is TMessage value ? value : (TMessage)MessageProxy.Create(typeof(TMessage), message);
+            await harness.InternalSend(typed, context).ConfigureAwait(false);
+        }
 
         public Task Send<TMessage>(Uri address, TMessage message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default) where TMessage : class
             => Send<TMessage>(address, (object)message!, contextCallback, cancellationToken);
@@ -310,6 +325,7 @@ public class InMemoryTestHarness : IMessageBus, ITransportFactory, IReceiveEndpo
         public InMemoryMessageContext(
             object message,
             Guid messageId,
+            Guid? requestId,
             Guid? correlationId,
             IList<string> messageType,
             IDictionary<string, object> headers,
@@ -319,6 +335,7 @@ public class InMemoryTestHarness : IMessageBus, ITransportFactory, IReceiveEndpo
         {
             this.message = message;
             MessageId = messageId;
+            RequestId = requestId;
             CorrelationId = correlationId;
             MessageType = messageType;
             Headers = headers;
@@ -328,6 +345,7 @@ public class InMemoryTestHarness : IMessageBus, ITransportFactory, IReceiveEndpo
         }
 
         public Guid MessageId { get; }
+        public Guid? RequestId { get; }
         public Guid? CorrelationId { get; }
         public IList<string> MessageType { get; }
         public Uri? ResponseAddress { get; }

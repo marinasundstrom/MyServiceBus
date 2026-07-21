@@ -1,11 +1,16 @@
 package com.myservicebus;
 
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 
 import com.myservicebus.tasks.CancellationToken;
 
 public interface MessageConsumeContext {
+    UUID getRequestId();
+
+    UUID getCorrelationId();
+
     <T> CompletableFuture<Void> respond(T message, CancellationToken cancellationToken);
 
     default CompletableFuture<Void> respond(SendContext context) {

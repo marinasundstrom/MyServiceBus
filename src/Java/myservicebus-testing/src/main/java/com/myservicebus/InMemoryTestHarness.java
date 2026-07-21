@@ -11,6 +11,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
+import java.util.Objects;
 
 import com.myservicebus.di.ServiceProvider;
 import com.myservicebus.di.ServiceScope;
@@ -116,7 +117,8 @@ public class InMemoryTestHarness implements RequestClientTransport, TransportSen
             com.myservicebus.Consumer<Object> handler = (com.myservicebus.Consumer<Object>) raw;
             @SuppressWarnings("unchecked")
             ConsumeContext<Object> consumeContext = new ConsumeContext<>(message, context.getHeaders(), responseAddress,
-                    faultAddress, context.getCancellationToken(), this);
+                    faultAddress, null, context.getCancellationToken(), this, java.net.URI.create("inmemory:bus"),
+                    entityName -> "inmemory:" + entityName, context.getRequestId(), context.getCorrelationId());
             future = future.thenCompose(v -> {
                 try {
                     if (consumeContextProvider != null) {
@@ -155,8 +157,10 @@ public class InMemoryTestHarness implements RequestClientTransport, TransportSen
                                     .getService(ct.getConsumerType());
                             @SuppressWarnings("unchecked")
                             ConsumeContext<Object> consumeContext = new ConsumeContext<>(message, context.getHeaders(),
-                                    responseAddress, faultAddress, context.getCancellationToken(),
-                                    InMemoryTestHarness.this);
+                                    responseAddress, faultAddress, null, context.getCancellationToken(),
+                                    InMemoryTestHarness.this, java.net.URI.create("inmemory:bus"),
+                                    entityName -> "inmemory:" + entityName, context.getRequestId(),
+                                    context.getCorrelationId());
                             ConsumeContextProvider ctxProvider = scoped.getService(ConsumeContextProvider.class);
                             ctxProvider.setContext(consumeContext);
                             try {
@@ -192,13 +196,17 @@ public class InMemoryTestHarness implements RequestClientTransport, TransportSen
             Class<TResponse> responseType) {
         CompletableFuture<TResponse> future = new CompletableFuture<>();
         com.myservicebus.Consumer<TResponse> handler = ctx -> {
-            future.complete(responseType.cast(ctx.getMessage()));
+            if (Objects.equals(context.getRequestId(), ctx.getRequestId())) {
+                future.complete(responseType.cast(ctx.getMessage()));
+            }
             return CompletableFuture.completedFuture(null);
         };
         com.myservicebus.Consumer<Fault> faultHandler = ctx -> {
             @SuppressWarnings("unchecked")
             Fault<TRequest> fault = (Fault<TRequest>) ctx.getMessage();
-            future.completeExceptionally(new RequestFaultException(requestType.getSimpleName(), fault));
+            if (Objects.equals(context.getRequestId(), ctx.getRequestId())) {
+                future.completeExceptionally(new RequestFaultException(requestType.getSimpleName(), fault));
+            }
             return CompletableFuture.completedFuture(null);
         };
         registerHandler(responseType, handler);
@@ -225,18 +233,24 @@ public class InMemoryTestHarness implements RequestClientTransport, TransportSen
         CompletableFuture<Response2<T1, T2>> future = new CompletableFuture<>();
 
         com.myservicebus.Consumer<T1> h1 = ctx -> {
-            future.complete(Response2.fromT1(responseType1.cast(ctx.getMessage())));
+            if (Objects.equals(context.getRequestId(), ctx.getRequestId())) {
+                future.complete(Response2.fromT1(responseType1.cast(ctx.getMessage())));
+            }
             return CompletableFuture.completedFuture(null);
         };
         com.myservicebus.Consumer<T2> h2 = ctx -> {
-            future.complete(Response2.fromT2(responseType2.cast(ctx.getMessage())));
+            if (Objects.equals(context.getRequestId(), ctx.getRequestId())) {
+                future.complete(Response2.fromT2(responseType2.cast(ctx.getMessage())));
+            }
             return CompletableFuture.completedFuture(null);
         };
 
         com.myservicebus.Consumer<Fault> faultHandler = ctx -> {
             @SuppressWarnings("unchecked")
             Fault<TRequest> fault = (Fault<TRequest>) ctx.getMessage();
-            future.completeExceptionally(new RequestFaultException(requestType.getSimpleName(), fault));
+            if (Objects.equals(context.getRequestId(), ctx.getRequestId())) {
+                future.completeExceptionally(new RequestFaultException(requestType.getSimpleName(), fault));
+            }
             return CompletableFuture.completedFuture(null);
         };
 

@@ -150,6 +150,7 @@ public class MediatorTransportFactory : ITransportFactory
             var msgContext = new InMemoryMessageContext(
                 message!,
                 messageId,
+                context.RequestId,
                 correlationId,
                 messageTypes,
                 headers,
@@ -172,6 +173,7 @@ public class MediatorTransportFactory : ITransportFactory
         public InMemoryMessageContext(
             object message,
             Guid messageId,
+            Guid? requestId,
             Guid? correlationId,
             IList<string> messageType,
             IDictionary<string, object> headers,
@@ -181,6 +183,7 @@ public class MediatorTransportFactory : ITransportFactory
         {
             _message = message;
             MessageId = messageId;
+            RequestId = requestId;
             CorrelationId = correlationId;
             MessageType = messageType;
             Headers = headers;
@@ -190,6 +193,7 @@ public class MediatorTransportFactory : ITransportFactory
         }
 
         public Guid MessageId { get; }
+        public Guid? RequestId { get; }
         public Guid? CorrelationId { get; }
         public IList<string> MessageType { get; }
         public Uri? ResponseAddress { get; }

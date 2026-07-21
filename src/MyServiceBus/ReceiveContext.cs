@@ -10,6 +10,7 @@ public interface ReceiveContext : PipeContext
 {
     Guid MessageId { get; }
     Guid? RequestId => null;
+    Guid? CorrelationId => null;
     IList<string> MessageType { get; }
     Uri? ResponseAddress { get; }
     Uri? FaultAddress { get; }
@@ -41,6 +42,8 @@ public class ReceiveContextImpl : BasePipeContext, ReceiveContext
     public Guid MessageId => messageContext.MessageId;
 
     public Guid? RequestId => messageContext.RequestId;
+
+    public Guid? CorrelationId => messageContext.CorrelationId;
 
     public IList<string> MessageType => messageContext.MessageType;
 

@@ -9,6 +9,8 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.UUID;
 import java.util.stream.IntStream;
 
 import com.google.inject.Inject;
@@ -108,6 +110,63 @@ public class InMemoryHarnessDiTest {
             Pong response = client.getResponse(new Ping("hi"), Pong.class).join();
             assertEquals("hi", response.getValue());
         }
+        harness.stop().join();
+    }
+
+    @Test
+    void requestAndCorrelationIdentifiersFlowThroughResponse() {
+        InMemoryTestHarness harness = new InMemoryTestHarness();
+        AtomicReference<UUID> requestId = new AtomicReference<>();
+        AtomicReference<UUID> pendingCorrelationId = new AtomicReference<>();
+        AtomicReference<UUID> responseRequestId = new AtomicReference<>();
+        AtomicReference<UUID> responseCorrelationId = new AtomicReference<>();
+        harness.registerHandler(Ping.class, context -> {
+            requestId.set(context.getRequestId());
+            pendingCorrelationId.set(context.getCorrelationId());
+            return context.respond(new Pong(context.getMessage().getValue()));
+        });
+        harness.registerHandler(Pong.class, context -> {
+            responseRequestId.set(context.getRequestId());
+            responseCorrelationId.set(context.getCorrelationId());
+            return CompletableFuture.completedFuture(null);
+        });
+        harness.start().join();
+
+        UUID correlationId = UUID.randomUUID();
+        RequestClient<Ping> client = new GenericRequestClient<>(Ping.class, harness);
+        Pong response = client.getResponse(
+                new Ping("correlated"),
+                Pong.class,
+                context -> context.setCorrelationId(correlationId)).join();
+
+        assertEquals("correlated", response.getValue());
+        assertEquals(requestId.get(), responseRequestId.get());
+        assertEquals(correlationId, pendingCorrelationId.get());
+        assertEquals(null, responseCorrelationId.get());
+        harness.stop().join();
+    }
+
+    @Test
+    void concurrentRequestsMatchOnlyResponsesWithTheirRequestIdentifier() {
+        InMemoryTestHarness harness = new InMemoryTestHarness();
+        CopyOnWriteArrayList<ConsumeContext<Ping>> pending = new CopyOnWriteArrayList<>();
+        harness.registerHandler(Ping.class, context -> {
+            pending.add(context);
+            if (pending.size() == 2) {
+                return pending.get(1).respond(new Pong(pending.get(1).getMessage().getValue()))
+                        .thenCompose(ignored -> pending.get(0)
+                                .respond(new Pong(pending.get(0).getMessage().getValue())));
+            }
+            return CompletableFuture.completedFuture(null);
+        });
+        harness.start().join();
+        RequestClient<Ping> client = new GenericRequestClient<>(Ping.class, harness);
+
+        CompletableFuture<Pong> first = client.getResponse(new Ping("first"), Pong.class);
+        CompletableFuture<Pong> second = client.getResponse(new Ping("second"), Pong.class);
+
+        assertEquals("first", first.join().getValue());
+        assertEquals("second", second.join().getValue());
         harness.stop().join();
     }
 

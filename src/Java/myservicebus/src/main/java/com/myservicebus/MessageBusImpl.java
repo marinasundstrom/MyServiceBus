@@ -209,7 +209,9 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
                         CancellationToken.none(),
                         provider,
                         this.address,
-                        this::getPublishAddress);
+                        this::getPublishAddress,
+                        inboundMessage.getRequestId(),
+                        inboundMessage.getCorrelationId());
                 if (logger != null) {
                     logger.debug("Received {}", messageTypeUrn);
                 }
@@ -285,7 +287,9 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
                         responseAddress, faultAddress, errorAddress, CancellationToken.none(),
                         provider,
                         this.address,
-                        this::getPublishAddress);
+                        this::getPublishAddress,
+                        inboundMessage.getRequestId(),
+                        inboundMessage.getCorrelationId());
                 if (logger != null) {
                     logger.debug("Received {}", messageTypeUrn);
                 }
