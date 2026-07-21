@@ -60,6 +60,7 @@ public class RawMessageFormatTests
             new Uri("rabbitmq://localhost/"),
             new SendContextFactory(),
             new PublishContextFactory());
+        await bus.StartAsync(default);
 
         await bus.Publish(
             new TestMessage { Text = "hi" },
@@ -85,6 +86,7 @@ public class RawMessageFormatTests
             new Uri("rabbitmq://localhost/"),
             new SendContextFactory(),
             new PublishContextFactory());
+        await bus.StartAsync(default);
 
         var endpoint = await bus.GetSendEndpoint(new Uri("queue:test"));
         await endpoint.Send(

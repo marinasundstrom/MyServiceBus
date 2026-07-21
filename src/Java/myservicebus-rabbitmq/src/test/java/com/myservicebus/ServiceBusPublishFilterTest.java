@@ -95,7 +95,12 @@ class ServiceBusPublishFilterTest {
 
         MessageBus bus = new MessageBusImpl(services.buildServiceProvider());
 
-        bus.publish("hi");
+        bus.start();
+        try {
+            bus.publish("hi").join();
+        } finally {
+            bus.stop();
+        }
 
         assertEquals(
                 List.of("publish:before", "publish:after", "send:before", "send:after", "transport"),

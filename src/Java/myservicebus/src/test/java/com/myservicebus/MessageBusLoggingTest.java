@@ -1,12 +1,15 @@
 package com.myservicebus;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Function;
 
@@ -70,12 +73,28 @@ class MessageBusLoggingTest {
         ServiceProvider provider = services.buildServiceProvider();
         MessageBusImpl bus = new MessageBusImpl(provider);
 
+        CompletionException beforeStart = assertThrows(
+                CompletionException.class,
+                () -> bus.publish(new TestMessage()).join());
+        assertInstanceOf(IllegalStateException.class, beforeStart.getCause());
+
+        bus.start();
         bus.start();
         try {
             bus.publish(new TestMessage()).join();
         } finally {
             bus.stop();
+            bus.stop();
         }
+
+        CompletionException afterStop = assertThrows(
+                CompletionException.class,
+                () -> bus.publish(new TestMessage()).join());
+        assertInstanceOf(IllegalStateException.class, afterStop.getCause());
+
+        bus.start();
+        bus.publish(new TestMessage()).join();
+        bus.stop();
 
         String exchangeName = EntityNameFormatter.format(TestMessage.class);
         String destinationAddress = "loopback://localhost/exchange/" + exchangeName;

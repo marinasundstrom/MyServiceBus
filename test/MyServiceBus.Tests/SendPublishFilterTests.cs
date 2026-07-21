@@ -41,6 +41,7 @@ public class SendPublishFilterTests
         var bus = new MyServiceBus.MessageBus(new StubTransportFactory(), new ServiceCollection().BuildServiceProvider(),
             new SendPipe(sendCfg.Build()), new PublishPipe(publishCfg.Build()), new EnvelopeMessageSerializer(),
             new Uri("loopback://localhost/"), new SendContextFactory(), new PublishContextFactory());
+        await bus.StartAsync(default);
 
         await bus.Publish(new TestMessage());
 

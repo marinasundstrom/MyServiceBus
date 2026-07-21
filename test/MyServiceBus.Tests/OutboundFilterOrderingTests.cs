@@ -66,6 +66,7 @@ public class OutboundFilterOrderingTests
             new Uri("loopback://localhost/"),
             new SendContextFactory(),
             new PublishContextFactory());
+        await bus.StartAsync(default);
 
         await bus.Publish("hello");
 

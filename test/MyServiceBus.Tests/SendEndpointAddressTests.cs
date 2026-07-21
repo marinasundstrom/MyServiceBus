@@ -41,6 +41,7 @@ public class SendEndpointAddressTests
     {
         var factory = new StubTransportFactory();
         var bus = new MessageBus(factory, new ServiceCollection().BuildServiceProvider(), new SendPipe(Pipe.Empty<SendContext>()), new PublishPipe(Pipe.Empty<PublishContext>()), new EnvelopeMessageSerializer(), new Uri("rabbitmq://localhost/"), new SendContextFactory(), new PublishContextFactory());
+        await bus.StartAsync(default);
 
         var endpoint = await bus.GetSendEndpoint(new Uri(bus.Address, "queue/test"));
         await endpoint.Send(new TestMessage());

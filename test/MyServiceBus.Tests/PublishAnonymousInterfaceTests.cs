@@ -42,6 +42,7 @@ public class PublishAnonymousInterfaceTests
         var sendCfg = new PipeConfigurator<SendContext>();
         var publishCfg = new PipeConfigurator<PublishContext>();
         var bus = new MessageBus(factory, new ServiceCollection().BuildServiceProvider(), new SendPipe(sendCfg.Build()), new PublishPipe(publishCfg.Build()), new EnvelopeMessageSerializer(), new Uri("rabbitmq://localhost/"), new SendContextFactory(), new PublishContextFactory());
+        await bus.StartAsync(default);
 
         await bus.Publish<IOrder>(new { Id = 1 });
 

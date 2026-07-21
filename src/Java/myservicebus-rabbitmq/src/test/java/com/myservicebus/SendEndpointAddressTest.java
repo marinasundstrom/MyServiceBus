@@ -92,8 +92,13 @@ class SendEndpointAddressTest {
 
         MessageBus bus = new MessageBusImpl(services.buildServiceProvider());
 
-        SendEndpoint endpoint = bus.getSendEndpoint("rabbitmq://localhost/test-queue");
-        endpoint.send(new TestMessage());
+        bus.start();
+        try {
+            SendEndpoint endpoint = bus.getSendEndpoint("rabbitmq://localhost/test-queue");
+            endpoint.send(new TestMessage()).join();
+        } finally {
+            bus.stop();
+        }
 
         assertEquals(URI.create("rabbitmq://localhost/"), captured.get().getSourceAddress());
         assertEquals(URI.create("rabbitmq://localhost/test-queue"), captured.get().getDestinationAddress());
