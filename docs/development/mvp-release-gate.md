@@ -15,14 +15,14 @@ The MVP is not an inspection, dashboard, saga, outbox, or multi-transport releas
 - Runtime provisioning and inspection consume the normalized, versioned topology model.
 - The profile-neutral receive-endpoint topology is the supported transport extension API; legacy overloads are deprecated adapters.
 - The resolved .NET dependency graph has no known NuGet advisories, and CI rejects advisory-bearing restores.
+- All intended preview NuGet and Maven artifacts build locally with required identity, licensing, repository, source, symbol, and Javadoc metadata; CI validates the exact artifact sets.
 
 ## Remaining release gates
 
-1. **Package identity and metadata** — declare consistent package coordinates, descriptions, licensing, repository links, and an explicit prerelease version for every public C# and Java artifact.
-2. **Reproducible package verification** — build all intended NuGet and Maven artifacts in CI and verify that samples and tests consume the produced packages rather than only project outputs.
-3. **Supported-version declaration** — record the exact .NET, Java, RabbitMQ, and MassTransit versions for the first release and state the support window.
-4. **Public walkthrough audit** — run every canonical quick-start and interoperability example from a clean checkout and remove or label preview-only APIs.
-5. **Release candidate gate** — require the ordinary unit suites, RabbitMQ integration suite, complete interoperability matrix, dependency audit, and package verification on the same candidate commit.
+1. **Clean consumer-project verification** — verify that samples and tests consume the produced NuGet and Maven artifacts rather than only project outputs.
+2. **Supported-version declaration** — record the exact .NET, Java, RabbitMQ, and MassTransit versions for the first release and state the support window.
+3. **Public walkthrough audit** — run every canonical quick-start and interoperability example from a clean checkout and remove or label preview-only APIs.
+4. **Release candidate gate** — require the ordinary unit suites, RabbitMQ integration suite, complete interoperability matrix, dependency audit, and package verification on the same candidate commit.
 
 ## Release decision
 
