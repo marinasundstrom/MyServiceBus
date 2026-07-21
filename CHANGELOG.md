@@ -29,6 +29,7 @@ This changelog summarizes the bigger themes in the repository history. It is int
 - Defined seven foundational Java modules as `0.1.0-preview.1` Maven publications with source, Javadoc, license, project, developer, and source-control metadata; preview inspection and sample applications remain unpublished.
 - Scoped Java production dependencies to the modules that own them so published POMs do not expose unrelated broker, serialization, dependency-injection, logging, or telemetry libraries.
 - Added NuGet and Maven package construction to the regular .NET and Java CI workflows.
+- Declared the sample application's fat-JAR inputs as task dependencies so the aggregate Gradle build remains valid under Gradle 9.
 
 ### Product and hosting boundaries
 
