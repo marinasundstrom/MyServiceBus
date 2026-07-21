@@ -20,6 +20,28 @@ public class MediatorTransportFactoryTests
         public string Value { get; set; } = string.Empty;
     }
 
+    class FanoutMessage { }
+
+    class FirstFanoutConsumer : IConsumer<FanoutMessage>
+    {
+        public static int Count;
+        public Task Consume(ConsumeContext<FanoutMessage> context)
+        {
+            Count++;
+            return Task.CompletedTask;
+        }
+    }
+
+    class SecondFanoutConsumer : IConsumer<FanoutMessage>
+    {
+        public static int Count;
+        public Task Consume(ConsumeContext<FanoutMessage> context)
+        {
+            Count++;
+            return Task.CompletedTask;
+        }
+    }
+
     class RequestMessage
     {
         public string Value { get; set; } = string.Empty;
@@ -252,6 +274,36 @@ public class MediatorTransportFactoryTests
         var message = await SampleConsumer.Received.Task;
         Assert.Equal("hello", message.Value);
 
+        await hosted.StopAsync(CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task Directed_send_and_publish_reach_all_compatible_consumers()
+    {
+        FirstFanoutConsumer.Count = 0;
+        SecondFanoutConsumer.Count = 0;
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddServiceBus(cfg =>
+        {
+            cfg.UsingMediator();
+            cfg.AddConsumer<FirstFanoutConsumer>();
+            cfg.AddConsumer<SecondFanoutConsumer>();
+        });
+
+        await using var provider = services.BuildServiceProvider();
+        var hosted = provider.GetRequiredService<IHostedService>();
+        await hosted.StartAsync(CancellationToken.None);
+        var bus = provider.GetRequiredService<IMessageBus>();
+
+        var endpoint = await bus.GetSendEndpoint(new Uri("queue:fanout"));
+        await endpoint.Send(new FanoutMessage());
+        Assert.Equal(1, FirstFanoutConsumer.Count);
+        Assert.Equal(1, SecondFanoutConsumer.Count);
+
+        await bus.Publish(new FanoutMessage());
+        Assert.Equal(2, FirstFanoutConsumer.Count);
+        Assert.Equal(2, SecondFanoutConsumer.Count);
         await hosted.StopAsync(CancellationToken.None);
     }
 

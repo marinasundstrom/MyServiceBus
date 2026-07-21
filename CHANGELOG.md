@@ -152,6 +152,7 @@ This changelog summarizes the bigger themes in the repository history. It is int
 Keep this file updated for significant changes. Prefer adding dated entries that summarize the main themes of a change set instead of listing every commit.
 # Unreleased
 
+- Completed the mediator and in-memory stability matrix with matching directed-send and publish fan-out scenarios, added the missing Java local APIs, and fixed duplicate C# consumer delivery by sharing one receive transport per logical endpoint.
 - Added deterministic C# and Java scheduling conformance for both publish and directed send using injectable manual job schedulers, including cancellation without wall-clock sleeps and an explicit absence of same-time ordering guarantees.
 - Added matching eventual consumed-type observations to the C# and Java in-memory harnesses with explicit timeouts, successful-consumer-completion cardinality, and idiomatic cancellation behavior.
 - Aligned C# and Java local multiple-consumer dispatch so every matched consumer is attempted independently, dispatch waits for all deliveries, failures propagate without suppressing sibling consumers, and no inter-consumer ordering is promised.

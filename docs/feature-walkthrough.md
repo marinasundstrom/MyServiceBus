@@ -529,7 +529,10 @@ MediatorBus bus = MediatorBus.configure(services, cfg -> {
 });
 
 bus.publish(new SubmitOrder(UUID.randomUUID()));
+bus.send("queue:submit-order", new SubmitOrder(UUID.randomUUID()));
 ```
+
+The Java in-memory test harness also implements `PublishEndpoint`, so tests can use `publish` for fan-out semantics and `getSendEndpoint(...).send(...)` for directed-send semantics without treating the two operations as interchangeable.
 
 The mediator dispatches messages in-memory, making it useful for tests, local tools, modular-monolith boundaries, and interactions that are intentionally confined to the current process. It reuses the consumer model and pipelines, but it does not provide broker durability or independent delivery.
 

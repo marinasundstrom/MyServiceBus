@@ -162,11 +162,15 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
             && (mt == null
                 ? regs.Any(r => IsRawSerializer(r.Serializer))
                 : regs.Any(r => r.MessageUrn == mt));
-        var receiveTransport = await _transportFactory.CreateReceiveTransport(
-            topology,
-            (ctx) => HandleMessageAsync(queueName, ctx),
-            isRegistered,
-            cancellationToken);
+        IReceiveTransport? receiveTransport = null;
+        if (!_consumers.ContainsKey(queueName))
+        {
+            receiveTransport = await _transportFactory.CreateReceiveTransport(
+                topology,
+                (ctx) => HandleMessageAsync(queueName, ctx),
+                isRegistered,
+                cancellationToken);
+        }
 
         var configurator = new PipeConfigurator<ConsumeContext<TMessage>>();
         configurator.UseFilter<OpenTelemetryConsumeFilter<TMessage>>();
@@ -187,7 +191,8 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
             registrations = _consumers[queueName] = new List<(string, Type, IConsumePipe, IMessageSerializer)>();
         registrations.Add((messageUrn, messageType, pipe, serializer));
         _consumerTypes.Add(typeof(TConsumer));
-        _activeTransports.Add(receiveTransport);
+        if (receiveTransport is not null)
+            _activeTransports.Add(receiveTransport);
     }
 
     public async Task StartAsync(CancellationToken cancellationToken)

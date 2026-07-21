@@ -21,4 +21,3 @@ public class TestingServiceExtensions {
         return services;
     }
 }
-

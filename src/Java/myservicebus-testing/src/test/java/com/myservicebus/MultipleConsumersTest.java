@@ -35,7 +35,7 @@ public class MultipleConsumersTest {
     }
 
     @Test
-    void multiple_consumers_receive_message() {
+    void publishFansOutToMultipleConsumers() {
         ServiceCollection services = ServiceCollection.create();
         TestingServiceExtensions.addServiceBusTestHarness(services, cfg -> {
             cfg.addConsumer(FirstConsumer.class);
@@ -46,7 +46,26 @@ public class MultipleConsumersTest {
         InMemoryTestHarness harness = provider.getService(InMemoryTestHarness.class);
 
         harness.start().join();
-        harness.send(new Ping("hi")).join();
+        harness.publish(new Ping("hi")).join();
+
+        long count = harness.getConsumed().stream().filter(Ping.class::isInstance).count();
+        assertEquals(2, count);
+        harness.stop().join();
+    }
+
+    @Test
+    void directedSendReachesMultipleConsumers() {
+        ServiceCollection services = ServiceCollection.create();
+        TestingServiceExtensions.addServiceBusTestHarness(services, cfg -> {
+            cfg.addConsumer(FirstConsumer.class);
+            cfg.addConsumer(SecondConsumer.class);
+        });
+
+        ServiceProvider provider = services.buildServiceProvider();
+        InMemoryTestHarness harness = provider.getService(InMemoryTestHarness.class);
+        harness.start().join();
+
+        harness.getSendEndpoint("queue:ping").send(new Ping("hi")).join();
 
         long count = harness.getConsumed().stream().filter(Ping.class::isInstance).count();
         assertEquals(2, count);

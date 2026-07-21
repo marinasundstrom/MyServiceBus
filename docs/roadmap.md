@@ -101,6 +101,8 @@ The [MVP Release Gate](development/mvp-release-gate.md) defines the release boun
 
 The detailed checklist is defined in the [Mediator and In-Memory Stability Gate](development/in-memory-stability-gate.md).
 
+**Status:** implemented for the current preview scope. All shared scenarios are verified in C# and Java, including lifecycle, scopes, requests, retries, filters, metadata, type dispatch, deterministic scheduling, independent consumer failure behavior, eventual consumed observations, directed send, and publish fan-out.
+
 ## Phase 3: Inspection and Monitoring APIs
 
 **Outcome:** applications and tools can discover and observe a running MyServiceBus instance without coupling the core to a UI.

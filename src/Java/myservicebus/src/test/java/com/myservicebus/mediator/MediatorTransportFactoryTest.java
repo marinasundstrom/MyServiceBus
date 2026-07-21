@@ -37,6 +37,16 @@ public class MediatorTransportFactoryTest {
         }
     }
 
+    public static class SecondTestConsumer implements Consumer<TestMessage> {
+        static int count;
+
+        @Override
+        public CompletableFuture<Void> consume(ConsumeContext<TestMessage> context) {
+            count++;
+            return CompletableFuture.completedFuture(null);
+        }
+    }
+
     interface AssignableEvent {
     }
 
@@ -218,6 +228,26 @@ public class MediatorTransportFactoryTest {
         bus.publish(new TestMessage("hello"));
 
         Assertions.assertEquals("hello", TestConsumer.received.join().getValue());
+    }
+
+    @Test
+    public void directedSendAndPublishReachAllCompatibleConsumers() {
+        SecondTestConsumer.count = 0;
+        TestConsumer.received = new CompletableFuture<>();
+        ServiceCollection services = ServiceCollection.create();
+        MediatorBus bus = MediatorBus.configure(services, cfg -> {
+            cfg.addConsumer(TestConsumer.class);
+            cfg.addConsumer(SecondTestConsumer.class);
+        });
+
+        bus.send("queue:test", new TestMessage("sent"));
+        Assertions.assertEquals("sent", TestConsumer.received.join().getValue());
+        Assertions.assertEquals(1, SecondTestConsumer.count);
+
+        TestConsumer.received = new CompletableFuture<>();
+        bus.publish(new TestMessage("published"));
+        Assertions.assertEquals("published", TestConsumer.received.join().getValue());
+        Assertions.assertEquals(2, SecondTestConsumer.count);
     }
 
     @Test
