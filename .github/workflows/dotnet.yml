@@ -35,3 +35,5 @@ jobs:
           dotnet pack src/MyServiceBus.Testing/MyServiceBus.Testing.csproj --no-build --configuration Release --output artifacts/packages
       - name: Verify NuGet packages
         run: ./eng/verify-dotnet-packages.sh
+      - name: Verify NuGet package consumer
+        run: ./eng/verify-dotnet-package-consumer.sh
