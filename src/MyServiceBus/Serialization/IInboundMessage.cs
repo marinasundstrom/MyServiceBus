@@ -5,6 +5,8 @@ public interface IInboundMessage
     Guid MessageId { get; }
     Guid? RequestId => null;
     Guid? CorrelationId { get; }
+    Guid? ConversationId => null;
+    Guid? InitiatorId => null;
     IList<string> MessageType { get; }
     Uri? ResponseAddress { get; }
     Uri? FaultAddress { get; }

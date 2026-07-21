@@ -20,6 +20,8 @@ public class ConsumerConsumeContextImpl<TConsumer, TMessage> : ConsumerConsumeCo
     public TMessage Message => context.Message;
     public Guid? RequestId => context.RequestId;
     public Guid? CorrelationId => context.CorrelationId;
+    public Guid? ConversationId => context.ConversationId;
+    public Guid? InitiatorId => context.InitiatorId;
     public System.Collections.Generic.IDictionary<string, object> Headers => context.Headers;
     CancellationToken PipeContext.CancellationToken => context.CancellationToken;
 

@@ -89,6 +89,16 @@ public class EnvelopeInboundMessage implements InboundMessage {
         return metadataEnvelope.getCorrelationId();
     }
 
+    @Override
+    public UUID getConversationId() {
+        return metadataEnvelope.getConversationId();
+    }
+
+    @Override
+    public UUID getInitiatorId() {
+        return metadataEnvelope.getInitiatorId();
+    }
+
     @SuppressWarnings("unchecked")
     @Override
     public <T> T getMessage(Type type) throws Exception {

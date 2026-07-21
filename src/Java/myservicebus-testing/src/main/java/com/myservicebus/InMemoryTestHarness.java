@@ -118,7 +118,8 @@ public class InMemoryTestHarness implements RequestClientTransport, TransportSen
             @SuppressWarnings("unchecked")
             ConsumeContext<Object> consumeContext = new ConsumeContext<>(message, context.getHeaders(), responseAddress,
                     faultAddress, null, context.getCancellationToken(), this, java.net.URI.create("inmemory:bus"),
-                    entityName -> "inmemory:" + entityName, context.getRequestId(), context.getCorrelationId());
+                    entityName -> "inmemory:" + entityName, context.getRequestId(), context.getCorrelationId(),
+                    context.getConversationId(), context.getInitiatorId());
             future = future.thenCompose(v -> {
                 try {
                     if (consumeContextProvider != null) {
@@ -160,7 +161,7 @@ public class InMemoryTestHarness implements RequestClientTransport, TransportSen
                                     responseAddress, faultAddress, null, context.getCancellationToken(),
                                     InMemoryTestHarness.this, java.net.URI.create("inmemory:bus"),
                                     entityName -> "inmemory:" + entityName, context.getRequestId(),
-                                    context.getCorrelationId());
+                                    context.getCorrelationId(), context.getConversationId(), context.getInitiatorId());
                             ConsumeContextProvider ctxProvider = scoped.getService(ConsumeContextProvider.class);
                             ctxProvider.setContext(consumeContext);
                             try {

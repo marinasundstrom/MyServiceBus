@@ -22,6 +22,8 @@ public class SendContext implements PipeContext, ScheduledMessage {
     private Instant scheduledEnqueueTime;
     private UUID requestId;
     private UUID correlationId;
+    private UUID conversationId = UUID.randomUUID();
+    private UUID initiatorId;
     private List<String> messageTypes;
 
     public SendContext(Object message) {
@@ -77,6 +79,22 @@ public class SendContext implements PipeContext, ScheduledMessage {
         this.correlationId = correlationId;
     }
 
+    public UUID getConversationId() {
+        return conversationId;
+    }
+
+    public void setConversationId(UUID conversationId) {
+        this.conversationId = conversationId;
+    }
+
+    public UUID getInitiatorId() {
+        return initiatorId;
+    }
+
+    public void setInitiatorId(UUID initiatorId) {
+        this.initiatorId = initiatorId;
+    }
+
     public void setMessageTypes(List<String> messageTypes) {
         this.messageTypes = messageTypes;
     }
@@ -96,6 +114,8 @@ public class SendContext implements PipeContext, ScheduledMessage {
         context.setMessageId(UUID.randomUUID());
         context.setRequestId(requestId);
         context.setCorrelationId(correlationId);
+        context.setConversationId(conversationId);
+        context.setInitiatorId(initiatorId);
         context.setMessageType(messageTypes != null ? messageTypes : MessageUrn.forMessageTypes(message.getClass()));
         context.setResponseAddress(null);
         context.setFaultAddress(null);

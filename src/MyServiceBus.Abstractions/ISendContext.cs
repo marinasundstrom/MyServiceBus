@@ -10,6 +10,8 @@ public interface ISendContext : PipeContext, IScheduledMessage
     string RoutingKey { get; set; }
     IDictionary<string, object> Headers { get; }
     string? CorrelationId { get; set; }
+    Guid? ConversationId { get; set; }
+    Guid? InitiatorId { get; set; }
     Uri? ResponseAddress { get; set; }
     Uri? FaultAddress { get; set; }
 }

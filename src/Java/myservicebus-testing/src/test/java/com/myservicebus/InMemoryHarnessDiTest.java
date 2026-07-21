@@ -181,15 +181,23 @@ public class InMemoryHarnessDiTest {
         InMemoryTestHarness harness = new InMemoryTestHarness();
         AtomicReference<Object> header = new AtomicReference<>();
         AtomicReference<UUID> correlation = new AtomicReference<>();
+        AtomicReference<UUID> parentConversation = new AtomicReference<>();
+        AtomicReference<UUID> conversation = new AtomicReference<>();
+        AtomicReference<UUID> initiator = new AtomicReference<>();
         AtomicReference<CancellationToken> cancellation = new AtomicReference<>();
         UUID childCorrelationId = UUID.randomUUID();
-        harness.registerHandler(ParentEvent.class, context -> context.publish(new ChildEvent(), outbound -> {
-            outbound.getHeaders().put("trace-id", "child");
-            outbound.setCorrelationId(childCorrelationId);
-        }));
+        harness.registerHandler(ParentEvent.class, context -> {
+            parentConversation.set(context.getConversationId());
+            return context.publish(new ChildEvent(), outbound -> {
+                outbound.getHeaders().put("trace-id", "child");
+                outbound.setCorrelationId(childCorrelationId);
+            });
+        });
         harness.registerHandler(ChildEvent.class, context -> {
             header.set(context.getHeaders().get("trace-id"));
             correlation.set(context.getCorrelationId());
+            conversation.set(context.getConversationId());
+            initiator.set(context.getInitiatorId());
             cancellation.set(context.getCancellationToken());
             return CompletableFuture.completedFuture(null);
         });
@@ -204,6 +212,8 @@ public class InMemoryHarnessDiTest {
 
         assertEquals("child", header.get());
         assertEquals(childCorrelationId, correlation.get());
+        assertEquals(parentConversation.get(), conversation.get());
+        assertEquals(parentCorrelationId, initiator.get());
         assertEquals(source.token(), cancellation.get());
         harness.stop().join();
     }

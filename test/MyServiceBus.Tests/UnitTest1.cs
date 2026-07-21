@@ -50,4 +50,24 @@ public class EnvelopeMessageContextTests
         Assert.NotNull(message);
         Assert.Equal("Hello world", message!.Value);
     }
+
+    [Fact]
+    public void Null_Optional_Identifiers_Are_Parsed_As_Missing()
+    {
+        var json = JsonSerializer.SerializeToUtf8Bytes(new
+        {
+            messageId = Guid.NewGuid(),
+            requestId = (Guid?)null,
+            correlationId = (Guid?)null,
+            conversationId = (Guid?)null,
+            initiatorId = (Guid?)null
+        });
+
+        var context = new EnvelopeMessageContext(json, new Dictionary<string, object>());
+
+        Assert.Null(context.RequestId);
+        Assert.Null(context.CorrelationId);
+        Assert.Null(context.ConversationId);
+        Assert.Null(context.InitiatorId);
+    }
 }

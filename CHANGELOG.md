@@ -15,6 +15,7 @@ This changelog summarizes the bigger themes in the repository history. It is int
 
 ### MVP API stabilization
 
+- Added MassTransit-compatible conversation and initiator identifiers across C#, Java, local runtimes, and serialized envelopes.
 - Aligned consumer-initiated publish cancellation inheritance across C# and Java while keeping arbitrary headers and outbound correlation explicit, matching MassTransit semantics.
 - Exposed request and correlation identifiers to consumers, preserved request identifiers through responses, and isolated Java response matching by request identifier.
 - Aligned C# and Java request timeout and caller-cancellation behavior, including deadline-free requests.
