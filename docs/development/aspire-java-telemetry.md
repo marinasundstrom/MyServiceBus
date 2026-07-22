@@ -4,11 +4,14 @@ This repository includes an Aspire AppHost at [`src/AspireApp`](../../src/Aspire
 
 - the C# test app
 - the Java test app
+- the MassTransit compatibility app
 - a disposable RabbitMQ broker
 
 ## Why the Java app needs extra setup
 
 The AppHost supervises the Java test app through its Gradle `run` task and attaches the OpenTelemetry Java agent for automatic instrumentation.
+
+Aspire assigns the Java HTTP target port dynamically and exposes it through `HTTP_PORT`. This avoids conflicts when more than one AppHost instance is running and keeps the resource endpoint discoverable through the dashboard.
 
 MyServiceBus already creates spans in both runtimes:
 
@@ -16,6 +19,10 @@ MyServiceBus already creates spans in both runtimes:
 - Java emits spans through `GlobalOpenTelemetry`.
 
 Aspire handles OTLP export and the dashboard, but the Java process still needs the OpenTelemetry Java agent JAR to be present on disk.
+
+The AppHost selects `explicit_bucket_histogram` for the sample applications' OTLP metrics exporters where the SDK supports that setting. Traces and ordinary metrics are recorded for all application resources.
+
+Aspire Dashboard 13.4.6 may log `Histogram data point has bucket counts without any explicit bounds` for valid bucketless OpenTelemetry histograms. OpenTelemetry permits histograms that convey only a count and sum, but this dashboard version rejects that individual point. The warning does not mean that all telemetry was rejected: the dashboard still records and displays the other traces and metrics. Remove this note when the pinned Aspire dashboard accepts bucketless histograms.
 
 ## Java agent setup
 
@@ -52,13 +59,15 @@ cp /path/to/aspire/cert.pem src/AspireApp/agents/aspire-localhost-cert.pem
 
 If the local Aspire certificate rotates, refresh `src/AspireApp/agents/aspire-localhost-cert.pem` with the current PEM before starting the AppHost again.
 
-2. Start the Aspire AppHost from the repository root. It creates RabbitMQ and starts both applications; no separate broker or Java build step is required:
+2. Start the Aspire AppHost from the repository root. It creates RabbitMQ and starts all three applications; no separate broker or Java build step is required:
 
 ```bash
 dotnet run --project src/AspireApp/AspireApp.csproj
 ```
 
 3. Open the Aspire dashboard URL printed by the AppHost.
+
+All four resources should reach `Running`: `messaging`, `testapp`, `testapp-java`, and `testapp-masstransit`. Use each application's dashboard endpoint rather than assuming a fixed port. Publishing from either MyServiceBus sample should be observed by the MassTransit consumers, and publishing from the MassTransit sample should be observed by compatible MyServiceBus consumers. Each application should appear as a resource on the dashboard's Traces and Metrics pages.
 
 ## C# telemetry note
 
