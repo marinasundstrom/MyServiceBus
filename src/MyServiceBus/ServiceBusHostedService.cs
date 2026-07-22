@@ -6,13 +6,12 @@ namespace MyServiceBus;
 
 public sealed class ServiceBusHostedService : IHostedService
 {
-    private readonly IMessageBus messageBus;
     private readonly IServiceProvider serviceProvider;
     private readonly ILogger<ServiceBusHostedService> logger;
+    private IMessageBus? messageBus;
 
-    public ServiceBusHostedService(IMessageBus messageBus, IServiceProvider serviceProvider, ILogger<ServiceBusHostedService> logger)
+    public ServiceBusHostedService(IServiceProvider serviceProvider, ILogger<ServiceBusHostedService> logger)
     {
-        this.messageBus = messageBus;
         this.serviceProvider = serviceProvider;
         this.logger = logger;
     }
@@ -24,6 +23,7 @@ public sealed class ServiceBusHostedService : IHostedService
             action.Execute(serviceProvider);
         }
 
+        messageBus = serviceProvider.GetRequiredService<IMessageBus>();
         await messageBus.StartAsync(cancellationToken);
 
         logger.LogInformation("🚀 Service bus started");
@@ -31,7 +31,8 @@ public sealed class ServiceBusHostedService : IHostedService
 
     public async Task StopAsync(CancellationToken cancellationToken)
     {
-        await messageBus.StopAsync(cancellationToken);
+        if (messageBus is not null)
+            await messageBus.StopAsync(cancellationToken);
 
         logger.LogInformation("🛑 Service bus stopped");
     }

@@ -153,7 +153,9 @@ Keep this file updated for significant changes. Prefer adding dated entries that
 # Unreleased
 
 - Audited the public walkthrough and sample documentation, corrected stale Java and Aspire commands, fixed preview inspection routes and broken links, and aligned product and compatibility wording with the broker-backed MVP boundary.
-- Fixed the Aspire two-service sample by aligning Aspire package versions, supervising the Java Gradle task, using dynamic external endpoints, and injecting the orchestrated RabbitMQ endpoint into both clients.
+- Fixed the Aspire interoperability sample by aligning Aspire package versions, supervising the Java Gradle task, using dynamic external endpoints, and injecting the orchestrated RabbitMQ endpoint into every client.
+- Deferred C# bus construction until hosted post-build configuration is applied, allowing Aspire's dynamically assigned RabbitMQ endpoint to take effect; also made the Java HTTP target dynamic and selected explicit-bucket metrics where supported.
+- Added the existing MassTransit sample as an Aspire resource on the shared broker, with health endpoints and OpenTelemetry, so local orchestration demonstrates live C#, Java, and MassTransit interoperability.
 - Declared and CI-checked the MVP runtime and interoperability baseline, including exact .NET SDK, RabbitMQ, MassTransit, Gradle, and client-library versions plus the preview support window.
 - Added clean C# and Java consumer smoke projects that restore and run exclusively from the staged NuGet and Maven publications.
 - Added CI package verification for the four preview NuGet packages and seven Maven publications, validating exact artifact sets plus package identity, licensing, repository, symbols, sources, and Javadocs.
