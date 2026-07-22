@@ -8,14 +8,10 @@ This folder contains the Java modules for MyServiceBus. The Gradle multi-project
 - Docker (optional) to run RabbitMQ locally
 
 ## Build
-If the Gradle wrapper JAR is missing, bootstrap it from the repository root:
-```bash
-gradle wrapper
-```
 
-- From the repository root, build all modules and run tests:
+- From the repository root, build all modules and run tests with the system Gradle installation:
   ```bash
-  ./gradlew test
+  gradle test
   ```
 
 ## Run locally
@@ -27,14 +23,10 @@ docker compose up -d rabbitmq
 RabbitMQ defaults: host `localhost`, port `5672`, mgmt UI `http://localhost:15672` (guest/guest).
 
 ### 2) Run the Test App
-- From the module directory:
+
+- From the repository root:
   ```bash
-  cd src/Java/testapp
-  RABBITMQ_HOST=localhost HTTP_PORT=5301 ../../gradlew run
-  ```
-- From the repo root (no `cd` required):
-  ```bash
-  RABBITMQ_HOST=localhost HTTP_PORT=5301 ./gradlew -p src/Java/testapp run
+  RABBITMQ_HOST=localhost HTTP_PORT=5301 gradle :testapp:run
   ```
 
 Helper script (equivalent):
@@ -47,7 +39,7 @@ The app starts an HTTP server (default port 5301) with routes:
 - `GET /publish` – publishes SubmitOrder
 - `GET /send` – sends SubmitOrder to a queue
 - `GET /request` – request/response demo
-- `GET /request_multi` – request/response with Fault handling`
+- `GET /request_multi` – request/response with fault handling
 
 Run multiple instances by changing `HTTP_PORT` (e.g., 5301 and 5302).
 
@@ -57,17 +49,12 @@ Run multiple instances by changing `HTTP_PORT` (e.g., 5301 and 5302).
 
 ## Aspire and OpenTelemetry
 
-To run the Java test app under Aspire, two things must be true:
+To run the Java test app under Aspire, two files must be present:
 
 1. The OpenTelemetry Java agent JAR must exist at `src/AspireApp/agents/opentelemetry-javaagent.jar`.
 2. A trusted Aspire OTLP certificate PEM must exist at `src/AspireApp/agents/aspire-localhost-cert.pem`.
-3. The test app JAR must be built before the AppHost starts.
 
-Build the executable JAR from the repository root:
-
-```bash
-./gradlew :testapp:jar
-```
+The AppHost supervises the Java application's Gradle `run` task, so no separate JAR build is required.
 
 Set up the Java agent:
 
@@ -88,9 +75,9 @@ Then start Aspire:
 dotnet run --project src/AspireApp/AspireApp.csproj
 ```
 
-Additional details are documented in [`docs/development/aspire-java-telemetry.md`](/Users/robert/Projects/MyServiceBus/docs/development/aspire-java-telemetry.md).
+Additional details are documented in [`docs/development/aspire-java-telemetry.md`](../../docs/development/aspire-java-telemetry.md).
 
-See also: `docs/two-service-sample.md` for running .NET and Java together.
+See also: [`docs/two-service-sample.md`](../../docs/two-service-sample.md) for running .NET and Java together.
 
 ## Notes
 - Lombok is configured as an annotation processor via the root `build.gradle` and does not need to be added per-module.

@@ -3,9 +3,9 @@
 [![.NET CI](https://github.com/marinasundstrom/MyServiceBus/actions/workflows/dotnet.yml/badge.svg)](https://github.com/marinasundstrom/MyServiceBus/actions/workflows/dotnet.yml)
 [![Java CI](https://github.com/marinasundstrom/MyServiceBus/actions/workflows/java.yml/badge.svg)](https://github.com/marinasundstrom/MyServiceBus/actions/workflows/java.yml)
 
-MyServiceBus (working title) is a **transport-agnostic, asynchronous messaging framework** for Java and .NET, inspired by **MassTransit**.
+MyServiceBus (working title) is a lightweight, asynchronous service-bus runtime for Java and .NET, inspired by **MassTransit**.
 
-It provides a **consistent, opinionated application-level messaging model**—independent of brokers and application frameworks—while remaining compatible with the **MassTransit message envelope format and semantics**. This makes it possible for Java and .NET services to send, publish, and consume messages across platforms, or interoperate directly with existing MassTransit-based systems.
+It provides a consistent, opinionated broker-backed messaging model while remaining compatible with the documented **MassTransit RabbitMQ envelope and messaging semantics**. This makes it possible for Java and .NET services to send, publish, and consume messages across platforms, or interoperate with MassTransit in the [verified compatibility scenarios](docs/compatibility.md).
 
 See samples below.
 
@@ -23,7 +23,7 @@ MyServiceBus defines a stable messaging runtime with concepts such as:
 - scheduling
 - in-memory testing
 
-These semantics remain consistent regardless of the underlying transport or host framework.
+These portable concepts remain consistent across supported transport profiles, while broker-specific capabilities and guarantees remain explicit.
 
 Unlike most Java messaging solutions, MyServiceBus does **not require a framework-wide commitment** (such as Spring). It can be used as a self-contained runtime, integrated into an existing application, or composed via factories and decorators—depending on project needs.
 
@@ -31,7 +31,7 @@ Unlike most Java messaging solutions, MyServiceBus does **not require a framewor
 
 ## Goals
 
-- Provide a **community-driven, open-source alternative** to MassTransit and MediatR as they move toward commercial licensing.
+- Provide a focused, community-driven alternative for basic MassTransit-style broker-backed messaging scenarios.
 - Preserve a **MassTransit-compatible messaging model** across Java and .NET.
 - Enable **Java services to easily connect with .NET/C# services** using shared messaging semantics.
 - Offer a familiar experience for developers coming from .NET.
@@ -69,8 +69,8 @@ Unlike most Java messaging solutions, MyServiceBus does **not require a framewor
 ### Prerequisites
 
 - [.NET SDK](https://dotnet.microsoft.com/download)
-- Java (for the Java modules): JDK 17  
-  (Gradle wrapper included at the repo root)
+- Java (for the Java modules): JDK 17
+- Gradle
 
 ### Building
 
@@ -95,7 +95,7 @@ Unlike most Java messaging solutions, MyServiceBus does **not require a framewor
 * Java
 
   ```bash
-  ./gradlew test
+  gradle test
   ```
 
 ---
@@ -216,7 +216,7 @@ bus.publish(
 
 ## Java Quickstart
 
-See [`src/Java/README.md`](src/Java/README.md) for detailed Java build and run instructions, including JDK 17 toolchain setup and running the test application.
+See [`src/Java/README.md`](src/Java/README.md) for detailed Java build and run instructions, including JDK 17 prerequisites and running the test application.
 
 ---
 

@@ -125,4 +125,4 @@ Transient application technologies such as SignalR are integrations, not impleme
 
 ## Examples
 
-The RabbitMQ transport demonstrates these requirements. See [RabbitMQ Transport](rabbitmq-transport.md) for a concrete implementation.
+The RabbitMQ transport demonstrates these requirements. See [RabbitMQ Transport](../rabbitmq-transport.md) for a concrete implementation.

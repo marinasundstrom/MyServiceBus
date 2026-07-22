@@ -37,22 +37,32 @@ GET {{TestApp_HostAddress}}/request_multi/fault
 
 ###
 
-GET {{TestApp_HostAddress}}/dashboard/v1/overview
+GET {{TestApp_HostAddress}}/inspection/v1/overview
 Accept: application/json
 
 ###
 
-GET {{TestApp_HostAddress}}/dashboard/v1/messages
+GET {{TestApp_HostAddress}}/inspection/v1/messages
 Accept: application/json
 
 ###
 
-GET {{TestApp_HostAddress}}/dashboard/v1/consumers
+GET {{TestApp_HostAddress}}/inspection/v1/consumers
 Accept: application/json
 
 ###
 
-GET {{TestApp_HostAddress}}/dashboard/v1/topology
+GET {{TestApp_HostAddress}}/inspection/v1/topology
+Accept: application/json
+
+###
+
+GET {{TestApp_HostAddress}}/inspection/v1/queues
+Accept: application/json
+
+###
+
+GET {{TestApp_HostAddress}}/inspection/v1/metrics
 Accept: application/json
 
 ###

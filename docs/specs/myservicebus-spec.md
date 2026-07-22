@@ -23,7 +23,7 @@ MyServiceBus composes a distributed bus from a small set of building blocks:
 - **Send** – Consumers resolve send endpoints by URI and deliver messages to specific destinations.
 - **Publish** – Published messages are routed using message type conventions. A concrete message is eligible for its concrete contract, implemented interfaces, and non-root base classes; a registered consumer is invoked at most once for one delivery even when several contracts match.
 - **Request–response** – `GenericRequestClient` assigns a request identifier, uses temporary endpoints to await replies or `Fault<T>` messages, and requires responses to retain that request identifier. Caller-supplied correlation identifiers remain observable on the request consume context but are not copied to responses unless explicitly configured, matching MassTransit semantics. Local runtimes match responses by request identifier so concurrent requests for the same response type remain isolated.
-- **Faults** – Exceptions during consumption generate `Fault<T>` messages identical to MassTransit's and are forwarded to `<queue>_error` endpoints.
+- **Faults and errors** – Exceptions during consumption generate `Fault<T>` messages, while the original failed delivery is preserved at the receive endpoint's `<queue>_error` destination.
 - **Headers** – Headers prefixed with `_` map to native transport properties (e.g., `_correlation_id`).
 - **Cancellation** – All contexts carry a cancellation token so operations can observe shutdown or timeouts.
 - **Telemetry** – Outgoing messages embed host and process details for diagnostics.
@@ -37,8 +37,8 @@ Language-specific details are documented separately:
 
 ## Transport Specification
 
-Transport implementations must comply with the [ServiceBus Transport Specification](transport-spec.md). RabbitMQ-specific behavior is described in [RabbitMQ Transport](rabbitmq-transport.md).
+Transport implementations must comply with the [ServiceBus Transport Specification](transport-spec.md). RabbitMQ-specific behavior is described in [RabbitMQ Transport](../rabbitmq-transport.md).
 
 ## Relation to MassTransit
 
-MyServiceBus aligns with MassTransit wherever possible. See [Differences from MassTransit](masstransit-differences.md) for notable deviations.
+MyServiceBus aligns with MassTransit wherever possible. See [Differences from MassTransit](../masstransit-differences.md) for notable deviations.
