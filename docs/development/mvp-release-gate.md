@@ -18,11 +18,11 @@ The MVP is not an inspection, dashboard, saga, outbox, or multi-transport releas
 - All intended preview NuGet and Maven artifacts build locally with required identity, licensing, repository, source, symbol, and Javadoc metadata; CI validates the exact artifact sets.
 - Clean external-style C# and Java smoke projects restore, compile, and run against only the staged NuGet and Maven publications.
 - The supported .NET, Java, RabbitMQ, MassTransit, and client-library baselines and the preview servicing window are explicit and checked against CI configuration.
+- The public quick starts, walkthrough, two-service sample, Aspire workflow, Java helper script, and local documentation links have been audited from clean source state; preview inspection endpoints are labeled as unstable.
 
 ## Remaining release gates
 
-1. **Public walkthrough audit** — run every canonical quick-start and interoperability example from a clean checkout and remove or label preview-only APIs.
-2. **Release candidate gate** — require the ordinary unit suites, RabbitMQ integration suite, complete interoperability matrix, dependency audit, and package verification on the same candidate commit.
+1. **Release candidate gate** — require the ordinary unit suites, RabbitMQ integration suite, complete interoperability matrix, dependency audit, and package verification on the same candidate commit.
 
 ## Release decision
 

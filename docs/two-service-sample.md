@@ -35,13 +35,13 @@ The service listens on `http://localhost:5112`.
 From the repository root:
 
 ```bash
-./gradlew :testapp:run
+gradle :testapp:run
 ```
 
 Notes:
 - `RABBITMQ_HOST` defaults to `localhost` if not set.
 - `HTTP_PORT` defaults to `5301` if not set.
-- See `src/Java/README.md` for full Java build/run details and optional JDK 17 toolchain enforcement.
+- See [`src/Java/README.md`](../src/Java/README.md) for full Java build and run details.
 
 The Java service listens on `http://localhost:5301`.
 
@@ -57,12 +57,14 @@ Both services expose the same endpoints:
 - `/request/fault`
 - `/request_multi`
 - `/request_multi/fault`
-- `/dashboard/v1/overview`
-- `/dashboard/v1/messages`
-- `/dashboard/v1/consumers`
-- `/dashboard/v1/topology`
+- `/inspection/v1/overview`
+- `/inspection/v1/messages`
+- `/inspection/v1/consumers`
+- `/inspection/v1/topology`
+- `/inspection/v1/queues`
+- `/inspection/v1/metrics`
 
-The dashboard routes return stable JSON snapshots that summarize the configured bus address, registered message contracts, and consumer-to-queue bindings. They are implemented in the sample apps only for now so you can prototype dashboards before deciding what belongs in shared libraries.
+The inspection routes return preview JSON snapshots that summarize the configured bus address, registered message contracts, consumer-to-queue bindings, and sample runtime metrics. These sample HTTP endpoints are not part of the stable MVP API.
 
 The `.http` files for invoking them are:
 
@@ -104,8 +106,8 @@ curl http://localhost:5301/request_multi/fault
 You should see matching trace shapes in Aspire and comparable logs in both services, with differences limited to the runtime-specific exception formatting.
 
 ## Troubleshooting
-- If Gradle reports missing modules, run a full build first:
+- If Gradle reports missing modules, run a full build from the repository root first:
   ```bash
-  (cd src/Java && ./gradlew build -x test)
+  gradle build -x test
   ```
 - Ensure RabbitMQ is reachable at `RABBITMQ_HOST` and credentials are `guest/guest` (default in compose).

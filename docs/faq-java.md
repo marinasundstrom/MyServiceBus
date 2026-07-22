@@ -2,11 +2,11 @@
 
 ## What is MyServiceBus?
 
-MyServiceBus is a **transport-agnostic messaging framework** for Java and .NET that provides a **consistent, opinionated application-level messaging model**, independent of any specific broker or application framework.
+MyServiceBus is a lightweight service-bus runtime for Java and .NET that provides a consistent, opinionated broker-backed messaging model without requiring a particular application framework.
 
-It defines a stable set of messaging concepts—such as publishing, sending, consumers, request/response, retries, middleware, scheduling, and testing—and keeps those semantics consistent across transports and platforms.
+It defines a stable set of messaging concepts—such as publishing, sending, consumers, request/response, retries, middleware, scheduling, and testing—and keeps those semantics consistent across its C# and Java clients.
 
-MyServiceBus is inspired by and largely compatible with **MassTransit**, making it well suited for systems where Java and .NET services need to communicate using shared messaging conventions.
+MyServiceBus is inspired by MassTransit and has verified compatibility for the documented RabbitMQ scenarios. It does not claim complete MassTransit feature or source compatibility.
 
 Unlike most Java messaging solutions, MyServiceBus does **not require a framework-wide commitment** (such as Spring). It can be used as a self-contained runtime, integrated into existing applications, or composed using factories and decorators, depending on the needs of the project.
 
@@ -14,7 +14,7 @@ Unlike most Java messaging solutions, MyServiceBus does **not require a framewor
 
 ## What kind of projects is MyServiceBus for?
 
-MyServiceBus is designed for projects that need a **consistent, transport-agnostic messaging model**, especially in mixed .NET and Java environments.
+MyServiceBus is designed for projects that need a focused broker-backed messaging model, especially in mixed .NET and Java environments.
 
 It is particularly well suited for:
 
@@ -48,13 +48,13 @@ It offers:
 * Explicit composition instead of annotation-driven magic
 * A DI and logging model inspired by .NET infrastructure libraries
 
-### Transport-agnostic messaging architectures
+### Broker-backed messaging architectures
 
 MyServiceBus is a good fit when:
 
-* You want messaging logic decoupled from a specific broker
-* You expect transports to change or evolve
-* You want consistent behavior across environments
+* You want portable application concepts without hiding broker capabilities
+* You need the supported RabbitMQ interoperability profile
+* You want consistent behavior across C# and Java services
 
 ### Testable, infrastructure-aware services
 
@@ -70,7 +70,7 @@ will benefit from MyServiceBus’s runtime-centric design.
 
 ### Short summary
 
-> MyServiceBus is for teams building message-driven systems across Java and .NET, especially where compatibility with MassTransit, transport independence, and a shared messaging model matter.
+> MyServiceBus is for teams building broker-backed systems across Java and .NET, especially where documented MassTransit interoperability and a shared messaging model matter.
 
 ---
 
@@ -80,7 +80,7 @@ MyServiceBus was created to provide an **opinionated but consistent, framework-i
 
 Most asynchronous messaging offerings in the Java ecosystem are tightly coupled to application frameworks such as Spring. While these integrations are powerful, they often require an **all-or-nothing commitment** to a specific framework and its programming model.
 
-MyServiceBus takes a different approach: it defines a **standalone messaging runtime** with a stable, transport-agnostic API that can be used both with and without larger application frameworks.
+MyServiceBus takes a different approach: it defines a standalone messaging runtime that can be used both with and without larger application frameworks.
 
 ### Inspired by MassTransit
 
@@ -96,7 +96,7 @@ This makes it easier to build systems where Java and .NET services communicate u
 
 ### Motivation
 
-The project was motivated in part by the **recent commercialization of MassTransit** and the desire to preserve an open, framework-independent messaging model across platforms.
+The project aims to provide a smaller, community-driven option for teams that need basic MassTransit-style scenarios without adopting the breadth of an enterprise service-bus product.
 
 This motivation also led to the creation of an accompanying **C# implementation**, ensuring that the same abstractions and concepts are available on both sides of the Java/.NET boundary.
 
@@ -104,7 +104,7 @@ This motivation also led to the creation of an accompanying **C# implementation*
 
 ### Short summary
 
-> MyServiceBus exists to offer a consistent, transport-agnostic messaging framework for Java, inspired by MassTransit, independent of application frameworks, and suitable for cross-platform systems.
+> MyServiceBus offers a focused, framework-independent messaging runtime for Java and .NET with a documented MassTransit-compatible RabbitMQ profile.
 
 ---
 
@@ -136,9 +136,7 @@ MyServiceBus defines a consistent **application-level messaging model**:
 * Scheduling
 * In-memory testing
 
-This model stays the same regardless of the underlying transport.
-
-The transport is an implementation detail.
+The portable application concepts stay recognizable across supported transport profiles. Broker-specific topology, capabilities, and delivery guarantees remain explicit rather than being reduced to a lowest-common-denominator abstraction.
 
 ### Messaging semantics are part of the framework
 
@@ -149,7 +147,7 @@ Spring leaves many messaging semantics to:
 * Framework defaults
 * Application-specific conventions
 
-MyServiceBus makes these semantics explicit and part of the framework itself, ensuring predictable behavior across transports and environments.
+MyServiceBus makes these semantics explicit and part of the framework itself, ensuring predictable behavior across its supported clients and declared transport profiles.
 
 ### Testing and tooling are first-class concerns
 
@@ -183,8 +181,8 @@ The two are complementary, not mutually exclusive.
 
 ### Short answer
 
-> Spring provides excellent transport integrations, but not a transport-agnostic messaging model.
-> MyServiceBus exists to define that model and keep it consistent across transports, environments, and tests.
+> Spring provides excellent technology-specific messaging integrations.
+> MyServiceBus provides a focused service-bus model with explicit transport capabilities and matching C# and Java semantics.
 
 ---
 
@@ -216,9 +214,9 @@ All approaches result in the same runtime behavior.
 
 ---
 
-## Why does MyServiceBus define its own `LoggingFactory`?
+## Why does MyServiceBus define its own `LoggerFactory`?
 
-MyServiceBus defines a `LoggingFactory` abstraction to keep the core runtime **independent of any specific Java logging framework**.
+MyServiceBus defines a `LoggerFactory` abstraction to keep the core runtime independent of any specific Java logging framework.
 
 The Java logging ecosystem is diverse (SLF4J, Log4j, Logback, JUL, etc.), and libraries typically either hard-depend on one API or assume that the surrounding framework provides logging.
 
@@ -236,5 +234,5 @@ This approach mirrors the .NET model (`ILogger` / `ILoggerFactory`), where loggi
 
 ### Short summary
 
-> MyServiceBus defines minimal abstractions for dependency resolution and logging to support a predictable, transport-agnostic runtime.
+> MyServiceBus defines minimal abstractions for dependency resolution and logging to support a predictable runtime across its C# and Java clients.
 > Guice is the default DI implementation, and SLF4J is the default logging implementation, but neither is a hard requirement for application architecture.

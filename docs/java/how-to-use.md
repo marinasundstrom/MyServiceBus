@@ -1,6 +1,6 @@
 # How to use
 
-The Service Bus API is still in the works.
+The Java API is in preview. The examples below use the supported MVP application surface; inspection and dashboard APIs remain experimental.
 
 ## Configure Service Bus
 
@@ -32,7 +32,7 @@ public class Main {
                 .addServiceBus(cfg -> {
                     cfg.addConsumer(SubmitOrderConsumer.class);
                     cfg.using(RabbitMqFactoryConfigurator.class, (context, rbCfg) -> {
-                        rbCfg.host("rabbitmq://localhost");
+                        rbCfg.host("localhost");
                         rbCfg.receiveEndpoint("submit-order-queue", e -> {
                             e.configureConsumer(context, SubmitOrderConsumer.class);
                         });
@@ -44,7 +44,7 @@ public class Main {
             ServiceProvider sp = scope.getServiceProvider();
             MessageBus bus = sp.getService(MessageBus.class);
 
-            bus.start();
+            bus.start().join();
 
             System.out.println("Up and running");
 
@@ -63,10 +63,11 @@ public class Main {
 ## Request/Response
 
 ```java
-RequestClient<SubmitOrder> client = serviceProvider.getService(RequestClient.class);
+RequestClientFactory factory = serviceProvider.getService(RequestClientFactory.class);
+RequestClient<SubmitOrder> client = factory.create(SubmitOrder.class);
 OrderSubmitted response = client
-        .getResponse(new SubmitOrder(UUID.randomUUID(), "demo"), OrderSubmitted.class)
-        .get();
+        .getResponse(new SubmitOrder(UUID.randomUUID()), OrderSubmitted.class)
+        .join();
 ```
 
 ## Defining messages
@@ -77,8 +78,8 @@ If you are using Gradle:
 
 ```gradle
 dependencies {
-    compileOnly 'org.projectlombok:lombok:1.18.30'
-    annotationProcessor 'org.projectlombok:lombok:1.18.30'
+    compileOnly 'org.projectlombok:lombok:1.18.34'
+    annotationProcessor 'org.projectlombok:lombok:1.18.34'
 }
 ```
 

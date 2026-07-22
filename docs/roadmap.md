@@ -198,10 +198,9 @@ The following work remains demand-driven and is not automatically part of the po
 
 The next coherent investment is:
 
-1. complete the mediator and in-memory stability gate in matching C# and Java slices
-2. verify generated NuGet and Maven packages from isolated consumer projects
-3. stabilize the inspection addon DTOs against the completed topology foundation without expanding the control plane
-4. build focused monitoring state and event records
-5. select a second durable broker only after the local-runtime gate, demonstrated demand, and capability-model validation
+1. run the complete release-candidate gate on one commit and publish the verified MVP packages
+2. stabilize the inspection addon DTOs against the released topology foundation without expanding the control plane
+3. build focused monitoring state and event records
+4. select a second durable broker only after demonstrated demand and capability-model validation
 
 This sequence prioritizes predictable application fundamentals while reducing the architectural risk of adding transports, languages, or dashboard behavior too early.

@@ -3,7 +3,7 @@
 This guide compares basic usage of MyServiceBus in C# and Java. It is split into basics and advanced sections so newcomers can focus on fundamental messaging patterns before exploring configuration and other features.
 
 For an explanation of why the C# and Java examples differ, see the [design decisions](development/design-decisions.md).  
-For Java build and run instructions, including optional JDK 17 toolchain setup and how to run the test app, see `src/Java/README.md`.
+For Java build and run instructions, including JDK 17 setup and how to run the test app, see [`src/Java/README.md`](../src/Java/README.md).
 
 ## Contents
 
@@ -138,7 +138,7 @@ services.from(MessageBusServices.class)
 
 ServiceProvider serviceProvider = services.buildServiceProvider();
 MessageBus bus = serviceProvider.getService(MessageBus.class);
-bus.start();
+bus.start().join();
 ```
 
 `addServiceBus` activates consumers using `ScopeConsumerFactory`, so they can resolve dependencies from the `ServiceProvider`.
@@ -268,7 +268,7 @@ class SubmitOrderConsumer implements Consumer<SubmitOrder> {
 
 ### Retries
 
-Transient issues like network hiccups or temporary I/O errors may succeed on a subsequent attempt. MyServiceBus lets you opt into retry policies using filters, similar to MassTransit. Configure a consumer's pipe with `UseRetry` to automatically re-invoke it before faulting. After the retry limit is reached, the message is faulted; see [Faults](#faults) for details.
+Transient issues like network hiccups or temporary I/O errors may succeed on a subsequent attempt. MyServiceBus lets you opt into retry policies using filters, similar to MassTransit. Configure a consumer with `UseMessageRetry` in C# or `useMessageRetry` in Java to automatically re-invoke it before faulting. After the retry limit is reached, the message is faulted; see [Faults](#faults) for details.
 
 ---
 
@@ -327,7 +327,7 @@ cfg.ReceiveEndpoint("submit-order_fault", e =>
 ```java
 cfg.receiveEndpoint("submit-order_fault", e ->
     e.handler(Fault.class, ctx -> {
-        SubmitOrder original = ctx.getMessage().getMessage();
+        Object original = ctx.getMessage().getMessage();
         return CompletableFuture.completedFuture(null);
     })
 );
@@ -528,8 +528,8 @@ MediatorBus bus = MediatorBus.configure(services, cfg -> {
     cfg.addConsumer(SubmitOrderConsumer.class);
 });
 
-bus.publish(new SubmitOrder(UUID.randomUUID()));
-bus.send("queue:submit-order", new SubmitOrder(UUID.randomUUID()));
+bus.publish(new SubmitOrder(UUID.randomUUID())).join();
+bus.send("queue:submit-order", new SubmitOrder(UUID.randomUUID())).join();
 ```
 
 The Java in-memory test harness also implements `PublishEndpoint`, so tests can use `publish` for fan-out semantics and `getSendEndpoint(...).send(...)` for directed-send semantics without treating the two operations as interchangeable.
@@ -589,7 +589,7 @@ services.from(MessageBusServices.class)
         .addServiceBus(cfg -> {
             cfg.addConsumer(SubmitOrderConsumer.class);
             cfg.using(RabbitMqFactoryConfigurator.class, (context, rbCfg) -> {
-                rbCfg.host("rabbitmq://localhost");
+                rbCfg.host("localhost");
                 rbCfg.message(SubmitOrder.class, m -> {
                     m.setEntityName("submit-order-exchange");
                     // or
@@ -608,7 +608,7 @@ ServiceProvider provider = services.buildServiceProvider();
 try (ServiceScope scope = provider.createScope()) {
     ServiceProvider sp = scope.getServiceProvider();
     MessageBus bus = sp.getService(MessageBus.class);
-    bus.start();
+    bus.start().join();
 }
 ```
 
@@ -755,14 +755,14 @@ services.from(Logging.class)
 services.from(MessageBusServices.class)
         .addServiceBus(cfg -> {
             // consumers and other options
-            cfg.using(RabbitMqFactoryConfigurator.class, (context, rbCfg) -> rbCfg.host("rabbitmq://localhost"));
+            cfg.using(RabbitMqFactoryConfigurator.class, (context, rbCfg) -> rbCfg.host("localhost"));
         });
 
 ServiceProvider provider = services.buildServiceProvider();
 try (ServiceScope scope = provider.createScope()) {
     ServiceProvider sp = scope.getServiceProvider();
     MessageBus bus = sp.getService(MessageBus.class);
-    bus.start();
+    bus.start().join();
 }
 ```
 
@@ -867,14 +867,14 @@ services.from(MessageBusServices.class)
                 ctx.getHeaders().put("published", true);
                 return CompletableFuture.completedFuture(null);
             }));
-            cfg.using(RabbitMqFactoryConfigurator.class, (context, rbCfg) -> rbCfg.host("rabbitmq://localhost"));
+            cfg.using(RabbitMqFactoryConfigurator.class, (context, rbCfg) -> rbCfg.host("localhost"));
         });
 
 ServiceProvider provider = services.buildServiceProvider();
 try (ServiceScope scope = provider.createScope()) {
     ServiceProvider sp = scope.getServiceProvider();
     MessageBus bus = sp.getService(MessageBus.class);
-    bus.start();
+    bus.start().join();
 }
 ```
 
@@ -903,15 +903,16 @@ await scheduler.ScheduleSend(new Uri("queue:submit-order"), new SubmitOrder(), T
 #### Java
 
 ```java
-bus.publish(new OrderSubmitted(), ctx -> ctx.setScheduledEnqueueTime(Duration.ofSeconds(30))).get();
+bus.publish(new OrderSubmitted(), ctx -> ctx.setScheduledEnqueueTime(Duration.ofSeconds(30))).join();
 SendEndpoint endpoint = bus.getSendEndpoint("queue:submit-order");
-endpoint.send(new SubmitOrder(), ctx -> ctx.setScheduledEnqueueTime(Duration.ofSeconds(30))).get();
+endpoint.send(new SubmitOrder(), ctx -> ctx.setScheduledEnqueueTime(Duration.ofSeconds(30))).join();
 
-MessageScheduler scheduler = services.getService(MessageScheduler.class);
+MessageScheduler scheduler = serviceProvider.getService(MessageScheduler.class);
 ScheduledMessageHandle handle = scheduler.schedulePublish(new OrderSubmitted(), Duration.ofSeconds(30))
-    .toCompletableFuture().get();
-scheduler.cancelScheduledPublish(handle).toCompletableFuture().get();
-scheduler.scheduleSend("queue:submit-order", new SubmitOrder(), Duration.ofSeconds(30)).get();
+    .toCompletableFuture().join();
+scheduler.cancelScheduledPublish(handle).toCompletableFuture().join();
+scheduler.scheduleSend("queue:submit-order", new SubmitOrder(), Duration.ofSeconds(30))
+    .toCompletableFuture().join();
 ```
 
 ##### Custom schedulers
@@ -960,7 +961,7 @@ class QuartzJobScheduler implements JobScheduler {
 
 ServiceCollection services = ServiceCollection.create();
 services.addSingleton(JobScheduler.class, sp -> new QuartzJobScheduler(quartz));
-services.addServiceBus(cfg -> { /* ... */ });
+services.from(MessageBusServices.class).addServiceBus(cfg -> { /* ... */ });
 ```
 
 ---

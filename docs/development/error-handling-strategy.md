@@ -29,8 +29,8 @@ MyServiceBus adopts a unified cross-language approach to reporting and handling 
 ## Documentation and testing
 
 - XML documentation and Javadoc list each possible exception.
-- Examples in [`feature-walkthrough.md`](feature-walkthrough.md) illustrate recovery patterns.
-- Run `dotnet test` and `./gradlew test` to verify behavior across languages.
+- Examples in [`feature-walkthrough.md`](../feature-walkthrough.md) illustrate recovery patterns.
+- Run `dotnet test` and `gradle test` from the repository root to verify behavior across languages.
 
 ## Cross-language parity
 

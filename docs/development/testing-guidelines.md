@@ -11,4 +11,4 @@ These guidelines describe how to structure and run tests for MyServiceBus across
 
 Unit tests should verify small pieces of behavior and run quickly. When a feature is added or changed, add corresponding unit tests in both language implementations.
 
-For guidance on using the in-memory harness when writing tests, see [testing.md](testing.md).
+For guidance on using the in-memory harness when writing tests, see [testing.md](../testing.md).

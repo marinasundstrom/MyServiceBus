@@ -1,14 +1,14 @@
 # Aspire Java Telemetry
 
-This repository includes an Aspire AppHost at [`src/AspireApp`](/Users/robert/Projects/MyServiceBus/src/AspireApp) that starts:
+This repository includes an Aspire AppHost at [`src/AspireApp`](../../src/AspireApp) that starts:
 
 - the C# test app
 - the Java test app
-- optional RabbitMQ infrastructure
+- a disposable RabbitMQ broker
 
 ## Why the Java app needs extra setup
 
-The Java test app uses Aspire's Java hosting integration, which relies on the OpenTelemetry Java agent for automatic instrumentation.
+The AppHost supervises the Java test app through its Gradle `run` task and attaches the OpenTelemetry Java agent for automatic instrumentation.
 
 MyServiceBus already creates spans in both runtimes:
 
@@ -28,11 +28,7 @@ curl -fL \
   -o src/AspireApp/agents/opentelemetry-javaagent.jar
 ```
 
-The AppHost is configured to point to the agent directory relative to the Java app working directory:
-
-`../../AspireApp/agents`
-
-That resolves to:
+The AppHost resolves the agent to an absolute path before passing it to Gradle's forked JVM:
 
 `src/AspireApp/agents/opentelemetry-javaagent.jar`
 
@@ -42,37 +38,13 @@ The Java app also needs a trusted certificate PEM for Aspire's local OTLP endpoi
 
 The AppHost passes that file to the Java agent through `OTEL_EXPORTER_OTLP_CERTIFICATE`.
 
-See [`src/AspireApp/AppHost.cs`](/Users/robert/Projects/MyServiceBus/src/AspireApp/AppHost.cs).
-
-## Java packaging requirement
-
-Aspire launches the Java sample as an executable JAR:
-
-`src/Java/testapp/build/libs/testapp-1.0-SNAPSHOT.jar`
-
-That JAR must include its runtime dependencies. The Gradle configuration for [`src/Java/testapp/build.gradle`](/Users/robert/Projects/MyServiceBus/src/Java/testapp/build.gradle) builds a self-contained JAR so Aspire can launch it directly with `java -jar`.
-
-Build it from the repository root:
-
-```bash
-./gradlew :testapp:jar
-```
+See [`src/AspireApp/AppHost.cs`](../../src/AspireApp/AppHost.cs).
 
 ## Running locally with Aspire
 
-1. Start RabbitMQ:
+1. Ensure the Java agent JAR and Aspire localhost certificate PEM exist under `src/AspireApp/agents`.
 
-```bash
-docker compose up -d rabbitmq
-```
-
-2. Build the Java executable JAR:
-
-```bash
-./gradlew :testapp:jar
-```
-
-3. Ensure the Aspire localhost certificate PEM exists:
+If the certificate must be refreshed:
 
 ```bash
 cp /path/to/aspire/cert.pem src/AspireApp/agents/aspire-localhost-cert.pem
@@ -80,13 +52,13 @@ cp /path/to/aspire/cert.pem src/AspireApp/agents/aspire-localhost-cert.pem
 
 If the local Aspire certificate rotates, refresh `src/AspireApp/agents/aspire-localhost-cert.pem` with the current PEM before starting the AppHost again.
 
-4. Start the Aspire AppHost:
+2. Start the Aspire AppHost from the repository root. It creates RabbitMQ and starts both applications; no separate broker or Java build step is required:
 
 ```bash
 dotnet run --project src/AspireApp/AspireApp.csproj
 ```
 
-5. Open the Aspire dashboard URL printed by the AppHost.
+3. Open the Aspire dashboard URL printed by the AppHost.
 
 ## C# telemetry note
 
@@ -94,5 +66,5 @@ The C# app does not need an agent, but it does need to register the custom `MySe
 
 See:
 
-- [`src/MyServiceBus/OpenTelemetry.cs`](/Users/robert/Projects/MyServiceBus/src/MyServiceBus/OpenTelemetry.cs)
-- [`src/TestApp/Program.cs`](/Users/robert/Projects/MyServiceBus/src/TestApp/Program.cs)
+- [`src/MyServiceBus/OpenTelemetry.cs`](../../src/MyServiceBus/OpenTelemetry.cs)
+- [`src/TestApp/Program.cs`](../../src/TestApp/Program.cs)
