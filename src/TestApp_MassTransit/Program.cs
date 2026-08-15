@@ -1,9 +1,13 @@
 using MassTransit;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using TestApp;
-using System.Linq;
-using Microsoft.Extensions.Logging;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.AddServiceDefaults();
+
+var rabbitMqConnectionString = builder.Configuration.GetConnectionString("messaging")
+    ?? throw new InvalidOperationException("The RabbitMQ 'messaging' connection string is required.");
 
 builder.Services.AddMassTransit(x =>
 {
@@ -13,11 +17,7 @@ builder.Services.AddMassTransit(x =>
 
     x.UsingRabbitMq((context, cfg) =>
     {
-        cfg.Host("localhost", h =>
-        {
-            h.Username("guest");
-            h.Password("guest");
-        });
+        cfg.Host(new Uri(rabbitMqConnectionString));
 
         /*
         cfg.Message<SubmitOrder>(m =>
@@ -40,8 +40,6 @@ builder.Services.AddMassTransit(x =>
 });
 
 
-// Add services to the container.
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 
 var app = builder.Build();
@@ -49,13 +47,16 @@ var app = builder.Build();
 var logger = app.Logger;
 logger.LogInformation("🚀 Starting TestApp_MassTransit");
 
-// Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
 }
 
-app.UseHttpsRedirection();
+app.MapHealthChecks("/health/ready");
+app.MapHealthChecks("/health/live", new HealthCheckOptions
+{
+    Predicate = registration => registration.Tags.Contains("live")
+});
 
 var summaries = new[]
 {

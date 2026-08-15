@@ -14,8 +14,15 @@ var rabbitmq = builder.AddRabbitMQ("messaging", rabbitUser, rabbitPassword)
 
 var csharpTestApp = builder.AddProject<TestApp>("testapp")
     .WithReference(rabbitmq)
+    .WithEnvironment("OTEL_EXPORTER_OTLP_METRICS_DEFAULT_HISTOGRAM_AGGREGATION", "explicit_bucket_histogram")
     .WithEnvironment("RABBITMQ_HOST", rabbitmq.Resource.PrimaryEndpoint.Property(EndpointProperty.Host))
     .WithEnvironment("RABBITMQ_PORT", rabbitmq.Resource.PrimaryEndpoint.Property(EndpointProperty.Port))
+    .WithExternalHttpEndpoints()
+    .WaitFor(rabbitmq);
+
+var massTransitTestApp = builder.AddProject<TestApp_MassTransit>("testapp-masstransit")
+    .WithReference(rabbitmq)
+    .WithEnvironment("OTEL_EXPORTER_OTLP_METRICS_DEFAULT_HISTOGRAM_AGGREGATION", "explicit_bucket_histogram")
     .WithExternalHttpEndpoints()
     .WaitFor(rabbitmq);
 
@@ -26,9 +33,9 @@ var javaTestApp = builder.AddExecutable(
     ":testapp:run",
     "--no-daemon")
     .WithOtelAgent(javaAgentPath)
-    .WithHttpEndpoint(targetPort: 5301, name: "http")
+    .WithHttpEndpoint(name: "http", env: "HTTP_PORT")
     .WithEnvironment("OTEL_EXPORTER_OTLP_CERTIFICATE", aspireCertificatePath)
-    .WithEnvironment("HTTP_PORT", "5301")
+    .WithEnvironment("OTEL_EXPORTER_OTLP_METRICS_DEFAULT_HISTOGRAM_AGGREGATION", "explicit_bucket_histogram")
     .WithEnvironment("RABBITMQ_HOST", rabbitmq.Resource.PrimaryEndpoint.Property(EndpointProperty.Host))
     .WithEnvironment("RABBITMQ_PORT", rabbitmq.Resource.PrimaryEndpoint.Property(EndpointProperty.Port))
     .WithReference(rabbitmq)
