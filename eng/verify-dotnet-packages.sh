@@ -3,7 +3,7 @@ set -eu
 
 package_dir="${1:-artifacts/packages}"
 version="${2:-0.1.0-preview.1}"
-packages="MyServiceBus.Abstractions MyServiceBus MyServiceBus.RabbitMq MyServiceBus.Testing"
+packages="Sundstrom.MyServiceBus.Abstractions Sundstrom.MyServiceBus Sundstrom.MyServiceBus.RabbitMq Sundstrom.MyServiceBus.Testing"
 
 for package_id in $packages; do
   package="$package_dir/$package_id.$version.nupkg"

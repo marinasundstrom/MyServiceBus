@@ -8,9 +8,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="MyServiceBus.Abstractions" Version="0.1.0-preview.1" />
-    <PackageReference Include="MyServiceBus" Version="0.1.0-preview.1" />
-    <PackageReference Include="MyServiceBus.RabbitMq" Version="0.1.0-preview.1" />
-    <PackageReference Include="MyServiceBus.Testing" Version="0.1.0-preview.1" />
+    <PackageReference Include="Sundstrom.MyServiceBus.Abstractions" Version="0.1.0-preview.1" />
+    <PackageReference Include="Sundstrom.MyServiceBus" Version="0.1.0-preview.1" />
+    <PackageReference Include="Sundstrom.MyServiceBus.RabbitMq" Version="0.1.0-preview.1" />
+    <PackageReference Include="Sundstrom.MyServiceBus.Testing" Version="0.1.0-preview.1" />
   </ItemGroup>
 </Project>

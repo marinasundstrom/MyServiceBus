@@ -1,0 +1,93 @@
+---
+name: Publish NuGet preview
+
+'on':
+  workflow_dispatch:
+
+concurrency:
+  group: publish-nuget
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Build, verify, and publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.100'
+
+      - name: Read package version
+        id: package-version
+        shell: bash
+        run: |
+          version="$(dotnet msbuild src/MyServiceBus/MyServiceBus.csproj -nologo -getProperty:PackageVersion)"
+          case "$version" in
+            *-preview.*) ;;
+            *)
+              echo "Expected a preview package version, but found '$version'." >&2
+              exit 1
+              ;;
+          esac
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Restore dependencies
+        run: dotnet restore --warnaserror:'NU1901;NU1902;NU1903;NU1904'
+
+      - name: Verify supported versions
+        run: ./eng/verify-supported-versions.sh
+
+      - name: Build
+        run: dotnet build --no-restore --configuration Release
+
+      - name: Test
+        run: dotnet test --no-build --configuration Release --verbosity normal
+
+      - name: Build NuGet packages
+        run: |
+          dotnet pack src/MyServiceBus.Abstractions/MyServiceBus.Abstractions.csproj --no-build --configuration Release --output artifacts/packages
+          dotnet pack src/MyServiceBus/MyServiceBus.csproj --no-build --configuration Release --output artifacts/packages
+          dotnet pack src/MyServiceBus.RabbitMq/MyServiceBus.RabbitMq.csproj --no-build --configuration Release --output artifacts/packages
+          dotnet pack src/MyServiceBus.Testing/MyServiceBus.Testing.csproj --no-build --configuration Release --output artifacts/packages
+
+      - name: Verify NuGet packages
+        run: ./eng/verify-dotnet-packages.sh artifacts/packages "${{ steps.package-version.outputs.version }}"
+
+      - name: Verify NuGet package consumer
+        run: ./eng/verify-dotnet-package-consumer.sh
+
+      - name: Upload package artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: nuget-${{ steps.package-version.outputs.version }}
+          path: |
+            artifacts/packages/*.nupkg
+            artifacts/packages/*.snupkg
+          if-no-files-found: error
+
+      - name: NuGet login
+        id: nuget-login
+        uses: NuGet/login@v1
+        with:
+          user: marna.li
+
+      - name: Publish to NuGet.org
+        shell: bash
+        env:
+          NUGET_API_KEY: ${{ steps.nuget-login.outputs.NUGET_API_KEY }}
+        run: |
+          for package in artifacts/packages/*.nupkg; do
+            dotnet nuget push "$package" \
+              --api-key "$NUGET_API_KEY" \
+              --source https://api.nuget.org/v3/index.json \
+              --skip-duplicate
+          done

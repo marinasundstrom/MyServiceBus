@@ -5,6 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>true</IsPackable>
+    <PackageId>Sundstrom.MyServiceBus</PackageId>
     <Description>Cross-language messaging runtime with MassTransit-compatible concepts and wire conventions.</Description>
   </PropertyGroup>
 

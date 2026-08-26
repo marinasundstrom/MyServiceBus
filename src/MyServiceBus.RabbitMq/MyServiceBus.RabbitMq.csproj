@@ -5,6 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>true</IsPackable>
+    <PackageId>Sundstrom.MyServiceBus.RabbitMq</PackageId>
     <Description>RabbitMQ transport for MyServiceBus.</Description>
   </PropertyGroup>
 

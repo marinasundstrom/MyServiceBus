@@ -5,6 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>true</IsPackable>
+    <PackageId>Sundstrom.MyServiceBus.Testing</PackageId>
     <Description>In-memory test harness and testing utilities for MyServiceBus.</Description>
   </PropertyGroup>
 

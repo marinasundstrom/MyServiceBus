@@ -25,14 +25,16 @@ This changelog summarizes the bigger themes in the repository history. It is int
 ### MVP dependency hygiene
 
 - Updated Aspire hosting, ASP.NET Core OpenAPI, and OpenTelemetry package families to patched releases so the resolved MVP application dependency graph is clear of known NuGet advisories.
+- Updated the RabbitMQ Testcontainers dependency to resolve the patched SSH.NET release required by the release advisory gate.
 - Made .NET CI fail restoration when NuGet reports a low, moderate, high, or critical package advisory.
 
 ### MVP packaging
 
-- Defined the four supported .NET artifacts as explicit `0.1.0-preview.1` NuGet packages with repository, license, description, readme, and symbol metadata; all non-package projects are excluded by default.
+- Defined the four supported `Sundstrom.MyServiceBus` .NET artifacts as explicit `0.1.0-preview.1` NuGet packages with repository, license, description, readme, and symbol metadata; all non-package projects are excluded by default.
 - Defined seven foundational Java modules as `0.1.0-preview.1` Maven publications with source, Javadoc, license, project, developer, and source-control metadata; preview inspection and sample applications remain unpublished.
 - Scoped Java production dependencies to the modules that own them so published POMs do not expose unrelated broker, serialization, dependency-injection, logging, or telemetry libraries.
 - Added NuGet and Maven package construction to the regular .NET and Java CI workflows.
+- Added a NuGet preview publication workflow using NuGet.org trusted publishing and short-lived GitHub OIDC credentials.
 - Declared the sample application's fat-JAR inputs as task dependencies so the aggregate Gradle build remains valid under Gradle 9.
 
 ### Product and hosting boundaries
