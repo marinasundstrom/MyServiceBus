@@ -35,6 +35,7 @@ This changelog summarizes the bigger themes in the repository history. It is int
 - Scoped Java production dependencies to the modules that own them so published POMs do not expose unrelated broker, serialization, dependency-injection, logging, or telemetry libraries.
 - Added NuGet and Maven package construction to the regular .NET and Java CI workflows.
 - Added a NuGet preview publication workflow using NuGet.org trusted publishing and short-lived GitHub OIDC credentials.
+- Added NuGet package discovery, installation guidance, and a main-package version badge to the project README.
 - Declared the sample application's fat-JAR inputs as task dependencies so the aggregate Gradle build remains valid under Gradle 9.
 
 ### Product and hosting boundaries

@@ -2,12 +2,42 @@
 
 [![.NET CI](https://github.com/marinasundstrom/MyServiceBus/actions/workflows/dotnet.yml/badge.svg)](https://github.com/marinasundstrom/MyServiceBus/actions/workflows/dotnet.yml)
 [![Java CI](https://github.com/marinasundstrom/MyServiceBus/actions/workflows/java.yml/badge.svg)](https://github.com/marinasundstrom/MyServiceBus/actions/workflows/java.yml)
+[![NuGet](https://img.shields.io/nuget/vpre/Sundstrom.MyServiceBus.svg?logo=nuget&label=NuGet)](https://www.nuget.org/packages/Sundstrom.MyServiceBus)
 
 MyServiceBus (working title) is a lightweight, asynchronous service-bus runtime for Java and .NET, inspired by **MassTransit**.
 
 It provides a consistent, opinionated broker-backed messaging model while remaining compatible with the documented **MassTransit RabbitMQ envelope and messaging semantics**. This makes it possible for Java and .NET services to send, publish, and consume messages across platforms, or interoperate with MassTransit in the [verified compatibility scenarios](docs/compatibility.md).
 
 See samples below.
+
+---
+
+## Getting started with .NET
+
+Install the RabbitMQ transport for a broker-backed application. It brings in the core runtime and abstractions transitively:
+
+```bash
+dotnet add package Sundstrom.MyServiceBus.RabbitMq --version 0.1.0-preview.1
+```
+
+For an application that only needs the core runtime and its in-memory mediator, install the main package directly:
+
+```bash
+dotnet add package Sundstrom.MyServiceBus --version 0.1.0-preview.1
+```
+
+Continue with the [.NET quick start](#c) to register the bus, configure RabbitMQ, add a consumer, and publish a message. The [feature walkthrough](docs/feature-walkthrough.md) covers the complete C# and Java APIs.
+
+### NuGet packages
+
+| Package | Purpose |
+| --- | --- |
+| [`Sundstrom.MyServiceBus`](https://www.nuget.org/packages/Sundstrom.MyServiceBus) | Core messaging runtime and in-memory mediator |
+| [`Sundstrom.MyServiceBus.Abstractions`](https://www.nuget.org/packages/Sundstrom.MyServiceBus.Abstractions) | Portable message contracts, contexts, and endpoint abstractions |
+| [`Sundstrom.MyServiceBus.RabbitMq`](https://www.nuget.org/packages/Sundstrom.MyServiceBus.RabbitMq) | RabbitMQ transport and configuration integration |
+| [`Sundstrom.MyServiceBus.Testing`](https://www.nuget.org/packages/Sundstrom.MyServiceBus.Testing) | In-memory test harness and testing utilities |
+
+All packages currently use the same preview version. Install `Sundstrom.MyServiceBus.Testing` separately in test projects when the test harness is needed.
 
 ---
 
@@ -64,7 +94,7 @@ Unlike most Java messaging solutions, MyServiceBus does **not require a framewor
 
 ---
 
-## Getting Started
+## Building from source
 
 ### Prerequisites
 
