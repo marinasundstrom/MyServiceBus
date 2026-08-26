@@ -21,13 +21,13 @@ repositories {
 }
 
 dependencies {
-    implementation 'com.myservicebus:myservicebus-abstractions:0.1.0-preview.1'
-    implementation 'com.myservicebus:myservicebus-di:0.1.0-preview.1'
-    implementation 'com.myservicebus:myservicebus-logging:0.1.0-preview.1'
-    implementation 'com.myservicebus:myservicebus-tasks:0.1.0-preview.1'
-    implementation 'com.myservicebus:myservicebus:0.1.0-preview.1'
-    implementation 'com.myservicebus:myservicebus-rabbitmq:0.1.0-preview.1'
-    implementation 'com.myservicebus:myservicebus-testing:0.1.0-preview.1'
+    implementation 'com.sundstrom.myservicebus:myservicebus-abstractions:0.1.0-preview.1'
+    implementation 'com.sundstrom.myservicebus:myservicebus-di:0.1.0-preview.1'
+    implementation 'com.sundstrom.myservicebus:myservicebus-logging:0.1.0-preview.1'
+    implementation 'com.sundstrom.myservicebus:myservicebus-tasks:0.1.0-preview.1'
+    implementation 'com.sundstrom.myservicebus:myservicebus:0.1.0-preview.1'
+    implementation 'com.sundstrom.myservicebus:myservicebus-rabbitmq:0.1.0-preview.1'
+    implementation 'com.sundstrom.myservicebus:myservicebus-testing:0.1.0-preview.1'
 }
 
 application {

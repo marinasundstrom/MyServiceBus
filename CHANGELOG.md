@@ -38,6 +38,7 @@ This changelog summarizes the bigger themes in the repository history. It is int
 - Added NuGet package discovery, installation guidance, and a main-package version badge to the project README.
 - Added signed Maven Central bundle publication through the Central Portal API, including automatic validation, release-status polling, and synchronized .NET/Java version checks.
 - Added Maven Central artifact discovery and a coordinated tagged release procedure for keeping NuGet and Maven releases on the same commit.
+- Published Java artifacts under the owner-scoped `com.sundstrom.myservicebus` Maven group.
 - Declared the sample application's fat-JAR inputs as task dependencies so the aggregate Gradle build remains valid under Gradle 9.
 
 ### Product and hosting boundaries

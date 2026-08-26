@@ -25,10 +25,10 @@ output_dir="$(cd "$output_dir" && pwd)"
 
 for module in $modules; do
   repository="src/Java/$module/build/repository"
-  version_directory="$repository/com/myservicebus/$module/$version"
+  version_directory="$repository/com/sundstrom/myservicebus/$module/$version"
   test -d "$version_directory"
-  mkdir -p "$staging_dir/com/myservicebus/$module"
-  cp -R "$version_directory" "$staging_dir/com/myservicebus/$module/"
+  mkdir -p "$staging_dir/com/sundstrom/myservicebus/$module"
+  cp -R "$version_directory" "$staging_dir/com/sundstrom/myservicebus/$module/"
 done
 
 bundle="$staging_dir/$output_name"

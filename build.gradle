@@ -1,5 +1,5 @@
 
-group = 'com.myservicebus'
+group = 'com.sundstrom.myservicebus'
 version = '0.1.0-preview.1'
 
 def publishedProjectDescriptions = [
