@@ -1,5 +1,5 @@
 
-group = 'com.sundstrom.myservicebus'
+group = 'io.github.marinasundstrom.myservicebus'
 version = '0.1.0-preview.1'
 
 def publishedProjectDescriptions = [

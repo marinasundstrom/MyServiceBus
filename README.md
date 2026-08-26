@@ -3,7 +3,7 @@
 [![.NET CI](https://github.com/marinasundstrom/MyServiceBus/actions/workflows/dotnet.yml/badge.svg)](https://github.com/marinasundstrom/MyServiceBus/actions/workflows/dotnet.yml)
 [![Java CI](https://github.com/marinasundstrom/MyServiceBus/actions/workflows/java.yml/badge.svg)](https://github.com/marinasundstrom/MyServiceBus/actions/workflows/java.yml)
 [![NuGet](https://img.shields.io/nuget/vpre/Sundstrom.MyServiceBus.svg?logo=nuget&label=NuGet)](https://www.nuget.org/packages/Sundstrom.MyServiceBus)
-[![Maven Central](https://img.shields.io/maven-central/v/com.sundstrom.myservicebus/myservicebus?logo=apachemaven&label=Maven%20Central)](https://central.sonatype.com/artifact/com.sundstrom.myservicebus/myservicebus)
+[![Maven Central](https://img.shields.io/maven-central/v/io.github.marinasundstrom.myservicebus/myservicebus?logo=apachemaven&label=Maven%20Central)](https://central.sonatype.com/artifact/io.github.marinasundstrom.myservicebus/myservicebus)
 
 MyServiceBus (working title) is a lightweight, asynchronous service-bus runtime for Java and .NET, inspired by **MassTransit**.
 
@@ -48,7 +48,7 @@ Add the RabbitMQ module to a Gradle application. It brings in the Java runtime a
 
 ```groovy
 dependencies {
-    implementation 'com.sundstrom.myservicebus:myservicebus-rabbitmq:0.1.0-preview.1'
+    implementation 'io.github.marinasundstrom.myservicebus:myservicebus-rabbitmq:0.1.0-preview.1'
 }
 ```
 
@@ -56,7 +56,7 @@ For Maven applications:
 
 ```xml
 <dependency>
-  <groupId>com.sundstrom.myservicebus</groupId>
+  <groupId>io.github.marinasundstrom.myservicebus</groupId>
   <artifactId>myservicebus-rabbitmq</artifactId>
   <version>0.1.0-preview.1</version>
 </dependency>
@@ -68,13 +68,13 @@ Continue with the [Java quick start](#java) or the detailed [Java guide](src/Jav
 
 | Artifact | Purpose |
 | --- | --- |
-| [`com.sundstrom.myservicebus:myservicebus`](https://central.sonatype.com/artifact/com.sundstrom.myservicebus/myservicebus) | Core messaging runtime and in-memory mediator |
-| [`com.sundstrom.myservicebus:myservicebus-abstractions`](https://central.sonatype.com/artifact/com.sundstrom.myservicebus/myservicebus-abstractions) | Portable messaging contracts and abstractions |
-| [`com.sundstrom.myservicebus:myservicebus-di`](https://central.sonatype.com/artifact/com.sundstrom.myservicebus/myservicebus-di) | Dependency-injection abstractions |
-| [`com.sundstrom.myservicebus:myservicebus-logging`](https://central.sonatype.com/artifact/com.sundstrom.myservicebus/myservicebus-logging) | Logging abstractions and adapters |
-| [`com.sundstrom.myservicebus:myservicebus-tasks`](https://central.sonatype.com/artifact/com.sundstrom.myservicebus/myservicebus-tasks) | Asynchronous task and cancellation abstractions |
-| [`com.sundstrom.myservicebus:myservicebus-rabbitmq`](https://central.sonatype.com/artifact/com.sundstrom.myservicebus/myservicebus-rabbitmq) | RabbitMQ transport and configuration integration |
-| [`com.sundstrom.myservicebus:myservicebus-testing`](https://central.sonatype.com/artifact/com.sundstrom.myservicebus/myservicebus-testing) | In-memory test harness and testing utilities |
+| [`io.github.marinasundstrom.myservicebus:myservicebus`](https://central.sonatype.com/artifact/io.github.marinasundstrom.myservicebus/myservicebus) | Core messaging runtime and in-memory mediator |
+| [`io.github.marinasundstrom.myservicebus:myservicebus-abstractions`](https://central.sonatype.com/artifact/io.github.marinasundstrom.myservicebus/myservicebus-abstractions) | Portable messaging contracts and abstractions |
+| [`io.github.marinasundstrom.myservicebus:myservicebus-di`](https://central.sonatype.com/artifact/io.github.marinasundstrom.myservicebus/myservicebus-di) | Dependency-injection abstractions |
+| [`io.github.marinasundstrom.myservicebus:myservicebus-logging`](https://central.sonatype.com/artifact/io.github.marinasundstrom.myservicebus/myservicebus-logging) | Logging abstractions and adapters |
+| [`io.github.marinasundstrom.myservicebus:myservicebus-tasks`](https://central.sonatype.com/artifact/io.github.marinasundstrom.myservicebus/myservicebus-tasks) | Asynchronous task and cancellation abstractions |
+| [`io.github.marinasundstrom.myservicebus:myservicebus-rabbitmq`](https://central.sonatype.com/artifact/io.github.marinasundstrom.myservicebus/myservicebus-rabbitmq) | RabbitMQ transport and configuration integration |
+| [`io.github.marinasundstrom.myservicebus:myservicebus-testing`](https://central.sonatype.com/artifact/io.github.marinasundstrom.myservicebus/myservicebus-testing) | In-memory test harness and testing utilities |
 
 All Java artifacts use the same version as the corresponding NuGet release.
 

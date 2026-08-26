@@ -31,7 +31,7 @@ The trusted policy owner must own all four package IDs:
 
 ## One-time Maven Central setup
 
-Verify the `com.sundstrom.myservicebus` namespace in the Maven Central Publisher Portal and create a current Portal user token. The workflow uses these repository secrets:
+Verify that the Portal account has the GitHub-backed `io.github.marinasundstrom` namespace; the project publishes beneath it as `io.github.marinasundstrom.myservicebus`. Create a current Portal user token for that account. The workflow uses these repository secrets:
 
 | Secret | Content |
 | --- | --- |

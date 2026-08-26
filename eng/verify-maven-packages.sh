@@ -6,7 +6,7 @@ modules="myservicebus-abstractions myservicebus-di myservicebus-logging myservic
 require_signatures="${REQUIRE_MAVEN_SIGNATURES:-0}"
 
 for artifact_id in $modules; do
-  artifact_dir="src/Java/$artifact_id/build/repository/com/sundstrom/myservicebus/$artifact_id/$version"
+  artifact_dir="src/Java/$artifact_id/build/repository/io/github/marinasundstrom/myservicebus/$artifact_id/$version"
   base="$artifact_dir/$artifact_id-$version"
 
   test -f "$base.jar"
@@ -15,7 +15,7 @@ for artifact_id in $modules; do
   test -f "$base.module"
   test -f "$base.pom"
 
-  grep -Fq '<groupId>com.sundstrom.myservicebus</groupId>' "$base.pom"
+  grep -Fq '<groupId>io.github.marinasundstrom.myservicebus</groupId>' "$base.pom"
   grep -Fq "<artifactId>$artifact_id</artifactId>" "$base.pom"
   grep -Fq "<version>$version</version>" "$base.pom"
   grep -Fq '<name>MIT License</name>' "$base.pom"
