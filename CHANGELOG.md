@@ -36,6 +36,8 @@ This changelog summarizes the bigger themes in the repository history. It is int
 - Added NuGet and Maven package construction to the regular .NET and Java CI workflows.
 - Added a NuGet preview publication workflow using NuGet.org trusted publishing and short-lived GitHub OIDC credentials.
 - Added NuGet package discovery, installation guidance, and a main-package version badge to the project README.
+- Added signed Maven Central bundle publication through the Central Portal API, including automatic validation, release-status polling, and synchronized .NET/Java version checks.
+- Added Maven Central artifact discovery and a coordinated tagged release procedure for keeping NuGet and Maven releases on the same commit.
 - Declared the sample application's fat-JAR inputs as task dependencies so the aggregate Gradle build remains valid under Gradle 9.
 
 ### Product and hosting boundaries

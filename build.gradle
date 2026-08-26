@@ -63,6 +63,7 @@ subprojects {
 
 configure(subprojects.findAll { publishedProjectDescriptions.containsKey(it.name) }) {
     apply plugin: 'maven-publish'
+    apply plugin: 'signing'
 
     description = publishedProjectDescriptions[name]
 
@@ -116,6 +117,16 @@ configure(subprojects.findAll { publishedProjectDescriptions.containsKey(it.name
                 name = 'staging'
                 url = layout.buildDirectory.dir('repository')
             }
+        }
+    }
+
+    def signingKey = System.getenv('MAVEN_SIGNING_KEY')
+    def signingPassword = System.getenv('MAVEN_SIGNING_PASSWORD')
+
+    if (signingKey) {
+        signing {
+            useInMemoryPgpKeys(signingKey, signingPassword)
+            sign publishing.publications.mavenJava
         }
     }
 }

@@ -38,6 +38,7 @@ jobs:
               exit 1
               ;;
           esac
+          ./eng/verify-release-versions.sh "$version"
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
       - name: Restore dependencies

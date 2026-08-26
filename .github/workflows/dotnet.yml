@@ -25,6 +25,8 @@ jobs:
         run: dotnet restore --warnaserror:'NU1901;NU1902;NU1903;NU1904'
       - name: Verify supported versions
         run: ./eng/verify-supported-versions.sh
+      - name: Verify release versions
+        run: ./eng/verify-release-versions.sh
       - name: Build
         run: dotnet build --no-restore --configuration Release
       - name: Test

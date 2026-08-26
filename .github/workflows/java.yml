@@ -28,6 +28,8 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '9.0.0'
+      - name: Verify release versions
+        run: ./eng/verify-release-versions.sh
       - name: Build with Gradle
         run: gradle test publish
       - name: Verify Maven packages

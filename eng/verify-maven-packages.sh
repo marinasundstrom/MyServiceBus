@@ -3,6 +3,7 @@ set -eu
 
 version="${1:-0.1.0-preview.1}"
 modules="myservicebus-abstractions myservicebus-di myservicebus-logging myservicebus-tasks myservicebus myservicebus-rabbitmq myservicebus-testing"
+require_signatures="${REQUIRE_MAVEN_SIGNATURES:-0}"
 
 for artifact_id in $modules; do
   artifact_dir="src/Java/$artifact_id/build/repository/com/myservicebus/$artifact_id/$version"
@@ -20,8 +21,18 @@ for artifact_id in $modules; do
   grep -Fq '<name>MIT License</name>' "$base.pom"
   grep -Fq '<url>https://github.com/marinasundstrom/MyServiceBus</url>' "$base.pom"
 
-  actual_artifacts="$(find "$artifact_dir" -maxdepth 1 -type f | wc -l | tr -d ' ')"
-  test "$actual_artifacts" = 25
+  if [ "$require_signatures" = "1" ]; then
+    for artifact in "$base.jar" "$base-sources.jar" "$base-javadoc.jar" "$base.module" "$base.pom"; do
+      test -s "$artifact.asc"
+    done
+  else
+    actual_artifacts="$(find "$artifact_dir" -maxdepth 1 -type f | wc -l | tr -d ' ')"
+    test "$actual_artifacts" = 25
+  fi
 done
 
-echo "Verified seven Maven publications with binary, source, Javadoc, module, and POM artifacts for $version."
+if [ "$require_signatures" = "1" ]; then
+  echo "Verified seven signed Maven publications with binary, source, Javadoc, module, and POM artifacts for $version."
+else
+  echo "Verified seven Maven publications with binary, source, Javadoc, module, and POM artifacts for $version."
+fi
