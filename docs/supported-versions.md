@@ -2,7 +2,7 @@
 
 ## MVP baseline
 
-MyServiceBus `0.1.0-preview.1` is built and tested against the following baseline:
+MyServiceBus `0.1.0-preview.2` is built and tested against the following baseline:
 
 | Component | Supported line | Reproducible CI baseline | Scope |
 | --- | --- | --- | --- |
@@ -30,7 +30,7 @@ has been tested.
 
 Before `1.0`, only the newest published MyServiceBus preview is actively supported. A new preview replaces the previous preview's support window. Fixes are delivered in a newer preview; the project does not promise servicing releases for older previews.
 
-The runtime lines above remain the baseline for the lifetime of `0.1.0-preview.1`. Security and servicing patches within .NET 10 and Java 17 are supported and recommended. Changing the target framework, Java bytecode level, RabbitMQ minor line, or MassTransit interoperability peer requires an explicit update to this document and a passing release gate.
+The runtime lines above remain the baseline for the lifetime of `0.1.0-preview.2`. Security and servicing patches within .NET 10 and Java 17 are supported and recommended. Changing the target framework, Java bytecode level, RabbitMQ minor line, or MassTransit interoperability peer requires an explicit update to this document and a passing release gate.
 
 ## Compatibility boundaries
 

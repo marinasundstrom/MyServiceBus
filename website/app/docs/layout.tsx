@@ -39,7 +39,7 @@ export default function DocumentationLayout({ children }: { children: React.Reac
           ))}
           <div className="sidebar-note">
             <span className="pulse" aria-hidden="true" />
-            <div><strong>0.1.0-preview.1</strong><br />Latest preview</div>
+            <div><strong>0.1.0-preview.2</strong><br />Latest preview</div>
           </div>
         </aside>
         <main className="docs-main">{children}</main>

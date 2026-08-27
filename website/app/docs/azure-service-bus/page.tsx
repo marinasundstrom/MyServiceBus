@@ -32,9 +32,9 @@ const connectionString = `export MY_SERVICE_BUS_CONNECTION_STRING="$(
 
 const install = {
   csharp: `dotnet add package Sundstrom.MyServiceBus.AzureServiceBus \\
-  --version 0.1.0-preview.1`,
+  --version 0.1.0-preview.2`,
   java: `dependencies {
-    implementation 'io.github.marinasundstrom.myservicebus:myservicebus-azure-service-bus:0.1.0-preview.1'
+    implementation 'io.github.marinasundstrom.myservicebus:myservicebus-azure-service-bus:0.1.0-preview.2'
 }`,
 };
 

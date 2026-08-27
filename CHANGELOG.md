@@ -4,6 +4,8 @@ This changelog summarizes the bigger themes in the repository history. It is int
 
 ## Unreleased
 
+Release candidate: `0.1.0-preview.2`.
+
 ### Azure Service Bus transport groundwork
 
 - Defined the proposed Azure Service Bus transport profile, including initial capabilities, addressing, topology projection, message-property mapping, peek-lock settlement, compatibility error destinations, request/response, and the cross-language conformance boundary.

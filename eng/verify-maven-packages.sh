@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 set -eu
 
-version="${1:-0.1.0-preview.1}"
+version="${1:-0.1.0-preview.2}"
 modules="myservicebus-abstractions myservicebus-di myservicebus-logging myservicebus-tasks myservicebus myservicebus-rabbitmq myservicebus-azure-service-bus myservicebus-testing"
 require_signatures="${REQUIRE_MAVEN_SIGNATURES:-0}"
 
