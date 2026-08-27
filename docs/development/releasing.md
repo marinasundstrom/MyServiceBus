@@ -60,7 +60,7 @@ Using one immutable tag for both workflows prevents a branch update from causing
 ## Publishing both ecosystems
 
 1. In GitHub Actions, run **Publish Maven Central preview** and select the release tag.
-2. Wait for the workflow to reach Maven Central state `PUBLISHED`. It tests all Java modules, creates signed publications, verifies a clean consumer, uploads one bundle containing all eight artifacts, and waits for automatic validation and release.
+2. Wait for the workflow to reach Maven Central state `PUBLISHING` or `PUBLISHED`. It tests all Java modules, creates signed publications, verifies a clean consumer, uploads one bundle containing all eight artifacts, and waits for Central to validate and accept it. Publication then continues asynchronously in Central.
 3. Run **Publish NuGet preview** and select the same release tag.
 4. Confirm that all five NuGet packages and symbol packages were accepted.
 5. Verify the version on Maven Central and NuGet.org after registry indexing completes.
@@ -73,5 +73,12 @@ The `0.1.0-preview.1` NuGet packages were built from commit `e0314869a00daed5561
 ## Failure and retry behavior
 
 NuGet and Maven Central package versions are immutable. The NuGet workflow uses `--skip-duplicate`, allowing an interrupted multi-package push to resume without replacing accepted packages. Maven Central uploads all eight Java artifacts as one deployment bundle; validation failure leaves the deployment failed rather than partially publishing individual modules.
+
+If the Maven workflow is interrupted before Central accepts the deployment, do
+not upload the version again. Dispatch a ref containing the workflow's
+`deployment_id` resume input and supply the deployment ID from the interrupted
+run. The workflow checks that exact deployment and succeeds once Central reports
+`PUBLISHING` or `PUBLISHED`. Registry indexing is verified separately and must
+not keep the publication workflow running.
 
 Do not rebuild an already-published version from another commit. If a released artifact is defective, fix it, increment the preview version, repeat the complete candidate gate, and publish a new release tag.
