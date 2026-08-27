@@ -23,6 +23,7 @@ This changelog summarizes the bigger themes in the repository history. It is int
 - Made per-message entity-name configuration authoritative for publication and transport-composed requests in both implementations, including corresponding RabbitMQ resolution, after live Azure exposed the previous default-name fallback.
 - Added live Azure delivery-lock renewal coverage for C# and Java using handlers that outlive the entities' initial locks, with single-delivery and settlement verification.
 - Defined bidirectional MassTransit interoperability and matching transport naming as promotion requirements for every supported broker profile, and published the experimental Azure Service Bus status and evidence on the documentation website.
+- Aligned the default Azure Service Bus message-entity formatter with MassTransit in both clients, including namespace/package, nested-type, generic-type, and array conventions where the host type system exposes them, while keeping formatter configuration scoped to the transport.
 
 ### Documentation website
 

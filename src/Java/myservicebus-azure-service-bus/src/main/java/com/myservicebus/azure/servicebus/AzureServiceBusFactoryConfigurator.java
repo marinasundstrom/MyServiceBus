@@ -6,7 +6,6 @@ import com.myservicebus.BusRegistrationContext;
 import com.myservicebus.ConsumerFactory;
 import com.myservicebus.DefaultConstructorConsumerFactory;
 import com.myservicebus.EndpointNameFormatter;
-import com.myservicebus.EntityNameFormatter;
 import com.myservicebus.MessageBus;
 import com.myservicebus.MessageBusImpl;
 import com.myservicebus.MessageEntityNameFormatter;
@@ -34,6 +33,7 @@ public final class AzureServiceBusFactoryConfigurator implements BusFactoryConfi
     private int prefetchCount;
     private Function<String, String> temporaryEndpointNameFormatter = name -> name;
     private EndpointNameFormatter endpointNameFormatter;
+    private MessageEntityNameFormatter entityNameFormatter = AzureServiceBusMessageEntityNameFormatter.INSTANCE;
     private final Map<Class<?>, String> entityNames = new HashMap<>();
     private final List<AzureServiceBusReceiveEndpointConfigurator.HandlerRegistration<?>> handlers =
             new ArrayList<>();
@@ -66,7 +66,10 @@ public final class AzureServiceBusFactoryConfigurator implements BusFactoryConfi
     }
 
     public void setEntityNameFormatter(MessageEntityNameFormatter value) {
-        EntityNameFormatter.setFormatter(value);
+        if (value == null) {
+            throw new IllegalArgumentException("Entity name formatter cannot be null");
+        }
+        entityNameFormatter = value;
     }
 
     public void setTemporaryEndpointNameFormatter(Function<String, String> value) {
@@ -92,13 +95,13 @@ public final class AzureServiceBusFactoryConfigurator implements BusFactoryConfi
     }
 
     public String getEntityName(Class<?> messageType) {
-        return entityNames.getOrDefault(messageType, EntityNameFormatter.format(messageType));
+        return entityNames.getOrDefault(messageType, entityNameFormatter.formatEntityName(messageType));
     }
 
     public void receiveEndpoint(
             String queueName,
             Consumer<AzureServiceBusReceiveEndpointConfigurator> configure) {
-        configure.accept(new AzureServiceBusReceiveEndpointConfigurator(queueName, entityNames, handlers));
+        configure.accept(new AzureServiceBusReceiveEndpointConfigurator(queueName, this::getEntityName, handlers));
     }
 
     public void configureEndpoints(BusRegistrationContext context) {

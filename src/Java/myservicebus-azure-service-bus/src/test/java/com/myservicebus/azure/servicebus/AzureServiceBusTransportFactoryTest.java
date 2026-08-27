@@ -57,6 +57,15 @@ class AzureServiceBusTransportFactoryTest {
     }
 
     @Test
+    void profileUsesTheMassTransitAzureMessageNameConventionByDefault() {
+        AzureServiceBusFactoryConfigurator configurator = new AzureServiceBusFactoryConfigurator();
+
+        assertEquals(
+                "com.myservicebus.azure.servicebus/AzureServiceBusTransportFactoryTest-NestedMessage",
+                configurator.getEntityName(NestedMessage.class));
+    }
+
+    @Test
     void profileRejectsUnknownAbsoluteEntityTypes() {
         AzureServiceBusFactoryConfigurator configurator = new AzureServiceBusFactoryConfigurator();
         configurator.host(AzureServiceBusFactoryConfigurator.EMULATOR_CONNECTION_STRING);
@@ -87,5 +96,8 @@ class AzureServiceBusTransportFactoryTest {
     }
 
     private static final class ConfiguredMessage {
+    }
+
+    private static final class NestedMessage {
     }
 }

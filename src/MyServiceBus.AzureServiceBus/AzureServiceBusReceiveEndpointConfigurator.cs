@@ -8,7 +8,7 @@ namespace MyServiceBus;
 public sealed class AzureServiceBusReceiveEndpointConfigurator
 {
     private readonly string _queueName;
-    private readonly IDictionary<Type, string> _entityNames;
+    private readonly Func<Type, string> _entityNameResolver;
     private readonly IList<Action<IMessageBus, IServiceProvider>> _endpointActions;
     private int? _retryCount;
     private TimeSpan? _retryDelay;
@@ -17,12 +17,12 @@ public sealed class AzureServiceBusReceiveEndpointConfigurator
 
     internal AzureServiceBusReceiveEndpointConfigurator(
         string queueName,
-        IDictionary<Type, string> entityNames,
+        Func<Type, string> entityNameResolver,
         IList<Action<IMessageBus, IServiceProvider>> endpointActions)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(queueName);
         _queueName = queueName;
-        _entityNames = entityNames;
+        _entityNameResolver = entityNameResolver;
         _endpointActions = endpointActions;
     }
 
@@ -66,8 +66,7 @@ public sealed class AzureServiceBusReceiveEndpointConfigurator
             consumer.QueueName = _queueName;
             foreach (var binding in consumer.Bindings)
             {
-                if (_entityNames.TryGetValue(binding.MessageType, out var entityName))
-                    binding.EntityName = entityName;
+                binding.EntityName = _entityNameResolver(binding.MessageType);
             }
 
             consumer.PrefetchCount = _prefetchCount is null ? null : checked((ushort)_prefetchCount.Value);
@@ -104,9 +103,7 @@ public sealed class AzureServiceBusReceiveEndpointConfigurator
     public void Handler<T>(Func<ConsumeContext<T>, Task> handler) where T : class
     {
         ArgumentNullException.ThrowIfNull(handler);
-        var entityName = _entityNames.TryGetValue(typeof(T), out var configuredName)
-            ? configuredName
-            : EntityNameFormatter.Format(typeof(T));
+        var entityName = _entityNameResolver(typeof(T));
 
         _endpointActions.Add((bus, provider) =>
         {

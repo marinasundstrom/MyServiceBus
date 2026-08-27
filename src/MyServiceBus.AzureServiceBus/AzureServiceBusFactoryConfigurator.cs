@@ -23,7 +23,8 @@ public sealed class AzureServiceBusFactoryConfigurator : IAzureServiceBusFactory
 
     public IEndpointNameFormatter? EndpointNameFormatter { get; private set; }
 
-    public IMessageEntityNameFormatter? EntityNameFormatter { get; private set; }
+    public IMessageEntityNameFormatter? EntityNameFormatter { get; private set; } =
+        AzureServiceBusMessageEntityNameFormatter.Instance;
 
     public Func<string, string> TemporaryEndpointNameFormatter { get; private set; } = name => name;
 
@@ -59,7 +60,6 @@ public sealed class AzureServiceBusFactoryConfigurator : IAzureServiceBusFactory
     {
         ArgumentNullException.ThrowIfNull(formatter);
         EntityNameFormatter = formatter;
-        MyServiceBus.EntityNameFormatter.SetFormatter(formatter);
     }
 
     public void SetTemporaryEndpointNameFormatter(Func<string, string> formatter)
@@ -85,14 +85,14 @@ public sealed class AzureServiceBusFactoryConfigurator : IAzureServiceBusFactory
         ArgumentNullException.ThrowIfNull(messageType);
         return _entityNames.TryGetValue(messageType, out var configuredName)
             ? configuredName
-            : MyServiceBus.EntityNameFormatter.Format(messageType);
+            : EntityNameFormatter!.FormatEntityName(messageType);
     }
 
     public void ReceiveEndpoint(string queueName, Action<AzureServiceBusReceiveEndpointConfigurator> configure)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(queueName);
         ArgumentNullException.ThrowIfNull(configure);
-        configure(new AzureServiceBusReceiveEndpointConfigurator(queueName, _entityNames, _endpointActions));
+        configure(new AzureServiceBusReceiveEndpointConfigurator(queueName, GetEntityName, _endpointActions));
     }
 
     public void SetConsumerFactory(Type consumerFactoryType)

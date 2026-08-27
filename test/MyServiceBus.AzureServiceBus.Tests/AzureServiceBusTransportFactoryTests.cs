@@ -43,6 +43,19 @@ public sealed class AzureServiceBusTransportFactoryTests
     }
 
     [Fact]
+    public void Profile_uses_the_MassTransit_Azure_message_name_convention_by_default()
+    {
+        var configurator = new AzureServiceBusFactoryConfigurator();
+        var expected = new MassTransit.AzureServiceBusTransport.ServiceBusMessageNameFormatter()
+            .GetMessageName(typeof(GenericMessage<NestedMessage>));
+
+        configurator.GetEntityName(typeof(GenericMessage<NestedMessage>)).ShouldBe(expected);
+        expected.ShouldBe(
+            "MyServiceBus.AzureServiceBus.Tests/AzureServiceBusTransportFactoryTests-GenericMessage--" +
+            "AzureServiceBusTransportFactoryTests-NestedMessage--");
+    }
+
+    [Fact]
     public async Task Profile_rejects_unknown_absolute_entity_types()
     {
         var configurator = new AzureServiceBusFactoryConfigurator();
@@ -56,6 +69,14 @@ public sealed class AzureServiceBusTransportFactoryTests
     }
 
     private sealed class ConfiguredMessage
+    {
+    }
+
+    private sealed class NestedMessage
+    {
+    }
+
+    private sealed class GenericMessage<T>
     {
     }
 }

@@ -2,7 +2,6 @@ package com.myservicebus.azure.servicebus;
 
 import com.myservicebus.BusRegistrationContext;
 import com.myservicebus.ConsumeContext;
-import com.myservicebus.EntityNameFormatter;
 import com.myservicebus.PipeConfigurator;
 import com.myservicebus.RetryConfigurator;
 import com.myservicebus.serialization.MessageSerializer;
@@ -12,13 +11,12 @@ import com.myservicebus.topology.TopologyRegistry;
 
 import java.time.Duration;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 
 public final class AzureServiceBusReceiveEndpointConfigurator {
     private final String queueName;
-    private final Map<Class<?>, String> entityNames;
+    private final Function<Class<?>, String> entityNameResolver;
     private final List<HandlerRegistration<?>> handlers;
     private Integer retryCount;
     private Duration retryDelay;
@@ -27,10 +25,10 @@ public final class AzureServiceBusReceiveEndpointConfigurator {
 
     AzureServiceBusReceiveEndpointConfigurator(
             String queueName,
-            Map<Class<?>, String> entityNames,
+            Function<Class<?>, String> entityNameResolver,
             List<HandlerRegistration<?>> handlers) {
         this.queueName = queueName;
-        this.entityNames = entityNames;
+        this.entityNameResolver = entityNameResolver;
         this.handlers = handlers;
     }
 
@@ -61,10 +59,7 @@ public final class AzureServiceBusReceiveEndpointConfigurator {
                         "Consumer " + consumerClass.getSimpleName() + " is not registered"));
         definition.setQueueName(queueName);
         for (MessageBinding binding : definition.getBindings()) {
-            String entityName = entityNames.get(binding.getMessageType());
-            if (entityName != null) {
-                binding.setEntityName(entityName);
-            }
+            binding.setEntityName(entityNameResolver.apply(binding.getMessageType()));
         }
         definition.setPrefetchCount(prefetchCount);
         definition.setSerializerClass(serializerClass);
@@ -83,7 +78,7 @@ public final class AzureServiceBusReceiveEndpointConfigurator {
     public <T> void handler(
             Class<T> messageType,
             Function<ConsumeContext<T>, CompletableFuture<Void>> handler) {
-        String entityName = entityNames.getOrDefault(messageType, EntityNameFormatter.format(messageType));
+        String entityName = entityNameResolver.apply(messageType);
         handlers.add(new HandlerRegistration<>(
                 queueName,
                 messageType,
