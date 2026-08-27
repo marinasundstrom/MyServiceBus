@@ -30,7 +30,10 @@ import org.junit.jupiter.api.Test;
 import java.net.URI;
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -88,6 +91,66 @@ class AzureServiceBusEmulatorTest {
             assertEquals("from-java", received.get(20, TimeUnit.SECONDS).getValue());
         } finally {
             receiveTransport.stop();
+            factory.close();
+        }
+    }
+
+    @Test
+    void competingConsumersDeliverEachMessageOnce() throws Exception {
+        requireEmulator();
+        int messageCount = 20;
+        purgeQueue("msb-direct");
+        AzureServiceBusFactoryConfigurator configurator = new AzureServiceBusFactoryConfigurator();
+        configurator.host(CONNECTION_STRING);
+        configurator.usePreProvisionedTopology();
+        AzureServiceBusTransportFactory factory = new AzureServiceBusTransportFactory(
+                configurator,
+                LoggerFactoryBuilder.create(builder -> builder.addConsole()));
+        MessageBinding binding = new MessageBinding();
+        binding.setMessageType(CompatibilityMessage.class);
+        binding.setEntityName("msb-compatibility-message");
+        ReceiveEndpointTransportTopology topology = new ReceiveEndpointTransportTopology(
+                "msb-direct", true, false, 1, List.of(binding), null);
+        ObjectMapper mapper = new ObjectMapper().findAndRegisterModules();
+        Map<String, AtomicInteger> deliveries = new ConcurrentHashMap<>();
+        Set<String> consumers = ConcurrentHashMap.newKeySet();
+        AtomicInteger delivered = new AtomicInteger();
+        CompletableFuture<Void> allDelivered = new CompletableFuture<>();
+        ReceiveTransport first = factory.createReceiveTransport(
+                topology,
+                transportMessage -> recordCompetingDelivery(
+                        "first", transportMessage.getBody(), mapper, deliveries, consumers,
+                        delivered, messageCount, allDelivered),
+                MessageUrn.forClass(CompatibilityMessage.class)::equals);
+        ReceiveTransport second = factory.createReceiveTransport(
+                topology,
+                transportMessage -> recordCompetingDelivery(
+                        "second", transportMessage.getBody(), mapper, deliveries, consumers,
+                        delivered, messageCount, allDelivered),
+                MessageUrn.forClass(CompatibilityMessage.class)::equals);
+
+        first.start();
+        second.start();
+        try {
+            URI destination = URI.create(factory.getSendAddress("msb-direct"));
+            for (int index = 0; index < messageCount; index++) {
+                CompatibilityMessage message = new CompatibilityMessage();
+                message.setValue("competing-" + index);
+                SendContext context = new SendContext(message, CancellationToken.none());
+                context.setDestinationAddress(destination);
+                byte[] body = context.serialize(new EnvelopeMessageSerializer());
+                factory.getSendTransport(destination)
+                        .send(body, context.getHeaders(), "application/vnd.masstransit+json");
+            }
+
+            allDelivered.get(20, TimeUnit.SECONDS);
+            Thread.sleep(250);
+            assertEquals(messageCount, deliveries.size());
+            deliveries.values().forEach(count -> assertEquals(1, count.get()));
+            assertEquals(2, consumers.size());
+        } finally {
+            second.stop();
+            first.stop();
             factory.close();
         }
     }
@@ -402,6 +465,31 @@ class AzureServiceBusEmulatorTest {
             received.complete(envelope.getMessage());
             return CompletableFuture.completedFuture(null);
         } catch (Exception exception) {
+            return CompletableFuture.failedFuture(exception);
+        }
+    }
+
+    private static CompletableFuture<Void> recordCompetingDelivery(
+            String consumer,
+            byte[] body,
+            ObjectMapper mapper,
+            Map<String, AtomicInteger> deliveries,
+            Set<String> consumers,
+            AtomicInteger delivered,
+            int messageCount,
+            CompletableFuture<Void> allDelivered) {
+        try {
+            Envelope<CompatibilityMessage> envelope = mapper.readValue(body, new TypeReference<>() { });
+            consumers.add(consumer);
+            deliveries.computeIfAbsent(envelope.getMessage().getValue(), ignored -> new AtomicInteger())
+                    .incrementAndGet();
+            if (delivered.incrementAndGet() == messageCount) {
+                allDelivered.complete(null);
+            }
+            Thread.sleep(25);
+            return CompletableFuture.completedFuture(null);
+        } catch (Exception exception) {
+            allDelivered.completeExceptionally(exception);
             return CompletableFuture.failedFuture(exception);
         }
     }

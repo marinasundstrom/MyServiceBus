@@ -269,7 +269,7 @@ both clients where applicable:
 - [x] retry exhaustion and completion after copying to `_error`
 - [x] endpoint-specific `Fault<T>` publication
 - [x] preservation in `_skipped`
-- [ ] competing consumers receive one delivery once per attempt
+- [x] competing consumers receive one delivery once per attempt
 - [x] startup rejection for unsupported transport options
 - [ ] C# and Java consumption of messages produced by the pinned MassTransit Azure
   Service Bus peer

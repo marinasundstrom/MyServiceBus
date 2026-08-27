@@ -1,6 +1,7 @@
 using Azure.Messaging.ServiceBus;
 using MyServiceBus.Serialization;
 using MyServiceBus.Topology;
+using System.Collections.Concurrent;
 using System.Text.Json;
 
 namespace MyServiceBus.AzureServiceBus.Tests;
@@ -61,6 +62,69 @@ public sealed class AzureServiceBusEmulatorTests
         finally
         {
             await receiveTransport.Stop();
+        }
+    }
+
+    [AzureServiceBusEmulatorFact]
+    public async Task Competing_consumers_deliver_each_message_once()
+    {
+        const int messageCount = 20;
+        await PurgeQueue("msb-direct");
+        var configurator = new AzureServiceBusFactoryConfigurator();
+        configurator.Host(ConnectionString);
+        configurator.UsePreProvisionedTopology();
+        await using var client = new ServiceBusClient(ConnectionString);
+        var factory = new AzureServiceBusTransportFactory(client, configurator);
+        var deliveries = new ConcurrentDictionary<string, int>();
+        var consumers = new ConcurrentDictionary<string, byte>();
+        var delivered = 0;
+        var allDelivered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var topology = new ReceiveEndpointTransportTopology(
+            "msb-direct",
+            durable: true,
+            temporary: false,
+            prefetchCount: 1,
+            [new MessageBinding { MessageType = typeof(CompatibilityMessage), EntityName = "msb-compatibility-message" }]);
+
+        Func<string, Func<ReceiveContext, Task>> handler = consumer => async context =>
+        {
+            if (context.TryGetMessage<CompatibilityMessage>(out var message))
+            {
+                consumers.TryAdd(consumer, 0);
+                deliveries.AddOrUpdate(message.Value, 1, (_, count) => count + 1);
+                if (Interlocked.Increment(ref delivered) == messageCount)
+                    allDelivered.TrySetResult();
+                await Task.Delay(25);
+            }
+        };
+        var first = await factory.CreateReceiveTransport(topology, handler("first"));
+        var second = await factory.CreateReceiveTransport(topology, handler("second"));
+
+        await first.Start();
+        await second.Start();
+        try
+        {
+            var sendTransport = await factory.GetSendTransport(new Uri("queue:msb-direct"));
+            for (var index = 0; index < messageCount; index++)
+            {
+                var context = new SendContext([typeof(CompatibilityMessage)], new EnvelopeMessageSerializer())
+                {
+                    MessageId = Guid.NewGuid().ToString(),
+                    DestinationAddress = new Uri("sb://localhost/msb-direct")
+                };
+                await sendTransport.Send(new CompatibilityMessage { Value = $"competing-{index}" }, context);
+            }
+
+            await allDelivered.Task.WaitAsync(TimeSpan.FromSeconds(20));
+            await Task.Delay(250);
+            Assert.Equal(messageCount, deliveries.Count);
+            Assert.All(deliveries.Values, count => Assert.Equal(1, count));
+            Assert.Equal(2, consumers.Count);
+        }
+        finally
+        {
+            await second.Stop();
+            await first.Stop();
         }
     }
 
