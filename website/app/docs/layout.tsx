@@ -6,6 +6,7 @@ const sections = [
     label: 'Start here',
     links: [
       ['Introduction', '/docs'],
+      ['Why MyServiceBus?', '/docs/why-myservicebus'],
       ['Getting started', '/docs/getting-started'],
     ],
   },
@@ -13,6 +14,7 @@ const sections = [
     label: 'Learn',
     links: [
       ['Core concepts', '/docs/concepts'],
+      ['Distributed systems fundamentals', '/docs/distributed-systems'],
       ['RabbitMQ transport', '/docs/rabbitmq'],
       ['Azure Service Bus', '/docs/azure-service-bus'],
       ['Runtime monitoring', '/docs/runtime-monitoring'],

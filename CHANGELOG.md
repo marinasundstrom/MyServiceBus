@@ -56,6 +56,7 @@ Release candidate: `0.1.0-preview.4`.
 
 ### Documentation website
 
+- Added practical guides for distributed-systems fundamentals, choosing asynchronous messaging, modeling communication before selecting a broker, and evaluating MyServiceBus as a community-driven preview alongside MassTransit and direct broker APIs.
 - Added a focused public documentation website with a C#/Java switch for the introduction and getting-started examples.
 - Curated the published information architecture around core messaging concepts, RabbitMQ, testing, and verified interoperability while keeping development documentation repository-only.
 - Added an independently triggered GitHub Pages deployment workflow that does not restore, build, test, or release the .NET and Java projects.
