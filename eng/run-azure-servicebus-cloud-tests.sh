@@ -1,9 +1,41 @@
 #!/bin/sh
 set -eu
 
+script_directory="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 resource_group="${AZURE_SERVICEBUS_RESOURCE_GROUP:-rg-myservicebus-tests}"
 namespace_name="${AZURE_SERVICEBUS_NAMESPACE:-sb-myservicebus-tests-se}"
 authorization_rule="${AZURE_SERVICEBUS_AUTHORIZATION_RULE:-MyServiceBusTests}"
+ephemeral=false
+
+case "${1:-}" in
+  "")
+    ;;
+  --ephemeral)
+    ephemeral=true
+    namespace_name="${AZURE_SERVICEBUS_EPHEMERAL_NAMESPACE:-sb-msb-tests-$(date -u +%Y%m%d%H%M%S)-$$}"
+    export AZURE_SERVICEBUS_NAMESPACE="$namespace_name"
+    "$script_directory/manage-azure-servicebus-cloud-tests.sh" provision
+    ;;
+  *)
+    echo "Usage: $0 [--ephemeral]" >&2
+    exit 2
+    ;;
+esac
+
+cleanup() {
+  exit_status=$?
+  trap - EXIT HUP INT TERM
+  if [ "$ephemeral" = true ]; then
+    if ! "$script_directory/manage-azure-servicebus-cloud-tests.sh" teardown; then
+      if [ "$exit_status" -eq 0 ]; then
+        exit_status=1
+      fi
+    fi
+  fi
+  exit "$exit_status"
+}
+
+trap cleanup EXIT HUP INT TERM
 
 command -v az >/dev/null 2>&1 || {
   echo "Azure CLI is required." >&2

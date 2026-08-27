@@ -17,7 +17,8 @@ This changelog summarizes the bigger themes in the repository history. It is int
 - Added bidirectional Azure Service Bus conformance for MassTransit envelope metadata, application headers, and corresponding native broker properties.
 - Added corresponding C# and Java Azure Service Bus competing-consumer conformance with duplicate-delivery detection.
 - Added an opt-in cloud smoke gate for C# and Java consumption of messages sent by the pinned MassTransit Azure Service Bus transport.
-- Added secret-free Azure CLI orchestration and live Standard-tier acceptance tests that prove C# and Java Create-mode topology provisioning, publication, forwarding, consumption, and cleanup.
+- Added secret-free Azure CLI lifecycle orchestration, including failure-safe ephemeral namespace teardown, and live Standard-tier acceptance tests that prove C# and Java Create-mode topology provisioning, publication, forwarding, consumption, and cleanup.
+- Extended the live gate with corresponding C# and Java correlated request/response scenarios that inspect native temporary response queues and verify their auto-delete configuration.
 - Made per-message entity-name configuration authoritative for publication and transport-composed requests in both implementations, including corresponding RabbitMQ resolution, after live Azure exposed the previous default-name fallback.
 
 ### Documentation website

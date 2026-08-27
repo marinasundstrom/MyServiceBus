@@ -1,4 +1,6 @@
+using Azure.Messaging.ServiceBus;
 using Azure.Messaging.ServiceBus.Administration;
+using MyServiceBus.Serialization;
 
 namespace MyServiceBus.AzureServiceBus.Tests;
 
@@ -57,6 +59,60 @@ public sealed class AzureServiceBusCloudAcceptanceTests
         }
     }
 
+    [AzureServiceBusCloudFact]
+    public async Task Csharp_create_mode_provisions_a_temporary_request_endpoint()
+    {
+        var suffix = Guid.NewGuid().ToString("N")[..12];
+        var queueName = $"msb-request-csharp-{suffix}";
+        var topicName = $"msb-request-message-{suffix}";
+        var responseQueueName = $"msb-response-csharp-{suffix}";
+        var administrationClient = new ServiceBusAdministrationClient(ConnectionString);
+        var server = MessageBus.Factory.Create<AzureServiceBusFactoryConfigurator>(cfg =>
+        {
+            cfg.Host(ConnectionString);
+            cfg.Message<CloudRequest>(message => message.SetEntityName(topicName));
+            cfg.ReceiveEndpoint(queueName, endpoint =>
+                endpoint.Handler<CloudRequest>(context =>
+                    context.RespondAsync(new CloudResponse
+                    {
+                        Value = "response-to-" + context.Message.Value
+                    })));
+        });
+        var requestConfigurator = new AzureServiceBusFactoryConfigurator();
+        requestConfigurator.Host(ConnectionString);
+        requestConfigurator.Message<CloudRequest>(message => message.SetEntityName(topicName));
+        requestConfigurator.SetTemporaryEndpointNameFormatter(_ => responseQueueName);
+        await using var client = new ServiceBusClient(ConnectionString);
+        var requestFactory = new AzureServiceBusTransportFactory(client, requestConfigurator);
+        var requestClient = new GenericRequestClient<CloudRequest>(
+            requestFactory,
+            new EnvelopeMessageSerializer(),
+            new SendContextFactory(),
+            timeout: RequestTimeout.After(TimeSpan.FromSeconds(30)));
+
+        try
+        {
+            await server.StartAsync(CancellationToken.None);
+
+            var response = await requestClient.GetResponseAsync<CloudResponse>(
+                new CloudRequest { Value = "csharp-live-request" });
+
+            Assert.Equal("response-to-csharp-live-request", response.Message.Value);
+            var responseQueue = (await administrationClient.GetQueueAsync(responseQueueName)).Value;
+            Assert.Equal(TimeSpan.FromMinutes(5), responseQueue.AutoDeleteOnIdle);
+        }
+        finally
+        {
+            await server.StopAsync(CancellationToken.None);
+            await DeleteQueueIfExists(administrationClient, responseQueueName);
+            await DeleteQueueIfExists(administrationClient, queueName);
+            await DeleteQueueIfExists(administrationClient, queueName + "_error");
+            await DeleteQueueIfExists(administrationClient, queueName + "_skipped");
+            await DeleteTopicIfExists(administrationClient, topicName);
+            await DeleteTopicIfExists(administrationClient, queueName + "_fault");
+        }
+    }
+
     private static async Task DeleteQueueIfExists(
         ServiceBusAdministrationClient administrationClient,
         string queueName)
@@ -79,6 +135,16 @@ public sealed class AzureServiceBusCloudAcceptanceTests
             : address;
 
     public sealed class CloudMessage
+    {
+        public string Value { get; set; } = string.Empty;
+    }
+
+    public sealed class CloudRequest
+    {
+        public string Value { get; set; } = string.Empty;
+    }
+
+    public sealed class CloudResponse
     {
         public string Value { get; set; } = string.Empty;
     }

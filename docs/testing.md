@@ -85,6 +85,43 @@ namespace `sb-myservicebus-tests-se`, and authorization rule
 be allowed to list authorization-rule keys. The connection string exists only
 in the runner process environment and is not written to the repository.
 
+The namespace lifecycle can be managed explicitly:
+
+```bash
+eng/manage-azure-servicebus-cloud-tests.sh provision
+eng/manage-azure-servicebus-cloud-tests.sh status
+eng/manage-azure-servicebus-cloud-tests.sh teardown
+```
+
+`teardown` waits until the exact configured namespace has been deleted. It
+does not delete the resource group or any other resource. For an isolated
+one-shot run, provision a globally unique namespace and guarantee teardown on
+success, test failure, or interruption with:
+
+```bash
+eng/run-azure-servicebus-cloud-tests.sh --ephemeral
+```
+
+The ephemeral runner deliberately ignores `AZURE_SERVICEBUS_NAMESPACE` and
+generates a unique namespace. Set `AZURE_SERVICEBUS_EPHEMERAL_NAMESPACE` only
+when a predictable one-shot name is required. The free resource group remains
+afterward so its deletion can never remove unrelated resources.
+
+The repeatable live-test procedure is:
+
+1. Sign in with `az login` and select the intended subscription with
+   `az account set` when necessary.
+2. Run `eng/run-azure-servicebus-cloud-tests.sh --ephemeral` for an isolated
+   acceptance run, or provision once and use the runner without an argument for
+   the persistent development namespace.
+3. Let the C# gate finish before the Java gate; both use unique entity names and
+   remove their queues, topics, and subscriptions in test cleanup.
+4. Confirm that both gates report success. They verify Create-mode topology,
+   publish/forward/consume behavior, correlated request/response, and the
+   five-minute native auto-delete setting on temporary response queues.
+5. For persistent use, run the explicit `teardown` command when the namespace is
+   no longer needed. Ephemeral runs do this automatically in an exit trap.
+
 Create an equivalent isolated namespace and test rule with:
 
 ```bash

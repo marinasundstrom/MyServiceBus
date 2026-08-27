@@ -244,7 +244,7 @@ least:
 
 - [x] cloud topology creation from both clients
 - [x] cloud publish, subscription forwarding, and consumption from both clients
-- auto-delete response queues
+- [x] correlated request/response and auto-delete response queues in both clients
 - lock renewal during a long-running consumer
 - `_error`/completion behavior across a transient failure
 - MassTransit interoperability on the pinned compatibility version
@@ -275,6 +275,7 @@ both clients where applicable:
 - [x] competing consumers receive one delivery once per attempt
 - [x] startup rejection for unsupported transport options
 - [x] C# and Java live-Azure topology creation, publication, forwarding, and consumption
+- [x] C# and Java live-Azure request/response with native auto-delete response queues
 - [ ] C# and Java consumption of messages produced by the pinned MassTransit Azure
   Service Bus peer (an opt-in cloud gate is checked in; cloud execution evidence
   is still required)
