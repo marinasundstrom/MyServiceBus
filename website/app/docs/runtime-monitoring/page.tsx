@@ -31,6 +31,8 @@ const exporterInstall = {
   java: `implementation 'io.github.marinasundstrom.myservicebus:myservicebus-monitoring:0.1.0-preview.4'`,
 };
 
+const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? '';
+
 export default function RuntimeMonitoring() {
   return (
     <article className="docs-article">
@@ -61,7 +63,7 @@ export default function RuntimeMonitoring() {
       <div className="dashboard-screenshots">
         <figure>
           <Image
-            src="/docs/runtime-monitoring-dashboard-dark.jpg"
+            src={`${basePath}/docs/runtime-monitoring-dashboard-dark.jpg`}
             alt="MyServiceBus monitoring dashboard in dark theme with fictional Commerce applications"
             width={1280}
             height={720}
@@ -70,7 +72,7 @@ export default function RuntimeMonitoring() {
         </figure>
         <figure>
           <Image
-            src="/docs/runtime-monitoring-dashboard-light.jpg"
+            src={`${basePath}/docs/runtime-monitoring-dashboard-light.jpg`}
             alt="MyServiceBus monitoring dashboard in light theme with fictional Commerce applications"
             width={1280}
             height={720}
