@@ -6,6 +6,13 @@ This changelog summarizes the bigger themes in the repository history. It is int
 
 Release candidate: `0.1.0-preview.4`.
 
+### NServiceBus interoperability
+
+- Separated neutral Raw JSON serialization from an explicit NServiceBus JSON compatibility profile in both C# and Java.
+- Added NServiceBus message headers, intents, contract-identity overrides, case-insensitive inbound JSON, and RabbitMQ conventional endpoint routing in both clients.
+- Added live RabbitMQ directed-send tests in both directions between NServiceBus and the C# and Java MyServiceBus clients, pinned to NServiceBus `10.2.8` and its RabbitMQ transport `11.2.1`.
+- Added an isolated Aspire test stack with a real NServiceBus peer and a MyServiceBus peer configured for the NServiceBus profile, and documented the verified boundary without implying untested features.
+
 ### Runtime monitoring direction
 
 - Published the optional inspection and monitoring client integrations as corresponding NuGet and Maven packages, with the collector and dashboard distributed independently as versioned multi-architecture container images.

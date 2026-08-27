@@ -20,6 +20,7 @@ For Java build and run instructions, including JDK 17 setup and how to run the t
   - [Mediator (In-Memory Transport)](#mediator-in-memory-transport)
 - [Advanced](#advanced)
   - [Configuration](#configuration)
+  - [JSON interoperability profiles](#json-interoperability-profiles)
   - [Dependency Injection](#dependency-injection)
   - [Logging](#logging)
   - [OpenTelemetry](#opentelemetry)
@@ -670,6 +671,33 @@ public record OrderSubmitted() { }
 ```
 
 Built-in endpoint name formatters include `DefaultEndpointNameFormatter`, `KebabCaseEndpointNameFormatter`, and `SnakeCaseEndpointNameFormatter`. Like MassTransit, automatic endpoint names are derived from the consumer type rather than the message type, and the `Consumer`, `Saga`, and `Activity` suffixes are removed before casing is applied. The suffix rules keep the naming surface compatible; they do not imply that saga or activity runtimes are currently implemented.
+
+### JSON interoperability profiles
+
+Raw JSON and NServiceBus compatibility are intentionally separate. Select `RawJsonMessageSerializer` for a plain JSON body without peer-specific headers. Select `NServiceBusJsonMessageSerializer` only for the documented NServiceBus RabbitMQ boundary.
+
+#### C#
+
+```csharp
+builder.Services.AddServiceBus(x =>
+{
+    x.SetSerializer<NServiceBusJsonMessageSerializer>();
+    x.UsingRabbitMq((context, rabbit) => rabbit.ConfigureEndpoints(context));
+});
+```
+
+#### Java
+
+```java
+services.from(MessageBusServices.class)
+        .addServiceBus(cfg -> {
+            cfg.setSerializer(NServiceBusJsonMessageSerializer.class);
+            cfg.using(RabbitMqFactoryConfigurator.class,
+                    (context, rabbit) -> rabbit.configureEndpoints(context));
+        });
+```
+
+The serializer supplies NServiceBus message identity, intent, time, conversation, correlation, and reply headers. Use `NServiceBusMessageType` on a contract when its C# and Java names must map to a shared NServiceBus identity. See [NServiceBus interoperability](nservicebus-interoperability.md) for the verified versions, conventional topology requirement, and current directed-send boundary.
 
 #### Queue Arguments
 

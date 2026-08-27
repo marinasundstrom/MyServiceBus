@@ -335,6 +335,20 @@ public sealed class RabbitMqTransportFactory : ITransportFactory
             cancellationToken: cancellationToken
         );
 
+        // Conventional service-bus routing addresses an endpoint through a
+        // fanout exchange with the same name as its queue.
+        await channel.ExchangeDeclareAsync(
+            exchange: rabbitMqTopology.QueueName,
+            type: ExchangeType.Fanout,
+            durable: rabbitMqTopology.Durable,
+            autoDelete: rabbitMqTopology.AutoDelete,
+            cancellationToken: cancellationToken);
+        await channel.QueueBindAsync(
+            queue: rabbitMqTopology.QueueName,
+            exchange: rabbitMqTopology.QueueName,
+            routingKey: string.Empty,
+            cancellationToken: cancellationToken);
+
         foreach (var binding in rabbitMqTopology.Bindings)
         {
             await channel.QueueBindAsync(

@@ -50,6 +50,15 @@ public class RabbitMqReceiveTransport implements ReceiveTransport {
             } else {
                 headers.putIfAbsent(headerConvention.getContentTypeHeader(), "application/vnd.masstransit+json");
             }
+            if (delivery.getProperties().getMessageId() != null) {
+                headers.put("message_id", delivery.getProperties().getMessageId());
+            }
+            if (delivery.getProperties().getCorrelationId() != null) {
+                headers.put("correlation_id", delivery.getProperties().getCorrelationId());
+            }
+            if (delivery.getProperties().getReplyTo() != null) {
+                headers.put("reply_to", delivery.getProperties().getReplyTo());
+            }
             headers.putIfAbsent(headerConvention.getFaultAddressHeader(), faultAddress);
 
             TransportMessage tm = new TransportMessage(delivery.getBody(), headers);
@@ -64,7 +73,7 @@ public class RabbitMqReceiveTransport implements ReceiveTransport {
                 logger.error("Failed to parse message type", e);
             }
 
-            if (messageTypeUrn == null || !isMessageTypeRegistered.apply(messageTypeUrn)) {
+            if (!isMessageTypeRegistered.apply(messageTypeUrn)) {
                 channel.basicPublish(queueName + "_skipped", "", delivery.getProperties(), delivery.getBody());
                 channel.basicAck(delivery.getEnvelope().getDeliveryTag(), false);
                 return;

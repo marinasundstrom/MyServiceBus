@@ -20,6 +20,7 @@ const sections = [
       ['Runtime monitoring', '/docs/runtime-monitoring'],
       ['Testing', '/docs/testing'],
       ['Interoperability', '/docs/interoperability'],
+      ['NServiceBus', '/docs/nservicebus'],
     ],
   },
 ];

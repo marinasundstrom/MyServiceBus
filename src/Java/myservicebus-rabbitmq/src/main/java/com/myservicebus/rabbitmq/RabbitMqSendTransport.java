@@ -3,6 +3,7 @@ package com.myservicebus.rabbitmq;
 import com.myservicebus.SendTransport;
 import com.rabbitmq.client.AMQP;
 import com.rabbitmq.client.Channel;
+import com.rabbitmq.client.impl.LongStringHelper;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
@@ -61,7 +62,9 @@ public class RabbitMqSendTransport implements SendTransport {
                             break;
                     }
                 } else {
-                    if (v instanceof String s)
+                    if (v instanceof String s && k.startsWith("NServiceBus."))
+                        amqpHeaders.put(k, LongStringHelper.asLongString(s));
+                    else if (v instanceof String s)
                         amqpHeaders.put(k, s.getBytes(StandardCharsets.UTF_8));
                     else
                         amqpHeaders.put(k, v);

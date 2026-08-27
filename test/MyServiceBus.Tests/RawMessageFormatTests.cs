@@ -64,13 +64,14 @@ public class RawMessageFormatTests
 
         await bus.Publish(
             new TestMessage { Text = "hi" },
-            ctx => ctx.Headers["NServiceBus.EnclosedMessageTypes"] = "Contracts:TestMessage");
+            ctx => ctx.Headers["tenant-id"] = "tenant-a");
 
         Assert.Equal("application/json", factory.Transport.ContentType);
         Assert.Contains("\"text\":\"hi\"", Encoding.UTF8.GetString(factory.Transport.Body!));
         Assert.Equal(
-            "Contracts:TestMessage",
-            factory.Transport.Headers!["NServiceBus.EnclosedMessageTypes"]);
+            "tenant-a",
+            factory.Transport.Headers!["tenant-id"]);
+        Assert.DoesNotContain(NServiceBusHeaders.EnclosedMessageTypes, factory.Transport.Headers);
     }
 
     [Fact]
@@ -91,12 +92,13 @@ public class RawMessageFormatTests
         var endpoint = await bus.GetSendEndpoint(new Uri("queue:test"));
         await endpoint.Send(
             new TestMessage { Text = "hi" },
-            ctx => ctx.Headers["NServiceBus.EnclosedMessageTypes"] = "Contracts:TestMessage");
+            ctx => ctx.Headers["tenant-id"] = "tenant-a");
 
         Assert.Equal("application/json", factory.Transport.ContentType);
         Assert.Contains("\"text\":\"hi\"", Encoding.UTF8.GetString(factory.Transport.Body!));
         Assert.Equal(
-            "Contracts:TestMessage",
-            factory.Transport.Headers!["NServiceBus.EnclosedMessageTypes"]);
+            "tenant-a",
+            factory.Transport.Headers!["tenant-id"]);
+        Assert.DoesNotContain(NServiceBusHeaders.EnclosedMessageTypes, factory.Transport.Headers);
     }
 }

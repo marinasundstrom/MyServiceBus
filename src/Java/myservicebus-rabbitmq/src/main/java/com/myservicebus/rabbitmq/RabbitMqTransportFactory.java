@@ -177,10 +177,13 @@ public class RabbitMqTransportFactory implements TransportFactory {
             channel.basicQos(count);
         }
 
+        channel.exchangeDeclare(topology.queueName(), BuiltinExchangeType.FANOUT, true);
+        channel.queueDeclare(topology.queueName(), true, false, false, topology.queueArguments());
+        channel.queueBind(topology.queueName(), topology.queueName(), "");
+
         for (MessageBinding binding : topology.bindings()) {
             String exchangeName = binding.getEntityName();
             channel.exchangeDeclare(exchangeName, BuiltinExchangeType.FANOUT, true);
-            channel.queueDeclare(topology.queueName(), true, false, false, topology.queueArguments());
             channel.queueBind(topology.queueName(), exchangeName, "");
         }
 

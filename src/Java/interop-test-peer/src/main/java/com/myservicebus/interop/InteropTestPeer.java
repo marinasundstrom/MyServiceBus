@@ -20,6 +20,10 @@ import com.myservicebus.rabbitmq.RabbitMqRequestClientTransport;
 import com.myservicebus.rabbitmq.RabbitMqTransport;
 import com.myservicebus.rabbitmq.RabbitMqTransportFactory;
 import com.myservicebus.serialization.EnvelopeMessageSerializer;
+import com.myservicebus.serialization.DefaultInboundMessageResolver;
+import com.myservicebus.serialization.EnvelopeMessageDeserializer;
+import com.myservicebus.serialization.NServiceBusHeaders;
+import com.myservicebus.serialization.NServiceBusJsonMessageSerializer;
 import com.myservicebus.tasks.CancellationToken;
 import com.myservicebus.topology.MessageBinding;
 import com.rabbitmq.client.ConnectionFactory;
@@ -74,9 +78,69 @@ public final class InteropTestPeer {
             reply(transportFactory, args[1], args[2], args[3], false);
         } else if ("fault".equals(args[0])) {
             reply(transportFactory, args[1], args[2], args[3], true);
+        } else if ("nservicebus-consume".equals(args[0])) {
+            consumeNServiceBus(transportFactory, args[1], args[2], args[3]);
+        } else if ("nservicebus-send".equals(args[0])) {
+            sendNServiceBus(transportFactory, args[2], args[3]);
         } else {
             throw new IllegalArgumentException("Unknown mode: " + args[0]);
         }
+    }
+
+    private static void consumeNServiceBus(
+            RabbitMqTransportFactory transportFactory, String exchangeName, String queueName, String expectedValue)
+            throws Exception {
+        MessageBinding binding = new MessageBinding();
+        binding.setMessageType(TestApp.CrossLanguageMessage.class);
+        binding.setEntityName(exchangeName);
+        CompletableFuture<String> received = new CompletableFuture<>();
+        DefaultInboundMessageResolver resolver =
+                new DefaultInboundMessageResolver(new EnvelopeMessageDeserializer());
+        ReceiveTransport receiveTransport = transportFactory.createReceiveTransport(
+                queueName,
+                List.of(binding),
+                transportMessage -> {
+                    try {
+                        TestApp.CrossLanguageMessage message = resolver.resolve(transportMessage)
+                                .getMessage(TestApp.CrossLanguageMessage.class);
+                        received.complete(message.getValue());
+                        return CompletableFuture.completedFuture(null);
+                    } catch (Exception exception) {
+                        return CompletableFuture.failedFuture(exception);
+                    }
+                },
+                ignored -> true,
+                1);
+
+        receiveTransport.start();
+        System.out.println("READY");
+        System.out.flush();
+        try {
+            String actual = received.get(20, TimeUnit.SECONDS);
+            if (!expectedValue.equals(actual)) {
+                throw new IllegalStateException("Expected '" + expectedValue + "' but received '" + actual + "'");
+            }
+            System.out.println("RECEIVED");
+            System.out.flush();
+        } finally {
+            receiveTransport.stop();
+        }
+        System.exit(0);
+    }
+
+    private static void sendNServiceBus(
+            RabbitMqTransportFactory transportFactory, String queueName, String value) throws Exception {
+        TestApp.CrossLanguageMessage message = new TestApp.CrossLanguageMessage();
+        message.setValue(value);
+        SendContext context = new SendContext(message, CancellationToken.none());
+        context.getHeaders().put(NServiceBusHeaders.ENCLOSED_MESSAGE_TYPES, "TestApp.CrossLanguageMessage");
+        NServiceBusJsonMessageSerializer serializer = new NServiceBusJsonMessageSerializer();
+        byte[] body = context.serialize(serializer);
+        transportFactory.getQueueTransport(queueName)
+                .send(body, context.getHeaders(), serializer.getContentType());
+        System.out.println("SENT");
+        System.out.flush();
+        System.exit(0);
     }
 
     private static void consumeUnrecognized(

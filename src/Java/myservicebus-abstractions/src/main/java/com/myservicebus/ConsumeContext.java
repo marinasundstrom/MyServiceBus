@@ -225,6 +225,7 @@ public class ConsumeContext<T>
             return CompletableFuture.completedFuture(null);
         }
         context.setSourceAddress(busAddress);
+        context.setIntent(com.myservicebus.serialization.MessageIntent.REPLY);
         context.setDestinationAddress(URI.create(responseAddress));
         context.setRequestId(requestId);
         if (conversationId != null) {

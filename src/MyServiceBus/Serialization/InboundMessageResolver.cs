@@ -17,6 +17,12 @@ public class InboundMessageResolver : IInboundMessageResolver
 
     public IInboundMessage Resolve(ITransportMessage transportMessage)
     {
+        if (transportMessage.Headers.ContainsKey(NServiceBusHeaders.EnclosedMessageTypes)
+            || transportMessage.Headers.ContainsKey(NServiceBusHeaders.ContentType))
+        {
+            return new NServiceBusJsonMessageContext(transportMessage.Payload, transportMessage.Headers);
+        }
+
         var contentType = ReadContentType(transportMessage);
         return contentType switch
         {

@@ -92,7 +92,7 @@ RabbitMQ, Azure Service Bus, SQS/SNS, and other profiles are independent conform
 - Provide a factory that resolves send and receive transports and manages underlying connections.
 - Produce profile-correct publish and temporary-endpoint addresses. Portable request clients must obtain destination and response addresses from the transport rather than construct broker-specific URIs.
 - Ensure required topology exists before sending or receiving messages when topology provisioning is supported and enabled.
-- Serialize and transmit envelopes with `content_type` defaulting to `application/vnd.masstransit+json` so they are compatible with MassTransit. Transports may also send raw JSON with `content_type=application/json` when a raw serializer is explicitly selected. Receive paths must continue to support envelope messages by default and may dispatch raw `application/json` messages for endpoints that are explicitly configured for raw consumption.
+- Serialize and transmit envelopes with `content_type` defaulting to `application/vnd.masstransit+json` so they are compatible with MassTransit. Transports may also send neutral raw JSON with `content_type=application/json` when explicitly selected. Peer-specific protocols that also use JSON, including the NServiceBus profile, must remain separate serializers with their own documented headers and topology requirements.
 - Map headers prefixed with `_` to native transport properties.
 - Propagate cancellation tokens so operations can observe shutdown or timeouts.
 - Apply the selected profile's error and fault conventions. For the RabbitMQ profile, move failed messages to `<queue>_error` and publish `Fault<T>` messages describing the exception using the documented MassTransit-compatible routing rules.

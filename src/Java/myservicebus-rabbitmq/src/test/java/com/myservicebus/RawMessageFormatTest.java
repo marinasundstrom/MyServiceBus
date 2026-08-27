@@ -2,6 +2,7 @@ package com.myservicebus;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.net.URI;
@@ -46,19 +47,20 @@ class RawMessageFormatTest {
 
         provider.getSendEndpoint("queue:test").send(
                 new TestMessage("hi"),
-                ctx -> ctx.getHeaders().put("NServiceBus.EnclosedMessageTypes", "Contracts:TestMessage"),
+                ctx -> ctx.getHeaders().put("tenant-id", "tenant-a"),
                 com.myservicebus.tasks.CancellationToken.none()).join();
 
         assertEquals("application/json", factory.contentType);
         assertTrue(new String(factory.body, StandardCharsets.UTF_8).contains("\"text\":\"hi\""));
-        assertEquals("Contracts:TestMessage", factory.headers.get("NServiceBus.EnclosedMessageTypes"));
+        assertEquals("tenant-a", factory.headers.get("tenant-id"));
+        assertFalse(factory.headers.containsKey("NServiceBus.EnclosedMessageTypes"));
     }
 
     @Test
     void publish_pipe_can_emit_raw_json_payload() {
         RawJsonMessageSerializer serializer = new RawJsonMessageSerializer();
         SendContext context = new SendContext(new TestMessage("hi"), com.myservicebus.tasks.CancellationToken.none());
-        context.getHeaders().put("NServiceBus.EnclosedMessageTypes", "Contracts:TestMessage");
+        context.getHeaders().put("tenant-id", "tenant-a");
 
         byte[] body;
         try {
@@ -69,7 +71,8 @@ class RawMessageFormatTest {
 
         assertTrue(new String(body, StandardCharsets.UTF_8).contains("\"text\":\"hi\""));
         assertEquals("application/json", context.getHeaders().get("content_type"));
-        assertEquals("Contracts:TestMessage", context.getHeaders().get("NServiceBus.EnclosedMessageTypes"));
+        assertEquals("tenant-a", context.getHeaders().get("tenant-id"));
+        assertFalse(context.getHeaders().containsKey("NServiceBus.EnclosedMessageTypes"));
     }
 
     static class CapturingFactory extends RabbitMqTransportFactory {

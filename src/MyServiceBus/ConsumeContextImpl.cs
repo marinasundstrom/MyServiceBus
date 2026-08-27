@@ -109,6 +109,7 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
         var transport = await _transportFactory.GetSendTransport(address, cancellationToken);
 
         var context = _sendContextFactory.Create(MessageTypeCache.GetMessageTypes(typeof(T)), _messageSerializer, cancellationToken);
+        context.Intent = MessageIntent.Reply;
         context.MessageId = Guid.NewGuid().ToString();
         context.RequestId = receiveContext.RequestId;
         context.ConversationId = receiveContext.ConversationId;

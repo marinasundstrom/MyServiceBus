@@ -16,6 +16,8 @@ public class MessageSerializationContext<T>
     public Guid? ConversationId { get; set; }
     public Guid? InitiatorId { get; set; }
 
+    public MessageIntent Intent { get; set; } = MessageIntent.Send;
+
     public IList<string> MessageType { get; set; }
 
     public Uri? ResponseAddress { get; set; }

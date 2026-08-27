@@ -27,6 +27,7 @@ public class SendContext : BasePipeContext, ISendContext
     public string? CorrelationId { get; set; }
     public Guid? ConversationId { get; set; }
     public Guid? InitiatorId { get; set; }
+    public MessageIntent Intent { get; set; } = MessageIntent.Send;
     public Uri? ResponseAddress { get; set; }
     public Uri? FaultAddress { get; set; }
     public Uri? SourceAddress { get; set; }
@@ -39,11 +40,12 @@ public class SendContext : BasePipeContext, ISendContext
     {
         var context = new MessageSerializationContext<T>(message)
         {
-            MessageId = Guid.NewGuid(),
+            MessageId = Guid.TryParse(MessageId, out var messageId) ? messageId : Guid.NewGuid(),
             RequestId = RequestId,
             CorrelationId = Guid.TryParse(CorrelationId, out var correlationId) ? correlationId : null,
             ConversationId = ConversationId,
             InitiatorId = InitiatorId,
+            Intent = Intent,
             MessageType = [.. messageTypes.Select(x => MessageUrn.For(x))],
             ResponseAddress = ResponseAddress,
             FaultAddress = FaultAddress,

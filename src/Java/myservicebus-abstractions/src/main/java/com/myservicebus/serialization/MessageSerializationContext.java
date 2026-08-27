@@ -13,6 +13,7 @@ public class MessageSerializationContext<T> {
     private UUID correlationId;
     private UUID conversationId;
     private UUID initiatorId;
+    private MessageIntent intent = MessageIntent.SEND;
     private List<String> messageType;
     private URI responseAddress;
     private URI faultAddress;
@@ -65,6 +66,14 @@ public class MessageSerializationContext<T> {
 
     public void setInitiatorId(UUID initiatorId) {
         this.initiatorId = initiatorId;
+    }
+
+    public MessageIntent getIntent() {
+        return intent;
+    }
+
+    public void setIntent(MessageIntent intent) {
+        this.intent = intent;
     }
 
     public List<String> getMessageType() {

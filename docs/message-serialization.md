@@ -1,17 +1,18 @@
 # Message serialization
 
-The primary content type used for the envelope is `application/vnd.masstransit+json`. For compatibility the older
-`application/vnd.masstransit+json` value is also recognized.
+MyServiceBus supports three distinct JSON wire formats. They are separate choices rather than aliases for one another.
 
-Raw messages in JSON use `application/json`.
-This mode is intended for interoperability with non-MyServiceBus consumers such as NServiceBus endpoints or other plain-JSON consumers.
+| Serializer | Content type | Wire shape | Purpose |
+| --- | --- | --- | --- |
+| `EnvelopeMessageSerializer` | `application/vnd.masstransit+json` | MyServiceBus/MassTransit envelope | Default portable messaging profile |
+| `RawJsonMessageSerializer` | `application/json` | JSON payload only | Neutral integration with plain-JSON applications |
+| `NServiceBusJsonMessageSerializer` | `application/json` | NServiceBus JSON payload and headers | Explicit NServiceBus interoperability profile |
 
-If a message arrives without a `Content-Type` header, the envelope content type `application/vnd.masstransit+json` is
-assumed.
+If a message arrives without a content type, MyServiceBus assumes the envelope format. Raw JSON does not manufacture NServiceBus headers and the presence of raw JSON alone does not imply NServiceBus compatibility.
 
-## Configuring the serializer
+## Raw JSON
 
-The serializer can be swapped at registration time.
+Use raw JSON when another application wants only a JSON body and application-defined headers.
 
 **C#**
 
@@ -25,43 +26,43 @@ services.AddServiceBus(x =>
 **Java**
 
 ```java
-ServiceCollection services = ServiceCollection.create();
-
 services.from(MessageBusServices.class)
         .addServiceBus(cfg -> {
             cfg.setSerializer(RawJsonMessageSerializer.class);
-            cfg.using(RabbitMqFactoryConfigurator.class, (context, rbCfg) -> {});
+            cfg.using(RabbitMqFactoryConfigurator.class, (context, rabbit) -> {});
         });
 ```
 
-`EnvelopeMessageSerializer` remains the default and wraps the message with metadata. Use `RawJsonMessageSerializer` to send the payload as raw JSON while still allowing custom headers to be attached for external consumers.
+Raw JSON covers outbound send and publish and inbound dispatch through endpoints explicitly configured with `RawJsonMessageSerializer`. Since the payload contains no type envelope, the receive endpoint's configured consumer or handler type supplies the dispatch type.
 
-### Current scope
+## NServiceBus JSON
 
-Raw message support covers outbound `send` and `publish`.
-It also supports inbound `application/json` dispatch for handlers or consumers that are explicitly configured with `RawJsonMessageSerializer`.
-Envelope-based messaging remains the default.
+Use `NServiceBusJsonMessageSerializer` only for an endpoint or bus that communicates with NServiceBus. It writes the NServiceBus message identity, intent, conversation, correlation, reply, related-message, sent-time, content-type, and enclosed-message-type headers and reads the corresponding inbound form.
 
-### Per-endpoint serializer
+The supported RabbitMQ boundary and configuration examples are documented in [NServiceBus interoperability](nservicebus-interoperability.md).
 
-You can override the serializer used by a specific handler or consumer.
-When `RawJsonMessageSerializer` is configured on the endpoint, outbound follow-up messages use raw JSON and inbound `application/json` messages are dispatched directly to the configured message type without requiring an envelope.
+## Per-endpoint serializers
+
+A receive endpoint can override the global serializer. Inbound messages and outbound responses or follow-up operations from that endpoint then use the same format.
 
 **C#**
 
 ```csharp
-cfg.ReceiveEndpoint("input", e =>
+cfg.ReceiveEndpoint("input", endpoint =>
 {
-    e.SetSerializer<RawJsonMessageSerializer>();
-    e.Handler<MyMessage>(context => Task.CompletedTask);
+    endpoint.SetSerializer<RawJsonMessageSerializer>();
+    endpoint.Handler<MyMessage>(_ => Task.CompletedTask);
 });
 ```
 
 **Java**
 
 ```java
-cfg.receiveEndpoint("input", e -> {
-    e.setSerializer(RawJsonMessageSerializer.class);
-    e.handler(MyMessage.class, ctx -> CompletableFuture.completedFuture(null));
+cfg.receiveEndpoint("input", endpoint -> {
+    endpoint.setSerializer(RawJsonMessageSerializer.class);
+    endpoint.handler(MyMessage.class,
+            context -> CompletableFuture.completedFuture(null));
 });
 ```
+
+Substitute `NServiceBusJsonMessageSerializer` when the endpoint belongs to the NServiceBus compatibility profile.

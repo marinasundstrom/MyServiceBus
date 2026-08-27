@@ -32,7 +32,7 @@ The ServiceBus Java client mirrors the C# design by providing an asynchronous me
 ### RabbitMQ Transport
   - `RabbitMqSendEndpointProvider` uses the configured `MessageSerializer` (default `EnvelopeMessageSerializer`) to encode messages before forwarding them through cached `RabbitMqSendTransport` objects. Queue URIs such as `rabbitmq://host/orders` send directly to the named queue via the default exchange, while URIs containing `/exchange/` (for example `rabbitmq://host/exchange/orders`) or using the `exchange:<name>` shortcut publish to the specified exchange.
   - `RabbitMqTransportFactory` ensures exchanges exist before obtaining transports and reuses a shared connection via `ConnectionProvider`, which verifies the link is open and waits with exponential backoff to re-establish it when necessary.
-  - `RabbitMqSendTransport` uses `application/vnd.masstransit+json` for envelope messages and `application/json` when `RawJsonMessageSerializer` is configured for outbound sends.
+  - `RabbitMqSendTransport` uses `application/vnd.masstransit+json` for envelope messages and `application/json` for both neutral Raw JSON and the explicitly selected NServiceBus JSON profile.
   - Headers beginning with `_` map to standard transport properties (e.g., `_correlation_id` sets the AMQP `correlation-id`).
 
 ### Azure Service Bus Transport (Preview)
@@ -53,5 +53,5 @@ The ServiceBus Java client mirrors the C# design by providing an asynchronous me
 - The in-memory mediator supports this filter but does not enable retries unless configured.
 
 ## Behavior
-- Send and publish operations serialize messages into an envelope by default, encoding headers, host information, and message type. `RawJsonMessageSerializer` can be used for raw JSON interoperability on outbound operations, and handlers or consumers explicitly configured with it can consume inbound `application/json` messages without an envelope.
+- Send and publish operations serialize messages into an envelope by default. `RawJsonMessageSerializer` provides neutral payload-only JSON. `NServiceBusJsonMessageSerializer` is separate and writes and reads the headers required by the scoped [NServiceBus RabbitMQ profile](../nservicebus-interoperability.md).
 - Request–response and retry behaviors are supported through `GenericRequestClient` and `RetryFilter`.

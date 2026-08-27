@@ -174,11 +174,9 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
 
         MessageSerializer endpointSerializer = consumerDef.getSerializerClass() != null
                 ? consumerDef.getSerializerClass().getDeclaredConstructor().newInstance()
-                : null;
+                : serviceProvider.getService(MessageSerializer.class);
         boolean rawSerializer = isRawSerializer(endpointSerializer);
-        TransportSendEndpointProvider provider = endpointSerializer != null
-                ? transportSendEndpointProvider.withSerializer(endpointSerializer)
-                : transportSendEndpointProvider;
+        TransportSendEndpointProvider provider = transportSendEndpointProvider.withSerializer(endpointSerializer);
 
         Function<TransportMessage, CompletableFuture<Void>> handler = transportMessage -> {
             try {

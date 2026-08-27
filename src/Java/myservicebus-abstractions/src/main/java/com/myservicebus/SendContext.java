@@ -1,5 +1,6 @@
 package com.myservicebus;
 
+import com.myservicebus.serialization.MessageIntent;
 import com.myservicebus.serialization.MessageSerializationContext;
 import com.myservicebus.serialization.MessageSerializer;
 import java.net.URI;
@@ -26,6 +27,7 @@ public class SendContext implements PipeContext, ScheduledMessage {
     private UUID correlationId;
     private UUID conversationId = UUID.randomUUID();
     private UUID initiatorId;
+    private MessageIntent intent = MessageIntent.SEND;
     private List<String> messageTypes;
 
     public SendContext(Object message) {
@@ -113,6 +115,14 @@ public class SendContext implements PipeContext, ScheduledMessage {
         this.initiatorId = initiatorId;
     }
 
+    public MessageIntent getIntent() {
+        return intent;
+    }
+
+    public void setIntent(MessageIntent intent) {
+        this.intent = intent;
+    }
+
     public void setMessageTypes(List<String> messageTypes) {
         this.messageTypes = messageTypes;
     }
@@ -134,6 +144,7 @@ public class SendContext implements PipeContext, ScheduledMessage {
         context.setCorrelationId(correlationId);
         context.setConversationId(conversationId);
         context.setInitiatorId(initiatorId);
+        context.setIntent(intent);
         context.setMessageType(messageTypes != null ? messageTypes : MessageUrn.forMessageTypes(message.getClass()));
         context.setResponseAddress(responseAddress);
         context.setFaultAddress(faultAddress);

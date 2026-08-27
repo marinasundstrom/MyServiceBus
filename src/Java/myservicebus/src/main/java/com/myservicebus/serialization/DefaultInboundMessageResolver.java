@@ -26,6 +26,12 @@ public class DefaultInboundMessageResolver implements InboundMessageResolver {
 
     @Override
     public InboundMessage resolve(TransportMessage transportMessage) throws Exception {
+        if (transportMessage.getHeaders().containsKey(NServiceBusHeaders.ENCLOSED_MESSAGE_TYPES)
+                || transportMessage.getHeaders().containsKey(NServiceBusHeaders.CONTENT_TYPE)) {
+            return new NServiceBusJsonInboundMessage(
+                    transportMessage.getBody(), transportMessage.getHeaders(), rawMessageMapper);
+        }
+
         String contentType = readContentType(transportMessage);
         if (RAW_JSON_CONTENT_TYPE.equalsIgnoreCase(contentType)) {
             return new RawJsonInboundMessage(transportMessage.getBody(), transportMessage.getHeaders(), rawMessageMapper, headerConvention);

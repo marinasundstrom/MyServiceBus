@@ -9,6 +9,6 @@ public class PublishContext : SendContext, IPublishContext
     public PublishContext(Type[] messageTypes, IMessageSerializer messageSerializer, CancellationToken cancellationToken = default)
         : base(messageTypes, messageSerializer, cancellationToken)
     {
+        Intent = MessageIntent.Publish;
     }
 }
-

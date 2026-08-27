@@ -11,6 +11,8 @@
     <PackageReference Include="coverlet.collector" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="MassTransit.RabbitMQ" />
+    <PackageReference Include="NServiceBus" />
+    <PackageReference Include="NServiceBus.RabbitMQ" />
     <PackageReference Include="NSubstitute" />
     <PackageReference Include="Shouldly" />
     <PackageReference Include="Testcontainers.RabbitMq" />

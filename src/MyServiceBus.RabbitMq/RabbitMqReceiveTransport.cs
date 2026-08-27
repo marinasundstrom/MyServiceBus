@@ -53,6 +53,13 @@ public sealed class RabbitMqReceiveTransport : IReceiveTransport
                 else if (!headers.ContainsKey(_headerConvention.ContentTypeHeader))
                     headers[_headerConvention.ContentTypeHeader] = InboundMessageResolver.EnvelopeContentType;
 
+                if (!string.IsNullOrWhiteSpace(props.MessageId))
+                    headers["message_id"] = props.MessageId;
+                if (!string.IsNullOrWhiteSpace(props.CorrelationId))
+                    headers["correlation_id"] = props.CorrelationId;
+                if (!string.IsNullOrWhiteSpace(props.ReplyTo))
+                    headers["reply_to"] = props.ReplyTo;
+
                 if (_faultAddress != null && !headers.ContainsKey(_headerConvention.FaultAddressHeader))
                     headers[_headerConvention.FaultAddressHeader] = _faultAddress.ToString();
 

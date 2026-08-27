@@ -7,7 +7,7 @@
 
 MyServiceBus (working title) is a lightweight, asynchronous service-bus runtime for Java and .NET, inspired by **MassTransit**.
 
-It provides a consistent, opinionated broker-backed messaging model while remaining compatible with the documented **MassTransit RabbitMQ and Azure Service Bus profiles**. This makes it possible for Java and .NET services to send, publish, and consume messages across platforms, or interoperate with MassTransit in the [verified compatibility scenarios](docs/compatibility.md).
+It provides a consistent, opinionated broker-backed messaging model while remaining compatible with documented **MassTransit** transport profiles and a separate, scoped **NServiceBus RabbitMQ** profile. This makes it possible for Java and .NET services to communicate across platforms and with verified peer runtimes.
 
 See samples below.
 
@@ -135,7 +135,8 @@ Unlike most Java messaging solutions, MyServiceBus does **not require a framewor
 - Verified-preview Azure Service Bus transport with corresponding C# and Java implementations
 - In-memory mediator and test harness
 - Compatibility with MassTransit message envelopes
-- Raw JSON messages
+- Neutral Raw JSON messages
+- Verified NServiceBus RabbitMQ directed-send interoperability for C# and Java
 - Fault and error handling semantics aligned with MassTransit
 - Middleware / pipeline behaviors
 - OpenTelemetry support
@@ -148,6 +149,7 @@ Unlike most Java messaging solutions, MyServiceBus does **not require a framewor
 - [MyServiceBus Specification](docs/specs/myservicebus-spec.md)
 - [ServiceBus Transport Specification](docs/specs/transport-spec.md)
 - [Differences from MassTransit](docs/masstransit-differences.md)
+- [NServiceBus interoperability](docs/nservicebus-interoperability.md)
 
 ---
 

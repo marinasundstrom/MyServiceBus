@@ -11,6 +11,7 @@ MyServiceBus `0.1.0-preview.4` is built and tested against the following baselin
 | Gradle | Gradle 9.0 | Gradle `9.0.0` | Build and Maven publication tooling; not an application runtime dependency. |
 | RabbitMQ server | RabbitMQ 4.1 | Docker image `rabbitmq:4.1.8-alpine` | The declared RabbitMQ transport-profile baseline. Other broker lines are not yet claimed as supported. |
 | MassTransit | MassTransit 8.5 | `MassTransit.RabbitMQ` `8.5.1` | The exact interoperability peer. Compatibility with other MassTransit versions must not be inferred from this baseline. |
+| NServiceBus | NServiceBus 10.2 | `NServiceBus` `10.2.8` with `NServiceBus.RabbitMQ` `11.2.1` | Exact peer for the separate RabbitMQ directed-send profile. Other NServiceBus features and versions are not implied. |
 | Azure Service Bus | Standard tier | Live Azure Standard namespace | The declared Azure transport-profile baseline. Premium is expected to support this slice but is not the release-gating environment. Basic is unsupported because it lacks topics and subscriptions. |
 | MassTransit Azure Service Bus | MassTransit 8.5 | `MassTransit.Azure.ServiceBus.Core` `8.5.1` | The exact Azure interoperability peer. Compatibility with other MassTransit versions must not be inferred from this baseline. |
 | .NET RabbitMQ client | RabbitMQ.Client 7.2 | `7.2.1` | Implementation dependency of the C# RabbitMQ transport. |
@@ -35,6 +36,7 @@ The runtime lines above remain the baseline for the lifetime of `0.1.0-preview.4
 ## Compatibility boundaries
 
 - RabbitMQ `4.1.8`, live Azure Service Bus Standard, and the respective MassTransit `8.5.1` transports are evidence-backed interoperability targets, not broad promises for every broker or MassTransit 8.x release.
+- NServiceBus `10.2.8` with its RabbitMQ transport `11.2.1` is evidence for the directed-send scenarios in the separate [NServiceBus profile](nservicebus-interoperability.md), not general NServiceBus compatibility.
 - Java releases newer than 17 and .NET 10 servicing releases are runtime compatibility expectations. A defect reproduced only outside the CI baseline may require a new conformance job before it becomes release-blocking.
 - End-of-life runtime or broker releases are not supported, even if they happen to run the packages.
 - Support for another broker, MassTransit version, target framework, or Java baseline begins only when it is named here and covered by the appropriate conformance suite.
