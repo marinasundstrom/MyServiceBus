@@ -16,6 +16,7 @@ This changelog summarizes the bigger themes in the repository history. It is int
 - Added corresponding Azure Service Bus request composition in C# and Java, including transport-produced temporary endpoint addresses, correlated responses and faults, pre-provisioned emulator mapping, and bidirectional C#↔Java request conformance.
 - Added bidirectional Azure Service Bus conformance for MassTransit envelope metadata, application headers, and corresponding native broker properties.
 - Added corresponding C# and Java Azure Service Bus competing-consumer conformance with duplicate-delivery detection.
+- Added an opt-in cloud smoke gate for C# and Java consumption of messages sent by the pinned MassTransit Azure Service Bus transport.
 
 ### Documentation website
 

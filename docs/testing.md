@@ -67,6 +67,17 @@ require Java 17 and system Gradle. These tests prove the local data plane only;
 cloud topology creation, identity, and MassTransit Azure Service Bus
 interoperability remain separate gates.
 
+The optional cloud gate includes send-only interoperability from the pinned
+MassTransit Azure Service Bus transport into both the C# and Java clients. It
+expects the profile's `msb-direct` entity to exist in the target namespace:
+
+```bash
+RUN_AZURE_SERVICEBUS_CLOUD_TESTS=1 \
+AZURE_SERVICEBUS_CLOUD_CONNECTION_STRING='<connection-string>' \
+  dotnet test test/MyServiceBus.AzureServiceBus.Tests/MyServiceBus.AzureServiceBus.Tests.csproj \
+  --filter FullyQualifiedName~MassTransitAzureServiceBusInteropTests
+```
+
 See the fixture README and the [Azure Service Bus transport profile](azure-service-bus-transport.md)
 for its topology, connection string, sequential-test constraint, and cloud
 smoke-test boundary.

@@ -272,6 +272,7 @@ both clients where applicable:
 - [x] competing consumers receive one delivery once per attempt
 - [x] startup rejection for unsupported transport options
 - [ ] C# and Java consumption of messages produced by the pinned MassTransit Azure
-  Service Bus peer
+  Service Bus peer (an opt-in cloud gate is checked in; cloud execution evidence
+  is still required)
 
 Compatibility claims remain scoped to scenarios with executable evidence.
