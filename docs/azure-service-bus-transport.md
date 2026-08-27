@@ -2,10 +2,11 @@
 
 ## Status
 
-This document defines the Azure Service Bus transport profile. Corresponding
-experimental C# and Java adapters implement the first data-plane slice against
-the official emulator. The profile is not yet declared supported because the
-remaining conformance and cloud gates listed below have not passed.
+This document defines the verified Azure Service Bus preview transport profile.
+Corresponding C# and Java adapters pass the local emulator suite and the
+documented live-Azure conformance gate. Support is limited to the implemented
+capabilities and pinned interoperability peer below; it is not a claim for
+every Azure Service Bus or MassTransit feature.
 
 Azure Service Bus is a durable bus transport. It implements the existing
 transport contract rather than introducing stream concepts into the portable
@@ -33,10 +34,10 @@ public factory path independently for each client. It also proves bidirectional
 C# and Java delivery for directed send and publish, plus retry recovery,
 retry exhaustion, `_error` and `_skipped` settlement, and endpoint fault
 publication in both clients.
-The live Azure acceptance gate now proves cloud administration, publication,
-forwarding, and consumption from both implementations. The remaining cloud
-failure, lifecycle, and MassTransit conformance cases remain before the initial
-profile is complete.
+The live Azure acceptance gate proves cloud administration, publication,
+forwarding, consumption, lock renewal, request/response, terminal failure
+settlement, and bidirectional MassTransit interoperability from both
+implementations.
 
 The first slice does not expose sessions, duplicate detection, native scheduled
 enqueue, deferral, delayed redelivery, transactions, partitioning, or custom
@@ -124,8 +125,10 @@ corresponding `TestApp.CrossLanguageMessage` .NET type and
 the cloud cases isolated. The live request matrix is complete in both directions
 for both MyServiceBus clients. The live fault matrix is likewise complete in
 both directions. Default consumer endpoint, subscription, and companion names
-also match MassTransit in both clients. Cloud failure-copy settlement remains
-experimental and is listed below.
+also match MassTransit in both clients. Live terminal-failure cases verify that
+MassTransit receives the correlated fault, the original request and exception
+metadata are preserved in `_error`, and the source delivery is completed in
+both clients.
 
 ## Topology Projection
 
@@ -269,16 +272,15 @@ data-plane tests. It uses a fixed AMQP port and static entity names, so suites
 that share it must run sequentially and reset the Compose project between
 scenarios that require empty entities.
 
-The emulator is not sufficient evidence for every cloud behavior. Before the
-transport is declared supported, the optional Azure smoke suite must cover at
-least:
+The emulator is not sufficient evidence for every cloud behavior. The optional
+Azure gate used to verify this preview profile covers at least:
 
 - [x] cloud topology creation from both clients
 - [x] cloud publish, subscription forwarding, and consumption from both clients
 - [x] correlated request/response and auto-delete response queues in both clients
 - [x] C# and Java delivery-lock renewal during a long-running consumer
-- `_error`/completion behavior across a transient failure
-- bidirectional MassTransit interoperability on the pinned compatibility version,
+- [x] `_error` preservation and source completion after a terminal consumer failure
+- [x] bidirectional MassTransit interoperability on the pinned compatibility version,
   including default and explicitly configured names
 
 Partitioned entities, networking and identity integration, geo-recovery,
@@ -287,8 +289,8 @@ outside emulator conformance.
 
 ## Initial Conformance Matrix
 
-The transport profile is not complete until these scenarios pass for
-both clients where applicable:
+The verified initial profile consists of these passing scenarios for both
+clients where applicable:
 
 - [x] C# queue send and receive
 - [x] Java queue send and receive
@@ -320,5 +322,7 @@ both clients where applicable:
 - [x] C# and Java MyServiceBus request clients receive correlated MassTransit responses
 - [x] MassTransit request clients receive C# and Java MyServiceBus responses
 - [x] bidirectional fault flows with MassTransit
+- [x] C# and Java terminal failures preserve the original request in `_error`,
+  publish a correlated MassTransit fault, and complete the source delivery
 
 Compatibility claims remain scoped to scenarios with executable evidence.

@@ -32,7 +32,7 @@ The first container-backed run may be slower while the RabbitMQ image is downloa
 ## Azure Service Bus Emulator Fixture
 
 A pinned Docker Compose fixture under `test/AzureServiceBusEmulator` prepares
-the local topology for the experimental C# and Java Azure Service Bus
+the local topology for the C# and Java Azure Service Bus preview
 transports. Both suites exercise direct queue delivery, topic publication with
 subscription forwarding, their corresponding public factory configuration
 paths, retry recovery and exhaustion, `_error` and `_skipped` settlement, and
@@ -130,7 +130,10 @@ The repeatable live-test procedure is:
    verify correlated responses from MassTransit through unique native temporary
    queues, while MassTransit request clients verify correlated responses from
    C# and Java MyServiceBus services. The same four directions verify correlated
-   fault responses and their MassTransit-compatible exception details.
+   fault responses and their MassTransit-compatible exception details. When a
+   C# or Java MyServiceBus handler fails, the gate additionally verifies the
+   original MassTransit request and exception metadata in `_error` and confirms
+   that the primary queue drains after the compatibility copy succeeds.
 5. For persistent use, run the explicit `teardown` command when the namespace is
    no longer needed. Ephemeral runs do this automatically in an exit trap.
 

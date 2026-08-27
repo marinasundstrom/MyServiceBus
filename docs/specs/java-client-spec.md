@@ -35,10 +35,10 @@ The ServiceBus Java client mirrors the C# design by providing an asynchronous me
   - `RabbitMqSendTransport` uses `application/vnd.masstransit+json` for envelope messages and `application/json` when `RawJsonMessageSerializer` is configured for outbound sends.
   - Headers beginning with `_` map to standard transport properties (e.g., `_correlation_id` sets the AMQP `correlation-id`).
 
-### Azure Service Bus Transport (Experimental)
+### Azure Service Bus Transport (Preview)
   - `AzureServiceBusTransportFactory` maps directed addresses to queues and publish addresses to topics, while receive endpoints consume from queues fed by forwarding subscriptions.
   - The Java adapter follows the same topology projection, native-property normalization, peek-lock completion/abandon decisions, skipped-message copy, and capability descriptor as the C# adapter.
-  - The emulator uses `PRE_PROVISIONED` topology mode. Cloud namespaces default to `CREATE`, but cloud administration remains outside the currently verified support boundary.
+  - The emulator uses `PRE_PROVISIONED` topology mode. Cloud namespaces default to `CREATE`; administration and the documented transport flows are verified against a live Standard-tier namespace.
 
 ### Cancellation Propagation
 - All pipe contexts expose a `CancellationToken` through `PipeContext`, enabling operations to observe shutdown or timeouts.

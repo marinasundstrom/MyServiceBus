@@ -105,17 +105,18 @@ Parity includes:
 
 Parity does not require identical method names, type systems, dependency injection frameworks, or asynchronous programming models.
 
-## Immediate Compatibility Target
+## Verified Compatibility Target
 
-The immediate target is the **RabbitMQ interoperability baseline for the C# and Java reference clients**.
+The verified target is the **RabbitMQ and Azure Service Bus interoperability
+baseline for the C# and Java reference clients**.
 
 The target consists of:
 
 1. **Level 1 wire compatibility** between MyServiceBus C#, MyServiceBus Java, and supported MassTransit versions.
 2. **Level 2 semantic compatibility** for the portable core: send, publish, consume, request/response, correlation, retry, faults, skipped messages, and error handling.
-3. **Level 3 RabbitMQ transport-profile interoperability** in both directions between MyServiceBus and MassTransit.
+3. **Level 3 RabbitMQ and Azure Service Bus transport-profile interoperability** in both directions between MyServiceBus and MassTransit.
 4. **Level 4 API familiarity** for C# and concept familiarity with idiomatic APIs for Java.
-5. **Level 5 C#↔Java parity** for the portable core and RabbitMQ profile.
+5. **Level 5 C#↔Java parity** for the portable core and both broker profiles.
 
 This verified RabbitMQ baseline establishes the rule for every broker-backed
 transport that MyServiceBus promotes to supported status. Its C# and Java
@@ -129,7 +130,7 @@ The immediate target explicitly does not include:
 
 - source compatibility with MassTransit
 - every MassTransit consumer, saga, routing-slip, persistence, scheduler, or middleware API
-- transport-profile compatibility beyond RabbitMQ
+- transport-profile compatibility beyond RabbitMQ and Azure Service Bus
 - treating Kafka, SignalR, or serverless hosts as interchangeable queue transports
 - multiple bus instances in one host or MassTransit's marker-interface registration model
 - complete feature parity with the latest MassTransit release
@@ -183,6 +184,15 @@ The current RabbitMQ baseline uses RabbitMQ `4.1.8-alpine` and MassTransit `8.5.
 
 This baseline is **verified with documented limitations** for the scenarios in the matrix. It is not a claim of complete MassTransit feature or API compatibility.
 
+The Azure Service Bus preview baseline uses a live Standard-tier namespace and
+MassTransit `8.5.1`. It verifies corresponding C# and Java Create-mode topology,
+default and explicit naming, publish and directed send in both MassTransit
+directions, cross-language delivery, correlated responses and faults, lock
+renewal, and terminal failure preservation in `_error` followed by source
+completion. It is likewise **verified with documented limitations**; sessions,
+managed identity, transactions, native scheduling, and the other capabilities
+listed as unsupported or unexposed in the transport profile are not implied.
+
 ## Compatibility Status Labels
 
 Documentation and package metadata should use consistent labels:
@@ -195,18 +205,19 @@ Documentation and package metadata should use consistent labels:
 
 Avoid unqualified claims such as “fully MassTransit compatible.” Prefer a statement such as:
 
-> MyServiceBus 1.x is verified for MassTransit-compatible RabbitMQ envelopes and the documented send, publish, consume, request/response, and fault scenarios across its C# and Java clients.
+> MyServiceBus is verified for the documented MassTransit-compatible RabbitMQ
+> and Azure Service Bus send, publish, consume, request/response, fault, and
+> terminal-settlement scenarios across its C# and Java clients.
 
 That statement should only be published after the associated version matrix passes.
 
 ## Future Targets
 
-After the immediate RabbitMQ baseline is verified:
+After the RabbitMQ and Azure Service Bus baselines:
 
-1. Complete the experimental Azure Service Bus profile, including its naming,
-   topology, and bidirectional MassTransit conformance matrix for both clients.
-2. Promote Azure Service Bus only after the documented cloud gates pass.
-3. Define a separate event-stream profile before implementing Kafka.
-4. Validate the language-neutral specification through a third language client.
+1. Keep both profiles gated by their declared cross-language and MassTransit
+   matrices as their preview APIs evolve.
+2. Define a separate event-stream profile before implementing Kafka.
+3. Validate the language-neutral specification through a third language client.
 
 Every future transport or language begins as experimental and advances independently through the applicable compatibility levels.

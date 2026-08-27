@@ -7,7 +7,7 @@
 
 MyServiceBus (working title) is a lightweight, asynchronous service-bus runtime for Java and .NET, inspired by **MassTransit**.
 
-It provides a consistent, opinionated broker-backed messaging model while remaining compatible with the documented **MassTransit RabbitMQ envelope and messaging semantics**. This makes it possible for Java and .NET services to send, publish, and consume messages across platforms, or interoperate with MassTransit in the [verified compatibility scenarios](docs/compatibility.md).
+It provides a consistent, opinionated broker-backed messaging model while remaining compatible with the documented **MassTransit RabbitMQ and Azure Service Bus profiles**. This makes it possible for Java and .NET services to send, publish, and consume messages across platforms, or interoperate with MassTransit in the [verified compatibility scenarios](docs/compatibility.md).
 
 See samples below.
 
@@ -36,7 +36,7 @@ Continue with the [.NET quick start](#c) to register the bus, configure RabbitMQ
 | [`Sundstrom.MyServiceBus`](https://www.nuget.org/packages/Sundstrom.MyServiceBus) | Core messaging runtime and in-memory mediator |
 | [`Sundstrom.MyServiceBus.Abstractions`](https://www.nuget.org/packages/Sundstrom.MyServiceBus.Abstractions) | Portable message contracts, contexts, and endpoint abstractions |
 | [`Sundstrom.MyServiceBus.RabbitMq`](https://www.nuget.org/packages/Sundstrom.MyServiceBus.RabbitMq) | RabbitMQ transport and configuration integration |
-| `Sundstrom.MyServiceBus.AzureServiceBus` | Experimental Azure Service Bus transport for direct send and publish/subscribe |
+| `Sundstrom.MyServiceBus.AzureServiceBus` | Verified-preview Azure Service Bus transport for direct send and publish/subscribe |
 | [`Sundstrom.MyServiceBus.Testing`](https://www.nuget.org/packages/Sundstrom.MyServiceBus.Testing) | In-memory test harness and testing utilities |
 
 All packages currently use the same preview version. Install `Sundstrom.MyServiceBus.Testing` separately in test projects when the test harness is needed.
@@ -75,7 +75,7 @@ Continue with the [Java quick start](#java) or the detailed [Java guide](src/Jav
 | [`io.github.marinasundstrom.myservicebus:myservicebus-logging`](https://central.sonatype.com/artifact/io.github.marinasundstrom.myservicebus/myservicebus-logging) | Logging abstractions and adapters |
 | [`io.github.marinasundstrom.myservicebus:myservicebus-tasks`](https://central.sonatype.com/artifact/io.github.marinasundstrom.myservicebus/myservicebus-tasks) | Asynchronous task and cancellation abstractions |
 | [`io.github.marinasundstrom.myservicebus:myservicebus-rabbitmq`](https://central.sonatype.com/artifact/io.github.marinasundstrom.myservicebus/myservicebus-rabbitmq) | RabbitMQ transport and configuration integration |
-| `io.github.marinasundstrom.myservicebus:myservicebus-azure-service-bus` | Experimental Azure Service Bus transport for direct send and publish/subscribe |
+| `io.github.marinasundstrom.myservicebus:myservicebus-azure-service-bus` | Verified-preview Azure Service Bus transport for direct send and publish/subscribe |
 | [`io.github.marinasundstrom.myservicebus:myservicebus-testing`](https://central.sonatype.com/artifact/io.github.marinasundstrom.myservicebus/myservicebus-testing) | In-memory test harness and testing utilities |
 
 All Java artifacts use the same version as the corresponding NuGet release.
@@ -117,7 +117,7 @@ Unlike most Java messaging solutions, MyServiceBus does **not require a framewor
 - Publish/subscribe pattern
 - Request/response pattern (`RequestClient` and scoped client factory)
 - RabbitMQ transport
-- Experimental Azure Service Bus transport with corresponding C# and Java implementations
+- Verified-preview Azure Service Bus transport with corresponding C# and Java implementations
 - In-memory mediator and test harness
 - Compatibility with MassTransit message envelopes
 - Raw JSON messages

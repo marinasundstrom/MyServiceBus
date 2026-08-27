@@ -147,7 +147,7 @@ Java accepts this self-contained model because the runtime lacks a standard depe
 
 #### Azure Service Bus preview
 
-The experimental Azure Service Bus adapters deliberately keep the same entry
+The verified-preview Azure Service Bus adapters deliberately keep the same entry
 shape as the RabbitMQ adapters. In C#, install
 `Sundstrom.MyServiceBus.AzureServiceBus` and use the MassTransit-familiar
 transport configuration:

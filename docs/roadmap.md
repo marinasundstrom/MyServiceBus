@@ -135,7 +135,11 @@ The detailed checklist is defined in the [Mediator and In-Memory Stability Gate]
 
 Azure Service Bus is the recommended first candidate because topics, subscriptions, sessions, native dead-lettering, and scheduling exercise the capability model. Final selection should follow demonstrated user demand and maintainer access.
 
-The [Azure Service Bus transport profile](azure-service-bus-transport.md) fixes the initial implementation and emulator-conformance boundary. Corresponding experimental C# and Java adapters now pass direct-send, topic-forwarding, and public-configuration scenarios against the pinned declarative emulator fixture. Request/response, full failure conformance, cloud topology smoke tests, cross-language exchange, and MassTransit interoperability remain before profile support can be declared.
+The [Azure Service Bus transport profile](azure-service-bus-transport.md) fixes
+the initial implementation and conformance boundary. Corresponding C# and Java
+adapters now pass the pinned emulator suite and the live-Azure gate for cloud
+topology, delivery, lock renewal, request/response, terminal failure settlement,
+cross-language exchange, and bidirectional MassTransit interoperability.
 
 - Implement the adapter in C# and Java, or document a deliberately staged parity plan.
 - Define the MassTransit-compatible address and topology profile.

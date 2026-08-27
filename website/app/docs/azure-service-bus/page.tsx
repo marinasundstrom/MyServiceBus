@@ -102,7 +102,7 @@ export default function AzureServiceBus() {
       <h1>Run MyServiceBus on Azure Service Bus.</h1>
       <p className="docs-summary">Provision a namespace, connect the C# or Java client, and let MyServiceBus create the queues, topics, and subscriptions needed by your consumers.</p>
 
-      <div className="callout callout-accent"><strong>Experimental preview</strong><p>The transport is ready for evaluation against live Azure, but is not yet part of the supported interoperability baseline. Preview releases may make breaking configuration changes.</p></div>
+      <div className="callout callout-accent"><strong>Verified preview</strong><p>The documented C# and Java flows are verified against live Azure and MassTransit 8.5.1. The project is still pre-1.0, so preview releases may make breaking configuration changes.</p></div>
 
       <h2>1. Provision a namespace</h2>
       <p>Install the Azure CLI, sign in, and create an isolated Service Bus namespace. Replace the namespace placeholder with a globally unique name. Use Standard or Premium: the Basic tier does not support the topics and subscriptions required for publish/subscribe.</p>
@@ -137,7 +137,7 @@ export default function AzureServiceBus() {
       <p className="small-note">Request clients normally create unique auto-delete response queues. A pre-provisioned environment must also map temporary response endpoint names to infrastructure-owned queues.</p>
 
       <h2>MassTransit interoperability</h2>
-      <p>Azure entity names are part of the wire contract. Automatic consumer endpoint names follow MassTransit’s default suffix rules in both clients, and corresponding message contracts resolve to the same topic names. Use matching explicit entity-name overrides in MyServiceBus and MassTransit when defaults are not suitable. Live tests cover the resulting queues, subscriptions, companions, directed sends, publication, correlated responses, and correlated faults.</p>
+      <p>Azure entity names are part of the wire contract. Automatic consumer endpoint names follow MassTransit’s default suffix rules in both clients, and corresponding message contracts resolve to the same topic names. Use matching explicit entity-name overrides in MyServiceBus and MassTransit when defaults are not suitable. Live tests cover the resulting queues, subscriptions, companions, directed sends, publication, correlated responses and faults, and terminal failure preservation in <code>_error</code>.</p>
 
       <h2>Remove an evaluation environment</h2>
       <p>If the resource group is dedicated to this evaluation, delete it when you finish to stop further Azure charges. This removes the namespace and every entity inside it.</p>
@@ -145,7 +145,7 @@ export default function AzureServiceBus() {
 
       <p className="small-note">Azure CLI command details and Service Bus tier behavior are documented by <a href="https://learn.microsoft.com/cli/azure/servicebus/namespace?view=azure-cli-latest">Microsoft Learn</a>.</p>
 
-      <div className="next-card"><div><span>Compatibility</span><strong>See the verified baseline and remaining preview gates</strong></div><Link href="/docs/interoperability">Interoperability →</Link></div>
+      <div className="next-card"><div><span>Compatibility</span><strong>See the verified scenarios and preview boundaries</strong></div><Link href="/docs/interoperability">Interoperability →</Link></div>
     </article>
   );
 }

@@ -4,7 +4,7 @@
 
 The MVP support boundary is the ordinary application path in both reference clients:
 
-- configure a bus and a supported transport (RabbitMQ is the verified profile; Azure Service Bus is currently experimental)
+- configure a bus and a supported transport (RabbitMQ and Azure Service Bus are verified preview profiles)
 - register consumers and handlers
 - start and stop the bus through the platform's hosting or lifecycle model
 - send to a directed endpoint and publish by message contract

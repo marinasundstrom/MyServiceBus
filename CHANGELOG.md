@@ -30,6 +30,7 @@ This changelog summarizes the bigger themes in the repository history. It is int
 - Completed the live Azure request/response matrix with correlated C# and Java MyServiceBus responses to MassTransit request clients.
 - Completed the live bidirectional Azure fault matrix between MassTransit and the C# and Java MyServiceBus request clients and services.
 - Aligned automatic consumer endpoint naming with MassTransit across C# and Java and both broker transports, including consumer-type derivation and suffix trimming, and verified the resulting Azure queues, subscriptions, and companion entities live.
+- Completed the Azure Service Bus promotion gate by verifying live C# and Java terminal failures preserve the original MassTransit request in `_error`, publish a correlated fault, and complete the source delivery; the documented initial profile is now a verified preview with explicit limitations.
 
 ### Documentation website
 
