@@ -4,6 +4,7 @@ plugins {
 
 dependencies {
     implementation project(':myservicebus-rabbitmq')
+    implementation project(':myservicebus-azure-service-bus')
 }
 
 application {

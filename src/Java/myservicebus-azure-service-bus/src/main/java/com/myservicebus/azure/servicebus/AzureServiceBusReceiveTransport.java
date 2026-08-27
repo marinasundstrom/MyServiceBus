@@ -25,6 +25,9 @@ public final class AzureServiceBusReceiveTransport implements ReceiveTransport {
     private final String faultAddress;
     private final Logger logger;
     private final ObjectMapper mapper = new ObjectMapper();
+    private final Object lifecycleMonitor = new Object();
+    private int activeMessages;
+    private boolean stopping;
 
     AzureServiceBusReceiveTransport(
             ServiceBusProcessorClient processor,
@@ -44,6 +47,13 @@ public final class AzureServiceBusReceiveTransport implements ReceiveTransport {
     }
 
     void process(com.azure.messaging.servicebus.ServiceBusReceivedMessageContext context) {
+        synchronized (lifecycleMonitor) {
+            if (stopping) {
+                return;
+            }
+            activeMessages++;
+        }
+
         ServiceBusReceivedMessage message = context.getMessage();
         try {
             Map<String, Object> headers = AzureServiceBusMessageMapper.createHeaders(message, faultAddress);
@@ -70,6 +80,11 @@ public final class AzureServiceBusReceiveTransport implements ReceiveTransport {
                 logger.error("Failed to abandon Azure Service Bus message on queue " + queueName,
                         settlementException);
             }
+        } finally {
+            synchronized (lifecycleMonitor) {
+                activeMessages--;
+                lifecycleMonitor.notifyAll();
+            }
         }
     }
 
@@ -80,6 +95,9 @@ public final class AzureServiceBusReceiveTransport implements ReceiveTransport {
     @Override
     public void start() {
         try {
+            synchronized (lifecycleMonitor) {
+                stopping = false;
+            }
             processor.start();
         } catch (Exception exception) {
             throw new AzureServiceBusTransportException("start receive", queueName, exception);
@@ -89,7 +107,16 @@ public final class AzureServiceBusReceiveTransport implements ReceiveTransport {
     @Override
     public void stop() {
         try {
+            synchronized (lifecycleMonitor) {
+                stopping = true;
+                while (activeMessages > 0) {
+                    lifecycleMonitor.wait();
+                }
+            }
             processor.stop();
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new AzureServiceBusTransportException("stop receive", queueName, exception);
         } catch (Exception exception) {
             throw new AzureServiceBusTransportException("stop receive", queueName, exception);
         }

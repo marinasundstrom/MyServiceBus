@@ -27,8 +27,11 @@ Both clients currently implement:
 - corresponding MassTransit-familiar C# and idiomatic Java factory configuration
 
 The emulator suite currently proves direct delivery, topic forwarding, and the
-public factory path independently for each client. Cross-language exchange,
-failure-destination conformance, request/response, and cloud administration
+public factory path independently for each client. It also proves bidirectional
+C# and Java delivery for directed send and publish, plus retry recovery,
+retry exhaustion, `_error` and `_skipped` settlement, and endpoint fault
+publication in both clients.
+Request/response, the remaining conformance cases, and cloud administration
 remain before the initial profile is complete.
 
 The first slice does not expose sessions, duplicate detection, native scheduled
@@ -241,16 +244,17 @@ both clients where applicable:
 - [x] Java queue send and receive
 - [x] C# publish and subscription forwarding
 - [x] Java publish and subscription forwarding
-- [ ] C# publish consumed by Java
-- [ ] Java publish consumed by C#
-- correlated request and response in both directions
-- envelope and native-property preservation in both directions
-- retry success and retry exhaustion
-- preservation in `_error` and `_skipped`
-- endpoint-specific `Fault<T>` publication
-- competing consumers receive one delivery once per attempt
-- startup rejection for unsupported transport options
-- C# and Java consumption of messages produced by the pinned MassTransit Azure
+- [x] C# directed send and publish consumed by Java
+- [x] Java directed send and publish consumed by C#
+- [ ] correlated request and response in both directions
+- [ ] envelope and native-property preservation in both directions
+- [x] retry success without failure-destination traffic
+- [x] retry exhaustion and completion after copying to `_error`
+- [x] endpoint-specific `Fault<T>` publication
+- [x] preservation in `_skipped`
+- [ ] competing consumers receive one delivery once per attempt
+- [x] startup rejection for unsupported transport options
+- [ ] C# and Java consumption of messages produced by the pinned MassTransit Azure
   Service Bus peer
 
 Compatibility claims remain scoped to scenarios with executable evidence.

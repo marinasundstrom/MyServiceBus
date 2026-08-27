@@ -1,6 +1,7 @@
 using Azure.Messaging.ServiceBus;
 using MyServiceBus.Serialization;
 using MyServiceBus.Topology;
+using System.Text.Json;
 
 namespace MyServiceBus.AzureServiceBus.Tests;
 
@@ -147,6 +148,141 @@ public sealed class AzureServiceBusEmulatorTests
         }
     }
 
+    [AzureServiceBusEmulatorFact]
+    public async Task Retry_exhaustion_moves_the_message_to_error_and_publishes_a_fault()
+    {
+        await PurgeQueue("msb-publish");
+        await PurgeQueue("msb-publish_error");
+        await PurgeQueue("msb-publish-fault-observer");
+        var attempts = 0;
+        var bus = MessageBus.Factory.Create<AzureServiceBusFactoryConfigurator>(cfg =>
+        {
+            cfg.Host(ConnectionString);
+            cfg.UsePreProvisionedTopology();
+            cfg.Message<CompatibilityMessage>(message =>
+                message.SetEntityName("msb-compatibility-message"));
+            cfg.ReceiveEndpoint("msb-publish", endpoint =>
+            {
+                endpoint.UseMessageRetry(retry => retry.Immediate(2));
+                endpoint.Handler<CompatibilityMessage>(_ =>
+                {
+                    Interlocked.Increment(ref attempts);
+                    return Task.FromException(new InvalidOperationException("emulator-retry-exhausted"));
+                });
+            });
+        });
+
+        await bus.StartAsync(CancellationToken.None);
+        try
+        {
+            await bus.Publish(new CompatibilityMessage { Value = "failed-dotnet-message" });
+            var errorMessage = await ReceiveOne("msb-publish_error");
+            var faultMessage = await ReceiveOne("msb-publish-fault-observer");
+            var errorEnvelope = JsonSerializer.Deserialize<Envelope<CompatibilityMessage>>(
+                errorMessage.Body,
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+            Assert.Equal(3, Volatile.Read(ref attempts));
+            Assert.Equal("failed-dotnet-message", errorEnvelope?.Message.Value);
+            Assert.Equal(
+                "emulator-retry-exhausted",
+                errorEnvelope?.Headers[MessageHeaders.ExceptionMessage].ToString());
+            Assert.Contains("Fault", faultMessage.Body.ToString(), StringComparison.Ordinal);
+        }
+        finally
+        {
+            await bus.StopAsync(CancellationToken.None);
+        }
+    }
+
+    [AzureServiceBusEmulatorFact]
+    public async Task Retry_recovers_without_using_failure_destinations()
+    {
+        await PurgeQueue("msb-publish");
+        await PurgeQueue("msb-publish_error");
+        await PurgeQueue("msb-publish-fault-observer");
+        var attempts = 0;
+        var consumed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var bus = MessageBus.Factory.Create<AzureServiceBusFactoryConfigurator>(cfg =>
+        {
+            cfg.Host(ConnectionString);
+            cfg.UsePreProvisionedTopology();
+            cfg.Message<CompatibilityMessage>(message =>
+                message.SetEntityName("msb-compatibility-message"));
+            cfg.ReceiveEndpoint("msb-publish", endpoint =>
+            {
+                endpoint.UseMessageRetry(retry => retry.Immediate(2));
+                endpoint.Handler<CompatibilityMessage>(_ =>
+                {
+                    if (Interlocked.Increment(ref attempts) < 3)
+                        return Task.FromException(new InvalidOperationException("emulator-retry"));
+
+                    consumed.TrySetResult();
+                    return Task.CompletedTask;
+                });
+            });
+        });
+
+        await bus.StartAsync(CancellationToken.None);
+        try
+        {
+            await bus.Publish(new CompatibilityMessage { Value = "eventually-consumed" });
+            await consumed.Task.WaitAsync(TimeSpan.FromSeconds(20));
+
+            Assert.Equal(3, Volatile.Read(ref attempts));
+            Assert.Null(await TryReceiveOne("msb-publish_error", TimeSpan.FromMilliseconds(500)));
+            Assert.Null(await TryReceiveOne("msb-publish-fault-observer", TimeSpan.FromMilliseconds(500)));
+        }
+        finally
+        {
+            await bus.StopAsync(CancellationToken.None);
+        }
+    }
+
+    [AzureServiceBusEmulatorFact]
+    public async Task Unregistered_message_is_preserved_in_the_skipped_queue()
+    {
+        await PurgeQueue("msb-publish");
+        await PurgeQueue("msb-publish_skipped");
+        await using var client = new ServiceBusClient(ConnectionString);
+        var configurator = new AzureServiceBusFactoryConfigurator();
+        configurator.Host(ConnectionString);
+        configurator.UsePreProvisionedTopology();
+        var factory = new AzureServiceBusTransportFactory(client, configurator);
+        var topology = new ReceiveEndpointTransportTopology(
+            "msb-publish",
+            durable: true,
+            temporary: false,
+            prefetchCount: 1,
+            [new MessageBinding { MessageType = typeof(CompatibilityMessage), EntityName = "msb-compatibility-message" }]);
+        var receiveTransport = await factory.CreateReceiveTransport(
+            topology,
+            _ => Task.FromException(new InvalidOperationException("An unregistered message reached the handler.")),
+            urn => urn == MessageUrn.For(typeof(CompatibilityMessage)));
+
+        await receiveTransport.Start();
+        try
+        {
+            var context = new SendContext([typeof(UnregisteredMessage)], new EnvelopeMessageSerializer())
+            {
+                MessageId = Guid.NewGuid().ToString(),
+                DestinationAddress = new Uri("sb://localhost/msb-publish")
+            };
+            var sendTransport = await factory.GetSendTransport(new Uri("queue:msb-publish"));
+            await sendTransport.Send(new UnregisteredMessage { Value = "skipped-dotnet-message" }, context);
+
+            var skippedMessage = await ReceiveOne("msb-publish_skipped");
+            var skippedEnvelope = JsonSerializer.Deserialize<Envelope<UnregisteredMessage>>(
+                skippedMessage.Body,
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            Assert.Equal("skipped-dotnet-message", skippedEnvelope?.Message.Value);
+        }
+        finally
+        {
+            await receiveTransport.Stop();
+        }
+    }
+
     private static async Task PurgeQueue(string queueName)
     {
         await using var client = new ServiceBusClient(ConnectionString);
@@ -158,8 +294,32 @@ public sealed class AzureServiceBusEmulatorTests
         }
     }
 
+    private static async Task<ServiceBusReceivedMessage> ReceiveOne(string queueName)
+    {
+        await using var client = new ServiceBusClient(ConnectionString);
+        await using var receiver = client.CreateReceiver(
+            queueName,
+            new ServiceBusReceiverOptions { ReceiveMode = ServiceBusReceiveMode.ReceiveAndDelete });
+        return await receiver.ReceiveMessageAsync(TimeSpan.FromSeconds(20))
+            ?? throw new TimeoutException($"No message arrived on '{queueName}'.");
+    }
+
+    private static async Task<ServiceBusReceivedMessage?> TryReceiveOne(string queueName, TimeSpan timeout)
+    {
+        await using var client = new ServiceBusClient(ConnectionString);
+        await using var receiver = client.CreateReceiver(
+            queueName,
+            new ServiceBusReceiverOptions { ReceiveMode = ServiceBusReceiveMode.ReceiveAndDelete });
+        return await receiver.ReceiveMessageAsync(timeout);
+    }
+
     [EntityName("msb-compatibility-message")]
     public sealed class CompatibilityMessage
+    {
+        public string Value { get; set; } = string.Empty;
+    }
+
+    public sealed class UnregisteredMessage
     {
         public string Value { get; set; } = string.Empty;
     }

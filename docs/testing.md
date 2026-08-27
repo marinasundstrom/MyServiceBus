@@ -34,8 +34,11 @@ The first container-backed run may be slower while the RabbitMQ image is downloa
 A pinned Docker Compose fixture under `test/AzureServiceBusEmulator` prepares
 the local topology for the experimental C# and Java Azure Service Bus
 transports. Both suites exercise direct queue delivery, topic publication with
-subscription forwarding, and their corresponding public factory configuration
-paths against this shared topology.
+subscription forwarding, their corresponding public factory configuration
+paths, retry recovery and exhaustion, `_error` and `_skipped` settlement, and
+endpoint fault publication against this shared topology. The .NET suite also launches the Java
+interoperability peer to prove directed send and publish in both language
+directions.
 
 Validate the checked-in JSON and Compose configuration with:
 
@@ -52,9 +55,10 @@ RUN_AZURE_SERVICEBUS_EMULATOR_TESTS=1 \
   gradle :myservicebus-azure-service-bus:test --rerun-tasks
 ```
 
-Ordinary test runs skip the emulator scenarios. These tests prove the local
-data plane only; cloud topology creation, identity, and MassTransit Azure
-Service Bus interoperability remain separate gates.
+Ordinary test runs skip the emulator scenarios. The cross-language cases also
+require Java 17 and system Gradle. These tests prove the local data plane only;
+cloud topology creation, identity, and MassTransit Azure Service Bus
+interoperability remain separate gates.
 
 See the fixture README and the [Azure Service Bus transport profile](azure-service-bus-transport.md)
 for its topology, connection string, sequential-test constraint, and cloud
