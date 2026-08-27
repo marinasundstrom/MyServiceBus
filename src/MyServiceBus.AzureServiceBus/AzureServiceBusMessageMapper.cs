@@ -1,5 +1,6 @@
 using Azure.Messaging.ServiceBus;
 using MyServiceBus.Serialization;
+using System.Globalization;
 
 namespace MyServiceBus.AzureServiceBus;
 
@@ -68,6 +69,12 @@ internal static class AzureServiceBusMessageMapper
             headers["correlation_id"] = message.CorrelationId;
         if (!string.IsNullOrWhiteSpace(message.ReplyTo))
             headers["reply_to"] = message.ReplyTo;
+        if (!string.IsNullOrWhiteSpace(message.Subject))
+            headers["subject"] = message.Subject;
+        if (!string.IsNullOrWhiteSpace(message.To))
+            headers["to"] = message.To;
+        if (message.TimeToLive != default)
+            headers["expiration"] = checked((long)message.TimeToLive.TotalMilliseconds).ToString(CultureInfo.InvariantCulture);
         if (faultAddress is not null && !headers.ContainsKey(HeaderConvention.FaultAddressHeader))
             headers[HeaderConvention.FaultAddressHeader] = faultAddress.ToString();
 
@@ -97,6 +104,11 @@ internal static class AzureServiceBusMessageMapper
                 break;
             case "to":
                 message.To = text;
+                break;
+            case "expiration":
+                if (!long.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var milliseconds) || milliseconds < 0)
+                    throw new ArgumentException("Azure Service Bus expiration must be a non-negative millisecond value.", nameof(value));
+                message.TimeToLive = TimeSpan.FromMilliseconds(milliseconds);
                 break;
             default:
                 if (TryNormalizeApplicationProperty(value, out var normalized))

@@ -1,6 +1,7 @@
 using Azure.Messaging.ServiceBus;
 using MyServiceBus.Serialization;
 using MyServiceBus.Topology;
+using Shouldly;
 using TestApp;
 
 namespace MyServiceBus.AzureServiceBus.Tests;
@@ -11,6 +12,18 @@ public sealed class CrossLanguageAzureServiceBusTests
     private const string ConnectionString =
         "Endpoint=sb://localhost;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true;";
     private const string BindingEntityName = "msb-compatibility-message";
+    private static readonly Guid RequestId = Guid.Parse("11111111-1111-1111-1111-111111111111");
+    private static readonly Guid CorrelationId = Guid.Parse("22222222-2222-2222-2222-222222222222");
+    private static readonly Guid ConversationId = Guid.Parse("33333333-3333-3333-3333-333333333333");
+    private static readonly Guid InitiatorId = Guid.Parse("44444444-4444-4444-4444-444444444444");
+    private const string NativeMessageId = "55555555-5555-5555-5555-555555555555";
+    private const string ResponseAddress = "sb://localhost/msb-response";
+    private const string FaultAddress = "sb://localhost/msb-publish_fault?type=topic";
+    private const string SourceAddress = "sb://localhost/cross-language-source";
+    private const string Subject = "cross-language-subject";
+    private const string To = "cross-language-target";
+    private const string Expiration = "60000";
+    private const string HeaderValue = "cross-language-header-value";
 
     [AzureServiceBusEmulatorFact]
     public async Task Csharp_direct_send_delivers_to_java_consumer()
@@ -133,9 +146,20 @@ public sealed class CrossLanguageAzureServiceBusTests
         var factory = CreateTransportFactory(client);
         var context = new SendContext([typeof(CrossLanguageMessage)], new EnvelopeMessageSerializer())
         {
-            MessageId = Guid.NewGuid().ToString(),
+            MessageId = NativeMessageId,
+            RequestId = RequestId,
+            CorrelationId = CorrelationId.ToString(),
+            ConversationId = ConversationId,
+            InitiatorId = InitiatorId,
+            ResponseAddress = new Uri(ResponseAddress),
+            FaultAddress = new Uri(FaultAddress),
+            SourceAddress = new Uri(SourceAddress),
             DestinationAddress = destination
         };
+        context.Headers["cross-language-header"] = HeaderValue;
+        context.Headers["_subject"] = Subject;
+        context.Headers["_to"] = To;
+        context.Headers["_expiration"] = Expiration;
         var transport = await factory.GetSendTransport(destination);
         await transport.Send(new CrossLanguageMessage { Value = expectedValue }, context);
 
@@ -165,8 +189,28 @@ public sealed class CrossLanguageAzureServiceBusTests
             topology,
             context =>
             {
-                if (context.TryGetMessage<CrossLanguageMessage>(out var message))
-                    received.TrySetResult(message);
+                try
+                {
+                    context.RequestId.ShouldBe(RequestId);
+                    context.CorrelationId.ShouldBe(CorrelationId);
+                    context.ConversationId.ShouldBe(ConversationId);
+                    context.InitiatorId.ShouldBe(InitiatorId);
+                    context.ResponseAddress.ShouldBe(new Uri(ResponseAddress));
+                    context.FaultAddress.ShouldBe(new Uri(FaultAddress));
+                    context.Headers["message_id"].ShouldBe(NativeMessageId);
+                    context.Headers["correlation_id"].ShouldBe(CorrelationId.ToString());
+                    context.Headers["reply_to"].ShouldBe(ResponseAddress);
+                    context.Headers["subject"].ShouldBe(Subject);
+                    context.Headers["to"].ShouldBe(To);
+                    context.Headers["expiration"].ShouldBe(Expiration);
+                    context.Headers["cross-language-header"].ShouldBe(HeaderValue);
+                    if (context.TryGetMessage<CrossLanguageMessage>(out var message))
+                        received.TrySetResult(message);
+                }
+                catch (Exception exception)
+                {
+                    received.TrySetException(exception);
+                }
                 return Task.CompletedTask;
             },
             urn => urn == MessageUrn.For(typeof(CrossLanguageMessage)));

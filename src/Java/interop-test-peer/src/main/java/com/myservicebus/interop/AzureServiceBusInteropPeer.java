@@ -22,10 +22,25 @@ import com.myservicebus.topology.ReceiveEndpointTransportTopology;
 import java.net.URI;
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
 final class AzureServiceBusInteropPeer {
+    private static final UUID REQUEST_ID = UUID.fromString("11111111-1111-1111-1111-111111111111");
+    private static final UUID CORRELATION_ID = UUID.fromString("22222222-2222-2222-2222-222222222222");
+    private static final UUID CONVERSATION_ID = UUID.fromString("33333333-3333-3333-3333-333333333333");
+    private static final UUID INITIATOR_ID = UUID.fromString("44444444-4444-4444-4444-444444444444");
+    private static final String NATIVE_MESSAGE_ID = "55555555-5555-5555-5555-555555555555";
+    private static final String RESPONSE_ADDRESS = "sb://localhost/msb-response";
+    private static final String FAULT_ADDRESS = "sb://localhost/msb-publish_fault?type=topic";
+    private static final String SOURCE_ADDRESS = "sb://localhost/cross-language-source";
+    private static final String SUBJECT = "cross-language-subject";
+    private static final String TO = "cross-language-target";
+    private static final String EXPIRATION = "60000";
+    private static final String HEADER_VALUE = "cross-language-header-value";
+
     private AzureServiceBusInteropPeer() {
     }
 
@@ -74,7 +89,8 @@ final class AzureServiceBusInteropPeer {
         ObjectMapper mapper = new ObjectMapper().findAndRegisterModules();
         ReceiveTransport receiveTransport = transportFactory.createReceiveTransport(
                 topology,
-                transportMessage -> deserialize(transportMessage.getBody(), mapper, received),
+                transportMessage -> deserialize(
+                        transportMessage.getBody(), transportMessage.getHeaders(), mapper, received),
                 MessageUrn.forClass(CrossLanguageMessage.class)::equals);
 
         receiveTransport.start();
@@ -95,10 +111,27 @@ final class AzureServiceBusInteropPeer {
 
     private static CompletableFuture<Void> deserialize(
             byte[] body,
+            Map<String, Object> transportHeaders,
             ObjectMapper mapper,
             CompletableFuture<String> received) {
         try {
             Envelope<CrossLanguageMessage> envelope = mapper.readValue(body, new TypeReference<>() { });
+            requireEqual(REQUEST_ID, envelope.getRequestId(), "envelope requestId");
+            requireEqual(CORRELATION_ID, envelope.getCorrelationId(), "envelope correlationId");
+            requireEqual(CONVERSATION_ID, envelope.getConversationId(), "envelope conversationId");
+            requireEqual(INITIATOR_ID, envelope.getInitiatorId(), "envelope initiatorId");
+            requireEqual(RESPONSE_ADDRESS, envelope.getResponseAddress(), "envelope responseAddress");
+            requireEqual(FAULT_ADDRESS, envelope.getFaultAddress(), "envelope faultAddress");
+            requireEqual(SOURCE_ADDRESS, envelope.getSourceAddress(), "envelope sourceAddress");
+            requireEqual(HEADER_VALUE, envelope.getHeaders().get("cross-language-header"), "envelope header");
+            requireEqual(NATIVE_MESSAGE_ID, transportHeaders.get("message_id"), "native messageId");
+            requireEqual(CORRELATION_ID.toString(), transportHeaders.get("correlation_id"),
+                    "native correlationId");
+            requireEqual(RESPONSE_ADDRESS, transportHeaders.get("reply_to"), "native replyTo");
+            requireEqual(SUBJECT, transportHeaders.get("subject"), "native subject");
+            requireEqual(TO, transportHeaders.get("to"), "native to");
+            requireEqual(EXPIRATION, transportHeaders.get("expiration"), "native expiration");
+            requireEqual(HEADER_VALUE, transportHeaders.get("cross-language-header"), "application property");
             received.complete(envelope.getMessage().getValue());
             return CompletableFuture.completedFuture(null);
         } catch (Exception exception) {
@@ -118,12 +151,33 @@ final class AzureServiceBusInteropPeer {
                 ? URI.create(transportFactory.getPublishAddress(entityName))
                 : URI.create(transportFactory.getSendAddress(entityName));
         context.setDestinationAddress(destination);
+        context.setRequestId(REQUEST_ID);
+        context.setCorrelationId(CORRELATION_ID);
+        context.setConversationId(CONVERSATION_ID);
+        context.setInitiatorId(INITIATOR_ID);
+        context.setResponseAddress(URI.create(RESPONSE_ADDRESS));
+        context.setFaultAddress(URI.create(FAULT_ADDRESS));
+        context.setSourceAddress(URI.create(SOURCE_ADDRESS));
+        context.getHeaders().put("cross-language-header", HEADER_VALUE);
+        context.getHeaders().put("_message_id", NATIVE_MESSAGE_ID);
+        context.getHeaders().put("_correlation_id", CORRELATION_ID.toString());
+        context.getHeaders().put("_reply_to", RESPONSE_ADDRESS);
+        context.getHeaders().put("_subject", SUBJECT);
+        context.getHeaders().put("_to", TO);
+        context.getHeaders().put("_expiration", EXPIRATION);
         byte[] body = context.serialize(new EnvelopeMessageSerializer());
         transportFactory.getSendTransport(destination)
                 .send(body, context.getHeaders(), "application/vnd.masstransit+json");
         System.out.println("SENT");
         System.out.flush();
         System.exit(0);
+    }
+
+    private static void requireEqual(Object expected, Object actual, String field) {
+        if (!expected.equals(actual)) {
+            throw new IllegalStateException(
+                    "Expected " + field + " '" + expected + "' but received '" + actual + "'");
+        }
     }
 
     private static void respond(

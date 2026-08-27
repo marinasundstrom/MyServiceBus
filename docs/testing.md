@@ -40,7 +40,10 @@ endpoint fault publication against this shared topology. Request tests map
 generated temporary endpoint names to the fixture's sequential `msb-response`
 queue and cover responses and faults. The .NET suite also launches the Java
 interoperability peer to prove directed send and publish in both language
-directions, including correlated requests and responses.
+directions, including correlated requests and responses. Those cross-language
+delivery checks also verify envelope identifiers, addresses, application
+headers, and native message, correlation, reply-to, subject, and destination
+properties.
 
 Validate the checked-in JSON and Compose configuration with:
 

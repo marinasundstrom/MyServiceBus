@@ -135,12 +135,22 @@ The adapter maps portable metadata to `ServiceBusMessage` or
 | Correlation ID | `CorrelationId` |
 | Content type | `ContentType` |
 | Response address | `ReplyTo` |
+| Subject/type | `Subject` |
+| Destination hint | `To` |
 | Time to live/expiration | `TimeToLive` |
 | Remaining headers | Application properties |
 
 Envelope fields remain authoritative for MassTransit wire compatibility.
 Native properties support broker features, diagnostics, and non-MyServiceBus
 peers; they do not replace the envelope.
+
+Transport-specific header names use the same underscore convention in both
+clients. For example, `_message_id`, `_correlation_id`, `_reply_to`, `_subject`,
+`_to`, and `_expiration` set native properties rather than application properties;
+expiration is expressed as non-negative milliseconds. On receive,
+their normalized names (`message_id`, `correlation_id`, `reply_to`, `subject`,
+`to`, and `expiration`) are merged with the envelope headers. This makes native metadata
+available to consumers while preserving the original envelope.
 
 Property conversion must use the intersection of AMQP application-property
 types supported by the current .NET and Java SDKs. Unsupported values must be
@@ -254,7 +264,7 @@ both clients where applicable:
 - [x] correlated request, response, and fault handling in both clients
 - [x] C# request consumed and answered by Java
 - [x] Java request consumed and answered by C#
-- [ ] envelope and native-property preservation in both directions
+- [x] envelope and native-property preservation in both directions
 - [x] retry success without failure-destination traffic
 - [x] retry exhaustion and completion after copying to `_error`
 - [x] endpoint-specific `Fault<T>` publication

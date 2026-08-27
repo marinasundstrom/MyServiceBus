@@ -14,6 +14,7 @@ This changelog summarizes the bigger themes in the repository history. It is int
 - Aligned direct Java bus publication with C# by resolving the singleton transport endpoint directly while retaining send logging; scoped endpoint providers remain reserved for operations that carry a consumer or application scope.
 - Added emulator-backed C#↔Java directed-send and publish conformance, plus matching retry recovery/exhaustion, `_error` and `_skipped` settlement, and endpoint-fault checks for both clients.
 - Added corresponding Azure Service Bus request composition in C# and Java, including transport-produced temporary endpoint addresses, correlated responses and faults, pre-provisioned emulator mapping, and bidirectional C#↔Java request conformance.
+- Added bidirectional Azure Service Bus conformance for MassTransit envelope metadata, application headers, and corresponding native broker properties.
 
 ### Documentation website
 

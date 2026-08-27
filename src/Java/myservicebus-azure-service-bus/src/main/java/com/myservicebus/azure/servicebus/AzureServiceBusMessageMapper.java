@@ -62,6 +62,15 @@ final class AzureServiceBusMessageMapper {
         if (message.getReplyTo() != null) {
             headers.put("reply_to", message.getReplyTo());
         }
+        if (message.getSubject() != null) {
+            headers.put("subject", message.getSubject());
+        }
+        if (message.getTo() != null) {
+            headers.put("to", message.getTo());
+        }
+        if (message.getTimeToLive() != null) {
+            headers.put("expiration", Long.toString(message.getTimeToLive().toMillis()));
+        }
         if (faultAddress != null) {
             headers.putIfAbsent(HEADER_CONVENTION.getFaultAddressHeader(), faultAddress);
         }
@@ -77,6 +86,18 @@ final class AzureServiceBusMessageMapper {
             case "reply_to" -> message.setReplyTo(text);
             case "subject", "type" -> message.setSubject(text);
             case "to" -> message.setTo(text);
+            case "expiration" -> {
+                try {
+                    long milliseconds = Long.parseLong(text);
+                    if (milliseconds < 0) {
+                        throw new NumberFormatException("negative expiration");
+                    }
+                    message.setTimeToLive(java.time.Duration.ofMillis(milliseconds));
+                } catch (NumberFormatException exception) {
+                    throw new IllegalArgumentException(
+                            "Azure Service Bus expiration must be a non-negative millisecond value.", exception);
+                }
+            }
             default -> message.getApplicationProperties().put(key, normalize(value));
         }
     }
