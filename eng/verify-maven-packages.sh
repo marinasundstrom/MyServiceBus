@@ -1,8 +1,8 @@
 #!/usr/bin/env sh
 set -eu
 
-version="${1:-0.1.0-preview.3}"
-modules="myservicebus-abstractions myservicebus-di myservicebus-logging myservicebus-tasks myservicebus myservicebus-rabbitmq myservicebus-azure-service-bus myservicebus-testing"
+version="${1:-0.1.0-preview.4}"
+modules="myservicebus-abstractions myservicebus-di myservicebus-logging myservicebus-tasks myservicebus myservicebus-inspection myservicebus-monitoring myservicebus-rabbitmq myservicebus-azure-service-bus myservicebus-testing"
 require_signatures="${REQUIRE_MAVEN_SIGNATURES:-0}"
 
 for artifact_id in $modules; do
@@ -32,7 +32,7 @@ for artifact_id in $modules; do
 done
 
 if [ "$require_signatures" = "1" ]; then
-  echo "Verified eight signed Maven publications with binary, source, Javadoc, module, and POM artifacts for $version."
+  echo "Verified ten signed Maven publications with binary, source, Javadoc, module, and POM artifacts for $version."
 else
-  echo "Verified eight Maven publications with binary, source, Javadoc, module, and POM artifacts for $version."
+  echo "Verified ten Maven publications with binary, source, Javadoc, module, and POM artifacts for $version."
 fi

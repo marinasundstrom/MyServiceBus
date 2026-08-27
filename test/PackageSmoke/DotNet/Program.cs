@@ -1,4 +1,6 @@
 using MyServiceBus;
+using MyServiceBus.Inspection;
+using MyServiceBus.Monitoring;
 using MyServiceBus.RabbitMq;
 
 var consumed = false;
@@ -17,6 +19,8 @@ if (!consumed)
     throw new InvalidOperationException("The packaged in-memory harness did not deliver the message.");
 
 _ = typeof(IMessageBus);
+_ = typeof(IBusInspectionProvider);
+_ = typeof(MonitoringExporterOptions);
 _ = typeof(RabbitMqFactoryConfigurator);
 _ = typeof(AzureServiceBusFactoryConfigurator);
 Console.WriteLine("Verified the staged MyServiceBus NuGet packages from a consumer project.");

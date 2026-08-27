@@ -25,6 +25,12 @@ bus.start();
 exporter.start(inspectionProvider);`,
 };
 
+const exporterInstall = {
+  csharp: `dotnet add package Sundstrom.MyServiceBus.Monitoring \\
+  --version 0.1.0-preview.4`,
+  java: `implementation 'io.github.marinasundstrom.myservicebus:myservicebus-monitoring:0.1.0-preview.4'`,
+};
+
 export default function RuntimeMonitoring() {
   return (
     <article className="docs-article">
@@ -41,7 +47,7 @@ export default function RuntimeMonitoring() {
         <p>
           The end-to-end stack is ready for local development and controlled
           evaluation. It is not yet a production observability backend: storage,
-          authentication, durable storage, configurable retention, broker metrics,
+          authentication, configurable retention, broker metrics,
           and automated scaling advice remain future work.
         </p>
       </div>
@@ -89,6 +95,7 @@ export default function RuntimeMonitoring() {
       </p>
 
       <h2>Enable an exporter</h2>
+      <LanguageTabs csharp={exporterInstall.csharp} java={exporterInstall.java} />
       <LanguageTabs csharp={exporterSetup.csharp} java={exporterSetup.java} />
 
       <h2>What the MVP shows</h2>
@@ -151,6 +158,21 @@ export default function RuntimeMonitoring() {
         applications&apos; <code>/publish</code>, <code>/send</code>, or
         <code>/request/fault</code> routes. Both clients self-register with the same
         collector and appear as separate applications.
+      </p>
+
+      <h2>Deploy the components separately</h2>
+      <p>
+        The exporter is a client package. The in-memory collector and Blazor
+        dashboard are separate applications, published as versioned Linux container
+        images for AMD64 and ARM64:
+      </p>
+      <pre><code>{`ghcr.io/marinasundstrom/myservicebus-monitoring-collector:0.1.0-preview.4
+ghcr.io/marinasundstrom/myservicebus-monitoring-dashboard:0.1.0-preview.4`}</code></pre>
+      <p>
+        Both listen on port <code>8080</code>. Configure the dashboard&apos;s
+        <code>MonitoringService</code> setting with the collector base address. The
+        prototype has no authentication or durable history yet, so keep it inside a
+        controlled network.
       </p>
 
       <div className="next-card">

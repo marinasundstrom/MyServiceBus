@@ -6,6 +6,9 @@ MyServiceBus publishes matching .NET and Java previews from one release commit. 
 | --- | --- | --- |
 | .NET | `Publish NuGet preview` (`publish-nuget.yml`) | NuGet.org |
 | Java | `Publish Maven Central preview` (`publish-maven.yml`) | Maven Central Publisher Portal |
+| Monitoring collector and dashboard | `Publish monitoring images` (`publish-monitoring-images.yml`) | GitHub Container Registry |
+
+The first monitoring-image publication creates two container packages under the repository owner. Confirm that both packages inherit access from this public repository or set their visibility to public before announcing the release; unauthenticated `docker pull` is part of the release verification.
 
 ## One-time NuGet.org setup
 
@@ -22,10 +25,12 @@ Create a trusted publishing policy for the NuGet.org account that owns the MySer
 
 Enter only the workflow filename, not the `.github/workflows/` path. The workflow supplies the public NuGet.org profile username directly to `NuGet/login`; no NuGet API-key secret is required. GitHub OIDC is exchanged for a short-lived key immediately before publication.
 
-The trusted policy owner must own all five package IDs:
+The trusted policy owner must own all seven package IDs:
 
 - `Sundstrom.MyServiceBus.Abstractions`
 - `Sundstrom.MyServiceBus`
+- `Sundstrom.MyServiceBus.Inspection`
+- `Sundstrom.MyServiceBus.Monitoring`
 - `Sundstrom.MyServiceBus.RabbitMq`
 - `Sundstrom.MyServiceBus.AzureServiceBus`
 - `Sundstrom.MyServiceBus.Testing`
@@ -60,19 +65,22 @@ Using one immutable tag for both workflows prevents a branch update from causing
 ## Publishing both ecosystems
 
 1. In GitHub Actions, run **Publish Maven Central preview** and select the release tag.
-2. Wait for the workflow to reach Maven Central state `PUBLISHING` or `PUBLISHED`. It tests all Java modules, creates signed publications, verifies a clean consumer, uploads one bundle containing all eight artifacts, and waits for Central to validate and accept it. Publication then continues asynchronously in Central.
+2. Wait for the workflow to reach Maven Central state `PUBLISHING` or `PUBLISHED`. It tests all Java modules, creates signed publications, verifies a clean consumer, uploads one bundle containing all ten artifacts, and waits for Central to validate and accept it. Publication then continues asynchronously in Central.
 3. Run **Publish NuGet preview** and select the same release tag.
-4. Confirm that all five NuGet packages and symbol packages were accepted.
-5. Verify the version on Maven Central and NuGet.org after registry indexing completes.
-6. Create the GitHub prerelease and use the same version in its title and release notes.
+4. Confirm that all seven NuGet packages and symbol packages were accepted.
+5. Run **Publish monitoring images** from the same tag and confirm that the separately deployable collector and dashboard images were accepted by GitHub Container Registry for AMD64 and ARM64.
+6. Verify the version on Maven Central, NuGet.org, and GitHub Container Registry after registry indexing completes.
+7. Create the GitHub prerelease and use the same version in its title and release notes.
 
 Maven Central is published first because its validation is stricter and can reject an entire deployment before release. Once both workflows succeed, the release tag, Maven coordinates, NuGet package versions, and GitHub prerelease all identify the same source state.
 
 The `0.1.0-preview.1` NuGet packages were built from commit `e0314869a00daed55613dfe8c7568190c7793eee`, before the Maven workflow existed. For this inaugural Java publication, use the first release-publication commit and verify that no Java or .NET product source changed after `e031486`; future releases must use one shared tag from the outset.
 
+Maven Central accepted the original eight-artifact `0.1.0-preview.3` deployment before the missing monitoring distribution was identified. No matching NuGet, container, website, or GitHub release was published. `0.1.0-preview.4` supersedes that incomplete Maven-only version and is the coordinated monitoring release.
+
 ## Failure and retry behavior
 
-NuGet and Maven Central package versions are immutable. The NuGet workflow uses `--skip-duplicate`, allowing an interrupted multi-package push to resume without replacing accepted packages. Maven Central uploads all eight Java artifacts as one deployment bundle; validation failure leaves the deployment failed rather than partially publishing individual modules.
+NuGet and Maven Central package versions are immutable. The NuGet workflow uses `--skip-duplicate`, allowing an interrupted multi-package push to resume without replacing accepted packages. Maven Central uploads all ten Java artifacts as one deployment bundle; validation failure leaves the deployment failed rather than partially publishing individual modules. The collector and dashboard are applications rather than client libraries, so they are distributed as separate OCI images named `ghcr.io/marinasundstrom/myservicebus-monitoring-collector` and `ghcr.io/marinasundstrom/myservicebus-monitoring-dashboard`.
 
 If the Maven workflow is interrupted before Central accepts the deployment, do
 not upload the version again. Dispatch a ref containing the workflow's

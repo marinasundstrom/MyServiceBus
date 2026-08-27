@@ -1,6 +1,6 @@
 
 group = 'io.github.marinasundstrom.myservicebus'
-version = '0.1.0-preview.3'
+version = '0.1.0-preview.4'
 
 def publishedProjectDescriptions = [
     'myservicebus-abstractions': 'Portable messaging contracts and abstractions for MyServiceBus.',
@@ -8,6 +8,8 @@ def publishedProjectDescriptions = [
     'myservicebus-logging'      : 'Logging abstractions and adapters for MyServiceBus.',
     'myservicebus-tasks'        : 'Asynchronous task abstractions for MyServiceBus.',
     'myservicebus'              : 'Idiomatic Java messaging runtime with MassTransit-compatible concepts and wire conventions.',
+    'myservicebus-inspection'   : 'Queryable bus metadata and topology inspection APIs for MyServiceBus.',
+    'myservicebus-monitoring'   : 'Optional batched runtime monitoring exporter and collector protocol for MyServiceBus.',
     'myservicebus-rabbitmq'     : 'RabbitMQ transport for MyServiceBus.',
     'myservicebus-azure-service-bus': 'Azure Service Bus transport for MyServiceBus.',
     'myservicebus-testing'      : 'In-memory test harness and testing utilities for MyServiceBus.'

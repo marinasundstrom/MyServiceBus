@@ -35,7 +35,7 @@ The MVP includes:
 - a standalone Blazor runtime overview with persisted light, dark, and system themes
 - equivalent exporter behavior for C# and Java
 
-The MVP does not yet include authentication, durable storage, configurable retention, alerting or scaling recommendations, broker queue depth, host saturation, payload-byte limits, or a production deployment model. The dashboard uses WebSocket invalidations to re-query HTTP snapshots, with a 15-second polling fallback.
+The MVP does not yet include authentication, durable storage, configurable retention, alerting or scaling recommendations, broker queue depth, host saturation, or payload-byte limits. The dashboard uses WebSocket invalidations to re-query HTTP snapshots, with a 15-second polling fallback.
 
 ## Dashboard Preview
 
@@ -61,7 +61,11 @@ Use the sample applications' `/publish`, `/send`, and `/request` routes to creat
 
 ## Enable the C# Exporter
 
-Install or reference `MyServiceBus.Monitoring`, then register the addon after the bus:
+Install the optional exporter package, then register the addon after the bus:
+
+```bash
+dotnet add package Sundstrom.MyServiceBus.Monitoring --version 0.1.0-preview.4
+```
 
 ```csharp
 builder.Services.AddServiceBus(configurator =>
@@ -86,6 +90,10 @@ The exporter is registered as both an `IBusHook` and a hosted background service
 ## Enable the Java Exporter
 
 Reference `myservicebus-monitoring`, add monitoring before building the service provider, and start the exporter after the bus:
+
+```groovy
+implementation 'io.github.marinasundstrom.myservicebus:myservicebus-monitoring:0.1.0-preview.4'
+```
 
 ```java
 MonitoringExporterOptions monitoring = new MonitoringExporterOptions();
@@ -164,6 +172,13 @@ Failed-message inspection intentionally excludes message bodies and arbitrary he
 
 ## Deployment and Security Boundary
 
-The current in-memory service is intended for local development and controlled evaluation. Before exposing it outside a trusted network, add host-level authentication and authorization, request and payload limits, TLS, durable persistence if history is required, and an explicit retention policy. Do not send message bodies, arbitrary headers, credentials, or broker-management data through the monitoring protocol.
+The collector and dashboard are independently deployable applications, not client-library packages. Versioned Linux images for AMD64 and ARM64 are published separately:
+
+```text
+ghcr.io/marinasundstrom/myservicebus-monitoring-collector:0.1.0-preview.4
+ghcr.io/marinasundstrom/myservicebus-monitoring-dashboard:0.1.0-preview.4
+```
+
+The collector listens on port `8080`. The dashboard also listens on port `8080` and reads its collector base address from the `MonitoringService` configuration key (for example, the `MonitoringService` environment variable). The current in-memory collector is intended for local development and controlled evaluation. Before exposing it outside a trusted network, add host-level authentication and authorization, request and payload limits, TLS, durable persistence if history is required, and an explicit retention policy. Do not send message bodies, arbitrary headers, credentials, or broker-management data through the monitoring protocol.
 
 For the longer-term design and vocabulary, see the [Runtime Monitoring Proposal](proposals/runtime-monitoring.md).

@@ -5,6 +5,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import com.myservicebus.InMemoryTestHarness;
 import com.myservicebus.MessageBus;
 import com.myservicebus.azure.servicebus.AzureServiceBusFactoryConfigurator;
+import com.myservicebus.inspection.BusInspectionProvider;
+import com.myservicebus.monitoring.MonitoringExporterOptions;
 import com.myservicebus.rabbitmq.RabbitMqFactoryConfigurator;
 
 public final class PackageSmoke {
@@ -28,6 +30,8 @@ public final class PackageSmoke {
         }
 
         requireType(MessageBus.class);
+        requireType(BusInspectionProvider.class);
+        requireType(MonitoringExporterOptions.class);
         requireType(RabbitMqFactoryConfigurator.class);
         requireType(AzureServiceBusFactoryConfigurator.class);
         System.out.println("Verified the staged MyServiceBus Maven packages from a consumer project.");

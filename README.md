@@ -18,13 +18,13 @@ See samples below.
 Install the RabbitMQ transport for a broker-backed application. It brings in the core runtime and abstractions transitively:
 
 ```bash
-dotnet add package Sundstrom.MyServiceBus.RabbitMq --version 0.1.0-preview.3
+dotnet add package Sundstrom.MyServiceBus.RabbitMq --version 0.1.0-preview.4
 ```
 
 For an application that only needs the core runtime and its in-memory mediator, install the main package directly:
 
 ```bash
-dotnet add package Sundstrom.MyServiceBus --version 0.1.0-preview.3
+dotnet add package Sundstrom.MyServiceBus --version 0.1.0-preview.4
 ```
 
 Continue with the [.NET quick start](#c) to register the bus, configure RabbitMQ, add a consumer, and publish a message. The [feature walkthrough](docs/feature-walkthrough.md) covers the complete C# and Java APIs.
@@ -35,6 +35,8 @@ Continue with the [.NET quick start](#c) to register the bus, configure RabbitMQ
 | --- | --- |
 | [`Sundstrom.MyServiceBus`](https://www.nuget.org/packages/Sundstrom.MyServiceBus) | Core messaging runtime and in-memory mediator |
 | [`Sundstrom.MyServiceBus.Abstractions`](https://www.nuget.org/packages/Sundstrom.MyServiceBus.Abstractions) | Portable message contracts, contexts, and endpoint abstractions |
+| `Sundstrom.MyServiceBus.Inspection` | Queryable bus metadata and topology inspection APIs |
+| `Sundstrom.MyServiceBus.Monitoring` | Optional batched runtime monitoring exporter and collector protocol |
 | [`Sundstrom.MyServiceBus.RabbitMq`](https://www.nuget.org/packages/Sundstrom.MyServiceBus.RabbitMq) | RabbitMQ transport and configuration integration |
 | `Sundstrom.MyServiceBus.AzureServiceBus` | Verified-preview Azure Service Bus transport for direct send and publish/subscribe |
 | [`Sundstrom.MyServiceBus.Testing`](https://www.nuget.org/packages/Sundstrom.MyServiceBus.Testing) | In-memory test harness and testing utilities |
@@ -49,7 +51,7 @@ Add the RabbitMQ module to a Gradle application. It brings in the Java runtime a
 
 ```groovy
 dependencies {
-    implementation 'io.github.marinasundstrom.myservicebus:myservicebus-rabbitmq:0.1.0-preview.3'
+    implementation 'io.github.marinasundstrom.myservicebus:myservicebus-rabbitmq:0.1.0-preview.4'
 }
 ```
 
@@ -59,7 +61,7 @@ For Maven applications:
 <dependency>
   <groupId>io.github.marinasundstrom.myservicebus</groupId>
   <artifactId>myservicebus-rabbitmq</artifactId>
-  <version>0.1.0-preview.3</version>
+  <version>0.1.0-preview.4</version>
 </dependency>
 ```
 
@@ -70,6 +72,8 @@ Continue with the [Java quick start](#java) or the detailed [Java guide](src/Jav
 | Artifact | Purpose |
 | --- | --- |
 | [`io.github.marinasundstrom.myservicebus:myservicebus`](https://central.sonatype.com/artifact/io.github.marinasundstrom.myservicebus/myservicebus) | Core messaging runtime and in-memory mediator |
+| `io.github.marinasundstrom.myservicebus:myservicebus-inspection` | Queryable bus metadata and topology inspection APIs |
+| `io.github.marinasundstrom.myservicebus:myservicebus-monitoring` | Optional batched runtime monitoring exporter and collector protocol |
 | [`io.github.marinasundstrom.myservicebus:myservicebus-abstractions`](https://central.sonatype.com/artifact/io.github.marinasundstrom.myservicebus/myservicebus-abstractions) | Portable messaging contracts and abstractions |
 | [`io.github.marinasundstrom.myservicebus:myservicebus-di`](https://central.sonatype.com/artifact/io.github.marinasundstrom.myservicebus/myservicebus-di) | Dependency-injection abstractions |
 | [`io.github.marinasundstrom.myservicebus:myservicebus-logging`](https://central.sonatype.com/artifact/io.github.marinasundstrom.myservicebus/myservicebus-logging) | Logging abstractions and adapters |
@@ -79,6 +83,17 @@ Continue with the [Java quick start](#java) or the detailed [Java guide](src/Jav
 | [`io.github.marinasundstrom.myservicebus:myservicebus-testing`](https://central.sonatype.com/artifact/io.github.marinasundstrom.myservicebus/myservicebus-testing) | In-memory test harness and testing utilities |
 
 All Java artifacts use the same version as the corresponding NuGet release.
+
+### Runtime monitoring deployment
+
+The optional inspection and exporter APIs are client libraries in the package tables above. The collector and Blazor dashboard are separate deployable applications, published as versioned Linux container images:
+
+```text
+ghcr.io/marinasundstrom/myservicebus-monitoring-collector:0.1.0-preview.4
+ghcr.io/marinasundstrom/myservicebus-monitoring-dashboard:0.1.0-preview.4
+```
+
+See the [runtime monitoring guide](docs/runtime-monitoring.md) for configuration, the live dashboard model, OpenTelemetry boundaries, and the experimental security scope.
 
 ---
 

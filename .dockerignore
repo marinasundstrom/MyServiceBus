@@ -1,0 +1,11 @@
+.git
+.github
+.idea
+.vscode
+**/.gradle
+**/bin
+**/build
+**/node_modules
+**/obj
+artifacts
+website

@@ -1,0 +1,133 @@
+---
+name: Publish monitoring images
+
+'on':
+  workflow_dispatch:
+
+concurrency:
+  group: publish-monitoring-images
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  verify:
+    name: Verify deployable stack
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build collector and dashboard images
+        run: |
+          docker build \
+            --file src/MyServiceBus.Monitoring.Server/Dockerfile \
+            --tag myservicebus-monitoring-collector:release-test \
+            .
+          docker build \
+            --file src/MyServiceBus.Dashboard/Dockerfile \
+            --tag myservicebus-monitoring-dashboard:release-test \
+            .
+
+      - name: Verify collector API and dashboard assets
+        shell: bash
+        run: |
+          collector_id="$(docker run --rm --detach --publish 5310:8080 \
+            myservicebus-monitoring-collector:release-test)"
+          dashboard_id="$(docker run --rm --detach --publish 5320:8080 \
+            --env MonitoringService=http://172.17.0.1:5310 \
+            myservicebus-monitoring-dashboard:release-test)"
+          cleanup() {
+            docker stop "$dashboard_id" "$collector_id" >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT HUP INT TERM
+
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent \
+              http://localhost:5310/api/monitoring/v1/applications \
+              > collector-response.json; then
+              break
+            fi
+            sleep 1
+          done
+          test "$(cat collector-response.json)" = '[]'
+
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://localhost:5320/ \
+              > dashboard-response.html; then
+              break
+            fi
+            sleep 1
+          done
+          grep -Fq 'MyServiceBus' dashboard-response.html
+          curl --fail --silent --output blazor.web.js \
+            http://localhost:5320/_framework/blazor.web.js
+          test -s blazor.web.js
+
+  publish:
+    name: Publish ${{ matrix.component }}
+    needs: verify
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - component: collector
+            dockerfile: src/MyServiceBus.Monitoring.Server/Dockerfile
+            image: myservicebus-monitoring-collector
+          - component: dashboard
+            dockerfile: src/MyServiceBus.Dashboard/Dockerfile
+            image: myservicebus-monitoring-dashboard
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.100'
+
+      - name: Read release version
+        id: release-version
+        shell: bash
+        run: |
+          version="$(dotnet msbuild src/MyServiceBus/MyServiceBus.csproj -nologo -getProperty:PackageVersion)"
+          case "$version" in
+            *-preview.*) ;;
+            *)
+              echo "Expected a preview version, but found '$version'." >&2
+              exit 1
+              ;;
+          esac
+          ./eng/verify-release-versions.sh "$version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and publish image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ghcr.io/marinasundstrom/${{ matrix.image }}:${{ steps.release-version.outputs.version }}
+            ghcr.io/marinasundstrom/${{ matrix.image }}:preview
+          labels: |
+            org.opencontainers.image.source=https://github.com/marinasundstrom/MyServiceBus
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ steps.release-version.outputs.version }}
+          cache-from: type=gha,scope=${{ matrix.component }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.component }}

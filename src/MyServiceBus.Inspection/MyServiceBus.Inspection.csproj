@@ -4,6 +4,10 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <IsPackable>true</IsPackable>
+    <PackageId>Sundstrom.MyServiceBus.Inspection</PackageId>
+    <Description>Queryable bus metadata and topology inspection APIs for MyServiceBus.</Description>
+    <PackageTags>$(PackageTags);inspection;topology;observability</PackageTags>
   </PropertyGroup>
 
   <ItemGroup>

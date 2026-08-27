@@ -4,10 +4,11 @@ This changelog summarizes the bigger themes in the repository history. It is int
 
 ## Unreleased
 
-Release candidate: `0.1.0-preview.3`.
+Release candidate: `0.1.0-preview.4`.
 
 ### Runtime monitoring direction
 
+- Published the optional inspection and monitoring client integrations as corresponding NuGet and Maven packages, with the collector and dashboard distributed independently as versioned multi-architecture container images.
 - Added an end-to-end monitoring proof of concept with a central in-memory service, HTTP ingestion and query APIs, WebSocket invalidations, and a standalone Blazor dashboard orchestrated through Aspire.
 - Added corresponding general-purpose immutable bus hooks for C# and Java; hook failures are isolated and the extension point is independent of the monitoring collector.
 - Added optional C# and Java monitoring exporters that self-register metadata, emit heartbeats, and batch observations through bounded local queues without placing remote I/O in the messaging pipeline.
