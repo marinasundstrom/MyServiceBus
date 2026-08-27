@@ -9,6 +9,7 @@ import com.myservicebus.MessageBus;
 import com.myservicebus.MessageUrn;
 import com.myservicebus.ReceiveTransport;
 import com.myservicebus.RequestClient;
+import com.myservicebus.RequestFaultException;
 import com.myservicebus.RequestTimeout;
 import com.myservicebus.SendContext;
 import com.myservicebus.TransportRequestClientTransport;
@@ -26,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
 final class AzureServiceBusInteropPeer {
@@ -48,7 +50,7 @@ final class AzureServiceBusInteropPeer {
     static void run(String[] args) throws Exception {
         if (args.length != 4) {
             throw new IllegalArgumentException(
-                    "Expected: <azure-consume|azure-consume-value|azure-send|azure-publish|azure-respond|azure-request> "
+                    "Expected: <azure-consume|azure-consume-value|azure-send|azure-publish|azure-respond|azure-fault|azure-request|azure-request-fault> "
                             + "<queue-or-entity> <binding-or-unused> <value>");
         }
 
@@ -58,7 +60,8 @@ final class AzureServiceBusInteropPeer {
         if (!"1".equals(System.getenv("AZURE_SERVICEBUS_CREATE_TOPOLOGY"))) {
             configurator.usePreProvisionedTopology();
         }
-        String temporaryEndpointName = "azure-request".equals(args[0]) && !"unused".equals(args[2])
+        String temporaryEndpointName = ("azure-request".equals(args[0])
+                || "azure-request-fault".equals(args[0])) && !"unused".equals(args[2])
                 ? args[2]
                 : "msb-response";
         configurator.setTemporaryEndpointNameFormatter(ignored -> temporaryEndpointName);
@@ -75,7 +78,9 @@ final class AzureServiceBusInteropPeer {
             case "azure-publish" -> send(transportFactory, args[1], args[3], true);
             case "azure-publish-default" -> publishDefault(connectionString, args[3]);
             case "azure-respond" -> respond(connectionString, args[1], args[2], args[3]);
+            case "azure-fault" -> fault(connectionString, args[1], args[2], args[3]);
             case "azure-request" -> request(transportFactory, args[1], args[3]);
+            case "azure-request-fault" -> requestFault(transportFactory, args[1], args[3]);
             default -> throw new IllegalArgumentException("Unknown Azure Service Bus mode: " + args[0]);
         }
     }
@@ -317,6 +322,67 @@ final class AzureServiceBusInteropPeer {
         System.out.println("RECEIVED");
         System.out.flush();
         System.exit(0);
+    }
+
+    private static void requestFault(
+            AzureServiceBusTransportFactory transportFactory,
+            String entityName,
+            String value) throws Exception {
+        RequestClient<InteropRequest> requestClient = new GenericRequestClient<>(
+                InteropRequest.class,
+                new TransportRequestClientTransport(transportFactory, new EnvelopeMessageSerializer()),
+                URI.create(transportFactory.getPublishAddress(entityName)),
+                RequestTimeout.after(Duration.ofSeconds(20)));
+        InteropRequest request = new InteropRequest();
+        request.setValue(value);
+        try {
+            requestClient.getResponse(request, InteropResponse.class).get(20, TimeUnit.SECONDS);
+            throw new IllegalStateException("Expected the request to fault.");
+        } catch (ExecutionException exception) {
+            if (!(exception.getCause() instanceof RequestFaultException requestFault)
+                    || !requestFault.getMessage().contains("mass-transit-fault")) {
+                throw exception;
+            }
+        }
+        System.out.println("FAULT");
+        System.out.flush();
+        System.exit(0);
+    }
+
+    private static void fault(
+            String connectionString,
+            String queueName,
+            String bindingEntityName,
+            String expectedValue) throws Exception {
+        CompletableFuture<Void> received = new CompletableFuture<>();
+        MessageBus bus = MessageBus.factory.create(AzureServiceBusFactoryConfigurator.class, cfg -> {
+            cfg.host(connectionString);
+            if (!"1".equals(System.getenv("AZURE_SERVICEBUS_CREATE_TOPOLOGY"))) {
+                cfg.usePreProvisionedTopology();
+            }
+            cfg.message(InteropRequest.class, message -> message.setEntityName(bindingEntityName));
+            cfg.receiveEndpoint(queueName, endpoint ->
+                    endpoint.handler(InteropRequest.class, context -> {
+                        if (!expectedValue.equals(context.getMessage().getValue())) {
+                            return CompletableFuture.failedFuture(new IllegalStateException(
+                                    "Unexpected request: " + context.getMessage().getValue()));
+                        }
+                        received.complete(null);
+                        return CompletableFuture.failedFuture(new IllegalStateException("java-fault"));
+                    }));
+        });
+
+        bus.start();
+        System.out.println("READY");
+        System.out.flush();
+        try {
+            received.get(20, TimeUnit.SECONDS);
+            System.out.println("FAULTING");
+            System.out.flush();
+            Thread.sleep(TimeUnit.SECONDS.toMillis(30));
+        } finally {
+            bus.stop();
+        }
     }
 
     private static String requiredEnvironment(String name) {

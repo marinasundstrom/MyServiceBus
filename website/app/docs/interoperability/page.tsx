@@ -28,7 +28,7 @@ export default function Interoperability() {
       <h2>Contract for every supported transport</h2>
       <p>Both MyServiceBus clients must follow the supported MassTransit peer’s addressing, entity naming, topology, native-property, and settlement conventions. A transport is not promoted from experimental to supported until C#, Java, and MassTransit can communicate in both directions through that profile’s documented conformance matrix.</p>
 
-      <div className="callout"><strong>Azure Service Bus: experimental</strong><p>Live Azure verifies cloud topology, default message-topic naming, bidirectional publish, directed queue sends in every direction, and request/response between MassTransit and both MyServiceBus clients in every direction. Default endpoint naming and fault interoperability remain release gates.</p></div>
+      <div className="callout"><strong>Azure Service Bus: experimental</strong><p>Live Azure verifies cloud topology, default message-topic naming, bidirectional publish, directed queue sends, and correlated responses and faults between MassTransit and both MyServiceBus clients in every direction. Default endpoint naming and cloud failure settlement remain release gates.</p></div>
 
       <div className="version-table" role="table" aria-label="Supported baseline">
         <div role="row"><span role="cell">MyServiceBus</span><strong role="cell">0.1.0-preview.1</strong></div>

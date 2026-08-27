@@ -129,7 +129,8 @@ The repeatable live-test procedure is:
    MyServiceBus client direction. C# and Java MyServiceBus request clients also
    verify correlated responses from MassTransit through unique native temporary
    queues, while MassTransit request clients verify correlated responses from
-   C# and Java MyServiceBus services.
+   C# and Java MyServiceBus services. The same four directions verify correlated
+   fault responses and their MassTransit-compatible exception details.
 5. For persistent use, run the explicit `teardown` command when the namespace is
    no longer needed. Ephemeral runs do this automatically in an exit trap.
 

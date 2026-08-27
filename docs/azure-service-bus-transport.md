@@ -122,8 +122,9 @@ corresponding `TestApp.CrossLanguageMessage` .NET type and
 `TestApp.CrossLanguageMessage` Java type, which both resolve to
 `TestApp/CrossLanguageMessage`. Explicit collision-free queues continue to keep
 the cloud cases isolated. The live request matrix is complete in both directions
-for both MyServiceBus clients. Automatic endpoint and companion naming and the
-MassTransit fault matrix remain experimental and are listed below.
+for both MyServiceBus clients. The live fault matrix is likewise complete in
+both directions. Automatic endpoint and companion naming and cloud failure-copy
+settlement remain experimental and are listed below.
 
 ## Topology Projection
 
@@ -317,6 +318,6 @@ both clients where applicable:
 - [x] C# and Java directed send is consumed by MassTransit
 - [x] C# and Java MyServiceBus request clients receive correlated MassTransit responses
 - [x] MassTransit request clients receive C# and Java MyServiceBus responses
-- [ ] bidirectional fault flows with MassTransit
+- [x] bidirectional fault flows with MassTransit
 
 Compatibility claims remain scoped to scenarios with executable evidence.

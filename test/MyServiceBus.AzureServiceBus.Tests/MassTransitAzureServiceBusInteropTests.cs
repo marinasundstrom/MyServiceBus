@@ -185,6 +185,167 @@ public sealed class MassTransitAzureServiceBusInteropTests
     }
 
     [AzureServiceBusCloudFact]
+    public async Task Csharp_MyServiceBus_request_client_receives_MassTransit_fault()
+    {
+        var suffix = Guid.NewGuid().ToString("N")[..12];
+        var queueName = $"msb-csharp-fault-mt-{suffix}";
+        var responseQueueName = $"msb-csharp-fault-response-{suffix}";
+        var administrationClient = new ServiceBusAdministrationClient(ConnectionString);
+        var massTransit = MassTransit.Bus.Factory.CreateUsingAzureServiceBus(cfg =>
+        {
+            cfg.Host(ConnectionString);
+            cfg.ReceiveEndpoint(queueName, endpoint => endpoint.Consumer<MassTransitFaultingConsumer>());
+        });
+        var requestConfigurator = new AzureServiceBusFactoryConfigurator();
+        requestConfigurator.Host(ConnectionString);
+        requestConfigurator.SetTemporaryEndpointNameFormatter(_ => responseQueueName);
+        await using var serviceBusClient = new ServiceBusClient(ConnectionString);
+        var requestFactory = new AzureServiceBusTransportFactory(serviceBusClient, requestConfigurator);
+        var requestClient = new GenericRequestClient<InteropRequest>(
+            requestFactory,
+            new MyServiceBus.Serialization.EnvelopeMessageSerializer(),
+            new SendContextFactory(),
+            timeout: MyServiceBus.RequestTimeout.After(TimeSpan.FromSeconds(30)));
+
+        await massTransit.StartAsync(CancellationToken.None);
+        try
+        {
+            var exception = await Assert.ThrowsAsync<MyServiceBus.RequestFaultException>(() =>
+                requestClient.GetResponseAsync<InteropResponse>(
+                    new InteropRequest { Value = "fault-from-masstransit" }));
+
+            Assert.Contains("mass-transit-fault", exception.Fault.Exceptions[0].Message);
+        }
+        finally
+        {
+            await massTransit.StopAsync();
+            await DeleteQueueIfExists(administrationClient, responseQueueName);
+            await DeleteTopology(administrationClient, queueName, DefaultRequestTopicName);
+        }
+    }
+
+    [AzureServiceBusCloudFact]
+    public async Task Java_MyServiceBus_request_client_receives_MassTransit_fault()
+    {
+        var suffix = Guid.NewGuid().ToString("N")[..12];
+        var queueName = $"msb-java-fault-mt-{suffix}";
+        var responseQueueName = $"msb-java-fault-response-{suffix}";
+        var administrationClient = new ServiceBusAdministrationClient(ConnectionString);
+        var massTransit = MassTransit.Bus.Factory.CreateUsingAzureServiceBus(cfg =>
+        {
+            cfg.Host(ConnectionString);
+            cfg.ReceiveEndpoint(queueName, endpoint => endpoint.Consumer<MassTransitFaultingConsumer>());
+        });
+
+        await massTransit.StartAsync(CancellationToken.None);
+        using var javaPeer = AzureServiceBusJavaInteropPeer.Start(
+            ConnectionString,
+            "azure-request-fault",
+            DefaultRequestTopicName,
+            responseQueueName,
+            "fault-from-java",
+            createTopology: true);
+        try
+        {
+            await AzureServiceBusJavaInteropPeer.WaitForOutput(javaPeer, "FAULT", TimeSpan.FromMinutes(2));
+            await AzureServiceBusJavaInteropPeer.WaitForExit(javaPeer, TimeSpan.FromSeconds(10));
+            Assert.Equal(0, javaPeer.ExitCode);
+        }
+        finally
+        {
+            await massTransit.StopAsync();
+            if (!javaPeer.HasExited)
+                javaPeer.Kill(entireProcessTree: true);
+            await DeleteQueueIfExists(administrationClient, responseQueueName);
+            await DeleteTopology(administrationClient, queueName, DefaultRequestTopicName);
+        }
+    }
+
+    [AzureServiceBusCloudFact]
+    public async Task MassTransit_request_client_receives_Csharp_MyServiceBus_fault()
+    {
+        var suffix = Guid.NewGuid().ToString("N")[..12];
+        var queueName = $"mt-fault-csharp-msb-{suffix}";
+        var responseQueueName = $"mt-fault-response-csharp-{suffix}";
+        var administrationClient = new ServiceBusAdministrationClient(ConnectionString);
+        var myServiceBus = MyServiceBus.MessageBus.Factory.Create<AzureServiceBusFactoryConfigurator>(cfg =>
+        {
+            cfg.Host(ConnectionString);
+            cfg.ReceiveEndpoint(queueName, endpoint =>
+                endpoint.Handler<InteropRequest>(_ =>
+                    Task.FromException(new InvalidOperationException("myservicebus-fault"))));
+        });
+        var massTransit = MassTransit.Bus.Factory.CreateUsingAzureServiceBus(cfg =>
+        {
+            cfg.Host(ConnectionString);
+            cfg.OverrideDefaultBusEndpointQueueName(responseQueueName);
+        });
+
+        await myServiceBus.StartAsync(CancellationToken.None);
+        await massTransit.StartAsync(CancellationToken.None);
+        try
+        {
+            var client = massTransit.CreateRequestClient<InteropRequest>(
+                MassTransit.RequestTimeout.After(s: 30));
+            var exception = await Assert.ThrowsAsync<MassTransit.RequestFaultException>(() =>
+                client.GetResponse<InteropResponse>(
+                    new InteropRequest { Value = "fault-from-myservicebus" }));
+
+            Assert.Contains("myservicebus-fault", exception.Message);
+        }
+        finally
+        {
+            await massTransit.StopAsync();
+            await myServiceBus.StopAsync(CancellationToken.None);
+            await DeleteTopology(administrationClient, queueName, DefaultRequestTopicName);
+            await DeleteQueueIfExists(administrationClient, responseQueueName);
+        }
+    }
+
+    [AzureServiceBusCloudFact]
+    public async Task MassTransit_request_client_receives_Java_MyServiceBus_fault()
+    {
+        var suffix = Guid.NewGuid().ToString("N")[..12];
+        var queueName = $"mt-fault-java-msb-{suffix}";
+        var responseQueueName = $"mt-fault-response-java-{suffix}";
+        var administrationClient = new ServiceBusAdministrationClient(ConnectionString);
+        using var javaPeer = AzureServiceBusJavaInteropPeer.Start(
+            ConnectionString,
+            "azure-fault",
+            queueName,
+            DefaultRequestTopicName,
+            "fault-from-masstransit",
+            createTopology: true);
+        var massTransit = MassTransit.Bus.Factory.CreateUsingAzureServiceBus(cfg =>
+        {
+            cfg.Host(ConnectionString);
+            cfg.OverrideDefaultBusEndpointQueueName(responseQueueName);
+        });
+
+        try
+        {
+            await AzureServiceBusJavaInteropPeer.WaitForOutput(javaPeer, "READY", TimeSpan.FromMinutes(2));
+            await massTransit.StartAsync(CancellationToken.None);
+            var client = massTransit.CreateRequestClient<InteropRequest>(
+                MassTransit.RequestTimeout.After(s: 30));
+            var responseTask = client.GetResponse<InteropResponse>(
+                new InteropRequest { Value = "fault-from-masstransit" });
+            await AzureServiceBusJavaInteropPeer.WaitForOutput(javaPeer, "FAULTING", TimeSpan.FromSeconds(20));
+            var exception = await Assert.ThrowsAsync<MassTransit.RequestFaultException>(() => responseTask);
+
+            Assert.Contains("java-fault", exception.Message);
+        }
+        finally
+        {
+            await massTransit.StopAsync();
+            if (!javaPeer.HasExited)
+                javaPeer.Kill(entireProcessTree: true);
+            await DeleteTopology(administrationClient, queueName, DefaultRequestTopicName);
+            await DeleteQueueIfExists(administrationClient, responseQueueName);
+        }
+    }
+
+    [AzureServiceBusCloudFact]
     public async Task MassTransit_publish_is_consumed_by_default_named_Csharp_MyServiceBus_endpoint()
     {
         var queueName = $"msb-mt-default-csharp-{Guid.NewGuid():N}"[..34];
@@ -525,5 +686,13 @@ public sealed class MassTransitAzureServiceBusInteropTests
     {
         if ((await administrationClient.TopicExistsAsync(topicName)).Value)
             await administrationClient.DeleteTopicAsync(topicName);
+    }
+
+    private sealed class MassTransitFaultingConsumer : MassTransit.IConsumer<InteropRequest>
+    {
+        public Task Consume(MassTransit.ConsumeContext<InteropRequest> context)
+        {
+            throw new InvalidOperationException("mass-transit-fault");
+        }
     }
 }
