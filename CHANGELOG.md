@@ -22,6 +22,7 @@ This changelog summarizes the bigger themes in the repository history. It is int
 - Made the pinned MassTransit live-Azure gate self-provisioning and collision-free, and verified its messages are consumed by both the C# and Java MyServiceBus clients.
 - Made per-message entity-name configuration authoritative for publication and transport-composed requests in both implementations, including corresponding RabbitMQ resolution, after live Azure exposed the previous default-name fallback.
 - Added live Azure delivery-lock renewal coverage for C# and Java using handlers that outlive the entities' initial locks, with single-delivery and settlement verification.
+- Defined bidirectional MassTransit interoperability and matching transport naming as promotion requirements for every supported broker profile, and published the experimental Azure Service Bus status and evidence on the documentation website.
 
 ### Documentation website
 

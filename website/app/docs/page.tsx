@@ -27,16 +27,18 @@ export default function Introduction() {
       <h1>Messaging across .NET and Java, without changing the mental model.</h1>
       <p className="docs-summary">
         MyServiceBus is a lightweight asynchronous service-bus runtime with aligned
-        C# and Java APIs. It provides RabbitMQ-backed messaging, an in-memory
-        mediator, and familiar MassTransit-style concepts.
+        C# and Java APIs. It provides RabbitMQ-backed messaging, an experimental
+        Azure Service Bus transport, an in-memory mediator, and familiar
+        MassTransit-style concepts.
       </p>
 
       <div className="callout callout-accent">
         <strong>Current scope</strong>
         <p>
-          The preview focuses on RabbitMQ, portable messaging semantics, and
-          verified C# ↔ Java interoperability. It is not a drop-in replacement
-          for every MassTransit feature.
+          RabbitMQ is the verified broker profile. Azure Service Bus is
+          experimental while its C#, Java, and MassTransit cloud matrix is being
+          completed. MyServiceBus is not a drop-in replacement for every
+          MassTransit feature.
         </p>
       </div>
 

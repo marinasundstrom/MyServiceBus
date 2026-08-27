@@ -14,6 +14,7 @@ const sections = [
     links: [
       ['Core concepts', '/docs/concepts'],
       ['RabbitMQ transport', '/docs/rabbitmq'],
+      ['Azure Service Bus', '/docs/azure-service-bus'],
       ['Testing', '/docs/testing'],
       ['Interoperability', '/docs/interoperability'],
     ],

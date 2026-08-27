@@ -117,6 +117,14 @@ The target consists of:
 4. **Level 4 API familiarity** for C# and concept familiarity with idiomatic APIs for Java.
 5. **Level 5 C#↔Java parity** for the portable core and RabbitMQ profile.
 
+This verified RabbitMQ baseline establishes the rule for every broker-backed
+transport that MyServiceBus promotes to supported status. Its C# and Java
+clients must use the same transport-profile naming and topology conventions as
+the supported MassTransit peer so that services can communicate without a
+MyServiceBus-specific bridge. Each transport advances independently and must
+prove both MyServiceBus-to-MassTransit and MassTransit-to-MyServiceBus flows;
+compatibility on one transport is never evidence for another.
+
 The immediate target explicitly does not include:
 
 - source compatibility with MassTransit
@@ -195,8 +203,9 @@ That statement should only be published after the associated version matrix pass
 
 After the immediate RabbitMQ baseline is verified:
 
-1. Add the transport capability descriptor and startup validation.
-2. Select a second durable broker profile, with Azure Service Bus as the current architectural candidate.
+1. Complete the experimental Azure Service Bus profile, including its naming,
+   topology, and bidirectional MassTransit conformance matrix for both clients.
+2. Promote Azure Service Bus only after the documented cloud gates pass.
 3. Define a separate event-stream profile before implementing Kafka.
 4. Validate the language-neutral specification through a third language client.
 

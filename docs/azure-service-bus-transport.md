@@ -96,6 +96,31 @@ The factory owns all externally visible address production:
 - `GetErrorAddress(endpointName)` returns the `<endpointName>_error` queue.
 - `GetFaultAddress(endpointName)` returns the `<endpointName>_fault` topic.
 
+### MassTransit naming contract
+
+Entity naming is part of transport interoperability, not a cosmetic client
+default. For the same contract and endpoint configuration, MyServiceBus C#,
+MyServiceBus Java, and the pinned MassTransit peer must resolve the same:
+
+- message topic name
+- receive queue name
+- subscription name and forwarding target
+- `_error`, `_skipped`, and `_fault` companion names
+- temporary response queue and serialized endpoint addresses
+
+An explicit per-message entity name is authoritative in both MyServiceBus
+clients and must match a corresponding MassTransit entity-name override. The
+default convention must be derived from the language-neutral contract identity,
+then projected through the Azure Service Bus naming rules; it must not depend on
+a Java package or .NET namespace that the corresponding contract does not
+share. Endpoint name formatters likewise produce the actual queue and
+subscription names in both clients.
+
+The current live MassTransit tests use explicit collision-free entity names.
+They prove MassTransit-to-MyServiceBus directed delivery, but do not yet prove
+default name resolution or the complete bidirectional publish and request
+matrix. Those gaps remain experimental and are listed below.
+
 ## Topology Projection
 
 The adapter projects `ReceiveEndpointTransportTopology` without adding
@@ -247,7 +272,8 @@ least:
 - [x] correlated request/response and auto-delete response queues in both clients
 - [x] C# and Java delivery-lock renewal during a long-running consumer
 - `_error`/completion behavior across a transient failure
-- MassTransit interoperability on the pinned compatibility version
+- bidirectional MassTransit interoperability on the pinned compatibility version,
+  including default and explicitly configured names
 
 Partitioned entities, networking and identity integration, geo-recovery,
 metrics, quotas beyond the emulator limits, and production performance are
@@ -278,5 +304,9 @@ both clients where applicable:
 - [x] C# and Java live-Azure request/response with native auto-delete response queues
 - [x] C# and Java consumption of messages produced by the pinned MassTransit Azure
   Service Bus peer on self-provisioned live-Azure topology
+- [ ] default message, endpoint, subscription, and companion names match the
+  pinned MassTransit Azure Service Bus conventions in C# and Java
+- [ ] C# and Java publish and directed send are consumed by MassTransit
+- [ ] bidirectional request/response and fault flows with MassTransit
 
 Compatibility claims remain scoped to scenarios with executable evidence.

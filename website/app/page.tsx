@@ -77,7 +77,7 @@ export default function Home() {
             </div>
             <div className="compatibility-line">
               <span aria-hidden="true" className="pulse" />
-              RabbitMQ transport · MassTransit-compatible envelopes
+              RabbitMQ verified · Azure Service Bus experimental
             </div>
           </div>
 
@@ -147,6 +147,7 @@ export default function Home() {
             <Link href="/docs/getting-started"><span>4 steps</span><h3>Getting started</h3><p>Install, configure, consume, and publish in C# or Java.</p><b>Open guide →</b></Link>
             <Link href="/docs/concepts"><span>Core model</span><h3>Messaging concepts</h3><p>Choose between publish, send, consume, and request.</p><b>Learn concepts →</b></Link>
             <Link href="/docs/rabbitmq"><span>Transport</span><h3>RabbitMQ</h3><p>Understand recovery, failure queues, topology, and tuning.</p><b>Configure transport →</b></Link>
+            <Link href="/docs/azure-service-bus"><span>Preview transport</span><h3>Azure Service Bus</h3><p>Track cloud behavior, MassTransit interoperability, and the remaining release gates.</p><b>Explore the preview →</b></Link>
             <Link href="/docs/testing"><span>Confidence</span><h3>Testing</h3><p>Exercise message flows with the aligned in-memory harness.</p><b>Write a test →</b></Link>
           </div>
         </section>
