@@ -1,0 +1,34 @@
+<script type="module" src="@Assets["Components/Layout/ReconnectModal.razor.js"]"></script>
+
+<dialog id="components-reconnect-modal" data-nosnippet aria-labelledby="reconnect-title">
+    <div class="components-reconnect-container">
+        <div class="components-rejoining-animation" aria-hidden="true">
+            <div></div>
+            <div></div>
+        </div>
+        <p id="reconnect-title" class="reconnect-title components-reconnect-first-attempt-visible">
+            Reconnecting to monitoring
+        </p>
+        <p class="components-reconnect-first-attempt-visible reconnect-detail">
+            Live updates were interrupted. Your dashboard data is unchanged.
+        </p>
+        <p class="components-reconnect-repeated-attempt-visible">
+            Reconnect failed. Trying again in <span id="components-seconds-to-next-attempt"></span> seconds.
+        </p>
+        <p class="components-reconnect-failed-visible">
+            The dashboard could not reconnect. Retry now or reload the page.
+        </p>
+        <button id="components-reconnect-button" class="components-reconnect-failed-visible">
+            Retry connection
+        </button>
+        <p class="components-pause-visible">
+            The dashboard session was paused by the server.
+        </p>
+        <button id="components-resume-button" class="components-pause-visible">
+            Resume session
+        </button>
+        <p class="components-resume-failed-visible">
+            The session could not resume. Please reload the page.
+        </p>
+    </div>
+</dialog>

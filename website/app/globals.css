@@ -102,6 +102,10 @@ pre { font-family: var(--font-geist-mono), monospace; font-size: clamp(10px, .9v
 .docs-summary { color: #4d5950; font-size: clamp(18px, 2vw, 22px) !important; line-height: 1.55 !important; margin: 28px 0 50px !important; max-width: 760px; }
 .docs-article > h2 { border-top: 1px solid var(--line); font-size: 27px; font-weight: 620; letter-spacing: -.035em; margin: 68px 0 18px; padding-top: 38px; }
 .docs-article > p { color: #4f5a52; font-size: 15.5px; line-height: 1.8; max-width: 700px; }
+.dashboard-screenshots { display: grid; gap: 16px; grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 28px 0 8px; }
+.dashboard-screenshots figure { margin: 0; }
+.dashboard-screenshots img { border: 1px solid var(--line); border-radius: 10px; display: block; height: auto; width: 100%; }
+.dashboard-screenshots figcaption { color: #667169; font-size: 12px; margin-top: 8px; text-align: center; }
 .docs-article p code, .callout code, .queue-map code, .check-list code { background: #e5e0d3; border-radius: 3px; color: #304038; font-family: var(--font-geist-mono), monospace; font-size: .86em; padding: 2px 5px; }
 .callout { background: #e8e3d6; border-left: 3px solid #758078; border-radius: 0 6px 6px 0; margin: 46px 0; padding: 20px 23px; }
 .callout-accent { background: #e6eadb; border-left-color: var(--signal); }
@@ -205,6 +209,7 @@ html[data-theme='dark'] .hero::before { background-image: linear-gradient(to rig
 html[data-theme='dark'] .lede,
 html[data-theme='dark'] .docs-summary,
 html[data-theme='dark'] .docs-article > p { color: #bac6bd; }
+html[data-theme='dark'] .dashboard-screenshots figcaption { color: #9caaa0; }
 html[data-theme='dark'] .primary-button { box-shadow: 4px 4px 0 #030705; }
 html[data-theme='dark'] .primary-button:hover { box-shadow: 2px 2px 0 #030705; }
 html[data-theme='dark'] .code-card { box-shadow: 18px 18px 0 #263229; }
@@ -226,6 +231,7 @@ html[data-theme='dark'] .queue-map div,
 html[data-theme='dark'] .version-table,
 html[data-theme='dark'] .version-table > div { border-color: #344239; }
 @media (max-width: 760px) {
+  .dashboard-screenshots { grid-template-columns: 1fr; }
   .explore-section { grid-template-columns: 1fr; padding-bottom: 80px; padding-top: 76px; }
   .explore-grid { grid-template-columns: 1fr; }
   .site-footer { align-items: start; grid-template-columns: 1fr; }

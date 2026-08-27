@@ -27,7 +27,8 @@ public class MonitoringRepositoryTests
                 now,
                 [],
                 [],
-                [])));
+                []),
+            new Dictionary<string, string> { ["group"] = "commerce" }));
 
         var observation = new MonitoringObservation(
             1,
@@ -64,8 +65,161 @@ public class MonitoringRepositoryTests
         application.ApplicationName.ShouldBe("orders");
         application.OnlineInstances.ShouldBe(1);
         application.Totals.Published.ShouldBe(1);
+        application.Labels!["group"].ShouldBe("commerce");
         repository.GetRecentObservations("orders", 10).ShouldHaveSingleItem();
     }
+
+    [Fact]
+    public void Repository_derives_windowed_instance_metrics_retries_and_observed_flow()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var repository = new MonitoringRepository();
+        repository.UpsertMetadata(CreateMetadata("gateway", "gateway-1", now, "commerce"));
+        repository.UpsertMetadata(CreateMetadata("orders", "orders-1", now, "commerce"));
+
+        repository.RecordBatch(CreateBatch(
+            "gateway",
+            "gateway-1",
+            now,
+            new MonitoringObservation(
+                1, now.AddSeconds(-2), "sent", true, "SubmitOrder", "urn:message:SubmitOrder",
+                null, "loopback://orders", 2, null, null, null, "conversation-1", null, null)));
+        repository.RecordBatch(CreateBatch(
+            "orders",
+            "orders-1",
+            now,
+            new MonitoringObservation(
+                1, now.AddSeconds(-1), "consumed", true, "SubmitOrder", "urn:message:SubmitOrder",
+                "orders", null, 42, null, null, null, "conversation-1", null, null),
+            new MonitoringObservation(
+                2, now.AddMilliseconds(-500), "retry_attempted", false, "SubmitOrder", "urn:message:SubmitOrder",
+                "orders", null, 0, typeof(InvalidOperationException).FullName, "retry", null, "conversation-2", null, null, 1, 2),
+            new MonitoringObservation(
+                3, now.AddMilliseconds(-250), "retry_exhausted", false, "SubmitOrder", "urn:message:SubmitOrder",
+                "orders", null, 0, typeof(InvalidOperationException).FullName, "retry", null, "conversation-2", null, null, 3, 2)));
+
+        var applicationRate = repository.GetRates("orders", 60, false, now).ShouldHaveSingleItem();
+        applicationRate.InstanceId.ShouldBeNull();
+        applicationRate.Counts.Consumed.ShouldBe(1);
+        applicationRate.Counts.RetryAttempted.ShouldBe(1);
+        applicationRate.Counts.RetryExhausted.ShouldBe(1);
+        applicationRate.Rates.ConsumedPerSecond.ShouldBe(1d / 60d);
+        applicationRate.AverageConsumeDurationMs.ShouldBe(42);
+        applicationRate.P95ConsumeDurationMs.ShouldBe(50);
+
+        var instanceRate = repository.GetRates("orders", 60, true, now).ShouldHaveSingleItem();
+        instanceRate.InstanceId.ShouldBe("orders-1");
+
+        var series = repository.GetTimeSeries("orders", 60, 5, false, now);
+        series.Count.ShouldBe(13);
+        series.Sum(point => point.Counts.Consumed).ShouldBe(1);
+        series.ShouldAllBe(point => point.ApplicationName == "orders" && point.InstanceId == null);
+        series.ShouldAllBe(point => point.Complete);
+
+        var flow = repository.GetFlow(null, 60, now).ShouldHaveSingleItem();
+        flow.SourceApplication.ShouldBe("gateway");
+        flow.TargetApplication.ShouldBe("orders");
+        flow.EndpointName.ShouldBe("orders");
+        flow.Count.ShouldBe(1);
+    }
+
+    [Fact]
+    public void Repository_rejects_unbounded_resource_labels()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var metadata = CreateMetadata("orders", "orders-1", now, "commerce") with
+        {
+            Labels = Enumerable.Range(0, 17).ToDictionary(index => $"label-{index}", _ => "value")
+        };
+
+        var repository = new MonitoringRepository();
+        Should.Throw<MonitoringValidationException>(() => repository.UpsertMetadata(metadata));
+    }
+
+    [Fact]
+    public void Repository_limits_incomplete_coverage_to_the_affected_window()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var repository = new MonitoringRepository();
+        repository.UpsertMetadata(CreateMetadata("orders", "orders-1", now, "commerce"));
+        var batch = CreateBatch(
+            "orders",
+            "orders-1",
+            now,
+            new MonitoringObservation(
+                1, now, "consumed", true, "SubmitOrder", "urn:message:SubmitOrder",
+                "orders", null, 1, null, null, null, null, null, null)) with
+        {
+            DroppedObservations = 3
+        };
+        repository.RecordBatch(batch).ShouldBeTrue();
+
+        var affected = repository.GetRates("orders", 60, false, now).ShouldHaveSingleItem();
+        affected.Complete.ShouldBeFalse();
+        affected.DroppedObservations.ShouldBe(3);
+
+        var recovered = repository.GetRates("orders", 60, false, now.AddMinutes(2)).ShouldHaveSingleItem();
+        recovered.Complete.ShouldBeTrue();
+        recovered.DroppedObservations.ShouldBe(0);
+    }
+
+    [Fact]
+    public void Repository_groups_replicas_by_application_and_keeps_only_common_labels()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var repository = new MonitoringRepository();
+        repository.UpsertMetadata(CreateMetadata("workers", "worker-1", now, "commerce") with
+        {
+            Labels = new Dictionary<string, string> { ["group"] = "commerce", ["zone"] = "north" }
+        });
+        repository.UpsertMetadata(CreateMetadata("workers", "worker-2", now, "commerce") with
+        {
+            Labels = new Dictionary<string, string> { ["group"] = "commerce", ["zone"] = "south" }
+        });
+
+        var application = repository.GetApplications(now).ShouldHaveSingleItem();
+        application.ApplicationName.ShouldBe("workers");
+        application.OnlineInstances.ShouldBe(2);
+        application.TotalInstances.ShouldBe(2);
+        application.Labels!.Count.ShouldBe(1);
+        application.Labels["group"].ShouldBe("commerce");
+        repository.GetInstances("workers", now).Count.ShouldBe(2);
+    }
+
+    private static MonitoringMetadata CreateMetadata(
+        string applicationName,
+        string instanceId,
+        DateTimeOffset now,
+        string group)
+        => new(
+            MonitoringProtocol.Version,
+            applicationName,
+            instanceId,
+            "1.0.0",
+            "dotnet",
+            "1.0.0",
+            "bus",
+            now,
+            now,
+            new BusInspectionSnapshot("mediator", new Uri("loopback://localhost/"), now, [], [], []),
+            new Dictionary<string, string> { ["group"] = group });
+
+    private static MonitoringObservationBatch CreateBatch(
+        string applicationName,
+        string instanceId,
+        DateTimeOffset now,
+        params MonitoringObservation[] observations)
+        => new(
+            MonitoringProtocol.Version,
+            applicationName,
+            instanceId,
+            "bus",
+            Guid.NewGuid().ToString("N"),
+            observations[0].Sequence,
+            observations[^1].Sequence,
+            0,
+            now,
+            observations);
 
     private sealed record TestMessage(string Value);
 }

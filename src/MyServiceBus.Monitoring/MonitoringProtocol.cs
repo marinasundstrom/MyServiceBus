@@ -17,7 +17,8 @@ public sealed record MonitoringMetadata(
     string BusId,
     DateTimeOffset StartedAtUtc,
     DateTimeOffset CapturedAtUtc,
-    BusInspectionSnapshot Bus);
+    BusInspectionSnapshot Bus,
+    IReadOnlyDictionary<string, string>? Labels = null);
 
 public sealed record MonitoringObservation(
     long Sequence,
@@ -34,7 +35,9 @@ public sealed record MonitoringObservation(
     string? CorrelationId,
     string? ConversationId,
     string? TraceId,
-    string? SpanId);
+    string? SpanId,
+    int? RetryAttempt = null,
+    int? RetryLimit = null);
 
 public sealed record MonitoringObservationBatch(
     string ProtocolVersion,
@@ -60,7 +63,8 @@ public sealed record MonitoringApplicationSummary(
     int OnlineInstances,
     int TotalInstances,
     MonitoringCounterSet Totals,
-    DateTimeOffset LastSeenAtUtc);
+    DateTimeOffset LastSeenAtUtc,
+    IReadOnlyDictionary<string, string>? Labels = null);
 
 public sealed record MonitoringInstanceSummary(
     string ApplicationName,
@@ -75,7 +79,8 @@ public sealed record MonitoringInstanceSummary(
     DateTimeOffset StartedAtUtc,
     DateTimeOffset LastSeenAtUtc,
     MonitoringCounterSet Totals,
-    long DroppedObservations);
+    long DroppedObservations,
+    IReadOnlyDictionary<string, string>? Labels = null);
 
 public sealed record MonitoringCounterSet(
     long Sent,
@@ -83,4 +88,54 @@ public sealed record MonitoringCounterSet(
     long Published,
     long PublishFaulted,
     long Consumed,
-    long ConsumeFaulted);
+    long ConsumeFaulted,
+    long RetryAttempted = 0,
+    long RetryExhausted = 0,
+    long FaultPublished = 0);
+
+public sealed record MonitoringRateSet(
+    double SentPerSecond,
+    double PublishedPerSecond,
+    double ConsumedPerSecond,
+    double FaultedPerSecond,
+    double RetriedPerSecond);
+
+public sealed record MonitoringRateSummary(
+    string ApplicationName,
+    string? InstanceId,
+    int WindowSeconds,
+    DateTimeOffset WindowStartUtc,
+    DateTimeOffset WindowEndUtc,
+    MonitoringCounterSet Counts,
+    MonitoringRateSet Rates,
+    double AverageConsumeDurationMs,
+    double P95ConsumeDurationMs,
+    long DroppedObservations,
+    bool Complete);
+
+public sealed record MonitoringTimeSeriesPoint(
+    string ApplicationName,
+    string? InstanceId,
+    DateTimeOffset TimestampUtc,
+    int BucketSeconds,
+    MonitoringCounterSet Counts,
+    MonitoringRateSet Rates,
+    long DroppedObservations,
+    bool Complete);
+
+public sealed record MonitoringObservationRecord(
+    string ApplicationName,
+    string InstanceId,
+    string BusId,
+    MonitoringObservation Observation);
+
+public sealed record MonitoringFlowEdge(
+    string SourceApplication,
+    string TargetApplication,
+    string? EndpointName,
+    string? MessageType,
+    string? MessageUrn,
+    string OperationKind,
+    long Count,
+    DateTimeOffset FirstSeenAtUtc,
+    DateTimeOffset LastSeenAtUtc);

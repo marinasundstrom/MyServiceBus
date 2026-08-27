@@ -2,6 +2,7 @@ package com.myservicebus.monitoring;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 
 import com.myservicebus.inspection.BusInspectionSnapshot;
 
@@ -21,7 +22,8 @@ public final class MonitoringProtocol {
             String busId,
             Instant startedAtUtc,
             Instant capturedAtUtc,
-            BusInspectionSnapshot bus) {
+            BusInspectionSnapshot bus,
+            Map<String, String> labels) {
     }
 
     public record Observation(
@@ -39,7 +41,9 @@ public final class MonitoringProtocol {
             String correlationId,
             String conversationId,
             String traceId,
-            String spanId) {
+            String spanId,
+            Integer retryAttempt,
+            Integer retryLimit) {
     }
 
     public record ObservationBatch(

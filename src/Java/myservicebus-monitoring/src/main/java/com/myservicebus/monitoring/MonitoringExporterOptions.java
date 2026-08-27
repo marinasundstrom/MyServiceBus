@@ -2,6 +2,8 @@ package com.myservicebus.monitoring;
 
 import java.net.URI;
 import java.time.Duration;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 public final class MonitoringExporterOptions {
     private URI serviceAddress = URI.create("http://localhost:5310");
@@ -9,6 +11,7 @@ public final class MonitoringExporterOptions {
     private String instanceId = System.getenv().getOrDefault("HOSTNAME", "java-" + ProcessHandle.current().pid());
     private String applicationVersion = "unknown";
     private String busId = "bus";
+    private final Map<String, String> labels = new LinkedHashMap<>();
     private Duration exportInterval = Duration.ofSeconds(1);
     private Duration heartbeatInterval = Duration.ofSeconds(15);
     private int maxBatchSize = 256;
@@ -52,6 +55,17 @@ public final class MonitoringExporterOptions {
 
     public void setBusId(String busId) {
         this.busId = busId;
+    }
+
+    public Map<String, String> getLabels() {
+        return labels;
+    }
+
+    public void setLabels(Map<String, String> labels) {
+        this.labels.clear();
+        if (labels != null) {
+            this.labels.putAll(labels);
+        }
     }
 
     public Duration getExportInterval() {

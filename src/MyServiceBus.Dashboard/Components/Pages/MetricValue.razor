@@ -1,0 +1,15 @@
+<div class="metric @(Alert ? "alert" : null)">
+    <span>@Label</span>
+    <strong>@Value</strong>
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public required string Label { get; set; }
+
+    [Parameter, EditorRequired]
+    public required string Value { get; set; }
+
+    [Parameter]
+    public bool Alert { get; set; }
+}

@@ -1,7 +1,9 @@
 using MyServiceBus.Dashboard;
 using MyServiceBus.Dashboard.Components;
+using Microsoft.AspNetCore.Hosting.StaticWebAssets;
 
 var builder = WebApplication.CreateBuilder(args);
+StaticWebAssetsLoader.UseStaticWebAssets(builder.Environment, builder.Configuration);
 builder.AddServiceDefaults();
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
@@ -11,8 +13,8 @@ builder.Services.AddHttpClient<MonitoringApiClient>(client =>
 });
 
 var app = builder.Build();
-app.UseStaticFiles();
 app.UseAntiforgery();
+app.MapStaticAssets();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 app.MapDefaultEndpoints();

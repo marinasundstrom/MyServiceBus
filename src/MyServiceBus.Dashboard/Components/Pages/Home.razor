@@ -2,6 +2,7 @@
 @rendermode InteractiveServer
 @implements IAsyncDisposable
 @inject MonitoringApiClient Api
+@using System.Net.WebSockets
 
 <PageTitle>MyServiceBus Monitoring</PageTitle>
 
@@ -9,11 +10,11 @@
     <div>
         <p class="eyebrow">Distributed messaging, live</p>
         <h1>Runtime overview</h1>
-        <p class="lede">Applications export bus metadata and activity to the central monitoring service.</p>
+        <p class="lede">Compare replica throughput, latency, retries, and failures. The data is descriptive—the scaling decision remains yours.</p>
     </div>
     <div class="connection @(_error is null ? "online" : "offline")">
         <span></span>
-        @(_error is null ? "Monitoring service connected" : "Monitoring service unavailable")
+        @(_error is not null ? "Monitoring service unavailable" : _liveConnected ? "Live updates connected" : "Polling monitoring service")
     </div>
 </section>
 
@@ -21,111 +22,283 @@
 {
     <section class="empty-state">
         <h2>Waiting for applications</h2>
-        <p>Start an application with the monitoring exporter enabled. It will register itself automatically.</p>
+        <p>Start an application with the monitoring exporter enabled. Its replicas will register automatically.</p>
     </section>
 }
 else
 {
-    <section class="summary-grid">
-        @foreach (var application in _applications)
-        {
-            <article class="summary-card">
-                <div class="card-heading">
-                    <div>
-                        <p class="eyebrow">Application</p>
-                        <h2>@application.ApplicationName</h2>
-                    </div>
-                    <span class="pill">@application.OnlineInstances / @application.TotalInstances online</span>
-                </div>
-                <div class="metrics">
-                    <Metric Label="Sent" Value="application.Totals.Sent" />
-                    <Metric Label="Published" Value="application.Totals.Published" />
-                    <Metric Label="Consumed" Value="application.Totals.Consumed" />
-                    <Metric Label="Failures" Value="application.Totals.SendFaulted + application.Totals.PublishFaulted + application.Totals.ConsumeFaulted" Alert="true" />
-                </div>
-            </article>
-        }
+    <section class="guidance">
+        <strong>Reading the scaling view</strong>
+        <span>Applications group their replicas automatically. Compare consume rate, load share, and p95 duration between instances. Queue depth and host saturation can be supplied by transport or telemetry integrations later.</span>
     </section>
 
-    <section class="instances">
+    <section class="panel chart-panel">
         <div class="section-heading">
             <div>
-                <p class="eyebrow">Processes</p>
+                <p class="eyebrow">Live throughput</p>
+                <h2>Consumed messages per second</h2>
+            </div>
+            <span>Last 5 minutes · 5-second buckets</span>
+        </div>
+        <ThroughputChart Points="_timeSeries" />
+    </section>
+
+    @foreach (var group in GroupedApplications)
+    {
+        <section class="application-group">
+            <div class="group-heading">
+                <div>
+                    <p class="eyebrow">Application group</p>
+                    <h2>@group.Key</h2>
+                </div>
+                <span>@group.Count() application@(group.Count() == 1 ? null : "s")</span>
+            </div>
+            <div class="summary-grid">
+                @foreach (var application in group)
+                {
+                    var rate = ApplicationRate(application.ApplicationName);
+                    <article class="summary-card">
+                        <div class="card-heading">
+                            <div>
+                                <p class="eyebrow">Application</p>
+                                <h2>@application.ApplicationName</h2>
+                            </div>
+                            <span class="pill">@application.OnlineInstances / @application.TotalInstances replicas online</span>
+                        </div>
+                        <div class="metrics">
+                            <MetricValue Label="Consume / sec" Value="@FormatRate(rate?.Rates.ConsumedPerSecond)" />
+                            <MetricValue Label="p95 consume" Value="@FormatDuration(rate?.P95ConsumeDurationMs)" />
+                            <MetricValue Label="Retries · 60 sec" Value="@FormatCount(rate?.Counts.RetryAttempted)" Alert="@(rate?.Counts.RetryAttempted > 0)" />
+                            <MetricValue Label="Failures · 60 sec" Value="@FormatCount(Failures(rate?.Counts))" Alert="@(Failures(rate?.Counts) > 0)" />
+                        </div>
+                        @if (application.Labels is { Count: > 0 })
+                        {
+                            <div class="labels">
+                                @foreach (var label in application.Labels.Where(label => label.Key != "group"))
+                                {
+                                    <span>@label.Key: @label.Value</span>
+                                }
+                            </div>
+                        }
+                    </article>
+                }
+            </div>
+        </section>
+    }
+
+    <section class="panel instances">
+        <div class="section-heading">
+            <div>
+                <p class="eyebrow">Replica detail</p>
                 <h2>Application instances</h2>
             </div>
-            <span>Updated @_updatedAt.ToLocalTime().ToString("HH:mm:ss")</span>
+            <span>60-second window · updated @_updatedAt.ToLocalTime().ToString("HH:mm:ss")</span>
         </div>
         <div class="table-wrap">
             <table>
                 <thead>
                     <tr>
                         <th>Status</th>
-                        <th>Application</th>
-                        <th>Client</th>
+                        <th>Group / application</th>
+                        <th>Instance</th>
+                        <th>Consume / sec</th>
+                        <th>Load share</th>
+                        <th>p95 consume</th>
+                        <th>Retries</th>
+                        <th>Failures</th>
                         <th>Transport</th>
-                        <th>Address</th>
-                        <th>Sent</th>
-                        <th>Published</th>
-                        <th>Consumed</th>
-                        <th>Faulted</th>
                     </tr>
                 </thead>
                 <tbody>
-                    @foreach (var instance in _instances)
+                    @foreach (var instance in _instances.OrderBy(GetGroup).ThenBy(instance => instance.ApplicationName).ThenBy(instance => instance.InstanceId))
                     {
+                        var rate = InstanceRate(instance.ApplicationName, instance.InstanceId);
                         <tr>
                             <td><span class="status-dot @(instance.Online ? "online" : "offline")"></span>@(instance.Online ? "Online" : "Offline")</td>
-                            <td><strong>@instance.ApplicationName</strong><small>@instance.InstanceId</small></td>
-                            <td>@instance.ClientLanguage <small>@instance.ClientVersion</small></td>
-                            <td>@instance.TransportName</td>
-                            <td class="mono">@instance.BusAddress</td>
-                            <td>@instance.Totals.Sent</td>
-                            <td>@instance.Totals.Published</td>
-                            <td>@instance.Totals.Consumed</td>
-                            <td class="fault">@(instance.Totals.SendFaulted + instance.Totals.PublishFaulted + instance.Totals.ConsumeFaulted)</td>
+                            <td><strong>@instance.ApplicationName</strong><small>@GetGroup(instance)</small></td>
+                            <td class="mono">@instance.InstanceId<small>@instance.ClientLanguage @instance.ClientVersion</small></td>
+                            <td>@FormatRate(rate?.Rates.ConsumedPerSecond)</td>
+                            <td>@FormatShare(rate)</td>
+                            <td>@FormatDuration(rate?.P95ConsumeDurationMs)</td>
+                            <td class="@(rate?.Counts.RetryAttempted > 0 ? "fault" : null)">@FormatCount(rate?.Counts.RetryAttempted)</td>
+                            <td class="@(Failures(rate?.Counts) > 0 ? "fault" : null)">@FormatCount(Failures(rate?.Counts))</td>
+                            <td>@instance.TransportName<small class="mono">@instance.BusAddress</small></td>
                         </tr>
                     }
                 </tbody>
             </table>
         </div>
     </section>
+
+    <div class="detail-grid">
+        <section class="panel">
+            <div class="section-heading">
+                <div>
+                    <p class="eyebrow">Observed paths</p>
+                    <h2>Message flow</h2>
+                </div>
+                <span>Last 5 minutes</span>
+            </div>
+            @if (_flow.Count == 0)
+            {
+                <p class="panel-empty">No correlated message paths observed in this window.</p>
+            }
+            else
+            {
+                <div class="flow-list">
+                    @foreach (var edge in _flow.Take(12))
+                    {
+                        <div class="flow-edge">
+                            <strong>@edge.SourceApplication</strong>
+                            <span>→</span>
+                            <strong>@edge.TargetApplication</strong>
+                            <small>@ShortMessageType(edge.MessageType) · @edge.Count.ToString("N0")</small>
+                        </div>
+                    }
+                </div>
+            }
+        </section>
+
+        <section class="panel">
+            <div class="section-heading">
+                <div>
+                    <p class="eyebrow">Attention</p>
+                    <h2>Retries and failed messages</h2>
+                </div>
+                <span>Most recent</span>
+            </div>
+            @if (SignificantObservations.Count == 0)
+            {
+                <p class="panel-empty">No retries or failures in the retained observations.</p>
+            }
+            else
+            {
+                <div class="event-list">
+                    @foreach (var record in SignificantObservations.Take(12))
+                    {
+                        <details class="event-row">
+                            <summary>
+                                <span class="event-kind">@DisplayKind(record.Observation.Kind)</span>
+                                <span class="event-summary">
+                                    <strong>@record.ApplicationName</strong>
+                                    <small>@ShortMessageType(record.Observation.MessageType) · @record.InstanceId</small>
+                                </span>
+                                <time>@record.Observation.OccurredAtUtc.ToLocalTime().ToString("HH:mm:ss")</time>
+                            </summary>
+                            <div class="event-detail">
+                                <span><small>Endpoint</small><strong>@ValueOrDash(record.Observation.EndpointName)</strong></span>
+                                <span><small>Retry</small><strong>@RetryDescription(record.Observation)</strong></span>
+                                <span><small>Exception</small><strong>@ValueOrDash(record.Observation.ExceptionType)</strong></span>
+                                <span><small>Correlation ID</small><strong class="mono">@ValueOrDash(record.Observation.CorrelationId)</strong></span>
+                                <span><small>Conversation ID</small><strong class="mono">@ValueOrDash(record.Observation.ConversationId)</strong></span>
+                                <span><small>Trace ID</small><strong class="mono">@ValueOrDash(record.Observation.TraceId)</strong></span>
+                                <span class="event-message"><small>Failure message</small><strong>@ValueOrDash(record.Observation.ExceptionMessage)</strong></span>
+                                <span class="event-message"><small>Message URN</small><strong class="mono">@ValueOrDash(record.Observation.MessageUrn)</strong></span>
+                            </div>
+                        </details>
+                    }
+                </div>
+            }
+        </section>
+    </div>
 }
 
 @code {
     private readonly CancellationTokenSource _stopping = new();
+    private readonly SemaphoreSlim _refreshLock = new(1, 1);
     private IReadOnlyList<MonitoringApplicationSummary> _applications = [];
     private IReadOnlyList<MonitoringInstanceSummary> _instances = [];
+    private IReadOnlyList<MonitoringRateSummary> _applicationRates = [];
+    private IReadOnlyList<MonitoringRateSummary> _instanceRates = [];
+    private IReadOnlyList<MonitoringTimeSeriesPoint> _timeSeries = [];
+    private IReadOnlyList<MonitoringFlowEdge> _flow = [];
+    private IReadOnlyList<MonitoringObservationRecord> _observations = [];
     private DateTimeOffset _updatedAt = DateTimeOffset.UtcNow;
     private string? _error;
+    private bool _liveConnected;
+    private Task? _pollTask;
+    private Task? _watchTask;
+
+    private IEnumerable<IGrouping<string, MonitoringApplicationSummary>> GroupedApplications
+        => _applications.GroupBy(GetGroup).OrderBy(group => group.Key, StringComparer.Ordinal);
+
+    private IReadOnlyList<MonitoringObservationRecord> SignificantObservations
+        => _observations.Where(record => record.Observation.Kind.Contains("fault", StringComparison.Ordinal)
+            || record.Observation.Kind.StartsWith("retry_", StringComparison.Ordinal)).ToArray();
 
     protected override async Task OnInitializedAsync()
     {
         await Refresh();
-        _ = Poll();
+        _pollTask = Poll();
+        _watchTask = WatchChanges();
     }
 
     private async Task Poll()
     {
-        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(2));
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(15));
         try
         {
             while (await timer.WaitForNextTickAsync(_stopping.Token))
-            {
-                await Refresh();
-                await InvokeAsync(StateHasChanged);
-            }
+                await RefreshAndRender();
         }
         catch (OperationCanceledException) when (_stopping.IsCancellationRequested)
         {
         }
     }
 
+    private async Task WatchChanges()
+    {
+        while (!_stopping.IsCancellationRequested)
+        {
+            try
+            {
+                await foreach (var _ in Api.WatchChanges(_stopping.Token))
+                {
+                    _liveConnected = true;
+                    await RefreshAndRender();
+                }
+            }
+            catch (OperationCanceledException) when (_stopping.IsCancellationRequested)
+            {
+                return;
+            }
+            catch (Exception exception) when (exception is HttpRequestException or WebSocketException or InvalidOperationException)
+            {
+                _liveConnected = false;
+                await InvokeAsync(StateHasChanged);
+            }
+
+            await Task.Delay(TimeSpan.FromSeconds(5), _stopping.Token);
+        }
+    }
+
+    private async Task RefreshAndRender()
+    {
+        await Refresh();
+        await InvokeAsync(StateHasChanged);
+    }
+
     private async Task Refresh()
     {
+        if (!await _refreshLock.WaitAsync(0, _stopping.Token))
+            return;
         try
         {
-            _applications = await Api.GetApplications(_stopping.Token);
-            _instances = await Api.GetInstances(_stopping.Token);
+            var applications = Api.GetApplications(_stopping.Token);
+            var instances = Api.GetInstances(_stopping.Token);
+            var applicationRates = Api.GetRates(false, _stopping.Token);
+            var instanceRates = Api.GetRates(true, _stopping.Token);
+            var flow = Api.GetFlow(_stopping.Token);
+            var timeSeries = Api.GetTimeSeries(_stopping.Token);
+            var observations = Api.GetRecentObservations(_stopping.Token);
+            await Task.WhenAll(applications, instances, applicationRates, instanceRates, flow, timeSeries, observations);
+            _applications = applications.Result;
+            _instances = instances.Result;
+            _applicationRates = applicationRates.Result;
+            _instanceRates = instanceRates.Result;
+            _flow = flow.Result;
+            _timeSeries = timeSeries.Result;
+            _observations = observations.Result;
             _updatedAt = DateTimeOffset.UtcNow;
             _error = null;
         }
@@ -133,12 +306,62 @@ else
         {
             _error = exception.Message;
         }
+        finally
+        {
+            _refreshLock.Release();
+        }
     }
 
-    public ValueTask DisposeAsync()
+    private MonitoringRateSummary? ApplicationRate(string applicationName)
+        => _applicationRates.FirstOrDefault(rate => rate.ApplicationName == applicationName);
+
+    private MonitoringRateSummary? InstanceRate(string applicationName, string instanceId)
+        => _instanceRates.FirstOrDefault(rate => rate.ApplicationName == applicationName && rate.InstanceId == instanceId);
+
+    private string FormatShare(MonitoringRateSummary? instanceRate)
+    {
+        if (instanceRate is null)
+            return "—";
+        var total = ApplicationRate(instanceRate.ApplicationName)?.Counts.Consumed ?? 0;
+        return total == 0 ? "—" : $"{instanceRate.Counts.Consumed * 100d / total:N0}%";
+    }
+
+    private static string GetGroup(MonitoringApplicationSummary application) => GetGroup(application.Labels);
+    private static string GetGroup(MonitoringInstanceSummary instance) => GetGroup(instance.Labels);
+
+    private static string GetGroup(IReadOnlyDictionary<string, string>? labels)
+        => labels is not null && labels.TryGetValue("group", out var group) && !string.IsNullOrWhiteSpace(group)
+            ? group
+            : "Ungrouped";
+
+    private static long Failures(MonitoringCounterSet? counters)
+        => counters is null ? 0 : counters.SendFaulted + counters.PublishFaulted + counters.ConsumeFaulted + counters.RetryExhausted;
+
+    private static string FormatRate(double? value) => value.HasValue ? value.Value.ToString("N2") : "—";
+    private static string FormatDuration(double? value) => value.HasValue ? $"{value.Value:N0} ms" : "—";
+    private static string FormatCount(long? value) => value.HasValue ? value.Value.ToString("N0") : "—";
+    private static string DisplayKind(string value) => value.Replace('_', ' ');
+    private static string ValueOrDash(string? value) => string.IsNullOrWhiteSpace(value) ? "—" : value;
+
+    private static string RetryDescription(MonitoringObservation observation)
+        => observation.RetryAttempt.HasValue
+            ? $"Attempt {observation.RetryAttempt} · limit {observation.RetryLimit ?? 0}"
+            : "—";
+
+    private static string ShortMessageType(string? value)
+        => string.IsNullOrWhiteSpace(value) ? "Unknown message" : value.Split('.').Last();
+
+    public async ValueTask DisposeAsync()
     {
         _stopping.Cancel();
+        try
+        {
+            await Task.WhenAll(_pollTask ?? Task.CompletedTask, _watchTask ?? Task.CompletedTask);
+        }
+        catch (OperationCanceledException)
+        {
+        }
         _stopping.Dispose();
-        return ValueTask.CompletedTask;
+        _refreshLock.Dispose();
     }
 }

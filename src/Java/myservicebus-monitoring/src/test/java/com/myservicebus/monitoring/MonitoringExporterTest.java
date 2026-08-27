@@ -46,6 +46,7 @@ class MonitoringExporterTest {
         MonitoringExporterOptions options = new MonitoringExporterOptions();
         options.setServiceAddress(URI.create("http://localhost:" + server.getAddress().getPort()));
         options.setApplicationName("orders-java");
+        options.getLabels().put("group", "commerce");
         options.setExportInterval(Duration.ofMillis(20));
         options.setHeartbeatInterval(Duration.ofSeconds(1));
         options.setMaxBatchSize(1);
@@ -73,6 +74,7 @@ class MonitoringExporterTest {
             assertTrue(metadataReceived.await(2, TimeUnit.SECONDS));
             assertTrue(batchReceived.await(2, TimeUnit.SECONDS));
             assertTrue(metadataJson.get().contains("\"startedAtUtc\":\""));
+            assertTrue(metadataJson.get().contains("\"labels\":{\"group\":\"commerce\"}"));
             assertTrue(batchJson.get().contains("\"applicationName\":\"orders-java\""));
             assertTrue(batchJson.get().contains("\"exportedAtUtc\":\""));
             assertTrue(batchJson.get().contains("\"kind\":\"published\""));

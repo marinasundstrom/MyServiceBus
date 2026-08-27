@@ -22,15 +22,30 @@ The MVP includes:
 - current endpoint, consumer, message, binding, address, and transport metadata
 - instance heartbeats and online/offline leases
 - bounded client queues and interval/count-based observation batches
-- cumulative sent, published, consumed, and faulted counters
+- cumulative and time-window sent, published, consumed, faulted, and retry metrics
+- five-minute real-time throughput series with five-second buckets
+- automatic replica grouping by application name and optional resource labels
+- per-replica throughput, load share, p95 consume duration, retries, and failures
+- observed cross-application message-flow reconstruction from correlation identifiers
+- expandable failed-message metadata with endpoint, retry, exception, correlation, and trace details
 - recent observations with optional W3C trace and span identifiers
 - batch deduplication and reported dropped-observation counts
 - HTTP ingest and query APIs
 - WebSocket change invalidations
-- a standalone Blazor runtime overview
+- a standalone Blazor runtime overview with persisted light, dark, and system themes
 - equivalent exporter behavior for C# and Java
 
-The MVP does not yet include authentication, durable storage, retention, time-window throughput rates, retry-specific observations, message-flow reconstruction, alerting, payload-byte limits, or a production deployment model. The dashboard currently refreshes the query API every two seconds; the WebSocket endpoint is available for consumers but is not yet used by the Blazor UI.
+The MVP does not yet include authentication, durable storage, configurable retention, alerting or scaling recommendations, broker queue depth, host saturation, payload-byte limits, or a production deployment model. The dashboard uses WebSocket invalidations to re-query HTTP snapshots, with a 15-second polling fallback.
+
+## Dashboard Preview
+
+The dashboard is usable in both dark and light environments. The selector persists an explicit light or dark preference locally; system mode follows the operating-system preference. The reconnect dialog uses the same theme tokens, so connection status remains legible while the server is unavailable.
+
+![Monitoring dashboard in dark theme with fictional application and host names](images/runtime-monitoring-dashboard-dark.jpg)
+
+![Monitoring dashboard in light theme with fictional application and host names](images/runtime-monitoring-dashboard-light.jpg)
+
+The screenshots use generated monitoring records for fictional `Commerce` applications and instances. They contain no workstation, user, or production-system identity.
 
 ## Run the Complete Stack
 
@@ -61,6 +76,8 @@ builder.Services.AddServiceBusMonitoring(options =>
     options.ServiceAddress = new Uri("http://monitoring-service:8080");
     options.ApplicationName = "Orders.Api";
     options.InstanceId = Environment.MachineName;
+    options.Labels["group"] = "commerce";
+    options.Labels["environment"] = "production";
 });
 ```
 
@@ -74,6 +91,8 @@ Reference `myservicebus-monitoring`, add monitoring before building the service 
 MonitoringExporterOptions monitoring = new MonitoringExporterOptions();
 monitoring.setServiceAddress(URI.create("http://monitoring-service:8080"));
 monitoring.setApplicationName("Orders.Worker");
+monitoring.getLabels().put("group", "commerce");
+monitoring.getLabels().put("environment", "production");
 
 MonitoringExporter exporter = MonitoringServices.addMonitoring(services, monitoring);
 ServiceProvider provider = services.buildServiceProvider();
@@ -84,6 +103,12 @@ exporter.start(provider.getRequiredService(BusInspectionProvider.class));
 ```
 
 Close the exporter during graceful application shutdown so it can make its bounded final flush.
+
+## Identity, Replicas, and Labels
+
+`ApplicationName` is the logical application identity. All running processes with the same application name are shown as replicas of that application. `InstanceId` identifies an individual replica, and `BusId` distinguishes a bus within that process. A bus address is displayed as transport context but is not used as the unique runtime identity.
+
+Labels are optional bounded resource metadata. The dashboard recognizes `group` as a simple display grouping and also shows labels such as `environment` and `role`. Labels do not replace identity: the view is effectively `group → application → replicas`. Labels common to every replica are projected onto the application summary; conflicting instance labels remain visible only on those instances.
 
 ## General-Purpose Hooks
 
@@ -104,15 +129,38 @@ The prototype uses `/api/monitoring/v1` for both ingest and query operations.
 | `GET` | `/instances?application=...` | Query application instances |
 | `GET` | `/metadata/{application}/{instanceId}/{busId}` | Query current bus metadata |
 | `GET` | `/observations?application=...&limit=100` | Query recent observations |
+| `GET` | `/metrics?application=...&windowSeconds=60&byInstance=true` | Query bounded-window rates, counts, and consume latency |
+| `GET` | `/metrics/timeseries?windowSeconds=300&bucketSeconds=5` | Query bucketed rates for real-time graphs |
+| `GET` | `/flow?application=...&windowSeconds=300` | Query observed correlated application flow |
 | WebSocket | `/stream` | Receive change invalidations |
 
 WebSocket messages indicate that metadata or observations changed; clients should re-query the authoritative HTTP read model. They are not a durable event stream.
 
+The in-memory service retains metric buckets for 15 minutes and bounds its recent observation buffer. A `Complete` flag on window summaries reports whether the exporter has declared dropped observations. A zero rate with incomplete coverage must not be interpreted as proven inactivity.
+
 ## OpenTelemetry Boundary
 
-The monitoring service does not receive or store OpenTelemetry data. MyServiceBus observations may carry trace and span identifiers already present in the messaging operation. A future dashboard integration can use those identifiers to link to an independently configured tracing backend.
+MyServiceBus has OpenTelemetry tracing support independently of the monitoring addon. The C# and Java clients create producer spans for send and publish operations, create consumer spans while handling messages, and propagate W3C trace context in message headers. When an application sends or publishes from inside a consumer, that new producer span inherits the active consumer span.
+
+For example, one distributed trace can show this causal path:
+
+```text
+HTTP request → Checkout.Api
+  └─ send SubmitOrder
+      └─ consume SubmitOrder → Order.Worker
+          └─ publish OrderAccepted
+              └─ consume OrderAccepted → Inventory.Worker
+```
+
+This answers a different question from the monitoring overview. The dashboard shows the current shape and behavior of the system—applications, replicas, rates, latency, retries, failures, and observed aggregate flow. An OpenTelemetry backend shows the path and timing of one particular operation across service and messaging boundaries, including the work that caused the next message.
+
+When running the repository through Aspire, open the Aspire dashboard's telemetry trace view to inspect this complete request-and-message chain. The inbound HTTP span, MyServiceBus producer and consumer spans, and any other instrumented application work appear together in the same trace, provided every participating service exports the propagated context. The MyServiceBus monitoring dashboard remains the aggregate runtime overview alongside that per-operation Aspire view.
+
+The monitoring service does not receive or store OpenTelemetry spans. MyServiceBus observations may carry trace and span identifiers already present in a messaging operation. The dashboard currently surfaces those identifiers as correlation metadata on failures; a future provider can turn them into links to an independently configured tracing backend without making that backend part of the monitoring collector.
 
 This keeps the monitoring service focused on MyServiceBus topology and runtime state while existing OpenTelemetry collectors and backends continue to own traces, metrics, and logs.
+
+Failed-message inspection intentionally excludes message bodies and arbitrary headers. The prototype exposes only operational metadata already present in hook observations: message identity, endpoint, retry attempt, exception detail, correlation, conversation, and trace identifiers.
 
 ## Deployment and Security Boundary
 

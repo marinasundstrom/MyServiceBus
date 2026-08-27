@@ -6,12 +6,18 @@ namespace MyServiceBus.Monitoring.Server;
 public sealed class MonitoringRepository
 {
     private static readonly TimeSpan LeaseTimeout = TimeSpan.FromSeconds(45);
-    private const int RecentObservationLimit = 500;
+    private static readonly TimeSpan MetricRetention = TimeSpan.FromMinutes(15);
+    private const int RecentObservationLimit = 5_000;
+    private const int MaximumLabelCount = 16;
     private readonly ConcurrentDictionary<InstanceKey, InstanceState> instances = new();
+    private readonly object observationSync = new();
+    private readonly Queue<MonitoringObservationRecord> recentObservations = new();
+    private readonly SortedDictionary<long, Dictionary<MetricKey, MutableMetricSet>> metricBuckets = new();
 
     public void UpsertMetadata(MonitoringMetadata metadata)
     {
         ValidateProtocol(metadata.ProtocolVersion);
+        ValidateLabels(metadata.Labels);
         var key = new InstanceKey(metadata.ApplicationName, metadata.InstanceId, metadata.BusId);
         instances.AddOrUpdate(
             key,
@@ -29,8 +35,53 @@ public sealed class MonitoringRepository
         var key = new InstanceKey(batch.ApplicationName, batch.InstanceId, batch.BusId);
         if (!instances.TryGetValue(key, out var state))
             return false;
+        if (!state.Record(batch))
+            return true;
 
-        state.Record(batch);
+        lock (observationSync)
+        {
+            foreach (var observation in batch.Observations)
+            {
+                recentObservations.Enqueue(new MonitoringObservationRecord(
+                    batch.ApplicationName,
+                    batch.InstanceId,
+                    batch.BusId,
+                    observation));
+                while (recentObservations.Count > RecentObservationLimit)
+                    recentObservations.Dequeue();
+
+                var bucketKey = observation.OccurredAtUtc.ToUnixTimeSeconds();
+                if (!metricBuckets.TryGetValue(bucketKey, out var metrics))
+                {
+                    metrics = new Dictionary<MetricKey, MutableMetricSet>();
+                    metricBuckets.Add(bucketKey, metrics);
+                }
+                var metricKey = new MetricKey(batch.ApplicationName, batch.InstanceId);
+                if (!metrics.TryGetValue(metricKey, out var values))
+                {
+                    values = new MutableMetricSet();
+                    metrics.Add(metricKey, values);
+                }
+                values.Record(observation);
+            }
+            if (batch.DroppedObservations > 0)
+            {
+                var bucketKey = batch.ExportedAtUtc.ToUnixTimeSeconds();
+                if (!metricBuckets.TryGetValue(bucketKey, out var metrics))
+                {
+                    metrics = new Dictionary<MetricKey, MutableMetricSet>();
+                    metricBuckets.Add(bucketKey, metrics);
+                }
+                var metricKey = new MetricKey(batch.ApplicationName, batch.InstanceId);
+                if (!metrics.TryGetValue(metricKey, out var values))
+                {
+                    values = new MutableMetricSet();
+                    metrics.Add(metricKey, values);
+                }
+                values.RecordDropped(batch.DroppedObservations);
+            }
+            PruneMetrics(batch.ExportedAtUtc - MetricRetention);
+        }
         return true;
     }
 
@@ -40,7 +91,6 @@ public sealed class MonitoringRepository
         var key = new InstanceKey(heartbeat.ApplicationName, heartbeat.InstanceId, heartbeat.BusId);
         if (!instances.TryGetValue(key, out var state))
             return false;
-
         state.MarkSeen(heartbeat.SentAtUtc);
         return true;
     }
@@ -54,8 +104,10 @@ public sealed class MonitoringRepository
                 group.Count(instance => instance.Online),
                 group.Count(),
                 Sum(group.Select(instance => instance.Totals)),
-                group.Max(instance => instance.LastSeenAtUtc)))
-            .OrderBy(application => application.ApplicationName, StringComparer.Ordinal)
+                group.Max(instance => instance.LastSeenAtUtc),
+                CommonLabels(group.Select(instance => instance.Labels))))
+            .OrderBy(application => application.Labels?.GetValueOrDefault("group"), StringComparer.Ordinal)
+            .ThenBy(application => application.ApplicationName, StringComparer.Ordinal)
             .ToArray();
 
     public IReadOnlyList<MonitoringInstanceSummary> GetInstances(string? applicationName, DateTimeOffset now)
@@ -71,32 +123,265 @@ public sealed class MonitoringRepository
             ? state.Metadata
             : null;
 
-    public IReadOnlyList<MonitoringObservation> GetRecentObservations(string? applicationName, int limit)
-        => instances.Values
-            .Where(state => applicationName is null || string.Equals(state.Metadata.ApplicationName, applicationName, StringComparison.Ordinal))
-            .SelectMany(state => state.RecentObservations)
-            .OrderByDescending(observation => observation.OccurredAtUtc)
-            .Take(Math.Clamp(limit, 1, RecentObservationLimit))
+    public IReadOnlyList<MonitoringObservationRecord> GetRecentObservations(string? applicationName, int limit)
+    {
+        lock (observationSync)
+        {
+            return recentObservations
+                .Where(record => applicationName is null || string.Equals(record.ApplicationName, applicationName, StringComparison.Ordinal))
+                .OrderByDescending(record => record.Observation.OccurredAtUtc)
+                .Take(Math.Clamp(limit, 1, RecentObservationLimit))
+                .ToArray();
+        }
+    }
+
+    public IReadOnlyList<MonitoringRateSummary> GetRates(
+        string? applicationName,
+        int windowSeconds,
+        bool byInstance,
+        DateTimeOffset now)
+    {
+        var boundedWindow = Math.Clamp(windowSeconds, 10, (int)MetricRetention.TotalSeconds);
+        var start = now.AddSeconds(-boundedWindow);
+        var values = new Dictionary<MetricKey, MutableMetricSet>();
+        lock (observationSync)
+        {
+            foreach (var bucket in metricBuckets)
+            {
+                var occurredAt = DateTimeOffset.FromUnixTimeSeconds(bucket.Key);
+                if (occurredAt < start || occurredAt > now)
+                    continue;
+                foreach (var entry in bucket.Value)
+                {
+                    if (applicationName is not null && !string.Equals(entry.Key.ApplicationName, applicationName, StringComparison.Ordinal))
+                        continue;
+                    var key = byInstance ? entry.Key : new MetricKey(entry.Key.ApplicationName, null);
+                    if (!values.TryGetValue(key, out var aggregate))
+                    {
+                        aggregate = new MutableMetricSet();
+                        values.Add(key, aggregate);
+                    }
+                    aggregate.Add(entry.Value);
+                }
+            }
+        }
+
+        var instanceSummaries = GetInstances(applicationName, now);
+        var resultKeys = byInstance
+            ? instanceSummaries.Select(instance => new MetricKey(instance.ApplicationName, instance.InstanceId)).Distinct().ToArray()
+            : instanceSummaries.Select(instance => new MetricKey(instance.ApplicationName, null)).Distinct().ToArray();
+
+        return resultKeys.Select(key =>
+            {
+                values.TryGetValue(key, out var metrics);
+                metrics ??= new MutableMetricSet();
+                var counter = metrics.Counters.ToImmutable();
+                var dropped = metrics.DroppedObservations;
+                var faulted = counter.SendFaulted + counter.PublishFaulted + counter.ConsumeFaulted;
+                return new MonitoringRateSummary(
+                    key.ApplicationName,
+                    key.InstanceId,
+                    boundedWindow,
+                    start,
+                    now,
+                    counter,
+                    new MonitoringRateSet(
+                        counter.Sent / (double)boundedWindow,
+                        counter.Published / (double)boundedWindow,
+                        counter.Consumed / (double)boundedWindow,
+                        faulted / (double)boundedWindow,
+                        counter.RetryAttempted / (double)boundedWindow),
+                    metrics.ConsumeDurations.Average,
+                    metrics.ConsumeDurations.Percentile95,
+                    dropped,
+                    dropped == 0);
+            })
+            .OrderBy(summary => summary.ApplicationName, StringComparer.Ordinal)
+            .ThenBy(summary => summary.InstanceId, StringComparer.Ordinal)
             .ToArray();
+    }
+
+    public IReadOnlyList<MonitoringTimeSeriesPoint> GetTimeSeries(
+        string? applicationName,
+        int windowSeconds,
+        int bucketSeconds,
+        bool byInstance,
+        DateTimeOffset now)
+    {
+        var boundedWindow = Math.Clamp(windowSeconds, 10, (int)MetricRetention.TotalSeconds);
+        var boundedBucket = Math.Clamp(bucketSeconds, 1, Math.Min(60, boundedWindow));
+        var endSecond = now.ToUnixTimeSeconds();
+        var startSecond = endSecond - boundedWindow;
+        var values = new Dictionary<(long Bucket, MetricKey Metric), MutableMetricSet>();
+        lock (observationSync)
+        {
+            foreach (var bucket in metricBuckets)
+            {
+                if (bucket.Key < startSecond || bucket.Key > endSecond)
+                    continue;
+                var outputBucket = bucket.Key - (bucket.Key - startSecond) % boundedBucket;
+                foreach (var entry in bucket.Value)
+                {
+                    if (applicationName is not null && !string.Equals(entry.Key.ApplicationName, applicationName, StringComparison.Ordinal))
+                        continue;
+                    var metricKey = byInstance ? entry.Key : new MetricKey(entry.Key.ApplicationName, null);
+                    if (!values.TryGetValue((outputBucket, metricKey), out var aggregate))
+                    {
+                        aggregate = new MutableMetricSet();
+                        values.Add((outputBucket, metricKey), aggregate);
+                    }
+                    aggregate.Add(entry.Value);
+                }
+            }
+        }
+
+        var metricKeys = GetInstances(applicationName, now)
+            .Select(instance => byInstance
+                ? new MetricKey(instance.ApplicationName, instance.InstanceId)
+                : new MetricKey(instance.ApplicationName, null))
+            .Distinct()
+            .ToArray();
+        var result = new List<MonitoringTimeSeriesPoint>();
+        for (var bucket = startSecond; bucket <= endSecond; bucket += boundedBucket)
+        {
+            foreach (var metricKey in metricKeys)
+            {
+                values.TryGetValue((bucket, metricKey), out var metrics);
+                var counters = metrics?.Counters.ToImmutable() ?? new MonitoringCounterSet(0, 0, 0, 0, 0, 0);
+                var faulted = counters.SendFaulted + counters.PublishFaulted + counters.ConsumeFaulted;
+                result.Add(new MonitoringTimeSeriesPoint(
+                    metricKey.ApplicationName,
+                    metricKey.InstanceId,
+                    DateTimeOffset.FromUnixTimeSeconds(bucket),
+                    boundedBucket,
+                    counters,
+                    new MonitoringRateSet(
+                        counters.Sent / (double)boundedBucket,
+                        counters.Published / (double)boundedBucket,
+                        counters.Consumed / (double)boundedBucket,
+                        faulted / (double)boundedBucket,
+                        counters.RetryAttempted / (double)boundedBucket),
+                    metrics?.DroppedObservations ?? 0,
+                    metrics?.DroppedObservations is null or 0));
+            }
+        }
+        return result;
+    }
+
+    public IReadOnlyList<MonitoringFlowEdge> GetFlow(string? applicationName, int windowSeconds, DateTimeOffset now)
+    {
+        var boundedWindow = Math.Clamp(windowSeconds, 10, (int)MetricRetention.TotalSeconds);
+        var start = now.AddSeconds(-boundedWindow);
+        MonitoringObservationRecord[] records;
+        lock (observationSync)
+        {
+            records = recentObservations
+                .Where(record => record.Observation.OccurredAtUtc >= start && record.Observation.OccurredAtUtc <= now)
+                .OrderBy(record => record.Observation.OccurredAtUtc)
+                .ToArray();
+        }
+
+        var sources = new Dictionary<string, FlowSource>(StringComparer.Ordinal);
+        var edges = new Dictionary<FlowEdgeKey, MutableFlowEdge>();
+        foreach (var record in records)
+        {
+            var observation = record.Observation;
+            if (observation.Kind is "sent" or "published" or "fault_published")
+            {
+                var outboundSource = new FlowSource(record.ApplicationName, observation.Kind);
+                foreach (var correlationKey in CorrelationKeys(observation))
+                    sources[correlationKey] = outboundSource;
+                continue;
+            }
+            if (!string.Equals(observation.Kind, "consumed", StringComparison.Ordinal))
+                continue;
+
+            FlowSource? matchedSource = null;
+            foreach (var correlationKey in CorrelationKeys(observation))
+            {
+                if (sources.TryGetValue(correlationKey, out matchedSource))
+                    break;
+            }
+            if (matchedSource is null)
+                continue;
+            if (applicationName is not null
+                && !string.Equals(matchedSource.ApplicationName, applicationName, StringComparison.Ordinal)
+                && !string.Equals(record.ApplicationName, applicationName, StringComparison.Ordinal))
+                continue;
+
+            var edgeKey = new FlowEdgeKey(
+                matchedSource.ApplicationName,
+                record.ApplicationName,
+                observation.EndpointName,
+                observation.MessageUrn,
+                matchedSource.OperationKind);
+            if (!edges.TryGetValue(edgeKey, out var edge))
+            {
+                edge = new MutableFlowEdge(
+                    matchedSource.ApplicationName,
+                    record.ApplicationName,
+                    observation.EndpointName,
+                    observation.MessageType,
+                    observation.MessageUrn,
+                    matchedSource.OperationKind,
+                    observation.OccurredAtUtc);
+                edges.Add(edgeKey, edge);
+            }
+            edge.Record(observation.OccurredAtUtc);
+        }
+
+        return edges.Values
+            .Select(edge => edge.ToImmutable())
+            .OrderByDescending(edge => edge.Count)
+            .ThenBy(edge => edge.SourceApplication, StringComparer.Ordinal)
+            .ThenBy(edge => edge.TargetApplication, StringComparer.Ordinal)
+            .ToArray();
+    }
+
+    private void PruneMetrics(DateTimeOffset cutoff)
+    {
+        var cutoffKey = cutoff.ToUnixTimeSeconds();
+        while (metricBuckets.Count > 0 && metricBuckets.First().Key < cutoffKey)
+            metricBuckets.Remove(metricBuckets.First().Key);
+    }
+
+    private static IEnumerable<string> CorrelationKeys(MonitoringObservation observation)
+    {
+        if (!string.IsNullOrWhiteSpace(observation.CorrelationId))
+            yield return $"correlation:{observation.CorrelationId}";
+        if (!string.IsNullOrWhiteSpace(observation.ConversationId))
+            yield return $"conversation:{observation.ConversationId}";
+        if (!string.IsNullOrWhiteSpace(observation.TraceId))
+            yield return $"trace:{observation.TraceId}";
+    }
+
+    private static IReadOnlyDictionary<string, string> CommonLabels(
+        IEnumerable<IReadOnlyDictionary<string, string>?> labelSets)
+    {
+        Dictionary<string, string>? common = null;
+        foreach (var labels in labelSets)
+        {
+            var current = labels ?? new Dictionary<string, string>();
+            if (common is null)
+            {
+                common = new Dictionary<string, string>(current, StringComparer.Ordinal);
+                continue;
+            }
+            foreach (var key in common.Keys.ToArray())
+            {
+                if (!current.TryGetValue(key, out var value) || !string.Equals(value, common[key], StringComparison.Ordinal))
+                    common.Remove(key);
+            }
+        }
+        return common ?? new Dictionary<string, string>();
+    }
 
     private static MonitoringCounterSet Sum(IEnumerable<MonitoringCounterSet> counters)
     {
-        long sent = 0;
-        long sendFaulted = 0;
-        long published = 0;
-        long publishFaulted = 0;
-        long consumed = 0;
-        long consumeFaulted = 0;
+        var result = new MutableCounterSet();
         foreach (var counter in counters)
-        {
-            sent += counter.Sent;
-            sendFaulted += counter.SendFaulted;
-            published += counter.Published;
-            publishFaulted += counter.PublishFaulted;
-            consumed += counter.Consumed;
-            consumeFaulted += counter.ConsumeFaulted;
-        }
-        return new MonitoringCounterSet(sent, sendFaulted, published, publishFaulted, consumed, consumeFaulted);
+            result.Add(counter);
+        return result.ToImmutable();
     }
 
     private static void ValidateProtocol(string protocolVersion)
@@ -105,21 +390,212 @@ public sealed class MonitoringRepository
             throw new UnsupportedMonitoringProtocolException(protocolVersion);
     }
 
+    private static void ValidateLabels(IReadOnlyDictionary<string, string>? labels)
+    {
+        if (labels is null)
+            return;
+        if (labels.Count > MaximumLabelCount)
+            throw new MonitoringValidationException($"Monitoring metadata accepts at most {MaximumLabelCount} labels.");
+        foreach (var label in labels)
+        {
+            if (string.IsNullOrWhiteSpace(label.Key) || label.Key.Length > 64)
+                throw new MonitoringValidationException("Monitoring label keys must contain 1 to 64 characters.");
+            if (label.Value.Length > 128)
+                throw new MonitoringValidationException("Monitoring label values must contain at most 128 characters.");
+        }
+    }
+
     private readonly record struct InstanceKey(string ApplicationName, string InstanceId, string BusId);
+    private readonly record struct MetricKey(string ApplicationName, string? InstanceId);
+    private readonly record struct FlowEdgeKey(
+        string SourceApplication,
+        string TargetApplication,
+        string? EndpointName,
+        string? MessageUrn,
+        string OperationKind);
+    private sealed record FlowSource(string ApplicationName, string OperationKind);
+
+    private sealed class MutableFlowEdge
+    {
+        private long count;
+        private DateTimeOffset firstSeenAtUtc;
+        private DateTimeOffset lastSeenAtUtc;
+
+        public MutableFlowEdge(
+            string sourceApplication,
+            string targetApplication,
+            string? endpointName,
+            string? messageType,
+            string? messageUrn,
+            string operationKind,
+            DateTimeOffset occurredAtUtc)
+        {
+            SourceApplication = sourceApplication;
+            TargetApplication = targetApplication;
+            EndpointName = endpointName;
+            MessageType = messageType;
+            MessageUrn = messageUrn;
+            OperationKind = operationKind;
+            firstSeenAtUtc = occurredAtUtc;
+            lastSeenAtUtc = occurredAtUtc;
+        }
+
+        public string SourceApplication { get; }
+        public string TargetApplication { get; }
+        public string? EndpointName { get; }
+        public string? MessageType { get; }
+        public string? MessageUrn { get; }
+        public string OperationKind { get; }
+
+        public void Record(DateTimeOffset occurredAtUtc)
+        {
+            count++;
+            if (occurredAtUtc < firstSeenAtUtc)
+                firstSeenAtUtc = occurredAtUtc;
+            if (occurredAtUtc > lastSeenAtUtc)
+                lastSeenAtUtc = occurredAtUtc;
+        }
+
+        public MonitoringFlowEdge ToImmutable() => new(
+            SourceApplication,
+            TargetApplication,
+            EndpointName,
+            MessageType,
+            MessageUrn,
+            OperationKind,
+            count,
+            firstSeenAtUtc,
+            lastSeenAtUtc);
+    }
+
+    private sealed class MutableMetricSet
+    {
+        public MutableCounterSet Counters { get; } = new();
+        public DurationHistogram ConsumeDurations { get; } = new();
+        public long DroppedObservations { get; private set; }
+
+        public void Record(MonitoringObservation observation)
+        {
+            Counters.Increment(observation.Kind);
+            if (observation.Kind is "consumed" or "consume_faulted" && observation.DurationMs.HasValue)
+                ConsumeDurations.Record(observation.DurationMs.Value);
+        }
+
+        public void Add(MutableMetricSet other)
+        {
+            Counters.Add(other.Counters);
+            ConsumeDurations.Add(other.ConsumeDurations);
+            DroppedObservations += other.DroppedObservations;
+        }
+
+        public void RecordDropped(long count) => DroppedObservations += count;
+    }
+
+    private sealed class DurationHistogram
+    {
+        private static readonly double[] Bounds = [1, 5, 10, 25, 50, 100, 250, 500, 1_000, 5_000, double.PositiveInfinity];
+        private readonly long[] buckets = new long[Bounds.Length];
+        private long count;
+        private double total;
+
+        public double Average => count == 0 ? 0 : total / count;
+        public double Percentile95
+        {
+            get
+            {
+                if (count == 0)
+                    return 0;
+                var target = (long)Math.Ceiling(count * 0.95);
+                long cumulative = 0;
+                for (var i = 0; i < buckets.Length; i++)
+                {
+                    cumulative += buckets[i];
+                    if (cumulative >= target)
+                        return double.IsPositiveInfinity(Bounds[i]) ? Bounds[^2] : Bounds[i];
+                }
+                return 0;
+            }
+        }
+
+        public void Record(double milliseconds)
+        {
+            count++;
+            total += milliseconds;
+            var index = Array.FindIndex(Bounds, bound => milliseconds <= bound);
+            buckets[index < 0 ? buckets.Length - 1 : index]++;
+        }
+
+        public void Add(DurationHistogram other)
+        {
+            count += other.count;
+            total += other.total;
+            for (var i = 0; i < buckets.Length; i++)
+                buckets[i] += other.buckets[i];
+        }
+    }
+
+    private sealed class MutableCounterSet
+    {
+        public long Sent { get; private set; }
+        public long SendFaulted { get; private set; }
+        public long Published { get; private set; }
+        public long PublishFaulted { get; private set; }
+        public long Consumed { get; private set; }
+        public long ConsumeFaulted { get; private set; }
+        public long RetryAttempted { get; private set; }
+        public long RetryExhausted { get; private set; }
+        public long FaultPublished { get; private set; }
+
+        public void Increment(string kind)
+        {
+            switch (kind)
+            {
+                case "sent": Sent++; break;
+                case "send_faulted": SendFaulted++; break;
+                case "published": Published++; break;
+                case "publish_faulted": PublishFaulted++; break;
+                case "consumed": Consumed++; break;
+                case "consume_faulted": ConsumeFaulted++; break;
+                case "retry_attempted": RetryAttempted++; break;
+                case "retry_exhausted": RetryExhausted++; break;
+                case "fault_published": FaultPublished++; break;
+            }
+        }
+
+        public void Add(MutableCounterSet other) => Add(other.ToImmutable());
+
+        public void Add(MonitoringCounterSet other)
+        {
+            Sent += other.Sent;
+            SendFaulted += other.SendFaulted;
+            Published += other.Published;
+            PublishFaulted += other.PublishFaulted;
+            Consumed += other.Consumed;
+            ConsumeFaulted += other.ConsumeFaulted;
+            RetryAttempted += other.RetryAttempted;
+            RetryExhausted += other.RetryExhausted;
+            FaultPublished += other.FaultPublished;
+        }
+
+        public MonitoringCounterSet ToImmutable() => new(
+            Sent,
+            SendFaulted,
+            Published,
+            PublishFaulted,
+            Consumed,
+            ConsumeFaulted,
+            RetryAttempted,
+            RetryExhausted,
+            FaultPublished);
+    }
 
     private sealed class InstanceState
     {
         private readonly object sync = new();
         private readonly HashSet<string> batchIds = new(StringComparer.Ordinal);
-        private readonly Queue<MonitoringObservation> recentObservations = new();
+        private readonly MutableCounterSet totals = new();
         private MonitoringMetadata metadata;
         private DateTimeOffset lastSeenAtUtc;
-        private long sent;
-        private long sendFaulted;
-        private long published;
-        private long publishFaulted;
-        private long consumed;
-        private long consumeFaulted;
         private long droppedObservations;
 
         public InstanceState(MonitoringMetadata metadata)
@@ -134,15 +610,6 @@ public sealed class MonitoringRepository
             {
                 lock (sync)
                     return metadata;
-            }
-        }
-
-        public IReadOnlyList<MonitoringObservation> RecentObservations
-        {
-            get
-            {
-                lock (sync)
-                    return recentObservations.ToArray();
             }
         }
 
@@ -164,34 +631,19 @@ public sealed class MonitoringRepository
             }
         }
 
-        public void Record(MonitoringObservationBatch batch)
+        public bool Record(MonitoringObservationBatch batch)
         {
             lock (sync)
             {
                 if (batchIds.Count >= 2_000)
                     batchIds.Clear();
-
                 if (!batchIds.Add(batch.BatchId))
-                    return;
-
+                    return false;
                 droppedObservations += batch.DroppedObservations;
                 lastSeenAtUtc = batch.ExportedAtUtc > lastSeenAtUtc ? batch.ExportedAtUtc : lastSeenAtUtc;
                 foreach (var observation in batch.Observations)
-                {
-                    switch (observation.Kind)
-                    {
-                        case "sent": sent++; break;
-                        case "send_faulted": sendFaulted++; break;
-                        case "published": published++; break;
-                        case "publish_faulted": publishFaulted++; break;
-                        case "consumed": consumed++; break;
-                        case "consume_faulted": consumeFaulted++; break;
-                    }
-
-                    recentObservations.Enqueue(observation);
-                    while (recentObservations.Count > RecentObservationLimit)
-                        recentObservations.Dequeue();
-                }
+                    totals.Increment(observation.Kind);
+                return true;
             }
         }
 
@@ -211,8 +663,9 @@ public sealed class MonitoringRepository
                     now - lastSeenAtUtc <= leaseTimeout,
                     metadata.StartedAtUtc,
                     lastSeenAtUtc,
-                    new MonitoringCounterSet(sent, sendFaulted, published, publishFaulted, consumed, consumeFaulted),
-                    droppedObservations);
+                    totals.ToImmutable(),
+                    droppedObservations,
+                    metadata.Labels);
             }
         }
     }
@@ -227,4 +680,12 @@ public sealed class UnsupportedMonitoringProtocolException : Exception
     }
 
     public string ProtocolVersion { get; }
+}
+
+public sealed class MonitoringValidationException : Exception
+{
+    public MonitoringValidationException(string message)
+        : base(message)
+    {
+    }
 }

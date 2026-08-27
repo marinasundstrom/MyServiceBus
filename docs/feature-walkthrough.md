@@ -817,6 +817,20 @@ try (ServiceScope scope = provider.createScope()) {
 
 MyServiceBus automatically creates spans for send and consume operations and propagates W3C `traceparent` headers. Any active span when publishing or sending is injected into the message headers, and consumers create child spans from those headers. This mirrors MassTransit's OpenTelemetry integration so traces flow across both C# and Java services.
 
+That propagation preserves causality across asynchronous boundaries. If an HTTP request reaches one service, that service sends a command, its consumer publishes an event, and another service consumes the event, an OpenTelemetry backend can present the entire sequence as one distributed trace:
+
+```text
+HTTP request → Checkout.Api
+  └─ send SubmitOrder
+      └─ consume SubmitOrder → Order.Worker
+          └─ publish OrderAccepted
+              └─ consume OrderAccepted → Inventory.Worker
+```
+
+The runtime-monitoring dashboard complements this trace view rather than replacing it. Monitoring summarizes aggregate system behavior and current topology; OpenTelemetry explains the path and timing of an individual request or message chain. The monitoring collector does not ingest OpenTelemetry spans today, although monitoring observations retain trace identifiers that can support links to a separately configured trace backend later.
+
+In the repository's Aspire stack, the Aspire dashboard telemetry trace view shows this end-to-end picture directly. An inbound HTTP request and the producer and consumer spans created as messages cross services appear in one trace, as long as each participating application exports the propagated context. Use the MyServiceBus monitoring dashboard for the aggregate runtime view and Aspire telemetry for an individual request-and-message path.
+
 For C# apps, OpenTelemetry must subscribe to the `MyServiceBus` activity source. The shared Aspire `AddServiceDefaults()` setup in this repository now does that automatically. If you configure OpenTelemetry manually, include `AddSource("MyServiceBus")` in your tracing setup or the bus spans and propagated trace headers will be missing.
 
 ---
@@ -867,6 +881,7 @@ builder.Services.AddServiceBusMonitoring(options =>
 {
     options.ServiceAddress = new Uri("http://localhost:5310");
     options.ApplicationName = "Orders.Api";
+    options.Labels["group"] = "commerce";
 });
 ```
 
@@ -876,6 +891,7 @@ services.from(InspectionServices.class).addInspection();
 MonitoringExporterOptions options = new MonitoringExporterOptions();
 options.setServiceAddress(URI.create("http://localhost:5310"));
 options.setApplicationName("Orders.Api");
+options.getLabels().put("group", "commerce");
 MonitoringExporter exporter = MonitoringServices.addMonitoring(services, options);
 
 ServiceProvider provider = services.buildServiceProvider();
@@ -884,7 +900,7 @@ bus.start();
 exporter.start(provider.getRequiredService(BusInspectionProvider.class));
 ```
 
-The proof-of-concept service accepts metadata, observation batches, and heartbeats under `/api/monitoring/v1`. Its query API exposes applications, instances, metadata, recent observations, and a WebSocket invalidation stream at the same prefix. `MyServiceBus.Dashboard` is a separate Blazor application that consumes only those service APIs. OpenTelemetry collection remains separate; observations carry trace identifiers only as optional correlation references.
+The proof-of-concept service accepts metadata, observation batches, and heartbeats under `/api/monitoring/v1`. Its query API exposes applications, replicas, metadata, bounded-window metrics, bucketed real-time series, recent observations, observed flow, and a WebSocket invalidation stream. Replicas group automatically by application name; optional bounded labels such as `group`, `environment`, and `role` provide another display dimension. `MyServiceBus.Dashboard` is a separate Blazor application that consumes only those service APIs. OpenTelemetry collection remains separate; observations carry trace identifiers only as optional correlation references.
 
 See [Runtime Monitoring](runtime-monitoring.md) for the complete Aspire walkthrough, service API, deployment boundary, and current MVP limitations.
 

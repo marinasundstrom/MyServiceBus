@@ -16,7 +16,9 @@ public record MessageOperationHookEvent(
         String correlationId,
         String conversationId,
         String traceId,
-        String spanId) implements BusHookEvent {
+        String spanId,
+        Integer retryAttempt,
+        Integer retryLimit) implements BusHookEvent {
 
     public static MessageOperationHookEvent create(
             String kind,
@@ -28,6 +30,22 @@ public record MessageOperationHookEvent(
             Throwable exception,
             String correlationId,
             String conversationId) {
+        return create(kind, succeeded, messageType, endpointName, destinationAddress, startedAtNanos,
+                exception, correlationId, conversationId, null, null);
+    }
+
+    public static MessageOperationHookEvent create(
+            String kind,
+            boolean succeeded,
+            Class<?> messageType,
+            String endpointName,
+            String destinationAddress,
+            long startedAtNanos,
+            Throwable exception,
+            String correlationId,
+            String conversationId,
+            Integer retryAttempt,
+            Integer retryLimit) {
         return new MessageOperationHookEvent(
                 Instant.now(),
                 kind,
@@ -42,6 +60,8 @@ public record MessageOperationHookEvent(
                 correlationId,
                 conversationId,
                 null,
-                null);
+                null,
+                retryAttempt,
+                retryLimit);
     }
 }

@@ -13,6 +13,9 @@ Release candidate: `0.1.0-preview.2`.
 - Added optional C# and Java monitoring exporters that self-register metadata, emit heartbeats, and batch observations through bounded local queues without placing remote I/O in the messaging pipeline.
 - Removed the sample applications' experimental embedded inspection endpoints and local dashboard state; both samples now export to the shared monitoring service.
 - Added collector aggregation, lease tracking, batch deduplication, recent observations, and C#/Java hook and exporter coverage.
+- Added automatic replica grouping, bounded resource labels, retry observations, per-application and per-instance windowed rates, consume latency, completeness indicators, observed message flow, and bounded real-time series queries.
+- Expanded the Blazor prototype with label-grouped application views, replica load comparisons, live throughput graphs, and recent retry and failure detail driven by WebSocket invalidations with a polling fallback.
+- Added expandable failed-message inspection for endpoint, retry, exception, correlation, conversation, and trace metadata while keeping payload and arbitrary-header capture out of scope.
 - Validated the complete Aspire stack with live C# and Java traffic, fault observations, trace correlation, HTTP queries, WebSocket invalidations, and the Blazor dashboard; fixed endpoint discovery, exporter lifetime/draining, topology remapping, and Java timestamp interoperability defects found by that exercise.
 - Added runtime-monitoring guides to the repository documentation and public documentation website, including the experimental MVP and production-readiness boundaries.
 - Proposed a collector-style monitoring pipeline in which optional C# and Java hook handlers enqueue bus metadata, heartbeats, and bounded observation batches for export to a central monitoring service.
@@ -214,6 +217,8 @@ Release candidate: `0.1.0-preview.2`.
 Keep this file updated for significant changes. Prefer adding dated entries that summarize the main themes of a change set instead of listing every commit.
 # Unreleased
 
+- Added an optional cross-language runtime-monitoring MVP with general-purpose hooks, bounded exporters, a central in-memory collector, real-time metrics and flow queries, failure inspection, replica grouping, and a themed standalone Blazor dashboard.
+- Added sanitized light and dark monitoring-dashboard screenshots to the runtime-monitoring documentation and website.
 - Audited the public walkthrough and sample documentation, corrected stale Java and Aspire commands, fixed preview inspection routes and broken links, and aligned product and compatibility wording with the broker-backed MVP boundary.
 - Fixed the Aspire interoperability sample by aligning Aspire package versions, supervising the Java Gradle task, using dynamic external endpoints, and injecting the orchestrated RabbitMQ endpoint into every client.
 - Deferred C# bus construction until hosted post-build configuration is applied, allowing Aspire's dynamically assigned RabbitMQ endpoint to take effect; also made the Java HTTP target dynamic and selected explicit-bucket metrics where supported.

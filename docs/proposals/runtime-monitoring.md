@@ -2,7 +2,7 @@
 
 ## Status
 
-Experimental MVP implemented and validated end to end through the Aspire stack. The current proof of concept covers general-purpose hooks, C# and Java exporters, in-memory collection and query APIs, WebSocket invalidations, and a standalone Blazor overview. Retry-specific observations, flow reconstruction, authentication, payload-byte limits, persistence, time-window rates, and external telemetry links remain future work. See [Runtime Monitoring](../runtime-monitoring.md) for setup and the current operational boundary.
+Experimental MVP implemented and validated end to end through the Aspire stack. The proof of concept covers general-purpose hooks, C# and Java exporters, retry observations, bounded time-window and time-series metrics, observed flow reconstruction, in-memory query APIs, WebSocket invalidations, and a standalone grouped Blazor overview with light and dark themes. Authentication, payload-byte limits, persistence, broker and host metrics, automated scaling advice, and external telemetry links remain future work. See [Runtime Monitoring](../runtime-monitoring.md) for setup and the current operational boundary.
 
 ## Recommendation
 
@@ -262,8 +262,9 @@ Use a small MyServiceBus resource identity:
 - `applicationVersion`
 - MyServiceBus client language and version
 - stable `busId` within the process
+- optional bounded resource `labels`
 
-Applications configure these values through the monitoring addon. For convenience, platform adapters may use common host or telemetry resource values as defaults, but the monitoring contract does not depend on an OpenTelemetry SDK.
+Applications configure these values through the monitoring addon. `applicationName` is the logical identity that groups worker replicas, `instanceId` identifies each running replica, and `busId` distinguishes a bus within that process. Transport addresses are descriptive metadata rather than unique application identity. For convenience, platform adapters may use common host or telemetry resource values as defaults, but the monitoring contract does not depend on an OpenTelemetry SDK.
 
 ### Self-Registration
 
@@ -271,7 +272,7 @@ An application registers by sending its first metadata snapshot. No separate adm
 
 Each instance receives or supplies a registration identifier and renews a lease through heartbeats. If the lease expires, the monitoring service marks that instance offline but retains its last metadata according to retention policy.
 
-The dashboard may allow operators to assign display names, tags, environments, and grouping rules to discovered applications. Those annotations belong to the monitoring service, not the client.
+Clients may attach a small bounded set of resource labels. `group` is a conventional label for arranging related logical applications, while labels such as `environment` and `role` remain generic query and display metadata. The hierarchy is `label group → application → instances`: applications group their replicas automatically, and labels never replace runtime identity. Advanced dashboard-defined grouping rules and stored operator annotations remain future work.
 
 Static allowlists or expected-application definitions may be added later to show missing applications and reject unknown ones.
 
@@ -407,6 +408,7 @@ The dashboard uses a separate read-only API:
 - `GET /api/monitoring/v1/applications/{application}/instances`
 - `GET /api/monitoring/v1/instances/{instanceId}/metadata`
 - `GET /api/monitoring/v1/metrics`
+- `GET /api/monitoring/v1/metrics/timeseries`
 - `GET /api/monitoring/v1/observations`
 - `GET /api/monitoring/v1/flow`
 

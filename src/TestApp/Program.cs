@@ -48,6 +48,9 @@ builder.Services.AddServiceBusMonitoring(options =>
         Environment.GetEnvironmentVariable("MONITORING_SERVICE_URL") ?? "http://localhost:5310");
     options.ApplicationName = "TestApp.CSharp";
     options.InstanceId = Environment.GetEnvironmentVariable("HOSTNAME") ?? Environment.MachineName;
+    options.Labels["group"] = "sample-system";
+    options.Labels["environment"] = builder.Environment.EnvironmentName;
+    options.Labels["role"] = "api";
 });
 
 builder.Services.AddHealthChecks()

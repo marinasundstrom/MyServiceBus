@@ -1,0 +1,35 @@
+@implements IAsyncDisposable
+@inject IJSRuntime JavaScript
+
+<div class="chart" @ref="_chart"></div>
+
+@code {
+    private ElementReference _chart;
+    private IJSObjectReference? _module;
+
+    [Parameter, EditorRequired]
+    public required IReadOnlyList<MonitoringTimeSeriesPoint> Points { get; set; }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        _module ??= await JavaScript.InvokeAsync<IJSObjectReference>("import", "./monitoringChart.js");
+        await _module.InvokeVoidAsync("renderThroughputChart", _chart, Points.Select(point => new
+        {
+            point.ApplicationName,
+            point.TimestampUtc,
+            point.Rates.ConsumedPerSecond
+        }));
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            if (_module is not null)
+                await _module.DisposeAsync();
+        }
+        catch (JSDisconnectedException)
+        {
+        }
+    }
+}

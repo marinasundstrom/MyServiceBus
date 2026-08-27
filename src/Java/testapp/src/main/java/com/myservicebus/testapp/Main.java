@@ -45,6 +45,10 @@ public class Main {
         monitoringOptions.setServiceAddress(URI.create(
                 System.getenv().getOrDefault("MONITORING_SERVICE_URL", "http://localhost:5310")));
         monitoringOptions.setApplicationName("TestApp.Java");
+        monitoringOptions.getLabels().put("group", "sample-system");
+        monitoringOptions.getLabels().put("environment",
+                System.getenv().getOrDefault("ENVIRONMENT", "Development"));
+        monitoringOptions.getLabels().put("role", "worker");
         MonitoringExporter monitoringExporter = MonitoringServices.addMonitoring(services, monitoringOptions);
 
         String rabbitMqHost = System.getenv().getOrDefault("RABBITMQ_HOST", "localhost");

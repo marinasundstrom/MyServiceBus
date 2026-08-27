@@ -78,7 +78,10 @@ public class PipeConfigurator<TContext extends PipeContext> {
                         "retryCount", Integer.toString(retryCount),
                         "delayMilliseconds", Long.toString(delay.toMillis()));
         addFilter(
-                sp -> new RetryFilter<>(retryCount, delay),
+                sp -> new RetryFilter<>(
+                        retryCount,
+                        delay,
+                        sp == null ? java.util.Set.of() : sp.getServices(RetryObserver.class)),
                 "retry",
                 RetryFilter.class,
                 FilterLifetime.PIPE,

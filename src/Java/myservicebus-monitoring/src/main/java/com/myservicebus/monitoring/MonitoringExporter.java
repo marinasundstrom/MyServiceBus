@@ -158,7 +158,8 @@ public final class MonitoringExporter implements BusHook, AutoCloseable {
                 options.getBusId(),
                 startedAtUtc,
                 Instant.now(),
-                provider.getSnapshot());
+                provider.getSnapshot(),
+                java.util.Map.copyOf(options.getLabels()));
         metadataRegistered = post("/api/monitoring/v1/metadata", metadata);
     }
 
@@ -177,14 +178,15 @@ public final class MonitoringExporter implements BusHook, AutoCloseable {
         if (busEvent instanceof BusLifecycleHookEvent lifecycle) {
             return new MonitoringProtocol.Observation(
                     sequence.incrementAndGet(), lifecycle.occurredAtUtc(), "bus_" + lifecycle.state(), true,
-                    null, null, null, lifecycle.busAddress(), null, null, null, null, null, null, null);
+                    null, null, null, lifecycle.busAddress(), null, null, null, null, null, null, null, null, null);
         }
         if (busEvent instanceof MessageOperationHookEvent operation) {
             return new MonitoringProtocol.Observation(
                     sequence.incrementAndGet(), operation.occurredAtUtc(), operation.kind(), operation.succeeded(),
                     operation.messageType(), operation.messageUrn(), operation.endpointName(), operation.destinationAddress(),
                     operation.durationMs(), operation.exceptionType(), operation.exceptionMessage(), operation.correlationId(),
-                    operation.conversationId(), operation.traceId(), operation.spanId());
+                    operation.conversationId(), operation.traceId(), operation.spanId(), operation.retryAttempt(),
+                    operation.retryLimit());
         }
         return null;
     }

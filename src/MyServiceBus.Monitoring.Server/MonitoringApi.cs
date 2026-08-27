@@ -9,9 +9,16 @@ public static class MonitoringApi
         var ingest = endpoints.MapGroup("/api/monitoring/v1").WithTags("Monitoring ingest");
         ingest.MapPost("/metadata", (MonitoringMetadata metadata, MonitoringRepository repository, MonitoringChangeFeed changes) =>
         {
-            repository.UpsertMetadata(metadata);
-            changes.Publish("metadata_changed");
-            return Results.Accepted();
+            try
+            {
+                repository.UpsertMetadata(metadata);
+                changes.Publish("metadata_changed");
+                return Results.Accepted();
+            }
+            catch (MonitoringValidationException exception)
+            {
+                return Results.BadRequest(new { error = exception.Message });
+            }
         });
         ingest.MapPost("/observations:batch", (MonitoringObservationBatch batch, MonitoringRepository repository, MonitoringChangeFeed changes) =>
         {
@@ -33,6 +40,12 @@ public static class MonitoringApi
         });
         query.MapGet("/observations", (string? application, int? limit, MonitoringRepository repository) =>
             repository.GetRecentObservations(application, limit ?? 100));
+        query.MapGet("/metrics", (string? application, int? windowSeconds, bool? byInstance, MonitoringRepository repository) =>
+            repository.GetRates(application, windowSeconds ?? 60, byInstance ?? false, DateTimeOffset.UtcNow));
+        query.MapGet("/metrics/timeseries", (string? application, int? windowSeconds, int? bucketSeconds, bool? byInstance, MonitoringRepository repository) =>
+            repository.GetTimeSeries(application, windowSeconds ?? 300, bucketSeconds ?? 5, byInstance ?? false, DateTimeOffset.UtcNow));
+        query.MapGet("/flow", (string? application, int? windowSeconds, MonitoringRepository repository) =>
+            repository.GetFlow(application, windowSeconds ?? 300, DateTimeOffset.UtcNow));
         query.MapGet("/stream", (HttpContext context, MonitoringChangeFeed changes, CancellationToken cancellationToken) =>
             changes.Stream(context, cancellationToken));
 

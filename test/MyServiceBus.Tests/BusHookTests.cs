@@ -57,6 +57,43 @@ public class BusHookTests
     }
 
     [Fact]
+    public async Task Retry_hooks_report_attempts_and_exhaustion()
+    {
+        RetryingConsumer.Attempts = 0;
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddServiceBus(configurator =>
+        {
+            configurator.UsingMediator();
+            configurator.AddHook<RecordingHook>();
+            configurator.AddConsumer<RetryingConsumer, TestMessage>(pipe => pipe.UseRetry(1));
+        });
+
+        await using var provider = services.BuildServiceProvider();
+        var hostedService = provider.GetRequiredService<IHostedService>();
+        await hostedService.StartAsync(CancellationToken.None);
+
+        await Should.ThrowAsync<InvalidOperationException>(() =>
+            provider.GetRequiredService<IMessageBus>().Publish(new TestMessage("retry")));
+
+        var operations = provider.GetServices<IBusHook>()
+            .OfType<RecordingHook>()
+            .Single()
+            .Events
+            .OfType<MessageOperationHookEvent>()
+            .ToArray();
+        var attempted = operations.Single(operation => operation.Kind == "retry_attempted");
+        attempted.RetryAttempt.ShouldBe(1);
+        attempted.RetryLimit.ShouldBe(1);
+        var exhausted = operations.Single(operation => operation.Kind == "retry_exhausted");
+        exhausted.RetryAttempt.ShouldBe(2);
+        exhausted.RetryLimit.ShouldBe(1);
+        RetryingConsumer.Attempts.ShouldBe(2);
+
+        await hostedService.StopAsync(CancellationToken.None);
+    }
+
+    [Fact]
     public void Monitoring_exporter_can_be_resolved_as_a_hook_without_a_bus_dependency_cycle()
     {
         var services = new ServiceCollection();
@@ -117,6 +154,17 @@ public class BusHookTests
     public sealed class TestConsumer : IConsumer<TestMessage>
     {
         public Task Consume(ConsumeContext<TestMessage> context) => Task.CompletedTask;
+    }
+
+    public sealed class RetryingConsumer : IConsumer<TestMessage>
+    {
+        public static int Attempts { get; set; }
+
+        public Task Consume(ConsumeContext<TestMessage> context)
+        {
+            Attempts++;
+            throw new InvalidOperationException("retry failure");
+        }
     }
 
     public sealed class RecordingHook : IBusHook

@@ -36,7 +36,9 @@ public sealed record MessageOperationHookEvent(
     string? CorrelationId,
     string? ConversationId,
     string? TraceId,
-    string? SpanId) : BusHookEvent(OccurredAtUtc)
+    string? SpanId,
+    int? RetryAttempt,
+    int? RetryLimit) : BusHookEvent(OccurredAtUtc)
 {
     public static MessageOperationHookEvent Create(
         string kind,
@@ -48,7 +50,9 @@ public sealed record MessageOperationHookEvent(
         TimeSpan duration,
         Exception? exception = null,
         string? correlationId = null,
-        string? conversationId = null)
+        string? conversationId = null,
+        int? retryAttempt = null,
+        int? retryLimit = null)
     {
         var activity = Activity.Current;
         return new MessageOperationHookEvent(
@@ -65,7 +69,44 @@ public sealed record MessageOperationHookEvent(
             correlationId,
             conversationId,
             activity?.TraceId.ToString(),
-            activity?.SpanId.ToString());
+            activity?.SpanId.ToString(),
+            retryAttempt,
+            retryLimit);
+    }
+}
+
+internal sealed class BusHookRetryObserver : IRetryObserver
+{
+    private readonly IBusHookDispatcher dispatcher;
+
+    public BusHookRetryObserver(IBusHookDispatcher dispatcher)
+    {
+        this.dispatcher = dispatcher;
+    }
+
+    public void Observe(RetryEvent retryEvent)
+    {
+        if (!dispatcher.IsEnabled || retryEvent.Context is not ConsumeContext context)
+            return;
+
+        var message = retryEvent.Context.GetType().GetProperty("Message")?.GetValue(retryEvent.Context);
+        if (message is null)
+            return;
+
+        var messageType = message.GetType();
+        dispatcher.Dispatch(MessageOperationHookEvent.Create(
+            retryEvent.Exhausted ? "retry_exhausted" : "retry_attempted",
+            false,
+            messageType.FullName ?? messageType.Name,
+            MessageUrn.For(messageType),
+            null,
+            null,
+            TimeSpan.Zero,
+            retryEvent.Exception,
+            context.CorrelationId?.ToString(),
+            context.ConversationId?.ToString(),
+            retryEvent.Attempt,
+            retryEvent.RetryLimit));
     }
 }
 

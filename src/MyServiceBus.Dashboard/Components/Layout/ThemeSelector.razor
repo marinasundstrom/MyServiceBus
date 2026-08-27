@@ -1,0 +1,32 @@
+@inject IJSRuntime JavaScript
+@rendermode InteractiveServer
+
+<label class="theme-selector">
+    <span>Theme</span>
+    <select value="@theme" @onchange="ChangeThemeAsync" aria-label="Dashboard theme">
+        <option value="system">System</option>
+        <option value="dark">Dark</option>
+        <option value="light">Light</option>
+    </select>
+</label>
+
+@code {
+    private string theme = "system";
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        theme = await JavaScript.InvokeAsync<string>("dashboardTheme.get");
+        StateHasChanged();
+    }
+
+    private async Task ChangeThemeAsync(ChangeEventArgs args)
+    {
+        theme = args.Value?.ToString() ?? "system";
+        await JavaScript.InvokeVoidAsync("dashboardTheme.set", theme);
+    }
+}

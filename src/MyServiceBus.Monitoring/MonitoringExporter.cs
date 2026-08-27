@@ -163,7 +163,8 @@ public sealed class MonitoringExporter : BackgroundService, IBusHook
             options.BusId,
             startedAtUtc,
             DateTimeOffset.UtcNow,
-            serviceProvider.GetRequiredService<IBusInspectionProvider>().GetSnapshot());
+            serviceProvider.GetRequiredService<IBusInspectionProvider>().GetSnapshot(),
+            new Dictionary<string, string>(options.Labels, StringComparer.Ordinal));
         using var response = await httpClient.PostAsJsonAsync("/api/monitoring/v1/metadata", metadata, cancellationToken).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
     }
@@ -241,5 +242,7 @@ public sealed class MonitoringExporter : BackgroundService, IBusHook
             busEvent.CorrelationId,
             busEvent.ConversationId,
             busEvent.TraceId,
-            busEvent.SpanId);
+            busEvent.SpanId,
+            busEvent.RetryAttempt,
+            busEvent.RetryLimit);
 }

@@ -178,6 +178,9 @@ public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigura
         serviceCollection.addSingleton(TopologyRegistry.class, sp -> () -> topology);
         serviceCollection.addSingleton(TransportCapabilityRequirements.class, sp -> () -> capabilityRequirements);
         serviceCollection.addSingleton(com.myservicebus.topology.BusTopology.class, sp -> () -> topology);
+        if (serviceCollection.getDescriptors().stream().anyMatch(d -> d.getServiceType().equals(BusHook.class))) {
+            serviceCollection.addMultiBinding(RetryObserver.class, BusHookRetryObserver.class);
+        }
         serviceCollection.addSingleton(SendPipe.class, sp -> () -> new SendPipe(sendConfigurator.build(sp)));
         serviceCollection.addSingleton(PublishPipe.class, sp -> () -> new PublishPipe(publishConfigurator.build(sp)));
         serviceCollection.addSingleton(com.myservicebus.serialization.MessageSerializer.class, sp -> () -> {

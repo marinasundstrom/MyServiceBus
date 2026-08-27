@@ -116,6 +116,7 @@ public class BusRegistrationConfigurator : IBusRegistrationConfigurator
         Services.AddSingleton(_topology);
         Services.AddSingleton<IBusTopology>(_ => _topology);
         Services.AddSingleton<IBusHookDispatcher, BusHookDispatcher>();
+        Services.AddSingleton<IRetryObserver, BusHookRetryObserver>();
         Services.AddSingleton<IPostBuildAction>(_ => new ConsumerRegistrationAction(_topology));
         Services.AddSingleton<ISendPipe>((sp) => new SendPipe(sendConfigurator.Build(sp)));
         Services.AddSingleton<IPublishPipe>((sp) => new PublishPipe(publishConfigurator.Build(sp)));

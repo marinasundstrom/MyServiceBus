@@ -8,6 +8,8 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.Collection;
+import java.util.List;
 
 import com.myservicebus.tasks.CancellationRegistration;
 
@@ -17,12 +19,18 @@ import com.myservicebus.tasks.CancellationRegistration;
 public class RetryFilter<TContext extends PipeContext> implements Filter<TContext> {
     private final int retryCount;
     private final Duration delay;
+    private final Collection<RetryObserver> observers;
 
     public RetryFilter(int retryCount, Duration delay) {
+        this(retryCount, delay, List.of());
+    }
+
+    public RetryFilter(int retryCount, Duration delay, Collection<RetryObserver> observers) {
         if (retryCount < 0)
             throw new IllegalArgumentException("retryCount");
         this.retryCount = retryCount;
         this.delay = delay;
+        this.observers = observers == null ? List.of() : List.copyOf(observers);
     }
 
     @Override
@@ -42,6 +50,7 @@ public class RetryFilter<TContext extends PipeContext> implements Filter<TContex
             if (ex == null) {
                 promise.complete(null);
             } else if (remaining > 0) {
+                notifyObservers(context, retryCount - remaining + 1, false, unwrap(ex));
                 Runnable retry = () -> attempt(context, next, remaining - 1, promise);
                 if (delay != null && !delay.isZero()) {
                     ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
@@ -73,8 +82,27 @@ public class RetryFilter<TContext extends PipeContext> implements Filter<TContex
                     retry.run();
                 }
             } else {
+                notifyObservers(context, retryCount + 1, true, unwrap(ex));
                 promise.completeExceptionally(ex);
             }
         });
+    }
+
+    private void notifyObservers(TContext context, int attempt, boolean exhausted, Throwable exception) {
+        RetryEvent retryEvent = new RetryEvent(context, attempt, retryCount, exhausted, delay, exception);
+        for (RetryObserver observer : observers) {
+            try {
+                observer.observe(retryEvent);
+            } catch (RuntimeException ignored) {
+                // Retry observers are diagnostic and cannot change retry behavior.
+            }
+        }
+    }
+
+    private static Throwable unwrap(Throwable throwable) {
+        if (throwable instanceof java.util.concurrent.CompletionException && throwable.getCause() != null) {
+            return throwable.getCause();
+        }
+        return throwable;
     }
 }

@@ -67,7 +67,10 @@ public class PipeConfigurator<TContext>
             configuration["delayMilliseconds"] = delay.Value.TotalMilliseconds.ToString(CultureInfo.InvariantCulture);
 
         AddFilter(
-            _ => new RetryFilter<TContext>(retryCount, delay),
+            provider => new RetryFilter<TContext>(
+                retryCount,
+                delay,
+                provider?.GetServices<IRetryObserver>()),
             "retry",
             typeof(RetryFilter<TContext>),
             FilterLifetime.Pipe,
