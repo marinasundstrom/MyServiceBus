@@ -58,6 +58,6 @@ export RUN_AZURE_SERVICEBUS_CLOUD_TESTS=1
 export AZURE_SERVICEBUS_CLOUD_CONNECTION_STRING="$connection_string"
 
 dotnet test test/MyServiceBus.AzureServiceBus.Tests/MyServiceBus.AzureServiceBus.Tests.csproj \
-  --filter FullyQualifiedName~AzureServiceBusCloudAcceptanceTests
+  --filter "FullyQualifiedName~AzureServiceBusCloudAcceptanceTests|FullyQualifiedName~MassTransitAzureServiceBusInteropTests"
 gradle :myservicebus-azure-service-bus:test --rerun-tasks \
   --tests com.myservicebus.azure.servicebus.AzureServiceBusCloudTest

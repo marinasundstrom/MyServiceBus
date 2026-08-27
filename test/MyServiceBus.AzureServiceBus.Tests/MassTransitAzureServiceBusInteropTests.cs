@@ -1,4 +1,5 @@
 using Azure.Messaging.ServiceBus;
+using Azure.Messaging.ServiceBus.Administration;
 using MassTransit;
 using MyServiceBus.Topology;
 using TestApp;
@@ -14,20 +15,22 @@ public sealed class MassTransitAzureServiceBusInteropTests
     [AzureServiceBusCloudFact]
     public async Task MassTransit_send_is_consumed_by_Csharp_MyServiceBus()
     {
-        await PurgeQueue("msb-direct");
+        var suffix = Guid.NewGuid().ToString("N")[..12];
+        var queueName = $"msb-mt-csharp-{suffix}";
+        var topicName = $"msb-mt-message-{suffix}";
+        var administrationClient = new ServiceBusAdministrationClient(ConnectionString);
         await using var client = new ServiceBusClient(ConnectionString);
         var configurator = new AzureServiceBusFactoryConfigurator();
         configurator.Host(ConnectionString);
-        configurator.UsePreProvisionedTopology();
         var factory = new AzureServiceBusTransportFactory(client, configurator);
         var received = new TaskCompletionSource<CrossLanguageMessage>(
             TaskCreationOptions.RunContinuationsAsynchronously);
         var topology = new ReceiveEndpointTransportTopology(
-            "msb-direct",
+            queueName,
             durable: true,
             temporary: false,
             prefetchCount: 1,
-            [new MessageBinding { MessageType = typeof(CrossLanguageMessage), EntityName = "msb-compatibility-message" }]);
+            [new MessageBinding { MessageType = typeof(CrossLanguageMessage), EntityName = topicName }]);
         var receiveTransport = await factory.CreateReceiveTransport(
             topology,
             context =>
@@ -44,7 +47,7 @@ public sealed class MassTransitAzureServiceBusInteropTests
         await bus.StartAsync(startTimeout.Token);
         try
         {
-            var endpoint = await bus.GetSendEndpoint(new Uri("queue:msb-direct"));
+            var endpoint = await bus.GetSendEndpoint(new Uri($"queue:{queueName}"));
             await endpoint.Send(new CrossLanguageMessage { Value = "masstransit-to-csharp" });
 
             var message = await received.Task.WaitAsync(TimeSpan.FromSeconds(20));
@@ -54,27 +57,32 @@ public sealed class MassTransitAzureServiceBusInteropTests
         {
             await bus.StopAsync();
             await receiveTransport.Stop();
+            await DeleteTopology(administrationClient, queueName, topicName);
         }
     }
 
     [AzureServiceBusCloudFact]
     public async Task MassTransit_send_is_consumed_by_Java_MyServiceBus()
     {
-        await PurgeQueue("msb-direct");
+        var suffix = Guid.NewGuid().ToString("N")[..12];
+        var queueName = $"msb-mt-java-{suffix}";
+        var topicName = $"msb-mt-message-{suffix}";
+        var administrationClient = new ServiceBusAdministrationClient(ConnectionString);
         using var javaPeer = AzureServiceBusJavaInteropPeer.Start(
             ConnectionString,
-            "azure-consume",
-            "msb-direct",
-            "msb-compatibility-message",
-            "masstransit-to-java");
-        await AzureServiceBusJavaInteropPeer.WaitForOutput(javaPeer, "READY", TimeSpan.FromMinutes(2));
+            "azure-consume-value",
+            queueName,
+            topicName,
+            "masstransit-to-java",
+            createTopology: true);
         var bus = MassTransit.Bus.Factory.CreateUsingAzureServiceBus(cfg => cfg.Host(ConnectionString));
 
-        using var startTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-        await bus.StartAsync(startTimeout.Token);
         try
         {
-            var endpoint = await bus.GetSendEndpoint(new Uri("queue:msb-direct"));
+            await AzureServiceBusJavaInteropPeer.WaitForOutput(javaPeer, "READY", TimeSpan.FromMinutes(2));
+            using var startTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            await bus.StartAsync(startTimeout.Token);
+            var endpoint = await bus.GetSendEndpoint(new Uri($"queue:{queueName}"));
             await endpoint.Send(new CrossLanguageMessage { Value = "masstransit-to-java" });
 
             await AzureServiceBusJavaInteropPeer.WaitForOutput(javaPeer, "RECEIVED", TimeSpan.FromSeconds(20));
@@ -84,17 +92,37 @@ public sealed class MassTransitAzureServiceBusInteropTests
         finally
         {
             await bus.StopAsync();
+            if (!javaPeer.HasExited)
+                javaPeer.Kill(entireProcessTree: true);
+            await DeleteTopology(administrationClient, queueName, topicName);
         }
     }
 
-    private static async Task PurgeQueue(string queueName)
+    private static async Task DeleteTopology(
+        ServiceBusAdministrationClient administrationClient,
+        string queueName,
+        string topicName)
     {
-        await using var client = new ServiceBusClient(ConnectionString);
-        await using var receiver = client.CreateReceiver(
-            queueName,
-            new ServiceBusReceiverOptions { ReceiveMode = ServiceBusReceiveMode.ReceiveAndDelete });
-        while ((await receiver.ReceiveMessagesAsync(100, TimeSpan.FromMilliseconds(250))).Count > 0)
-        {
-        }
+        await DeleteQueueIfExists(administrationClient, queueName);
+        await DeleteQueueIfExists(administrationClient, queueName + "_error");
+        await DeleteQueueIfExists(administrationClient, queueName + "_skipped");
+        await DeleteTopicIfExists(administrationClient, topicName);
+        await DeleteTopicIfExists(administrationClient, queueName + "_fault");
+    }
+
+    private static async Task DeleteQueueIfExists(
+        ServiceBusAdministrationClient administrationClient,
+        string queueName)
+    {
+        if ((await administrationClient.QueueExistsAsync(queueName)).Value)
+            await administrationClient.DeleteQueueAsync(queueName);
+    }
+
+    private static async Task DeleteTopicIfExists(
+        ServiceBusAdministrationClient administrationClient,
+        string topicName)
+    {
+        if ((await administrationClient.TopicExistsAsync(topicName)).Value)
+            await administrationClient.DeleteTopicAsync(topicName);
     }
 }

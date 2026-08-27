@@ -114,8 +114,10 @@ The repeatable live-test procedure is:
 2. Run `eng/run-azure-servicebus-cloud-tests.sh --ephemeral` for an isolated
    acceptance run, or provision once and use the runner without an argument for
    the persistent development namespace.
-3. Let the C# gate finish before the Java gate; both use unique entity names and
-   remove their queues, topics, and subscriptions in test cleanup.
+3. Let the .NET-hosted gate finish before the standalone Java gate. The first
+   also launches the Java interoperability peer for the pinned MassTransit
+   producer cases. Every case uses unique entity names and removes its queues,
+   topics, and subscriptions in test cleanup.
 4. Confirm that both gates report success. They verify Create-mode topology,
    publish/forward/consume behavior, correlated request/response, and the
    five-minute native auto-delete setting on temporary response queues.
@@ -160,9 +162,8 @@ AZURE_SERVICEBUS_CLOUD_CONNECTION_STRING='<connection-string>' \
   --tests com.myservicebus.azure.servicebus.AzureServiceBusCloudTest
 ```
 
-The separate MassTransit cloud gate remains available through the
-`MassTransitAzureServiceBusInteropTests` .NET filter and currently expects its
-fixed fixture topology to be provisioned.
+The self-provisioning MassTransit cloud cases are included by the runner. To run
+only those cases, use the `MassTransitAzureServiceBusInteropTests` .NET filter.
 
 See the fixture README and the [Azure Service Bus transport profile](azure-service-bus-transport.md)
 for its topology, connection string, sequential-test constraint, and cloud

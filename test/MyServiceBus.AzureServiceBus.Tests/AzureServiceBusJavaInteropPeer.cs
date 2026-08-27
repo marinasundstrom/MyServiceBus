@@ -9,7 +9,8 @@ internal static class AzureServiceBusJavaInteropPeer
         string mode,
         string queueOrEntity,
         string bindingOrUnused,
-        string value)
+        string value,
+        bool createTopology = false)
     {
         var startInfo = new ProcessStartInfo
         {
@@ -24,6 +25,8 @@ internal static class AzureServiceBusJavaInteropPeer
         startInfo.ArgumentList.Add(":interop-test-peer:run");
         startInfo.ArgumentList.Add($"--args={mode} {queueOrEntity} {bindingOrUnused} {value}");
         startInfo.Environment["AZURE_SERVICEBUS_CONNECTION_STRING"] = connectionString;
+        if (createTopology)
+            startInfo.Environment["AZURE_SERVICEBUS_CREATE_TOPOLOGY"] = "1";
 
         return Process.Start(startInfo)
             ?? throw new InvalidOperationException("Failed to start the Java interoperability peer.");

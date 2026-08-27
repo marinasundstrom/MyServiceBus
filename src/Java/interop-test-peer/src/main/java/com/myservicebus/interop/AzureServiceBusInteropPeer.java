@@ -47,21 +47,24 @@ final class AzureServiceBusInteropPeer {
     static void run(String[] args) throws Exception {
         if (args.length != 4) {
             throw new IllegalArgumentException(
-                    "Expected: <azure-consume|azure-send|azure-publish|azure-respond|azure-request> "
+                    "Expected: <azure-consume|azure-consume-value|azure-send|azure-publish|azure-respond|azure-request> "
                             + "<queue-or-entity> <binding-or-unused> <value>");
         }
 
         String connectionString = requiredEnvironment("AZURE_SERVICEBUS_CONNECTION_STRING");
         AzureServiceBusFactoryConfigurator configurator = new AzureServiceBusFactoryConfigurator();
         configurator.host(connectionString);
-        configurator.usePreProvisionedTopology();
+        if (!"1".equals(System.getenv("AZURE_SERVICEBUS_CREATE_TOPOLOGY"))) {
+            configurator.usePreProvisionedTopology();
+        }
         configurator.setTemporaryEndpointNameFormatter(ignored -> "msb-response");
         AzureServiceBusTransportFactory transportFactory = new AzureServiceBusTransportFactory(
                 configurator,
                 LoggerFactoryBuilder.create(builder -> builder.addConsole()));
 
         switch (args[0]) {
-            case "azure-consume" -> consume(transportFactory, args[1], args[2], args[3]);
+            case "azure-consume" -> consume(transportFactory, args[1], args[2], args[3], true);
+            case "azure-consume-value" -> consume(transportFactory, args[1], args[2], args[3], false);
             case "azure-send" -> send(transportFactory, args[1], args[3], false);
             case "azure-publish" -> send(transportFactory, args[1], args[3], true);
             case "azure-respond" -> respond(connectionString, args[1], args[2], args[3]);
@@ -74,7 +77,8 @@ final class AzureServiceBusInteropPeer {
             AzureServiceBusTransportFactory transportFactory,
             String queueName,
             String bindingEntityName,
-            String expectedValue) throws Exception {
+            String expectedValue,
+            boolean validateMetadata) throws Exception {
         MessageBinding binding = new MessageBinding();
         binding.setMessageType(CrossLanguageMessage.class);
         binding.setEntityName(bindingEntityName);
@@ -90,7 +94,7 @@ final class AzureServiceBusInteropPeer {
         ReceiveTransport receiveTransport = transportFactory.createReceiveTransport(
                 topology,
                 transportMessage -> deserialize(
-                        transportMessage.getBody(), transportMessage.getHeaders(), mapper, received),
+                        transportMessage.getBody(), transportMessage.getHeaders(), mapper, received, validateMetadata),
                 MessageUrn.forClass(CrossLanguageMessage.class)::equals);
 
         receiveTransport.start();
@@ -113,25 +117,28 @@ final class AzureServiceBusInteropPeer {
             byte[] body,
             Map<String, Object> transportHeaders,
             ObjectMapper mapper,
-            CompletableFuture<String> received) {
+            CompletableFuture<String> received,
+            boolean validateMetadata) {
         try {
             Envelope<CrossLanguageMessage> envelope = mapper.readValue(body, new TypeReference<>() { });
-            requireEqual(REQUEST_ID, envelope.getRequestId(), "envelope requestId");
-            requireEqual(CORRELATION_ID, envelope.getCorrelationId(), "envelope correlationId");
-            requireEqual(CONVERSATION_ID, envelope.getConversationId(), "envelope conversationId");
-            requireEqual(INITIATOR_ID, envelope.getInitiatorId(), "envelope initiatorId");
-            requireEqual(RESPONSE_ADDRESS, envelope.getResponseAddress(), "envelope responseAddress");
-            requireEqual(FAULT_ADDRESS, envelope.getFaultAddress(), "envelope faultAddress");
-            requireEqual(SOURCE_ADDRESS, envelope.getSourceAddress(), "envelope sourceAddress");
-            requireEqual(HEADER_VALUE, envelope.getHeaders().get("cross-language-header"), "envelope header");
-            requireEqual(NATIVE_MESSAGE_ID, transportHeaders.get("message_id"), "native messageId");
-            requireEqual(CORRELATION_ID.toString(), transportHeaders.get("correlation_id"),
-                    "native correlationId");
-            requireEqual(RESPONSE_ADDRESS, transportHeaders.get("reply_to"), "native replyTo");
-            requireEqual(SUBJECT, transportHeaders.get("subject"), "native subject");
-            requireEqual(TO, transportHeaders.get("to"), "native to");
-            requireEqual(EXPIRATION, transportHeaders.get("expiration"), "native expiration");
-            requireEqual(HEADER_VALUE, transportHeaders.get("cross-language-header"), "application property");
+            if (validateMetadata) {
+                requireEqual(REQUEST_ID, envelope.getRequestId(), "envelope requestId");
+                requireEqual(CORRELATION_ID, envelope.getCorrelationId(), "envelope correlationId");
+                requireEqual(CONVERSATION_ID, envelope.getConversationId(), "envelope conversationId");
+                requireEqual(INITIATOR_ID, envelope.getInitiatorId(), "envelope initiatorId");
+                requireEqual(RESPONSE_ADDRESS, envelope.getResponseAddress(), "envelope responseAddress");
+                requireEqual(FAULT_ADDRESS, envelope.getFaultAddress(), "envelope faultAddress");
+                requireEqual(SOURCE_ADDRESS, envelope.getSourceAddress(), "envelope sourceAddress");
+                requireEqual(HEADER_VALUE, envelope.getHeaders().get("cross-language-header"), "envelope header");
+                requireEqual(NATIVE_MESSAGE_ID, transportHeaders.get("message_id"), "native messageId");
+                requireEqual(CORRELATION_ID.toString(), transportHeaders.get("correlation_id"),
+                        "native correlationId");
+                requireEqual(RESPONSE_ADDRESS, transportHeaders.get("reply_to"), "native replyTo");
+                requireEqual(SUBJECT, transportHeaders.get("subject"), "native subject");
+                requireEqual(TO, transportHeaders.get("to"), "native to");
+                requireEqual(EXPIRATION, transportHeaders.get("expiration"), "native expiration");
+                requireEqual(HEADER_VALUE, transportHeaders.get("cross-language-header"), "application property");
+            }
             received.complete(envelope.getMessage().getValue());
             return CompletableFuture.completedFuture(null);
         } catch (Exception exception) {

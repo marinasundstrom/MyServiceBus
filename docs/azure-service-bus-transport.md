@@ -276,8 +276,7 @@ both clients where applicable:
 - [x] startup rejection for unsupported transport options
 - [x] C# and Java live-Azure topology creation, publication, forwarding, and consumption
 - [x] C# and Java live-Azure request/response with native auto-delete response queues
-- [ ] C# and Java consumption of messages produced by the pinned MassTransit Azure
-  Service Bus peer (an opt-in cloud gate is checked in; cloud execution evidence
-  is still required)
+- [x] C# and Java consumption of messages produced by the pinned MassTransit Azure
+  Service Bus peer on self-provisioned live-Azure topology
 
 Compatibility claims remain scoped to scenarios with executable evidence.
