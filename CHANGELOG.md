@@ -21,6 +21,7 @@ This changelog summarizes the bigger themes in the repository history. It is int
 - Extended the live gate with corresponding C# and Java correlated request/response scenarios that inspect native temporary response queues and verify their auto-delete configuration.
 - Made the pinned MassTransit live-Azure gate self-provisioning and collision-free, and verified its messages are consumed by both the C# and Java MyServiceBus clients.
 - Made per-message entity-name configuration authoritative for publication and transport-composed requests in both implementations, including corresponding RabbitMQ resolution, after live Azure exposed the previous default-name fallback.
+- Added live Azure delivery-lock renewal coverage for C# and Java using handlers that outlive the entities' initial locks, with single-delivery and settlement verification.
 
 ### Documentation website
 

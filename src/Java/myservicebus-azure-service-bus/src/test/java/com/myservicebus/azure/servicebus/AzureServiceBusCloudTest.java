@@ -2,6 +2,7 @@ package com.myservicebus.azure.servicebus;
 
 import com.azure.messaging.servicebus.administration.ServiceBusAdministrationClient;
 import com.azure.messaging.servicebus.administration.ServiceBusAdministrationClientBuilder;
+import com.azure.messaging.servicebus.administration.models.CreateQueueOptions;
 import com.myservicebus.GenericRequestClient;
 import com.myservicebus.MessageBus;
 import com.myservicebus.RequestClient;
@@ -16,7 +17,10 @@ import java.net.URI;
 import java.time.Duration;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -127,6 +131,58 @@ class AzureServiceBusCloudTest {
         }
     }
 
+    @Test
+    void javaReceiverRenewsTheLockDuringLongProcessing() throws Exception {
+        String connectionString = cloudConnectionString();
+        String suffix = UUID.randomUUID().toString().replace("-", "").substring(0, 12);
+        String queueName = "msb-lock-java-" + suffix;
+        String topicName = "msb-lock-message-" + suffix;
+        AtomicInteger attempts = new AtomicInteger();
+        CompletableFuture<Void> processed = new CompletableFuture<>();
+        ServiceBusAdministrationClient administrationClient = new ServiceBusAdministrationClientBuilder()
+                .connectionString(connectionString)
+                .buildClient();
+        administrationClient.createQueue(
+                queueName,
+                new CreateQueueOptions().setLockDuration(Duration.ofSeconds(5)));
+        MessageBus bus = MessageBus.factory.create(AzureServiceBusFactoryConfigurator.class, cfg -> {
+            cfg.host(connectionString);
+            cfg.message(CloudMessage.class, message -> message.setEntityName(topicName));
+            cfg.receiveEndpoint(queueName, endpoint ->
+                    endpoint.handler(CloudMessage.class, context -> {
+                        attempts.incrementAndGet();
+                        return CompletableFuture.runAsync(() -> {
+                            try {
+                                Thread.sleep(Duration.ofSeconds(12).toMillis());
+                                processed.complete(null);
+                            } catch (InterruptedException exception) {
+                                Thread.currentThread().interrupt();
+                                throw new CompletionException(exception);
+                            }
+                        });
+                    }));
+        });
+
+        try {
+            bus.start();
+            CloudMessage message = new CloudMessage();
+            message.setValue("java-lock-renewal");
+            bus.publish(message).get(30, TimeUnit.SECONDS);
+
+            processed.get(30, TimeUnit.SECONDS);
+            waitForQueueToDrain(administrationClient, queueName, Duration.ofSeconds(10));
+
+            assertEquals(1, attempts.get());
+        } finally {
+            bus.stop();
+            deleteQueueIfExists(administrationClient, queueName);
+            deleteQueueIfExists(administrationClient, queueName + "_error");
+            deleteQueueIfExists(administrationClient, queueName + "_skipped");
+            deleteTopicIfExists(administrationClient, topicName);
+            deleteTopicIfExists(administrationClient, queueName + "_fault");
+        }
+    }
+
     private static String cloudConnectionString() {
         String connectionString = System.getenv("AZURE_SERVICEBUS_CLOUD_CONNECTION_STRING");
         Assumptions.assumeTrue(
@@ -152,6 +208,21 @@ class AzureServiceBusCloudTest {
         if (administrationClient.getTopicExists(topicName)) {
             administrationClient.deleteTopic(topicName);
         }
+    }
+
+    private static void waitForQueueToDrain(
+            ServiceBusAdministrationClient administrationClient,
+            String queueName,
+            Duration timeout) throws Exception {
+        long deadline = System.nanoTime() + timeout.toNanos();
+        while (System.nanoTime() < deadline) {
+            if (administrationClient.getQueueRuntimeProperties(queueName).getActiveMessageCount() == 0) {
+                return;
+            }
+            Thread.sleep(250);
+        }
+        throw new TimeoutException(
+                "Azure Service Bus queue '" + queueName + "' did not drain within " + timeout);
     }
 
     private static String entityName(String address) {

@@ -113,6 +113,53 @@ public sealed class AzureServiceBusCloudAcceptanceTests
         }
     }
 
+    [AzureServiceBusCloudFact]
+    public async Task Csharp_receiver_renews_the_lock_during_long_processing()
+    {
+        var suffix = Guid.NewGuid().ToString("N")[..12];
+        var queueName = $"msb-lock-csharp-{suffix}";
+        var topicName = $"msb-lock-message-{suffix}";
+        var attempts = 0;
+        var processed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var administrationClient = new ServiceBusAdministrationClient(ConnectionString);
+        await administrationClient.CreateQueueAsync(new CreateQueueOptions(queueName)
+        {
+            LockDuration = TimeSpan.FromSeconds(5)
+        });
+        var bus = MessageBus.Factory.Create<AzureServiceBusFactoryConfigurator>(cfg =>
+        {
+            cfg.Host(ConnectionString);
+            cfg.Message<CloudMessage>(message => message.SetEntityName(topicName));
+            cfg.ReceiveEndpoint(queueName, endpoint =>
+                endpoint.Handler<CloudMessage>(async _ =>
+                {
+                    Interlocked.Increment(ref attempts);
+                    await Task.Delay(TimeSpan.FromSeconds(12));
+                    processed.TrySetResult();
+                }));
+        });
+
+        try
+        {
+            await bus.StartAsync(CancellationToken.None);
+            await bus.Publish(new CloudMessage { Value = "csharp-lock-renewal" });
+
+            await processed.Task.WaitAsync(TimeSpan.FromSeconds(30));
+            await WaitForQueueToDrain(administrationClient, queueName, TimeSpan.FromSeconds(10));
+
+            Assert.Equal(1, Volatile.Read(ref attempts));
+        }
+        finally
+        {
+            await bus.StopAsync(CancellationToken.None);
+            await DeleteQueueIfExists(administrationClient, queueName);
+            await DeleteQueueIfExists(administrationClient, queueName + "_error");
+            await DeleteQueueIfExists(administrationClient, queueName + "_skipped");
+            await DeleteTopicIfExists(administrationClient, topicName);
+            await DeleteTopicIfExists(administrationClient, queueName + "_fault");
+        }
+    }
+
     private static async Task DeleteQueueIfExists(
         ServiceBusAdministrationClient administrationClient,
         string queueName)
@@ -127,6 +174,26 @@ public sealed class AzureServiceBusCloudAcceptanceTests
     {
         if ((await administrationClient.TopicExistsAsync(topicName)).Value)
             await administrationClient.DeleteTopicAsync(topicName);
+    }
+
+    private static async Task WaitForQueueToDrain(
+        ServiceBusAdministrationClient administrationClient,
+        string queueName,
+        TimeSpan timeout)
+    {
+        using var cancellation = new CancellationTokenSource(timeout);
+        while (!cancellation.IsCancellationRequested)
+        {
+            var properties = (await administrationClient.GetQueueRuntimePropertiesAsync(
+                queueName,
+                cancellation.Token)).Value;
+            if (properties.ActiveMessageCount == 0)
+                return;
+
+            await Task.Delay(TimeSpan.FromMilliseconds(250), cancellation.Token);
+        }
+
+        throw new TimeoutException($"Azure Service Bus queue '{queueName}' did not drain within {timeout}.");
     }
 
     private static string EntityName(string address) =>

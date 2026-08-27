@@ -119,6 +119,7 @@ The repeatable live-test procedure is:
    producer cases. Every case uses unique entity names and removes its queues,
    topics, and subscriptions in test cleanup.
 4. Confirm that both gates report success. They verify Create-mode topology,
+   delivery-lock renewal while a handler runs beyond the initial lock duration,
    publish/forward/consume behavior, correlated request/response, and the
    five-minute native auto-delete setting on temporary response queues.
 5. For persistent use, run the explicit `teardown` command when the namespace is

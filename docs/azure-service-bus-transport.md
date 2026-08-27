@@ -245,7 +245,7 @@ least:
 - [x] cloud topology creation from both clients
 - [x] cloud publish, subscription forwarding, and consumption from both clients
 - [x] correlated request/response and auto-delete response queues in both clients
-- lock renewal during a long-running consumer
+- [x] C# and Java delivery-lock renewal during a long-running consumer
 - `_error`/completion behavior across a transient failure
 - MassTransit interoperability on the pinned compatibility version
 
