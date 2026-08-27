@@ -5,7 +5,7 @@ name: Publish Maven Central preview
   workflow_dispatch:
     inputs:
       deployment_id:
-        description: Existing Maven Central deployment ID to resume polling without uploading again
+        description: Existing Maven Central deployment ID to resume acceptance checks without uploading again
         required: false
         type: string
 
@@ -119,7 +119,7 @@ jobs:
           fi
           echo "deployment-id=$deployment_id" >> "$GITHUB_OUTPUT"
 
-      - name: Wait for Maven Central publication
+      - name: Wait for Maven Central acceptance
         shell: bash
         env:
           OSSRH_USERNAME: ${{ secrets.OSSRH_USERNAME }}
@@ -129,7 +129,7 @@ jobs:
           test -n "$DEPLOYMENT_ID"
           authorization="$(printf '%s:%s' "$OSSRH_USERNAME" "$OSSRH_TOKEN" | base64 | tr -d '\n')"
           echo "::add-mask::$authorization"
-          for attempt in $(seq 1 240); do
+          for attempt in $(seq 1 120); do
             response="$(curl --fail-with-body --silent --show-error \
               --request POST \
               --header "Authorization: Bearer $authorization" \
@@ -137,14 +137,15 @@ jobs:
             state="$(jq --raw-output '.deploymentState' <<< "$response")"
             echo "Maven Central deployment state: $state"
             case "$state" in
-              PUBLISHED)
+              PUBLISHING|PUBLISHED)
+                echo "Maven Central accepted the deployment; publication may continue asynchronously."
                 exit 0
                 ;;
               FAILED)
                 jq '.errors' <<< "$response"
                 exit 1
                 ;;
-              PENDING|VALIDATING|VALIDATED|PUBLISHING)
+              PENDING|VALIDATING|VALIDATED)
                 sleep 15
                 ;;
               *)
@@ -153,5 +154,5 @@ jobs:
                 ;;
             esac
           done
-          echo "Timed out waiting for Maven Central deployment $DEPLOYMENT_ID." >&2
+          echo "Timed out waiting for Maven Central to accept deployment $DEPLOYMENT_ID." >&2
           exit 1
