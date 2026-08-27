@@ -4,6 +4,13 @@ This changelog summarizes the bigger themes in the repository history. It is int
 
 ## Unreleased
 
+### Documentation website
+
+- Added a focused public documentation website with a C#/Java switch for the introduction and getting-started examples.
+- Curated the published information architecture around core messaging concepts, RabbitMQ, testing, and verified interoperability while keeping development documentation repository-only.
+- Added an independently triggered GitHub Pages deployment workflow that does not restore, build, test, or release the .NET and Java projects.
+- Added a browser-only light/dark theme switch that respects the visitor's system preference and remembers an explicit choice locally.
+
 ### Stable cross-language topology foundation
 
 - Added corresponding versioned topology snapshots for C# and Java with stable identities, logical endpoint addresses, and canonical conformance fixtures.

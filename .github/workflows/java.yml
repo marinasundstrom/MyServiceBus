@@ -6,10 +6,14 @@ name: Java CI
     branches: [main, dev]
     paths-ignore:
       - '**/*.md'
+      - 'website/**'
+      - '.github/workflows/deploy-website.yml'
   pull_request:
     branches: [main, dev]
     paths-ignore:
       - '**/*.md'
+      - 'website/**'
+      - '.github/workflows/deploy-website.yml'
   workflow_dispatch:
 
 jobs:
