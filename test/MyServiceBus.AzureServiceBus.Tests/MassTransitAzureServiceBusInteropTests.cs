@@ -165,6 +165,87 @@ public sealed class MassTransitAzureServiceBusInteropTests
     }
 
     [AzureServiceBusCloudFact]
+    public async Task Csharp_MyServiceBus_direct_send_is_consumed_by_MassTransit()
+    {
+        var queueName = $"msb-csharp-send-mt-{Guid.NewGuid():N}"[..32];
+        var administrationClient = new ServiceBusAdministrationClient(ConnectionString);
+        var received = new TaskCompletionSource<CrossLanguageMessage>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var massTransit = MassTransit.Bus.Factory.CreateUsingAzureServiceBus(cfg =>
+        {
+            cfg.Host(ConnectionString);
+            cfg.ReceiveEndpoint(queueName, endpoint =>
+                endpoint.Handler<CrossLanguageMessage>(context =>
+                {
+                    received.TrySetResult(context.Message);
+                    return Task.CompletedTask;
+                }));
+        });
+        var myServiceBus = MyServiceBus.MessageBus.Factory.Create<AzureServiceBusFactoryConfigurator>(cfg =>
+            cfg.Host(ConnectionString));
+
+        await massTransit.StartAsync(CancellationToken.None);
+        await myServiceBus.StartAsync(CancellationToken.None);
+        try
+        {
+            var endpoint = await myServiceBus.GetSendEndpoint(new Uri($"queue:{queueName}"));
+            await endpoint.Send(new CrossLanguageMessage { Value = "csharp-send-to-masstransit" });
+
+            var message = await received.Task.WaitAsync(TimeSpan.FromSeconds(20));
+            Assert.Equal("csharp-send-to-masstransit", message.Value);
+        }
+        finally
+        {
+            await myServiceBus.StopAsync(CancellationToken.None);
+            await massTransit.StopAsync();
+            await DeleteTopology(administrationClient, queueName, DefaultTopicName);
+        }
+    }
+
+    [AzureServiceBusCloudFact]
+    public async Task Java_MyServiceBus_direct_send_is_consumed_by_MassTransit()
+    {
+        var queueName = $"msb-java-send-mt-{Guid.NewGuid():N}"[..30];
+        var administrationClient = new ServiceBusAdministrationClient(ConnectionString);
+        var received = new TaskCompletionSource<CrossLanguageMessage>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var massTransit = MassTransit.Bus.Factory.CreateUsingAzureServiceBus(cfg =>
+        {
+            cfg.Host(ConnectionString);
+            cfg.ReceiveEndpoint(queueName, endpoint =>
+                endpoint.Handler<CrossLanguageMessage>(context =>
+                {
+                    received.TrySetResult(context.Message);
+                    return Task.CompletedTask;
+                }));
+        });
+
+        await massTransit.StartAsync(CancellationToken.None);
+        using var javaPeer = AzureServiceBusJavaInteropPeer.Start(
+            ConnectionString,
+            "azure-send-public",
+            queueName,
+            "unused",
+            "java-send-to-masstransit");
+        try
+        {
+            await AzureServiceBusJavaInteropPeer.WaitForOutput(javaPeer, "SENT", TimeSpan.FromMinutes(2));
+            await AzureServiceBusJavaInteropPeer.WaitForExit(javaPeer, TimeSpan.FromSeconds(10));
+            Assert.Equal(0, javaPeer.ExitCode);
+
+            var message = await received.Task.WaitAsync(TimeSpan.FromSeconds(20));
+            Assert.Equal("java-send-to-masstransit", message.Value);
+        }
+        finally
+        {
+            await massTransit.StopAsync();
+            if (!javaPeer.HasExited)
+                javaPeer.Kill(entireProcessTree: true);
+            await DeleteTopology(administrationClient, queueName, DefaultTopicName);
+        }
+    }
+
+    [AzureServiceBusCloudFact]
     public async Task MassTransit_send_is_consumed_by_Csharp_MyServiceBus()
     {
         var suffix = Guid.NewGuid().ToString("N")[..12];

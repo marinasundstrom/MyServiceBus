@@ -121,8 +121,8 @@ and bidirectional publication for both MyServiceBus clients. They use a
 corresponding `TestApp.CrossLanguageMessage` .NET type and
 `TestApp.CrossLanguageMessage` Java type, which both resolve to
 `TestApp/CrossLanguageMessage`. Explicit collision-free queues continue to keep
-the cloud cases isolated. Automatic endpoint and companion naming, directed
-send to MassTransit, and the complete request matrix remain experimental and
+the cloud cases isolated. Automatic endpoint and companion naming and the
+complete request matrix remain experimental and
 are listed below.
 
 ## Topology Projection
@@ -314,7 +314,7 @@ both clients where applicable:
   MassTransit Azure Service Bus conventions in C# and Java
 - [x] C# and Java default-named publish is consumed by MassTransit, and
   MassTransit default-named publish is consumed by both MyServiceBus clients
-- [ ] C# and Java directed send is consumed by MassTransit
+- [x] C# and Java directed send is consumed by MassTransit
 - [ ] bidirectional request/response and fault flows with MassTransit
 
 Compatibility claims remain scoped to scenarios with executable evidence.

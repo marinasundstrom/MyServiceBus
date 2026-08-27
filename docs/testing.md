@@ -125,7 +125,8 @@ The repeatable live-test procedure is:
    publish/forward/consume behavior, correlated request/response, and the
    five-minute native auto-delete setting on temporary response queues. The
    MassTransit cases additionally verify default message-topic naming and
-   bidirectional publication for both MyServiceBus clients.
+   bidirectional publication plus directed queue sends in every MassTransit and
+   MyServiceBus client direction.
 5. For persistent use, run the explicit `teardown` command when the namespace is
    no longer needed. Ephemeral runs do this automatically in an exit trap.
 

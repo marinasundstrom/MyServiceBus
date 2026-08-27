@@ -68,6 +68,7 @@ final class AzureServiceBusInteropPeer {
             case "azure-consume-value" -> consume(transportFactory, args[1], args[2], args[3], false);
             case "azure-consume-default" -> consumeDefault(connectionString, args[1], args[3]);
             case "azure-send" -> send(transportFactory, args[1], args[3], false);
+            case "azure-send-public" -> sendPublic(connectionString, args[1], args[3]);
             case "azure-publish" -> send(transportFactory, args[1], args[3], true);
             case "azure-publish-default" -> publishDefault(connectionString, args[3]);
             case "azure-respond" -> respond(connectionString, args[1], args[2], args[3]);
@@ -115,6 +116,22 @@ final class AzureServiceBusInteropPeer {
         bus.start();
         try {
             bus.publish(message).get(20, TimeUnit.SECONDS);
+            System.out.println("SENT");
+            System.out.flush();
+        } finally {
+            bus.stop();
+        }
+    }
+
+    private static void sendPublic(String connectionString, String queueName, String value) throws Exception {
+        MessageBus bus = MessageBus.factory.create(AzureServiceBusFactoryConfigurator.class, cfg ->
+                cfg.host(connectionString));
+        CrossLanguageMessage message = new CrossLanguageMessage();
+        message.setValue(value);
+
+        bus.start();
+        try {
+            bus.getSendEndpoint("queue:" + queueName).send(message).get(20, TimeUnit.SECONDS);
             System.out.println("SENT");
             System.out.flush();
         } finally {

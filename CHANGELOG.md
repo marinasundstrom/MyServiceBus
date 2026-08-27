@@ -25,6 +25,7 @@ This changelog summarizes the bigger themes in the repository history. It is int
 - Defined bidirectional MassTransit interoperability and matching transport naming as promotion requirements for every supported broker profile, and published the experimental Azure Service Bus status and evidence on the documentation website.
 - Aligned the default Azure Service Bus message-entity formatter with MassTransit in both clients, including namespace/package, nested-type, generic-type, and array conventions where the host type system exposes them, while keeping formatter configuration scoped to the transport.
 - Added live bidirectional default-name Azure publication between MassTransit and both MyServiceBus clients, using corresponding C# and Java contract identities and public client APIs.
+- Completed the live Azure directed-send matrix with public C# and Java MyServiceBus sends to MassTransit queues, complementing the verified reverse directions.
 
 ### Documentation website
 

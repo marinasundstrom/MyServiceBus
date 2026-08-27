@@ -17,6 +17,7 @@ export default function AzureServiceBus() {
         <li>Delivery-lock renewal during long-running C# and Java consumers</li>
         <li>MassTransit directed sends consumed by both MyServiceBus clients using explicit entity names</li>
         <li>Default message-topic naming and bidirectional publish with MassTransit for both clients</li>
+        <li>C# and Java directed queue sends consumed by MassTransit</li>
       </ul>
 
       <h2>MassTransit naming is a contract</h2>
@@ -25,7 +26,6 @@ export default function AzureServiceBus() {
       <h2>Remaining promotion gates</h2>
       <ul>
         <li>Default endpoint, subscription, and companion naming parity with the pinned MassTransit version</li>
-        <li>MyServiceBus directed sends consumed by MassTransit from both clients</li>
         <li>Bidirectional MassTransit request, response, and fault flows</li>
         <li>Cloud failure-copy and original-message completion behavior</li>
       </ul>
