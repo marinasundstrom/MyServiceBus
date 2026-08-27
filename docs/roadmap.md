@@ -135,6 +135,8 @@ The detailed checklist is defined in the [Mediator and In-Memory Stability Gate]
 
 Azure Service Bus is the recommended first candidate because topics, subscriptions, sessions, native dead-lettering, and scheduling exercise the capability model. Final selection should follow demonstrated user demand and maintainer access.
 
+The proposed [Azure Service Bus transport profile](azure-service-bus-transport.md) fixes the initial implementation and emulator-conformance boundary. A pinned, declaratively provisioned emulator fixture is available under `test/AzureServiceBusEmulator`; this design and test infrastructure does not yet constitute transport support.
+
 - Implement the adapter in C# and Java, or document a deliberately staged parity plan.
 - Define the MassTransit-compatible address and topology profile.
 - Add broker-specific capability constraints and configuration.

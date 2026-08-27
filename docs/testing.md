@@ -29,6 +29,24 @@ gradle test
 
 The first container-backed run may be slower while the RabbitMQ image is downloaded.
 
+## Azure Service Bus Emulator Fixture
+
+A pinned Docker Compose fixture under `test/AzureServiceBusEmulator` prepares
+the local topology for the proposed Azure Service Bus transport. The transport
+and its executable conformance suites are not implemented yet; the fixture
+exists so both clients can target the same broker configuration as that work
+begins.
+
+Validate the checked-in JSON and Compose configuration with:
+
+```bash
+sh eng/verify-servicebus-emulator.sh
+```
+
+See the fixture README and the [Azure Service Bus transport profile](azure-service-bus-transport.md)
+for its topology, connection string, sequential-test constraint, and cloud
+smoke-test boundary.
+
 ### Cross-language RabbitMQ matrix
 
 The interoperability matrix uses one Testcontainers broker per scenario. It covers C#↔Java and bidirectional envelope delivery, correlated request/response, correlated fault responses, retry exhaustion, and preservation in MassTransit-readable `_error` and `_skipped` queues for both reference clients and the pinned MassTransit version. Java scenarios launch the Java interoperability peer from the .NET test process. They require .NET, Java 17, Gradle, and Docker.

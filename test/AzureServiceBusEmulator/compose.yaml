@@ -1,0 +1,32 @@
+name: myservicebus-azure-service-bus-tests
+
+services:
+  emulator:
+    image: mcr.microsoft.com/azure-messaging/servicebus-emulator:2.0.1
+    ports:
+      - "5672:5672"
+      - "5300:5300"
+    environment:
+      ACCEPT_EULA: "Y"
+      EMULATOR_HTTP_PORT: "5300"
+      MSSQL_SA_PASSWORD: "${MSB_SERVICEBUS_SQL_PASSWORD:-MyServiceBus_Emulator1!}"
+      SQL_SERVER: mssql
+      SQL_WAIT_INTERVAL: "5"
+    volumes:
+      - ./config.json:/ServiceBus_Emulator/ConfigFiles/Config.json:ro
+    depends_on:
+      - mssql
+    networks:
+      - servicebus-emulator
+
+  mssql:
+    image: mcr.microsoft.com/mssql/server:2022-CU26-ubuntu-22.04
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_PID: Developer
+      MSSQL_SA_PASSWORD: "${MSB_SERVICEBUS_SQL_PASSWORD:-MyServiceBus_Emulator1!}"
+    networks:
+      - servicebus-emulator
+
+networks:
+  servicebus-emulator:

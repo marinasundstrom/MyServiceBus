@@ -1,6 +1,6 @@
 # Implementing a New Transport
 
-This guide walks through adding a new transport to MyServiceBus, using Azure Service Bus as an example. It highlights the common steps and the differences between the C# and Java implementations. For background on the overarching factory and fluent configuration approaches, see [configuration-patterns](../configuration-patterns.md).
+This guide walks through adding a new transport to MyServiceBus, using Azure Service Bus as an example. It highlights the common steps and the differences between the C# and Java implementations. For background on the overarching factory and fluent configuration approaches, see [configuration-patterns](../configuration-patterns.md). The proposed addressing, topology, settlement, and conformance rules for that example are defined in the [Azure Service Bus transport profile](../azure-service-bus-transport.md).
 
 ## 1. Define the Transport Factory
 
