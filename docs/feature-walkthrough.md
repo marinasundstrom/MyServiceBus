@@ -23,6 +23,7 @@ For Java build and run instructions, including JDK 17 setup and how to run the t
   - [Dependency Injection](#dependency-injection)
   - [Logging](#logging)
   - [OpenTelemetry](#opentelemetry)
+  - [Hooks and Runtime Monitoring](#hooks-and-runtime-monitoring)
   - [Health checks](#health-checks)
   - [Filters](#filters)
   - [Scheduling Messages](#scheduling-messages)
@@ -817,6 +818,75 @@ try (ServiceScope scope = provider.createScope()) {
 MyServiceBus automatically creates spans for send and consume operations and propagates W3C `traceparent` headers. Any active span when publishing or sending is injected into the message headers, and consumers create child spans from those headers. This mirrors MassTransit's OpenTelemetry integration so traces flow across both C# and Java services.
 
 For C# apps, OpenTelemetry must subscribe to the `MyServiceBus` activity source. The shared Aspire `AddServiceDefaults()` setup in this repository now does that automatically. If you configure OpenTelemetry manually, include `AddSource("MyServiceBus")` in your tracing setup or the bus spans and propagated trace headers will be missing.
+
+---
+
+### Hooks and Runtime Monitoring
+
+Hooks are general-purpose, read-only handlers for immutable bus lifecycle and message-operation events. They are not specific to the dashboard or collector. A hook may feed tests, diagnostics, an application-specific counter, or another addon. Hook exceptions are logged and isolated from messaging; implementations should still return quickly and must not perform remote I/O on the message-processing path.
+
+#### C# custom hook
+
+```csharp
+public sealed class AuditCounterHook : IBusHook
+{
+    public void Handle(BusHookEvent busEvent)
+    {
+        // Copy the immutable event into your own bounded buffer or counter.
+    }
+}
+
+builder.Services.AddServiceBus(cfg =>
+{
+    cfg.AddHook<AuditCounterHook>();
+    cfg.UsingRabbitMq((context, rabbit) => rabbit.ConfigureEndpoints(context));
+});
+```
+
+#### Java custom hook
+
+```java
+public final class AuditCounterHook implements BusHook {
+    @Override
+    public void handle(BusHookEvent busEvent) {
+        // Copy the immutable event into your own bounded buffer or counter.
+    }
+}
+
+services.from(MessageBusServices.class).addServiceBus(cfg -> {
+    cfg.addHook(AuditCounterHook.class);
+    cfg.using(RabbitMqFactoryConfigurator.class,
+            (context, rabbit) -> rabbit.configureEndpoints(context));
+});
+```
+
+MyServiceBus Monitoring is one optional hook integration. Its exporter copies events into a bounded local queue, batches them, and sends them to the central monitoring service. Applications do not retain queryable monitoring history and do not host monitoring endpoints.
+
+```csharp
+builder.Services.AddServiceBusMonitoring(options =>
+{
+    options.ServiceAddress = new Uri("http://localhost:5310");
+    options.ApplicationName = "Orders.Api";
+});
+```
+
+```java
+services.from(InspectionServices.class).addInspection();
+
+MonitoringExporterOptions options = new MonitoringExporterOptions();
+options.setServiceAddress(URI.create("http://localhost:5310"));
+options.setApplicationName("Orders.Api");
+MonitoringExporter exporter = MonitoringServices.addMonitoring(services, options);
+
+ServiceProvider provider = services.buildServiceProvider();
+MessageBus bus = provider.getRequiredService(MessageBus.class);
+bus.start();
+exporter.start(provider.getRequiredService(BusInspectionProvider.class));
+```
+
+The proof-of-concept service accepts metadata, observation batches, and heartbeats under `/api/monitoring/v1`. Its query API exposes applications, instances, metadata, recent observations, and a WebSocket invalidation stream at the same prefix. `MyServiceBus.Dashboard` is a separate Blazor application that consumes only those service APIs. OpenTelemetry collection remains separate; observations carry trace identifiers only as optional correlation references.
+
+See [Runtime Monitoring](runtime-monitoring.md) for the complete Aspire walkthrough, service API, deployment boundary, and current MVP limitations.
 
 ---
 

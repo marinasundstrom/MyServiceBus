@@ -6,29 +6,19 @@ using System.Linq;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Logging;
-using MyServiceBus.Inspection;
+using MyServiceBus.Monitoring;
 using OpenTelemetry.Trace;
 
 var builder = WebApplication.CreateBuilder(args);
-var inspectionState = new DashboardState();
-
-builder.Services.AddSingleton(inspectionState);
 
 builder.AddServiceDefaults();
 
 builder.Services.AddServiceBus(x =>
 {
-    x.ConfigureSend(cfg => cfg.UseFilter(new DashboardSendMetricsFilter(inspectionState)));
-    x.ConfigurePublish(cfg => cfg.UseFilter(new DashboardPublishMetricsFilter(inspectionState)));
-
-    x.AddConsumer<SubmitOrderConsumer, SubmitOrder>(cfg =>
-        cfg.UseFilter(new DashboardConsumeMetricsFilter<SubmitOrder>(inspectionState, "submit-order")));
-    x.AddConsumer<OrderSubmittedConsumer, OrderSubmitted>(cfg =>
-        cfg.UseFilter(new DashboardConsumeMetricsFilter<OrderSubmitted>(inspectionState, "order-submitted")));
-    x.AddConsumer<TestRequestConsumer, TestRequest>(cfg =>
-        cfg.UseFilter(new DashboardConsumeMetricsFilter<TestRequest>(inspectionState, "test-request")));
-    x.AddConsumer<SubmitOrderFaultConsumer, Fault<SubmitOrder>>(cfg =>
-        cfg.UseFilter(new DashboardConsumeMetricsFilter<Fault<SubmitOrder>>(inspectionState, "fault-submit-order")));
+    x.AddConsumer<SubmitOrderConsumer>();
+    x.AddConsumer<OrderSubmittedConsumer>();
+    x.AddConsumer<TestRequestConsumer>();
+    x.AddConsumer<SubmitOrderFaultConsumer>();
 
     x.UsingRabbitMq((context, cfg) =>
     {
@@ -52,9 +42,16 @@ builder.Services.AddServiceBus(x =>
     });
 });
 
+builder.Services.AddServiceBusMonitoring(options =>
+{
+    options.ServiceAddress = new Uri(
+        Environment.GetEnvironmentVariable("MONITORING_SERVICE_URL") ?? "http://localhost:5310");
+    options.ApplicationName = "TestApp.CSharp";
+    options.InstanceId = Environment.GetEnvironmentVariable("HOSTNAME") ?? Environment.MachineName;
+});
+
 builder.Services.AddHealthChecks()
     .AddMyServiceBus();
-builder.Services.AddServiceBusInspection();
 
 //builder.Services.AddHostedService<HostedService>();
 
@@ -83,10 +80,6 @@ app.MapHealthChecks("/health/ready", new HealthCheckOptions
 {
     Predicate = check => check.Tags.Contains("ready")
 });
-
-app.MapDashboardApi(new DashboardMetadata("TestApp", "rabbitmq"));
-
-app.Lifetime.ApplicationStarted.Register(() => inspectionState.MarkStarted(DateTime.UtcNow));
 
 var summaries = new[]
 {

@@ -38,6 +38,11 @@ public abstract class BusRegistrationConfiguratorDecorator implements BusRegistr
     }
 
     @Override
+    public void addHook(Class<? extends BusHook> hookClass) {
+        inner.addHook(hookClass);
+    }
+
+    @Override
     public void setSerializer(Class<? extends MessageSerializer> serializerClass) {
         inner.setSerializer(serializerClass);
     }

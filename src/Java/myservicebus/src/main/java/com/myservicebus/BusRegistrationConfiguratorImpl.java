@@ -88,6 +88,11 @@ public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigura
     }
 
     @Override
+    public void addHook(Class<? extends BusHook> hookClass) {
+        serviceCollection.addMultiBinding(BusHook.class, hookClass);
+    }
+
+    @Override
     public void setSerializer(Class<? extends com.myservicebus.serialization.MessageSerializer> serializerClass) {
         this.serializerClass = serializerClass;
     }

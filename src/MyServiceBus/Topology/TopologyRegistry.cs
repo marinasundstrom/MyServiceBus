@@ -51,6 +51,22 @@ public class TopologyRegistry : IBusTopology
         });
     }
 
+    public void MoveConsumerToEndpoint(ConsumerTopology consumer, string endpointName)
+    {
+        ArgumentNullException.ThrowIfNull(consumer);
+        ArgumentException.ThrowIfNullOrWhiteSpace(endpointName);
+
+        var previousEndpointName = consumer.QueueName;
+        consumer.QueueName = endpointName;
+        EnsureReceiveEndpoint(endpointName);
+
+        if (!string.Equals(previousEndpointName, endpointName, StringComparison.Ordinal)
+            && !Consumers.Any(x => !ReferenceEquals(x, consumer) && x.QueueName == previousEndpointName))
+        {
+            _receiveEndpoints.RemoveAll(x => x.Name == previousEndpointName);
+        }
+    }
+
     private void EnsureReceiveEndpoint(string endpointName)
     {
         if (_receiveEndpoints.Any(x => x.Name == endpointName))

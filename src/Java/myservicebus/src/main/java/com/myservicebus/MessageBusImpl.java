@@ -48,6 +48,7 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
     private final Set<String> consumerRegistrations = new HashSet<>();
     private final Set<String> messageTypes = new HashSet<>();
     private final Function<Class<?>, ConsumerFactory> consumerFactoryFactory;
+    private final BusHookDispatcher hooks;
     private volatile BusState state = BusState.STOPPED;
 
     public MessageBusImpl(ServiceProvider serviceProvider) {
@@ -65,6 +66,7 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
         LoggerFactory loggerFactory = serviceProvider.getService(LoggerFactory.class);
         this.logger = loggerFactory != null ? loggerFactory.create(MessageBusImpl.class) : null;
         this.sendLogger = loggerFactory != null ? loggerFactory.create(SendEndpointProviderImpl.class) : null;
+        this.hooks = new BusHookDispatcher(serviceProvider.getServices(BusHook.class), loggerFactory);
         MessageDeserializer md = serviceProvider.getService(MessageDeserializer.class);
         if (md == null) {
             md = new com.myservicebus.serialization.EnvelopeMessageDeserializer();
@@ -120,6 +122,7 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
             }
 
             state = BusState.STARTED;
+            hooks.dispatch(new BusLifecycleHookEvent(Instant.now(), "started", address.toString()));
             if (logger != null) {
                 logger.info("Service bus started");
             }
@@ -150,6 +153,10 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
 
         PipeConfigurator<ConsumeContext<Object>> configurator = new PipeConfigurator<>();
         configurator.useFilter(new OpenTelemetryConsumeFilter<>());
+        configurator.useFilter(new BusHookConsumeFilter<>(
+                hooks,
+                consumerDef.getQueueName(),
+                consumerDef.getBindings().get(0).getMessageType()));
         @SuppressWarnings({ "unchecked", "rawtypes" })
         Filter<ConsumeContext<Object>> errorFilter = new ErrorTransportFilter(serviceProvider);
         configurator.useFilter(errorFilter);
@@ -209,7 +216,7 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
                         faultAddress,
                         errorAddress,
                         CancellationToken.none(),
-                        provider,
+                        observeConsumerEndpoints(provider),
                         this.address,
                         this::getPublishAddress,
                         inboundMessage.getRequestId(),
@@ -246,6 +253,7 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
             java.util.Map<String, Object> queueArguments, MessageSerializer serializer) throws Exception {
         PipeConfigurator<ConsumeContext<T>> configurator = new PipeConfigurator<>();
         configurator.useFilter(new OpenTelemetryConsumeFilter<>());
+        configurator.useFilter(new BusHookConsumeFilter<>(hooks, queueName, messageType));
         @SuppressWarnings({ "unchecked", "rawtypes" })
         Filter<ConsumeContext<T>> errorFilter = new ErrorTransportFilter(serviceProvider);
         configurator.useFilter(errorFilter);
@@ -374,6 +382,7 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
                 }
             } finally {
                 state = BusState.STOPPED;
+                hooks.dispatch(new BusLifecycleHookEvent(Instant.now(), "stopped", address.toString()));
             }
         }
 
@@ -439,8 +448,28 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
             delayFuture = CompletableFuture.completedFuture(null);
         }
 
-        return delayFuture.thenCompose(v -> publishPipe.send(context).thenCompose(x ->
+        long startedAt = hooks.isEnabled() ? System.nanoTime() : 0;
+        CompletableFuture<Void> operation = delayFuture.thenCompose(v -> publishPipe.send(context).thenCompose(x ->
                 createSendEndpoint(address).send(context)));
+        if (!hooks.isEnabled()) {
+            return operation;
+        }
+
+        return operation.whenComplete((ignored, throwable) -> {
+                    Throwable failure = throwable instanceof java.util.concurrent.CompletionException && throwable.getCause() != null
+                            ? throwable.getCause()
+                            : throwable;
+                    hooks.dispatch(MessageOperationHookEvent.create(
+                            failure == null ? "published" : "publish_faulted",
+                            failure == null,
+                            context.getMessage().getClass(),
+                            null,
+                            context.getDestinationAddress().toString(),
+                            startedAt,
+                            failure,
+                            context.getCorrelationId() == null ? null : context.getCorrelationId().toString(),
+                            context.getConversationId() == null ? null : context.getConversationId().toString()));
+                });
     }
 
     public <T> CompletableFuture<Void> publish(T message) {
@@ -467,7 +496,27 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
 
     private SendEndpoint createSendEndpoint(String uri) {
         SendEndpoint endpoint = transportSendEndpointProvider.getSendEndpoint(uri);
-        return new LoggingSendEndpoint(endpoint, URI.create(uri), sendLogger);
+        endpoint = new LoggingSendEndpoint(endpoint, URI.create(uri), sendLogger);
+        return hooks.isEnabled()
+                ? new HookSendEndpoint(endpoint, URI.create(uri), hooks)
+                : endpoint;
+    }
+
+    private TransportSendEndpointProvider observeConsumerEndpoints(TransportSendEndpointProvider provider) {
+        if (!hooks.isEnabled()) {
+            return provider;
+        }
+        return new TransportSendEndpointProvider() {
+            @Override
+            public SendEndpoint getSendEndpoint(String uri) {
+                return new HookSendEndpoint(provider.getSendEndpoint(uri), URI.create(uri), hooks, true);
+            }
+
+            @Override
+            public TransportSendEndpointProvider withSerializer(MessageSerializer serializer) {
+                return observeConsumerEndpoints(provider.withSerializer(serializer));
+            }
+        };
     }
 
     boolean isStarted() {

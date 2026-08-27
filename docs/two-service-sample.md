@@ -10,7 +10,7 @@ From the repository root:
 dotnet run --project src/AspireApp
 ```
 
-The AppHost starts a disposable instance of the pinned RabbitMQ broker, runs the Java application through its Gradle task, and injects the broker host and dynamically resolved port into both services. The Aspire dashboard links to the .NET and Java HTTP endpoints and collects their OpenTelemetry data.
+The AppHost starts a disposable instance of the pinned RabbitMQ broker, the central MyServiceBus monitoring service, the standalone Blazor monitoring dashboard, and both sample applications. It injects the dynamically resolved broker and monitoring-service addresses into the clients. The Aspire dashboard still collects OpenTelemetry separately.
 
 The manual steps below remain useful when you do not want to run Aspire.
 
@@ -23,6 +23,15 @@ docker compose up rabbitmq
 ```
 
 ## 2. Run the .NET service
+
+First start the collector and optional dashboard in separate terminals:
+
+```bash
+dotnet run --project src/MyServiceBus.Monitoring.Server --urls http://localhost:5310
+dotnet run --project src/MyServiceBus.Dashboard
+```
+
+Then start the .NET client:
 
 ```bash
 dotnet run --project src/TestApp
@@ -41,6 +50,7 @@ gradle :testapp:run
 Notes:
 - `RABBITMQ_HOST` defaults to `localhost` if not set.
 - `HTTP_PORT` defaults to `5301` if not set.
+- `MONITORING_SERVICE_URL` defaults to `http://localhost:5310` in both clients.
 - See [`src/Java/README.md`](../src/Java/README.md) for full Java build and run details.
 
 The Java service listens on `http://localhost:5301`.
@@ -57,14 +67,8 @@ Both services expose the same endpoints:
 - `/request/fault`
 - `/request_multi`
 - `/request_multi/fault`
-- `/inspection/v1/overview`
-- `/inspection/v1/messages`
-- `/inspection/v1/consumers`
-- `/inspection/v1/topology`
-- `/inspection/v1/queues`
-- `/inspection/v1/metrics`
 
-The inspection routes return preview JSON snapshots that summarize the configured bus address, registered message contracts, consumer-to-queue bindings, and sample runtime metrics. These sample HTTP endpoints are not part of the stable MVP API.
+The applications no longer host inspection or monitoring APIs. Their optional exporters send metadata, heartbeats, and observation batches to the monitoring service. The dashboard queries that service for the combined C# and Java runtime view.
 
 The `.http` files for invoking them are:
 

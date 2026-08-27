@@ -12,12 +12,24 @@ var rabbitmq = builder.AddRabbitMQ("messaging", rabbitUser, rabbitPassword)
     .WithManagementPlugin()
     .WithImageTag("4.1.8-management-alpine");
 
+var monitoringService = builder.AddProject<MyServiceBus_Monitoring_Server>("monitoring-service")
+    .WithHttpEndpoint(name: "http")
+    .WithExternalHttpEndpoints();
+
+builder.AddProject<MyServiceBus_Dashboard>("monitoring-dashboard")
+    .WithHttpEndpoint(name: "http")
+    .WithEnvironment("MonitoringService", monitoringService.GetEndpoint("http"))
+    .WithExternalHttpEndpoints()
+    .WaitFor(monitoringService);
+
 var csharpTestApp = builder.AddProject<TestApp>("testapp")
     .WithReference(rabbitmq)
+    .WithEnvironment("MONITORING_SERVICE_URL", monitoringService.GetEndpoint("http"))
     .WithEnvironment("OTEL_EXPORTER_OTLP_METRICS_DEFAULT_HISTOGRAM_AGGREGATION", "explicit_bucket_histogram")
     .WithEnvironment("RABBITMQ_HOST", rabbitmq.Resource.PrimaryEndpoint.Property(EndpointProperty.Host))
     .WithEnvironment("RABBITMQ_PORT", rabbitmq.Resource.PrimaryEndpoint.Property(EndpointProperty.Port))
     .WithExternalHttpEndpoints()
+    .WaitFor(monitoringService)
     .WaitFor(rabbitmq);
 
 var massTransitTestApp = builder.AddProject<TestApp_MassTransit>("testapp-masstransit")
@@ -38,8 +50,10 @@ var javaTestApp = builder.AddExecutable(
     .WithEnvironment("OTEL_EXPORTER_OTLP_METRICS_DEFAULT_HISTOGRAM_AGGREGATION", "explicit_bucket_histogram")
     .WithEnvironment("RABBITMQ_HOST", rabbitmq.Resource.PrimaryEndpoint.Property(EndpointProperty.Host))
     .WithEnvironment("RABBITMQ_PORT", rabbitmq.Resource.PrimaryEndpoint.Property(EndpointProperty.Port))
+    .WithEnvironment("MONITORING_SERVICE_URL", monitoringService.GetEndpoint("http"))
     .WithReference(rabbitmq)
     .WithExternalHttpEndpoints()
+    .WaitFor(monitoringService)
     .WaitFor(rabbitmq);
 
 builder.Build().Run();

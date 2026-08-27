@@ -75,6 +75,20 @@ public class TopologySnapshotTests
         Assert.Equal("contracts-order-submitted", Assert.Single(topology.Bindings).EntityName);
     }
 
+    [Fact]
+    public void Moving_a_consumer_keeps_endpoint_topology_consistent()
+    {
+        var registry = new TopologyRegistry();
+        registry.RegisterConsumer<OrderConsumer>("order-consumer", null, typeof(OrderSubmitted));
+
+        registry.MoveConsumerToEndpoint(registry.Consumers.Single(), "orders");
+
+        var snapshot = ((IBusTopology)registry).GetSnapshot();
+        var endpoint = Assert.Single(snapshot.ReceiveEndpoints);
+        Assert.Equal("orders", endpoint.Name);
+        Assert.Equal(endpoint.Id, Assert.Single(snapshot.Consumers).EndpointId);
+    }
+
     private interface IOrderEvent;
 
     private sealed class OrderSubmitted : IOrderEvent;

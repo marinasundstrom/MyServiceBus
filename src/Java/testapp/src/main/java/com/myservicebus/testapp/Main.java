@@ -1,7 +1,9 @@
 package com.myservicebus.testapp;
 
 import io.javalin.Javalin;
+import java.net.URI;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.myservicebus.ExceptionInfo;
 import com.myservicebus.Fault;
@@ -16,21 +18,17 @@ import com.myservicebus.di.ServiceProvider;
 import com.myservicebus.di.ServiceScope;
 import com.myservicebus.inspection.BusInspectionProvider;
 import com.myservicebus.inspection.InspectionServices;
+import com.myservicebus.monitoring.MonitoringExporter;
+import com.myservicebus.monitoring.MonitoringExporterOptions;
+import com.myservicebus.monitoring.MonitoringServices;
 import com.myservicebus.rabbitmq.RabbitMqFactoryConfigurator;
 import com.myservicebus.logging.LogLevel;
 import com.myservicebus.logging.Logger;
 import com.myservicebus.logging.LoggerFactory;
 import com.myservicebus.logging.Logging;
-import com.myservicebus.testapp.dashboard.DashboardApi;
-import com.myservicebus.testapp.dashboard.DashboardMetricsFilters;
-import com.myservicebus.testapp.dashboard.DashboardMetadata;
-import com.myservicebus.testapp.dashboard.DashboardState;
-import java.time.Instant;
 
 public class Main {
     public static void main(String[] args) {
-        DashboardState inspectionState = new DashboardState();
-
         ServiceCollection services = ServiceCollection.create();
 
         // Configure logging provider Slf4j
@@ -43,19 +41,20 @@ public class Main {
         services.from(InspectionServices.class)
                 .addInspection();
 
+        MonitoringExporterOptions monitoringOptions = new MonitoringExporterOptions();
+        monitoringOptions.setServiceAddress(URI.create(
+                System.getenv().getOrDefault("MONITORING_SERVICE_URL", "http://localhost:5310")));
+        monitoringOptions.setApplicationName("TestApp.Java");
+        MonitoringExporter monitoringExporter = MonitoringServices.addMonitoring(services, monitoringOptions);
+
         String rabbitMqHost = System.getenv().getOrDefault("RABBITMQ_HOST", "localhost");
         int rabbitMqPort = Integer.parseInt(System.getenv().getOrDefault("RABBITMQ_PORT", "5672"));
 
         services.from(MessageBusServices.class)
                 .addServiceBus(c -> {
-                    c.configureSend(cfg -> cfg.useFilter(new DashboardMetricsFilters.SendMetricsFilter(inspectionState)));
-                    c.configurePublish(cfg -> cfg.useFilter(new DashboardMetricsFilters.PublishMetricsFilter(inspectionState)));
-                    c.addConsumer(SubmitOrderConsumer.class, SubmitOrder.class,
-                            cfg -> cfg.useFilter(new DashboardMetricsFilters.ConsumeMetricsFilter<>(inspectionState, "submit-order", SubmitOrder.class)));
-                    c.addConsumer(OrderSubmittedConsumer.class, OrderSubmitted.class,
-                            cfg -> cfg.useFilter(new DashboardMetricsFilters.ConsumeMetricsFilter<>(inspectionState, "order-submitted", OrderSubmitted.class)));
-                    c.addConsumer(TestRequestConsumer.class, TestRequest.class,
-                            cfg -> cfg.useFilter(new DashboardMetricsFilters.ConsumeMetricsFilter<>(inspectionState, "test-request", TestRequest.class)));
+                    c.addConsumer(SubmitOrderConsumer.class);
+                    c.addConsumer(OrderSubmittedConsumer.class);
+                    c.addConsumer(TestRequestConsumer.class);
                     c.addConsumer(SubmitOrderFaultConsumer.class);
 
                     c.using(RabbitMqFactoryConfigurator.class, (context, cfg) -> {
@@ -92,10 +91,12 @@ public class Main {
         final Logger logger = loggerFactory != null ? loggerFactory.create(Main.class) : null;
         MessageBus serviceBus = provider.getRequiredService(MessageBus.class);
         BusInspectionProvider inspectionProvider = provider.getRequiredService(BusInspectionProvider.class);
+        AtomicBoolean started = new AtomicBoolean();
 
         try {
             serviceBus.start();
-            inspectionState.markStarted(Instant.now());
+            monitoringExporter.start(inspectionProvider);
+            started.set(true);
             logger.info("🚀 Test app started");
         } catch (Exception e) {
             logger.error("❌ Failed to start service bus", e);
@@ -105,8 +106,17 @@ public class Main {
         int httpPort = Integer.parseInt(System.getenv().getOrDefault("HTTP_PORT", "5301"));
         var app = Javalin.create().start(httpPort);
         app.get("/health/live", ctx -> ctx.status(200));
-        app.get("/health/ready", ctx -> ctx.status(inspectionState.isStarted() ? 200 : 503));
-        DashboardApi.register(app, inspectionProvider, new DashboardMetadata("TestApp", "rabbitmq"), inspectionState);
+        app.get("/health/ready", ctx -> ctx.status(started.get() ? 200 : 503));
+
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            started.set(false);
+            monitoringExporter.close();
+            try {
+                serviceBus.stop();
+            } catch (Exception exception) {
+                logger.error("Failed to stop service bus", exception);
+            }
+        }));
 
         app.get("/publish", ctx -> {
             try (ServiceScope scope = provider.createScope()) {

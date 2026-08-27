@@ -15,6 +15,7 @@ const sections = [
       ['Core concepts', '/docs/concepts'],
       ['RabbitMQ transport', '/docs/rabbitmq'],
       ['Azure Service Bus', '/docs/azure-service-bus'],
+      ['Runtime monitoring', '/docs/runtime-monitoring'],
       ['Testing', '/docs/testing'],
       ['Interoperability', '/docs/interoperability'],
     ],

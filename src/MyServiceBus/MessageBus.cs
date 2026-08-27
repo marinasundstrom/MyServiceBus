@@ -7,6 +7,7 @@ using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using Microsoft.Extensions.Logging;
+using System.Diagnostics;
 
 namespace MyServiceBus;
 
@@ -24,6 +25,7 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
     private readonly ILogger<MessageBus>? _logger;
     private readonly ISendContextFactory _sendContextFactory;
     private readonly IPublishContextFactory _publishContextFactory;
+    private readonly IBusHookDispatcher _hooks;
     private readonly SemaphoreSlim _lifecycleLock = new(1, 1);
     private volatile BusState _state = BusState.Stopped;
 
@@ -47,6 +49,8 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
         _logger = _serviceProvider.GetService<ILogger<MessageBus>>();
         _sendContextFactory = sendContextFactory;
         _publishContextFactory = publishContextFactory;
+        _hooks = _serviceProvider.GetService<IBusHookDispatcher>()
+            ?? new BusHookDispatcher(_serviceProvider.GetServices<IBusHook>(), _serviceProvider.GetService<ILogger<BusHookDispatcher>>());
     }
 
     public Uri Address => _address;
@@ -82,9 +86,19 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
                 await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
         }
 
-        await _publishPipe.Send(context);
-        await _sendPipe.Send(context);
-        await transport.Send(message, context, cancellationToken);
+        var startedAt = Stopwatch.GetTimestamp();
+        try
+        {
+            await _publishPipe.Send(context);
+            await _sendPipe.Send(context);
+            await transport.Send(message, context, cancellationToken);
+            DispatchMessageOperation("published", true, typeof(T), context, Stopwatch.GetElapsedTime(startedAt));
+        }
+        catch (Exception exception)
+        {
+            DispatchMessageOperation("publish_faulted", false, typeof(T), context, Stopwatch.GetElapsedTime(startedAt), exception);
+            throw;
+        }
     }
 
     public IPublishEndpoint GetPublishEndpoint() => this;
@@ -93,7 +107,7 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
     {
         var loggerFactory = _serviceProvider.GetService<ILoggerFactory>();
         var logger = loggerFactory?.CreateLogger<TransportSendEndpoint>();
-        ISendEndpoint endpoint = new TransportSendEndpoint(_transportFactory, _sendPipe, _messageSerializer, uri, _address, _sendContextFactory, logger, EnsureStarted);
+        ISendEndpoint endpoint = new TransportSendEndpoint(_transportFactory, _sendPipe, _messageSerializer, uri, _address, _sendContextFactory, logger, EnsureStarted, _hooks);
         return Task.FromResult(endpoint);
     }
 
@@ -114,6 +128,7 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
 
         var configurator = new PipeConfigurator<ConsumeContext<TMessage>>();
         configurator.UseFilter<OpenTelemetryConsumeFilter<TMessage>>();
+        configurator.UseFilter(new BusHookConsumeFilter<TMessage>(_hooks, queueName));
         var errorLogger = _serviceProvider.GetService<ILogger<ErrorTransportFilter<TMessage>>>();
         configurator.UseFilter(new ErrorTransportFilter<TMessage>(errorLogger));
         configurator.UseFilter(new HandlerFaultFilter<TMessage>(_serviceProvider));
@@ -124,7 +139,7 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
 
         async Task TransportHandler(ReceiveContext context)
         {
-            var consumeContext = new ConsumeContextImpl<TMessage>(context, _transportFactory, _sendPipe, _publishPipe, endpointSerializer, _address, _sendContextFactory, _publishContextFactory, _serviceProvider.GetService<ILoggerFactory>());
+            var consumeContext = new ConsumeContextImpl<TMessage>(context, _transportFactory, _sendPipe, _publishPipe, endpointSerializer, _address, _sendContextFactory, _publishContextFactory, _serviceProvider.GetService<ILoggerFactory>(), _hooks);
             await pipe.Send(consumeContext).ConfigureAwait(false);
         }
 
@@ -174,6 +189,7 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
 
         var configurator = new PipeConfigurator<ConsumeContext<TMessage>>();
         configurator.UseFilter<OpenTelemetryConsumeFilter<TMessage>>();
+        configurator.UseFilter(new BusHookConsumeFilter<TMessage>(_hooks, queueName));
         var errorLogger = _serviceProvider.GetService<ILogger<ErrorTransportFilter<TMessage>>>();
         configurator.UseFilter(new ErrorTransportFilter<TMessage>(errorLogger));
         configurator.UseFilter(new ConsumerFaultFilter<TConsumer, TMessage>(_serviceProvider));
@@ -218,6 +234,7 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
                 }
 
                 _state = BusState.Started;
+                _hooks.Dispatch(new BusLifecycleHookEvent(DateTimeOffset.UtcNow, "started", Address.ToString()));
             }
             catch
             {
@@ -234,6 +251,7 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
                 }
 
                 _state = BusState.Stopped;
+                _hooks.Dispatch(new BusLifecycleHookEvent(DateTimeOffset.UtcNow, "stopped", Address.ToString()));
                 throw;
             }
         }
@@ -260,6 +278,7 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
             finally
             {
                 _state = BusState.Stopped;
+                _hooks.Dispatch(new BusLifecycleHookEvent(DateTimeOffset.UtcNow, "stopped", Address.ToString()));
             }
         }
         finally
@@ -314,7 +333,8 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
                 _address,
                 _sendContextFactory,
                 _publishContextFactory,
-                _serviceProvider.GetService<ILoggerFactory>())
+                _serviceProvider.GetService<ILoggerFactory>(),
+                _hooks)
                 ?? throw new InvalidOperationException("Failed to create ConsumeContext");
 
             _logger?.LogDebug("Received {MessageType}", messageTypeName);
@@ -324,4 +344,28 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
 
     private static bool IsRawSerializer(IMessageSerializer serializer)
         => serializer.EnvelopeMode == MessageEnvelopeMode.Raw;
+
+    private void DispatchMessageOperation(
+        string kind,
+        bool succeeded,
+        Type messageType,
+        SendContext context,
+        TimeSpan duration,
+        Exception? exception = null)
+    {
+        if (!_hooks.IsEnabled)
+            return;
+
+        _hooks.Dispatch(MessageOperationHookEvent.Create(
+            kind,
+            succeeded,
+            messageType.FullName ?? messageType.Name,
+            MessageUrn.For(messageType),
+            null,
+            context.DestinationAddress?.ToString(),
+            duration,
+            exception,
+            context.CorrelationId,
+            context.ConversationId?.ToString()));
+    }
 }

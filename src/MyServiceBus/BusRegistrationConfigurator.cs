@@ -84,6 +84,11 @@ public class BusRegistrationConfigurator : IBusRegistrationConfigurator
         configure(publishConfigurator);
     }
 
+    public void AddHook<THook>() where THook : class, IBusHook
+    {
+        Services.AddSingleton<IBusHook, THook>();
+    }
+
     public void SetSerializer<TSerializer>() where TSerializer : class, IMessageSerializer
     {
         serializerType = typeof(TSerializer);
@@ -110,6 +115,7 @@ public class BusRegistrationConfigurator : IBusRegistrationConfigurator
 
         Services.AddSingleton(_topology);
         Services.AddSingleton<IBusTopology>(_ => _topology);
+        Services.AddSingleton<IBusHookDispatcher, BusHookDispatcher>();
         Services.AddSingleton<IPostBuildAction>(_ => new ConsumerRegistrationAction(_topology));
         Services.AddSingleton<ISendPipe>((sp) => new SendPipe(sendConfigurator.Build(sp)));
         Services.AddSingleton<IPublishPipe>((sp) => new PublishPipe(publishConfigurator.Build(sp)));

@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed
+Experimental MVP implemented and validated end to end through the Aspire stack. The current proof of concept covers general-purpose hooks, C# and Java exporters, in-memory collection and query APIs, WebSocket invalidations, and a standalone Blazor overview. Retry-specific observations, flow reconstruction, authentication, payload-byte limits, persistence, time-window rates, and external telemetry links remain future work. See [Runtime Monitoring](../runtime-monitoring.md) for setup and the current operational boundary.
 
 ## Recommendation
 

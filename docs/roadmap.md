@@ -105,16 +105,18 @@ The detailed checklist is defined in the [Mediator and In-Memory Stability Gate]
 
 ## Phase 3: Inspection and Monitoring APIs
 
-**Outcome:** applications and tools can discover and observe a running MyServiceBus instance without coupling the core to a UI.
+**Outcome:** applications and tools can discover and observe a distributed MyServiceBus system without coupling clients to a UI or local monitoring store.
 
 - Complete first-party inspection addons for C# and Java.
 - Stabilize language-neutral DTOs for services, instances, endpoints, consumers, contracts, versions, and capabilities.
 - Implement the monitoring addon described in the monitoring proposal.
-- Capture aggregate runtime state and high-signal records for retries, faults, skipped messages, and moves to error.
+- Expose general-purpose immutable hooks that any application or addon can implement.
+- Keep collector-specific batching and export in the optional monitoring integration.
+- Capture aggregate runtime state and high-signal records for retries, faults, skipped messages, and moves to error in a central service.
 - Keep health endpoints and OpenTelemetry integrations distinct but discoverable.
 - Define optional registration or heartbeat events for aggregating multiple runtime instances.
 
-**Exit criteria:** equivalent C# and Java services expose compatible inspection and monitoring snapshots, and consumers can use the programmatic APIs without HTTP.
+**Exit criteria:** equivalent C# and Java clients export compatible metadata and observations, and the central service exposes a programmatic distributed runtime model.
 
 ## Phase 4: Read-Only Dashboard
 
@@ -124,7 +126,7 @@ The detailed checklist is defined in the [Mediator and In-Memory Stability Gate]
 - Show services, instances, endpoints, consumers, contracts, and producer/consumer relationships.
 - Show compatibility and capability warnings.
 - Show retries, faults, skipped messages, error moves, and links to traces.
-- Add an optional registry/collector for multi-instance discovery and historical monitoring.
+- Extend the central monitoring service with optional historical persistence.
 - Define optional broker-metrics adapters for queue depth and broker-native health.
 
 **Exit criteria:** the dashboard can visualize a mixed C#/Java system and remains useful when broker administration APIs are unavailable.

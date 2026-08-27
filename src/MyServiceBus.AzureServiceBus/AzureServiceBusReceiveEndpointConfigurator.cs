@@ -63,7 +63,7 @@ public sealed class AzureServiceBusReceiveEndpointConfigurator
 
             var registry = context.ServiceProvider.GetRequiredService<TopologyRegistry>();
             var consumer = registry.Consumers.First(c => c.ConsumerType == consumerType);
-            consumer.QueueName = _queueName;
+            registry.MoveConsumerToEndpoint(consumer, _queueName);
             foreach (var binding in consumer.Bindings)
             {
                 binding.EntityName = _entityNameResolver(binding.MessageType);

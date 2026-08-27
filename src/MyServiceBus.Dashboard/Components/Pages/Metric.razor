@@ -1,0 +1,15 @@
+<div class="metric @(Alert && Value > 0 ? "alert" : null)">
+    <span>@Label</span>
+    <strong>@Value.ToString("N0")</strong>
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public required string Label { get; set; }
+
+    [Parameter]
+    public long Value { get; set; }
+
+    [Parameter]
+    public bool Alert { get; set; }
+}

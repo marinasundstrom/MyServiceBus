@@ -1,0 +1,144 @@
+@page "/"
+@rendermode InteractiveServer
+@implements IAsyncDisposable
+@inject MonitoringApiClient Api
+
+<PageTitle>MyServiceBus Monitoring</PageTitle>
+
+<section class="hero">
+    <div>
+        <p class="eyebrow">Distributed messaging, live</p>
+        <h1>Runtime overview</h1>
+        <p class="lede">Applications export bus metadata and activity to the central monitoring service.</p>
+    </div>
+    <div class="connection @(_error is null ? "online" : "offline")">
+        <span></span>
+        @(_error is null ? "Monitoring service connected" : "Monitoring service unavailable")
+    </div>
+</section>
+
+@if (_applications.Count == 0)
+{
+    <section class="empty-state">
+        <h2>Waiting for applications</h2>
+        <p>Start an application with the monitoring exporter enabled. It will register itself automatically.</p>
+    </section>
+}
+else
+{
+    <section class="summary-grid">
+        @foreach (var application in _applications)
+        {
+            <article class="summary-card">
+                <div class="card-heading">
+                    <div>
+                        <p class="eyebrow">Application</p>
+                        <h2>@application.ApplicationName</h2>
+                    </div>
+                    <span class="pill">@application.OnlineInstances / @application.TotalInstances online</span>
+                </div>
+                <div class="metrics">
+                    <Metric Label="Sent" Value="application.Totals.Sent" />
+                    <Metric Label="Published" Value="application.Totals.Published" />
+                    <Metric Label="Consumed" Value="application.Totals.Consumed" />
+                    <Metric Label="Failures" Value="application.Totals.SendFaulted + application.Totals.PublishFaulted + application.Totals.ConsumeFaulted" Alert="true" />
+                </div>
+            </article>
+        }
+    </section>
+
+    <section class="instances">
+        <div class="section-heading">
+            <div>
+                <p class="eyebrow">Processes</p>
+                <h2>Application instances</h2>
+            </div>
+            <span>Updated @_updatedAt.ToLocalTime().ToString("HH:mm:ss")</span>
+        </div>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Status</th>
+                        <th>Application</th>
+                        <th>Client</th>
+                        <th>Transport</th>
+                        <th>Address</th>
+                        <th>Sent</th>
+                        <th>Published</th>
+                        <th>Consumed</th>
+                        <th>Faulted</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var instance in _instances)
+                    {
+                        <tr>
+                            <td><span class="status-dot @(instance.Online ? "online" : "offline")"></span>@(instance.Online ? "Online" : "Offline")</td>
+                            <td><strong>@instance.ApplicationName</strong><small>@instance.InstanceId</small></td>
+                            <td>@instance.ClientLanguage <small>@instance.ClientVersion</small></td>
+                            <td>@instance.TransportName</td>
+                            <td class="mono">@instance.BusAddress</td>
+                            <td>@instance.Totals.Sent</td>
+                            <td>@instance.Totals.Published</td>
+                            <td>@instance.Totals.Consumed</td>
+                            <td class="fault">@(instance.Totals.SendFaulted + instance.Totals.PublishFaulted + instance.Totals.ConsumeFaulted)</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </section>
+}
+
+@code {
+    private readonly CancellationTokenSource _stopping = new();
+    private IReadOnlyList<MonitoringApplicationSummary> _applications = [];
+    private IReadOnlyList<MonitoringInstanceSummary> _instances = [];
+    private DateTimeOffset _updatedAt = DateTimeOffset.UtcNow;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Refresh();
+        _ = Poll();
+    }
+
+    private async Task Poll()
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(2));
+        try
+        {
+            while (await timer.WaitForNextTickAsync(_stopping.Token))
+            {
+                await Refresh();
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+        catch (OperationCanceledException) when (_stopping.IsCancellationRequested)
+        {
+        }
+    }
+
+    private async Task Refresh()
+    {
+        try
+        {
+            _applications = await Api.GetApplications(_stopping.Token);
+            _instances = await Api.GetInstances(_stopping.Token);
+            _updatedAt = DateTimeOffset.UtcNow;
+            _error = null;
+        }
+        catch (HttpRequestException exception)
+        {
+            _error = exception.Message;
+        }
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        _stopping.Cancel();
+        _stopping.Dispose();
+        return ValueTask.CompletedTask;
+    }
+}

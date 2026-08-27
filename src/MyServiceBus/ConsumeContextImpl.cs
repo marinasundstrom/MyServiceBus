@@ -1,5 +1,6 @@
 using System;
 using System.Reflection;
+using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -19,11 +20,12 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
     private readonly ISendContextFactory _sendContextFactory;
     private readonly IPublishContextFactory _publishContextFactory;
     private readonly ILoggerFactory? _loggerFactory;
+    private readonly IBusHookDispatcher? _hooks;
     private TMessage? message;
 
     public ConsumeContextImpl(ReceiveContext receiveContext, ITransportFactory transportFactory,
         ISendPipe sendPipe, IPublishPipe publishPipe, IMessageSerializer messageSerializer, Uri address,
-        ISendContextFactory sendContextFactory, IPublishContextFactory publishContextFactory, ILoggerFactory? loggerFactory = null)
+        ISendContextFactory sendContextFactory, IPublishContextFactory publishContextFactory, ILoggerFactory? loggerFactory = null, IBusHookDispatcher? hooks = null)
         : base(receiveContext.CancellationToken)
     {
         this.receiveContext = receiveContext;
@@ -35,6 +37,7 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
         _sendContextFactory = sendContextFactory;
         _publishContextFactory = publishContextFactory;
         _loggerFactory = loggerFactory;
+        _hooks = hooks;
     }
 
     internal ReceiveContext ReceiveContext => receiveContext;
@@ -49,7 +52,7 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
     public Task<ISendEndpoint> GetSendEndpoint(Uri uri)
     {
         var logger = _loggerFactory?.CreateLogger<TransportSendEndpoint>();
-        ISendEndpoint endpoint = new TransportSendEndpoint(_transportFactory, _sendPipe, _messageSerializer, uri, _address, _sendContextFactory, logger);
+        ISendEndpoint endpoint = new TransportSendEndpoint(_transportFactory, _sendPipe, _messageSerializer, uri, _address, _sendContextFactory, logger, hooks: _hooks);
         return Task.FromResult(endpoint);
     }
 
@@ -76,12 +79,21 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
         context.DestinationAddress = uri;
         context.RoutingKey = exchangeName;
 
-        contextCallback?.Invoke(context);
-
-        await _publishPipe.Send(context);
-        await _sendPipe.Send(context);
-        var typed = message is T t ? t : (T)MessageProxy.Create(typeof(T), message);
-        await transport.Send(typed, context, effectiveCancellationToken);
+        var startedAt = Stopwatch.GetTimestamp();
+        try
+        {
+            contextCallback?.Invoke(context);
+            await _publishPipe.Send(context);
+            await _sendPipe.Send(context);
+            var typed = message is T t ? t : (T)MessageProxy.Create(typeof(T), message);
+            await transport.Send(typed, context, effectiveCancellationToken);
+            Dispatch("published", true, typeof(T), context, startedAt);
+        }
+        catch (Exception exception)
+        {
+            Dispatch("publish_faulted", false, typeof(T), context, startedAt, exception);
+            throw;
+        }
     }
 
     public async Task RespondAsync<T>(T message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default) where T : class
@@ -104,11 +116,20 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
         context.SourceAddress = _address;
         context.DestinationAddress = address;
 
-        contextCallback?.Invoke(context);
-
-        await _sendPipe.Send(context);
-        var typed = message is T t ? t : (T)MessageProxy.Create(typeof(T), message);
-        await transport.Send(typed, context, cancellationToken);
+        var startedAt = Stopwatch.GetTimestamp();
+        try
+        {
+            contextCallback?.Invoke(context);
+            await _sendPipe.Send(context);
+            var typed = message is T t ? t : (T)MessageProxy.Create(typeof(T), message);
+            await transport.Send(typed, context, cancellationToken);
+            Dispatch("sent", true, typeof(T), context, startedAt);
+        }
+        catch (Exception exception)
+        {
+            Dispatch("send_faulted", false, typeof(T), context, startedAt, exception);
+            throw;
+        }
     }
 
     internal async Task RespondFaultAsync(Exception exception, CancellationToken cancellationToken = default)
@@ -136,8 +157,18 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
         context.SourceAddress = _address;
         context.DestinationAddress = address;
 
-        await _sendPipe.Send(context);
-        await transport.Send(fault, context, cancellationToken);
+        var startedAt = Stopwatch.GetTimestamp();
+        try
+        {
+            await _sendPipe.Send(context);
+            await transport.Send(fault, context, cancellationToken);
+            Dispatch("fault_published", true, typeof(Fault<TMessage>), context, startedAt);
+        }
+        catch (Exception publishException)
+        {
+            Dispatch("fault_publish_faulted", false, typeof(Fault<TMessage>), context, startedAt, publishException);
+            throw;
+        }
     }
 
     public Task Send<T>(Uri address, T message, Action<ISendContext>? contextCallback = null,
@@ -180,5 +211,29 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
         MassTransitVersion = "your-custom-version",
         OperatingSystemVersion = Environment.OSVersion.VersionString
     };
+
+    private void Dispatch(
+        string kind,
+        bool succeeded,
+        Type messageType,
+        SendContext context,
+        long startedAt,
+        Exception? exception = null)
+    {
+        if (_hooks?.IsEnabled != true)
+            return;
+
+        _hooks?.Dispatch(MessageOperationHookEvent.Create(
+            kind,
+            succeeded,
+            messageType.FullName ?? messageType.Name,
+            MessageUrn.For(messageType),
+            null,
+            context.DestinationAddress?.ToString(),
+            Stopwatch.GetElapsedTime(startedAt),
+            exception,
+            context.CorrelationId,
+            context.ConversationId?.ToString()));
+    }
 
 }

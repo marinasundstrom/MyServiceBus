@@ -242,7 +242,7 @@ public class RabbitMqFactoryConfigurator implements BusFactoryConfigurator {
                         .orElseThrow(() -> new IllegalStateException(
                                 "Consumer " + consumerClass.getSimpleName() + " not registered"));
 
-                def.setQueueName(queueName);
+                registry.moveConsumerToEndpoint(def, queueName);
 
                 MessageBinding binding = def.getBindings().get(0);
                 String exchange = exchangeNames.get(binding.getMessageType());

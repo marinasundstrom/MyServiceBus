@@ -3,6 +3,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using MyServiceBus.Serialization;
+using System.Diagnostics;
 
 namespace MyServiceBus;
 
@@ -16,8 +17,9 @@ internal class TransportSendEndpoint : ISendEndpoint
     readonly ISendContextFactory _contextFactory;
     readonly ILogger<TransportSendEndpoint>? _logger;
     readonly Action? _ensureStarted;
+    readonly IBusHookDispatcher? _hooks;
 
-    public TransportSendEndpoint(ITransportFactory transportFactory, ISendPipe sendPipe, IMessageSerializer serializer, Uri address, Uri sourceAddress, ISendContextFactory contextFactory, ILogger<TransportSendEndpoint>? logger = null, Action? ensureStarted = null)
+    public TransportSendEndpoint(ITransportFactory transportFactory, ISendPipe sendPipe, IMessageSerializer serializer, Uri address, Uri sourceAddress, ISendContextFactory contextFactory, ILogger<TransportSendEndpoint>? logger = null, Action? ensureStarted = null, IBusHookDispatcher? hooks = null)
     {
         _transportFactory = transportFactory;
         _sendPipe = sendPipe;
@@ -27,6 +29,7 @@ internal class TransportSendEndpoint : ISendEndpoint
         _contextFactory = contextFactory;
         _logger = logger;
         _ensureStarted = ensureStarted;
+        _hooks = hooks;
     }
 
     public Task Send<T>(T message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default) where T : class
@@ -52,8 +55,36 @@ internal class TransportSendEndpoint : ISendEndpoint
                 await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
         }
 
-        await _sendPipe.Send(context);
-        var typed = message is T t ? t : (T)MessageProxy.Create(typeof(T), message);
-        await transport.Send(typed, context, cancellationToken);
+        var startedAt = Stopwatch.GetTimestamp();
+        try
+        {
+            await _sendPipe.Send(context);
+            var typed = message is T t ? t : (T)MessageProxy.Create(typeof(T), message);
+            await transport.Send(typed, context, cancellationToken);
+            Dispatch("sent", true, context, Stopwatch.GetElapsedTime(startedAt));
+        }
+        catch (Exception exception)
+        {
+            Dispatch("send_faulted", false, context, Stopwatch.GetElapsedTime(startedAt), exception);
+            throw;
+        }
+
+        void Dispatch(string kind, bool succeeded, SendContext sendContext, TimeSpan duration, Exception? exception = null)
+        {
+            if (_hooks?.IsEnabled != true)
+                return;
+
+            _hooks?.Dispatch(MessageOperationHookEvent.Create(
+                kind,
+                succeeded,
+                typeof(T).FullName ?? typeof(T).Name,
+                MessageUrn.For(typeof(T)),
+                null,
+                sendContext.DestinationAddress?.ToString(),
+                duration,
+                exception,
+                sendContext.CorrelationId,
+                sendContext.ConversationId?.ToString()));
+        }
     }
 }

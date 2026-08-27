@@ -57,7 +57,7 @@ public final class AzureServiceBusReceiveEndpointConfigurator {
                 .findFirst()
                 .orElseThrow(() -> new IllegalStateException(
                         "Consumer " + consumerClass.getSimpleName() + " is not registered"));
-        definition.setQueueName(queueName);
+        registry.moveConsumerToEndpoint(definition, queueName);
         for (MessageBinding binding : definition.getBindings()) {
             binding.setEntityName(entityNameResolver.apply(binding.getMessageType()));
         }

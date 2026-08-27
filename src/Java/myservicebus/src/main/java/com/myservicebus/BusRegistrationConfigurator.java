@@ -10,6 +10,7 @@ public interface BusRegistrationConfigurator {
     <TMessage, TConsumer extends com.myservicebus.Consumer<TMessage>> void addConsumer(Class<TConsumer> consumerClass, Class<TMessage> messageClass, java.util.function.Consumer<PipeConfigurator<ConsumeContext<TMessage>>> configure);
     void configureSend(java.util.function.Consumer<PipeConfigurator<SendContext>> configure);
     void configurePublish(java.util.function.Consumer<PipeConfigurator<PublishContext>> configure);
+    void addHook(Class<? extends BusHook> hookClass);
     void setSerializer(Class<? extends MessageSerializer> serializerClass);
     void setDeserializer(Class<? extends MessageDeserializer> deserializerClass);
     void requireTransportCapability(String capability, boolean requireNative);

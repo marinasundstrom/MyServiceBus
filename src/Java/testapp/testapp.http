@@ -31,33 +31,3 @@ GET {{JavaTestApp_HostAddress}}/request_multi
 GET {{JavaTestApp_HostAddress}}/request_multi/fault
 
 ###
-
-GET {{JavaTestApp_HostAddress}}/inspection/v1/overview
-Accept: application/json
-
-###
-
-GET {{JavaTestApp_HostAddress}}/inspection/v1/messages
-Accept: application/json
-
-###
-
-GET {{JavaTestApp_HostAddress}}/inspection/v1/consumers
-Accept: application/json
-
-###
-
-GET {{JavaTestApp_HostAddress}}/inspection/v1/topology
-Accept: application/json
-
-###
-
-GET {{JavaTestApp_HostAddress}}/inspection/v1/queues
-Accept: application/json
-
-###
-
-GET {{JavaTestApp_HostAddress}}/inspection/v1/metrics
-Accept: application/json
-
-###

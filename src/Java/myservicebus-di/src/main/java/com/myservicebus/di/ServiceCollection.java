@@ -47,4 +47,3 @@ public interface ServiceCollection extends Iterable<ServiceDescriptor> {
 
     ServiceProvider buildServiceProvider();
 }
-

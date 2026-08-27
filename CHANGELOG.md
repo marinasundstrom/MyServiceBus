@@ -8,6 +8,13 @@ Release candidate: `0.1.0-preview.2`.
 
 ### Runtime monitoring direction
 
+- Added an end-to-end monitoring proof of concept with a central in-memory service, HTTP ingestion and query APIs, WebSocket invalidations, and a standalone Blazor dashboard orchestrated through Aspire.
+- Added corresponding general-purpose immutable bus hooks for C# and Java; hook failures are isolated and the extension point is independent of the monitoring collector.
+- Added optional C# and Java monitoring exporters that self-register metadata, emit heartbeats, and batch observations through bounded local queues without placing remote I/O in the messaging pipeline.
+- Removed the sample applications' experimental embedded inspection endpoints and local dashboard state; both samples now export to the shared monitoring service.
+- Added collector aggregation, lease tracking, batch deduplication, recent observations, and C#/Java hook and exporter coverage.
+- Validated the complete Aspire stack with live C# and Java traffic, fault observations, trace correlation, HTTP queries, WebSocket invalidations, and the Blazor dashboard; fixed endpoint discovery, exporter lifetime/draining, topology remapping, and Java timestamp interoperability defects found by that exercise.
+- Added runtime-monitoring guides to the repository documentation and public documentation website, including the experimental MVP and production-readiness boundaries.
 - Proposed a collector-style monitoring pipeline in which optional C# and Java hook handlers enqueue bus metadata, heartbeats, and bounded observation batches for export to a central monitoring service.
 - Assigned instance registration, aggregation, flow analysis, query APIs, and all future persistence to the monitoring service while keeping client applications free of monitoring history.
 - Defined the standalone Blazor dashboard as a consumer of the monitoring query API and aligned the vocabulary with MassTransit's monitoring, observability, observer, metrics, flow, and dashboard terminology.

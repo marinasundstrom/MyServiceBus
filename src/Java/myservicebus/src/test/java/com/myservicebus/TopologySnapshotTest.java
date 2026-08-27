@@ -76,6 +76,20 @@ class TopologySnapshotTest {
         assertEquals("contracts-order-submitted", topology.bindings().get(0).getEntityName());
     }
 
+    @Test
+    void movingConsumerKeepsEndpointTopologyConsistent() {
+        TopologyRegistry registry = new TopologyRegistry();
+        registry.registerConsumer(OrderConsumer.class, "order-consumer", null, OrderSubmitted.class);
+
+        registry.moveConsumerToEndpoint(registry.getConsumers().get(0), "orders");
+
+        var snapshot = registry.getSnapshot();
+        var endpoint = snapshot.receiveEndpoints().get(0);
+        assertEquals(1, snapshot.receiveEndpoints().size());
+        assertEquals("orders", endpoint.name());
+        assertEquals(endpoint.id(), snapshot.consumers().get(0).endpointId());
+    }
+
     private interface OrderEvent {
     }
 

@@ -207,18 +207,21 @@ Operational features are first-party addons over stable programmatic contracts.
 
 ```mermaid
 flowchart LR
-    Runtime["Bus runtime"] --> Inspection["Inspection addon\nconfiguration and topology"]
-    Pipelines["Pipeline events"] --> Monitoring["Monitoring addon\nstate and event records"]
-    Inspection --> API["Programmatic operational API"]
-    Monitoring --> API
-    BrokerAdapter["Optional broker metrics adapter"] -.-> API
-    API --> HTTP["Optional HTTP adapter"]
-    API --> CLI["CLI and support tools"]
-    API --> Dashboard["Read-only dashboard"]
-    Telemetry["OpenTelemetry"] --> Dashboard
+    Runtime["Bus runtime"] --> Inspection["Immutable bus metadata"]
+    Pipelines["Pipeline events"] --> Hooks["General-purpose hooks"]
+    Inspection --> Exporter["Optional monitoring exporter\nbounded local batches"]
+    Hooks --> Exporter
+    Exporter --> Service["Monitoring service\ndistributed runtime model"]
+    BrokerAdapter["Optional broker metrics adapter"] -.-> Service
+    Service --> Query["HTTP query API"]
+    Service --> Live["WebSocket invalidations"]
+    Query --> CLI["CLI and support tools"]
+    Query --> Dashboard["Standalone read-only dashboard"]
+    Live --> Dashboard
+    Telemetry["External OpenTelemetry backend"] -.-> Dashboard
 ```
 
-Inspection describes configured endpoints, consumers, contracts, instances, versions, and capabilities. Monitoring describes activity observed by MyServiceBus, including retries, faults, skipped messages, and error moves. Broker depth and broker-native health belong to optional broker-specific metrics adapters, not the core inspection contract.
+Inspection describes configured endpoints, consumers, contracts, instances, versions, and capabilities. General-purpose immutable hooks expose bus activity to any addon or application handler. The monitoring exporter is one hook implementation: it buffers bounded batches and sends them to the central service. Applications do not store monitoring history or expose monitoring query endpoints. Broker depth and broker-native health belong to optional broker-specific metrics adapters, not the core inspection contract.
 
 Inspection must consume the stable topology query API. It must not infer endpoint durability, exchange types, addresses, or terminal destinations from a broker scheme or naming suffix. The normalized model and transport projection are defined in the [Topology Model Specification](specs/topology-model-spec.md).
 

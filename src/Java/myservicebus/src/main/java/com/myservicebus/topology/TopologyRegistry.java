@@ -64,6 +64,24 @@ public class TopologyRegistry implements BusTopology {
         consumers.add(consumer);
     }
 
+    public void moveConsumerToEndpoint(ConsumerTopology consumer, String endpointName) {
+        if (consumer == null) {
+            throw new IllegalArgumentException("consumer must not be null");
+        }
+        if (endpointName == null || endpointName.isBlank()) {
+            throw new IllegalArgumentException("endpointName must not be blank");
+        }
+
+        String previousEndpointName = consumer.getQueueName();
+        consumer.setQueueName(endpointName);
+        ensureReceiveEndpoint(endpointName);
+
+        if (!previousEndpointName.equals(endpointName)
+                && consumers.stream().noneMatch(x -> x != consumer && x.getQueueName().equals(previousEndpointName))) {
+            receiveEndpoints.removeIf(x -> x.name().equals(previousEndpointName));
+        }
+    }
+
     private void ensureReceiveEndpoint(String endpointName) {
         boolean exists = receiveEndpoints.stream().anyMatch(x -> x.name().equals(endpointName));
         if (!exists) {
