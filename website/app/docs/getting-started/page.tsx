@@ -1,6 +1,12 @@
 import Link from 'next/link';
 import LanguageTabs from '../../components/LanguageTabs';
 
+const startRabbitMq = `docker run --rm --detach \\
+  --name myservicebus-rabbitmq \\
+  --publish 5672:5672 \\
+  --publish 15672:15672 \\
+  rabbitmq:4.1.8-management-alpine`;
+
 const install = {
   csharp: `dotnet add package Sundstrom.MyServiceBus.RabbitMq \\
   --version 0.1.0-preview.4`,
@@ -75,34 +81,39 @@ export default function GettingStarted() {
       <p className="docs-kicker">Getting started</p>
       <h1>Publish your first message.</h1>
       <p className="docs-summary">
-        In four short steps, configure RabbitMQ, register a consumer, and publish
+        In five short steps, start RabbitMQ, register a consumer, and publish
         an event. Choose your language at each step.
       </p>
 
       <ol className="step-list">
         <li>
-          <div className="step-heading"><span>01</span><div><h2>Install the RabbitMQ transport</h2><p>The transport brings in the core runtime and abstractions.</p></div></div>
+          <div className="step-heading"><span>01</span><div><h2>Start RabbitMQ in Docker</h2><p>Run the tested RabbitMQ 4.1 broker locally with its management UI.</p></div></div>
+          <pre><code>{startRabbitMq}</code></pre>
+          <p className="small-note">
+            The broker listens on <code>localhost:5672</code>. Open the management UI at{' '}
+            <a href="http://localhost:15672">localhost:15672</a> and sign in with{' '}
+            <code>guest</code> / <code>guest</code>. Stop and remove the container with{' '}
+            <code>docker stop myservicebus-rabbitmq</code>.
+          </p>
+        </li>
+        <li>
+          <div className="step-heading"><span>02</span><div><h2>Install the RabbitMQ transport</h2><p>The transport brings in the core runtime and abstractions.</p></div></div>
           <LanguageTabs csharp={install.csharp} java={install.java} csharpLabel=".NET CLI" javaLabel="Gradle" csharpLanguage="shell" javaLanguage="groovy" />
           <p className="small-note">Using Maven? Add the same group, artifact, and version as a standard dependency.</p>
         </li>
         <li>
-          <div className="step-heading"><span>02</span><div><h2>Configure the bus</h2><p>Register the consumer and let MyServiceBus create its receive endpoint.</p></div></div>
+          <div className="step-heading"><span>03</span><div><h2>Configure the bus</h2><p>Register the consumer and let MyServiceBus create its receive endpoint.</p></div></div>
           <LanguageTabs csharp={configure.csharp} java={configure.java} />
         </li>
         <li>
-          <div className="step-heading"><span>03</span><div><h2>Define messages and a consumer</h2><p>A consumer handles one message type through a consume context.</p></div></div>
+          <div className="step-heading"><span>04</span><div><h2>Define messages and a consumer</h2><p>A consumer handles one message type through a consume context.</p></div></div>
           <LanguageTabs csharp={messages.csharp} java={messages.java} />
         </li>
         <li>
-          <div className="step-heading"><span>04</span><div><h2>Publish</h2><p>Publishing fans the event out to every interested receive endpoint.</p></div></div>
+          <div className="step-heading"><span>05</span><div><h2>Publish</h2><p>Publishing fans the event out to every interested receive endpoint.</p></div></div>
           <LanguageTabs csharp={publish.csharp} java={publish.java} />
         </li>
       </ol>
-
-      <div className="callout">
-        <strong>RabbitMQ must be running</strong>
-        <p>The examples connect to a broker on <code>localhost</code> using its default connection settings.</p>
-      </div>
 
       <div className="next-card"><div><span>Next</span><strong>Understand the messaging model</strong></div><Link href="/docs/concepts">Core concepts →</Link></div>
     </article>
