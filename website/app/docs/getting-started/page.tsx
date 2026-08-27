@@ -3,9 +3,9 @@ import LanguageTabs from '../../components/LanguageTabs';
 
 const install = {
   csharp: `dotnet add package Sundstrom.MyServiceBus.RabbitMq \\
-  --version 0.1.0-preview.2`,
+  --version 0.1.0-preview.3`,
   java: `dependencies {
-    implementation 'io.github.marinasundstrom.myservicebus:myservicebus-rabbitmq:0.1.0-preview.2'
+    implementation 'io.github.marinasundstrom.myservicebus:myservicebus-rabbitmq:0.1.0-preview.3'
 }`,
 };
 

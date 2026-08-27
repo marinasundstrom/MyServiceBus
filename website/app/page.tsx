@@ -21,7 +21,7 @@ await bus.Publish(new SubmitOrder(Guid.NewGuid()));`,
   java: {
     label: 'Java',
     install:
-      "implementation 'io.github.marinasundstrom.myservicebus:myservicebus-rabbitmq:0.1.0-preview.2'",
+      "implementation 'io.github.marinasundstrom.myservicebus:myservicebus-rabbitmq:0.1.0-preview.3'",
     code: `services.from(MessageBusServices.class)
     .addServiceBus(cfg -> {
         cfg.addConsumer(SubmitOrderConsumer.class);

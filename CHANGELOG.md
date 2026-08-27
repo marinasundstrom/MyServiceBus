@@ -4,7 +4,7 @@ This changelog summarizes the bigger themes in the repository history. It is int
 
 ## Unreleased
 
-Release candidate: `0.1.0-preview.2`.
+Release candidate: `0.1.0-preview.3`.
 
 ### Runtime monitoring direction
 

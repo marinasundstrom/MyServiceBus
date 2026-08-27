@@ -31,7 +31,7 @@ export default function Interoperability() {
       <div className="callout"><strong>Azure Service Bus: verified preview</strong><p>Live Azure verifies cloud topology, default message and consumer endpoint naming, bidirectional publish, directed queue sends, correlated responses and faults, lock renewal, and terminal failure settlement between MassTransit and both MyServiceBus clients.</p></div>
 
       <div className="version-table" role="table" aria-label="Supported baseline">
-        <div role="row"><span role="cell">MyServiceBus</span><strong role="cell">0.1.0-preview.2</strong></div>
+        <div role="row"><span role="cell">MyServiceBus</span><strong role="cell">0.1.0-preview.3</strong></div>
         <div role="row"><span role="cell">.NET</span><strong role="cell">.NET 10</strong></div>
         <div role="row"><span role="cell">Java</span><strong role="cell">17 or newer</strong></div>
         <div role="row"><span role="cell">RabbitMQ</span><strong role="cell">4.1.8 baseline</strong></div>
