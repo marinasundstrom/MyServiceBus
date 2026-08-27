@@ -74,4 +74,9 @@ The `0.1.0-preview.1` NuGet packages were built from commit `e0314869a00daed5561
 
 NuGet and Maven Central package versions are immutable. The NuGet workflow uses `--skip-duplicate`, allowing an interrupted multi-package push to resume without replacing accepted packages. Maven Central uploads all eight Java artifacts as one deployment bundle; validation failure leaves the deployment failed rather than partially publishing individual modules.
 
+If the Maven workflow times out while Central still reports `PUBLISHING`, do
+not upload the version again. Dispatch a ref containing the workflow's
+`deployment_id` resume input, supply the deployment ID from the failed run, and
+let the workflow continue polling that exact deployment.
+
 Do not rebuild an already-published version from another commit. If a released artifact is defective, fix it, increment the preview version, repeat the complete candidate gate, and publish a new release tag.

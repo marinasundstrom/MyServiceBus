@@ -3,6 +3,11 @@ name: Publish Maven Central preview
 
 'on':
   workflow_dispatch:
+    inputs:
+      deployment_id:
+        description: Existing Maven Central deployment ID to resume polling without uploading again
+        required: false
+        type: string
 
 concurrency:
   group: publish-maven-central
@@ -60,26 +65,32 @@ jobs:
           test -n "$MAVEN_SIGNING_PASSWORD"
 
       - name: Test
+        if: inputs.deployment_id == ''
         run: gradle test
 
       - name: Stage signed Maven publications
+        if: inputs.deployment_id == ''
         env:
           MAVEN_SIGNING_KEY: ${{ secrets.MAVEN_SIGNING_KEY }}
           MAVEN_SIGNING_PASSWORD: ${{ secrets.MAVEN_SIGNING_PASSWORD }}
         run: gradle publish
 
       - name: Verify Maven publications
+        if: inputs.deployment_id == ''
         env:
           REQUIRE_MAVEN_SIGNATURES: '1'
         run: ./eng/verify-maven-packages.sh "${{ steps.release-version.outputs.version }}"
 
       - name: Verify Maven package consumer
+        if: inputs.deployment_id == ''
         run: ./eng/verify-maven-package-consumer.sh
 
       - name: Create Maven Central bundle
+        if: inputs.deployment_id == ''
         run: ./eng/create-maven-central-bundle.sh build/maven-central-bundle.zip "${{ steps.release-version.outputs.version }}"
 
       - name: Upload release bundle artifact
+        if: inputs.deployment_id == ''
         uses: actions/upload-artifact@v4
         with:
           name: maven-central-${{ steps.release-version.outputs.version }}
@@ -88,6 +99,7 @@ jobs:
 
       - name: Upload to Maven Central
         id: central-upload
+        if: inputs.deployment_id == ''
         shell: bash
         env:
           OSSRH_USERNAME: ${{ secrets.OSSRH_USERNAME }}
@@ -112,11 +124,12 @@ jobs:
         env:
           OSSRH_USERNAME: ${{ secrets.OSSRH_USERNAME }}
           OSSRH_TOKEN: ${{ secrets.OSSRH_TOKEN }}
-          DEPLOYMENT_ID: ${{ steps.central-upload.outputs.deployment-id }}
+          DEPLOYMENT_ID: ${{ inputs.deployment_id || steps.central-upload.outputs.deployment-id }}
         run: |
+          test -n "$DEPLOYMENT_ID"
           authorization="$(printf '%s:%s' "$OSSRH_USERNAME" "$OSSRH_TOKEN" | base64 | tr -d '\n')"
           echo "::add-mask::$authorization"
-          for attempt in $(seq 1 120); do
+          for attempt in $(seq 1 240); do
             response="$(curl --fail-with-body --silent --show-error \
               --request POST \
               --header "Authorization: Bearer $authorization" \
