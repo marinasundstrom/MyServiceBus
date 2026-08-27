@@ -2,11 +2,6 @@
 name: Deploy documentation website to GitHub Pages
 
 'on':
-  push:
-    branches: [main]
-    paths:
-      - 'website/**'
-      - '.github/workflows/deploy-website.yml'
   workflow_dispatch:
 
 concurrency:

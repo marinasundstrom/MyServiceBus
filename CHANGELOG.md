@@ -42,6 +42,7 @@ Release candidate: `0.1.0-preview.2`.
 - Added a browser-only light/dark theme switch that respects the visitor's system preference and remembers an explicit choice locally.
 - Reworked the public Azure Service Bus page into an application-facing setup guide for provisioning, secret handling, C# and Java configuration, topology ownership, interoperability, and teardown while retaining maintainer conformance detail in the repository development docs.
 - Added browser-side Google Analytics 4 measurement for the public documentation site.
+- Made website deployment explicitly dispatched so release documentation can be published after its matching NuGet and Maven packages.
 
 ### Stable cross-language topology foundation
 

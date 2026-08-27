@@ -21,8 +21,9 @@ npm run build
 
 The `Deploy documentation website` GitHub Actions workflow installs, builds,
 and publishes this project without restoring, compiling, testing, or releasing
-the MyServiceBus .NET and Java projects. It runs when files under `website/`
-change on `main`, and it can also be started manually.
+the MyServiceBus .NET and Java projects. Start it manually after the matching
+preview packages have been published so installation instructions never point
+to a version that is not yet available.
 
 The workflow creates a static export and publishes the `out/` directory with
 GitHub Pages. It uses the repository name as the production base path, so the
