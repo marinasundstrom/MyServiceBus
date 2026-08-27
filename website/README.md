@@ -35,6 +35,10 @@ runtime, API routes, or server-owned state.
 The language switches and light/dark theme preference are client-side controls.
 The selected theme is stored only in the visitor's browser.
 
+Anonymous site usage is measured with Google Analytics 4 using measurement ID
+`G-RQ2J1Y64JG`. The Google tag is loaded in the browser after the page becomes
+interactive.
+
 Repository development documents are not website source and must not be copied
 into this project automatically.
 

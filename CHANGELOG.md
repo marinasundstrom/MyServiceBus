@@ -41,6 +41,7 @@ Release candidate: `0.1.0-preview.2`.
 - Added an independently triggered GitHub Pages deployment workflow that does not restore, build, test, or release the .NET and Java projects.
 - Added a browser-only light/dark theme switch that respects the visitor's system preference and remembers an explicit choice locally.
 - Reworked the public Azure Service Bus page into an application-facing setup guide for provisioning, secret handling, C# and Java configuration, topology ownership, interoperability, and teardown while retaining maintainer conformance detail in the repository development docs.
+- Added browser-side Google Analytics 4 measurement for the public documentation site.
 
 ### Stable cross-language topology foundation
 
