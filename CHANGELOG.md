@@ -6,6 +6,15 @@ This changelog summarizes the bigger themes in the repository history. It is int
 
 Release candidate: `0.1.0-preview.2`.
 
+### Runtime monitoring direction
+
+- Proposed a collector-style monitoring pipeline in which optional C# and Java hook handlers enqueue bus metadata, heartbeats, and bounded observation batches for export to a central monitoring service.
+- Assigned instance registration, aggregation, flow analysis, query APIs, and all future persistence to the monitoring service while keeping client applications free of monitoring history.
+- Defined the standalone Blazor dashboard as a consumer of the monitoring query API and aligned the vocabulary with MassTransit's monitoring, observability, observer, metrics, flow, and dashboard terminology.
+- Kept OpenTelemetry collection separate and reserved optional dashboard providers for trace links and external telemetry queries.
+- Scoped the implementation to MyServiceBus-specific hooks, export, aggregation, and query models while reusing existing infrastructure for telemetry, security, live updates, and persistence.
+- Defined bounded exporter batching by interval, observation count, and payload size, with independent heartbeats, retry backoff, drop reporting, and a short shutdown flush.
+
 ### Azure Service Bus transport groundwork
 
 - Defined the proposed Azure Service Bus transport profile, including initial capabilities, addressing, topology projection, message-property mapping, peek-lock settlement, compatibility error destinations, request/response, and the cross-language conformance boundary.

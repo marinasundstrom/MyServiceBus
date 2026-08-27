@@ -224,7 +224,7 @@ Inspection must consume the stable topology query API. It must not infer endpoin
 
 The initial dashboard is observational. Replay, purge, topology mutation, or remote configuration require a later control-plane design with authentication, authorization, audit records, and explicit safety boundaries.
 
-See the [Monitoring API Proposal](proposals/monitoring-api.md) for the addon design and the [Project Roadmap](roadmap.md) for the proposed delivery sequence.
+See the [Runtime Monitoring Proposal](proposals/runtime-monitoring.md) for the addon design and the [Project Roadmap](roadmap.md) for the proposed delivery sequence.
 
 ## Conformance Architecture
 
