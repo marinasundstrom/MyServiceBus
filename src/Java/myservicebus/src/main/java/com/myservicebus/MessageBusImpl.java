@@ -40,6 +40,7 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
     private final PublishPipe publishPipe;
     private final PublishContextFactory publishContextFactory;
     private final Logger logger;
+    private final Logger sendLogger;
     private final InboundMessageResolver inboundMessageResolver;
     private final List<ReceiveTransport> receiveTransports = new ArrayList<>();
     private final URI address;
@@ -63,6 +64,7 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
         this.publishPipe = serviceProvider.getService(PublishPipe.class);
         LoggerFactory loggerFactory = serviceProvider.getService(LoggerFactory.class);
         this.logger = loggerFactory != null ? loggerFactory.create(MessageBusImpl.class) : null;
+        this.sendLogger = loggerFactory != null ? loggerFactory.create(SendEndpointProviderImpl.class) : null;
         MessageDeserializer md = serviceProvider.getService(MessageDeserializer.class);
         if (md == null) {
             md = new com.myservicebus.serialization.EnvelopeMessageDeserializer();
@@ -431,11 +433,8 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
             delayFuture = CompletableFuture.completedFuture(null);
         }
 
-        return delayFuture.thenCompose(v -> publishPipe.send(context).thenCompose(x -> {
-            SendEndpointProvider provider = serviceProvider.getService(SendEndpointProvider.class);
-            SendEndpoint endpoint = provider.getSendEndpoint(address);
-            return endpoint.send(context);
-        }));
+        return delayFuture.thenCompose(v -> publishPipe.send(context).thenCompose(x ->
+                createSendEndpoint(address).send(context)));
     }
 
     public <T> CompletableFuture<Void> publish(T message) {
@@ -449,8 +448,7 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
 
     @Override
     public SendEndpoint getSendEndpoint(String uri) {
-        SendEndpointProvider provider = serviceProvider.getService(SendEndpointProvider.class);
-        SendEndpoint endpoint = provider.getSendEndpoint(uri);
+        SendEndpoint endpoint = createSendEndpoint(uri);
         return new SendEndpoint() {
             @Override
             public <T> CompletableFuture<Void> send(T message, CancellationToken cancellationToken) {
@@ -459,6 +457,11 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
                         : notStartedFuture();
             }
         };
+    }
+
+    private SendEndpoint createSendEndpoint(String uri) {
+        SendEndpoint endpoint = transportSendEndpointProvider.getSendEndpoint(uri);
+        return new LoggingSendEndpoint(endpoint, URI.create(uri), sendLogger);
     }
 
     boolean isStarted() {

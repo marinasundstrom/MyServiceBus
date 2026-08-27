@@ -18,6 +18,7 @@ if (!consumed)
 
 _ = typeof(IMessageBus);
 _ = typeof(RabbitMqFactoryConfigurator);
+_ = typeof(AzureServiceBusFactoryConfigurator);
 Console.WriteLine("Verified the staged MyServiceBus NuGet packages from a consumer project.");
 
 internal sealed record SmokeMessage(string Value);

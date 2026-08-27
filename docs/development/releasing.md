@@ -22,11 +22,12 @@ Create a trusted publishing policy for the NuGet.org account that owns the MySer
 
 Enter only the workflow filename, not the `.github/workflows/` path. The workflow supplies the public NuGet.org profile username directly to `NuGet/login`; no NuGet API-key secret is required. GitHub OIDC is exchanged for a short-lived key immediately before publication.
 
-The trusted policy owner must own all four package IDs:
+The trusted policy owner must own all five package IDs:
 
 - `Sundstrom.MyServiceBus.Abstractions`
 - `Sundstrom.MyServiceBus`
 - `Sundstrom.MyServiceBus.RabbitMq`
+- `Sundstrom.MyServiceBus.AzureServiceBus`
 - `Sundstrom.MyServiceBus.Testing`
 
 ## One-time Maven Central setup
@@ -59,9 +60,9 @@ Using one immutable tag for both workflows prevents a branch update from causing
 ## Publishing both ecosystems
 
 1. In GitHub Actions, run **Publish Maven Central preview** and select the release tag.
-2. Wait for the workflow to reach Maven Central state `PUBLISHED`. It tests all Java modules, creates signed publications, verifies a clean consumer, uploads one bundle containing all seven artifacts, and waits for automatic validation and release.
+2. Wait for the workflow to reach Maven Central state `PUBLISHED`. It tests all Java modules, creates signed publications, verifies a clean consumer, uploads one bundle containing all eight artifacts, and waits for automatic validation and release.
 3. Run **Publish NuGet preview** and select the same release tag.
-4. Confirm that all four NuGet packages and symbol packages were accepted.
+4. Confirm that all five NuGet packages and symbol packages were accepted.
 5. Verify the version on Maven Central and NuGet.org after registry indexing completes.
 6. Create the GitHub prerelease and use the same version in its title and release notes.
 
@@ -71,6 +72,6 @@ The `0.1.0-preview.1` NuGet packages were built from commit `e0314869a00daed5561
 
 ## Failure and retry behavior
 
-NuGet and Maven Central package versions are immutable. The NuGet workflow uses `--skip-duplicate`, allowing an interrupted multi-package push to resume without replacing accepted packages. Maven Central uploads all seven Java artifacts as one deployment bundle; validation failure leaves the deployment failed rather than partially publishing individual modules.
+NuGet and Maven Central package versions are immutable. The NuGet workflow uses `--skip-duplicate`, allowing an interrupted multi-package push to resume without replacing accepted packages. Maven Central uploads all eight Java artifacts as one deployment bundle; validation failure leaves the deployment failed rather than partially publishing individual modules.
 
 Do not rebuild an already-published version from another commit. If a released artifact is defective, fix it, increment the preview version, repeat the complete candidate gate, and publish a new release tag.

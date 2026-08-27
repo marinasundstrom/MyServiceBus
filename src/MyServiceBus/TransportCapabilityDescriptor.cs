@@ -73,6 +73,26 @@ public static class TransportCapabilityDescriptors
             [TransportCapabilities.TopologyProvisioning] = TransportCapabilitySupport.Native
         });
 
+    public static TransportCapabilityDescriptor AzureServiceBus { get; } = new(
+        "azure-service-bus",
+        new Dictionary<string, TransportCapabilitySupport>
+        {
+            [TransportCapabilities.DirectedSend] = TransportCapabilitySupport.Native,
+            [TransportCapabilities.PublishSubscribe] = TransportCapabilitySupport.Native,
+            [TransportCapabilities.Durability] = TransportCapabilitySupport.Native,
+            [TransportCapabilities.CompetingConsumers] = TransportCapabilitySupport.Native,
+            [TransportCapabilities.Acknowledgement] = TransportCapabilitySupport.Native,
+            [TransportCapabilities.RequestResponse] = TransportCapabilitySupport.Unsupported,
+            [TransportCapabilities.Scheduling] = TransportCapabilitySupport.Emulated,
+            [TransportCapabilities.Retry] = TransportCapabilitySupport.Emulated,
+            [TransportCapabilities.Redelivery] = TransportCapabilitySupport.Unsupported,
+            [TransportCapabilities.ErrorDestinations] = TransportCapabilitySupport.Emulated,
+            [TransportCapabilities.Ordering] = TransportCapabilitySupport.Native,
+            [TransportCapabilities.Replay] = TransportCapabilitySupport.Unsupported,
+            [TransportCapabilities.TemporaryEndpoints] = TransportCapabilitySupport.Unsupported,
+            [TransportCapabilities.TopologyProvisioning] = TransportCapabilitySupport.Native
+        });
+
     public static TransportCapabilityDescriptor InMemory { get; } = new(
         "in-memory",
         new Dictionary<string, TransportCapabilitySupport>

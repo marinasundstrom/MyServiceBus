@@ -23,6 +23,9 @@ project(':myservicebus-tasks').projectDir = file("${javaDir}/myservicebus-tasks"
 include 'myservicebus-rabbitmq'
 project(':myservicebus-rabbitmq').projectDir = file("${javaDir}/myservicebus-rabbitmq")
 
+include 'myservicebus-azure-service-bus'
+project(':myservicebus-azure-service-bus').projectDir = file("${javaDir}/myservicebus-azure-service-bus")
+
 include 'testapp'
 project(':testapp').projectDir = file("${javaDir}/testapp")
 

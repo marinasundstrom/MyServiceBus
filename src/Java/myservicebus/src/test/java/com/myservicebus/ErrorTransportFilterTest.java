@@ -6,6 +6,7 @@ import java.net.URI;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 
 import org.junit.jupiter.api.Test;
 
@@ -73,7 +74,10 @@ class ErrorTransportFilterTest {
         configurator.useFilter(new FaultingFilter<>());
         Pipe<ConsumeContext<TestMessage>> pipe = configurator.build();
 
-        assertThrows(RuntimeException.class, () -> pipe.send(ctx).join());
+        CompletionException exception = assertThrows(CompletionException.class, () -> pipe.send(ctx).join());
+        assertInstanceOf(RuntimeException.class, exception.getCause());
+        assertTrue(ErrorTransportSettlement.wasMoved(exception));
+        assertEquals("error-queue", ErrorTransportSettlement.getErrorAddress(exception));
         assertEquals("error-queue", sendProvider.lastAddress);
         assertNotNull(sendProvider.endpoint.sentCtx);
         assertEquals(0, sendProvider.endpoint.sentCtx.getHeaders().get(MessageHeaders.REDELIVERY_COUNT));

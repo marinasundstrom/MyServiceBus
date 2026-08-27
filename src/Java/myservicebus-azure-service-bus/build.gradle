@@ -1,0 +1,4 @@
+dependencies {
+    api project(':myservicebus')
+    api "com.azure:azure-messaging-servicebus:${azureServiceBusVersion}"
+}

@@ -4,7 +4,7 @@
 
 The MVP support boundary is the ordinary application path in both reference clients:
 
-- configure a bus and RabbitMQ transport
+- configure a bus and a supported transport (RabbitMQ is the verified profile; Azure Service Bus is currently experimental)
 - register consumers and handlers
 - start and stop the bus through the platform's hosting or lifecycle model
 - send to a directed endpoint and publish by message contract
@@ -29,7 +29,7 @@ The following are not stable MVP commitments:
 - monitoring history and multi-instance discovery
 - transport-projection inspection DTOs
 - saga, outbox, replay, purge, and topology mutation APIs
-- additional broker and event-stream profiles
+- additional supported broker and event-stream profiles; experimental adapters may ship without a support claim while their conformance matrix is incomplete
 - implementation registries, mutable topology objects, and pipeline internals not documented in the feature walkthrough
 
 Preview APIs may evolve additively or be replaced before they are declared stable. Wire and RabbitMQ profile compatibility claims remain governed by the compatibility policy and conformance matrix rather than by source-level compatibility with MassTransit.

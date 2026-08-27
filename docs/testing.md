@@ -32,16 +32,29 @@ The first container-backed run may be slower while the RabbitMQ image is downloa
 ## Azure Service Bus Emulator Fixture
 
 A pinned Docker Compose fixture under `test/AzureServiceBusEmulator` prepares
-the local topology for the proposed Azure Service Bus transport. The transport
-and its executable conformance suites are not implemented yet; the fixture
-exists so both clients can target the same broker configuration as that work
-begins.
+the local topology for the experimental C# and Java Azure Service Bus
+transports. Both suites exercise direct queue delivery, topic publication with
+subscription forwarding, and their corresponding public factory configuration
+paths against this shared topology.
 
 Validate the checked-in JSON and Compose configuration with:
 
 ```bash
 sh eng/verify-servicebus-emulator.sh
 ```
+
+After starting the fixture, run the data-plane suites sequentially:
+
+```bash
+RUN_AZURE_SERVICEBUS_EMULATOR_TESTS=1 \
+  dotnet test test/MyServiceBus.AzureServiceBus.Tests/MyServiceBus.AzureServiceBus.Tests.csproj
+RUN_AZURE_SERVICEBUS_EMULATOR_TESTS=1 \
+  gradle :myservicebus-azure-service-bus:test --rerun-tasks
+```
+
+Ordinary test runs skip the emulator scenarios. These tests prove the local
+data plane only; cloud topology creation, identity, and MassTransit Azure
+Service Bus interoperability remain separate gates.
 
 See the fixture README and the [Azure Service Bus transport profile](azure-service-bus-transport.md)
 for its topology, connection string, sequential-test constraint, and cloud

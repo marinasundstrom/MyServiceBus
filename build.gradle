@@ -9,6 +9,7 @@ def publishedProjectDescriptions = [
     'myservicebus-tasks'        : 'Asynchronous task abstractions for MyServiceBus.',
     'myservicebus'              : 'Idiomatic Java messaging runtime with MassTransit-compatible concepts and wire conventions.',
     'myservicebus-rabbitmq'     : 'RabbitMQ transport for MyServiceBus.',
+    'myservicebus-azure-service-bus': 'Azure Service Bus transport for MyServiceBus.',
     'myservicebus-testing'      : 'In-memory test harness and testing utilities for MyServiceBus.'
 ]
 
@@ -16,6 +17,7 @@ ext {
     lombokVersion = '1.18.34'
     jacksonVersion = '2.17.2'
     rabbitmqVersion = '5.20.0'
+    azureServiceBusVersion = '7.17.20'
     guiceVersion = '5.1.0'
     javaxInjectVersion = '1'
     slf4jVersion = '2.0.13'

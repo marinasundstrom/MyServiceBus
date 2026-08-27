@@ -2,7 +2,7 @@
 
 To keep the C# and Java clients aligned, follow these guidelines:
 
-- **Preserve architectural parity**: Mirror pipeline stages, configuration patterns (the fluent configuration pattern and the factory pattern), and message handling semantics between the implementations whenever possible.
+- **Preserve architectural parity**: Mirror pipeline stages, configuration patterns (the fluent configuration pattern and the factory pattern), topology projection, message mapping, settlement decisions, and message handling semantics between implementations whenever possible. C# and Java should normally correspond closely; clients on less similar platforms should expose recognizable approximations of the same stages.
 - **Maintain feature parity**: Introduce new capabilities to both clients in tandem. If a feature ships in one client first, document the gap in [csharp-java-parity.md](csharp-java-parity.md) and track it for the other language.
 - **Align APIs**: Keep the public surface area similar across languages, adjusting only for idiomatic differences. See [API Design Guidelines](api-design-guidelines.md) for guidance on what to expose.
 - **Measure behavioral parity, not syntactic parity**: C# may evolve a MassTransit-familiar API, while Java favors factories and Java-style fluent builders. Do not force matching overloads or construction patterns across languages.

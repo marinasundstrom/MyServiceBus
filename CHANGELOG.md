@@ -8,6 +8,10 @@ This changelog summarizes the bigger themes in the repository history. It is int
 
 - Defined the proposed Azure Service Bus transport profile, including initial capabilities, addressing, topology projection, message-property mapping, peek-lock settlement, compatibility error destinations, request/response, and the cross-language conformance boundary.
 - Added a pinned Docker Compose emulator fixture with declarative queues, topics, forwarding subscriptions, health readiness, and structural validation for future C# and Java transport tests.
+- Added corresponding experimental C# and Java Azure Service Bus adapters with MassTransit-familiar configuration, queue and topic addressing, profile-neutral topology projection, native message mapping, explicit peek-lock settlement, and pre-provisioned emulator mode.
+- Added matching emulator-backed direct-delivery, publish/forwarding, and public factory-configuration tests, while reporting unimplemented request/response and temporary-endpoint behavior as unsupported.
+- Added both adapters to the NuGet and Maven package, verification, release-bundle, and consumer-smoke surfaces.
+- Aligned direct Java bus publication with C# by resolving the singleton transport endpoint directly while retaining send logging; scoped endpoint providers remain reserved for operations that carry a consumer or application scope.
 
 ### Documentation website
 

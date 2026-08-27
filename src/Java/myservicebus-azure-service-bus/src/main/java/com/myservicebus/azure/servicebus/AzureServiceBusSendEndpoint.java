@@ -1,0 +1,30 @@
+package com.myservicebus.azure.servicebus;
+
+import com.myservicebus.SendContext;
+import com.myservicebus.SendTransport;
+import com.myservicebus.serialization.MessageSerializer;
+
+import java.util.concurrent.CompletableFuture;
+
+final class AzureServiceBusSendEndpoint {
+    private final SendTransport transport;
+    private final MessageSerializer serializer;
+
+    AzureServiceBusSendEndpoint(SendTransport transport, MessageSerializer serializer) {
+        this.transport = transport;
+        this.serializer = serializer;
+    }
+
+    CompletableFuture<Void> send(SendContext context) {
+        try {
+            byte[] body = context.serialize(serializer);
+            String contentType = context.getHeaders()
+                    .getOrDefault("content_type", "application/vnd.masstransit+json")
+                    .toString();
+            transport.send(body, context.getHeaders(), contentType);
+            return CompletableFuture.completedFuture(null);
+        } catch (Exception exception) {
+            return CompletableFuture.failedFuture(exception);
+        }
+    }
+}

@@ -58,7 +58,7 @@ class MessageBusLoggingTest {
         services.addSingleton(ConsumeContextProvider.class, sp -> () -> new ConsumeContextProvider());
         services.addSingleton(TransportSendEndpointProvider.class,
                 sp -> () -> new InMemoryTransportSendEndpointProvider(transportFactory, new EnvelopeMessageSerializer()));
-        services.addSingleton(SendEndpointProvider.class,
+        services.addScoped(SendEndpointProvider.class,
                 sp -> () -> new SendEndpointProviderImpl(
                         sp.getService(ConsumeContextProvider.class),
                         sp.getService(TransportSendEndpointProvider.class),

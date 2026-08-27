@@ -14,14 +14,19 @@ assert_contains .github/workflows/java.yml "java-version: '17'"
 assert_contains .github/workflows/java.yml "gradle-version: '9.0.0'"
 assert_contains build.gradle 'languageVersion = JavaLanguageVersion.of(17)'
 assert_contains build.gradle "rabbitmqVersion = '5.20.0'"
+assert_contains build.gradle "azureServiceBusVersion = '7.17.20'"
 assert_contains Directory.Packages.props '<PackageVersion Include="RabbitMQ.Client" Version="7.2.1" />'
 assert_contains Directory.Packages.props '<PackageVersion Include="MassTransit.RabbitMQ" Version="8.5.1" />'
+assert_contains Directory.Packages.props '<PackageVersion Include="Azure.Messaging.ServiceBus" Version="7.20.2" />'
 assert_contains test/MyServiceBus.RabbitMq.Tests/RabbitMqTestcontainerTests.cs 'rabbitmq:4.1.8-alpine'
 assert_contains src/Java/myservicebus-rabbitmq/src/test/java/com/myservicebus/rabbitmq/RabbitMqTestcontainerTest.java 'rabbitmq:4.1.8-alpine'
 assert_contains docs/supported-versions.md '.NET SDK `10.0.100`'
 assert_contains docs/supported-versions.md '`rabbitmq:4.1.8-alpine`'
 assert_contains docs/supported-versions.md '`MassTransit.RabbitMQ` `8.5.1`'
 assert_contains docs/supported-versions.md '`com.rabbitmq:amqp-client` `5.20.0`'
+assert_contains docs/supported-versions.md '`Azure.Messaging.ServiceBus` `7.20.2`'
+assert_contains docs/supported-versions.md '`com.azure:azure-messaging-servicebus` `7.17.20`'
+assert_contains docs/supported-versions.md '`mcr.microsoft.com/azure-messaging/servicebus-emulator:2.0.1`'
 
 if rg -q 'rabbitmq:4\.1-alpine' test src/Java; then
   echo 'Found an unpinned RabbitMQ 4.1 Testcontainers image.' >&2

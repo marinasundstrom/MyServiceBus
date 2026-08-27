@@ -12,7 +12,7 @@ The ServiceBus Java client mirrors the C# design by providing an asynchronous me
 - `forward` redirects the consumed message to another destination using the original headers; it is intended only for exchanges since forwarding to a queue propagates error headers and can lead to duplicate deliveries.
 
 ### Publishing
-- `publish` uses `EntityNameFormatter.format` to derive an exchange name and sends the message via a resolved endpoint backed by the RabbitMQ transport.
+- `publish` uses `EntityNameFormatter.format` to derive the message entity name and asks the active transport for its publish address. RabbitMQ projects that entity to an exchange; Azure Service Bus projects it to a topic.
 - Publish filters use the dedicated `PublishContext` and `PipeConfigurator<PublishContext>`, corresponding to the C# publish pipeline rather than reusing the broader send-filter type.
 - Routine operations provide tokenless overloads. Advanced overloads accept a read-only `CancellationToken`; `CancellationTokenSource.token()` exposes the signal and `CancellationToken.none()` represents the absence of a cancellation policy.
 - `CancellationToken.onCancel` returns an unregisterable `CancellationRegistration`; callbacks registered after cancellation run immediately, and `throwIfCancelled()` uses Java's standard `CancellationException`.
@@ -34,6 +34,11 @@ The ServiceBus Java client mirrors the C# design by providing an asynchronous me
   - `RabbitMqTransportFactory` ensures exchanges exist before obtaining transports and reuses a shared connection via `ConnectionProvider`, which verifies the link is open and waits with exponential backoff to re-establish it when necessary.
   - `RabbitMqSendTransport` uses `application/vnd.masstransit+json` for envelope messages and `application/json` when `RawJsonMessageSerializer` is configured for outbound sends.
   - Headers beginning with `_` map to standard transport properties (e.g., `_correlation_id` sets the AMQP `correlation-id`).
+
+### Azure Service Bus Transport (Experimental)
+  - `AzureServiceBusTransportFactory` maps directed addresses to queues and publish addresses to topics, while receive endpoints consume from queues fed by forwarding subscriptions.
+  - The Java adapter follows the same topology projection, native-property normalization, peek-lock completion/abandon decisions, skipped-message copy, and capability descriptor as the C# adapter.
+  - The emulator uses `PRE_PROVISIONED` topology mode. Cloud namespaces default to `CREATE`, but cloud administration remains outside the currently verified support boundary.
 
 ### Cancellation Propagation
 - All pipe contexts expose a `CancellationToken` through `PipeContext`, enabling operations to observe shutdown or timeouts.

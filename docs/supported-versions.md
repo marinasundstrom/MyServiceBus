@@ -13,8 +13,11 @@ MyServiceBus `0.1.0-preview.1` is built and tested against the following baselin
 | MassTransit | MassTransit 8.5 | `MassTransit.RabbitMQ` `8.5.1` | The exact interoperability peer. Compatibility with other MassTransit versions must not be inferred from this baseline. |
 | .NET RabbitMQ client | RabbitMQ.Client 7.2 | `7.2.1` | Implementation dependency of the C# RabbitMQ transport. |
 | Java RabbitMQ client | AMQP client 5.20 | `com.rabbitmq:amqp-client` `5.20.0` | Implementation dependency of the Java RabbitMQ transport. |
+| Azure Service Bus emulator | Emulator 2.0 | `mcr.microsoft.com/azure-messaging/servicebus-emulator:2.0.1` | Local data-plane baseline for the experimental Azure Service Bus adapters; not a cloud-fidelity claim. |
+| .NET Azure Service Bus client | Azure SDK 7.20 | `Azure.Messaging.ServiceBus` `7.20.2` | Implementation dependency of the experimental C# adapter. |
+| Java Azure Service Bus client | Azure SDK 7.17 | `com.azure:azure-messaging-servicebus` `7.17.20` | Implementation dependency of the experimental Java adapter. |
 
-"Supported" means that the release candidate passes the ordinary unit suites, package-consumer smoke tests, RabbitMQ integration tests, and the declared cross-language and MassTransit interoperability matrix. It does not mean that every combination in a wider major-version range has been tested.
+"Supported" means that the release candidate passes the ordinary unit suites, package-consumer smoke tests, RabbitMQ integration tests, and the declared cross-language and MassTransit interoperability matrix. The Azure rows identify reproducible experimental baselines only; Azure support remains limited to the scenarios marked implemented in the transport profile. A baseline does not imply that every combination in a wider major-version range has been tested.
 
 ## Preview support window
 

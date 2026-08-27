@@ -145,6 +145,47 @@ bus.start().join();
 
 Java accepts this self-contained model because the runtime lacks a standard dependency injection library; consumers typically provide their own dependencies directly.
 
+#### Azure Service Bus preview
+
+The experimental Azure Service Bus adapters deliberately keep the same entry
+shape as the RabbitMQ adapters. In C#, install
+`Sundstrom.MyServiceBus.AzureServiceBus` and use the MassTransit-familiar
+transport configuration:
+
+```csharp
+builder.Services.AddServiceBus(x =>
+{
+    x.AddConsumer<SubmitOrderConsumer>();
+    x.UsingAzureServiceBus((context, cfg) =>
+    {
+        cfg.Host(builder.Configuration.GetConnectionString("ServiceBus")!);
+        cfg.ConfigureEndpoints(context);
+    });
+});
+```
+
+The corresponding Java module is
+`io.github.marinasundstrom.myservicebus:myservicebus-azure-service-bus`:
+
+```java
+services.from(MessageBusServices.class)
+        .addServiceBus(cfg -> {
+            cfg.addConsumer(SubmitOrderConsumer.class);
+            cfg.using(AzureServiceBusFactoryConfigurator.class, (context, asb) -> {
+                asb.host(serviceBusConnectionString);
+                asb.configureEndpoints(context);
+            });
+        });
+```
+
+Cloud namespaces use `Create` topology mode by default. For the checked-in
+emulator or infrastructure-managed entities, call
+`UsePreProvisionedTopology()` in C# or `usePreProvisionedTopology()` in Java.
+The current preview covers directed send and publish/subscribe; request/response
+and temporary endpoint lifecycle are not yet supported by this transport. See
+the [Azure Service Bus transport profile](azure-service-bus-transport.md) for
+the exact capability and conformance status.
+
 ---
 
 ### Publishing

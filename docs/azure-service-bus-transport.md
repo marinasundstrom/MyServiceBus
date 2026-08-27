@@ -2,18 +2,18 @@
 
 ## Status
 
-This document defines the proposed Azure Service Bus transport profile. The
-transport is not implemented or supported yet. The profile fixes the first
-implementation boundary so the C# and Java adapters can be developed against
-the same addressing, topology, settlement, and failure semantics.
+This document defines the Azure Service Bus transport profile. Corresponding
+experimental C# and Java adapters implement the first data-plane slice against
+the official emulator. The profile is not yet declared supported because the
+remaining conformance and cloud gates listed below have not passed.
 
 Azure Service Bus is a durable bus transport. It implements the existing
 transport contract rather than introducing stream concepts into the portable
 API.
 
-## Initial Scope
+## Implemented Preview Slice
 
-The first implementation slice covers:
+Both clients currently implement:
 
 - directed send to a queue
 - publish to a topic
@@ -23,8 +23,13 @@ The first implementation slice covers:
 - MassTransit-envelope serialization and native property mapping
 - in-process retry through the portable consume pipeline
 - `_error` and `_skipped` queues and endpoint-specific `Fault<T>` publication
-- request/response using a transport-created response queue
-- C# and Java data-plane interoperability
+- `Create` and `PreProvisioned` topology modes
+- corresponding MassTransit-familiar C# and idiomatic Java factory configuration
+
+The emulator suite currently proves direct delivery, topic forwarding, and the
+public factory path independently for each client. Cross-language exchange,
+failure-destination conformance, request/response, and cloud administration
+remain before the initial profile is complete.
 
 The first slice does not expose sessions, duplicate detection, native scheduled
 enqueue, deferral, delayed redelivery, transactions, partitioning, or custom
@@ -42,17 +47,17 @@ The initial adapters should publish this version 1 descriptor:
 | `durability` | Native | Durable queues, topics, subscriptions, and messages. |
 | `competingConsumers` | Native | Receivers compete on the same endpoint queue. |
 | `acknowledgement` | Native | Peek-lock delivery is completed only after the consume pipeline succeeds. |
-| `requestResponse` | Emulated | Composed from messages, correlation, and a response queue. |
+| `requestResponse` | Unsupported | The portable request client exists, but transport-created response queues are not implemented yet. |
 | `scheduling` | Emulated | Uses the portable job scheduler until native scheduled enqueue is specified. |
 | `retry` | Emulated | Re-invokes the consume pipeline while the delivery lock is held. |
 | `redelivery` | Unsupported | Abandon, defer, and scheduled redelivery are not initially exposed. |
 | `errorDestinations` | Emulated | Failed and skipped messages are copied to compatibility queues. |
 | `ordering` | Native | Preserves broker enqueue order within a non-session entity; concurrent processing may complete out of order. |
 | `replay` | Unsupported | Service Bus does not expose retained-history replay through this profile. |
-| `temporaryEndpoints` | Native | Uses short-lived queues in Azure; the emulator fixture uses a pre-provisioned response queue. |
+| `temporaryEndpoints` | Unsupported | Address production exists for future request work, but lifecycle and cloud conformance are not implemented yet. |
 | `topologyProvisioning` | Native | Cloud namespaces use the administration SDK; emulator tests may use declarative topology. |
 
-The descriptor reports behavior implemented by the adapter, not every feature
+The current descriptor reports behavior implemented by the adapter, not every feature
 available in the broker. For example, Azure Service Bus supports native
 scheduling, but the initial adapter continues to report portable scheduling as
 emulated until that path is implemented and tested.
@@ -178,9 +183,10 @@ conditions such as maximum delivery count or expiration. A later profile option
 may deliberately route application failures there, but it must not silently
 replace the compatibility behavior.
 
-## Request/Response and Temporary Endpoints
+## Planned Request/Response and Temporary Endpoints
 
-The factory produces the response address; portable request code never builds
+The completed profile will require the factory to produce the response address;
+portable request code must never build
 an `sb` URI. In Azure, the adapter creates a uniquely named queue with an
 appropriate auto-delete-on-idle lifetime and deletes it during orderly shutdown
 when possible.
@@ -228,13 +234,15 @@ outside emulator conformance.
 
 ## Initial Conformance Matrix
 
-The transport implementation is not complete until these scenarios pass for
+The transport profile is not complete until these scenarios pass for
 both clients where applicable:
 
-- C# queue send and receive
-- Java queue send and receive
-- C# publish consumed by Java
-- Java publish consumed by C#
+- [x] C# queue send and receive
+- [x] Java queue send and receive
+- [x] C# publish and subscription forwarding
+- [x] Java publish and subscription forwarding
+- [ ] C# publish consumed by Java
+- [ ] Java publish consumed by C#
 - correlated request and response in both directions
 - envelope and native-property preservation in both directions
 - retry success and retry exhaustion

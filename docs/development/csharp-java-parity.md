@@ -13,7 +13,7 @@ Parity in this document means equivalent concepts, behavior, and wire outcomes. 
 | Telemetry & host metadata | Implemented | Implemented | Both clients capture detailed host metadata for diagnostics. |
 | Header mapping | Implemented | Implemented | Headers beginning with `_` map to native transport properties. |
 | Cancellation propagation | Implemented | Implemented | Pipe contexts expose cancellation tokens. |
-| Transport abstraction | Implemented | Implemented | RabbitMQ transport factories ensure exchanges exist before use. |
+| Transport abstraction | Implemented | Implemented | RabbitMQ is the verified profile. Corresponding experimental Azure Service Bus adapters implement queue delivery, topic publication, topology projection, native mapping, and peek-lock settlement. |
 | Retries | Implemented | Implemented | Both clients require explicit configuration to retry consumers. |
 | Configuration API (host, queue, message overrides, endpoint formatter) | Implemented | Implemented | Both clients support overriding names and automatic endpoint configuration with custom formatters. |
 | Logging and tracing flow | Implemented | Implemented | Both clients emit MassTransit-style lifecycle and message-flow logs and propagate OpenTelemetry context across send/publish/consume pipelines. |

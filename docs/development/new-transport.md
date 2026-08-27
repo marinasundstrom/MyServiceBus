@@ -49,7 +49,7 @@ Both implementations should map MyServiceBus addresses to the transport's constr
 Transport registration uses the fluent configuration pattern. Review the [fluent configuration pattern](../configuration-patterns.md#fluent-configuration-pattern) for the underlying concepts.
 
 ### C#
-- Expose an extension method `UseAzureServiceBus` that registers the transport factory and any options in DI.
+- Expose an extension method `UsingAzureServiceBus` that registers the transport factory and any options in DI.
 - Follow the pattern used by `RabbitMqServiceBusConfigurationBuilderExt`.
 
 ### Java

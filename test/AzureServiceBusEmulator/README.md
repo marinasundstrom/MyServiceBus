@@ -1,8 +1,9 @@
 # Azure Service Bus Emulator Fixture
 
-This fixture supplies the pre-provisioned topology for the proposed Azure
-Service Bus transport's local data-plane and interoperability tests. It is test
-infrastructure, not evidence that the transport is implemented or supported.
+This fixture supplies the pre-provisioned topology for the experimental C# and
+Java Azure Service Bus transports' local data-plane tests. Passing these tests
+is evidence for the listed emulator scenarios, not a claim of cloud or full
+MassTransit transport-profile support.
 
 The fixture pins:
 
@@ -54,7 +55,7 @@ project when a scenario requires empty entities.
 
 The official emulator management endpoint is currently supported natively only
 by the .NET administration client. Both language suites therefore consume the
-same declarative `config.json` and use the transport's planned
+same declarative `config.json` and use the transport's
 `PreProvisioned` topology mode.
 
 See Microsoft's [local testing guide](https://learn.microsoft.com/azure/service-bus-messaging/test-locally-with-service-bus-emulator)

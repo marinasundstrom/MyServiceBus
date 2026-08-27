@@ -55,6 +55,8 @@ public class ErrorTransportFilter<TMessage> : IFilter<ConsumeContext<TMessage>>
                         sendCtx.Headers[MessageHeaders.HostMassTransitVersion] = typeof(MessageBus).Assembly.GetName().Version?.ToString() ?? "unknown";
                         sendCtx.Headers[MessageHeaders.HostOperatingSystemVersion] = Environment.OSVersion.VersionString;
                     }, context.CancellationToken);
+
+                    ErrorTransportSettlement.MarkMoved(ex, errorAddress);
                 }
             }
 
