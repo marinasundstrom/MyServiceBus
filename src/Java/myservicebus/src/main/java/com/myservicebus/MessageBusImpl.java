@@ -368,7 +368,13 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
                 receiveTransports.get(i).stop();
             }
         } finally {
-            state = BusState.STOPPED;
+            try {
+                if (transportFactory instanceof AutoCloseable closeable) {
+                    closeable.close();
+                }
+            } finally {
+                state = BusState.STOPPED;
+            }
         }
 
         if (logger != null) {

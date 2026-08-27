@@ -16,6 +16,8 @@ public interface IAzureServiceBusFactoryConfigurator
 
     IMessageEntityNameFormatter? EntityNameFormatter { get; }
 
+    Func<string, string> TemporaryEndpointNameFormatter { get; }
+
     void Host(string connectionString);
 
     void ManagementEndpoint(string connectionString);
@@ -27,6 +29,8 @@ public interface IAzureServiceBusFactoryConfigurator
     void SetEndpointNameFormatter(IEndpointNameFormatter formatter);
 
     void SetEntityNameFormatter(IMessageEntityNameFormatter formatter);
+
+    void SetTemporaryEndpointNameFormatter(Func<string, string> formatter);
 
     void Message<T>(Action<AzureServiceBusMessageConfigurator> configure);
 

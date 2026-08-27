@@ -51,7 +51,8 @@ public class GenericRequestClientTests
                 var types = MessageTypeCache.GetMessageTypes(typeof(OrderAccepted));
                 var sendContext = new SendContext(types, serializer)
                 {
-                    MessageId = Guid.NewGuid().ToString()
+                    MessageId = Guid.NewGuid().ToString(),
+                    RequestId = ctx.RequestId
                 };
                 await send.Send(new OrderAccepted { Message = "ok" }, sendContext);
             }
@@ -99,7 +100,8 @@ public class GenericRequestClientTests
                 var types = MessageTypeCache.GetMessageTypes(response.GetType());
                 var sendContext = new SendContext(types, serializer)
                 {
-                    MessageId = Guid.NewGuid().ToString()
+                    MessageId = Guid.NewGuid().ToString(),
+                    RequestId = ctx.RequestId
                 };
                 await send.Send(response, sendContext);
             }
@@ -118,6 +120,51 @@ public class GenericRequestClientTests
         Assert.True(response.Is(out rejected));
 
         await receive.Stop();
+    }
+
+    [Fact]
+    public async Task Ignores_response_for_a_different_request()
+    {
+        var transportFactory = new MediatorTransportFactory();
+        var serializer = new EnvelopeMessageSerializer();
+        var topology = new ReceiveEndpointTopology
+        {
+            QueueName = "correlated-order-request",
+            ExchangeName = EntityNameFormatter.Format(typeof(OrderRequest))!,
+            RoutingKey = "",
+            ExchangeType = "fanout",
+            Durable = true,
+            AutoDelete = false
+        };
+
+        var receive = await transportFactory.CreateReceiveTransport(topology, async ctx =>
+        {
+            var send = await transportFactory.GetSendTransport(ctx.ResponseAddress!);
+            var types = MessageTypeCache.GetMessageTypes(typeof(OrderAccepted));
+            await send.Send(new OrderAccepted { Message = "wrong" }, new SendContext(types, serializer)
+            {
+                MessageId = Guid.NewGuid().ToString(),
+                RequestId = Guid.NewGuid()
+            });
+            await send.Send(new OrderAccepted { Message = "right" }, new SendContext(types, serializer)
+            {
+                MessageId = Guid.NewGuid().ToString(),
+                RequestId = ctx.RequestId
+            });
+        }, null);
+
+        await receive.Start();
+        try
+        {
+            var client = new GenericRequestClient<OrderRequest>(transportFactory, serializer, new SendContextFactory());
+            var response = await client.GetResponseAsync<OrderAccepted>(new OrderRequest());
+
+            Assert.Equal("right", response.Message.Message);
+        }
+        finally
+        {
+            await receive.Stop();
+        }
     }
 
     [Fact]
@@ -149,7 +196,8 @@ public class GenericRequestClientTests
                 var types = MessageTypeCache.GetMessageTypes(fault.GetType());
                 var sendContext = new SendContext(types, serializer)
                 {
-                    MessageId = Guid.NewGuid().ToString()
+                    MessageId = Guid.NewGuid().ToString(),
+                    RequestId = ctx.RequestId
                 };
                 await send.Send(fault, sendContext);
             }
@@ -192,7 +240,8 @@ public class GenericRequestClientTests
                 var types = MessageTypeCache.GetMessageTypes(fault.GetType());
                 var sendContext = new SendContext(types, serializer)
                 {
-                    MessageId = Guid.NewGuid().ToString()
+                    MessageId = Guid.NewGuid().ToString(),
+                    RequestId = ctx.RequestId
                 };
                 await send.Send(fault, sendContext);
             }

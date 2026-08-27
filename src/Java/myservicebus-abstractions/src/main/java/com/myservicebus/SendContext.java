@@ -19,6 +19,8 @@ public class SendContext implements PipeContext, ScheduledMessage {
     private final CancellationToken cancellationToken;
     private URI sourceAddress;
     private URI destinationAddress;
+    private URI responseAddress;
+    private URI faultAddress;
     private Instant scheduledEnqueueTime;
     private UUID requestId;
     private UUID correlationId;
@@ -61,6 +63,22 @@ public class SendContext implements PipeContext, ScheduledMessage {
 
     public void setDestinationAddress(URI destinationAddress) {
         this.destinationAddress = destinationAddress;
+    }
+
+    public URI getResponseAddress() {
+        return responseAddress;
+    }
+
+    public void setResponseAddress(URI responseAddress) {
+        this.responseAddress = responseAddress;
+    }
+
+    public URI getFaultAddress() {
+        return faultAddress;
+    }
+
+    public void setFaultAddress(URI faultAddress) {
+        this.faultAddress = faultAddress;
     }
 
     public UUID getRequestId() {
@@ -117,8 +135,8 @@ public class SendContext implements PipeContext, ScheduledMessage {
         context.setConversationId(conversationId);
         context.setInitiatorId(initiatorId);
         context.setMessageType(messageTypes != null ? messageTypes : MessageUrn.forMessageTypes(message.getClass()));
-        context.setResponseAddress(null);
-        context.setFaultAddress(null);
+        context.setResponseAddress(responseAddress);
+        context.setFaultAddress(faultAddress);
         context.setSourceAddress(sourceAddress != null ? sourceAddress : URI.create("loopback://localhost/source"));
         context.setDestinationAddress(
                 destinationAddress != null ? destinationAddress

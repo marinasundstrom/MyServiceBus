@@ -21,6 +21,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
+import java.util.function.Function;
 
 public final class AzureServiceBusFactoryConfigurator implements BusFactoryConfigurator {
     public static final String EMULATOR_CONNECTION_STRING =
@@ -31,6 +32,7 @@ public final class AzureServiceBusFactoryConfigurator implements BusFactoryConfi
     private String managementConnectionString;
     private AzureServiceBusTopologyMode topologyMode = AzureServiceBusTopologyMode.CREATE;
     private int prefetchCount;
+    private Function<String, String> temporaryEndpointNameFormatter = name -> name;
     private EndpointNameFormatter endpointNameFormatter;
     private final Map<Class<?>, String> entityNames = new HashMap<>();
     private final List<AzureServiceBusReceiveEndpointConfigurator.HandlerRegistration<?>> handlers =
@@ -65,6 +67,19 @@ public final class AzureServiceBusFactoryConfigurator implements BusFactoryConfi
 
     public void setEntityNameFormatter(MessageEntityNameFormatter value) {
         EntityNameFormatter.setFormatter(value);
+    }
+
+    public void setTemporaryEndpointNameFormatter(Function<String, String> value) {
+        if (value == null) {
+            throw new IllegalArgumentException("Temporary endpoint name formatter cannot be null");
+        }
+        temporaryEndpointNameFormatter = name -> {
+            String formatted = value.apply(name);
+            if (formatted == null || formatted.isBlank()) {
+                throw new IllegalStateException("The temporary endpoint name formatter returned a blank name");
+            }
+            return formatted;
+        };
     }
 
     public void setConsumerFactory(
@@ -132,6 +147,10 @@ public final class AzureServiceBusFactoryConfigurator implements BusFactoryConfi
 
     public int getPrefetchCount() {
         return prefetchCount;
+    }
+
+    public Function<String, String> getTemporaryEndpointNameFormatter() {
+        return temporaryEndpointNameFormatter;
     }
 
     @Override

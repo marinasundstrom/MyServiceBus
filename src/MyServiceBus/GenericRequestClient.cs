@@ -45,11 +45,17 @@ public sealed class GenericRequestClient<TRequest> : IRequestClient<TRequest>, I
             [new MessageBinding { MessageType = typeof(T), EntityName = responseExchange }]);
 
         IReceiveTransport? responseReceiveTransport = null;
+        var requestId = Guid.NewGuid();
 
         var responseHandler = async (ReceiveContext context) =>
         {
             try
             {
+                if (context.RequestId != requestId)
+                {
+                    return;
+                }
+
                 if (context.MessageType.Contains(MessageUrn.For(typeof(T))) &&
                     context.TryGetMessage<T>(out var responeMessage))
                 {
@@ -82,9 +88,11 @@ public sealed class GenericRequestClient<TRequest> : IRequestClient<TRequest>, I
         sendContext.ResponseAddress = responseAddress;
         sendContext.FaultAddress = responseAddress;
         sendContext.MessageId = Guid.NewGuid().ToString();
-        sendContext.RequestId = Guid.NewGuid();
+        sendContext.RequestId = requestId;
 
         contextCallback?.Invoke(sendContext);
+        requestId = sendContext.RequestId ?? requestId;
+        sendContext.RequestId = requestId;
 
         await requestSendTransport.Send(request, sendContext, cancellationToken);
 
@@ -117,11 +125,17 @@ public sealed class GenericRequestClient<TRequest> : IRequestClient<TRequest>, I
             [new MessageBinding { MessageType = typeof(T1), EntityName = responseExchange }]);
 
         IReceiveTransport? responseReceiveTransport = null;
+        var requestId = Guid.NewGuid();
 
         var responseHandler = async (ReceiveContext context) =>
         {
             try
             {
+                if (context.RequestId != requestId)
+                {
+                    return;
+                }
+
                 if (context.MessageType.Contains(MessageUrn.For(typeof(T1))) &&
                     context.TryGetMessage<T1>(out var message1))
                 {
@@ -162,9 +176,11 @@ public sealed class GenericRequestClient<TRequest> : IRequestClient<TRequest>, I
         sendContext.ResponseAddress = responseAddress;
         sendContext.FaultAddress = responseAddress;
         sendContext.MessageId = Guid.NewGuid().ToString();
-        sendContext.RequestId = Guid.NewGuid();
+        sendContext.RequestId = requestId;
 
         contextCallback?.Invoke(sendContext);
+        requestId = sendContext.RequestId ?? requestId;
+        sendContext.RequestId = requestId;
 
         await requestSendTransport.Send(request, sendContext, cancellationToken);
 

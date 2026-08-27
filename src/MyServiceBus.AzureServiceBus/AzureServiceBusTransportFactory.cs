@@ -13,6 +13,7 @@ public sealed class AzureServiceBusTransportFactory : ITransportFactory
     private readonly ServiceBusAdministrationClient? _administrationClient;
     private readonly AzureServiceBusTopologyMode _topologyMode;
     private readonly int _defaultPrefetchCount;
+    private readonly Func<string, string> _temporaryEndpointNameFormatter;
     private readonly Uri _baseAddress;
     private readonly ILoggerFactory? _loggerFactory;
     private readonly ConcurrentDictionary<string, ISendTransport> _sendTransports = new(StringComparer.Ordinal);
@@ -27,6 +28,7 @@ public sealed class AzureServiceBusTransportFactory : ITransportFactory
         _client = client;
         _topologyMode = configurator.TopologyMode;
         _defaultPrefetchCount = configurator.PrefetchCount;
+        _temporaryEndpointNameFormatter = configurator.TemporaryEndpointNameFormatter;
         _baseAddress = GetEndpoint(configurator.ConnectionString);
         _loggerFactory = loggerFactory;
         if (_topologyMode == AzureServiceBusTopologyMode.Create)
@@ -41,7 +43,7 @@ public sealed class AzureServiceBusTransportFactory : ITransportFactory
     public Uri GetPublishAddress(string entityName) => CreateAddress(entityName, topic: true);
 
     public Uri GetTemporaryEndpointAddress(string endpointName) =>
-        CreateAddress(endpointName, topic: false, "temporary=true");
+        CreateAddress(FormatTemporaryEndpointName(endpointName), topic: false, "temporary=true");
 
     public Uri GetErrorAddress(string endpointName) => CreateAddress(endpointName + "_error", topic: false);
 
@@ -70,7 +72,7 @@ public sealed class AzureServiceBusTransportFactory : ITransportFactory
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(handler);
-        var projected = AzureServiceBusReceiveEndpointTopology.Project(topology);
+        var projected = AzureServiceBusReceiveEndpointTopology.Project(MapTemporaryEndpoint(topology));
         if (_topologyMode == AzureServiceBusTopologyMode.Create)
         {
             try
@@ -128,7 +130,7 @@ public sealed class AzureServiceBusTransportFactory : ITransportFactory
                 .ConfigureAwait(false);
         }
 
-        foreach (var binding in topology.Bindings)
+        foreach (var binding in topology.Temporary ? [] : topology.Bindings)
         {
             await EnsureTopic(administrationClient, binding.EntityName, cancellationToken).ConfigureAwait(false);
             await EnsureSubscription(
@@ -139,6 +141,26 @@ public sealed class AzureServiceBusTransportFactory : ITransportFactory
                     cancellationToken)
                 .ConfigureAwait(false);
         }
+    }
+
+    private ReceiveEndpointTransportTopology MapTemporaryEndpoint(ReceiveEndpointTransportTopology topology)
+    {
+        if (!topology.Temporary)
+            return topology;
+
+        return new ReceiveEndpointTransportTopology(
+            FormatTemporaryEndpointName(topology.Name),
+            topology.Durable,
+            topology.Temporary,
+            topology.PrefetchCount,
+            topology.Bindings,
+            topology.TransportOptions);
+    }
+
+    private string FormatTemporaryEndpointName(string endpointName)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(endpointName);
+        return _temporaryEndpointNameFormatter(endpointName);
     }
 
     private static async Task EnsureQueue(

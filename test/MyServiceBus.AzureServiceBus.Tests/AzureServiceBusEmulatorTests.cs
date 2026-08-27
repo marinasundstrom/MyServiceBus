@@ -283,6 +283,97 @@ public sealed class AzureServiceBusEmulatorTests
         }
     }
 
+    [AzureServiceBusEmulatorFact]
+    public async Task Request_client_receives_a_correlated_response()
+    {
+        await PurgeQueue("msb-publish");
+        await PurgeQueue("msb-response");
+        var server = MessageBus.Factory.Create<AzureServiceBusFactoryConfigurator>(cfg =>
+        {
+            cfg.Host(ConnectionString);
+            cfg.UsePreProvisionedTopology();
+            cfg.Message<RequestMessage>(message =>
+                message.SetEntityName("msb-compatibility-message"));
+            cfg.ReceiveEndpoint("msb-publish", endpoint =>
+                endpoint.Handler<RequestMessage>(context =>
+                    context.RespondAsync(new ResponseMessage
+                    {
+                        Value = "response-to-" + context.Message.Value
+                    })));
+        });
+
+        await server.StartAsync(CancellationToken.None);
+        try
+        {
+            var configurator = new AzureServiceBusFactoryConfigurator();
+            configurator.Host(ConnectionString);
+            configurator.UsePreProvisionedTopology();
+            configurator.SetTemporaryEndpointNameFormatter(_ => "msb-response");
+            await using var client = new ServiceBusClient(ConnectionString);
+            var factory = new AzureServiceBusTransportFactory(client, configurator);
+            var requestClient = new GenericRequestClient<RequestMessage>(
+                factory,
+                new EnvelopeMessageSerializer(),
+                new SendContextFactory(),
+                factory.GetPublishAddress("msb-compatibility-message"),
+                RequestTimeout.After(TimeSpan.FromSeconds(20)));
+
+            var response = await requestClient.GetResponseAsync<ResponseMessage>(
+                new RequestMessage { Value = "dotnet-request" });
+
+            Assert.Equal("response-to-dotnet-request", response.Message.Value);
+        }
+        finally
+        {
+            await server.StopAsync(CancellationToken.None);
+        }
+    }
+
+    [AzureServiceBusEmulatorFact]
+    public async Task Request_client_receives_a_correlated_fault()
+    {
+        await PurgeQueue("msb-publish");
+        await PurgeQueue("msb-publish_error");
+        await PurgeQueue("msb-response");
+        var server = MessageBus.Factory.Create<AzureServiceBusFactoryConfigurator>(cfg =>
+        {
+            cfg.Host(ConnectionString);
+            cfg.UsePreProvisionedTopology();
+            cfg.Message<RequestMessage>(message =>
+                message.SetEntityName("msb-compatibility-message"));
+            cfg.ReceiveEndpoint("msb-publish", endpoint =>
+                endpoint.Handler<RequestMessage>(_ =>
+                    Task.FromException(new InvalidOperationException("request-handler-fault"))));
+        });
+
+        await server.StartAsync(CancellationToken.None);
+        try
+        {
+            var configurator = new AzureServiceBusFactoryConfigurator();
+            configurator.Host(ConnectionString);
+            configurator.UsePreProvisionedTopology();
+            configurator.SetTemporaryEndpointNameFormatter(_ => "msb-response");
+            await using var client = new ServiceBusClient(ConnectionString);
+            var factory = new AzureServiceBusTransportFactory(client, configurator);
+            var requestClient = new GenericRequestClient<RequestMessage>(
+                factory,
+                new EnvelopeMessageSerializer(),
+                new SendContextFactory(),
+                factory.GetPublishAddress("msb-compatibility-message"),
+                RequestTimeout.After(TimeSpan.FromSeconds(20)));
+
+            var exception = await Assert.ThrowsAsync<RequestFaultException>(() =>
+                requestClient.GetResponseAsync<ResponseMessage>(
+                    new RequestMessage { Value = "faulting-dotnet-request" }));
+
+            Assert.Contains("RequestMessage", exception.Message, StringComparison.Ordinal);
+        }
+        finally
+        {
+            await server.StopAsync(CancellationToken.None);
+        }
+    }
+
     private static async Task PurgeQueue(string queueName)
     {
         await using var client = new ServiceBusClient(ConnectionString);
@@ -320,6 +411,16 @@ public sealed class AzureServiceBusEmulatorTests
     }
 
     public sealed class UnregisteredMessage
+    {
+        public string Value { get; set; } = string.Empty;
+    }
+
+    public sealed class RequestMessage
+    {
+        public string Value { get; set; } = string.Empty;
+    }
+
+    public sealed class ResponseMessage
     {
         public string Value { get; set; } = string.Empty;
     }

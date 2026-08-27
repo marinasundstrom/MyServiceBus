@@ -82,14 +82,14 @@ public static class TransportCapabilityDescriptors
             [TransportCapabilities.Durability] = TransportCapabilitySupport.Native,
             [TransportCapabilities.CompetingConsumers] = TransportCapabilitySupport.Native,
             [TransportCapabilities.Acknowledgement] = TransportCapabilitySupport.Native,
-            [TransportCapabilities.RequestResponse] = TransportCapabilitySupport.Unsupported,
+            [TransportCapabilities.RequestResponse] = TransportCapabilitySupport.Emulated,
             [TransportCapabilities.Scheduling] = TransportCapabilitySupport.Emulated,
             [TransportCapabilities.Retry] = TransportCapabilitySupport.Emulated,
             [TransportCapabilities.Redelivery] = TransportCapabilitySupport.Unsupported,
             [TransportCapabilities.ErrorDestinations] = TransportCapabilitySupport.Emulated,
             [TransportCapabilities.Ordering] = TransportCapabilitySupport.Native,
             [TransportCapabilities.Replay] = TransportCapabilitySupport.Unsupported,
-            [TransportCapabilities.TemporaryEndpoints] = TransportCapabilitySupport.Unsupported,
+            [TransportCapabilities.TemporaryEndpoints] = TransportCapabilitySupport.Native,
             [TransportCapabilities.TopologyProvisioning] = TransportCapabilitySupport.Native
         });
 

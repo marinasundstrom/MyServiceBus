@@ -181,10 +181,13 @@ services.from(MessageBusServices.class)
 Cloud namespaces use `Create` topology mode by default. For the checked-in
 emulator or infrastructure-managed entities, call
 `UsePreProvisionedTopology()` in C# or `usePreProvisionedTopology()` in Java.
-The current preview covers directed send and publish/subscribe; request/response
-and temporary endpoint lifecycle are not yet supported by this transport. See
-the [Azure Service Bus transport profile](azure-service-bus-transport.md) for
-the exact capability and conformance status.
+Request clients use unique native auto-delete queues in the default `Create`
+mode. A pre-provisioned environment must map generated logical response names to
+an infrastructure-owned queue using `SetTemporaryEndpointNameFormatter` in C#
+or `setTemporaryEndpointNameFormatter` in Java. The checked-in emulator fixture
+maps them to `msb-response` and therefore runs request scenarios sequentially.
+See the [Azure Service Bus transport profile](azure-service-bus-transport.md)
+for the exact capability and conformance status.
 
 ---
 

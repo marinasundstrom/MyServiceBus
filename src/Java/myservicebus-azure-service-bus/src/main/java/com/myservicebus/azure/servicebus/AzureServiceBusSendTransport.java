@@ -24,4 +24,8 @@ public final class AzureServiceBusSendTransport implements SendTransport {
             throw new AzureServiceBusTransportException("send", entityName, exception);
         }
     }
+
+    void close() {
+        sender.close();
+    }
 }

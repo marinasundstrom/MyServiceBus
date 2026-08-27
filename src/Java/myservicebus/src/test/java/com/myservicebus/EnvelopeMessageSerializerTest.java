@@ -31,6 +31,8 @@ public class EnvelopeMessageSerializerTest {
 
         MessageSerializer serializer = new EnvelopeMessageSerializer();
         SendContext context = new SendContext(message, CancellationToken.none());
+        context.setResponseAddress(URI.create("queue:response"));
+        context.setFaultAddress(URI.create("queue:fault"));
 
         byte[] bytes = context.serialize(serializer);
 
@@ -44,6 +46,8 @@ public class EnvelopeMessageSerializerTest {
         assertEquals(
                 URI.create("loopback://localhost/" + SampleMessage.class.getSimpleName()).toString(),
                 envelope.getDestinationAddress());
+        assertEquals("queue:response", envelope.getResponseAddress());
+        assertEquals("queue:fault", envelope.getFaultAddress());
     }
 
     @Test

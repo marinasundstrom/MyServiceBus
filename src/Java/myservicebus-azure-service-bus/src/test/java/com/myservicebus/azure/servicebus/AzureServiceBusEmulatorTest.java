@@ -13,7 +13,12 @@ import com.myservicebus.MessageBus;
 import com.myservicebus.MessageHeaders;
 import com.myservicebus.MessageUrn;
 import com.myservicebus.ReceiveTransport;
+import com.myservicebus.GenericRequestClient;
+import com.myservicebus.RequestClient;
+import com.myservicebus.RequestFaultException;
+import com.myservicebus.RequestTimeout;
 import com.myservicebus.SendContext;
+import com.myservicebus.TransportRequestClientTransport;
 import com.myservicebus.logging.LoggerFactoryBuilder;
 import com.myservicebus.serialization.EnvelopeMessageSerializer;
 import com.myservicebus.tasks.CancellationToken;
@@ -27,6 +32,7 @@ import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -82,6 +88,7 @@ class AzureServiceBusEmulatorTest {
             assertEquals("from-java", received.get(20, TimeUnit.SECONDS).getValue());
         } finally {
             receiveTransport.stop();
+            factory.close();
         }
     }
 
@@ -123,6 +130,7 @@ class AzureServiceBusEmulatorTest {
             assertEquals("published-from-java", received.get(20, TimeUnit.SECONDS).getValue());
         } finally {
             receiveTransport.stop();
+            factory.close();
         }
     }
 
@@ -284,6 +292,104 @@ class AzureServiceBusEmulatorTest {
             assertEquals("skipped-java-message", skippedEnvelope.getMessage().getValue());
         } finally {
             receiveTransport.stop();
+            factory.close();
+        }
+    }
+
+    @Test
+    void requestClientReceivesACorrelatedResponse() throws Exception {
+        requireEmulator();
+        purgeQueue("msb-publish");
+        purgeQueue("msb-response");
+        MessageBus server = MessageBus.factory.create(AzureServiceBusFactoryConfigurator.class, cfg -> {
+            cfg.host(CONNECTION_STRING);
+            cfg.usePreProvisionedTopology();
+            cfg.message(RequestMessage.class,
+                    message -> message.setEntityName("msb-compatibility-message"));
+            cfg.receiveEndpoint("msb-publish", endpoint ->
+                    endpoint.handler(RequestMessage.class, context -> {
+                        ResponseMessage response = new ResponseMessage();
+                        response.setValue("response-to-" + context.getMessage().getValue());
+                        return context.respond(response);
+                    }));
+        });
+
+        AzureServiceBusTransportFactory requestFactory = null;
+        server.start();
+        try {
+            AzureServiceBusFactoryConfigurator configurator = new AzureServiceBusFactoryConfigurator();
+            configurator.host(CONNECTION_STRING);
+            configurator.usePreProvisionedTopology();
+            configurator.setTemporaryEndpointNameFormatter(ignored -> "msb-response");
+            requestFactory = new AzureServiceBusTransportFactory(
+                    configurator,
+                    LoggerFactoryBuilder.create(builder -> builder.addConsole()));
+            RequestClient<RequestMessage> requestClient = new GenericRequestClient<>(
+                    RequestMessage.class,
+                    new TransportRequestClientTransport(requestFactory, new EnvelopeMessageSerializer()),
+                    URI.create(requestFactory.getPublishAddress("msb-compatibility-message")),
+                    RequestTimeout.after(Duration.ofSeconds(20)));
+            RequestMessage request = new RequestMessage();
+            request.setValue("java-request");
+
+            ResponseMessage response = requestClient.getResponse(request, ResponseMessage.class)
+                    .get(20, TimeUnit.SECONDS);
+
+            assertEquals("response-to-java-request", response.getValue());
+        } finally {
+            if (requestFactory != null) {
+                requestFactory.close();
+            }
+            server.stop();
+        }
+    }
+
+    @Test
+    void requestClientReceivesACorrelatedFault() throws Exception {
+        requireEmulator();
+        purgeQueue("msb-publish");
+        purgeQueue("msb-publish_error");
+        purgeQueue("msb-response");
+        MessageBus server = MessageBus.factory.create(AzureServiceBusFactoryConfigurator.class, cfg -> {
+            cfg.host(CONNECTION_STRING);
+            cfg.usePreProvisionedTopology();
+            cfg.message(RequestMessage.class,
+                    message -> message.setEntityName("msb-compatibility-message"));
+            cfg.receiveEndpoint("msb-publish", endpoint ->
+                    endpoint.handler(RequestMessage.class, context ->
+                            CompletableFuture.failedFuture(
+                                    new IllegalStateException("request-handler-fault"))));
+        });
+
+        AzureServiceBusTransportFactory requestFactory = null;
+        server.start();
+        try {
+            AzureServiceBusFactoryConfigurator configurator = new AzureServiceBusFactoryConfigurator();
+            configurator.host(CONNECTION_STRING);
+            configurator.usePreProvisionedTopology();
+            configurator.setTemporaryEndpointNameFormatter(ignored -> "msb-response");
+            requestFactory = new AzureServiceBusTransportFactory(
+                    configurator,
+                    LoggerFactoryBuilder.create(builder -> builder.addConsole()));
+            RequestClient<RequestMessage> requestClient = new GenericRequestClient<>(
+                    RequestMessage.class,
+                    new TransportRequestClientTransport(requestFactory, new EnvelopeMessageSerializer()),
+                    URI.create(requestFactory.getPublishAddress("msb-compatibility-message")),
+                    RequestTimeout.after(Duration.ofSeconds(20)));
+            RequestMessage request = new RequestMessage();
+            request.setValue("faulting-java-request");
+
+            ExecutionException exception = org.junit.jupiter.api.Assertions.assertThrows(
+                    ExecutionException.class,
+                    () -> requestClient.getResponse(request, ResponseMessage.class)
+                            .get(20, TimeUnit.SECONDS));
+
+            org.junit.jupiter.api.Assertions.assertInstanceOf(RequestFaultException.class, exception.getCause());
+        } finally {
+            if (requestFactory != null) {
+                requestFactory.close();
+            }
+            server.stop();
         }
     }
 
@@ -353,6 +459,30 @@ class AzureServiceBusEmulatorTest {
     }
 
     public static class UnregisteredMessage {
+        private String value;
+
+        public String getValue() {
+            return value;
+        }
+
+        public void setValue(String value) {
+            this.value = value;
+        }
+    }
+
+    public static class RequestMessage {
+        private String value;
+
+        public String getValue() {
+            return value;
+        }
+
+        public void setValue(String value) {
+            this.value = value;
+        }
+    }
+
+    public static class ResponseMessage {
         private String value;
 
         public String getValue() {

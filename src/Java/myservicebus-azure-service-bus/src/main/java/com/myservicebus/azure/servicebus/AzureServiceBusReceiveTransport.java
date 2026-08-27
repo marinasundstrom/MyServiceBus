@@ -114,6 +114,8 @@ public final class AzureServiceBusReceiveTransport implements ReceiveTransport {
                 }
             }
             processor.stop();
+            processor.close();
+            skippedSender.close();
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
             throw new AzureServiceBusTransportException("stop receive", queueName, exception);

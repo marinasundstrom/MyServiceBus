@@ -14,14 +14,18 @@ public sealed class AzureServiceBusTransportFactoryTests
         var configurator = new AzureServiceBusFactoryConfigurator();
         configurator.Host(ConnectionString);
         configurator.UsePreProvisionedTopology();
+        configurator.SetTemporaryEndpointNameFormatter(_ => "msb-response");
         var factory = new AzureServiceBusTransportFactory(new ServiceBusClient(ConnectionString), configurator);
 
         factory.GetPublishAddress("orders").ShouldBe(new Uri("sb://localhost/orders?type=topic"));
         factory.GetErrorAddress("orders").ShouldBe(new Uri("sb://localhost/orders_error"));
         factory.GetFaultAddress("orders").ShouldBe(new Uri("sb://localhost/orders_fault?type=topic"));
+        factory.GetTemporaryEndpointAddress("generated-response")
+            .ShouldBe(new Uri("sb://localhost/msb-response?temporary=true"));
         factory.Capabilities.Transport.ShouldBe("azure-service-bus");
         factory.Capabilities.Get(TransportCapabilities.DirectedSend).ShouldBe(TransportCapabilitySupport.Native);
-        factory.Capabilities.Get(TransportCapabilities.RequestResponse).ShouldBe(TransportCapabilitySupport.Unsupported);
+        factory.Capabilities.Get(TransportCapabilities.RequestResponse).ShouldBe(TransportCapabilitySupport.Emulated);
+        factory.Capabilities.Get(TransportCapabilities.TemporaryEndpoints).ShouldBe(TransportCapabilitySupport.Native);
     }
 
     [Fact]

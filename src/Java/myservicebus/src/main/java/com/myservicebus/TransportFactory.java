@@ -86,4 +86,8 @@ public interface TransportFactory extends PublishAddressProvider {
     }
 
     String getSendAddress(String queue);
+
+    default String getTemporaryEndpointAddress(String endpointName) {
+        return getSendAddress(endpointName);
+    }
 }

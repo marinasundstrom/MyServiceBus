@@ -36,9 +36,11 @@ the local topology for the experimental C# and Java Azure Service Bus
 transports. Both suites exercise direct queue delivery, topic publication with
 subscription forwarding, their corresponding public factory configuration
 paths, retry recovery and exhaustion, `_error` and `_skipped` settlement, and
-endpoint fault publication against this shared topology. The .NET suite also launches the Java
+endpoint fault publication against this shared topology. Request tests map
+generated temporary endpoint names to the fixture's sequential `msb-response`
+queue and cover responses and faults. The .NET suite also launches the Java
 interoperability peer to prove directed send and publish in both language
-directions.
+directions, including correlated requests and responses.
 
 Validate the checked-in JSON and Compose configuration with:
 

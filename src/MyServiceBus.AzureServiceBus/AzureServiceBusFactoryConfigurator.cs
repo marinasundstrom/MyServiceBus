@@ -25,6 +25,8 @@ public sealed class AzureServiceBusFactoryConfigurator : IAzureServiceBusFactory
 
     public IMessageEntityNameFormatter? EntityNameFormatter { get; private set; }
 
+    public Func<string, string> TemporaryEndpointNameFormatter { get; private set; } = name => name;
+
     public void Host(string connectionString)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(connectionString);
@@ -58,6 +60,18 @@ public sealed class AzureServiceBusFactoryConfigurator : IAzureServiceBusFactory
         ArgumentNullException.ThrowIfNull(formatter);
         EntityNameFormatter = formatter;
         MyServiceBus.EntityNameFormatter.SetFormatter(formatter);
+    }
+
+    public void SetTemporaryEndpointNameFormatter(Func<string, string> formatter)
+    {
+        ArgumentNullException.ThrowIfNull(formatter);
+        TemporaryEndpointNameFormatter = name =>
+        {
+            var formatted = formatter(name);
+            return string.IsNullOrWhiteSpace(formatted)
+                ? throw new InvalidOperationException("The temporary endpoint name formatter returned a blank name.")
+                : formatted;
+        };
     }
 
     public void Message<T>(Action<AzureServiceBusMessageConfigurator> configure)

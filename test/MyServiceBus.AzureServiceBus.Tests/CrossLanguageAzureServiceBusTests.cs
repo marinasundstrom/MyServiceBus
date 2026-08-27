@@ -44,6 +44,76 @@ public sealed class CrossLanguageAzureServiceBusTests
             "msb-compatibility-message",
             "publish-from-java");
 
+    [AzureServiceBusEmulatorFact]
+    public async Task Csharp_request_client_receives_java_response()
+    {
+        await PurgeQueue("msb-publish");
+        await PurgeQueue("msb-response");
+        const string expectedValue = "request-from-dotnet";
+        using var javaPeer = AzureServiceBusJavaInteropPeer.Start(
+            ConnectionString,
+            "azure-respond",
+            "msb-publish",
+            BindingEntityName,
+            expectedValue);
+        await AzureServiceBusJavaInteropPeer.WaitForOutput(javaPeer, "READY", TimeSpan.FromMinutes(2));
+
+        var configurator = new AzureServiceBusFactoryConfigurator();
+        configurator.Host(ConnectionString);
+        configurator.UsePreProvisionedTopology();
+        configurator.SetTemporaryEndpointNameFormatter(_ => "msb-response");
+        await using var client = new ServiceBusClient(ConnectionString);
+        var factory = new AzureServiceBusTransportFactory(client, configurator);
+        var requestClient = new GenericRequestClient<InteropRequest>(
+            factory,
+            new EnvelopeMessageSerializer(),
+            new SendContextFactory(),
+            factory.GetPublishAddress(BindingEntityName),
+            RequestTimeout.After(TimeSpan.FromSeconds(20)));
+
+        var response = await requestClient.GetResponseAsync<InteropResponse>(
+            new InteropRequest { Value = expectedValue });
+        await AzureServiceBusJavaInteropPeer.WaitForOutput(javaPeer, "RESPONDED", TimeSpan.FromSeconds(20));
+        await AzureServiceBusJavaInteropPeer.WaitForExit(javaPeer, TimeSpan.FromSeconds(10));
+
+        Assert.Equal(0, javaPeer.ExitCode);
+        Assert.Equal("response-from-java", response.Message.Value);
+    }
+
+    [AzureServiceBusEmulatorFact]
+    public async Task Java_request_client_receives_csharp_response()
+    {
+        await PurgeQueue("msb-publish");
+        await PurgeQueue("msb-response");
+        var server = MessageBus.Factory.Create<AzureServiceBusFactoryConfigurator>(cfg =>
+        {
+            cfg.Host(ConnectionString);
+            cfg.UsePreProvisionedTopology();
+            cfg.Message<InteropRequest>(message => message.SetEntityName(BindingEntityName));
+            cfg.ReceiveEndpoint("msb-publish", endpoint =>
+                endpoint.Handler<InteropRequest>(context =>
+                    context.RespondAsync(new InteropResponse { Value = "response-from-dotnet" })));
+        });
+
+        await server.StartAsync(CancellationToken.None);
+        try
+        {
+            using var javaPeer = AzureServiceBusJavaInteropPeer.Start(
+                ConnectionString,
+                "azure-request",
+                BindingEntityName,
+                "unused",
+                "request-from-java");
+            await AzureServiceBusJavaInteropPeer.WaitForOutput(javaPeer, "RECEIVED", TimeSpan.FromMinutes(2));
+            await AzureServiceBusJavaInteropPeer.WaitForExit(javaPeer, TimeSpan.FromSeconds(10));
+            Assert.Equal(0, javaPeer.ExitCode);
+        }
+        finally
+        {
+            await server.StopAsync(CancellationToken.None);
+        }
+    }
+
     private static async Task SendFromCsharpToJava(
         string queueName,
         string javaMode,

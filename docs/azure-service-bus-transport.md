@@ -25,14 +25,16 @@ Both clients currently implement:
 - `_error` and `_skipped` queues and endpoint-specific `Fault<T>` publication
 - `Create` and `PreProvisioned` topology modes
 - corresponding MassTransit-familiar C# and idiomatic Java factory configuration
+- correlated request responses and faults through transport-produced response addresses
+- native auto-delete response queues in `Create` mode and explicitly mapped response queues in `PreProvisioned` mode
 
 The emulator suite currently proves direct delivery, topic forwarding, and the
 public factory path independently for each client. It also proves bidirectional
 C# and Java delivery for directed send and publish, plus retry recovery,
 retry exhaustion, `_error` and `_skipped` settlement, and endpoint fault
 publication in both clients.
-Request/response, the remaining conformance cases, and cloud administration
-remain before the initial profile is complete.
+The remaining conformance cases and cloud administration remain before the
+initial profile is complete.
 
 The first slice does not expose sessions, duplicate detection, native scheduled
 enqueue, deferral, delayed redelivery, transactions, partitioning, or custom
@@ -50,14 +52,14 @@ The initial adapters should publish this version 1 descriptor:
 | `durability` | Native | Durable queues, topics, subscriptions, and messages. |
 | `competingConsumers` | Native | Receivers compete on the same endpoint queue. |
 | `acknowledgement` | Native | Peek-lock delivery is completed only after the consume pipeline succeeds. |
-| `requestResponse` | Unsupported | The portable request client exists, but transport-created response queues are not implemented yet. |
+| `requestResponse` | Emulated | Composes request/response from correlated envelopes, directed sends, and transport-produced response queues. |
 | `scheduling` | Emulated | Uses the portable job scheduler until native scheduled enqueue is specified. |
 | `retry` | Emulated | Re-invokes the consume pipeline while the delivery lock is held. |
 | `redelivery` | Unsupported | Abandon, defer, and scheduled redelivery are not initially exposed. |
 | `errorDestinations` | Emulated | Failed and skipped messages are copied to compatibility queues. |
 | `ordering` | Native | Preserves broker enqueue order within a non-session entity; concurrent processing may complete out of order. |
 | `replay` | Unsupported | Service Bus does not expose retained-history replay through this profile. |
-| `temporaryEndpoints` | Unsupported | Address production exists for future request work, but lifecycle and cloud conformance are not implemented yet. |
+| `temporaryEndpoints` | Native | `Create` mode provisions uniquely named auto-delete queues; `PreProvisioned` mode can map logical names to infrastructure-owned queues. |
 | `topologyProvisioning` | Native | Cloud namespaces use the administration SDK; emulator tests may use declarative topology. |
 
 The current descriptor reports behavior implemented by the adapter, not every feature
@@ -186,18 +188,21 @@ conditions such as maximum delivery count or expiration. A later profile option
 may deliberately route application failures there, but it must not silently
 replace the compatibility behavior.
 
-## Planned Request/Response and Temporary Endpoints
+## Request/Response and Temporary Endpoints
 
-The completed profile will require the factory to produce the response address;
-portable request code must never build
-an `sb` URI. In Azure, the adapter creates a uniquely named queue with an
-appropriate auto-delete-on-idle lifetime and deletes it during orderly shutdown
-when possible.
+The factory produces the response address; portable request code never builds
+an `sb` URI. In `Create` mode, the adapters create uniquely named queues with a
+native auto-delete-on-idle lifetime. The C# portable request client and Java's
+corresponding `TransportRequestClientTransport` both start the response
+receiver before sending, propagate the request identifier, recognize normal
+and fault responses, and stop the receiver when the request completes.
 
 The emulator does not persist entities across restart and its management
 surface differs from the cloud service. Emulator conformance tests therefore
-use the pre-provisioned `msb-response` queue and run sequentially. This is a test
-fixture constraint, not the production topology strategy.
+use the pre-provisioned `msb-response` queue and run sequentially. Configure
+this explicitly with `SetTemporaryEndpointNameFormatter` in C# or
+`setTemporaryEndpointNameFormatter` in Java. This is a test fixture constraint,
+not the production topology strategy.
 
 ## Topology Management Modes
 
@@ -246,7 +251,9 @@ both clients where applicable:
 - [x] Java publish and subscription forwarding
 - [x] C# directed send and publish consumed by Java
 - [x] Java directed send and publish consumed by C#
-- [ ] correlated request and response in both directions
+- [x] correlated request, response, and fault handling in both clients
+- [x] C# request consumed and answered by Java
+- [x] Java request consumed and answered by C#
 - [ ] envelope and native-property preservation in both directions
 - [x] retry success without failure-destination traffic
 - [x] retry exhaustion and completion after copying to `_error`

@@ -47,14 +47,14 @@ public final class TransportCapabilityDescriptors {
                     Map.entry(TransportCapabilities.DURABILITY, TransportCapabilitySupport.NATIVE),
                     Map.entry(TransportCapabilities.COMPETING_CONSUMERS, TransportCapabilitySupport.NATIVE),
                     Map.entry(TransportCapabilities.ACKNOWLEDGEMENT, TransportCapabilitySupport.NATIVE),
-                    Map.entry(TransportCapabilities.REQUEST_RESPONSE, TransportCapabilitySupport.UNSUPPORTED),
+                    Map.entry(TransportCapabilities.REQUEST_RESPONSE, TransportCapabilitySupport.EMULATED),
                     Map.entry(TransportCapabilities.SCHEDULING, TransportCapabilitySupport.EMULATED),
                     Map.entry(TransportCapabilities.RETRY, TransportCapabilitySupport.EMULATED),
                     Map.entry(TransportCapabilities.REDELIVERY, TransportCapabilitySupport.UNSUPPORTED),
                     Map.entry(TransportCapabilities.ERROR_DESTINATIONS, TransportCapabilitySupport.EMULATED),
                     Map.entry(TransportCapabilities.ORDERING, TransportCapabilitySupport.NATIVE),
                     Map.entry(TransportCapabilities.REPLAY, TransportCapabilitySupport.UNSUPPORTED),
-                    Map.entry(TransportCapabilities.TEMPORARY_ENDPOINTS, TransportCapabilitySupport.UNSUPPORTED),
+                    Map.entry(TransportCapabilities.TEMPORARY_ENDPOINTS, TransportCapabilitySupport.NATIVE),
                     Map.entry(TransportCapabilities.TOPOLOGY_PROVISIONING, TransportCapabilitySupport.NATIVE)));
 
     private TransportCapabilityDescriptors() {

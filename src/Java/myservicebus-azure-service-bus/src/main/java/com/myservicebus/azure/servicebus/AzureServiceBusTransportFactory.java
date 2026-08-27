@@ -27,11 +27,12 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 
-public final class AzureServiceBusTransportFactory implements TransportFactory {
+public final class AzureServiceBusTransportFactory implements TransportFactory, AutoCloseable {
     private final String connectionString;
     private final ServiceBusAdministrationClient administrationClient;
     private final AzureServiceBusTopologyMode topologyMode;
     private final int defaultPrefetchCount;
+    private final Function<String, String> temporaryEndpointNameFormatter;
     private final URI baseAddress;
     private final LoggerFactory loggerFactory;
     private final ConcurrentHashMap<String, SendTransport> sendTransports = new ConcurrentHashMap<>();
@@ -42,6 +43,7 @@ public final class AzureServiceBusTransportFactory implements TransportFactory {
         this.connectionString = configurator.getConnectionString();
         this.topologyMode = configurator.getTopologyMode();
         this.defaultPrefetchCount = configurator.getPrefetchCount();
+        this.temporaryEndpointNameFormatter = configurator.getTemporaryEndpointNameFormatter();
         this.baseAddress = endpoint(connectionString);
         this.loggerFactory = loggerFactory;
         this.administrationClient = topologyMode == AzureServiceBusTopologyMode.CREATE
@@ -72,7 +74,7 @@ public final class AzureServiceBusTransportFactory implements TransportFactory {
             Function<TransportMessage, CompletableFuture<Void>> handler,
             Function<String, Boolean> isMessageTypeRegistered) {
         AzureServiceBusReceiveEndpointTopology projected =
-                AzureServiceBusReceiveEndpointTopology.project(topology);
+                AzureServiceBusReceiveEndpointTopology.project(mapTemporaryEndpoint(topology));
         if (topologyMode == AzureServiceBusTopologyMode.CREATE) {
             try {
                 ensureTopology(projected);
@@ -130,8 +132,15 @@ public final class AzureServiceBusTransportFactory implements TransportFactory {
         return address(queue, false, null).toString();
     }
 
+    @Override
     public String getTemporaryEndpointAddress(String endpointName) {
-        return address(endpointName, false, "temporary=true").toString();
+        return address(formatTemporaryEndpointName(endpointName), false, "temporary=true").toString();
+    }
+
+    @Override
+    public void close() {
+        sendTransports.values().forEach(transport -> ((AzureServiceBusSendTransport) transport).close());
+        sendTransports.clear();
     }
 
     private ServiceBusSenderClient sender(
@@ -155,7 +164,7 @@ public final class AzureServiceBusTransportFactory implements TransportFactory {
             ensureQueue(topology.queueName() + "_skipped", false);
             ensureTopic(topology.queueName() + "_fault");
         }
-        for (MessageBinding binding : topology.bindings()) {
+        for (MessageBinding binding : topology.temporary() ? java.util.List.<MessageBinding>of() : topology.bindings()) {
             ensureTopic(binding.getEntityName());
             if (!administrationClient.getSubscriptionExists(binding.getEntityName(), topology.queueName())) {
                 try {
@@ -168,6 +177,26 @@ public final class AzureServiceBusTransportFactory implements TransportFactory {
                 }
             }
         }
+    }
+
+    private ReceiveEndpointTransportTopology mapTemporaryEndpoint(ReceiveEndpointTransportTopology topology) {
+        if (!topology.temporary()) {
+            return topology;
+        }
+        return new ReceiveEndpointTransportTopology(
+                formatTemporaryEndpointName(topology.name()),
+                topology.durable(),
+                topology.temporary(),
+                topology.prefetchCount(),
+                topology.bindings(),
+                topology.transportOptions());
+    }
+
+    private String formatTemporaryEndpointName(String endpointName) {
+        if (endpointName == null || endpointName.isBlank()) {
+            throw new IllegalArgumentException("Temporary endpoint name cannot be blank");
+        }
+        return temporaryEndpointNameFormatter.apply(endpointName);
     }
 
     private void ensureQueue(String name, boolean temporary) {
