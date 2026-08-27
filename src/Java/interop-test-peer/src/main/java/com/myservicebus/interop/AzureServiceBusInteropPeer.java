@@ -58,7 +58,10 @@ final class AzureServiceBusInteropPeer {
         if (!"1".equals(System.getenv("AZURE_SERVICEBUS_CREATE_TOPOLOGY"))) {
             configurator.usePreProvisionedTopology();
         }
-        configurator.setTemporaryEndpointNameFormatter(ignored -> "msb-response");
+        String temporaryEndpointName = "azure-request".equals(args[0]) && !"unused".equals(args[2])
+                ? args[2]
+                : "msb-response";
+        configurator.setTemporaryEndpointNameFormatter(ignored -> temporaryEndpointName);
         AzureServiceBusTransportFactory transportFactory = new AzureServiceBusTransportFactory(
                 configurator,
                 LoggerFactoryBuilder.create(builder -> builder.addConsole()));

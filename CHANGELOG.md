@@ -26,6 +26,7 @@ This changelog summarizes the bigger themes in the repository history. It is int
 - Aligned the default Azure Service Bus message-entity formatter with MassTransit in both clients, including namespace/package, nested-type, generic-type, and array conventions where the host type system exposes them, while keeping formatter configuration scoped to the transport.
 - Added live bidirectional default-name Azure publication between MassTransit and both MyServiceBus clients, using corresponding C# and Java contract identities and public client APIs.
 - Completed the live Azure directed-send matrix with public C# and Java MyServiceBus sends to MassTransit queues, complementing the verified reverse directions.
+- Verified live correlated MassTransit responses to C# and Java MyServiceBus request clients through unique native Azure Service Bus response queues.
 
 ### Documentation website
 

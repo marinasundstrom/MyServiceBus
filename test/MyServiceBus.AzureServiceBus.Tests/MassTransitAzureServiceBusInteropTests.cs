@@ -16,6 +16,90 @@ public sealed class MassTransitAzureServiceBusInteropTests
         new MassTransit.AzureServiceBusTransport.ServiceBusMessageNameFormatter()
             .GetMessageName(typeof(CrossLanguageMessage));
 
+    private static string DefaultRequestTopicName =>
+        new MassTransit.AzureServiceBusTransport.ServiceBusMessageNameFormatter()
+            .GetMessageName(typeof(InteropRequest));
+
+    [AzureServiceBusCloudFact]
+    public async Task Csharp_MyServiceBus_request_client_receives_MassTransit_response()
+    {
+        var suffix = Guid.NewGuid().ToString("N")[..12];
+        var queueName = $"msb-csharp-request-mt-{suffix}";
+        var responseQueueName = $"msb-csharp-response-mt-{suffix}";
+        var administrationClient = new ServiceBusAdministrationClient(ConnectionString);
+        var massTransit = MassTransit.Bus.Factory.CreateUsingAzureServiceBus(cfg =>
+        {
+            cfg.Host(ConnectionString);
+            cfg.ReceiveEndpoint(queueName, endpoint =>
+                endpoint.Handler<InteropRequest>(context =>
+                    context.RespondAsync(new InteropResponse { Value = "response-from-masstransit" })));
+        });
+        var requestConfigurator = new AzureServiceBusFactoryConfigurator();
+        requestConfigurator.Host(ConnectionString);
+        requestConfigurator.SetTemporaryEndpointNameFormatter(_ => responseQueueName);
+        await using var serviceBusClient = new ServiceBusClient(ConnectionString);
+        var requestFactory = new AzureServiceBusTransportFactory(serviceBusClient, requestConfigurator);
+        var requestClient = new GenericRequestClient<InteropRequest>(
+            requestFactory,
+            new MyServiceBus.Serialization.EnvelopeMessageSerializer(),
+            new SendContextFactory(),
+            timeout: MyServiceBus.RequestTimeout.After(TimeSpan.FromSeconds(30)));
+
+        await massTransit.StartAsync(CancellationToken.None);
+        try
+        {
+            var response = await requestClient.GetResponseAsync<InteropResponse>(
+                new InteropRequest { Value = "request-from-csharp" });
+
+            Assert.Equal("response-from-masstransit", response.Message.Value);
+        }
+        finally
+        {
+            await massTransit.StopAsync();
+            await DeleteQueueIfExists(administrationClient, responseQueueName);
+            await DeleteTopology(administrationClient, queueName, DefaultRequestTopicName);
+        }
+    }
+
+    [AzureServiceBusCloudFact]
+    public async Task Java_MyServiceBus_request_client_receives_MassTransit_response()
+    {
+        var suffix = Guid.NewGuid().ToString("N")[..12];
+        var queueName = $"msb-java-request-mt-{suffix}";
+        var responseQueueName = $"msb-java-response-mt-{suffix}";
+        var administrationClient = new ServiceBusAdministrationClient(ConnectionString);
+        var massTransit = MassTransit.Bus.Factory.CreateUsingAzureServiceBus(cfg =>
+        {
+            cfg.Host(ConnectionString);
+            cfg.ReceiveEndpoint(queueName, endpoint =>
+                endpoint.Handler<InteropRequest>(context =>
+                    context.RespondAsync(new InteropResponse { Value = "response-from-dotnet" })));
+        });
+
+        await massTransit.StartAsync(CancellationToken.None);
+        using var javaPeer = AzureServiceBusJavaInteropPeer.Start(
+            ConnectionString,
+            "azure-request",
+            DefaultRequestTopicName,
+            responseQueueName,
+            "request-from-java",
+            createTopology: true);
+        try
+        {
+            await AzureServiceBusJavaInteropPeer.WaitForOutput(javaPeer, "RECEIVED", TimeSpan.FromMinutes(2));
+            await AzureServiceBusJavaInteropPeer.WaitForExit(javaPeer, TimeSpan.FromSeconds(10));
+            Assert.Equal(0, javaPeer.ExitCode);
+        }
+        finally
+        {
+            await massTransit.StopAsync();
+            if (!javaPeer.HasExited)
+                javaPeer.Kill(entireProcessTree: true);
+            await DeleteQueueIfExists(administrationClient, responseQueueName);
+            await DeleteTopology(administrationClient, queueName, DefaultRequestTopicName);
+        }
+    }
+
     [AzureServiceBusCloudFact]
     public async Task MassTransit_publish_is_consumed_by_default_named_Csharp_MyServiceBus_endpoint()
     {

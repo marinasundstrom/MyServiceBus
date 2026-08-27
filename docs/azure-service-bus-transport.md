@@ -315,6 +315,8 @@ both clients where applicable:
 - [x] C# and Java default-named publish is consumed by MassTransit, and
   MassTransit default-named publish is consumed by both MyServiceBus clients
 - [x] C# and Java directed send is consumed by MassTransit
-- [ ] bidirectional request/response and fault flows with MassTransit
+- [x] C# and Java MyServiceBus request clients receive correlated MassTransit responses
+- [ ] MassTransit request clients receive C# and Java MyServiceBus responses
+- [ ] bidirectional fault flows with MassTransit
 
 Compatibility claims remain scoped to scenarios with executable evidence.
