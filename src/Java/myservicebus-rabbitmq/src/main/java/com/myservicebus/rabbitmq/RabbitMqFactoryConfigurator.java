@@ -87,8 +87,7 @@ public class RabbitMqFactoryConfigurator implements BusFactoryConfigurator {
     public void configureEndpoints(BusRegistrationContext context) {
         TopologyRegistry registry = context.getServiceProvider().getService(TopologyRegistry.class);
         for (ConsumerTopology def : registry.getConsumers()) {
-            Class<?> messageType = def.getBindings().get(0).getMessageType();
-            String queueName = endpointNameFormatter != null ? endpointNameFormatter.format(messageType)
+            String queueName = endpointNameFormatter != null ? endpointNameFormatter.format(def.getConsumerType())
                     : def.getQueueName();
             Class<?> consumerClass = def.getConsumerType();
             receiveEndpoint(queueName, e -> e.configureConsumer(context, consumerClass));

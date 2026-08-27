@@ -34,7 +34,7 @@ public class BusRegistrationConfigurator : IBusRegistrationConfigurator
         var messageType = GetHandledMessageTypes(typeof(TConsumer)).First();
 
         _topology.RegisterConsumer<TConsumer>(
-          queueName: KebabCaseEndpointNameFormatter.Instance.Format(messageType),
+          queueName: DefaultEndpointNameFormatter.Instance.Format(typeof(TConsumer)),
           configurePipe: null,
           messageTypes: messageType
       );
@@ -48,7 +48,7 @@ public class BusRegistrationConfigurator : IBusRegistrationConfigurator
         Services.AddScoped<IConsumer, TConsumer>((sp) => sp.GetRequiredService<TConsumer>());
 
         _topology.RegisterConsumer<TConsumer>(
-            queueName: KebabCaseEndpointNameFormatter.Instance.Format(typeof(TMessage)),
+            queueName: DefaultEndpointNameFormatter.Instance.Format(typeof(TConsumer)),
             configurePipe: configure,
             messageTypes: typeof(TMessage));
     }

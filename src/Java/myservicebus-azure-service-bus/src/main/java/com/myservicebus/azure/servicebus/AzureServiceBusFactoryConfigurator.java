@@ -107,9 +107,8 @@ public final class AzureServiceBusFactoryConfigurator implements BusFactoryConfi
     public void configureEndpoints(BusRegistrationContext context) {
         TopologyRegistry registry = context.getServiceProvider().getService(TopologyRegistry.class);
         for (ConsumerTopology definition : registry.getConsumers()) {
-            Class<?> messageType = definition.getBindings().get(0).getMessageType();
             String queueName = endpointNameFormatter != null
-                    ? endpointNameFormatter.format(messageType)
+                    ? endpointNameFormatter.format(definition.getConsumerType())
                     : definition.getQueueName();
             receiveEndpoint(queueName, endpoint -> endpoint.configureConsumer(context, definition.getConsumerType()));
         }

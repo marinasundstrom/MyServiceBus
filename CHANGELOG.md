@@ -29,6 +29,7 @@ This changelog summarizes the bigger themes in the repository history. It is int
 - Verified live correlated MassTransit responses to C# and Java MyServiceBus request clients through unique native Azure Service Bus response queues.
 - Completed the live Azure request/response matrix with correlated C# and Java MyServiceBus responses to MassTransit request clients.
 - Completed the live bidirectional Azure fault matrix between MassTransit and the C# and Java MyServiceBus request clients and services.
+- Aligned automatic consumer endpoint naming with MassTransit across C# and Java and both broker transports, including consumer-type derivation and suffix trimming, and verified the resulting Azure queues, subscriptions, and companion entities live.
 
 ### Documentation website
 

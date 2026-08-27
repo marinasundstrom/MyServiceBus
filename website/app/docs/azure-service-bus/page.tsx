@@ -137,7 +137,7 @@ export default function AzureServiceBus() {
       <p className="small-note">Request clients normally create unique auto-delete response queues. A pre-provisioned environment must also map temporary response endpoint names to infrastructure-owned queues.</p>
 
       <h2>MassTransit interoperability</h2>
-      <p>Azure entity names are part of the wire contract. Keep corresponding C# and Java message contracts aligned, and use the same explicit entity-name overrides in MyServiceBus and MassTransit when defaults are not suitable. Live tests cover directed sends, default-named publication, correlated responses, and correlated faults in every direction for both clients.</p>
+      <p>Azure entity names are part of the wire contract. Automatic consumer endpoint names follow MassTransit’s default suffix rules in both clients, and corresponding message contracts resolve to the same topic names. Use matching explicit entity-name overrides in MyServiceBus and MassTransit when defaults are not suitable. Live tests cover the resulting queues, subscriptions, companions, directed sends, publication, correlated responses, and correlated faults.</p>
 
       <h2>Remove an evaluation environment</h2>
       <p>If the resource group is dedicated to this evaluation, delete it when you finish to stop further Azure charges. This removes the namespace and every entity inside it.</p>

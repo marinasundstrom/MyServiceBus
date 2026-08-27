@@ -1,6 +1,7 @@
 using Azure.Messaging.ServiceBus;
 using Azure.Messaging.ServiceBus.Administration;
 using MassTransit;
+using Microsoft.Extensions.DependencyInjection;
 using MyServiceBus.Topology;
 using TestApp;
 
@@ -19,6 +20,94 @@ public sealed class MassTransitAzureServiceBusInteropTests
     private static string DefaultRequestTopicName =>
         new MassTransit.AzureServiceBusTransport.ServiceBusMessageNameFormatter()
             .GetMessageName(typeof(InteropRequest));
+
+    private static string DefaultEndpointName =>
+        new MassTransit.DefaultEndpointNameFormatter(false)
+            .Consumer<DefaultEndpointConsumer>();
+
+    [Fact]
+    public void Default_endpoint_formatter_matches_MassTransit()
+    {
+        Assert.Equal(
+            DefaultEndpointName,
+            MyServiceBus.DefaultEndpointNameFormatter.Instance.Format(typeof(DefaultEndpointConsumer)));
+    }
+
+    [AzureServiceBusCloudFact]
+    public async Task Default_Csharp_MyServiceBus_endpoint_uses_MassTransit_topology_names()
+    {
+        var received = new TaskCompletionSource<CrossLanguageMessage>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var administrationClient = new ServiceBusAdministrationClient(ConnectionString);
+        var services = new ServiceCollection();
+        services.AddSingleton(received);
+        services.AddServiceBus(x =>
+        {
+            x.AddConsumer<DefaultEndpointConsumer>();
+            x.UsingAzureServiceBus((context, cfg) =>
+            {
+                cfg.Host(ConnectionString);
+                cfg.ConfigureEndpoints(context);
+            });
+        });
+        await using var provider = services.BuildServiceProvider();
+        foreach (var action in provider.GetServices<MyServiceBus.IPostBuildAction>())
+            action.Execute(provider);
+        var myServiceBus = provider.GetRequiredService<MyServiceBus.IMessageBus>();
+        var massTransit = MassTransit.Bus.Factory.CreateUsingAzureServiceBus(cfg => cfg.Host(ConnectionString));
+
+        await myServiceBus.StartAsync(CancellationToken.None);
+        await massTransit.StartAsync(CancellationToken.None);
+        try
+        {
+            await AssertDefaultEndpointTopology(administrationClient);
+            var endpoint = await massTransit.GetSendEndpoint(new Uri($"queue:{DefaultEndpointName}"));
+            await endpoint.Send(new CrossLanguageMessage { Value = "default-csharp-endpoint" });
+
+            var message = await received.Task.WaitAsync(TimeSpan.FromSeconds(20));
+            Assert.Equal("default-csharp-endpoint", message.Value);
+        }
+        finally
+        {
+            await massTransit.StopAsync();
+            await myServiceBus.StopAsync(CancellationToken.None);
+            await DeleteTopology(administrationClient, DefaultEndpointName, DefaultTopicName);
+        }
+    }
+
+    [AzureServiceBusCloudFact]
+    public async Task Default_Java_MyServiceBus_endpoint_uses_MassTransit_topology_names()
+    {
+        var administrationClient = new ServiceBusAdministrationClient(ConnectionString);
+        using var javaPeer = AzureServiceBusJavaInteropPeer.Start(
+            ConnectionString,
+            "azure-consume-configured",
+            DefaultEndpointName,
+            "unused",
+            "default-java-endpoint",
+            createTopology: true);
+        var massTransit = MassTransit.Bus.Factory.CreateUsingAzureServiceBus(cfg => cfg.Host(ConnectionString));
+
+        try
+        {
+            await AzureServiceBusJavaInteropPeer.WaitForOutput(javaPeer, "READY", TimeSpan.FromMinutes(2));
+            await AssertDefaultEndpointTopology(administrationClient);
+            await massTransit.StartAsync(CancellationToken.None);
+            var endpoint = await massTransit.GetSendEndpoint(new Uri($"queue:{DefaultEndpointName}"));
+            await endpoint.Send(new CrossLanguageMessage { Value = "default-java-endpoint" });
+
+            await AzureServiceBusJavaInteropPeer.WaitForOutput(javaPeer, "RECEIVED", TimeSpan.FromSeconds(20));
+            await AzureServiceBusJavaInteropPeer.WaitForExit(javaPeer, TimeSpan.FromSeconds(10));
+            Assert.Equal(0, javaPeer.ExitCode);
+        }
+        finally
+        {
+            await massTransit.StopAsync();
+            if (!javaPeer.HasExited)
+                javaPeer.Kill(entireProcessTree: true);
+            await DeleteTopology(administrationClient, DefaultEndpointName, DefaultTopicName);
+        }
+    }
 
     [AzureServiceBusCloudFact]
     public async Task Csharp_MyServiceBus_request_client_receives_MassTransit_response()
@@ -672,6 +761,21 @@ public sealed class MassTransitAzureServiceBusInteropTests
         await DeleteTopicIfExists(administrationClient, queueName + "_fault");
     }
 
+    private static async Task AssertDefaultEndpointTopology(
+        ServiceBusAdministrationClient administrationClient)
+    {
+        Assert.True((await administrationClient.QueueExistsAsync(DefaultEndpointName)).Value);
+        Assert.True((await administrationClient.QueueExistsAsync(DefaultEndpointName + "_error")).Value);
+        Assert.True((await administrationClient.QueueExistsAsync(DefaultEndpointName + "_skipped")).Value);
+        Assert.True((await administrationClient.TopicExistsAsync(DefaultEndpointName + "_fault")).Value);
+        Assert.True((await administrationClient.TopicExistsAsync(DefaultTopicName)).Value);
+
+        var subscription = await administrationClient.GetSubscriptionAsync(
+            DefaultTopicName,
+            DefaultEndpointName);
+        Assert.EndsWith("/" + DefaultEndpointName, subscription.Value.ForwardTo);
+    }
+
     private static async Task DeleteQueueIfExists(
         ServiceBusAdministrationClient administrationClient,
         string queueName)
@@ -694,5 +798,26 @@ public sealed class MassTransitAzureServiceBusInteropTests
         {
             throw new InvalidOperationException("mass-transit-fault");
         }
+    }
+
+    private sealed class DefaultEndpointConsumer :
+        MyServiceBus.IConsumer<CrossLanguageMessage>,
+        MassTransit.IConsumer<CrossLanguageMessage>
+    {
+        private readonly TaskCompletionSource<CrossLanguageMessage> received;
+
+        public DefaultEndpointConsumer(TaskCompletionSource<CrossLanguageMessage> received)
+        {
+            this.received = received;
+        }
+
+        public Task Consume(MyServiceBus.ConsumeContext<CrossLanguageMessage> context)
+        {
+            received.TrySetResult(context.Message);
+            return Task.CompletedTask;
+        }
+
+        public Task Consume(MassTransit.ConsumeContext<CrossLanguageMessage> context) =>
+            Task.CompletedTask;
     }
 }

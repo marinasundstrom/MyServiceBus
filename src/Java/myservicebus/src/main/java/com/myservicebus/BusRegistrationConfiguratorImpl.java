@@ -54,7 +54,7 @@ public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigura
                     Type actualType = pt.getActualTypeArguments()[0];
                     Class<?> messageType = getClassFromType(actualType);
                     topology.registerConsumer(consumerClass,
-                            KebabCaseEndpointNameFormatter.INSTANCE.format(messageType),
+                            DefaultEndpointNameFormatter.INSTANCE.format(consumerClass),
                             null,
                             messageType);
                 }
@@ -73,7 +73,7 @@ public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigura
         }
 
         serviceCollection.addScoped(consumerClass);
-        topology.registerConsumer(consumerClass, KebabCaseEndpointNameFormatter.INSTANCE.format(messageClass), (java.util.function.Consumer) configure, messageClass);
+        topology.registerConsumer(consumerClass, DefaultEndpointNameFormatter.INSTANCE.format(consumerClass), (java.util.function.Consumer) configure, messageClass);
         consumerTypes.add(consumerClass);
     }
 

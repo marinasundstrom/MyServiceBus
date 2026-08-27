@@ -14,7 +14,18 @@ public class DefaultEndpointNameFormatter : IEndpointNameFormatter
 
     public string Format(Type messageType)
     {
-        return messageType.Name;
+        return TrimConsumerSuffix(messageType.Name);
+    }
+
+    internal static string TrimConsumerSuffix(string name)
+    {
+        foreach (var suffix in new[] { "Consumer", "Saga", "Activity" })
+        {
+            if (name.EndsWith(suffix, StringComparison.Ordinal))
+                return name[..^suffix.Length];
+        }
+
+        return name;
     }
 }
 
@@ -24,7 +35,7 @@ public class KebabCaseEndpointNameFormatter : IEndpointNameFormatter
 
     public string Format(Type messageType)
     {
-        var name = messageType.Name;
+        var name = DefaultEndpointNameFormatter.TrimConsumerSuffix(messageType.Name);
         return Regex.Replace(name, "([a-z0-9])([A-Z])", "$1-$2").ToLowerInvariant();
     }
 }
@@ -35,8 +46,7 @@ public class SnakeCaseEndpointNameFormatter : IEndpointNameFormatter
 
     public string Format(Type messageType)
     {
-        var name = messageType.Name;
+        var name = DefaultEndpointNameFormatter.TrimConsumerSuffix(messageType.Name);
         return Regex.Replace(name, "([a-z0-9])([A-Z])", "$1_$2").ToLowerInvariant();
     }
 }
-

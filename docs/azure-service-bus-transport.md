@@ -123,8 +123,9 @@ corresponding `TestApp.CrossLanguageMessage` .NET type and
 `TestApp/CrossLanguageMessage`. Explicit collision-free queues continue to keep
 the cloud cases isolated. The live request matrix is complete in both directions
 for both MyServiceBus clients. The live fault matrix is likewise complete in
-both directions. Automatic endpoint and companion naming and cloud failure-copy
-settlement remain experimental and are listed below.
+both directions. Default consumer endpoint, subscription, and companion names
+also match MassTransit in both clients. Cloud failure-copy settlement remains
+experimental and is listed below.
 
 ## Topology Projection
 
@@ -311,7 +312,7 @@ both clients where applicable:
   Service Bus peer on self-provisioned live-Azure topology
 - [x] default message-topic names match the pinned MassTransit Azure Service Bus
   convention in C# and Java
-- [ ] default endpoint, subscription, and companion names match the pinned
+- [x] default endpoint, subscription, and companion names match the pinned
   MassTransit Azure Service Bus conventions in C# and Java
 - [x] C# and Java default-named publish is consumed by MassTransit, and
   MassTransit default-named publish is consumed by both MyServiceBus clients

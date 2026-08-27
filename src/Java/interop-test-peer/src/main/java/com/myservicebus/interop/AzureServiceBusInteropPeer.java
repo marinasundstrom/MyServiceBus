@@ -5,7 +5,10 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.myservicebus.Envelope;
 import com.myservicebus.GenericRequestClient;
+import com.myservicebus.ConsumeContext;
+import com.myservicebus.Consumer;
 import com.myservicebus.MessageBus;
+import com.myservicebus.MessageBusServices;
 import com.myservicebus.MessageUrn;
 import com.myservicebus.ReceiveTransport;
 import com.myservicebus.RequestClient;
@@ -16,6 +19,8 @@ import com.myservicebus.TransportRequestClientTransport;
 import com.myservicebus.azure.servicebus.AzureServiceBusFactoryConfigurator;
 import com.myservicebus.azure.servicebus.AzureServiceBusTransportFactory;
 import com.myservicebus.logging.LoggerFactoryBuilder;
+import com.myservicebus.di.ServiceCollection;
+import com.myservicebus.di.ServiceProvider;
 import com.myservicebus.serialization.EnvelopeMessageSerializer;
 import com.myservicebus.tasks.CancellationToken;
 import com.myservicebus.topology.MessageBinding;
@@ -50,7 +55,7 @@ final class AzureServiceBusInteropPeer {
     static void run(String[] args) throws Exception {
         if (args.length != 4) {
             throw new IllegalArgumentException(
-                    "Expected: <azure-consume|azure-consume-value|azure-send|azure-publish|azure-respond|azure-fault|azure-request|azure-request-fault> "
+                    "Expected: <azure-consume|azure-consume-value|azure-consume-configured|azure-send|azure-publish|azure-respond|azure-fault|azure-request|azure-request-fault> "
                             + "<queue-or-entity> <binding-or-unused> <value>");
         }
 
@@ -73,6 +78,7 @@ final class AzureServiceBusInteropPeer {
             case "azure-consume" -> consume(transportFactory, args[1], args[2], args[3], true);
             case "azure-consume-value" -> consume(transportFactory, args[1], args[2], args[3], false);
             case "azure-consume-default" -> consumeDefault(connectionString, args[1], args[3]);
+            case "azure-consume-configured" -> consumeConfigured(connectionString, args[3]);
             case "azure-send" -> send(transportFactory, args[1], args[3], false);
             case "azure-send-public" -> sendPublic(connectionString, args[1], args[3]);
             case "azure-publish" -> send(transportFactory, args[1], args[3], true);
@@ -108,6 +114,32 @@ final class AzureServiceBusInteropPeer {
         System.out.flush();
         try {
             received.get(20, TimeUnit.SECONDS);
+            System.out.println("RECEIVED");
+            System.out.flush();
+        } finally {
+            bus.stop();
+        }
+    }
+
+    private static void consumeConfigured(String connectionString, String expectedValue) throws Exception {
+        DefaultEndpointConsumer.expectedValue = expectedValue;
+        DefaultEndpointConsumer.received = new CompletableFuture<>();
+        ServiceCollection services = ServiceCollection.create();
+        services.from(MessageBusServices.class).addServiceBus(cfg -> {
+            cfg.addConsumer(DefaultEndpointConsumer.class);
+            cfg.using(AzureServiceBusFactoryConfigurator.class, (context, serviceBus) -> {
+                serviceBus.host(connectionString);
+                serviceBus.configureEndpoints(context);
+            });
+        });
+        ServiceProvider provider = services.buildServiceProvider();
+        MessageBus bus = provider.getService(MessageBus.class);
+
+        bus.start();
+        System.out.println("READY");
+        System.out.flush();
+        try {
+            DefaultEndpointConsumer.received.get(20, TimeUnit.SECONDS);
             System.out.println("RECEIVED");
             System.out.flush();
         } finally {
@@ -414,6 +446,21 @@ final class AzureServiceBusInteropPeer {
 
         public void setValue(String value) {
             this.value = value;
+        }
+    }
+
+    public static final class DefaultEndpointConsumer implements Consumer<CrossLanguageMessage> {
+        private static String expectedValue;
+        private static CompletableFuture<Void> received;
+
+        @Override
+        public CompletableFuture<Void> consume(ConsumeContext<CrossLanguageMessage> context) {
+            if (!expectedValue.equals(context.getMessage().getValue())) {
+                return CompletableFuture.failedFuture(new IllegalStateException(
+                        "Unexpected message: " + context.getMessage().getValue()));
+            }
+            received.complete(null);
+            return CompletableFuture.completedFuture(null);
         }
     }
 }

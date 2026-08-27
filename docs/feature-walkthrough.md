@@ -668,7 +668,7 @@ public record OrderSubmitted;
 public record OrderSubmitted() { }
 ```
 
-Built-in endpoint name formatters include `DefaultEndpointNameFormatter`, `KebabCaseEndpointNameFormatter`, and `SnakeCaseEndpointNameFormatter`.
+Built-in endpoint name formatters include `DefaultEndpointNameFormatter`, `KebabCaseEndpointNameFormatter`, and `SnakeCaseEndpointNameFormatter`. Like MassTransit, automatic endpoint names are derived from the consumer type rather than the message type, and the `Consumer`, `Saga`, and `Activity` suffixes are removed before casing is applied. The suffix rules keep the naming surface compatible; they do not imply that saga or activity runtimes are currently implemented.
 
 #### Queue Arguments
 

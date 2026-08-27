@@ -15,8 +15,7 @@ public static class RabbitMqConfiguratorExtensions
         foreach (var consumer in registry.Consumers)
         {
             var consumerType = consumer.ConsumerType;
-            var messageType = consumer.Bindings.First().MessageType;
-            var queueName = formatter?.Format(messageType) ?? consumer.QueueName;
+            var queueName = formatter?.Format(consumerType) ?? consumer.QueueName;
 
             try
             {

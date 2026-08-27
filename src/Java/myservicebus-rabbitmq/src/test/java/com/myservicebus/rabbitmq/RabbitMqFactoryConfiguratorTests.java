@@ -170,6 +170,6 @@ public class RabbitMqFactoryConfiguratorTests {
                 .findFirst()
                 .orElseThrow();
 
-        assertEquals("formatted-mymessage", def.getQueueName());
+        assertEquals("formatted-myconsumer", def.getQueueName());
     }
 }

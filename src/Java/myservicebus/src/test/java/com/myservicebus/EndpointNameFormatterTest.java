@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 public class EndpointNameFormatterTest {
     static class SampleMessage {}
+    static class SubmitOrderConsumer {}
 
     @Test
     public void defaultFormatterReturnsTypeName() {
@@ -16,5 +17,12 @@ public class EndpointNameFormatterTest {
     public void snakeCaseFormatterFormats() {
         String name = SnakeCaseEndpointNameFormatter.INSTANCE.format(SampleMessage.class);
         assertEquals("sample_message", name);
+    }
+
+    @Test
+    public void formattersTrimMassTransitEndpointSuffixes() {
+        assertEquals("SubmitOrder", DefaultEndpointNameFormatter.INSTANCE.format(SubmitOrderConsumer.class));
+        assertEquals("submit-order", KebabCaseEndpointNameFormatter.INSTANCE.format(SubmitOrderConsumer.class));
+        assertEquals("submit_order", SnakeCaseEndpointNameFormatter.INSTANCE.format(SubmitOrderConsumer.class));
     }
 }

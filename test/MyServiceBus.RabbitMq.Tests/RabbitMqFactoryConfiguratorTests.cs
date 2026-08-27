@@ -210,6 +210,6 @@ public class RabbitMqFactoryConfiguratorTests
         configurator.ConfigureEndpoints(context);
 
         var def = registry.Consumers.First(c => c.ConsumerType == typeof(MyConsumer));
-        Assert.Equal("formatted-mymessage", def.QueueName);
+        Assert.Equal("formatted-myconsumer", def.QueueName);
     }
 }
