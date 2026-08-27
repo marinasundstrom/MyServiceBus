@@ -3,6 +3,7 @@ using Azure.Messaging.ServiceBus.Administration;
 using MassTransit;
 using Microsoft.Extensions.DependencyInjection;
 using MyServiceBus.Topology;
+using System.Text.Json;
 using TestApp;
 
 namespace MyServiceBus.AzureServiceBus.Tests;
@@ -381,6 +382,11 @@ public sealed class MassTransitAzureServiceBusInteropTests
                     new InteropRequest { Value = "fault-from-myservicebus" }));
 
             Assert.Contains("myservicebus-fault", exception.Message);
+            await AssertFailureCopyAndSourceCompletion(
+                administrationClient,
+                queueName,
+                "fault-from-myservicebus",
+                "myservicebus-fault");
         }
         finally
         {
@@ -423,6 +429,11 @@ public sealed class MassTransitAzureServiceBusInteropTests
             var exception = await Assert.ThrowsAsync<MassTransit.RequestFaultException>(() => responseTask);
 
             Assert.Contains("java-fault", exception.Message);
+            await AssertFailureCopyAndSourceCompletion(
+                administrationClient,
+                queueName,
+                "fault-from-masstransit",
+                "java-fault");
         }
         finally
         {
@@ -774,6 +785,50 @@ public sealed class MassTransitAzureServiceBusInteropTests
             DefaultTopicName,
             DefaultEndpointName);
         Assert.EndsWith("/" + DefaultEndpointName, subscription.Value.ForwardTo);
+    }
+
+    private static async Task AssertFailureCopyAndSourceCompletion(
+        ServiceBusAdministrationClient administrationClient,
+        string queueName,
+        string expectedValue,
+        string expectedExceptionMessage)
+    {
+        await using var client = new ServiceBusClient(ConnectionString);
+        await using var receiver = client.CreateReceiver(
+            queueName + "_error",
+            new ServiceBusReceiverOptions { ReceiveMode = ServiceBusReceiveMode.ReceiveAndDelete });
+        var errorMessage = await receiver.ReceiveMessageAsync(TimeSpan.FromSeconds(20))
+            ?? throw new TimeoutException($"Azure Service Bus queue '{queueName}_error' did not receive a message.");
+        var errorEnvelope = JsonSerializer.Deserialize<MyServiceBus.Envelope<InteropRequest>>(
+            errorMessage.Body,
+            new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+        Assert.Equal("application/vnd.masstransit+json", errorMessage.ContentType);
+        Assert.Equal(expectedValue, errorEnvelope?.Message.Value);
+        Assert.Equal(
+            expectedExceptionMessage,
+            errorEnvelope?.Headers[MessageHeaders.ExceptionMessage].ToString());
+        await WaitForQueueToDrain(administrationClient, queueName, TimeSpan.FromSeconds(10));
+    }
+
+    private static async Task WaitForQueueToDrain(
+        ServiceBusAdministrationClient administrationClient,
+        string queueName,
+        TimeSpan timeout)
+    {
+        using var cancellation = new CancellationTokenSource(timeout);
+        while (!cancellation.IsCancellationRequested)
+        {
+            var properties = (await administrationClient.GetQueueRuntimePropertiesAsync(
+                queueName,
+                cancellation.Token)).Value;
+            if (properties.ActiveMessageCount == 0)
+                return;
+
+            await Task.Delay(TimeSpan.FromMilliseconds(250), cancellation.Token);
+        }
+
+        throw new TimeoutException($"Azure Service Bus queue '{queueName}' did not drain within {timeout}.");
     }
 
     private static async Task DeleteQueueIfExists(
