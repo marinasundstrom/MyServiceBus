@@ -80,7 +80,7 @@ public sealed class GenericRequestClient<TRequest> : IRequestClient<TRequest>, I
 
         await responseReceiveTransport.Start(cancellationToken);
 
-        var requestAddress = _destinationAddress ?? _transportFactory.GetPublishAddress(EntityNameFormatter.Format(request.GetType()));
+        var requestAddress = _destinationAddress ?? _transportFactory.GetPublishAddress(request.GetType());
         var requestSendTransport = await _transportFactory.GetSendTransport(requestAddress, cancellationToken);
 
         var responseAddress = _transportFactory.GetTemporaryEndpointAddress(responseExchange);
@@ -168,7 +168,7 @@ public sealed class GenericRequestClient<TRequest> : IRequestClient<TRequest>, I
 
         await responseReceiveTransport.Start(cancellationToken);
 
-        var requestAddress = _destinationAddress ?? _transportFactory.GetPublishAddress(EntityNameFormatter.Format(request.GetType()));
+        var requestAddress = _destinationAddress ?? _transportFactory.GetPublishAddress(request.GetType());
         var requestSendTransport = await _transportFactory.GetSendTransport(requestAddress, cancellationToken);
 
         var responseAddress = _transportFactory.GetTemporaryEndpointAddress(responseExchange);

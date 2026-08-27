@@ -416,8 +416,8 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
     public CompletableFuture<Void> publish(PublishContext context) {
         if (state != BusState.STARTED)
             return notStartedFuture();
-        String exchange = EntityNameFormatter.format(context.getMessage().getClass());
-        String address = transportFactory.getPublishAddress(exchange);
+        String exchange = transportFactory.getPublishEntityName(context.getMessage().getClass());
+        String address = transportFactory.getPublishAddress(context.getMessage().getClass());
         context.setSourceAddress(this.address);
         context.setDestinationAddress(URI.create(address));
 

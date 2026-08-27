@@ -137,7 +137,7 @@ public final class TransportRequestClientTransport implements RequestClientTrans
             context.setFaultAddress(responseAddress);
             URI destination = context.getDestinationAddress() != null
                     ? context.getDestinationAddress()
-                    : URI.create(transportFactory.getPublishAddress(EntityNameFormatter.format(requestType)));
+                    : URI.create(transportFactory.getPublishAddress(requestType));
             context.setDestinationAddress(destination);
             byte[] body = context.serialize(serializer);
             transportFactory.getSendTransport(destination)

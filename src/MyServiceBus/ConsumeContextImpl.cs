@@ -63,9 +63,9 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
         var effectiveCancellationToken = cancellationToken.CanBeCanceled
             ? cancellationToken
             : receiveContext.CancellationToken;
-        var exchangeName = EntityNameFormatter.Format(typeof(T));
+        var exchangeName = _transportFactory.GetPublishEntityName(typeof(T));
 
-        var uri = _transportFactory.GetPublishAddress(exchangeName);
+        var uri = _transportFactory.GetPublishAddress(typeof(T));
         var transport = await _transportFactory.GetSendTransport(uri, effectiveCancellationToken);
 
         var context = _publishContextFactory.Create(MessageTypeCache.GetMessageTypes(typeof(T)), _messageSerializer, effectiveCancellationToken);

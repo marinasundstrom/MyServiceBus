@@ -80,6 +80,10 @@ public class RabbitMqFactoryConfigurator implements BusFactoryConfigurator {
         }
     }
 
+    public String getEntityName(Class<?> messageType) {
+        return exchangeNames.getOrDefault(messageType, EntityNameFormatter.format(messageType));
+    }
+
     public void configureEndpoints(BusRegistrationContext context) {
         TopologyRegistry registry = context.getServiceProvider().getService(TopologyRegistry.class);
         for (ConsumerTopology def : registry.getConsumers()) {

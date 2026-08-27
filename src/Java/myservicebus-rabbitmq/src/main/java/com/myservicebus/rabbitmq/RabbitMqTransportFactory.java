@@ -31,12 +31,19 @@ public class RabbitMqTransportFactory implements TransportFactory {
     private final ConcurrentHashMap<String, RabbitMqSendTransport> queueTransports = new ConcurrentHashMap<>();
     private final int defaultPrefetchCount;
     private final LoggerFactory loggerFactory;
+    private final Function<Class<?>, String> entityNameResolver;
 
     public RabbitMqTransportFactory(ConnectionProvider connectionProvider, RabbitMqFactoryConfigurator configurator,
             LoggerFactory loggerFactory) {
         this.connectionProvider = connectionProvider;
         this.defaultPrefetchCount = configurator.getPrefetchCount();
         this.loggerFactory = loggerFactory;
+        this.entityNameResolver = configurator::getEntityName;
+    }
+
+    @Override
+    public String getPublishEntityName(Class<?> messageType) {
+        return entityNameResolver.apply(messageType);
     }
 
     public SendTransport getSendTransport(String exchange, boolean durable, boolean autoDelete) {

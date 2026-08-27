@@ -67,16 +67,65 @@ require Java 17 and system Gradle. These tests prove the local data plane only;
 cloud topology creation, identity, and MassTransit Azure Service Bus
 interoperability remain separate gates.
 
-The optional cloud gate includes send-only interoperability from the pinned
-MassTransit Azure Service Bus transport into both the C# and Java clients. It
-expects the profile's `msb-direct` entity to exist in the target namespace:
+The optional cloud gate includes C# and Java acceptance tests that start with
+unique entity names, use MyServiceBus `Create` mode to provision queues,
+topics, forwarding subscriptions, and compatibility destinations, then publish,
+consume, inspect the resulting topology, and clean it up. Run the configured
+development namespace without copying its SAS key into the shell:
+
+```bash
+eng/run-azure-servicebus-cloud-tests.sh
+```
+
+The runner defaults to resource group `rg-myservicebus-tests`, Standard
+namespace `sb-myservicebus-tests-se`, and authorization rule
+`MyServiceBusTests`. Override those names with
+`AZURE_SERVICEBUS_RESOURCE_GROUP`, `AZURE_SERVICEBUS_NAMESPACE`, and
+`AZURE_SERVICEBUS_AUTHORIZATION_RULE`. The signed-in Azure CLI principal must
+be allowed to list authorization-rule keys. The connection string exists only
+in the runner process environment and is not written to the repository.
+
+Create an equivalent isolated namespace and test rule with:
+
+```bash
+az group create \
+  --name rg-myservicebus-tests \
+  --location swedencentral \
+  --tags project=MyServiceBus purpose=integration-testing
+az servicebus namespace create \
+  --resource-group rg-myservicebus-tests \
+  --name '<globally-unique-namespace>' \
+  --location swedencentral \
+  --sku Standard \
+  --tags project=MyServiceBus purpose=integration-testing
+az servicebus namespace authorization-rule create \
+  --resource-group rg-myservicebus-tests \
+  --namespace-name '<globally-unique-namespace>' \
+  --name MyServiceBusTests \
+  --rights Manage Send Listen
+```
+
+Standard is required because Basic does not support topics and subscriptions.
+Do not pre-provision messaging entities: an empty namespace is part of the
+acceptance condition.
+
+For a manually supplied namespace connection string, run the individual gates
+with:
 
 ```bash
 RUN_AZURE_SERVICEBUS_CLOUD_TESTS=1 \
 AZURE_SERVICEBUS_CLOUD_CONNECTION_STRING='<connection-string>' \
   dotnet test test/MyServiceBus.AzureServiceBus.Tests/MyServiceBus.AzureServiceBus.Tests.csproj \
-  --filter FullyQualifiedName~MassTransitAzureServiceBusInteropTests
+  --filter FullyQualifiedName~AzureServiceBusCloudAcceptanceTests
+RUN_AZURE_SERVICEBUS_CLOUD_TESTS=1 \
+AZURE_SERVICEBUS_CLOUD_CONNECTION_STRING='<connection-string>' \
+  gradle :myservicebus-azure-service-bus:test --rerun-tasks \
+  --tests com.myservicebus.azure.servicebus.AzureServiceBusCloudTest
 ```
+
+The separate MassTransit cloud gate remains available through the
+`MassTransitAzureServiceBusInteropTests` .NET filter and currently expects its
+fixed fixture topology to be provisioned.
 
 See the fixture README and the [Azure Service Bus transport profile](azure-service-bus-transport.md)
 for its topology, connection string, sequential-test constraint, and cloud

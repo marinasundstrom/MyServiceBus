@@ -34,6 +34,8 @@ public interface IAzureServiceBusFactoryConfigurator
 
     void Message<T>(Action<AzureServiceBusMessageConfigurator> configure);
 
+    string GetEntityName(Type messageType) => MyServiceBus.EntityNameFormatter.Format(messageType);
+
     void ReceiveEndpoint(string queueName, Action<AzureServiceBusReceiveEndpointConfigurator> configure);
 
     void ConfigureEndpoints(IBusRegistrationContext context);

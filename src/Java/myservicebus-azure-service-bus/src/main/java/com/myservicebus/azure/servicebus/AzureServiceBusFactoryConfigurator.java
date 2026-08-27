@@ -91,6 +91,10 @@ public final class AzureServiceBusFactoryConfigurator implements BusFactoryConfi
         configure.accept(new AzureServiceBusMessageConfigurator<>(messageType, entityNames));
     }
 
+    public String getEntityName(Class<?> messageType) {
+        return entityNames.getOrDefault(messageType, EntityNameFormatter.format(messageType));
+    }
+
     public void receiveEndpoint(
             String queueName,
             Consumer<AzureServiceBusReceiveEndpointConfigurator> configure) {

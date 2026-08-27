@@ -33,8 +33,10 @@ public factory path independently for each client. It also proves bidirectional
 C# and Java delivery for directed send and publish, plus retry recovery,
 retry exhaustion, `_error` and `_skipped` settlement, and endpoint fault
 publication in both clients.
-The remaining conformance cases and cloud administration remain before the
-initial profile is complete.
+The live Azure acceptance gate now proves cloud administration, publication,
+forwarding, and consumption from both implementations. The remaining cloud
+failure, lifecycle, and MassTransit conformance cases remain before the initial
+profile is complete.
 
 The first slice does not expose sessions, duplicate detection, native scheduled
 enqueue, deferral, delayed redelivery, transactions, partitioning, or custom
@@ -237,10 +239,11 @@ that share it must run sequentially and reset the Compose project between
 scenarios that require empty entities.
 
 The emulator is not sufficient evidence for every cloud behavior. Before the
-transport is declared supported, an optional Azure smoke suite should cover at
+transport is declared supported, the optional Azure smoke suite must cover at
 least:
 
-- cloud topology creation from both clients
+- [x] cloud topology creation from both clients
+- [x] cloud publish, subscription forwarding, and consumption from both clients
 - auto-delete response queues
 - lock renewal during a long-running consumer
 - `_error`/completion behavior across a transient failure
@@ -271,6 +274,7 @@ both clients where applicable:
 - [x] preservation in `_skipped`
 - [x] competing consumers receive one delivery once per attempt
 - [x] startup rejection for unsupported transport options
+- [x] C# and Java live-Azure topology creation, publication, forwarding, and consumption
 - [ ] C# and Java consumption of messages produced by the pinned MassTransit Azure
   Service Bus peer (an opt-in cloud gate is checked in; cloud execution evidence
   is still required)

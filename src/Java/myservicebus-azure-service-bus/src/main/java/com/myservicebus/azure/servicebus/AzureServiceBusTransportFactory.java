@@ -32,6 +32,7 @@ public final class AzureServiceBusTransportFactory implements TransportFactory, 
     private final ServiceBusAdministrationClient administrationClient;
     private final AzureServiceBusTopologyMode topologyMode;
     private final int defaultPrefetchCount;
+    private final Function<Class<?>, String> entityNameResolver;
     private final Function<String, String> temporaryEndpointNameFormatter;
     private final URI baseAddress;
     private final LoggerFactory loggerFactory;
@@ -43,6 +44,7 @@ public final class AzureServiceBusTransportFactory implements TransportFactory, 
         this.connectionString = configurator.getConnectionString();
         this.topologyMode = configurator.getTopologyMode();
         this.defaultPrefetchCount = configurator.getPrefetchCount();
+        this.entityNameResolver = configurator::getEntityName;
         this.temporaryEndpointNameFormatter = configurator.getTemporaryEndpointNameFormatter();
         this.baseAddress = endpoint(connectionString);
         this.loggerFactory = loggerFactory;
@@ -58,6 +60,11 @@ public final class AzureServiceBusTransportFactory implements TransportFactory, 
     @Override
     public TransportCapabilityDescriptor getCapabilities() {
         return TransportCapabilityDescriptors.AZURE_SERVICE_BUS;
+    }
+
+    @Override
+    public String getPublishEntityName(Class<?> messageType) {
+        return entityNameResolver.apply(messageType);
     }
 
     @Override

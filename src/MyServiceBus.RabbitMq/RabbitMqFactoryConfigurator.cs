@@ -33,6 +33,14 @@ public class RabbitMqFactoryConfigurator : IRabbitMqFactoryConfigurator, IBusFac
         configure(configurator);
     }
 
+    public string GetEntityName(Type messageType)
+    {
+        ArgumentNullException.ThrowIfNull(messageType);
+        return _exchangeNames.TryGetValue(messageType, out var configuredName)
+            ? configuredName
+            : MyServiceBus.EntityNameFormatter.Format(messageType);
+    }
+
     public void ReceiveEndpoint(string queueName, Action<ReceiveEndpointConfigurator> configure)
     {
         var configurator = new ReceiveEndpointConfigurator(queueName, _exchangeNames, _endpointActions);

@@ -42,6 +42,21 @@ class AzureServiceBusTransportFactoryTest {
     }
 
     @Test
+    void profileResolvesConfiguredMessageEntityNamesForPublish() {
+        AzureServiceBusFactoryConfigurator configurator = new AzureServiceBusFactoryConfigurator();
+        configurator.host(AzureServiceBusFactoryConfigurator.EMULATOR_CONNECTION_STRING);
+        configurator.usePreProvisionedTopology();
+        configurator.message(ConfiguredMessage.class, message -> message.setEntityName("configured-message"));
+        AzureServiceBusTransportFactory factory = new AzureServiceBusTransportFactory(
+                configurator,
+                LoggerFactoryBuilder.create(builder -> builder.addConsole()));
+
+        assertEquals("configured-message", factory.getPublishEntityName(ConfiguredMessage.class));
+        assertEquals("sb://localhost/configured-message?type=topic",
+                factory.getPublishAddress(ConfiguredMessage.class));
+    }
+
+    @Test
     void profileRejectsUnknownAbsoluteEntityTypes() {
         AzureServiceBusFactoryConfigurator configurator = new AzureServiceBusFactoryConfigurator();
         configurator.host(AzureServiceBusFactoryConfigurator.EMULATOR_CONNECTION_STRING);
@@ -69,5 +84,8 @@ class AzureServiceBusTransportFactoryTest {
         try (var scope = provider.createScope()) {
             assertNotNull(scope.getServiceProvider().getService(ScopedClientFactory.class));
         }
+    }
+
+    private static final class ConfiguredMessage {
     }
 }

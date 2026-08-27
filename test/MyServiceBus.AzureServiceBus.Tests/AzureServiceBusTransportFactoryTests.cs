@@ -29,6 +29,20 @@ public sealed class AzureServiceBusTransportFactoryTests
     }
 
     [Fact]
+    public void Profile_resolves_configured_message_entity_names_for_publish()
+    {
+        var configurator = new AzureServiceBusFactoryConfigurator();
+        configurator.Host(ConnectionString);
+        configurator.UsePreProvisionedTopology();
+        configurator.Message<ConfiguredMessage>(message => message.SetEntityName("configured-message"));
+        var factory = new AzureServiceBusTransportFactory(new ServiceBusClient(ConnectionString), configurator);
+
+        factory.GetPublishEntityName(typeof(ConfiguredMessage)).ShouldBe("configured-message");
+        factory.GetPublishAddress(typeof(ConfiguredMessage))
+            .ShouldBe(new Uri("sb://localhost/configured-message?type=topic"));
+    }
+
+    [Fact]
     public async Task Profile_rejects_unknown_absolute_entity_types()
     {
         var configurator = new AzureServiceBusFactoryConfigurator();
@@ -39,5 +53,9 @@ public sealed class AzureServiceBusTransportFactoryTests
 
         await Should.ThrowAsync<ArgumentException>(async () =>
             await factory.GetSendTransport(new Uri("sb://localhost/orders?type=subscription")));
+    }
+
+    private sealed class ConfiguredMessage
+    {
     }
 }

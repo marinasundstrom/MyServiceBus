@@ -6,7 +6,11 @@ public interface ITransportFactory
 {
     TransportCapabilityDescriptor Capabilities => TransportCapabilityDescriptors.Unknown(GetType().Name);
 
+    string GetPublishEntityName(Type messageType) => EntityNameFormatter.Format(messageType);
+
     Uri GetPublishAddress(string entityName) => new($"exchange:{entityName}");
+
+    Uri GetPublishAddress(Type messageType) => GetPublishAddress(GetPublishEntityName(messageType));
 
     Uri GetTemporaryEndpointAddress(string endpointName) =>
         new($"exchange:{endpointName}?durable=false&autodelete=true");

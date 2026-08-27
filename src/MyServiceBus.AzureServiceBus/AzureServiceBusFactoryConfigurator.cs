@@ -80,6 +80,14 @@ public sealed class AzureServiceBusFactoryConfigurator : IAzureServiceBusFactory
         configure(new AzureServiceBusMessageConfigurator(typeof(T), _entityNames));
     }
 
+    public string GetEntityName(Type messageType)
+    {
+        ArgumentNullException.ThrowIfNull(messageType);
+        return _entityNames.TryGetValue(messageType, out var configuredName)
+            ? configuredName
+            : MyServiceBus.EntityNameFormatter.Format(messageType);
+    }
+
     public void ReceiveEndpoint(string queueName, Action<AzureServiceBusReceiveEndpointConfigurator> configure)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(queueName);

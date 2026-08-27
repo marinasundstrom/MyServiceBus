@@ -13,6 +13,7 @@ public sealed class AzureServiceBusTransportFactory : ITransportFactory
     private readonly ServiceBusAdministrationClient? _administrationClient;
     private readonly AzureServiceBusTopologyMode _topologyMode;
     private readonly int _defaultPrefetchCount;
+    private readonly Func<Type, string> _entityNameResolver;
     private readonly Func<string, string> _temporaryEndpointNameFormatter;
     private readonly Uri _baseAddress;
     private readonly ILoggerFactory? _loggerFactory;
@@ -28,6 +29,7 @@ public sealed class AzureServiceBusTransportFactory : ITransportFactory
         _client = client;
         _topologyMode = configurator.TopologyMode;
         _defaultPrefetchCount = configurator.PrefetchCount;
+        _entityNameResolver = configurator.GetEntityName;
         _temporaryEndpointNameFormatter = configurator.TemporaryEndpointNameFormatter;
         _baseAddress = GetEndpoint(configurator.ConnectionString);
         _loggerFactory = loggerFactory;
@@ -40,7 +42,11 @@ public sealed class AzureServiceBusTransportFactory : ITransportFactory
 
     public TransportCapabilityDescriptor Capabilities => TransportCapabilityDescriptors.AzureServiceBus;
 
+    public string GetPublishEntityName(Type messageType) => _entityNameResolver(messageType);
+
     public Uri GetPublishAddress(string entityName) => CreateAddress(entityName, topic: true);
+
+    public Uri GetPublishAddress(Type messageType) => GetPublishAddress(GetPublishEntityName(messageType));
 
     public Uri GetTemporaryEndpointAddress(string endpointName) =>
         CreateAddress(FormatTemporaryEndpointName(endpointName), topic: false, "temporary=true");

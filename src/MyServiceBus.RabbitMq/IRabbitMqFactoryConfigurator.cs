@@ -15,6 +15,7 @@ namespace MyServiceBus;
 public interface IRabbitMqFactoryConfigurator
 {
     void Message<T>(Action<MessageConfigurator> configure);
+    string GetEntityName(Type messageType) => MyServiceBus.EntityNameFormatter.Format(messageType);
     void ReceiveEndpoint(string queueName, Action<ReceiveEndpointConfigurator> configure);
     void Host(string host, Action<IRabbitMqHostConfigurator>? configure = null);
     void Host(string host, int port, Action<IRabbitMqHostConfigurator>? configure = null);
