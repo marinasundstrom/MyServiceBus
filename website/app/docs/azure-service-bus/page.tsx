@@ -16,15 +16,16 @@ export default function AzureServiceBus() {
         <li>Native temporary response queues with auto-delete</li>
         <li>Delivery-lock renewal during long-running C# and Java consumers</li>
         <li>MassTransit directed sends consumed by both MyServiceBus clients using explicit entity names</li>
+        <li>Default message-topic naming and bidirectional publish with MassTransit for both clients</li>
       </ul>
 
       <h2>MassTransit naming is a contract</h2>
-      <p>Message topics, endpoint queues, subscriptions, companion failure entities, temporary response queues, and serialized addresses must resolve consistently across MyServiceBus C#, MyServiceBus Java, and MassTransit. Explicit entity-name overrides already drive the real entities in both clients. Default-name parity and the complete bidirectional MassTransit matrix remain required before support is declared.</p>
+      <p>Message topics, endpoint queues, subscriptions, companion failure entities, temporary response queues, and serialized addresses must resolve consistently across MyServiceBus C#, MyServiceBus Java, and MassTransit. Explicit overrides drive the real entities in both clients, and live tests now verify the formatter-derived default message topic in both publish directions. The remaining default endpoint names and complete MassTransit matrix are still required before support is declared.</p>
 
       <h2>Remaining promotion gates</h2>
       <ul>
-        <li>Default entity and endpoint naming parity with the pinned MassTransit version</li>
-        <li>MyServiceBus publish and send consumed by MassTransit from both clients</li>
+        <li>Default endpoint, subscription, and companion naming parity with the pinned MassTransit version</li>
+        <li>MyServiceBus directed sends consumed by MassTransit from both clients</li>
         <li>Bidirectional MassTransit request, response, and fault flows</li>
         <li>Cloud failure-copy and original-message completion behavior</li>
       </ul>

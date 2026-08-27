@@ -116,12 +116,16 @@ The repeatable live-test procedure is:
    the persistent development namespace.
 3. Let the .NET-hosted gate finish before the standalone Java gate. The first
    also launches the Java interoperability peer for the pinned MassTransit
-   producer cases. Every case uses unique entity names and removes its queues,
-   topics, and subscriptions in test cleanup.
+   producer and consumer cases. Endpoint queues are unique; the default-naming
+   cases intentionally share the formatter-derived message topic and remove it
+   after each sequential case. Test cleanup removes queues, topics, and
+   subscriptions.
 4. Confirm that both gates report success. They verify Create-mode topology,
    delivery-lock renewal while a handler runs beyond the initial lock duration,
    publish/forward/consume behavior, correlated request/response, and the
-   five-minute native auto-delete setting on temporary response queues.
+   five-minute native auto-delete setting on temporary response queues. The
+   MassTransit cases additionally verify default message-topic naming and
+   bidirectional publication for both MyServiceBus clients.
 5. For persistent use, run the explicit `teardown` command when the namespace is
    no longer needed. Ephemeral runs do this automatically in an exit trap.
 

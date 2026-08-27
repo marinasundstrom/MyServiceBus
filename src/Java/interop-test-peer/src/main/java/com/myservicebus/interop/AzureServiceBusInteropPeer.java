@@ -1,5 +1,6 @@
 package com.myservicebus.interop;
 
+import TestApp.CrossLanguageMessage;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.myservicebus.Envelope;
@@ -65,11 +66,59 @@ final class AzureServiceBusInteropPeer {
         switch (args[0]) {
             case "azure-consume" -> consume(transportFactory, args[1], args[2], args[3], true);
             case "azure-consume-value" -> consume(transportFactory, args[1], args[2], args[3], false);
+            case "azure-consume-default" -> consumeDefault(connectionString, args[1], args[3]);
             case "azure-send" -> send(transportFactory, args[1], args[3], false);
             case "azure-publish" -> send(transportFactory, args[1], args[3], true);
+            case "azure-publish-default" -> publishDefault(connectionString, args[3]);
             case "azure-respond" -> respond(connectionString, args[1], args[2], args[3]);
             case "azure-request" -> request(transportFactory, args[1], args[3]);
             default -> throw new IllegalArgumentException("Unknown Azure Service Bus mode: " + args[0]);
+        }
+    }
+
+    private static void consumeDefault(
+            String connectionString,
+            String queueName,
+            String expectedValue) throws Exception {
+        CompletableFuture<Void> received = new CompletableFuture<>();
+        MessageBus bus = MessageBus.factory.create(AzureServiceBusFactoryConfigurator.class, cfg -> {
+            cfg.host(connectionString);
+            cfg.receiveEndpoint(queueName, endpoint ->
+                    endpoint.handler(CrossLanguageMessage.class, context -> {
+                        if (!expectedValue.equals(context.getMessage().getValue())) {
+                            return CompletableFuture.failedFuture(new IllegalStateException(
+                                    "Unexpected message: " + context.getMessage().getValue()));
+                        }
+                        received.complete(null);
+                        return CompletableFuture.completedFuture(null);
+                    }));
+        });
+
+        bus.start();
+        System.out.println("READY");
+        System.out.flush();
+        try {
+            received.get(20, TimeUnit.SECONDS);
+            System.out.println("RECEIVED");
+            System.out.flush();
+        } finally {
+            bus.stop();
+        }
+    }
+
+    private static void publishDefault(String connectionString, String value) throws Exception {
+        MessageBus bus = MessageBus.factory.create(AzureServiceBusFactoryConfigurator.class, cfg ->
+                cfg.host(connectionString));
+        CrossLanguageMessage message = new CrossLanguageMessage();
+        message.setValue(value);
+
+        bus.start();
+        try {
+            bus.publish(message).get(20, TimeUnit.SECONDS);
+            System.out.println("SENT");
+            System.out.flush();
+        } finally {
+            bus.stop();
         }
     }
 
@@ -254,18 +303,6 @@ final class AzureServiceBusInteropPeer {
             throw new IllegalStateException(name + " is required");
         }
         return value;
-    }
-
-    public static final class CrossLanguageMessage {
-        private String value;
-
-        public String getValue() {
-            return value;
-        }
-
-        public void setValue(String value) {
-            this.value = value;
-        }
     }
 
     public static final class InteropRequest {

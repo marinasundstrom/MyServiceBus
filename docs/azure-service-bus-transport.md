@@ -116,10 +116,14 @@ a Java package or .NET namespace that the corresponding contract does not
 share. Endpoint name formatters likewise produce the actual queue and
 subscription names in both clients.
 
-The current live MassTransit tests use explicit collision-free entity names.
-They prove MassTransit-to-MyServiceBus directed delivery, but do not yet prove
-default name resolution or the complete bidirectional publish and request
-matrix. Those gaps remain experimental and are listed below.
+The live MassTransit tests now prove the formatter-derived default message topic
+and bidirectional publication for both MyServiceBus clients. They use a
+corresponding `TestApp.CrossLanguageMessage` .NET type and
+`TestApp.CrossLanguageMessage` Java type, which both resolve to
+`TestApp/CrossLanguageMessage`. Explicit collision-free queues continue to keep
+the cloud cases isolated. Automatic endpoint and companion naming, directed
+send to MassTransit, and the complete request matrix remain experimental and
+are listed below.
 
 ## Topology Projection
 
@@ -304,9 +308,13 @@ both clients where applicable:
 - [x] C# and Java live-Azure request/response with native auto-delete response queues
 - [x] C# and Java consumption of messages produced by the pinned MassTransit Azure
   Service Bus peer on self-provisioned live-Azure topology
-- [ ] default message, endpoint, subscription, and companion names match the
-  pinned MassTransit Azure Service Bus conventions in C# and Java
-- [ ] C# and Java publish and directed send are consumed by MassTransit
+- [x] default message-topic names match the pinned MassTransit Azure Service Bus
+  convention in C# and Java
+- [ ] default endpoint, subscription, and companion names match the pinned
+  MassTransit Azure Service Bus conventions in C# and Java
+- [x] C# and Java default-named publish is consumed by MassTransit, and
+  MassTransit default-named publish is consumed by both MyServiceBus clients
+- [ ] C# and Java directed send is consumed by MassTransit
 - [ ] bidirectional request/response and fault flows with MassTransit
 
 Compatibility claims remain scoped to scenarios with executable evidence.
