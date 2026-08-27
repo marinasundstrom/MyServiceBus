@@ -36,6 +36,7 @@ This changelog summarizes the bigger themes in the repository history. It is int
 - Curated the published information architecture around core messaging concepts, RabbitMQ, testing, and verified interoperability while keeping development documentation repository-only.
 - Added an independently triggered GitHub Pages deployment workflow that does not restore, build, test, or release the .NET and Java projects.
 - Added a browser-only light/dark theme switch that respects the visitor's system preference and remembers an explicit choice locally.
+- Reworked the public Azure Service Bus page into an application-facing setup guide for provisioning, secret handling, C# and Java configuration, topology ownership, interoperability, and teardown while retaining maintainer conformance detail in the repository development docs.
 
 ### Stable cross-language topology foundation
 
