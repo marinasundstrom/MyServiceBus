@@ -27,6 +27,7 @@ This changelog summarizes the bigger themes in the repository history. It is int
 - Added live bidirectional default-name Azure publication between MassTransit and both MyServiceBus clients, using corresponding C# and Java contract identities and public client APIs.
 - Completed the live Azure directed-send matrix with public C# and Java MyServiceBus sends to MassTransit queues, complementing the verified reverse directions.
 - Verified live correlated MassTransit responses to C# and Java MyServiceBus request clients through unique native Azure Service Bus response queues.
+- Completed the live Azure request/response matrix with correlated C# and Java MyServiceBus responses to MassTransit request clients.
 
 ### Documentation website
 

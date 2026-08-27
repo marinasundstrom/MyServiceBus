@@ -264,7 +264,9 @@ final class AzureServiceBusInteropPeer {
         CompletableFuture<Void> responded = new CompletableFuture<>();
         MessageBus bus = MessageBus.factory.create(AzureServiceBusFactoryConfigurator.class, cfg -> {
             cfg.host(connectionString);
-            cfg.usePreProvisionedTopology();
+            if (!"1".equals(System.getenv("AZURE_SERVICEBUS_CREATE_TOPOLOGY"))) {
+                cfg.usePreProvisionedTopology();
+            }
             cfg.message(InteropRequest.class, message -> message.setEntityName(bindingEntityName));
             cfg.receiveEndpoint(queueName, endpoint ->
                     endpoint.handler(InteropRequest.class, context -> {
