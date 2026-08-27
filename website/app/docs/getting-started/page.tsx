@@ -85,6 +85,11 @@ export default function GettingStarted() {
         an event. Choose your language at each step.
       </p>
 
+      <div className="callout">
+        <strong>A concrete transport for the first run</strong>
+        <p>This walkthrough uses RabbitMQ so every infrastructure step is reproducible. Contracts, consumers, send, publish, request, retry, and fault concepts remain transport-neutral; only setup and transport configuration change for Azure Service Bus.</p>
+      </div>
+
       <ol className="step-list">
         <li>
           <div className="step-heading"><span>01</span><div><h2>Start RabbitMQ in Docker</h2><p>Run the tested RabbitMQ 4.1 broker locally with its management UI.</p></div></div>

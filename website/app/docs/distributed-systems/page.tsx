@@ -11,7 +11,7 @@ await orders.Send(new SubmitOrder(orderId));
 await publishEndpoint.Publish(new OrderSubmitted(orderId));`,
   java: `// A command has one intended destination.
 SendEndpoint orders = endpointProvider.getSendEndpoint(
-    "rabbitmq://localhost/submit-order");
+    "queue:submit-order");
 orders.send(new SubmitOrder(orderId)).join();
 
 // An event is a fact that any number of services may observe.
