@@ -1,9 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import Image from 'next/image';
 import Link from 'next/link';
 import CodeViewer from './components/CodeViewer';
+import HeroMessagingDiagram from './components/HeroMessagingDiagram';
 import ThemeSelector from './components/ThemeSelector';
 
 const examples = {
@@ -87,16 +87,7 @@ export default function Home() {
           </div>
 
           <div className="hero-showcase">
-            <figure className="hero-graphic">
-              <Image
-                alt="MyServiceBus — Messaging for .NET and Java, illustrated with connected message routes"
-                height={909}
-                priority
-                sizes="(max-width: 900px) calc(100vw - 48px), 52vw"
-                src="/og.png"
-                width={1730}
-              />
-            </figure>
+            <HeroMessagingDiagram />
 
             <div className="code-card" id="getting-started">
               <div className="code-card-header">
