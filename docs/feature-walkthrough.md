@@ -97,7 +97,7 @@ public static class OrderConsumers
 }
 ```
 
-`Task`, `ValueTask`, and `void` return shapes are supported. No `IConsumer` interface is required. Reflection discovery through `AddConsumers(...)` recognizes the same declarations. A class can instead be registered and mapped explicitly through the fluent API without an attribute:
+One-way methods can return `Task`, `ValueTask`, or `void`. Request handlers can return `Task<TResponse>` or `ValueTask<TResponse>`; MyServiceBus awaits the operation and sends the value through the consume context as the correlated response. The context parameter is still optional: inject `ConsumeContext<TMessage>` when the method needs headers or other receive metadata. No `IConsumer` interface is required. Reflection discovery through `AddConsumers(...)` recognizes the same declarations. A class can instead be registered and mapped explicitly through the fluent API without an attribute:
 
 Method names are unrestricted; discovery does not require the name `Consume`.
 
@@ -115,6 +115,22 @@ public static class OrderFunctions
         => Task.CompletedTask;
 }
 ```
+
+A response-returning method provides request-response semantics without a consumer class:
+
+```csharp
+public static class OrderFunctions
+{
+    [Consumer("submit-order")]
+    public static Task<SubmitOrderResponse> SubmitOrder(
+        SubmitOrder order,
+        IOrderService orders,
+        CancellationToken cancellationToken)
+        => orders.Submit(order, cancellationToken);
+}
+```
+
+The request must carry a response address. Missing response routing and method failures use the normal consume fault path. Synchronous response values are not supported.
 
 `[Consumer("orders")]` can also be placed on a normal class that implements `IConsumer<T>`. In that case it overrides the endpoint mapping and does not register `Consume` as a separate method consumer:
 
@@ -276,6 +292,19 @@ public final class OrderConsumers {
             OrderRepository orders,
             CancellationToken cancellationToken) {
         return orders.receive(order, cancellationToken);
+    }
+}
+```
+
+Java request handlers can return `CompletableFuture<TResponse>` or `CompletionStage<TResponse>`. The generated and reflection paths both send the completed value through `ConsumeContext.respond(...)`. Add a `ConsumeContext<TMessage>` parameter only when the handler needs headers or other receive metadata:
+
+```java
+public final class OrderConsumers {
+    @MessageConsumer("submit-order")
+    public static CompletionStage<SubmitOrderResponse> submitOrder(
+            SubmitOrder order,
+            OrderService orders) {
+        return orders.submit(order);
     }
 }
 ```

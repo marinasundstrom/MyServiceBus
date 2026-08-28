@@ -24,4 +24,9 @@ public final class GeneratedMethodConsumers {
     @MessageConsumer
     public static void orderSubmittedConsumer(GeneratedConventionMessage message) {
     }
+
+    @MessageConsumer("generated-java-response")
+    public static CompletionStage<GeneratedResponse> respond(GeneratedResponseRequest request) {
+        return CompletableFuture.completedFuture(new GeneratedResponse(request.value() + "-response"));
+    }
 }

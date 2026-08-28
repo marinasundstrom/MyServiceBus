@@ -49,11 +49,11 @@ The message parameter determines the consumed contract. Context parameters are s
 
 Generated invokers should use closed generic service resolution such as `GetRequiredService<IOrderRepository>()` and call the method directly. Reflection discovery should resolve the same service parameters and preserve the same scope and failure behavior. A missing required service should fail with the normal dependency-injection exception and identify the consumer method being activated.
 
-Supported return shapes are `Task`, `ValueTask`, and synchronous `void`. A method must have exactly one message parameter. Known context types and `CancellationToken` have framework bindings; the first ordinary parameter is the message and remaining ordinary parameters are resolved as services. Reflection discovery rejects invalid signatures. The generator reports invalid attributed signatures as compile-time diagnostics.
+One-way methods can return `Task`, `ValueTask`, or synchronous `void`. Request handlers can return `Task<TResponse>` or `ValueTask<TResponse>`. A method must have exactly one message parameter. Known context types and `CancellationToken` have framework bindings; the first ordinary parameter is the message and remaining ordinary parameters are resolved as services. Reflection discovery rejects invalid signatures. The generator reports invalid attributed signatures as compile-time diagnostics.
 
-## Future request-response methods
+## Request-response methods
 
-A future slice can extend method consumers with response-bearing return types such as `Task<TResponse>` and `ValueTask<TResponse>`. The returned value would not be an in-process method result: MyServiceBus would send it through the active consume context as the correlated response to the incoming request. Message, context, cancellation, and application-service parameters would continue to use the existing binder.
+A response-bearing return type sends its result through the active consume context. It is a correlated bus response, not an in-process method return. Message, context, cancellation, and application-service parameters use the same binder as one-way consumer methods. The context parameter remains optional; add `ConsumeContext<TMessage>` when the method needs headers, correlation identifiers, addresses, or other receive metadata.
 
 An illustrative language-level declaration could therefore have a minimal-Web-API-like shape:
 
@@ -68,7 +68,7 @@ func SubmitOrderConsumer(
 }
 ```
 
-This is not part of the current consumer-method contract. A later design must specify behavior when no response address is present, supported synchronous and asynchronous response shapes, fault propagation, correlation metadata, and reflection/generated-catalog parity before enabling it.
+C# supports `Task<TResponse>` and `ValueTask<TResponse>`. Java supports `CompletableFuture<TResponse>` and `CompletionStage<TResponse>`. Both reflection and generated catalogs await the result and call the platform's normal response API. That preserves request, conversation, and initiator metadata. A missing response address fails consumption instead of silently dropping the result, and a method exception continues through the normal retry and fault pipeline. Synchronous response values are not supported.
 
 Consumer method names are unrestricted. `Consume`, `ReceiveOrder`, `Handle`, and language-specific namespace function names are equivalent declarations; message binding comes from the signature rather than a naming convention. This keeps the descriptor model suitable for Raven namespace-level functions.
 
@@ -166,6 +166,19 @@ public final class OrderConsumers {
             OrderRepository orders,
             CancellationToken cancellationToken) {
         return orders.receive(order, cancellationToken);
+    }
+}
+```
+
+A Java request handler returns its response contract from the same method:
+
+```java
+public final class OrderConsumers {
+    @MessageConsumer("submit-order")
+    public static CompletionStage<SubmitOrderResponse> submitOrder(
+            SubmitOrder order,
+            OrderService orders) {
+        return orders.submit(order);
     }
 }
 ```

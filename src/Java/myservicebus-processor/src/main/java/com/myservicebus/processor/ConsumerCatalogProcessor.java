@@ -111,7 +111,7 @@ public final class ConsumerCatalogProcessor extends AbstractProcessor {
 
         ReturnKind returnKind = returnKind(method.getReturnType());
         if (returnKind == null) {
-            error(method, "Consumer method return type must be void, CompletableFuture, or CompletionStage");
+            error(method, "Consumer method return type must be void, CompletableFuture, or CompletionStage with an optional concrete response type");
             return null;
         }
 
@@ -289,6 +289,10 @@ public final class ConsumerCatalogProcessor extends AbstractProcessor {
             case FUTURE, STAGE -> writer.write(
                     "            return " + invocation
                             + ".thenApply(ignored -> (Void) null).toCompletableFuture();\n");
+            case FUTURE_RESPONSE, STAGE_RESPONSE -> writer.write(
+                    "            return " + invocation
+                            + ".thenCompose(response -> context.respond(response, context.getCancellationToken()))"
+                            + ".toCompletableFuture();\n");
         }
         writer.write("        });\n");
     }
@@ -325,14 +329,25 @@ public final class ConsumerCatalogProcessor extends AbstractProcessor {
             return ReturnKind.VOID;
         }
         if (isType(type, "java.util.concurrent.CompletableFuture")) {
-            return ReturnKind.FUTURE;
+            return asyncReturnKind(type, ReturnKind.FUTURE, ReturnKind.FUTURE_RESPONSE);
         }
         TypeElement stage = processingEnv.getElementUtils().getTypeElement("java.util.concurrent.CompletionStage");
         return stage != null && processingEnv.getTypeUtils().isAssignable(
                 processingEnv.getTypeUtils().erasure(type),
                 processingEnv.getTypeUtils().erasure(stage.asType()))
-                        ? ReturnKind.STAGE
+                        ? asyncReturnKind(type, ReturnKind.STAGE, ReturnKind.STAGE_RESPONSE)
                         : null;
+    }
+
+    private ReturnKind asyncReturnKind(TypeMirror type, ReturnKind oneWayKind, ReturnKind responseKind) {
+        if (!(type instanceof DeclaredType declared) || declared.getTypeArguments().isEmpty()) {
+            return oneWayKind;
+        }
+        TypeMirror responseType = declared.getTypeArguments().get(0);
+        if (isType(responseType, "java.lang.Void")) {
+            return oneWayKind;
+        }
+        return isClassLiteralType(responseType) ? responseKind : null;
     }
 
     private boolean isClassLiteralType(TypeMirror type) {
@@ -440,6 +455,8 @@ public final class ConsumerCatalogProcessor extends AbstractProcessor {
     private enum ReturnKind {
         VOID,
         FUTURE,
-        STAGE
+        STAGE,
+        FUTURE_RESPONSE,
+        STAGE_RESPONSE
     }
 }

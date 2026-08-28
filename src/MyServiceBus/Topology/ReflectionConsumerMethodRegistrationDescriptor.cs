@@ -11,15 +11,18 @@ internal sealed class ReflectionConsumerMethodRegistrationDescriptor<TMessage> :
     private readonly MethodInfo method;
     private readonly ConsumerMethodParameterBinding[] bindings;
     private readonly string consumerId;
+    private readonly IConsumerMethodResponseHandler? responseHandler;
 
     public ReflectionConsumerMethodRegistrationDescriptor(
         MethodInfo method,
         ConsumerMethodParameterBinding[] bindings,
-        string consumerId)
+        string consumerId,
+        IConsumerMethodResponseHandler? responseHandler)
     {
         this.method = method;
         this.bindings = bindings;
         this.consumerId = consumerId;
+        this.responseHandler = responseHandler;
     }
 
     public Type ConsumerType => method.DeclaringType!;
@@ -71,6 +74,12 @@ internal sealed class ReflectionConsumerMethodRegistrationDescriptor<TMessage> :
             throw;
         }
 
+        if (responseHandler is not null)
+        {
+            await responseHandler.Respond(result, context).ConfigureAwait(false);
+            return;
+        }
+
         switch (result)
         {
             case Task task:
@@ -91,6 +100,46 @@ internal enum ConsumerMethodParameterBinding
     Service
 }
 
+internal enum ConsumerMethodReturnKind
+{
+    Void,
+    Task,
+    ValueTask,
+    TaskResponse,
+    ValueTaskResponse
+}
+
+internal interface IConsumerMethodResponseHandler
+{
+    Task Respond(object? result, ConsumeContext context);
+}
+
+internal sealed class TaskConsumerMethodResponseHandler<TResponse> : IConsumerMethodResponseHandler
+    where TResponse : class
+{
+    public async Task Respond(object? result, ConsumeContext context)
+    {
+        if (result is not Task<TResponse> responseTask)
+            throw new InvalidOperationException($"Consumer method did not return Task<{typeof(TResponse)}>.");
+
+        var response = await responseTask.ConfigureAwait(false);
+        await context.RespondAsync(response, null, context.CancellationToken).ConfigureAwait(false);
+    }
+}
+
+internal sealed class ValueTaskConsumerMethodResponseHandler<TResponse> : IConsumerMethodResponseHandler
+    where TResponse : class
+{
+    public async Task Respond(object? result, ConsumeContext context)
+    {
+        if (result is not ValueTask<TResponse> responseTask)
+            throw new InvalidOperationException($"Consumer method did not return ValueTask<{typeof(TResponse)}>.");
+
+        var response = await responseTask.ConfigureAwait(false);
+        await context.RespondAsync(response, null, context.CancellationToken).ConfigureAwait(false);
+    }
+}
+
 internal sealed class ConsumerMethodDefinition
 {
     public ConsumerMethodDefinition(
@@ -99,7 +148,9 @@ internal sealed class ConsumerMethodDefinition
         string endpointName,
         bool endpointNameIsExplicit,
         Type? endpointNameFormatterType,
-        ConsumerMethodParameterBinding[] bindings)
+        ConsumerMethodParameterBinding[] bindings,
+        ConsumerMethodReturnKind returnKind,
+        Type? responseType)
     {
         Method = method;
         MessageType = messageType;
@@ -107,6 +158,8 @@ internal sealed class ConsumerMethodDefinition
         EndpointNameIsExplicit = endpointNameIsExplicit;
         EndpointNameFormatterType = endpointNameFormatterType;
         Bindings = bindings;
+        ReturnKind = returnKind;
+        ResponseType = responseType;
     }
 
     public MethodInfo Method { get; }
@@ -115,6 +168,8 @@ internal sealed class ConsumerMethodDefinition
     public bool EndpointNameIsExplicit { get; }
     public Type? EndpointNameFormatterType { get; }
     public ConsumerMethodParameterBinding[] Bindings { get; }
+    public ConsumerMethodReturnKind ReturnKind { get; }
+    public Type? ResponseType { get; }
 }
 
 internal static class ReflectionConsumerMethodDiscovery
@@ -173,12 +228,7 @@ internal static class ReflectionConsumerMethodDiscovery
         ConsumerAttribute? methodAttribute,
         ConsumerAttribute? typeAttribute)
     {
-        if (method.ReturnType != typeof(void)
-            && method.ReturnType != typeof(Task)
-            && method.ReturnType != typeof(ValueTask))
-        {
-            throw Invalid(method, "return type must be void, Task, or ValueTask");
-        }
+        var (returnKind, responseType) = GetReturnShape(method);
 
         Type? messageType = null;
         var parameters = method.GetParameters();
@@ -238,7 +288,33 @@ internal static class ReflectionConsumerMethodDiscovery
             endpointName,
             endpointNameIsExplicit,
             endpointNameFormatterType,
-            bindings);
+            bindings,
+            returnKind,
+            responseType);
+    }
+
+    private static (ConsumerMethodReturnKind ReturnKind, Type? ResponseType) GetReturnShape(MethodInfo method)
+    {
+        if (method.ReturnType == typeof(void))
+            return (ConsumerMethodReturnKind.Void, null);
+        if (method.ReturnType == typeof(Task))
+            return (ConsumerMethodReturnKind.Task, null);
+        if (method.ReturnType == typeof(ValueTask))
+            return (ConsumerMethodReturnKind.ValueTask, null);
+
+        if (method.ReturnType.IsGenericType)
+        {
+            var genericType = method.ReturnType.GetGenericTypeDefinition();
+            var responseType = method.ReturnType.GetGenericArguments()[0];
+            if (responseType.IsValueType)
+                throw Invalid(method, "response type must be a reference type");
+            if (genericType == typeof(Task<>))
+                return (ConsumerMethodReturnKind.TaskResponse, responseType);
+            if (genericType == typeof(ValueTask<>))
+                return (ConsumerMethodReturnKind.ValueTaskResponse, responseType);
+        }
+
+        throw Invalid(method, "return type must be void, Task, ValueTask, Task<TResponse>, or ValueTask<TResponse>");
     }
 
     private static InvalidOperationException Invalid(MethodInfo method, string reason)
@@ -253,10 +329,28 @@ internal static class ReflectionConsumerMethodRegistrationDescriptorFactory
     {
         var descriptorType = typeof(ReflectionConsumerMethodRegistrationDescriptor<>).MakeGenericType(definition.MessageType);
         var consumerId = $"{definition.Method.Module.ModuleVersionId:N}:{definition.Method.MetadataToken}";
+        var responseHandler = CreateResponseHandler(definition);
         return (IConsumerRegistrationDescriptor)(Activator.CreateInstance(
             descriptorType,
             definition.Method,
             definition.Bindings,
-            consumerId) ?? throw new InvalidOperationException($"Failed to create a registration descriptor for {definition.Method}."));
+            consumerId,
+            responseHandler) ?? throw new InvalidOperationException($"Failed to create a registration descriptor for {definition.Method}."));
+    }
+
+    private static IConsumerMethodResponseHandler? CreateResponseHandler(ConsumerMethodDefinition definition)
+    {
+        if (definition.ResponseType is null)
+            return null;
+
+        var handlerType = definition.ReturnKind switch
+        {
+            ConsumerMethodReturnKind.TaskResponse => typeof(TaskConsumerMethodResponseHandler<>),
+            ConsumerMethodReturnKind.ValueTaskResponse => typeof(ValueTaskConsumerMethodResponseHandler<>),
+            _ => null
+        };
+        return handlerType is null
+            ? null
+            : (IConsumerMethodResponseHandler?)Activator.CreateInstance(handlerType.MakeGenericType(definition.ResponseType));
     }
 }

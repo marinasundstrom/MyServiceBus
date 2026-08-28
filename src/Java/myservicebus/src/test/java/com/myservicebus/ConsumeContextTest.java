@@ -4,6 +4,7 @@ import com.myservicebus.tasks.CancellationToken;
 import com.myservicebus.tasks.CancellationTokenSource;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.atomic.AtomicReference;
 import java.net.URI;
 import org.junit.jupiter.api.Assertions;
@@ -181,5 +182,17 @@ public class ConsumeContextTest {
         ctx.respond(new FakeMessage()).join();
 
         Assertions.assertEquals("queue:response", uriRef.get());
+    }
+
+    @Test
+    public void respondFailsWhenResponseAddressIsMissing() {
+        ConsumeContext<FakeMessage> ctx = new ConsumeContext<>(new FakeMessage(), Map.of(), new StubProvider());
+
+        CompletionException exception = Assertions.assertThrows(
+                CompletionException.class,
+                () -> ctx.respond(new FakeMessage()).join());
+
+        Assertions.assertInstanceOf(IllegalStateException.class, exception.getCause());
+        Assertions.assertEquals("Response address not specified", exception.getCause().getMessage());
     }
 }

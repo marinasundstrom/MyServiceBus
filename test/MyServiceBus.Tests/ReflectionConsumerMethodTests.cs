@@ -7,6 +7,26 @@ namespace MyServiceBus.Tests;
 public class ReflectionConsumerMethodTests
 {
     [Fact]
+    public async Task Reflection_response_methods_respond_with_task_and_value_task_results()
+    {
+        var services = new ServiceCollection();
+        services.AddServiceBusTestHarness(configurator =>
+            configurator.AddConsumerMethods(typeof(ReflectionResponseConsumers)));
+        await using var provider = services.BuildServiceProvider();
+        var harness = provider.GetRequiredService<InMemoryTestHarness>();
+        await harness.Start();
+
+        var taskResponse = await provider.GetRequiredService<IRequestClient<ReflectionTaskRequest>>()
+            .GetResponseAsync<ReflectionTaskResponse>(new ReflectionTaskRequest("task"));
+        var valueTaskResponse = await provider.GetRequiredService<IRequestClient<ReflectionValueTaskRequest>>()
+            .GetResponseAsync<ReflectionValueTaskResponse>(new ReflectionValueTaskRequest("value-task"));
+
+        Assert.Equal("task-response", taskResponse.Message.Value);
+        Assert.Equal("value-task-response", valueTaskResponse.Message.Value);
+        await harness.Stop();
+    }
+
+    [Fact]
     public async Task Reflection_discovery_binds_method_message_context_services_and_cancellation()
     {
         var services = new ServiceCollection();
@@ -140,6 +160,20 @@ public class ReflectionConsumerMethodTests
     private sealed record ClassMappedMessage;
     private sealed record MethodMappedMessage;
     private sealed record ConventionMappedMessage;
+
+    private sealed record ReflectionTaskRequest(string Value);
+    private sealed record ReflectionTaskResponse(string Value);
+    private sealed record ReflectionValueTaskRequest(string Value);
+    private sealed record ReflectionValueTaskResponse(string Value);
+
+    private static class ReflectionResponseConsumers
+    {
+        public static Task<ReflectionTaskResponse> Respond(ReflectionTaskRequest request)
+            => Task.FromResult(new ReflectionTaskResponse($"{request.Value}-response"));
+
+        public static ValueTask<ReflectionValueTaskResponse> RespondValueTask(ReflectionValueTaskRequest request)
+            => ValueTask.FromResult(new ReflectionValueTaskResponse($"{request.Value}-response"));
+    }
 
     [Consumer("class-orders")]
     private static class GroupedMethodConsumers
