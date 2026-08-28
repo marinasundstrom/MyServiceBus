@@ -1,4 +1,3 @@
-using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using MyServiceBus.Serialization;
 using MyServiceBus.Topology;
@@ -53,51 +52,43 @@ public sealed class AzureServiceBusReceiveEndpointConfigurator
 
         try
         {
-            var messageType = consumerType
-                .GetInterfaces()
-                .FirstOrDefault(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IConsumer<>))
-                ?.GetGenericArguments().First();
-
-            if (messageType is null)
-                return;
-
             var registry = context.ServiceProvider.GetRequiredService<TopologyRegistry>();
-            var consumer = registry.Consumers.First(c => c.ConsumerType == consumerType);
-            registry.MoveConsumerToEndpoint(consumer, _queueName);
-            foreach (var binding in consumer.Bindings)
-            {
-                binding.EntityName = _entityNameResolver(binding.MessageType);
-            }
-
-            consumer.PrefetchCount = _prefetchCount is null ? null : checked((ushort)_prefetchCount.Value);
-            consumer.SerializerType = _serializerType;
-
-            if (_retryCount.HasValue)
-            {
-                var retryMethod = typeof(AzureServiceBusReceiveEndpointConfigurator)
-                    .GetMethod(nameof(ApplyRetry), BindingFlags.NonPublic | BindingFlags.Static)!
-                    .MakeGenericMethod(messageType);
-                var retryDelegate = (Delegate)retryMethod.Invoke(null, [_retryCount.Value, _retryDelay])!;
-                consumer.ConfigurePipe = consumer.ConfigurePipe is not null
-                    ? Delegate.Combine(retryDelegate, consumer.ConfigurePipe)
-                    : retryDelegate;
-            }
-
-            var bus = context.ServiceProvider.GetRequiredService<IMessageBus>();
-            var method = typeof(IMessageBus).GetMethod(nameof(IMessageBus.AddConsumer))!
-                .MakeGenericMethod(messageType, consumerType);
-            ((Task)method.Invoke(bus, [consumer, consumer.ConfigurePipe, CancellationToken.None])!)
-                .GetAwaiter().GetResult();
-        }
-        catch (TargetInvocationException exception) when (exception.InnerException is not null)
-        {
-            throw new InvalidOperationException(
-                $"Failed to configure consumer {consumerType.Name}.", exception.InnerException);
+            var consumers = registry.Consumers.Where(c => c.ConsumerType == consumerType).ToArray();
+            if (consumers.Length == 0)
+                throw new InvalidOperationException($"Consumer {consumerType.Name} is not registered.");
+            foreach (var consumer in consumers)
+                ConfigureConsumer(context, consumer);
         }
         catch (Exception exception)
         {
             throw new InvalidOperationException($"Failed to configure consumer {consumerType.Name}.", exception);
         }
+    }
+
+    internal void ConfigureConsumer(IBusRegistrationContext context, ConsumerTopology consumer)
+    {
+        var registration = consumer.Registration
+            ?? throw new InvalidOperationException($"Consumer {consumer.ConsumerType} has no runtime registration descriptor.");
+        var registry = context.ServiceProvider.GetRequiredService<TopologyRegistry>();
+        registry.MoveConsumerToEndpoint(consumer, _queueName);
+        foreach (var binding in consumer.Bindings)
+        {
+            binding.EntityName = _entityNameResolver(binding.MessageType);
+        }
+
+        consumer.PrefetchCount = _prefetchCount is null ? null : checked((ushort)_prefetchCount.Value);
+        consumer.SerializerType = _serializerType;
+
+        if (_retryCount.HasValue)
+        {
+            var retryConfiguration = registration.CreateRetryConfiguration(_retryCount.Value, _retryDelay);
+            consumer.ConfigurePipe = consumer.ConfigurePipe is null
+                ? retryConfiguration
+                : Delegate.Combine(retryConfiguration, consumer.ConfigurePipe);
+        }
+
+        var bus = context.ServiceProvider.GetRequiredService<IMessageBus>();
+        registration.Register(bus, consumer, CancellationToken.None).GetAwaiter().GetResult();
     }
 
     public void Handler<T>(Func<ConsumeContext<T>, Task> handler) where T : class
@@ -123,9 +114,4 @@ public sealed class AzureServiceBusReceiveEndpointConfigurator
         });
     }
 
-    private static Delegate ApplyRetry<T>(int retryCount, TimeSpan? delay) where T : class
-    {
-        void Configure(PipeConfigurator<ConsumeContext<T>> pipe) => pipe.UseRetry(retryCount, delay);
-        return (Action<PipeConfigurator<ConsumeContext<T>>>)Configure;
-    }
 }

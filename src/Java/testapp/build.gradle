@@ -23,6 +23,7 @@ jar {
 }
 
 dependencies {
+    annotationProcessor project(':myservicebus-processor')
     implementation project(':myservicebus-monitoring')
     implementation project(':myservicebus-rabbitmq')
     implementation "org.slf4j:slf4j-simple:${slf4jVersion}"

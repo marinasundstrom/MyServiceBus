@@ -5,6 +5,9 @@ import com.myservicebus.Consumer;
 import com.myservicebus.ConsumerFaultFilter;
 import com.myservicebus.ConsumerFactory;
 import com.myservicebus.ConsumerMessageFilter;
+import com.myservicebus.ConsumerMethodInvoker;
+import com.myservicebus.ConsumerMethodMessageFilter;
+import com.myservicebus.HandlerFaultFilter;
 import com.myservicebus.ScopeConsumerFactory;
 import com.myservicebus.ErrorTransportFilter;
 import com.myservicebus.Filter;
@@ -65,12 +68,21 @@ public class MediatorSendEndpoint implements SendEndpoint {
                 configurator.useFilter(errorFilter);
                 Class<? extends Consumer<Object>> consumerType = (Class<? extends Consumer<Object>>) consumerTopology
                         .getConsumerType();
-                Filter<ConsumeContext<Object>> faultFilter = new ConsumerFaultFilter<>(serviceProvider, consumerType);
+                Filter<ConsumeContext<Object>> faultFilter = consumerTopology.getMethodInvoker() != null
+                        ? new HandlerFaultFilter<>(serviceProvider)
+                        : new ConsumerFaultFilter<>(serviceProvider, consumerType);
                 configurator.useFilter(faultFilter);
                 if (consumerTopology.getConfigure() != null)
                     consumerTopology.getConfigure().accept((PipeConfigurator) configurator);
-                ConsumerFactory factory = new ScopeConsumerFactory(serviceProvider);
-                Filter<ConsumeContext<Object>> consumerFilter = new ConsumerMessageFilter(consumerType, factory);
+                Filter<ConsumeContext<Object>> consumerFilter;
+                if (consumerTopology.getMethodInvoker() != null) {
+                    consumerFilter = new ConsumerMethodMessageFilter<>(
+                            serviceProvider,
+                            (ConsumerMethodInvoker<Object>) consumerTopology.getMethodInvoker());
+                } else {
+                    ConsumerFactory factory = new ScopeConsumerFactory(serviceProvider);
+                    consumerFilter = new ConsumerMessageFilter<>(consumerType, factory);
+                }
                 configurator.useFilter(consumerFilter);
 
                 Pipe<ConsumeContext<Object>> pipe = configurator.build(serviceProvider);

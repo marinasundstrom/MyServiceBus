@@ -6,17 +6,22 @@ import java.util.Map;
 import java.util.function.Consumer;
 
 import com.myservicebus.ConsumeContext;
+import com.myservicebus.ConsumerMethodInvoker;
+import com.myservicebus.EndpointNameFormatter;
 import com.myservicebus.PipeConfigurator;
 import com.myservicebus.serialization.MessageSerializer;
 
 public class ConsumerTopology {
     private Class<?> consumerType;
     private String queueName;
+    private boolean endpointNameExplicit;
+    private Class<?> endpointNameFormatterType;
     private List<MessageBinding> bindings = new ArrayList<>();
     private Consumer<PipeConfigurator<ConsumeContext<Object>>> configure;
     private Integer prefetchCount;
     private Map<String, Object> queueArguments;
     private Class<? extends MessageSerializer> serializerClass;
+    private ConsumerMethodInvoker<?> methodInvoker;
 
     public Class<?> getConsumerType() {
         return consumerType;
@@ -32,6 +37,28 @@ public class ConsumerTopology {
 
     public void setQueueName(String queueName) {
         this.queueName = queueName;
+    }
+
+    public boolean isEndpointNameExplicit() {
+        return endpointNameExplicit;
+    }
+
+    public void setEndpointNameExplicit(boolean endpointNameExplicit) {
+        this.endpointNameExplicit = endpointNameExplicit;
+    }
+
+    public Class<?> getEndpointNameFormatterType() {
+        return endpointNameFormatterType;
+    }
+
+    public void setEndpointNameFormatterType(Class<?> endpointNameFormatterType) {
+        this.endpointNameFormatterType = endpointNameFormatterType;
+    }
+
+    public String resolveEndpointName(EndpointNameFormatter formatter) {
+        return !endpointNameExplicit && endpointNameFormatterType != null && formatter != null
+                ? formatter.format(endpointNameFormatterType)
+                : queueName;
     }
 
     public List<MessageBinding> getBindings() {
@@ -72,5 +99,13 @@ public class ConsumerTopology {
 
     public void setSerializerClass(Class<? extends MessageSerializer> serializerClass) {
         this.serializerClass = serializerClass;
+    }
+
+    public ConsumerMethodInvoker<?> getMethodInvoker() {
+        return methodInvoker;
+    }
+
+    public void setMethodInvoker(ConsumerMethodInvoker<?> methodInvoker) {
+        this.methodInvoker = methodInvoker;
     }
 }

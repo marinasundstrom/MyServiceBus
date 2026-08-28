@@ -17,6 +17,8 @@ const sections = [
       ['Distributed systems fundamentals', '/docs/distributed-systems'],
       ['RabbitMQ transport', '/docs/rabbitmq'],
       ['Azure Service Bus', '/docs/azure-service-bus'],
+      ['Consumer methods', '/docs/consumer-methods'],
+      ['Platform parity', '/docs/platform-parity'],
       ['Runtime monitoring', '/docs/runtime-monitoring'],
       ['Testing', '/docs/testing'],
       ['Interoperability', '/docs/interoperability'],

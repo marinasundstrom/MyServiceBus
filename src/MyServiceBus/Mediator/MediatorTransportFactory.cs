@@ -32,7 +32,20 @@ public class MediatorTransportFactory : ITransportFactory
         Func<string?, bool>? isMessageTypeRegistered = null,
         CancellationToken cancellationToken = default)
     {
-        var transport = new MediatorReceiveTransport(this, topology.ExchangeName, handler);
+        var transport = new MediatorReceiveTransport(this, [topology.ExchangeName], handler);
+        return Task.FromResult<IReceiveTransport>(transport);
+    }
+
+    public Task<IReceiveTransport> CreateReceiveTransport(
+        ReceiveEndpointTransportTopology topology,
+        Func<ReceiveContext, Task> handler,
+        Func<string?, bool>? isMessageTypeRegistered = null,
+        CancellationToken cancellationToken = default)
+    {
+        var transport = new MediatorReceiveTransport(
+            this,
+            topology.Bindings.Select(binding => binding.EntityName),
+            handler);
         return Task.FromResult<IReceiveTransport>(transport);
     }
 
@@ -94,14 +107,17 @@ public class MediatorTransportFactory : ITransportFactory
     class MediatorReceiveTransport : IReceiveTransport
     {
         private readonly MediatorTransportFactory _factory;
-        private readonly string _exchange;
+        private readonly string[] _exchanges;
         private readonly Func<ReceiveContext, Task> _handler;
         private bool _started;
 
-        public MediatorReceiveTransport(MediatorTransportFactory factory, string exchange, Func<ReceiveContext, Task> handler)
+        public MediatorReceiveTransport(
+            MediatorTransportFactory factory,
+            IEnumerable<string> exchanges,
+            Func<ReceiveContext, Task> handler)
         {
             _factory = factory;
-            _exchange = exchange;
+            _exchanges = exchanges.Distinct(StringComparer.Ordinal).ToArray();
             _handler = handler;
         }
 
@@ -109,7 +125,8 @@ public class MediatorTransportFactory : ITransportFactory
         {
             if (!_started)
             {
-                _factory.Register(_exchange, _handler);
+                foreach (var exchange in _exchanges)
+                    _factory.Register(exchange, _handler);
                 _started = true;
             }
             return Task.CompletedTask;
@@ -119,7 +136,8 @@ public class MediatorTransportFactory : ITransportFactory
         {
             if (_started)
             {
-                _factory.Unregister(_exchange, _handler);
+                foreach (var exchange in _exchanges)
+                    _factory.Unregister(exchange, _handler);
                 _started = false;
             }
             return Task.CompletedTask;

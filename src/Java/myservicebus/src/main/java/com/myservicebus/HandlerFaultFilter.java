@@ -8,10 +8,10 @@ import com.myservicebus.logging.Logger;
 import com.myservicebus.logging.LoggerFactory;
 import com.myservicebus.tasks.CancellationToken;
 
-class HandlerFaultFilter<T> implements Filter<ConsumeContext<T>> {
+public class HandlerFaultFilter<T> implements Filter<ConsumeContext<T>> {
     private final ServiceProvider provider;
 
-    HandlerFaultFilter(ServiceProvider provider) {
+    public HandlerFaultFilter(ServiceProvider provider) {
         this.provider = provider;
     }
 

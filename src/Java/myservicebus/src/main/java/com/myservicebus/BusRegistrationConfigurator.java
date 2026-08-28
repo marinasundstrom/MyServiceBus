@@ -7,7 +7,39 @@ import com.myservicebus.BusFactoryConfigurator;
 
 public interface BusRegistrationConfigurator {
     <T> void addConsumer(Class<T> consumerClass);
+
+    void addConsumerMethods(Class<?>... declaringTypes);
+
+    void addConsumerMethods(Class<?> declaringType, String endpointName);
+
+    default <TMessage> void addConsumerMethod(
+            Class<?> declaringType,
+            Class<TMessage> messageClass,
+            String endpointName,
+            ConsumerMethodInvoker<TMessage> invoker) {
+        addConsumerMethod(declaringType, messageClass, endpointName, true, null, invoker);
+    }
+
+    <TMessage> void addConsumerMethod(
+            Class<?> declaringType,
+            Class<TMessage> messageClass,
+            String endpointName,
+            boolean endpointNameExplicit,
+            Class<?> endpointNameFormatterType,
+            ConsumerMethodInvoker<TMessage> invoker);
+
+    default <TMessage, TConsumer extends com.myservicebus.Consumer<TMessage>> void addConsumer(
+            Class<TConsumer> consumerClass,
+            Class<TMessage> messageClass) {
+        addConsumer(consumerClass, messageClass, null);
+    }
     <TMessage, TConsumer extends com.myservicebus.Consumer<TMessage>> void addConsumer(Class<TConsumer> consumerClass, Class<TMessage> messageClass, java.util.function.Consumer<PipeConfigurator<ConsumeContext<TMessage>>> configure);
+
+    <TMessage, TConsumer extends com.myservicebus.Consumer<TMessage>> void addConsumer(
+            Class<TConsumer> consumerClass,
+            Class<TMessage> messageClass,
+            String endpointName,
+            java.util.function.Consumer<PipeConfigurator<ConsumeContext<TMessage>>> configure);
     void configureSend(java.util.function.Consumer<PipeConfigurator<SendContext>> configure);
     void configurePublish(java.util.function.Consumer<PipeConfigurator<PublishContext>> configure);
     void addHook(Class<? extends BusHook> hookClass);

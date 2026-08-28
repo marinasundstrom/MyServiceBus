@@ -10,9 +10,43 @@ public interface IRegistrationConfigurator
 {
     void AddConsumer<T>() where T : class, IConsumer;
 
+    void AddConsumerMethods<TConsumer>(string? endpointName = null) where TConsumer : class;
+
+    void AddConsumerMethods(Type declaringType, string? endpointName = null);
+
     void AddConsumers(params Assembly[] assemblies);
 
+    void AddConsumers(Func<Type, bool> typeFilter, params Assembly[] assemblies);
+
     void AddConsumer<TConsumer, TMessage>(Action<PipeConfigurator<ConsumeContext<TMessage>>>? configure = null)
+        where TConsumer : class, IConsumer<TMessage>
+        where TMessage : class;
+
+    void AddConsumer<TConsumer, TMessage>(
+        Func<IServiceProvider, TConsumer> consumerFactory,
+        Action<PipeConfigurator<ConsumeContext<TMessage>>>? configure = null)
+        where TConsumer : class, IConsumer<TMessage>
+        where TMessage : class;
+
+    void AddConsumer<TConsumer, TMessage>(
+        string endpointName,
+        Action<PipeConfigurator<ConsumeContext<TMessage>>>? configure = null)
+        where TConsumer : class, IConsumer<TMessage>
+        where TMessage : class;
+
+    void AddConsumer<TConsumer, TMessage>(
+        string endpointName,
+        Func<IServiceProvider, TConsumer> consumerFactory,
+        Action<PipeConfigurator<ConsumeContext<TMessage>>>? configure = null)
+        where TConsumer : class, IConsumer<TMessage>
+        where TMessage : class;
+
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    void AddGeneratedConsumer<TConsumer, TMessage>(
+        string endpointName,
+        Type? endpointNameFormatterType,
+        bool endpointNameIsExplicit,
+        Func<IServiceProvider, TConsumer> consumerFactory)
         where TConsumer : class, IConsumer<TMessage>
         where TMessage : class;
 

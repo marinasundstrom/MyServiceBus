@@ -17,3 +17,23 @@ Parity in this document means equivalent concepts, behavior, and wire outcomes. 
 | Retries | Implemented | Implemented | Both clients require explicit configuration to retry consumers. |
 | Configuration API (host, queue, message overrides, endpoint formatter) | Implemented | Implemented | Both clients support overriding names and automatic endpoint configuration with custom formatters. |
 | Logging and tracing flow | Implemented | Implemented | Both clients emit MassTransit-style lifecycle and message-flow logs and propagate OpenTelemetry context across send/publish/consume pipelines. |
+
+## Consumer declaration and generation
+
+Runtime capability and language tooling are tracked separately. A feature implemented by the .NET runtime is not automatically available through the C# source generator, and a Java runtime primitive does not imply that an annotation processor exists.
+
+| Capability | .NET runtime | C# source generator | Java runtime | Java build tooling |
+| --- | --- | --- | --- | --- |
+| Interface consumer | Implemented | Implemented | Implemented | Not required |
+| Explicit consumer/message catalog | Implemented | Emits catalog | Implemented | Emits catalog |
+| Reflection discovery of interface consumers | Implemented | Not applicable | Implemented per registered class | Not applicable |
+| Filtered assembly discovery | Implemented with type predicate | Not applicable | Not applicable | Not applicable |
+| Attributed or annotated method consumer | Reflection path implemented | Implemented | Implemented | Implemented |
+| Grouped static consumer methods | Reflection path implemented | Implemented | Implemented | Implemented |
+| Attribute endpoint override for `IConsumer<T>` | Reflection path implemented | Implemented | Implemented | Implemented |
+| Message and context parameter binding | Implemented | Implemented | Implemented | Implemented |
+| Method parameter service injection | Implemented | Implemented typed binding | Implemented | Implemented typed binding |
+| Generated direct method invocation | Typed adapter path implemented | Implemented | Typed invoker path implemented | Implemented with JSR 269 |
+| Named endpoint on a method declaration | Attribute and fluent mapping implemented | Implemented | Annotation and explicit mapping implemented | Implemented |
+| Reflection-free consumer-method discovery and invocation | Typed path implemented | Implemented | Typed path implemented | Implemented |
+Java intentionally has no classpath scan or scan predicate. Reflection method discovery is limited to classes explicitly passed to `addConsumerMethods(...)`; the annotation processor scans the current compilation and emits ordinary Java registration code. Raven is a separate product and is intentionally excluded from this product parity matrix. Its namespace-level functions could map to the descriptor model through an external integration.

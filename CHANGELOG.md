@@ -1,10 +1,34 @@
 # Changelog
 
+## 2026-08-28
+
+- Defined consumer-method endpoint precedence consistently across C# and Java: fluent overrides method attributes, method attributes override class attributes, and explicit endpoints override conventions and formatters.
+- Grouped all consumer-method bindings for one endpoint into a single receive transport, preserving multi-method dispatch in generated, reflection, and mediator paths.
+- Added C# static-container fluent registration and retained method-name conventions for bare method attributes, including generated catalogs.
+
 This changelog summarizes the bigger themes in the repository history. It is intentionally thematic rather than exhaustive, and is based on work landed between April 4, 2025 and March 24, 2026.
 
 ## Unreleased
 
 Release candidate: `0.1.0-preview.4`.
+
+### Generated consumer registration
+
+- Added a C# incremental source generator that emits typed consumer catalogs for compile-time discovery and registration.
+- Added matching explicit Java consumer/message registration and a framework-neutral JSR 269 processor that emits ordinary consumer catalogs and direct method invokers.
+- Kept reflection discovery and hand-written catalogs as supported alternatives to generated registration.
+
+### Attributed consumer methods
+
+- Added `[Consumer]` declarations for static methods, instance methods, and classes containing eligible methods without requiring `IConsumer<T>`.
+- Added message, consume-context, cancellation-token, and scoped service parameter binding with equivalent reflection discovery and generated typed adapters.
+- Added class-level attributes and explicit `AddConsumerMethods<TConsumer>(...)` registration as alternatives for discovering and mapping method consumers without an `IConsumer` marker.
+- Made grouped static methods on an attributed class the primary standalone-consumer shape, allowing several message methods to share one endpoint.
+- Allowed `[Consumer("endpoint")]` on `IConsumer<T>` classes to override their endpoint mapping in reflection and generated catalogs without duplicate method registration.
+- Documented declaration guidance based on consumer size and grouping, noting namespace-level functions only as a consideration for an external Raven integration.
+- Confirmed method-level `[Consumer]` as a complete declaration without a class attribute and added optional type-filtered assembly discovery.
+- Added a public platform-parity page that separates .NET runtime, C# generator, and Java runtime/tooling support.
+- Added corresponding Java `@MessageConsumer` declarations, explicit reflection registration, endpoint overrides, parameter binding, service injection, direct generated invocation, and mediator dispatch without introducing classpath scanning or a mandatory framework.
 
 ### NServiceBus interoperability
 

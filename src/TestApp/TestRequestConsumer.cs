@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 
 namespace TestApp;
 
+[Consumer("test-request-override")]
 class TestRequestConsumer :
     IConsumer<TestRequest>
 {

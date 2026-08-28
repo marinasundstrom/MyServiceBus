@@ -26,6 +26,7 @@ import com.myservicebus.logging.LogLevel;
 import com.myservicebus.logging.Logger;
 import com.myservicebus.logging.LoggerFactory;
 import com.myservicebus.logging.Logging;
+import com.myservicebus.generated.GeneratedConsumerCatalog;
 
 public class Main {
     public static void main(String[] args) {
@@ -56,10 +57,7 @@ public class Main {
 
         services.from(MessageBusServices.class)
                 .addServiceBus(c -> {
-                    c.addConsumer(SubmitOrderConsumer.class);
-                    c.addConsumer(OrderSubmittedConsumer.class);
-                    c.addConsumer(TestRequestConsumer.class);
-                    c.addConsumer(SubmitOrderFaultConsumer.class);
+                    GeneratedConsumerCatalog.INSTANCE.register(c);
 
                     c.using(RabbitMqFactoryConfigurator.class, (context, cfg) -> {
                         cfg.host(rabbitMqHost, rabbitMqPort, h -> {

@@ -3,10 +3,12 @@ package com.myservicebus.rabbitmq;
 import com.myservicebus.RetryConfigurator;
 import com.myservicebus.BusRegistrationContext;
 import com.myservicebus.serialization.MessageSerializer;
+import com.myservicebus.topology.ConsumerTopology;
 
 public interface ReceiveEndpointConfigurator {
     void useMessageRetry(java.util.function.Consumer<RetryConfigurator> configure);
     void configureConsumer(BusRegistrationContext context, Class<?> consumerClass);
+    void configureConsumer(BusRegistrationContext context, ConsumerTopology consumer);
     <T> void handler(Class<T> messageType, java.util.function.Function<com.myservicebus.ConsumeContext<T>, java.util.concurrent.CompletableFuture<Void>> handler);
     void prefetchCount(int prefetchCount);
     void setQueueArgument(String key, Object value);

@@ -34,6 +34,83 @@ public class TopologyRegistry : IBusTopology
     }
 
     public void RegisterConsumer<TConsumer>(string queueName, Delegate? configurePipe, params Type[] messageTypes)
+        => RegisterConsumerWithEndpointMetadata<TConsumer>(
+            queueName,
+            configurePipe,
+            endpointNameIsExplicit: false,
+            endpointNameFormatterType: typeof(TConsumer),
+            messageTypes);
+
+    internal void RegisterConsumerWithEndpointMetadata<TConsumer>(
+        string queueName,
+        Delegate? configurePipe,
+        bool endpointNameIsExplicit,
+        Type? endpointNameFormatterType,
+        params Type[] messageTypes)
+    {
+        RegisterConsumer(
+            typeof(TConsumer),
+            queueName,
+            configurePipe,
+            ReflectionConsumerRegistrationDescriptorFactory.Create(typeof(TConsumer), messageTypes.First()),
+            endpointNameIsExplicit,
+            endpointNameFormatterType,
+            messageTypes: messageTypes);
+    }
+
+    public void RegisterConsumer<TConsumer, TMessage>(
+        string queueName,
+        Action<PipeConfigurator<ConsumeContext<TMessage>>>? configurePipe = null,
+        bool endpointNameIsExplicit = false,
+        Type? endpointNameFormatterType = null)
+        where TConsumer : class, IConsumer<TMessage>
+        where TMessage : class
+    {
+        RegisterConsumerWithEndpointMetadata<TConsumer, TMessage>(
+            queueName,
+            configurePipe,
+            endpointNameIsExplicit,
+            endpointNameFormatterType ?? typeof(TConsumer));
+    }
+
+    internal void RegisterConsumerWithEndpointMetadata<TConsumer, TMessage>(
+        string queueName,
+        Action<PipeConfigurator<ConsumeContext<TMessage>>>? configurePipe,
+        bool endpointNameIsExplicit,
+        Type? endpointNameFormatterType)
+        where TConsumer : class, IConsumer<TMessage>
+        where TMessage : class
+    {
+        RegisterConsumer(
+            typeof(TConsumer),
+            queueName,
+            configurePipe,
+            new ConsumerRegistrationDescriptor<TConsumer, TMessage>(),
+            endpointNameIsExplicit,
+            endpointNameFormatterType,
+            typeof(TMessage));
+    }
+
+    internal void RegisterConsumerMethod(ConsumerMethodDefinition definition, string? endpointName = null)
+    {
+        RegisterConsumer(
+            definition.Method.DeclaringType!,
+            endpointName ?? definition.EndpointName,
+            configurePipe: null,
+            ReflectionConsumerMethodRegistrationDescriptorFactory.Create(definition),
+            endpointNameIsExplicit: endpointName is not null || definition.EndpointNameIsExplicit,
+            endpointNameFormatterType: endpointName is not null ? null : definition.EndpointNameFormatterType,
+            messageTypes: [definition.MessageType]);
+    }
+
+    private void RegisterConsumer(
+        Type consumerType,
+        string queueName,
+        Delegate? configurePipe,
+        IConsumerRegistrationDescriptor? registration,
+        bool endpointNameIsExplicit,
+        Type? endpointNameFormatterType,
+        params Type[] messageTypes)
     {
         EnsureReceiveEndpoint(queueName);
         var bindings = messageTypes.Select(mt =>
@@ -44,10 +121,13 @@ public class TopologyRegistry : IBusTopology
 
         Consumers.Add(new ConsumerTopology
         {
-            ConsumerType = typeof(TConsumer),
+            ConsumerType = consumerType,
             QueueName = queueName,
+            EndpointNameIsExplicit = endpointNameIsExplicit,
+            EndpointNameFormatterType = endpointNameFormatterType,
             Bindings = bindings,
-            ConfigurePipe = configurePipe
+            ConfigurePipe = configurePipe,
+            Registration = registration
         });
     }
 
@@ -73,5 +153,18 @@ public class TopologyRegistry : IBusTopology
             return;
 
         _receiveEndpoints.Add(new ReceiveEndpointDefinition(endpointName, Durable: true, Temporary: false));
+    }
+}
+
+internal static class ReflectionConsumerRegistrationDescriptorFactory
+{
+    public static IConsumerRegistrationDescriptor? Create(Type consumerType, Type messageType)
+    {
+        if (!typeof(IConsumer).IsAssignableFrom(consumerType))
+            return null;
+
+        var descriptorType = typeof(ConsumerRegistrationDescriptor<,>).MakeGenericType(consumerType, messageType);
+        return (IConsumerRegistrationDescriptor)(Activator.CreateInstance(descriptorType)
+            ?? throw new InvalidOperationException($"Failed to create a registration descriptor for {consumerType}."));
     }
 }

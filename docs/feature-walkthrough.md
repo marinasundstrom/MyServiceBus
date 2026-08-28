@@ -64,6 +64,102 @@ await app.StartAsync();
 var bus = app.Services.GetRequiredService<IMessageBus>();
 ```
 
+To move consumer discovery to compile time, reference the `Sundstrom.MyServiceBus.Generators` analyzer and register its generated catalog:
+
+```csharp
+using MyServiceBus.Generated;
+
+builder.Services.AddServiceBus(x =>
+{
+    x.AddGeneratedConsumers();
+});
+```
+
+The C# generator also discovers attributed methods and eligible methods on attributed classes. The method is the consumer; its containing C# type is only an organizational container. A static class can optionally group several related consumer methods on one endpoint instead of spreading them across one class per message. The first ordinary parameter is the message, known context and cancellation parameters come from the receive pipeline, and remaining parameters resolve as scoped services. `[Consumer("orders")]` sets the receive endpoint explicitly:
+
+```csharp
+[Consumer("orders")]
+public static class OrderConsumers
+{
+    public static Task ReceiveOrder(
+        Order order,
+        ConsumeContext<Order> context,
+        IOrderRepository orders,
+        CancellationToken cancellationToken)
+        => orders.Receive(order, cancellationToken);
+
+    public static Task CancelOrder(
+        CancelOrder command,
+        IOrderRepository orders,
+        CancellationToken cancellationToken)
+        => orders.Cancel(command, cancellationToken);
+}
+```
+
+`Task`, `ValueTask`, and `void` return shapes are supported. No `IConsumer` interface is required. Reflection discovery through `AddConsumers(...)` recognizes the same declarations. A class can instead be registered and mapped explicitly through the fluent API without an attribute:
+
+Method names are unrestricted; discovery does not require the name `Consume`.
+
+```csharp
+x.AddConsumerMethods(typeof(OrderConsumers), "receive-order");
+```
+
+A bare method-level attribute uses the method name as the endpoint convention:
+
+```csharp
+public static class OrderFunctions
+{
+    [Consumer]
+    public static Task OrderSubmittedConsumer(ConsumeContext<OrderSubmitted> context)
+        => Task.CompletedTask;
+}
+```
+
+`[Consumer("orders")]` can also be placed on a normal class that implements `IConsumer<T>`. In that case it overrides the endpoint mapping and does not register `Consume` as a separate method consumer:
+
+```csharp
+[Consumer("orders")]
+public sealed class SubmitOrderConsumer : IConsumer<SubmitOrder>
+{
+    public Task Consume(ConsumeContext<SubmitOrder> context) => /* ... */;
+}
+```
+
+Consumer interfaces and attributes are local application declarations, not shared wire contracts. See [Consumer method dispatch](development/consumer-method-dispatch.md) and the website platform-parity matrix for the current C# and Java boundaries.
+
+Choose between a consumer class and consumer methods based on size and grouping. A substantial consumer generally merits its own `IConsumer<T>` class. When a class would mainly act as a de-facto namespace for several related handlers, grouped static methods are the more direct shape. Raven is outside MyServiceBus; an external Raven integration should consider namespace-level functions before classes because Raven already supports that grouping directly.
+
+Reflection and generation differ only in discovery and registration: reflection scans declarations at startup, while the generator scans the compilation and emits explicit typed registrations. Both use the same consumer topology and receive pipeline after registration.
+
+The class itself does not need an attribute when individual methods are marked. Reflection scanning is bounded by the supplied assemblies and can optionally be narrowed with a type predicate:
+
+```csharp
+x.AddConsumers(
+    type => type.Namespace == "Sales.Consumers",
+    typeof(OrderFunctions).Assembly);
+```
+
+Java has the corresponding explicit catalog boundary and an optional standard annotation processor:
+
+```java
+cfg.addConsumer(SubmitOrderConsumer.class, SubmitOrder.class);
+cfg.addConsumerMethod(
+    OrderConsumers.class,
+    Order.class,
+    "orders",
+    (provider, context) -> OrderConsumers.receive(context.getMessage()));
+```
+
+```groovy
+dependencies {
+    annotationProcessor project(':myservicebus-processor')
+}
+```
+
+```java
+GeneratedConsumerCatalog.INSTANCE.register(cfg);
+```
+
 **Without host (fluent configuration pattern)**
 
 Outside of an ASP.NET host (or generic host), the fluent configuration pattern can populate an `IServiceCollection` directly.
@@ -146,6 +242,23 @@ bus.start().join();
 `addServiceBus` activates consumers using `ScopeConsumerFactory`, so they can resolve dependencies from the `ServiceProvider`.
 
 Java accepts this self-contained model because the runtime lacks a standard dependency injection library; consumers typically provide their own dependencies directly.
+
+Java consumer methods use `@MessageConsumer` because `Consumer<TMessage>` already names the interface-consumer contract. The method can bind its message, `ConsumeContext<T>`, `CancellationToken`, and normal scoped services. Reflection registration inspects only the classes explicitly supplied; there is no implicit classpath scan or Java scan predicate.
+
+```java
+public final class OrderConsumers {
+    @MessageConsumer("orders")
+    public static CompletionStage<Void> receiveOrder(
+            Order order,
+            ConsumeContext<Order> context,
+            OrderRepository orders,
+            CancellationToken cancellationToken) {
+        return orders.receive(order, cancellationToken);
+    }
+}
+```
+
+Use `cfg.addConsumerMethods(OrderConsumers.class)` for reflection discovery, or add `myservicebus-processor` to the build's `annotationProcessor` configuration and register `GeneratedConsumerCatalog.INSTANCE`. The processor is JSR 269 tooling and does not lock the application to Spring, Quarkus, Micronaut, or another framework.
 
 #### Azure Service Bus preview
 
@@ -297,6 +410,12 @@ class SubmitOrderConsumer : IConsumer<SubmitOrder>
         await context.Publish(new OrderSubmitted(context.Message.OrderId));
     }
 }
+```
+
+The generator automates ordinary typed registrations. The equivalent calls can also be maintained by hand:
+
+```csharp
+x.AddConsumer<SubmitOrderConsumer, SubmitOrder>();
 ```
 
 #### Java

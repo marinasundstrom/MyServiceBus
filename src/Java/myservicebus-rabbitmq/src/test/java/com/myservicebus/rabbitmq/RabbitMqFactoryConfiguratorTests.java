@@ -23,6 +23,14 @@ public class RabbitMqFactoryConfiguratorTests {
         }
     }
 
+    @MessageConsumer("attribute-orders")
+    static class ExplicitEndpointConsumer implements Consumer<MyMessage> {
+        @Override
+        public CompletableFuture<Void> consume(ConsumeContext<MyMessage> context) {
+            return CompletableFuture.completedFuture(null);
+        }
+    }
+
     @Test
     public void factoryConfiguresNonDefaultPort() {
         RabbitMqFactoryConfigurator configurator = new RabbitMqFactoryConfigurator();
@@ -171,5 +179,30 @@ public class RabbitMqFactoryConfiguratorTests {
                 .orElseThrow();
 
         assertEquals("formatted-myconsumer", def.getQueueName());
+    }
+
+    @Test
+    public void configureEndpointsDoesNotReplaceExplicitEndpoint() {
+        ServiceCollection services = ServiceCollection.create();
+        BusRegistrationConfiguratorImpl cfg = new BusRegistrationConfiguratorImpl(services);
+        cfg.addConsumer(ExplicitEndpointConsumer.class);
+
+        RabbitMqTransport.configure(cfg);
+        cfg.complete();
+
+        ServiceProvider provider = services.buildServiceProvider();
+        BusRegistrationContext context = new BusRegistrationContext(provider);
+        RabbitMqFactoryConfigurator factoryConfigurator = provider.getService(RabbitMqFactoryConfigurator.class);
+
+        factoryConfigurator.setEndpointNameFormatter(mt -> "formatted-" + mt.getSimpleName().toLowerCase());
+        factoryConfigurator.configureEndpoints(context);
+
+        TopologyRegistry registry = provider.getService(TopologyRegistry.class);
+        ConsumerTopology definition = registry.getConsumers().stream()
+                .filter(consumer -> consumer.getConsumerType().equals(ExplicitEndpointConsumer.class))
+                .findFirst()
+                .orElseThrow();
+
+        assertEquals("attribute-orders", definition.getQueueName());
     }
 }

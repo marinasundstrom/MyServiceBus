@@ -221,7 +221,7 @@ public class MediatorTransportFactoryTest {
     public void publishDeliversMessageToConsumer() {
         ServiceCollection services = ServiceCollection.create();
         MediatorBus bus = MediatorBus.configure(services, cfg -> {
-            cfg.addConsumer(TestConsumer.class);
+            cfg.addConsumer(TestConsumer.class, TestMessage.class);
         });
 
         TestConsumer.received = new CompletableFuture<>();
