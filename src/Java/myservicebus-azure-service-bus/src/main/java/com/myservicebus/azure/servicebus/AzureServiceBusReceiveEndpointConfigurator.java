@@ -52,11 +52,20 @@ public final class AzureServiceBusReceiveEndpointConfigurator {
 
     public void configureConsumer(BusRegistrationContext context, Class<?> consumerClass) {
         TopologyRegistry registry = context.getServiceProvider().getService(TopologyRegistry.class);
-        ConsumerTopology definition = registry.getConsumers().stream()
+        List<ConsumerTopology> definitions = registry.getConsumers().stream()
                 .filter(candidate -> candidate.getConsumerType().equals(consumerClass))
-                .findFirst()
-                .orElseThrow(() -> new IllegalStateException(
-                        "Consumer " + consumerClass.getSimpleName() + " is not registered"));
+                .toList();
+        if (definitions.isEmpty()) {
+            throw new IllegalStateException(
+                    "Consumer " + consumerClass.getSimpleName() + " is not registered");
+        }
+        for (ConsumerTopology definition : definitions) {
+            configureConsumer(context, definition);
+        }
+    }
+
+    public void configureConsumer(BusRegistrationContext context, ConsumerTopology definition) {
+        TopologyRegistry registry = context.getServiceProvider().getService(TopologyRegistry.class);
         registry.moveConsumerToEndpoint(definition, queueName);
         for (MessageBinding binding : definition.getBindings()) {
             binding.setEntityName(entityNameResolver.apply(binding.getMessageType()));

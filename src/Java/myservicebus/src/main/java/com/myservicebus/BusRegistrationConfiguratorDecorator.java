@@ -20,11 +20,39 @@ public abstract class BusRegistrationConfiguratorDecorator implements BusRegistr
     }
 
     @Override
+    public void addConsumerMethods(Class<?>... declaringTypes) {
+        inner.addConsumerMethods(declaringTypes);
+    }
+
+    @Override
+    public void addConsumerMethods(Class<?> declaringType, String endpointName) {
+        inner.addConsumerMethods(declaringType, endpointName);
+    }
+
+    @Override
+    public <TMessage> void addConsumerMethod(
+            Class<?> declaringType,
+            Class<TMessage> messageClass,
+            String endpointName,
+            ConsumerMethodInvoker<TMessage> invoker) {
+        inner.addConsumerMethod(declaringType, messageClass, endpointName, invoker);
+    }
+
+    @Override
     public <TMessage, TConsumer extends com.myservicebus.Consumer<TMessage>> void addConsumer(
             Class<TConsumer> consumerClass,
             Class<TMessage> messageClass,
             Consumer<PipeConfigurator<ConsumeContext<TMessage>>> configure) {
         inner.addConsumer(consumerClass, messageClass, configure);
+    }
+
+    @Override
+    public <TMessage, TConsumer extends com.myservicebus.Consumer<TMessage>> void addConsumer(
+            Class<TConsumer> consumerClass,
+            Class<TMessage> messageClass,
+            String endpointName,
+            java.util.function.Consumer<PipeConfigurator<ConsumeContext<TMessage>>> configure) {
+        inner.addConsumer(consumerClass, messageClass, endpointName, configure);
     }
 
     @Override

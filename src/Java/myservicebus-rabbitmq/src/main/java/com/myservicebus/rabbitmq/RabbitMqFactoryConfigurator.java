@@ -87,10 +87,8 @@ public class RabbitMqFactoryConfigurator implements BusFactoryConfigurator {
     public void configureEndpoints(BusRegistrationContext context) {
         TopologyRegistry registry = context.getServiceProvider().getService(TopologyRegistry.class);
         for (ConsumerTopology def : registry.getConsumers()) {
-            String queueName = endpointNameFormatter != null ? endpointNameFormatter.format(def.getConsumerType())
-                    : def.getQueueName();
-            Class<?> consumerClass = def.getConsumerType();
-            receiveEndpoint(queueName, e -> e.configureConsumer(context, consumerClass));
+            String queueName = def.resolveEndpointName(endpointNameFormatter);
+            receiveEndpoint(queueName, endpoint -> endpoint.configureConsumer(context, def));
         }
     }
 
@@ -236,12 +234,26 @@ public class RabbitMqFactoryConfigurator implements BusFactoryConfigurator {
         public void configureConsumer(BusRegistrationContext context, Class<?> consumerClass) {
             try {
                 TopologyRegistry registry = context.getServiceProvider().getService(TopologyRegistry.class);
-                ConsumerTopology def = registry.getConsumers().stream()
+                java.util.List<ConsumerTopology> definitions = registry.getConsumers().stream()
                         .filter(d -> d.getConsumerType().equals(consumerClass))
-                        .findFirst()
-                        .orElseThrow(() -> new IllegalStateException(
-                                "Consumer " + consumerClass.getSimpleName() + " not registered"));
+                        .toList();
+                if (definitions.isEmpty()) {
+                    throw new IllegalStateException(
+                            "Consumer " + consumerClass.getSimpleName() + " not registered");
+                }
+                for (ConsumerTopology definition : definitions) {
+                    configureConsumer(context, definition);
+                }
+            } catch (Exception ex) {
+                throw new RuntimeException(
+                        "Failed to configure consumer " + consumerClass.getSimpleName(), ex);
+            }
+        }
 
+        @Override
+        public void configureConsumer(BusRegistrationContext context, ConsumerTopology def) {
+            try {
+                TopologyRegistry registry = context.getServiceProvider().getService(TopologyRegistry.class);
                 registry.moveConsumerToEndpoint(def, queueName);
 
                 MessageBinding binding = def.getBindings().get(0);
@@ -266,7 +278,7 @@ public class RabbitMqFactoryConfigurator implements BusFactoryConfigurator {
                 def.setSerializerClass(serializerClass);
             } catch (Exception ex) {
                 throw new RuntimeException(
-                        "Failed to configure consumer " + consumerClass.getSimpleName(), ex);
+                        "Failed to configure consumer " + def.getConsumerType().getSimpleName(), ex);
             }
         }
 

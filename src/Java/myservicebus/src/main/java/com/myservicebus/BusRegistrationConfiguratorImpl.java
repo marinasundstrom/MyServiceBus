@@ -46,6 +46,13 @@ public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigura
         }
 
         serviceCollection.addScoped(consumerClass);
+        MessageConsumer annotation = consumerClass.getAnnotation(MessageConsumer.class);
+        String attributeEndpointName = annotation != null && !annotation.value().isBlank()
+                ? annotation.value()
+                : null;
+        String endpointName = attributeEndpointName != null
+                ? attributeEndpointName
+                : DefaultEndpointNameFormatter.INSTANCE.format(consumerClass);
 
         for (Type iface : consumerClass.getGenericInterfaces()) {
             if (iface instanceof ParameterizedType pt) {
@@ -54,7 +61,9 @@ public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigura
                     Type actualType = pt.getActualTypeArguments()[0];
                     Class<?> messageType = getClassFromType(actualType);
                     topology.registerConsumer(consumerClass,
-                            DefaultEndpointNameFormatter.INSTANCE.format(consumerClass),
+                            endpointName,
+                            attributeEndpointName != null,
+                            consumerClass,
                             null,
                             messageType);
                 }
@@ -65,15 +74,116 @@ public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigura
     }
 
     @Override
+    public void addConsumerMethods(Class<?>... declaringTypes) {
+        if (declaringTypes == null) {
+            throw new IllegalArgumentException("declaringTypes must not be null");
+        }
+        for (Class<?> declaringType : declaringTypes) {
+            registerMethodDefinitions(ReflectionConsumerMethodDiscovery.discover(declaringType, false), null);
+        }
+    }
+
+    @Override
+    public void addConsumerMethods(Class<?> declaringType, String endpointName) {
+        if (endpointName == null || endpointName.isBlank()) {
+            throw new IllegalArgumentException("endpointName must not be blank");
+        }
+        registerMethodDefinitions(ReflectionConsumerMethodDiscovery.discover(declaringType, false), endpointName);
+    }
+
+    private void registerMethodDefinitions(
+            java.util.List<ReflectionConsumerMethodDiscovery.Definition<?>> definitions,
+            String endpointOverride) {
+        if (definitions.isEmpty()) {
+            throw new IllegalArgumentException("No eligible consumer methods were found.");
+        }
+        for (ReflectionConsumerMethodDiscovery.Definition<?> definition : definitions) {
+            if (definition.requiresInstance()) {
+                serviceCollection.addScoped(definition.declaringType());
+            }
+            registerMethodDefinition(definition, endpointOverride);
+        }
+    }
+
+    @SuppressWarnings({ "unchecked", "rawtypes" })
+    private void registerMethodDefinition(
+            ReflectionConsumerMethodDiscovery.Definition<?> definition,
+            String endpointOverride) {
+        addConsumerMethod(
+                definition.declaringType(),
+                definition.messageType(),
+                endpointOverride != null ? endpointOverride : definition.endpointName(),
+                endpointOverride != null || definition.endpointNameExplicit(),
+                endpointOverride != null ? null : definition.endpointNameFormatterType(),
+                (ConsumerMethodInvoker) definition.invoker());
+    }
+
+    @Override
+    public <TMessage> void addConsumerMethod(
+            Class<?> declaringType,
+            Class<TMessage> messageClass,
+            String endpointName,
+            boolean endpointNameExplicit,
+            Class<?> endpointNameFormatterType,
+            ConsumerMethodInvoker<TMessage> invoker) {
+        if (endpointName == null || endpointName.isBlank()) {
+            throw new IllegalArgumentException("endpointName must not be blank");
+        }
+        topology.registerConsumerMethod(
+                declaringType,
+                messageClass,
+                endpointName,
+                endpointNameExplicit,
+                endpointNameFormatterType,
+                invoker);
+    }
+
+    @Override
     public <TMessage, TConsumer extends com.myservicebus.Consumer<TMessage>> void addConsumer(Class<TConsumer> consumerClass, Class<TMessage> messageClass,
             Consumer<PipeConfigurator<ConsumeContext<TMessage>>> configure) {
+        MessageConsumer annotation = consumerClass.getAnnotation(MessageConsumer.class);
+        String attributeEndpointName = annotation != null && !annotation.value().isBlank()
+                ? annotation.value()
+                : null;
+        if (consumerTypes.contains(consumerClass)) {
+            logger.debug("Consumer '{}' already registered, skipping", consumerClass.getSimpleName());
+            return;
+        }
+        serviceCollection.addScoped(consumerClass);
+        topology.registerConsumer(
+                consumerClass,
+                attributeEndpointName != null
+                        ? attributeEndpointName
+                        : DefaultEndpointNameFormatter.INSTANCE.format(consumerClass),
+                attributeEndpointName != null,
+                consumerClass,
+                (java.util.function.Consumer) configure,
+                messageClass);
+        consumerTypes.add(consumerClass);
+    }
+
+    @Override
+    public <TMessage, TConsumer extends com.myservicebus.Consumer<TMessage>> void addConsumer(
+            Class<TConsumer> consumerClass,
+            Class<TMessage> messageClass,
+            String endpointName,
+            Consumer<PipeConfigurator<ConsumeContext<TMessage>>> configure) {
+        if (endpointName == null || endpointName.isBlank()) {
+            throw new IllegalArgumentException("endpointName must not be blank");
+        }
         if (consumerTypes.contains(consumerClass)) {
             logger.debug("Consumer '{}' already registered, skipping", consumerClass.getSimpleName());
             return;
         }
 
         serviceCollection.addScoped(consumerClass);
-        topology.registerConsumer(consumerClass, DefaultEndpointNameFormatter.INSTANCE.format(consumerClass), (java.util.function.Consumer) configure, messageClass);
+        topology.registerConsumer(
+                consumerClass,
+                endpointName,
+                true,
+                null,
+                (java.util.function.Consumer) configure,
+                messageClass);
         consumerTypes.add(consumerClass);
     }
 

@@ -7,18 +7,17 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Logging;
 using MyServiceBus.Monitoring;
+using MyServiceBus.Generated;
 using OpenTelemetry.Trace;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
+builder.Services.AddScoped<GeneratedConsumerAudit>();
 
 builder.Services.AddServiceBus(x =>
 {
-    x.AddConsumer<SubmitOrderConsumer>();
-    x.AddConsumer<OrderSubmittedConsumer>();
-    x.AddConsumer<TestRequestConsumer>();
-    x.AddConsumer<SubmitOrderFaultConsumer>();
+    x.AddGeneratedConsumers();
 
     x.UsingRabbitMq((context, cfg) =>
     {

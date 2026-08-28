@@ -23,6 +23,7 @@ import com.myservicebus.serialization.RawJsonMessageSerializer;
 import com.myservicebus.tasks.CancellationToken;
 import com.myservicebus.topology.ConsumerTopology;
 import com.myservicebus.topology.MessageBinding;
+import com.myservicebus.topology.TopologyRegistry;
 
 class RawReceiveMessageTest {
     static class TestMessage {
@@ -47,9 +48,21 @@ class RawReceiveMessageTest {
         }
     }
 
+    static class OtherMessage {
+    }
+
+    static class OtherConsumer implements Consumer<OtherMessage> {
+        @Override
+        public CompletableFuture<Void> consume(ConsumeContext<OtherMessage> context) {
+            return CompletableFuture.completedFuture(null);
+        }
+    }
+
     static class StubTransportFactory implements TransportFactory {
         Function<TransportMessage, CompletableFuture<Void>> handler;
         Function<String, Boolean> isRegistered;
+        int receiveTransportCount;
+        List<MessageBinding> bindings;
 
         @Override
         public SendTransport getSendTransport(URI address) {
@@ -66,6 +79,8 @@ class RawReceiveMessageTest {
                 Map<String, Object> queueArguments) {
             this.handler = handler;
             this.isRegistered = isMessageTypeRegistered;
+            this.receiveTransportCount++;
+            this.bindings = bindings;
             return new ReceiveTransport() {
                 @Override
                 public void start() {
@@ -156,6 +171,30 @@ class RawReceiveMessageTest {
         factory.handler.apply(rawMessage).join();
 
         assertEquals("hi", TestConsumer.received.get());
+    }
+
+    @Test
+    void consumers_on_one_endpoint_create_one_transport_with_all_bindings() throws Exception {
+        StubTransportFactory factory = new StubTransportFactory();
+        TopologyRegistry topology = new TopologyRegistry();
+        topology.registerConsumer(TestConsumer.class, "shared", null, TestMessage.class);
+        topology.registerConsumer(OtherConsumer.class, "shared", null, OtherMessage.class);
+
+        ServiceCollection services = ServiceCollection.create();
+        services.addSingleton(TopologyRegistry.class, ignored -> () -> topology);
+        services.addSingleton(TransportFactory.class, ignored -> () -> factory);
+        services.addSingleton(TransportSendEndpointProvider.class, ignored -> () -> new NoopEndpointProvider());
+        services.addSingleton(PublishPipe.class, ignored -> () -> new PublishPipe(
+                context -> CompletableFuture.completedFuture(null)));
+        services.addSingleton(MessageSerializer.class, ignored -> () -> new EnvelopeMessageSerializer());
+        services.addScoped(TestConsumer.class);
+        services.addScoped(OtherConsumer.class);
+
+        MessageBusImpl bus = new MessageBusImpl(services.buildServiceProvider());
+        bus.start();
+
+        assertEquals(1, factory.receiveTransportCount);
+        assertEquals(2, factory.bindings.size());
     }
 
     static class NoopEndpointProvider implements TransportSendEndpointProvider {

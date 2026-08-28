@@ -2,10 +2,13 @@ package com.myservicebus;
 
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.IdentityHashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.HashSet;
 import java.util.concurrent.CompletableFuture;
 import java.time.Duration;
 import java.time.Instant;
@@ -45,8 +48,12 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
     private final List<ReceiveTransport> receiveTransports = new ArrayList<>();
     private final URI address;
     private final BusTopology topology;
-    private final Set<String> consumerRegistrations = new HashSet<>();
-    private final Set<String> messageTypes = new HashSet<>();
+    private final Set<ConsumerTopology> consumerRegistrations =
+            Collections.newSetFromMap(new IdentityHashMap<>());
+    private final Map<String, List<Function<TransportMessage, CompletableFuture<Void>>>> consumerHandlers =
+            new LinkedHashMap<>();
+    private final Set<String> rawConsumerEndpoints = new HashSet<>();
+    private final Set<String> consumerTransportEndpoints = new HashSet<>();
     private final Function<Class<?>, ConsumerFactory> consumerFactoryFactory;
     private final BusHookDispatcher hooks;
     private volatile BusState state = BusState.STOPPED;
@@ -115,6 +122,7 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
             for (ConsumerTopology consumerDef : topology.getConsumers()) {
                 addConsumer(consumerDef);
             }
+            createConsumerTransports(topology);
 
             for (ReceiveTransport transport : receiveTransports) {
                 transport.start();
@@ -141,15 +149,13 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
 
     public void addConsumer(ConsumerTopology consumerDef) throws Exception {
         String messageUrn = MessageUrn.forClass(consumerDef.getBindings().get(0).getMessageType());
-        String key = consumerDef.getQueueName() + "|" + messageUrn;
-        if (consumerRegistrations.contains(key)) {
+        if (consumerRegistrations.contains(consumerDef)) {
             if (logger != null) {
                 logger.debug("Consumer for '{}' on '{}' already registered, skipping", messageUrn,
                         consumerDef.getQueueName());
             }
             return;
         }
-        messageTypes.add(messageUrn);
 
         PipeConfigurator<ConsumeContext<Object>> configurator = new PipeConfigurator<>();
         configurator.useFilter(new OpenTelemetryConsumeFilter<>());
@@ -161,14 +167,27 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
         Filter<ConsumeContext<Object>> errorFilter = new ErrorTransportFilter(serviceProvider);
         configurator.useFilter(errorFilter);
         @SuppressWarnings({ "unchecked", "rawtypes" })
-        Filter<ConsumeContext<Object>> faultFilter = new ConsumerFaultFilter(serviceProvider,
-                consumerDef.getConsumerType());
+        Filter<ConsumeContext<Object>> faultFilter = consumerDef.getMethodInvoker() != null
+                ? new HandlerFaultFilter(serviceProvider)
+                : new ConsumerFaultFilter(serviceProvider, consumerDef.getConsumerType());
         configurator.useFilter(faultFilter);
         if (consumerDef.getConfigure() != null)
             consumerDef.getConfigure().accept(configurator);
-        ConsumerFactory factory = consumerFactoryFactory.apply(consumerDef.getConsumerType());
-        @SuppressWarnings({ "unchecked", "rawtypes" })
-        Filter<ConsumeContext<Object>> consumerFilter = new ConsumerMessageFilter(consumerDef.getConsumerType(), factory);
+        Filter<ConsumeContext<Object>> consumerFilter;
+        if (consumerDef.getMethodInvoker() != null) {
+            @SuppressWarnings({ "unchecked", "rawtypes" })
+            Filter<ConsumeContext<Object>> methodFilter = new ConsumerMethodMessageFilter(
+                    serviceProvider,
+                    consumerDef.getMethodInvoker());
+            consumerFilter = methodFilter;
+        } else {
+            ConsumerFactory factory = consumerFactoryFactory.apply(consumerDef.getConsumerType());
+            @SuppressWarnings({ "unchecked", "rawtypes" })
+            Filter<ConsumeContext<Object>> typedConsumerFilter = new ConsumerMessageFilter(
+                    consumerDef.getConsumerType(),
+                    factory);
+            consumerFilter = typedConsumerFilter;
+        }
         configurator.useFilter(consumerFilter);
         Pipe<ConsumeContext<Object>> pipe = configurator.build(serviceProvider);
 
@@ -176,6 +195,9 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
                 ? consumerDef.getSerializerClass().getDeclaredConstructor().newInstance()
                 : serviceProvider.getService(MessageSerializer.class);
         boolean rawSerializer = isRawSerializer(endpointSerializer);
+        if (rawSerializer) {
+            rawConsumerEndpoints.add(consumerDef.getQueueName());
+        }
         TransportSendEndpointProvider provider = transportSendEndpointProvider.withSerializer(endpointSerializer);
 
         Function<TransportMessage, CompletableFuture<Void>> handler = transportMessage -> {
@@ -200,7 +222,9 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
                     }
                 }
 
-                Type messageType = resolveMessageType(consumerDef.getConsumerType(), binding.getMessageType());
+                Type messageType = consumerDef.getMethodInvoker() != null
+                        ? binding.getMessageType()
+                        : resolveMessageType(consumerDef.getConsumerType(), binding.getMessageType());
                 Object message = inboundMessage.getMessage(messageType);
                 Map<String, Object> headers = inboundMessage.getHeaders();
                 String responseAddress = inboundMessage.getResponseAddress();
@@ -232,17 +256,64 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
             }
         };
 
-        java.util.function.Function<String, Boolean> isRegistered = urn -> urn == null ? rawSerializer : messageTypes.contains(urn);
-        ReceiveEndpointTransportTopology endpointTopology = new ReceiveEndpointTransportTopology(
-                consumerDef.getQueueName(),
-                true,
-                false,
-                consumerDef.getPrefetchCount() != null ? consumerDef.getPrefetchCount() : 0,
-                consumerDef.getBindings(),
-                consumerDef.getQueueArguments());
-        ReceiveTransport transport = transportFactory.createReceiveTransport(endpointTopology, handler, isRegistered);
-        receiveTransports.add(transport);
-        consumerRegistrations.add(key);
+        consumerHandlers.computeIfAbsent(consumerDef.getQueueName(), ignored -> new ArrayList<>()).add(handler);
+        consumerRegistrations.add(consumerDef);
+        if (state != BusState.STARTING) {
+            TopologyRegistry directRegistry = new TopologyRegistry();
+            directRegistry.getConsumers().add(consumerDef);
+            createConsumerTransports(directRegistry);
+        }
+    }
+
+    private void createConsumerTransports(TopologyRegistry registry) throws Exception {
+        Map<String, List<ConsumerTopology>> consumersByEndpoint = new LinkedHashMap<>();
+        for (ConsumerTopology consumer : registry.getConsumers()) {
+            consumersByEndpoint
+                    .computeIfAbsent(consumer.getQueueName(), ignored -> new ArrayList<>())
+                    .add(consumer);
+        }
+
+        for (Map.Entry<String, List<ConsumerTopology>> entry : consumersByEndpoint.entrySet()) {
+            String endpointName = entry.getKey();
+            if (!consumerTransportEndpoints.add(endpointName)) {
+                continue;
+            }
+
+            List<ConsumerTopology> endpointConsumers = entry.getValue();
+            Map<String, MessageBinding> bindingsByIdentity = new LinkedHashMap<>();
+            for (ConsumerTopology consumer : endpointConsumers) {
+                for (MessageBinding binding : consumer.getBindings()) {
+                    String identity = binding.getMessageType().getName() + "|" + binding.getEntityName();
+                    bindingsByIdentity.putIfAbsent(identity, binding);
+                }
+            }
+            List<MessageBinding> bindings = new ArrayList<>(bindingsByIdentity.values());
+            Set<String> registeredUrns = new HashSet<>();
+            for (MessageBinding binding : bindings) {
+                registeredUrns.add(MessageUrn.forClass(binding.getMessageType()));
+            }
+
+            ConsumerTopology first = endpointConsumers.get(0);
+            ReceiveEndpointTransportTopology endpointTopology = new ReceiveEndpointTransportTopology(
+                    endpointName,
+                    true,
+                    false,
+                    first.getPrefetchCount() != null ? first.getPrefetchCount() : 0,
+                    bindings,
+                    first.getQueueArguments());
+            Function<String, Boolean> isRegistered = urn -> urn == null
+                    ? rawConsumerEndpoints.contains(endpointName)
+                    : registeredUrns.contains(urn);
+            Function<TransportMessage, CompletableFuture<Void>> handler = message -> {
+                List<Function<TransportMessage, CompletableFuture<Void>>> handlers =
+                        consumerHandlers.getOrDefault(endpointName, List.of());
+                CompletableFuture<?>[] dispatches = handlers.stream()
+                        .map(candidate -> candidate.apply(message))
+                        .toArray(CompletableFuture[]::new);
+                return CompletableFuture.allOf(dispatches);
+            };
+            receiveTransports.add(transportFactory.createReceiveTransport(endpointTopology, handler, isRegistered));
+        }
     }
 
     public <T> void addHandler(String queueName, Class<T> messageType, String exchange,

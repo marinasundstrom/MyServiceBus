@@ -212,4 +212,26 @@ public class RabbitMqFactoryConfiguratorTests
         var def = registry.Consumers.First(c => c.ConsumerType == typeof(MyConsumer));
         Assert.Equal("formatted-myconsumer", def.QueueName);
     }
+
+    [Fact]
+    public void ConfigureEndpoints_does_not_replace_an_explicit_endpoint()
+    {
+        var registry = new TopologyRegistry();
+        registry.RegisterConsumer<MyConsumer, MyMessage>(
+            "attribute-orders",
+            endpointNameIsExplicit: true);
+
+        var services = new ServiceCollection();
+        services.AddSingleton(registry);
+        services.AddSingleton<IMessageBus, TestMessageBus>();
+        var provider = services.BuildServiceProvider();
+        var context = new TestBusRegistrationContext(provider);
+
+        var configurator = new TestRabbitMqFactoryConfigurator();
+        configurator.SetEndpointNameFormatter(new StaticFormatter());
+        configurator.ConfigureEndpoints(context);
+
+        var definition = Assert.Single(registry.Consumers);
+        Assert.Equal("attribute-orders", definition.QueueName);
+    }
 }

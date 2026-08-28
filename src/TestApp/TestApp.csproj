@@ -16,6 +16,9 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="../MyServiceBus.Generators/MyServiceBus.Generators.csproj"
+                      OutputItemType="Analyzer"
+                      ReferenceOutputAssembly="false" />
     <ProjectReference Include="../AspireApp.ServiceDefaults/AspireApp.ServiceDefaults.csproj" />
     <ProjectReference Include="../MyServiceBus.Monitoring/MyServiceBus.Monitoring.csproj" />
     <ProjectReference Include="../MyServiceBus.RabbitMq/MyServiceBus.RabbitMq.csproj" />

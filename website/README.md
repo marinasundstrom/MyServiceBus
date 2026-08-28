@@ -48,6 +48,8 @@ The public site currently covers:
 - introduction and getting started
 - core messaging concepts
 - RabbitMQ transport behavior
+- attributed C# consumer methods, parameter binding, and class-level discovery
+- platform parity across the .NET runtime, C# generation, and Java
 - application testing
 - verified interoperability and supported-version boundaries
 

@@ -14,6 +14,19 @@ This folder contains the Java modules for MyServiceBus. The Gradle multi-project
   gradle test
   ```
 
+## Generated consumer catalogs
+
+Java applications can register consumers explicitly or use the optional, framework-neutral JSR 269 processor:
+
+```groovy
+dependencies {
+    implementation 'io.github.marinasundstrom.myservicebus:myservicebus:0.1.0-preview.4'
+    annotationProcessor 'io.github.marinasundstrom.myservicebus:myservicebus-processor:0.1.0-preview.4'
+}
+```
+
+Annotate consumer methods with `@MessageConsumer`, then register the generated catalog with `GeneratedConsumerCatalog.INSTANCE::register`. This moves discovery to compilation and avoids reflective method invocation.
+
 ## Run locally
 ### 1) Start RabbitMQ
 From the repository root, start RabbitMQ using Docker Compose:

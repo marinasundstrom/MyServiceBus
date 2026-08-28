@@ -2,40 +2,17 @@ namespace MyServiceBus;
 
 using Microsoft.Extensions.DependencyInjection;
 using MyServiceBus.Topology;
-using System.Linq;
-using System.Reflection;
 
 public static class RabbitMqConfiguratorExtensions
 {
     public static void ConfigureEndpoints(this IRabbitMqFactoryConfigurator configurator, IBusRegistrationContext context)
     {
         var registry = context.ServiceProvider.GetRequiredService<TopologyRegistry>();
-        var formatter = configurator.EndpointNameFormatter;
-
         foreach (var consumer in registry.Consumers)
         {
-            var consumerType = consumer.ConsumerType;
-            var queueName = formatter?.Format(consumerType) ?? consumer.QueueName;
+            var queueName = consumer.ResolveEndpointName(configurator.EndpointNameFormatter);
 
-            try
-            {
-                configurator.ReceiveEndpoint(queueName, (endpoint) =>
-                {
-                    var method = typeof(ReceiveEndpointConfigurator)
-                        .GetMethod("ConfigureConsumer")!
-                        .MakeGenericMethod(consumerType);
-
-                    method.Invoke(endpoint, new object[] { context });
-                });
-            }
-            catch (TargetInvocationException ex) when (ex.InnerException != null)
-            {
-                throw new InvalidOperationException($"Failed to configure endpoint for {consumerType.Name}", ex.InnerException);
-            }
-            catch (Exception ex)
-            {
-                throw new InvalidOperationException($"Failed to configure endpoint for {consumerType.Name}", ex);
-            }
+            configurator.ReceiveEndpoint(queueName, endpoint => endpoint.ConfigureConsumer(context, consumer));
         }
     }
 }

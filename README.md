@@ -72,6 +72,7 @@ Continue with the [Java quick start](#java) or the detailed [Java guide](src/Jav
 | Artifact | Purpose |
 | --- | --- |
 | [`io.github.marinasundstrom.myservicebus:myservicebus`](https://central.sonatype.com/artifact/io.github.marinasundstrom.myservicebus/myservicebus) | Core messaging runtime and in-memory mediator |
+| `io.github.marinasundstrom.myservicebus:myservicebus-processor` | Optional JSR 269 processor for generated consumer catalogs and direct method invokers |
 | `io.github.marinasundstrom.myservicebus:myservicebus-inspection` | Queryable bus metadata and topology inspection APIs |
 | `io.github.marinasundstrom.myservicebus:myservicebus-monitoring` | Optional batched runtime monitoring exporter and collector protocol |
 | [`io.github.marinasundstrom.myservicebus:myservicebus-abstractions`](https://central.sonatype.com/artifact/io.github.marinasundstrom.myservicebus/myservicebus-abstractions) | Portable messaging contracts and abstractions |
@@ -141,6 +142,7 @@ Unlike most Java messaging solutions, MyServiceBus does **not require a framewor
 - Middleware / pipeline behaviors
 - OpenTelemetry support
 - Java and C# implementations with aligned semantics
+- Optional generated consumer catalogs for compile-time discovery and direct invocation
 
 ---
 

@@ -108,15 +108,8 @@ public sealed class AzureServiceBusFactoryConfigurator : IAzureServiceBusFactory
 
         foreach (var consumer in registry.Consumers)
         {
-            var consumerType = consumer.ConsumerType;
-            var queueName = EndpointNameFormatter?.Format(consumerType) ?? consumer.QueueName;
-            ReceiveEndpoint(queueName, endpoint =>
-            {
-                var method = typeof(AzureServiceBusReceiveEndpointConfigurator)
-                    .GetMethod(nameof(AzureServiceBusReceiveEndpointConfigurator.ConfigureConsumer))!
-                    .MakeGenericMethod(consumerType);
-                method.Invoke(endpoint, [context]);
-            });
+            var queueName = consumer.ResolveEndpointName(EndpointNameFormatter);
+            ReceiveEndpoint(queueName, endpoint => endpoint.ConfigureConsumer(context, consumer));
         }
     }
 

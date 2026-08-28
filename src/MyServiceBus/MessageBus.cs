@@ -4,14 +4,12 @@ using MyServiceBus.Topology;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
-using System.Runtime.InteropServices;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
 
 namespace MyServiceBus;
 
-public class MessageBus : IMessageBus, IReceiveEndpointConnector
+public class MessageBus : IMessageBus, IReceiveEndpointConnector, IConsumerMethodConnector
 {
     public static IBusFactory Factory { get; } = new DefaultBusFactory();
 
@@ -32,8 +30,9 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
     private readonly List<IReceiveTransport> _activeTransports = new();
 
     // Key = queue name, Value = list of registrations for that queue
-    private readonly Dictionary<string, List<(string MessageUrn, Type MessageType, IConsumePipe Pipe, IMessageSerializer Serializer)>> _consumers = new();
+    private readonly Dictionary<string, List<ConsumerPipeRegistration>> _consumers = new();
     private readonly HashSet<Type> _consumerTypes = new();
+    private readonly HashSet<string> _consumerMethods = new(StringComparer.Ordinal);
 
     public MessageBus(ITransportFactory transportFactory, IServiceProvider serviceProvider,
         ISendPipe sendPipe, IPublishPipe publishPipe, IMessageSerializer messageSerializer, Uri address,
@@ -167,7 +166,7 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
             durable: true,
             temporary: false,
             consumer.PrefetchCount ?? 0,
-            consumer.Bindings.ToArray(),
+            GetEndpointBindings(queueName, consumer),
             consumer.QueueArguments is null
                 ? null
                 : new Dictionary<string, object?>(consumer.QueueArguments, StringComparer.Ordinal));
@@ -203,10 +202,100 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
             ? (IMessageSerializer)ActivatorUtilities.CreateInstance(_serviceProvider, consumer.SerializerType)
             : _messageSerializer;
 
+        ConsumeContext CreateConsumeContext(ReceiveContext context) => new ConsumeContextImpl<TMessage>(
+            context,
+            _transportFactory,
+            _sendPipe,
+            _publishPipe,
+            serializer,
+            _address,
+            _sendContextFactory,
+            _publishContextFactory,
+            _serviceProvider.GetService<ILoggerFactory>(),
+            _hooks);
+
         if (!_consumers.TryGetValue(queueName, out var registrations))
-            registrations = _consumers[queueName] = new List<(string, Type, IConsumePipe, IMessageSerializer)>();
-        registrations.Add((messageUrn, messageType, pipe, serializer));
+            registrations = _consumers[queueName] = new List<ConsumerPipeRegistration>();
+        registrations.Add(new ConsumerPipeRegistration(messageUrn, messageType, pipe, serializer, CreateConsumeContext));
         _consumerTypes.Add(typeof(TConsumer));
+        if (receiveTransport is not null)
+            _activeTransports.Add(receiveTransport);
+    }
+
+    public async Task AddConsumerMethod<TMessage>(
+        ConsumerTopology consumer,
+        string consumerId,
+        Func<IServiceProvider, ConsumeContext<TMessage>, Task> invoke,
+        CancellationToken cancellationToken = default)
+        where TMessage : class
+    {
+        ArgumentNullException.ThrowIfNull(consumer);
+        ArgumentException.ThrowIfNullOrWhiteSpace(consumerId);
+        ArgumentNullException.ThrowIfNull(invoke);
+
+        if (!_consumerMethods.Add(consumerId))
+        {
+            _logger?.LogDebug("Consumer method {ConsumerMethod} already registered, skipping", consumerId);
+            return;
+        }
+
+        var messageType = consumer.Bindings.First().MessageType;
+        var messageUrn = MessageUrn.For(messageType);
+        var queueName = consumer.QueueName;
+        var topology = new ReceiveEndpointTransportTopology(
+            queueName,
+            durable: true,
+            temporary: false,
+            consumer.PrefetchCount ?? 0,
+            GetEndpointBindings(queueName, consumer),
+            consumer.QueueArguments is null
+                ? null
+                : new Dictionary<string, object?>(consumer.QueueArguments, StringComparer.Ordinal));
+
+        Func<string?, bool> isRegistered = messageUrnHeader =>
+            _consumers.TryGetValue(queueName, out var existingRegistrations)
+            && (messageUrnHeader == null
+                ? existingRegistrations.Any(registration => IsRawSerializer(registration.Serializer))
+                : existingRegistrations.Any(registration => registration.MessageUrn == messageUrnHeader));
+        IReceiveTransport? receiveTransport = null;
+        if (!_consumers.ContainsKey(queueName))
+        {
+            receiveTransport = await _transportFactory.CreateReceiveTransport(
+                topology,
+                context => HandleMessageAsync(queueName, context),
+                isRegistered,
+                cancellationToken);
+        }
+
+        var configurator = new PipeConfigurator<ConsumeContext<TMessage>>();
+        configurator.UseFilter<OpenTelemetryConsumeFilter<TMessage>>();
+        configurator.UseFilter(new BusHookConsumeFilter<TMessage>(_hooks, queueName));
+        var errorLogger = _serviceProvider.GetService<ILogger<ErrorTransportFilter<TMessage>>>();
+        configurator.UseFilter(new ErrorTransportFilter<TMessage>(errorLogger));
+        configurator.UseFilter(new HandlerFaultFilter<TMessage>(_serviceProvider));
+        if (consumer.ConfigurePipe is Action<PipeConfigurator<ConsumeContext<TMessage>>> configure)
+            configure(configurator);
+        configurator.UseFilter(new ConsumerMethodMessageFilter<TMessage>(_serviceProvider, invoke));
+        var pipe = new ConsumePipe<TMessage>(configurator.Build(_serviceProvider));
+
+        var serializer = consumer.SerializerType != null
+            ? (IMessageSerializer)ActivatorUtilities.CreateInstance(_serviceProvider, consumer.SerializerType)
+            : _messageSerializer;
+        ConsumeContext CreateConsumeContext(ReceiveContext context) => new ConsumeContextImpl<TMessage>(
+            context,
+            _transportFactory,
+            _sendPipe,
+            _publishPipe,
+            serializer,
+            _address,
+            _sendContextFactory,
+            _publishContextFactory,
+            _serviceProvider.GetService<ILoggerFactory>(),
+            _hooks);
+
+        if (!_consumers.TryGetValue(queueName, out var registrations))
+            registrations = _consumers[queueName] = new List<ConsumerPipeRegistration>();
+        registrations.Add(new ConsumerPipeRegistration(messageUrn, messageType, pipe, serializer, CreateConsumeContext));
         if (receiveTransport is not null)
             _activeTransports.Add(receiveTransport);
     }
@@ -322,20 +411,7 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
 
         foreach (var registration in matches)
         {
-            var consumeContextType = typeof(ConsumeContextImpl<>).MakeGenericType(registration.MessageType);
-            var consumeContext = (ConsumeContext)Activator.CreateInstance(
-                consumeContextType,
-                context,
-                _transportFactory,
-                _sendPipe,
-                _publishPipe,
-                registration.Serializer,
-                _address,
-                _sendContextFactory,
-                _publishContextFactory,
-                _serviceProvider.GetService<ILoggerFactory>(),
-                _hooks)
-                ?? throw new InvalidOperationException("Failed to create ConsumeContext");
+            var consumeContext = registration.CreateContext(context);
 
             _logger?.LogDebug("Received {MessageType}", messageTypeName);
             await registration.Pipe.Send(consumeContext);
@@ -344,6 +420,21 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector
 
     private static bool IsRawSerializer(IMessageSerializer serializer)
         => serializer.EnvelopeMode == MessageEnvelopeMode.Raw;
+
+    private MessageBinding[] GetEndpointBindings(string queueName, ConsumerTopology currentConsumer)
+        => _topology.Consumers
+            .Where(candidate => candidate.QueueName == queueName)
+            .SelectMany(candidate => candidate.Bindings)
+            .Concat(currentConsumer.Bindings)
+            .DistinctBy(binding => (binding.MessageType, binding.EntityName))
+            .ToArray();
+
+    private sealed record ConsumerPipeRegistration(
+        string MessageUrn,
+        Type MessageType,
+        IConsumePipe Pipe,
+        IMessageSerializer Serializer,
+        Func<ReceiveContext, ConsumeContext> CreateContext);
 
     private void DispatchMessageOperation(
         string kind,

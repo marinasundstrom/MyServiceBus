@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.function.Consumer;
 
 import com.myservicebus.ConsumeContext;
+import com.myservicebus.ConsumerMethodInvoker;
 import com.myservicebus.EntityNameFormatter;
 import com.myservicebus.PipeConfigurator;
 
@@ -44,6 +45,16 @@ public class TopologyRegistry implements BusTopology {
     }
 
     public <TConsumer> void registerConsumer(Class<TConsumer> consumerType, String queueName, Consumer<PipeConfigurator<ConsumeContext<Object>>> configure, Class<?>... messageTypes) {
+        registerConsumer(consumerType, queueName, false, consumerType, configure, messageTypes);
+    }
+
+    public <TConsumer> void registerConsumer(
+            Class<TConsumer> consumerType,
+            String queueName,
+            boolean endpointNameExplicit,
+            Class<?> endpointNameFormatterType,
+            Consumer<PipeConfigurator<ConsumeContext<Object>>> configure,
+            Class<?>... messageTypes) {
         ensureReceiveEndpoint(queueName);
         List<MessageBinding> bindings = new ArrayList<>();
         for (Class<?> mt : messageTypes) {
@@ -59,9 +70,36 @@ public class TopologyRegistry implements BusTopology {
         ConsumerTopology consumer = new ConsumerTopology();
         consumer.setConsumerType(consumerType);
         consumer.setQueueName(queueName);
+        consumer.setEndpointNameExplicit(endpointNameExplicit);
+        consumer.setEndpointNameFormatterType(endpointNameFormatterType);
         consumer.setBindings(bindings);
         consumer.setConfigure(configure);
         consumers.add(consumer);
+    }
+
+    public <TMessage> void registerConsumerMethod(
+            Class<?> declaringType,
+            Class<TMessage> messageType,
+            String queueName,
+            ConsumerMethodInvoker<TMessage> invoker) {
+        registerConsumerMethod(declaringType, messageType, queueName, true, null, invoker);
+    }
+
+    public <TMessage> void registerConsumerMethod(
+            Class<?> declaringType,
+            Class<TMessage> messageType,
+            String queueName,
+            boolean endpointNameExplicit,
+            Class<?> endpointNameFormatterType,
+            ConsumerMethodInvoker<TMessage> invoker) {
+        registerConsumer(
+                declaringType,
+                queueName,
+                endpointNameExplicit,
+                endpointNameFormatterType,
+                null,
+                messageType);
+        consumers.get(consumers.size() - 1).setMethodInvoker(invoker);
     }
 
     public void moveConsumerToEndpoint(ConsumerTopology consumer, String endpointName) {

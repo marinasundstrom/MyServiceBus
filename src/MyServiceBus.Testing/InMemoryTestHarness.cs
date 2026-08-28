@@ -10,7 +10,7 @@ using MyServiceBus.Topology;
 
 namespace MyServiceBus;
 
-public class InMemoryTestHarness : IMessageBus, ITransportFactory, IReceiveEndpointConnector
+public class InMemoryTestHarness : IMessageBus, ITransportFactory, IReceiveEndpointConnector, IConsumerMethodConnector
 {
     readonly Dictionary<Type, List<Func<ReceiveContext, Task>>> handlers = new();
     readonly object handlerLock = new();
@@ -19,6 +19,7 @@ public class InMemoryTestHarness : IMessageBus, ITransportFactory, IReceiveEndpo
     readonly object observationLock = new();
     readonly List<ConsumedWaiter> consumedWaiters = new();
     readonly HashSet<Type> consumerTypes = new();
+    readonly HashSet<string> consumerMethods = new(StringComparer.Ordinal);
     readonly IServiceProvider? provider;
     readonly IBusTopology topology;
     readonly ISendContextFactory _sendContextFactory;
@@ -187,6 +188,42 @@ public class InMemoryTestHarness : IMessageBus, ITransportFactory, IReceiveEndpo
         RegisterHandler<TMessage>(context =>
             factory.Send(context,
                 Pipe.Execute<ConsumerConsumeContext<TConsumer, TMessage>>(x => x.Consumer.Consume(x))));
+
+        return Task.CompletedTask;
+    }
+
+    public Task AddConsumerMethod<TMessage>(
+        ConsumerTopology consumer,
+        string consumerId,
+        Func<IServiceProvider, ConsumeContext<TMessage>, Task> invoke,
+        CancellationToken cancellationToken = default)
+        where TMessage : class
+    {
+        if (provider == null)
+            throw new InvalidOperationException("Service provider is required to add consumers");
+
+        lock (handlerLock)
+        {
+            if (!consumerMethods.Add(consumerId))
+                return Task.CompletedTask;
+        }
+
+        RegisterHandler<TMessage>(async context =>
+        {
+            await using var scope = provider.CreateAsyncScope();
+            var contextProvider = scope.ServiceProvider.GetService<ConsumeContextProvider>();
+            if (contextProvider is not null)
+                contextProvider.Context = context;
+            try
+            {
+                await invoke(scope.ServiceProvider, context).ConfigureAwait(false);
+            }
+            finally
+            {
+                if (contextProvider is not null)
+                    contextProvider.Context = null;
+            }
+        });
 
         return Task.CompletedTask;
     }

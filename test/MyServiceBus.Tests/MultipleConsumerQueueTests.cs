@@ -14,6 +14,7 @@ using Xunit;
 public class MultipleConsumerQueueTests
 {
     class MyMessage { }
+    class OtherMessage { }
 
     class ConsumerA : IConsumer<MyMessage>
     {
@@ -25,12 +26,29 @@ public class MultipleConsumerQueueTests
         public Task Consume(ConsumeContext<MyMessage> context) => Task.CompletedTask;
     }
 
+    class ConsumerC : IConsumer<OtherMessage>
+    {
+        public Task Consume(ConsumeContext<OtherMessage> context) => Task.CompletedTask;
+    }
+
     class CapturingTransportFactory : ITransportFactory
     {
         public readonly List<string> Queues = new();
+        public readonly List<IReadOnlyList<MessageBinding>> Bindings = new();
 
         public Task<ISendTransport> GetSendTransport(Uri address, CancellationToken cancellationToken = default)
             => Task.FromResult<ISendTransport>(new NopSendTransport());
+
+        public Task<IReceiveTransport> CreateReceiveTransport(
+            ReceiveEndpointTransportTopology topology,
+            Func<ReceiveContext, Task> handler,
+            Func<string?, bool>? isMessageTypeRegistered = null,
+            CancellationToken cancellationToken = default)
+        {
+            Queues.Add(topology.Name);
+            Bindings.Add(topology.Bindings);
+            return Task.FromResult<IReceiveTransport>(new NopReceiveTransport());
+        }
 
         public Task<IReceiveTransport> CreateReceiveTransport(
             ReceiveEndpointTopology topology,
@@ -88,5 +106,42 @@ public class MultipleConsumerQueueTests
         await bus.AddConsumer<MyMessage, ConsumerB>(registry.Consumers[1], null);
 
         factory.Queues.ShouldBe(new[] { "queueA", "queueB" });
+    }
+
+    [Fact]
+    public async Task Groups_all_message_bindings_into_one_transport_for_a_shared_queue()
+    {
+        var factory = new CapturingTransportFactory();
+        var services = new ServiceCollection();
+        services.AddSingleton<ITransportFactory>(factory);
+        services.AddSingleton<ISendPipe>(_ => new SendPipe(Pipe.Empty<SendContext>()));
+        services.AddSingleton<IPublishPipe>(_ => new PublishPipe(Pipe.Empty<PublishContext>()));
+        services.AddSingleton<IMessageSerializer, EnvelopeMessageSerializer>();
+        services.AddSingleton<ISendContextFactory, SendContextFactory>();
+        services.AddSingleton<IPublishContextFactory, PublishContextFactory>();
+        services.AddSingleton<TopologyRegistry>();
+        services.AddSingleton(typeof(IConsumerFactory<>), typeof(DefaultConstructorConsumerFactory<>));
+
+        var provider = services.BuildServiceProvider();
+        var bus = new MessageBus(
+            factory,
+            provider,
+            provider.GetRequiredService<ISendPipe>(),
+            provider.GetRequiredService<IPublishPipe>(),
+            provider.GetRequiredService<IMessageSerializer>(),
+            new Uri("rabbitmq://localhost/"),
+            provider.GetRequiredService<ISendContextFactory>(),
+            provider.GetRequiredService<IPublishContextFactory>());
+
+        var registry = provider.GetRequiredService<TopologyRegistry>();
+        registry.RegisterConsumer<ConsumerA>("shared", null, typeof(MyMessage));
+        registry.RegisterConsumer<ConsumerC>("shared", null, typeof(OtherMessage));
+
+        await bus.AddConsumer<MyMessage, ConsumerA>(registry.Consumers[0], null);
+        await bus.AddConsumer<OtherMessage, ConsumerC>(registry.Consumers[1], null);
+
+        factory.Queues.ShouldBe(new[] { "shared" });
+        factory.Bindings.Single().Select(binding => binding.MessageType)
+            .ShouldBe(new[] { typeof(MyMessage), typeof(OtherMessage) }, ignoreOrder: true);
     }
 }

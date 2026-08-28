@@ -5,6 +5,9 @@ def javaDir = 'src/Java'
 include 'myservicebus'
 project(':myservicebus').projectDir = file("${javaDir}/myservicebus")
 
+include 'myservicebus-processor'
+project(':myservicebus-processor').projectDir = file("${javaDir}/myservicebus-processor")
+
 include 'myservicebus-inspection'
 project(':myservicebus-inspection').projectDir = file("${javaDir}/myservicebus-inspection")
 
