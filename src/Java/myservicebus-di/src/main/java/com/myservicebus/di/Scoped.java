@@ -7,5 +7,5 @@ import java.lang.annotation.RetentionPolicy;
 
 @ScopeAnnotation
 @Retention(RetentionPolicy.RUNTIME)
-public @interface Scoped {
+@interface Scoped {
 }

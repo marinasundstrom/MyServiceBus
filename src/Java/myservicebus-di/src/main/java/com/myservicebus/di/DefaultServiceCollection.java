@@ -12,7 +12,7 @@ import java.util.List;
  * registrations using {@link ServiceDescriptor} entries. The collection can be
  * iterated to build a {@link ServiceProvider} backed by any IoC container.
  */
-public class DefaultServiceCollection implements ServiceCollection {
+final class DefaultServiceCollection implements ServiceCollection {
     private final List<ServiceDescriptor> descriptors = new ArrayList<>();
     private final PerMessageScope perMessageScope = new PerMessageScope();
     private boolean built;
@@ -298,7 +298,7 @@ public class DefaultServiceCollection implements ServiceCollection {
             @SuppressWarnings({ "unchecked", "rawtypes" })
             protected void configure() {
                 Class serviceType = d.getServiceType();
-                Provider guiceProvider = d.getImplementationFactory().create(provider);
+                Provider guiceProvider = () -> d.getImplementationFactory().create(provider).get();
                 if (d.isMultiBinding()) {
                     Multibinder binder = Multibinder.newSetBinder(binder(), serviceType);
                     ScopedBindingBuilder scoped = binder.addBinding().toProvider(guiceProvider);

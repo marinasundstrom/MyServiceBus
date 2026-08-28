@@ -8,6 +8,7 @@ const sections = [
       ['Introduction', '/docs'],
       ['Why MyServiceBus?', '/docs/why-myservicebus'],
       ['Getting started', '/docs/getting-started'],
+      ['Java adoption', '/docs/java-adoption'],
     ],
   },
   {
@@ -19,6 +20,7 @@ const sections = [
       ['Azure Service Bus', '/docs/azure-service-bus'],
       ['Consumer methods', '/docs/consumer-methods'],
       ['Platform parity', '/docs/platform-parity'],
+      ['AOT compilation', '/docs/native-aot'],
       ['Runtime monitoring', '/docs/runtime-monitoring'],
       ['Testing', '/docs/testing'],
       ['Interoperability', '/docs/interoperability'],

@@ -1,4 +1,4 @@
 dependencies {
     api project(':myservicebus-logging')
-    api "com.google.inject:guice:${guiceVersion}"
+    implementation "com.google.inject:guice:${guiceVersion}"
 }

@@ -8,11 +8,11 @@ import com.google.inject.Key;
 import com.google.inject.TypeLiteral;
 import com.google.inject.util.Types;
 
-public class ServiceProviderImpl implements ServiceProvider {
+final class ServiceProviderImpl implements ServiceProvider {
     private Injector root;
     private final PerMessageScope scope;
 
-    public ServiceProviderImpl(Injector root, PerMessageScope scope) {
+    ServiceProviderImpl(Injector root, PerMessageScope scope) {
         this.root = root;
         this.scope = scope;
     }
@@ -39,7 +39,7 @@ public class ServiceProviderImpl implements ServiceProvider {
         return new ServiceScope(root, scope);
     }
 
-    public void setInjector(Injector injector) {
+    void setInjector(Injector injector) {
         root = injector;
     }
 }

@@ -121,6 +121,9 @@ pre { font-family: var(--font-geist-mono), monospace; font-size: clamp(10px, .9v
 .docs-code-toolbar > span { color: #829189; font-family: var(--font-geist-mono), monospace; font-size: 8px; letter-spacing: .12em; }
 .docs-code-block pre { font-size: 11px; line-height: 1.7; min-height: 0; padding: 24px 22px 26px; }
 .monaco-viewer { background: #1e1e1e; min-width: 0; overflow: hidden; }
+.docs-article .monaco-viewer { border: 1px solid #33463b; border-radius: 8px; margin: 20px 0 28px; }
+.docs-code-block .monaco-viewer, .code-card .monaco-viewer { border: 0; border-radius: 0; margin: 0; }
+.code-card > .monaco-viewer + .monaco-viewer { border-top: 1px solid #314137; }
 .code-loading { align-items: center; color: #98a69d; display: flex; font-family: var(--font-geist-mono), monospace; font-size: 11px; height: 100%; padding: 20px; }
 .next-card { align-items: center; border-top: 1px solid var(--line); display: flex; justify-content: space-between; margin-top: 74px; padding-top: 28px; }
 .next-card > div { display: flex; flex-direction: column; gap: 5px; }

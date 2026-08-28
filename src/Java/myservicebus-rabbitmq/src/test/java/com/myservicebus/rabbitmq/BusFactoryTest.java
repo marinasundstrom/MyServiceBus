@@ -44,7 +44,7 @@ public class BusFactoryTest {
         LoggerFactory lf = LoggerFactoryBuilder.create(b -> b.addConsole());
         MessageBus bus = MessageBus.factory
                 .withLoggerFactory(lf)
-                .configureServices(s -> s.addSingleton(String.class, sp -> () -> "hi"))
+                .configureServices(s -> s.addSingleton(String.class, () -> "hi"))
                 .create(RabbitMqFactoryConfigurator.class, cfg -> cfg.host("localhost"));
         assertNotNull(bus);
 

@@ -36,9 +36,10 @@ For Java build and run instructions, including JDK 17 setup and how to run the t
 
 The examples below use the fluent configuration pattern unless noted. The factory pattern is demonstrated as well.
 
-> **Why the ServiceProvider abstraction exists**
+> **Why the internal ServiceProvider abstraction exists**
 >
 > MyServiceBus relies on scoped services to create consumers per message and to flow contextual data (headers, cancellation tokens, tracing) through send/publish/consume pipelines. The container integration is how MyServiceBus achieves MassTransit-like behavior without global state.
+> Java applications can start with the bus factory below without adopting or directly using this abstraction.
 
 #### C#
 
@@ -64,7 +65,7 @@ await app.StartAsync();
 var bus = app.Services.GetRequiredService<IMessageBus>();
 ```
 
-To move consumer discovery to compile time, reference the `Sundstrom.MyServiceBus.Generators` analyzer and register its generated catalog:
+For .NET NativeAOT and trimmed applications, reference the `Sundstrom.MyServiceBus.Generators` analyzer and replace reflection-based assembly scanning with the generated catalog:
 
 ```csharp
 using MyServiceBus.Generated;
@@ -160,6 +161,8 @@ dependencies {
 GeneratedConsumerCatalog.INSTANCE.register(cfg);
 ```
 
+See [NativeAOT](development/native-aot.md) for the current support boundary.
+
 **Without host (fluent configuration pattern)**
 
 Outside of an ASP.NET host (or generic host), the fluent configuration pattern can populate an `IServiceCollection` directly.
@@ -196,14 +199,33 @@ IMessageBus bus = MessageBus.Factory.Create<RabbitMqFactoryConfigurator>(cfg =>
 });
 ```
 
-In Java, `RabbitMqFactoryConfigurator` also defaults to `DefaultConstructorConsumerFactory`. Use `cfg.setConsumerFactory` to provide a different implementation:
+For Java, the bus factory is the recommended boundary when integrating MyServiceBus into an application that already has its own container. A complete bus can use an endpoint handler without constructing a MyServiceBus service collection:
 
 ```java
 MessageBus bus = MessageBus.factory.create(RabbitMqFactoryConfigurator.class, cfg -> {
-    cfg.setConsumerFactory((sp, type) -> new ScopeConsumerFactory(sp));
-    // configure endpoints...
+    cfg.host("localhost");
+    cfg.receiveEndpoint("submit-order", endpoint ->
+        endpoint.handler(SubmitOrder.class, context ->
+            new SubmitOrderConsumer().consume(context)));
+});
+
+bus.start();
+```
+
+The handler can instead resolve from an existing application container. MyServiceBus does not wrap that container in Guice or require the application to implement the MyServiceBus provider contracts:
+
+```java
+var applicationContext = createApplicationContext();
+
+MessageBus bus = MessageBus.factory.create(RabbitMqFactoryConfigurator.class, cfg -> {
+    cfg.host("localhost");
+    cfg.receiveEndpoint("submit-order", endpoint ->
+        endpoint.handler(SubmitOrder.class, context ->
+            applicationContext.getBean(SubmitOrderConsumer.class).consume(context)));
 });
 ```
+
+Use `cfg.setConsumerFactory` when configuring class-based consumers through the factory and their activation needs customization. The explicit endpoint-handler form is the smallest framework-neutral factory setup.
 
 You can also decorate the factory with additional services or a logger factory before creating the bus:
 
@@ -217,13 +239,13 @@ var bus = MessageBus.Factory
 ```java
 MessageBus bus = MessageBus.factory
     .withLoggerFactory(LoggerFactoryBuilder.create(b -> b.addConsole()))
-    .configureServices(s -> s.addSingleton(MyDependency.class, sp -> MyDependency::new))
+    .configureServices(s -> s.addSingleton(MyDependency.class, MyDependency::new))
     .create(RabbitMqFactoryConfigurator.class, cfg -> cfg.host("localhost"));
 ```
 
 #### Java
 
-Using the fluent configuration pattern:
+Java provides two practical starting points. A new MyServiceBus-first application will commonly use the established decorator style below and let MyServiceBus structure its registered service graph. An existing Java application can use the factory examples above to connect messaging to its current container. The decorator style is an optional, .NET-shaped application-structure proposal rather than a prerequisite for integration:
 
 ```java
 ServiceCollection services = ServiceCollection.create();
@@ -241,7 +263,7 @@ bus.start().join();
 
 `addServiceBus` activates consumers using `ScopeConsumerFactory`, so they can resolve dependencies from the `ServiceProvider`.
 
-Java accepts this self-contained model because the runtime lacks a standard dependency injection library; consumers typically provide their own dependencies directly.
+Java has no single standard dependency injection container. The MyServiceBus service collection is the stable programming model: it can be materialized by the included provider or by another framework through an adapter. Existing applications may alternatively use the bus factory with ordinary Java lambdas and method references when they do not want to adopt the collection model.
 
 Java consumer methods use `@MessageConsumer` because `Consumer<TMessage>` already names the interface-consumer contract. The method can bind its message, `ConsumeContext<T>`, `CancellationToken`, and normal scoped services. Reflection registration inspects only the classes explicitly supplied; there is no implicit classpath scan or Java scan predicate.
 
@@ -817,6 +839,8 @@ services.from(MessageBusServices.class)
 ```
 
 The serializer supplies NServiceBus message identity, intent, time, conversation, correlation, and reply headers. Use `NServiceBusMessageType` on a contract when its C# and Java names must map to a shared NServiceBus identity. See [NServiceBus interoperability](nservicebus-interoperability.md) for the verified versions, conventional topology requirement, and current directed-send boundary.
+
+For trimming and AOT scenarios, both clients also accept service-provider factories instead of activating serializer classes reflectively. Use `SetSerializer(provider => new CustomSerializer(...))` in C# and `setSerializer(provider -> new CustomSerializer(...))` in Java. Java provides the corresponding `setDeserializer` factory overload.
 
 #### Queue Arguments
 

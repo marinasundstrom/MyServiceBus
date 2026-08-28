@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import CodeViewer from '../../components/CodeViewer';
 import LanguageTabs from '../../components/LanguageTabs';
 
 const startRabbitMq = `docker run --rm --detach \\
@@ -44,8 +45,8 @@ services.from(MessageBusServices.class)
     });
 
 ServiceProvider provider = services.buildServiceProvider();
-MessageBus bus = provider.getService(MessageBus.class);
-bus.start().join();`,
+MessageBus bus = provider.getRequiredService(MessageBus.class);
+bus.start();`,
 };
 
 const messages = {
@@ -71,8 +72,7 @@ public class SubmitOrderConsumer implements Consumer<SubmitOrder> {
 const publish = {
   csharp: `var bus = app.Services.GetRequiredService<IMessageBus>();
 await bus.Publish(new SubmitOrder(Guid.NewGuid()));`,
-  java: `MessageBus bus = provider.getService(MessageBus.class);
-bus.publish(new SubmitOrder(UUID.randomUUID())).join();`,
+  java: `bus.publish(new SubmitOrder(UUID.randomUUID())).join();`,
 };
 
 export default function GettingStarted() {
@@ -90,10 +90,22 @@ export default function GettingStarted() {
         <p>This walkthrough uses RabbitMQ so every infrastructure step is reproducible. Contracts, consumers, send, publish, request, retry, and fault concepts remain transport-neutral; only setup and transport configuration change for Azure Service Bus.</p>
       </div>
 
+      <div className="callout callout-accent">
+        <strong>Two Java adoption paths</strong>
+        <p>
+          This quick start uses the recommended MyServiceBus-first decorator style for a new
+          Java project. It lets <code>ServiceCollection.from(...)</code> structure a
+          MyServiceBus-managed service graph in a form similar to the C# setup. When adding
+          MyServiceBus to an existing Spring, CDI, Dagger, Guice, or application-owned
+          environment, use the bus factory as the default integration boundary instead. See the{' '}
+          <Link href="/docs/java-adoption">Spring, CDI, Dagger, and application-factory examples</Link>.
+        </p>
+      </div>
+
       <ol className="step-list">
         <li>
           <div className="step-heading"><span>01</span><div><h2>Start RabbitMQ in Docker</h2><p>Run the tested RabbitMQ 4.1 broker locally with its management UI.</p></div></div>
-          <pre><code>{startRabbitMq}</code></pre>
+          <CodeViewer code={startRabbitMq} label="Start RabbitMQ in Docker" language="shell" />
           <p className="small-note">
             The broker listens on <code>localhost:5672</code>. Open the management UI at{' '}
             <a href="http://localhost:15672">localhost:15672</a> and sign in with{' '}

@@ -35,6 +35,31 @@ services.from(MessageBusServices.class)
 
 Raw JSON covers outbound send and publish and inbound dispatch through endpoints explicitly configured with `RawJsonMessageSerializer`. Since the payload contains no type envelope, the receive endpoint's configured consumer or handler type supplies the dispatch type.
 
+## Explicit factories for AOT
+
+The class-based APIs remain convenient when runtime activation is acceptable. Applications prioritizing trimming or AOT can construct serialization extensions explicitly and resolve their dependencies from the application service provider:
+
+```csharp
+services.AddServiceBus(x =>
+{
+    x.SetSerializer(provider => new RawJsonMessageSerializer(
+        provider.GetRequiredService<IMessageHeaderConvention>()));
+});
+```
+
+```java
+services.from(MessageBusServices.class)
+        .addServiceBus(cfg -> {
+            cfg.setSerializer(provider -> new RawJsonMessageSerializer(
+                    provider.getRequiredService(MessageHeaderConvention.class)));
+            cfg.setDeserializer(provider -> new EnvelopeMessageDeserializer());
+        });
+```
+
+These factory overloads are ordinary runtime configuration and do not require a source generator or a particular application framework.
+
+On .NET, `System.Text.Json` source generation remains owned by the application and its selected serializer. An AOT application can implement `IMessageSerializer` with its generated `JsonSerializerContext` and provide that implementation through the factory overload. MyServiceBus does not make source-generated JSON mandatory for managed applications or couple consumer-catalog generation to application serialization contracts.
+
 ## NServiceBus JSON
 
 Use `NServiceBusJsonMessageSerializer` only for an endpoint or bus that communicates with NServiceBus. It writes the NServiceBus message identity, intent, conversation, correlation, reply, related-message, sent-time, content-type, and enclosed-message-type headers and reads the corresponding inbound form.

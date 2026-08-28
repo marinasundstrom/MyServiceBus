@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import Image from 'next/image';
+import CodeViewer from '../../components/CodeViewer';
 import LanguageTabs from '../../components/LanguageTabs';
 
 const exporterSetup = {
@@ -135,11 +136,11 @@ export default function RuntimeMonitoring() {
         connect the request entering one service to the message it sends, the worker
         that consumes it, and any downstream message produced by that consumer.
       </p>
-      <pre><code>{`HTTP request → Checkout.Api
+      <CodeViewer code={`HTTP request → Checkout.Api
   └─ send SubmitOrder
       └─ consume SubmitOrder → Order.Worker
           └─ publish OrderAccepted
-              └─ consume OrderAccepted → Inventory.Worker`}</code></pre>
+              └─ consume OrderAccepted → Inventory.Worker`} label="Distributed trace example" language="plaintext" />
       <p>
         This complements the aggregate monitoring view: the dashboard describes
         current topology, throughput, latency, retries, failures, and observed flow,
@@ -154,7 +155,7 @@ export default function RuntimeMonitoring() {
 
       <h2>Try the complete stack</h2>
       <p>Run the Aspire AppHost from the repository root:</p>
-      <pre><code>dotnet run --project src/AspireApp --launch-profile http</code></pre>
+      <CodeViewer code="dotnet run --project src/AspireApp --launch-profile http" label="Run the Aspire AppHost" language="shell" />
       <p>
         Open the <code>monitoring-dashboard</code> resource, then call the sample
         applications&apos; <code>/publish</code>, <code>/send</code>, or
@@ -168,8 +169,12 @@ export default function RuntimeMonitoring() {
         dashboard are separate applications, published as versioned Linux container
         images for AMD64 and ARM64:
       </p>
-      <pre><code>{`ghcr.io/marinasundstrom/myservicebus-monitoring-collector:0.1.0-preview.4
-ghcr.io/marinasundstrom/myservicebus-monitoring-dashboard:0.1.0-preview.4`}</code></pre>
+      <CodeViewer
+        code={`ghcr.io/marinasundstrom/myservicebus-monitoring-collector:0.1.0-preview.4
+ghcr.io/marinasundstrom/myservicebus-monitoring-dashboard:0.1.0-preview.4`}
+        label="Monitoring container images"
+        language="plaintext"
+      />
       <p>
         Both listen on port <code>8080</code>. Configure the dashboard&apos;s
         <code>MonitoringService</code> setting with the collector base address. The

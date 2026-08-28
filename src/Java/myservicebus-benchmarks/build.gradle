@@ -1,0 +1,26 @@
+plugins {
+    id 'application'
+}
+
+application {
+    mainClass = 'org.openjdk.jmh.Main'
+}
+
+jar {
+    dependsOn configurations.runtimeClasspath
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    manifest {
+        attributes('Main-Class': application.mainClass.get())
+    }
+    from {
+        configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
+    }
+    exclude 'META-INF/*.SF', 'META-INF/*.DSA', 'META-INF/*.RSA'
+}
+
+dependencies {
+    annotationProcessor project(':myservicebus-processor')
+    implementation project(':myservicebus')
+    implementation 'org.openjdk.jmh:jmh-core:1.37'
+    annotationProcessor 'org.openjdk.jmh:jmh-generator-annprocess:1.37'
+}

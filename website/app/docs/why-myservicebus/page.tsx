@@ -165,6 +165,23 @@ export default function WhyMyServiceBus() {
       <div className="flow-line" aria-label="Getting started with MyServiceBus">
         <span>Define contract</span><b>→</b><span>Write consumer</span><b>→</b><span>Choose transport</span><b>→</b><span>Send a message</span>
       </div>
+      <h3>Choose the Java adoption path that fits the application</h3>
+      <div className="concept-comparison">
+        <section>
+          <span className="tag">MYSERVICEBUS-FIRST</span>
+          <h2>Decorator style</h2>
+          <p>For a new Java project, use <code>ServiceCollection.from(...)</code> to structure a MyServiceBus-managed service graph with a composition pattern familiar from the C# client.</p>
+        </section>
+        <section>
+          <span className="tag">EXISTING JAVA APP</span>
+          <h2>Bus factory</h2>
+          <p>Use the bus factory as the default integration boundary and let endpoint or service factories close over the application&apos;s existing container.</p>
+        </section>
+      </div>
+      <p>
+        The <Link href="/docs/java-adoption">Java adoption guide</Link> shows concrete
+        Spring, Jakarta CDI, Dagger, and application-owned factory integrations.
+      </p>
       <p>
         Use the in-memory mediator for deliberately local flows and fast tests, or run
         RabbitMQ locally for a realistic broker-backed development loop. The same consumer

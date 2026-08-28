@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Reflection;
 
@@ -33,6 +34,8 @@ public class TopologyRegistry : IBusTopology
         return messageTopology;
     }
 
+    [RequiresDynamicCode("Closing a consumer registration descriptor at runtime requires dynamic generic code. Use the typed RegisterConsumer overload for NativeAOT.")]
+    [RequiresUnreferencedCode("Runtime consumer discovery cannot guarantee that consumer metadata is preserved. Use the typed RegisterConsumer overload for trimmed applications.")]
     public void RegisterConsumer<TConsumer>(string queueName, Delegate? configurePipe, params Type[] messageTypes)
         => RegisterConsumerWithEndpointMetadata<TConsumer>(
             queueName,
@@ -91,6 +94,8 @@ public class TopologyRegistry : IBusTopology
             typeof(TMessage));
     }
 
+    [RequiresDynamicCode("Reflection-based consumer methods close generic registration descriptors at runtime. Use generated consumer registration for NativeAOT.")]
+    [RequiresUnreferencedCode("Reflection-based consumer methods require method and parameter metadata. Use generated consumer registration for trimmed applications.")]
     internal void RegisterConsumerMethod(ConsumerMethodDefinition definition, string? endpointName = null)
     {
         RegisterConsumer(
@@ -158,6 +163,8 @@ public class TopologyRegistry : IBusTopology
 
 internal static class ReflectionConsumerRegistrationDescriptorFactory
 {
+    [RequiresDynamicCode("Closing a consumer registration descriptor at runtime requires dynamic generic code. Use typed or generated consumer registration for NativeAOT.")]
+    [RequiresUnreferencedCode("Runtime consumer discovery cannot guarantee that consumer constructors and generic interfaces are preserved. Use generated consumer registration for trimmed applications.")]
     public static IConsumerRegistrationDescriptor? Create(Type consumerType, Type messageType)
     {
         if (!typeof(IConsumer).IsAssignableFrom(consumerType))

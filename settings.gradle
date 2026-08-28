@@ -8,6 +8,12 @@ project(':myservicebus').projectDir = file("${javaDir}/myservicebus")
 include 'myservicebus-processor'
 project(':myservicebus-processor').projectDir = file("${javaDir}/myservicebus-processor")
 
+include 'myservicebus-benchmarks'
+project(':myservicebus-benchmarks').projectDir = file("${javaDir}/myservicebus-benchmarks")
+
+include 'java-aot-smoke'
+project(':java-aot-smoke').projectDir = file("${javaDir}/java-aot-smoke")
+
 include 'myservicebus-inspection'
 project(':myservicebus-inspection').projectDir = file("${javaDir}/myservicebus-inspection")
 

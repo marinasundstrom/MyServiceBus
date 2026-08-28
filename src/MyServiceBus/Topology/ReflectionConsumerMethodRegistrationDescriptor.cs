@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using System.Runtime.ExceptionServices;
 using Microsoft.Extensions.DependencyInjection;
@@ -118,9 +119,11 @@ internal sealed class ConsumerMethodDefinition
 
 internal static class ReflectionConsumerMethodDiscovery
 {
+    [RequiresUnreferencedCode("Attributed consumer method discovery requires method and parameter metadata.")]
     public static IEnumerable<ConsumerMethodDefinition> Discover(Assembly assembly)
         => Discover(assembly, static _ => true);
 
+    [RequiresUnreferencedCode("Attributed consumer method discovery requires method and parameter metadata.")]
     public static IEnumerable<ConsumerMethodDefinition> Discover(Assembly assembly, Func<Type, bool> typeFilter)
     {
         foreach (var type in assembly.GetTypes().Where(typeFilter).Where(static type => type.IsClass && (!type.IsAbstract || type.IsSealed)))
@@ -146,6 +149,7 @@ internal static class ReflectionConsumerMethodDiscovery
             implementedInterface.IsGenericType
             && implementedInterface.GetGenericTypeDefinition() == typeof(IConsumer<>));
 
+    [RequiresUnreferencedCode("Consumer method discovery requires method and parameter metadata.")]
     public static IEnumerable<ConsumerMethodDefinition> Discover(Type consumerType)
     {
         ArgumentNullException.ThrowIfNull(consumerType);
@@ -243,6 +247,8 @@ internal static class ReflectionConsumerMethodDiscovery
 
 internal static class ReflectionConsumerMethodRegistrationDescriptorFactory
 {
+    [RequiresDynamicCode("Reflection-based consumer methods close generic registration descriptors at runtime. Use generated consumer registration for NativeAOT.")]
+    [RequiresUnreferencedCode("Reflection-based consumer methods require method and parameter metadata. Use generated consumer registration for trimmed applications.")]
     public static IConsumerRegistrationDescriptor Create(ConsumerMethodDefinition definition)
     {
         var descriptorType = typeof(ReflectionConsumerMethodRegistrationDescriptor<>).MakeGenericType(definition.MessageType);

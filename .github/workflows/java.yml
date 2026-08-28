@@ -36,6 +36,8 @@ jobs:
         run: ./eng/verify-release-versions.sh
       - name: Build with Gradle
         run: gradle test publish
+      - name: Verify generated dispatch with GraalVM Native Image
+        run: ./eng/verify-java-aot.sh
       - name: Verify Maven packages
         run: ./eng/verify-maven-packages.sh
       - name: Verify Maven package consumer

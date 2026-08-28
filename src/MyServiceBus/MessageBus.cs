@@ -126,7 +126,7 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector, IConsumerMetho
             queueArguments is null ? null : new Dictionary<string, object?>(queueArguments, StringComparer.Ordinal));
 
         var configurator = new PipeConfigurator<ConsumeContext<TMessage>>();
-        configurator.UseFilter<OpenTelemetryConsumeFilter<TMessage>>();
+        configurator.UseFilter(new OpenTelemetryConsumeFilter<TMessage>());
         configurator.UseFilter(new BusHookConsumeFilter<TMessage>(_hooks, queueName));
         var errorLogger = _serviceProvider.GetService<ILogger<ErrorTransportFilter<TMessage>>>();
         configurator.UseFilter(new ErrorTransportFilter<TMessage>(errorLogger));
@@ -187,7 +187,7 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector, IConsumerMetho
         }
 
         var configurator = new PipeConfigurator<ConsumeContext<TMessage>>();
-        configurator.UseFilter<OpenTelemetryConsumeFilter<TMessage>>();
+        configurator.UseFilter(new OpenTelemetryConsumeFilter<TMessage>());
         configurator.UseFilter(new BusHookConsumeFilter<TMessage>(_hooks, queueName));
         var errorLogger = _serviceProvider.GetService<ILogger<ErrorTransportFilter<TMessage>>>();
         configurator.UseFilter(new ErrorTransportFilter<TMessage>(errorLogger));
@@ -268,7 +268,7 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector, IConsumerMetho
         }
 
         var configurator = new PipeConfigurator<ConsumeContext<TMessage>>();
-        configurator.UseFilter<OpenTelemetryConsumeFilter<TMessage>>();
+        configurator.UseFilter(new OpenTelemetryConsumeFilter<TMessage>());
         configurator.UseFilter(new BusHookConsumeFilter<TMessage>(_hooks, queueName));
         var errorLogger = _serviceProvider.GetService<ILogger<ErrorTransportFilter<TMessage>>>();
         configurator.UseFilter(new ErrorTransportFilter<TMessage>(errorLogger));

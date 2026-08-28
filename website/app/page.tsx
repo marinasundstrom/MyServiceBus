@@ -22,7 +22,9 @@ await bus.Publish(new SubmitOrder(Guid.NewGuid()));`,
     label: 'Java',
     install:
       "implementation 'io.github.marinasundstrom.myservicebus:myservicebus-rabbitmq:0.1.0-preview.4'",
-    code: `services.from(MessageBusServices.class)
+    code: `ServiceCollection services = ServiceCollection.create();
+
+services.from(MessageBusServices.class)
     .addServiceBus(cfg -> {
         cfg.addConsumer(SubmitOrderConsumer.class);
         cfg.using(RabbitMqFactoryConfigurator.class,
@@ -30,6 +32,8 @@ await bus.Publish(new SubmitOrder(Guid.NewGuid()));`,
                 rabbit.configureEndpoints(context));
     });
 
+MessageBus bus = services.buildServiceProvider()
+    .getRequiredService(MessageBus.class);
 bus.publish(new SubmitOrder(UUID.randomUUID()));`,
   },
 };
@@ -64,8 +68,8 @@ export default function Home() {
             <p className="eyebrow">Messaging that speaks both languages</p>
             <h1>One service bus.<br />Two ecosystems.</h1>
             <p className="lede">
-              Build asynchronous .NET and Java services with the same focused,
-              MassTransit-inspired messaging model.
+              Mix .NET and Java services with the same focused, MassTransit-inspired
+              messaging model—choose the best platform for each application.
             </p>
             <div className="hero-actions">
               <Link className="primary-button" href="/docs/getting-started">
@@ -97,10 +101,12 @@ export default function Home() {
               </div>
               <span className="step-label">01 — QUICK START</span>
             </div>
-            <div className="install-command">
-              <span>$</span>
-              <code>{example.install}</code>
-            </div>
+            <CodeViewer
+              code={example.install}
+              height={72}
+              label={`${example.label} install command`}
+              language={language === 'csharp' ? 'shell' : 'groovy'}
+            />
             <CodeViewer
               code={example.code}
               height={278}
@@ -149,6 +155,7 @@ export default function Home() {
             <Link href="/docs/rabbitmq"><span>Transport</span><h3>RabbitMQ</h3><p>Understand recovery, failure queues, topology, and tuning.</p><b>Configure transport →</b></Link>
             <Link href="/docs/azure-service-bus"><span>Preview transport</span><h3>Azure Service Bus</h3><p>Provision Azure, configure either client, and understand the verified interoperability boundary.</p><b>Configure the transport →</b></Link>
             <Link href="/docs/testing"><span>Confidence</span><h3>Testing</h3><p>Exercise message flows with the aligned in-memory harness.</p><b>Write a test →</b></Link>
+            <Link href="/docs/native-aot"><span>Work in progress</span><h3>AOT compilation</h3><p>Generate consumer dispatch for .NET NativeAOT and GraalVM Native Image.</p><b>See the proof of concept →</b></Link>
           </div>
         </section>
       </main>

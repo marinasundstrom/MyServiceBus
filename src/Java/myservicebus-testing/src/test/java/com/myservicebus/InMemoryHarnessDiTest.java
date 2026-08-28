@@ -13,7 +13,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.UUID;
 import java.util.stream.IntStream;
 
-import com.google.inject.Inject;
+import javax.inject.Inject;
 
 import org.junit.jupiter.api.Test;
 

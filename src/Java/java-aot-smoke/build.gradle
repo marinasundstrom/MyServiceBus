@@ -1,0 +1,24 @@
+plugins {
+    id 'application'
+}
+
+application {
+    mainClass = 'com.myservicebus.aot.AotSmokeMain'
+}
+
+jar {
+    dependsOn configurations.runtimeClasspath
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    manifest {
+        attributes('Main-Class': application.mainClass.get())
+    }
+    from {
+        configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
+    }
+    exclude 'META-INF/*.SF', 'META-INF/*.DSA', 'META-INF/*.RSA'
+}
+
+dependencies {
+    annotationProcessor project(':myservicebus-processor')
+    implementation project(':myservicebus')
+}

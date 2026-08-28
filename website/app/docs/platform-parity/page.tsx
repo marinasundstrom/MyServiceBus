@@ -13,6 +13,11 @@ const rows = [
   ['Generated direct method invocation', 'Typed adapter path', 'Available', 'Typed invoker path', 'JSR 269'],
   ['Named method endpoint', 'Attribute or fluent', 'Available', 'Annotation or explicit', 'Available'],
   ['Reflection-free method discovery and invocation', 'Typed path', 'Available', 'Typed path', 'Available'],
+  ['Explicit serializer factory', 'Service-provider factory', 'Not needed', 'Serializer + deserializer', 'Not needed'],
+  ['Factory-only AOT dependency injection', 'Typed Microsoft DI', 'Not needed', 'No Guice activation', 'Not needed'],
+  ['Native executable smoke', 'Available', '.NET NativeAOT CI', 'No tracing metadata', 'GraalVM CI'],
+  ['Runtime-managed async core and consumer in a native executable', 'Opt-in .NET 11 preview target', 'Generated dispatch verified', 'Different JVM model', 'Not applicable'],
+  ['Source-generated JSON metadata', 'Application opt-in', 'Serializer-owned', 'Serializer-specific', 'Serializer-owned'],
 ];
 
 export default function PlatformParity() {
@@ -76,6 +81,8 @@ export default function PlatformParity() {
         <li>Both clients bind message, context, cancellation, and scoped service parameters.</li>
         <li>Method-consumer classes do not require or use an <code>IConsumer</code> marker.</li>
         <li>Java intentionally has no implicit classpath scan or scan predicate.</li>
+        <li>Java AOT applications can select a factory-only container; conventional Guice-backed setup remains available.</li>
+        <li>Full application AOT support remains work in progress in both runtimes.</li>
       </ul>
 
       <div className="callout">
@@ -88,8 +95,8 @@ export default function PlatformParity() {
       </div>
 
       <div className="next-card">
-        <div><span>Next</span><strong>Declare consumers as methods</strong></div>
-        <Link href="/docs/consumer-methods">Consumer methods →</Link>
+        <div><span>Next</span><strong>Use generated registration on .NET</strong></div>
+        <Link href="/docs/native-aot">NativeAOT for .NET →</Link>
       </div>
     </article>
   );
