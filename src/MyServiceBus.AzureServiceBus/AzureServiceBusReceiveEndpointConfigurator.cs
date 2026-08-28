@@ -91,6 +91,22 @@ public sealed class AzureServiceBusReceiveEndpointConfigurator
         registration.Register(bus, consumer, CancellationToken.None).GetAwaiter().GetResult();
     }
 
+    public void Consumer<TConsumer, TMessage>()
+        where TConsumer : class, IConsumer<TMessage>
+        where TMessage : class
+    {
+        _endpointActions.Add((_, provider) =>
+        {
+            var registry = provider.GetRequiredService<TopologyRegistry>();
+            registry.RegisterConsumer<TConsumer, TMessage>(
+                _queueName,
+                endpointNameIsExplicit: true,
+                endpointNameFormatterType: null);
+            var consumer = registry.Consumers[^1];
+            ConfigureConsumer(new BusRegistrationContext(provider), consumer);
+        });
+    }
+
     public void Handler<T>(Func<ConsumeContext<T>, Task> handler) where T : class
     {
         ArgumentNullException.ThrowIfNull(handler);

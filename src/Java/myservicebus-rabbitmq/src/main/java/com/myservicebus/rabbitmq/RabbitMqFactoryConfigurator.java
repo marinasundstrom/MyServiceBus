@@ -33,6 +33,7 @@ public class RabbitMqFactoryConfigurator implements BusFactoryConfigurator {
     private EndpointNameFormatter endpointNameFormatter;
     private MessageEntityNameFormatter entityNameFormatter;
     private final java.util.List<HandlerRegistration<?>> handlerRegistrations = new java.util.ArrayList<>();
+    private final java.util.List<ConsumerRegistration<?, ?>> consumerRegistrations = new java.util.ArrayList<>();
     private int prefetchCount;
     private java.util.function.BiFunction<ServiceProvider, Class<?>, ConsumerFactory> consumerFactory =
             (sp, type) -> new DefaultConstructorConsumerFactory();
@@ -69,7 +70,11 @@ public class RabbitMqFactoryConfigurator implements BusFactoryConfigurator {
 
     public void receiveEndpoint(String queueName, Consumer<ReceiveEndpointConfigurator> configure) {
         if (configure != null) {
-            ReceiveEndpointConfiguratorImpl cfg = new ReceiveEndpointConfiguratorImpl(queueName, exchangeNames, handlerRegistrations);
+            ReceiveEndpointConfiguratorImpl cfg = new ReceiveEndpointConfiguratorImpl(
+                    queueName,
+                    exchangeNames,
+                    handlerRegistrations,
+                    consumerRegistrations);
             configure.accept(cfg);
         }
     }
@@ -159,6 +164,7 @@ public class RabbitMqFactoryConfigurator implements BusFactoryConfigurator {
         services.addSingleton(MessageBus.class, sp -> () -> {
             BusRegistrationContext context = new BusRegistrationContext(sp);
             configureEndpoints(context);
+            applyConsumerRegistrations(context);
             MessageBusImpl bus = new MessageBusImpl(sp, type -> consumerFactory.apply(sp, type));
             try {
                 applyHandlers(bus);
@@ -167,6 +173,35 @@ public class RabbitMqFactoryConfigurator implements BusFactoryConfigurator {
             }
             return bus;
         });
+    }
+
+    private void applyConsumerRegistrations(BusRegistrationContext context) {
+        TopologyRegistry registry = context.getServiceProvider().getService(TopologyRegistry.class);
+        for (ConsumerRegistration<?, ?> registration : consumerRegistrations) {
+            applyConsumerRegistration(registry, registration);
+        }
+    }
+
+    @SuppressWarnings({ "rawtypes", "unchecked" })
+    private static void applyConsumerRegistration(
+            TopologyRegistry registry,
+            ConsumerRegistration registration) {
+        java.util.function.Consumer<PipeConfigurator<ConsumeContext<Object>>> configure = null;
+        if (registration.retryCount != null) {
+            configure = pipe -> pipe.useRetry(registration.retryCount, registration.retryDelay);
+        }
+        registry.registerConsumer(
+                registration.consumerType,
+                registration.queueName,
+                true,
+                null,
+                configure,
+                registration.messageType);
+        ConsumerTopology definition = registry.getConsumers().get(registry.getConsumers().size() - 1);
+        definition.getBindings().get(0).setEntityName(registration.exchange);
+        definition.setPrefetchCount(registration.prefetchCount);
+        definition.setQueueArguments(registration.queueArguments);
+        definition.setSerializerClass(registration.serializerClass);
     }
 
     private static class RabbitMqHostConfiguratorImpl implements RabbitMqHostConfigurator {
@@ -188,6 +223,7 @@ public class RabbitMqFactoryConfigurator implements BusFactoryConfigurator {
         private final String queueName;
         private final Map<Class<?>, String> exchangeNames;
         private final java.util.List<HandlerRegistration<?>> handlers;
+        private final java.util.List<ConsumerRegistration<?, ?>> consumers;
         private Integer retryCount;
         private Duration retryDelay;
         private java.util.function.Consumer<RetryConfigurator> retry;
@@ -195,10 +231,15 @@ public class RabbitMqFactoryConfigurator implements BusFactoryConfigurator {
         private Map<String, Object> queueArguments;
         private Class<? extends MessageSerializer> serializerClass;
 
-        ReceiveEndpointConfiguratorImpl(String queueName, Map<Class<?>, String> exchangeNames, java.util.List<HandlerRegistration<?>> handlers) {
+        ReceiveEndpointConfiguratorImpl(
+                String queueName,
+                Map<Class<?>, String> exchangeNames,
+                java.util.List<HandlerRegistration<?>> handlers,
+                java.util.List<ConsumerRegistration<?, ?>> consumers) {
             this.queueName = queueName;
             this.exchangeNames = exchangeNames;
             this.handlers = handlers;
+            this.consumers = consumers;
         }
 
         @Override
@@ -283,11 +324,61 @@ public class RabbitMqFactoryConfigurator implements BusFactoryConfigurator {
         }
 
         @Override
+        public <TMessage, TConsumer extends com.myservicebus.Consumer<TMessage>> void consumer(
+                Class<TMessage> messageType,
+                Class<TConsumer> consumerType) {
+            String exchange = exchangeNames.getOrDefault(messageType, EntityNameFormatter.format(messageType));
+            consumers.add(new ConsumerRegistration<>(
+                    queueName,
+                    messageType,
+                    consumerType,
+                    exchange,
+                    retryCount,
+                    retryDelay,
+                    prefetchCount,
+                    queueArguments,
+                    serializerClass));
+        }
+
+        @Override
         public <T> void handler(Class<T> messageType, java.util.function.Function<ConsumeContext<T>, java.util.concurrent.CompletableFuture<Void>> handler) {
             String exchange = exchangeNames.containsKey(messageType)
                     ? exchangeNames.get(messageType)
                     : EntityNameFormatter.format(messageType);
             handlers.add(new HandlerRegistration<>(queueName, messageType, exchange, handler, retryCount, retryDelay, prefetchCount, queueArguments, serializerClass));
+        }
+    }
+
+    private static class ConsumerRegistration<TMessage, TConsumer extends com.myservicebus.Consumer<TMessage>> {
+        final String queueName;
+        final Class<TMessage> messageType;
+        final Class<TConsumer> consumerType;
+        final String exchange;
+        final Integer retryCount;
+        final Duration retryDelay;
+        final Integer prefetchCount;
+        final Map<String, Object> queueArguments;
+        final Class<? extends MessageSerializer> serializerClass;
+
+        ConsumerRegistration(
+                String queueName,
+                Class<TMessage> messageType,
+                Class<TConsumer> consumerType,
+                String exchange,
+                Integer retryCount,
+                Duration retryDelay,
+                Integer prefetchCount,
+                Map<String, Object> queueArguments,
+                Class<? extends MessageSerializer> serializerClass) {
+            this.queueName = queueName;
+            this.messageType = messageType;
+            this.consumerType = consumerType;
+            this.exchange = exchange;
+            this.retryCount = retryCount;
+            this.retryDelay = retryDelay;
+            this.prefetchCount = prefetchCount;
+            this.queueArguments = queueArguments;
+            this.serializerClass = serializerClass;
         }
     }
 

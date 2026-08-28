@@ -18,6 +18,7 @@ public final class AzureServiceBusReceiveEndpointConfigurator {
     private final String queueName;
     private final Function<Class<?>, String> entityNameResolver;
     private final List<HandlerRegistration<?>> handlers;
+    private final List<ConsumerRegistration<?, ?>> consumers;
     private Integer retryCount;
     private Duration retryDelay;
     private Integer prefetchCount;
@@ -26,10 +27,12 @@ public final class AzureServiceBusReceiveEndpointConfigurator {
     AzureServiceBusReceiveEndpointConfigurator(
             String queueName,
             Function<Class<?>, String> entityNameResolver,
-            List<HandlerRegistration<?>> handlers) {
+            List<HandlerRegistration<?>> handlers,
+            List<ConsumerRegistration<?, ?>> consumers) {
         this.queueName = queueName;
         this.entityNameResolver = entityNameResolver;
         this.handlers = handlers;
+        this.consumers = consumers;
     }
 
     public void useMessageRetry(java.util.function.Consumer<RetryConfigurator> configure) {
@@ -99,11 +102,36 @@ public final class AzureServiceBusReceiveEndpointConfigurator {
                 serializerClass));
     }
 
+    public <TMessage, TConsumer extends com.myservicebus.Consumer<TMessage>> void consumer(
+            Class<TMessage> messageType,
+            Class<TConsumer> consumerType) {
+        consumers.add(new ConsumerRegistration<>(
+                queueName,
+                messageType,
+                consumerType,
+                entityNameResolver.apply(messageType),
+                retryCount,
+                retryDelay,
+                prefetchCount,
+                serializerClass));
+    }
+
     record HandlerRegistration<T>(
             String queueName,
             Class<T> messageType,
             String entityName,
             Function<ConsumeContext<T>, CompletableFuture<Void>> handler,
+            Integer retryCount,
+            Duration retryDelay,
+            Integer prefetchCount,
+            Class<? extends MessageSerializer> serializerClass) {
+    }
+
+    record ConsumerRegistration<TMessage, TConsumer extends com.myservicebus.Consumer<TMessage>>(
+            String queueName,
+            Class<TMessage> messageType,
+            Class<TConsumer> consumerType,
+            String entityName,
             Integer retryCount,
             Duration retryDelay,
             Integer prefetchCount,

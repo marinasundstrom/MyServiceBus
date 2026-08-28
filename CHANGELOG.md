@@ -14,6 +14,8 @@ This changelog summarizes the bigger themes in the repository history. It is int
 
 ## Unreleased
 
+- Completed the Java bus-factory container integration path with explicit endpoint consumer mappings for RabbitMQ and Azure Service Bus, allowing `ConsumerFactory` to resolve application consumers without binding them into the bus's isolated provider, and documented async-safe scope ownership.
+
 Release candidate: `0.1.0-preview.4`.
 
 ### NativeAOT registration

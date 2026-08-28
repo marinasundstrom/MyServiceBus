@@ -5,6 +5,8 @@ import static org.junit.jupiter.api.Assertions.*;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.jupiter.api.Test;
 import javax.inject.Inject;
@@ -129,5 +131,43 @@ class ConsumerMessageFilterTest {
         result.join();
 
         assertTrue(state.disposed);
+    }
+
+    @Test
+    void customConsumerFactoryControlsResolutionAndAsyncLifetime() {
+        AsyncConsumerState state = new AsyncConsumerState();
+        AtomicReference<Class<?>> requestedType = new AtomicReference<>();
+        AtomicBoolean scopeClosed = new AtomicBoolean();
+        ConsumerFactory factory = new ConsumerFactory() {
+            @Override
+            public <TConsumer, T> CompletableFuture<Void> send(
+                    Class<TConsumer> consumerType,
+                    ConsumeContext<T> context,
+                    Pipe<ConsumerConsumeContext<TConsumer, T>> next) {
+                requestedType.set(consumerType);
+                @SuppressWarnings("unchecked")
+                TConsumer consumer = (TConsumer) new ScopedAsyncConsumer(state);
+                return next.send(new ConsumerConsumeContext<>(consumer, context))
+                        .whenComplete((ignored, failure) -> scopeClosed.set(true));
+            }
+        };
+        ConsumeContext<TestMessage> context = new ConsumeContext<>(
+                new TestMessage("hi"),
+                Map.of(),
+                uri -> new CaptureEndpoint());
+        ConsumerMessageFilter<ScopedAsyncConsumer, TestMessage> filter =
+                new ConsumerMessageFilter<>(ScopedAsyncConsumer.class, factory);
+
+        CompletableFuture<Void> result = filter.send(
+                context,
+                ignored -> CompletableFuture.completedFuture(null));
+
+        assertEquals(ScopedAsyncConsumer.class, requestedType.get());
+        assertFalse(scopeClosed.get());
+
+        state.completion.complete(null);
+        result.join();
+
+        assertTrue(scopeClosed.get());
     }
 }

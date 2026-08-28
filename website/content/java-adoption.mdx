@@ -1,0 +1,158 @@
+<p className="docs-kicker">Java adoption</p>
+
+# Bring your container. Keep it in charge.
+
+<p className="docs-summary">Use the MyServiceBus service collection when you want its complete composition model. When an existing Java application already owns a container, use the bus factory and connect container-managed application code at the receive endpoint.</p>
+
+<div className="concept-comparison">
+  <section>
+    <span className="tag">MYSERVICEBUS-FIRST</span>
+    <h2>Decorator style</h2>
+    <p>Build a service graph through <code>ServiceCollection</code>. This is the recommended new-project style and deliberately resembles the C# client.</p>
+  </section>
+  <section>
+    <span className="tag">EXISTING JAVA APP</span>
+    <h2>Bus factory</h2>
+    <p>Let the application container construct consumers and their dependencies. Connect its native resolver through <code>ConsumerFactory</code>, or register a managed method directly as an endpoint handler.</p>
+  </section>
+</div>
+
+## New project: decorator style
+
+Start with the MyServiceBus service abstractions when the application does not already have a competing composition model. Decorators provide the Java equivalent of the extension-method structure used by the C# client.
+
+```java
+ServiceCollection services = ServiceCollection.create();
+
+services.from(MessageBusServices.class)
+    .addServiceBus(cfg -> {
+        cfg.addConsumer(SubmitOrderConsumer.class);
+        cfg.using(RabbitMqFactoryConfigurator.class,
+            (context, rabbit) -> {
+                rabbit.host("localhost");
+                rabbit.configureEndpoints(context);
+            });
+    });
+
+ServiceProvider provider = services.buildServiceProvider();
+MessageBus bus = provider.getRequiredService(MessageBus.class);
+bus.start();
+```
+
+<aside className="callout callout-accent">
+  <strong>Guice is not an application requirement</strong>
+  <p><code>ServiceCollection.create()</code> currently uses Guice as its included implementation. The bus-factory path does not connect Spring, CDI, Dagger, or an application container to that Guice instance. The application container remains the owner of its objects and scopes.</p>
+</aside>
+
+## Existing application: bus factory
+
+The consumer factory is the class-activation seam. MyServiceBus supplies the registered consumer type and a continuation representing the rest of the consumer pipeline. The adapter resolves that type from the application container and passes it to the continuation.
+
+The bus factory still builds a private MyServiceBus provider for transport and pipeline services. The adapter may ignore that provider; it does not need to connect the application container to Guice.
+
+```java
+MessageBus bus = MessageBus.factory.create(
+    RabbitMqFactoryConfigurator.class,
+    rabbit -> {
+        rabbit.host("localhost");
+        rabbit.setConsumerFactory((busProvider, consumerType) ->
+            new ApplicationConsumerFactory(applicationContainer));
+        rabbit.receiveEndpoint("submit-order", endpoint ->
+            endpoint.consumer(
+                SubmitOrder.class,
+                SubmitOrderConsumer.class));
+    });
+
+bus.start();
+```
+
+`endpoint.consumer(messageType, consumerType)` is an explicit mapping. It adds the consumer to bus topology without registering the consumer class in the bus&apos;s private provider. RabbitMQ and Azure Service Bus expose the same Java factory pattern.
+
+### Adapt the application container
+
+`ConsumerFactory` owns activation for one pipeline execution. This example uses placeholder `ApplicationContainer` and `ApplicationScope` types; an integration supplies the equivalent operations from Spring, CDI, Dagger, Micronaut, or application code.
+
+```java
+final class ApplicationConsumerFactory implements ConsumerFactory {
+    private final ApplicationContainer container;
+
+    ApplicationConsumerFactory(ApplicationContainer container) {
+        this.container = container;
+    }
+
+    @Override
+    public <TConsumer, TMessage> CompletableFuture<Void> send(
+            Class<TConsumer> consumerType,
+            ConsumeContext<TMessage> context,
+            Pipe<ConsumerConsumeContext<TConsumer, TMessage>> next) {
+        ApplicationScope scope = container.openScope();
+        try {
+            TConsumer consumer = scope.get(consumerType);
+            var consumerContext =
+                new ConsumerConsumeContext<>(consumer, context);
+            return next.send(consumerContext)
+                .whenComplete((ignored, failure) -> scope.close());
+        } catch (Throwable failure) {
+            scope.close();
+            return CompletableFuture.failedFuture(failure);
+        }
+    }
+}
+```
+
+The continuation is important: the native scope remains alive for consumer execution, filters that run after it, and asynchronous work. Closing the scope immediately after `next.send(...)` would dispose dependencies too early.
+
+### Use a direct handler when a class factory is unnecessary
+
+For a singleton or framework-managed proxy, inject the object into messaging configuration and pass a method reference. Constructor injection has already happened before MyServiceBus sees the handler.
+
+```java
+@Bean(initMethod = "start", destroyMethod = "stop")
+MessageBus messageBus(SubmitOrderConsumer consumer) {
+    return MessageBus.factory.create(
+        RabbitMqFactoryConfigurator.class,
+        rabbit -> {
+            rabbit.host("localhost");
+            rabbit.receiveEndpoint("submit-order", endpoint ->
+                endpoint.handler(
+                    SubmitOrder.class,
+                    consumer::consume));
+        });
+}
+```
+
+A captured consumer may receive messages concurrently, so the target must be safe for that lifetime. Prefer the typed consumer-factory path when each delivery needs a native container scope.
+
+### Provider and factory types
+
+Use the provider type native to the host framework at the composition boundary:
+
+- Spring can inject a normal singleton directly or expose an `ObjectProvider<T>` when the configured scope supports per-delivery lookup.
+- Jakarta CDI can resolve through `Instance<T>` and use a handle when explicit dependent-instance destruction is required.
+- Dagger can expose `Provider<T>` or a generated component method.
+- An application without a framework can use `Supplier<T>` or its own scope factory.
+
+A `Provider<T>` or `Supplier<T>` creates or locates an object; it does not by itself describe scope cleanup. When the container returns short-lived objects, adapt both resolution and release inside `ConsumerFactory`.
+
+<aside className="callout">
+  <strong>What MyServiceBus owns</strong>
+  <p>The bus owns transport delivery, consume context, retry and fault behavior, and completion of the handler pipeline. The host container owns consumer construction, dependency injection, scope rules, and disposal. Returning the consumer&apos;s future joins those two lifecycles without merging their container abstractions.</p>
+</aside>
+
+## Materialize the collection with another container
+
+A deeper adapter can implement the neutral MyServiceBus collection and provider contracts, translate registrations produced by the decorators, and return a provider backed by another container. Choose this path when the application wants the decorator programming model across its composition root, rather than only a bus-factory integration.
+
+Such an adapter must preserve the target container&apos;s lifetime, scope, cleanup, and multi-binding semantics:
+
+- `SINGLETON` maps to one instance across the root provider and message scopes.
+- `SCOPED` maps to one instance per MyServiceBus message scope.
+- `TRANSIENT` maps to a new instance per resolution under the framework&apos;s ownership rules.
+- A native scope closes only after asynchronous consumption completes.
+- Multi-bindings and provider-aware factories retain the active scoped provider.
+
+This is an alternative adoption path, not a requirement for using the bus factory.
+
+<p className="small-note">Framework references: <a href="https://docs.spring.io/spring-framework/reference/core/beans/basics.html">Spring container</a>, <a href="https://jakarta.ee/specifications/cdi/4.1/">Jakarta CDI</a>, and <a href="https://dagger.dev/dev-guide/basic-usage">Dagger components</a>.</p>
+
+<NextCard href="/docs/native-aot" title="AOT compilation" />

@@ -9,6 +9,9 @@ public interface ReceiveEndpointConfigurator {
     void useMessageRetry(java.util.function.Consumer<RetryConfigurator> configure);
     void configureConsumer(BusRegistrationContext context, Class<?> consumerClass);
     void configureConsumer(BusRegistrationContext context, ConsumerTopology consumer);
+    <TMessage, TConsumer extends com.myservicebus.Consumer<TMessage>> void consumer(
+            Class<TMessage> messageType,
+            Class<TConsumer> consumerType);
     <T> void handler(Class<T> messageType, java.util.function.Function<com.myservicebus.ConsumeContext<T>, java.util.concurrent.CompletableFuture<Void>> handler);
     void prefetchCount(int prefetchCount);
     void setQueueArgument(String key, Object value);

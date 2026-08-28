@@ -16,6 +16,7 @@ const rows = [
   ['Reflection-free method discovery and invocation', 'Typed path', 'Available', 'Typed path', 'Available'],
   ['Explicit serializer factory', 'Service-provider factory', 'Not needed', 'Serializer + deserializer', 'Not needed'],
   ['Factory-only AOT dependency injection', 'Typed Microsoft DI', 'Not needed', 'No Guice activation', 'Not needed'],
+  ['External-container consumer activation', 'Consumer factory', 'Not needed', 'Consumer factory', 'Not needed'],
   ['Native executable smoke', 'Available', '.NET NativeAOT CI', 'No tracing metadata', 'GraalVM CI'],
   ['Runtime-managed async core and consumer in a native executable', 'Opt-in .NET 11 preview target', 'Generated dispatch verified', 'Different JVM model', 'Not applicable'],
   ['Source-generated JSON metadata', 'Application opt-in', 'Serializer-owned', 'Serializer-specific', 'Serializer-owned'],

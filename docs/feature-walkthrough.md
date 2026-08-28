@@ -211,7 +211,7 @@ The factory uses `DefaultConstructorConsumerFactory` by default to instantiate c
 IMessageBus bus = MessageBus.Factory.Create<RabbitMqFactoryConfigurator>(cfg =>
 {
     cfg.SetConsumerFactory(typeof(ScopeConsumerFactory<>));
-    cfg.ReceiveEndpoint("orders", e => e.Consumer<SubmitOrderConsumer>());
+    cfg.ReceiveEndpoint("orders", e => e.Consumer<SubmitOrderConsumer, SubmitOrder>());
 });
 ```
 
@@ -228,20 +228,28 @@ MessageBus bus = MessageBus.factory.create(RabbitMqFactoryConfigurator.class, cf
 bus.start();
 ```
 
-The handler can instead resolve from an existing application container. MyServiceBus does not wrap that container in Guice or require the application to implement the MyServiceBus provider contracts:
+For class-based consumers, register the message-to-consumer mapping on the endpoint and adapt the application container through `setConsumerFactory`. The bus keeps its private provider for transport and pipeline services; the consumer factory can ignore that provider and resolve through the application container instead:
 
 ```java
 var applicationContext = createApplicationContext();
 
 MessageBus bus = MessageBus.factory.create(RabbitMqFactoryConfigurator.class, cfg -> {
     cfg.host("localhost");
+    cfg.setConsumerFactory((busProvider, consumerType) ->
+        new ApplicationConsumerFactory(applicationContext));
     cfg.receiveEndpoint("submit-order", endpoint ->
-        endpoint.handler(SubmitOrder.class, context ->
-            applicationContext.getBean(SubmitOrderConsumer.class).consume(context)));
+        endpoint.consumer(SubmitOrder.class, SubmitOrderConsumer.class));
 });
 ```
 
-Use `cfg.setConsumerFactory` when configuring class-based consumers through the factory and their activation needs customization. The explicit endpoint-handler form is the smallest framework-neutral factory setup.
+`ApplicationConsumerFactory` implements `ConsumerFactory.send`, resolves the supplied consumer type from a native application scope, and passes a `ConsumerConsumeContext` to the supplied continuation. The scope must remain open until the returned `CompletableFuture` completes. This preserves the application container's construction and disposal rules without registering application consumers in the bus provider. RabbitMQ and Azure Service Bus provide the same Java factory integration.
+
+The explicit endpoint-handler form remains the smallest integration when an application already has a singleton or framework-managed proxy:
+
+```java
+cfg.receiveEndpoint("submit-order", endpoint ->
+    endpoint.handler(SubmitOrder.class, submitOrderConsumer::consume));
+```
 
 You can also decorate the factory with additional services or a logger factory before creating the bus:
 

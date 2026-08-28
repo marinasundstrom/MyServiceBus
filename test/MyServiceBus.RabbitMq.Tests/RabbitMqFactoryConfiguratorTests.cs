@@ -21,8 +21,18 @@ public class RabbitMqFactoryConfiguratorTests
         public Task Consume(ConsumeContext<MyMessage> context) => Task.CompletedTask;
     }
 
+    class CustomConsumerFactory<TConsumer> : IConsumerFactory<TConsumer>
+        where TConsumer : class
+    {
+        public Task Send<TMessage>(
+            ConsumeContext<TMessage> context,
+            IPipe<ConsumerConsumeContext<TConsumer, TMessage>> next)
+            where TMessage : class => Task.CompletedTask;
+    }
+
     class TestMessageBus : IMessageBus
     {
+        public ConsumerTopology? AddedConsumer { get; private set; }
         public Uri Address => new("loopback://localhost/");
         public IBusTopology Topology => new TopologyRegistry();
         public Task StartAsync(CancellationToken cancellationToken) => Task.CompletedTask;
@@ -33,7 +43,11 @@ public class RabbitMqFactoryConfiguratorTests
         public Task<ISendEndpoint> GetSendEndpoint(Uri uri) => Task.FromResult<ISendEndpoint>(new StubSendEndpoint());
         public Task AddConsumer<TMessage, TConsumer>(ConsumerTopology consumer, Delegate? configure = null, CancellationToken cancellationToken = default)
             where TConsumer : class, IConsumer<TMessage>
-            where TMessage : class => Task.CompletedTask;
+            where TMessage : class
+        {
+            AddedConsumer = consumer;
+            return Task.CompletedTask;
+        }
 
         public Task AddHandler<TMessage>(string queueName, string exchangeName, Func<ConsumeContext<TMessage>, Task> handler, int? retryCount = null, TimeSpan? retryDelay = null, ushort? prefetchCount = null, IDictionary<string, object?>? queueArguments = null, IMessageSerializer? serializer = null, CancellationToken cancellationToken = default) where TMessage : class => Task.CompletedTask;
 
@@ -42,6 +56,43 @@ public class RabbitMqFactoryConfiguratorTests
             public Task Send<T>(T message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default) where T : class => Task.CompletedTask;
             public Task Send<T>(object message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default) where T : class => Task.CompletedTask;
         }
+    }
+
+    [Fact]
+    public void Factory_endpoint_registers_typed_consumer_without_service_binding()
+    {
+        var registry = new TopologyRegistry();
+        var bus = new TestMessageBus();
+        var services = new ServiceCollection();
+        services.AddSingleton(registry);
+        services.AddSingleton<IMessageBus>(bus);
+        var provider = services.BuildServiceProvider();
+        var endpointActions = new List<Action<IMessageBus, IServiceProvider>>();
+        var endpoint = new ReceiveEndpointConfigurator("external-orders", new Dictionary<Type, string>(), endpointActions);
+
+        endpoint.Consumer<MyConsumer, MyMessage>();
+        endpointActions.Single()(bus, provider);
+
+        var consumer = Assert.Single(registry.Consumers);
+        Assert.Equal(typeof(MyConsumer), consumer.ConsumerType);
+        Assert.Equal(typeof(MyMessage), consumer.Bindings[0].MessageType);
+        Assert.Equal("external-orders", consumer.QueueName);
+        Assert.Same(consumer, bus.AddedConsumer);
+        Assert.Null(provider.GetService<MyConsumer>());
+    }
+
+    [Fact]
+    public void Factory_uses_configured_consumer_factory_type()
+    {
+        var configurator = new RabbitMqFactoryConfigurator();
+        configurator.SetConsumerFactory(typeof(CustomConsumerFactory<>));
+        var services = new ServiceCollection();
+
+        configurator.Configure(services);
+        var provider = services.BuildServiceProvider();
+
+        Assert.IsType<CustomConsumerFactory<MyConsumer>>(
+            provider.GetRequiredService<IConsumerFactory<MyConsumer>>());
     }
 
     class TestBusRegistrationContext : IBusRegistrationContext

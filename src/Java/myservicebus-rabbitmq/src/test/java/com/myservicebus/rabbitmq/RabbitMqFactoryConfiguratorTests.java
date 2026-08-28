@@ -3,6 +3,9 @@ package com.myservicebus.rabbitmq;
 import static org.junit.jupiter.api.Assertions.*;
 
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicReference;
+import java.lang.reflect.Field;
+import java.util.function.Function;
 
 import org.junit.jupiter.api.Test;
 
@@ -17,6 +20,19 @@ public class RabbitMqFactoryConfiguratorTests {
     }
 
     static class MyConsumer implements Consumer<MyMessage> {
+        @Override
+        public CompletableFuture<Void> consume(ConsumeContext<MyMessage> context) {
+            return CompletableFuture.completedFuture(null);
+        }
+    }
+
+    interface ExternalDependency {
+    }
+
+    static class ExternalConsumer implements Consumer<MyMessage> {
+        ExternalConsumer(ExternalDependency dependency) {
+        }
+
         @Override
         public CompletableFuture<Void> consume(ConsumeContext<MyMessage> context) {
             return CompletableFuture.completedFuture(null);
@@ -39,6 +55,53 @@ public class RabbitMqFactoryConfiguratorTests {
 
         assertEquals("container-host", configurator.getClientHost());
         assertEquals(32789, configurator.getClientPort());
+    }
+
+    @Test
+    public void factoryRegistersConsumerWithoutBindingItToTheInternalProvider() throws Exception {
+        AtomicReference<Class<?>> requestedConsumerType = new AtomicReference<>();
+        RabbitMqFactoryConfigurator configurator = new RabbitMqFactoryConfigurator();
+        configurator.message(MyMessage.class, message -> message.setEntityName("external-message"));
+        configurator.setConsumerFactory((ignored, consumerType) -> {
+            requestedConsumerType.set(consumerType);
+            return new ConsumerFactory() {
+                @Override
+                public <TConsumer, T> CompletableFuture<Void> send(
+                        Class<TConsumer> type,
+                        ConsumeContext<T> context,
+                        Pipe<ConsumerConsumeContext<TConsumer, T>> next) {
+                    return CompletableFuture.completedFuture(null);
+                }
+            };
+        });
+        configurator.receiveEndpoint("external-orders", endpoint -> {
+            endpoint.prefetchCount(12);
+            endpoint.setQueueArgument("x-queue-type", "quorum");
+            endpoint.consumer(MyMessage.class, ExternalConsumer.class);
+        });
+
+        ServiceCollection services = ServiceCollection.create();
+        configurator.configure(services);
+        ServiceProvider provider = services.buildServiceProvider();
+        MessageBusImpl bus = (MessageBusImpl) provider.getService(MessageBus.class);
+        ConsumerTopology definition = provider.getService(TopologyRegistry.class).getConsumers().stream()
+                .filter(candidate -> candidate.getConsumerType().equals(ExternalConsumer.class))
+                .findFirst()
+                .orElseThrow();
+
+        assertEquals("external-orders", definition.getQueueName());
+        assertEquals("external-message", definition.getBindings().get(0).getEntityName());
+        assertEquals(12, definition.getPrefetchCount());
+        assertEquals("quorum", definition.getQueueArguments().get("x-queue-type"));
+
+        Field factoryField = MessageBusImpl.class.getDeclaredField("consumerFactoryFactory");
+        factoryField.setAccessible(true);
+        @SuppressWarnings("unchecked")
+        Function<Class<?>, ConsumerFactory> factory =
+                (Function<Class<?>, ConsumerFactory>) factoryField.get(bus);
+        factory.apply(ExternalConsumer.class);
+
+        assertEquals(ExternalConsumer.class, requestedConsumerType.get());
     }
 
     @Test

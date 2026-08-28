@@ -37,6 +37,8 @@ public final class AzureServiceBusFactoryConfigurator implements BusFactoryConfi
     private final Map<Class<?>, String> entityNames = new HashMap<>();
     private final List<AzureServiceBusReceiveEndpointConfigurator.HandlerRegistration<?>> handlers =
             new ArrayList<>();
+    private final List<AzureServiceBusReceiveEndpointConfigurator.ConsumerRegistration<?, ?>> consumers =
+            new ArrayList<>();
     private java.util.function.BiFunction<ServiceProvider, Class<?>, ConsumerFactory> consumerFactory =
             (provider, type) -> new DefaultConstructorConsumerFactory();
 
@@ -101,7 +103,11 @@ public final class AzureServiceBusFactoryConfigurator implements BusFactoryConfi
     public void receiveEndpoint(
             String queueName,
             Consumer<AzureServiceBusReceiveEndpointConfigurator> configure) {
-        configure.accept(new AzureServiceBusReceiveEndpointConfigurator(queueName, this::getEntityName, handlers));
+        configure.accept(new AzureServiceBusReceiveEndpointConfigurator(
+                queueName,
+                this::getEntityName,
+                handlers,
+                consumers));
     }
 
     public void configureEndpoints(BusRegistrationContext context) {
@@ -173,6 +179,7 @@ public final class AzureServiceBusFactoryConfigurator implements BusFactoryConfi
         services.addSingleton(MessageBus.class, provider -> () -> {
             BusRegistrationContext context = new BusRegistrationContext(provider);
             configureEndpoints(context);
+            applyConsumerRegistrations(context);
             MessageBusImpl bus = new MessageBusImpl(provider, type -> consumerFactory.apply(provider, type));
             try {
                 applyHandlers(bus);
@@ -181,6 +188,34 @@ public final class AzureServiceBusFactoryConfigurator implements BusFactoryConfi
             }
             return bus;
         });
+    }
+
+    private void applyConsumerRegistrations(BusRegistrationContext context) {
+        TopologyRegistry registry = context.getServiceProvider().getService(TopologyRegistry.class);
+        for (AzureServiceBusReceiveEndpointConfigurator.ConsumerRegistration<?, ?> registration : consumers) {
+            applyConsumerRegistration(registry, registration);
+        }
+    }
+
+    @SuppressWarnings({ "rawtypes", "unchecked" })
+    private static void applyConsumerRegistration(
+            TopologyRegistry registry,
+            AzureServiceBusReceiveEndpointConfigurator.ConsumerRegistration registration) {
+        java.util.function.Consumer<com.myservicebus.PipeConfigurator<com.myservicebus.ConsumeContext<Object>>> configure = null;
+        if (registration.retryCount() != null) {
+            configure = pipe -> pipe.useRetry(registration.retryCount(), registration.retryDelay());
+        }
+        registry.registerConsumer(
+                registration.consumerType(),
+                registration.queueName(),
+                true,
+                null,
+                configure,
+                registration.messageType());
+        ConsumerTopology definition = registry.getConsumers().get(registry.getConsumers().size() - 1);
+        definition.getBindings().get(0).setEntityName(registration.entityName());
+        definition.setPrefetchCount(registration.prefetchCount());
+        definition.setSerializerClass(registration.serializerClass());
     }
 
     private static void endpoint(String connectionString) {
