@@ -44,7 +44,7 @@ export default function CodeViewer({ code, language, label, height }: CodeViewer
           scrollbar: { alwaysConsumeMouseWheel: false, horizontalScrollbarSize: 8, verticalScrollbarSize: 8 },
           selectionHighlight: false,
           stickyScroll: { enabled: false },
-          wordWrap: 'on',
+          wordWrap: 'off',
         }}
         theme="vs-dark"
         value={code}
