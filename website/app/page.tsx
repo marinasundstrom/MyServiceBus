@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import CodeViewer from './components/CodeViewer';
 import ThemeSelector from './components/ThemeSelector';
@@ -66,7 +67,7 @@ export default function Home() {
         <section className="hero">
           <div className="hero-copy">
             <p className="eyebrow">Messaging that speaks both languages</p>
-            <h1>One service bus.<br />Two ecosystems.</h1>
+            <h1>One service bus. Two ecosystems.</h1>
             <p className="lede">
               Mix .NET and Java services with the same focused, MassTransit-inspired
               messaging model—choose the best platform for each application.
@@ -85,37 +86,50 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="code-card" id="getting-started">
-            <div className="code-card-header">
-              <div className="language-toggle" aria-label="Code language">
-                {(Object.keys(examples) as Language[]).map((key) => (
-                  <button
-                    className={language === key ? 'active' : ''}
-                    key={key}
-                    onClick={() => setLanguage(key)}
-                    type="button"
-                  >
-                    {examples[key].label}
-                  </button>
-                ))}
+          <div className="hero-showcase">
+            <figure className="hero-graphic">
+              <Image
+                alt="MyServiceBus — Messaging for .NET and Java, illustrated with connected message routes"
+                height={909}
+                priority
+                sizes="(max-width: 900px) calc(100vw - 48px), 52vw"
+                src="/og.png"
+                width={1730}
+              />
+            </figure>
+
+            <div className="code-card" id="getting-started">
+              <div className="code-card-header">
+                <div className="language-toggle" aria-label="Code language">
+                  {(Object.keys(examples) as Language[]).map((key) => (
+                    <button
+                      className={language === key ? 'active' : ''}
+                      key={key}
+                      onClick={() => setLanguage(key)}
+                      type="button"
+                    >
+                      {examples[key].label}
+                    </button>
+                  ))}
+                </div>
+                <span className="step-label">01 — QUICK START</span>
               </div>
-              <span className="step-label">01 — QUICK START</span>
+              <CodeViewer
+                code={example.install}
+                height={72}
+                label={`${example.label} install command`}
+                language={language === 'csharp' ? 'shell' : 'groovy'}
+              />
+              <CodeViewer
+                code={example.code}
+                height={278}
+                label={`${example.label} quick start`}
+                language={language}
+              />
+              <Link className="continue-link" href="/docs/getting-started">
+                Continue the {example.label} guide <span aria-hidden="true">→</span>
+              </Link>
             </div>
-            <CodeViewer
-              code={example.install}
-              height={72}
-              label={`${example.label} install command`}
-              language={language === 'csharp' ? 'shell' : 'groovy'}
-            />
-            <CodeViewer
-              code={example.code}
-              height={278}
-              label={`${example.label} quick start`}
-              language={language}
-            />
-            <Link className="continue-link" href="/docs/getting-started">
-              Continue the {example.label} guide <span aria-hidden="true">→</span>
-            </Link>
           </div>
         </section>
 
