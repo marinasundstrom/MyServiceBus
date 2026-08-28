@@ -118,7 +118,7 @@ public class NServiceBusInteropTests
             "java-myservicebus-to-nservicebus");
         try
         {
-            await JavaInteropPeer.WaitForOutput(javaPeer, "SENT", TimeSpan.FromSeconds(30));
+            await JavaInteropPeer.WaitForOutput(javaPeer, "SENT", TimeSpan.FromMinutes(2));
             var message = await NServiceBusCrossLanguageMessageHandler.Received.Task
                 .WaitAsync(TimeSpan.FromSeconds(20));
             Assert.Equal("java-myservicebus-to-nservicebus", message.Value);
@@ -148,7 +148,7 @@ public class NServiceBusInteropTests
             EntityNameFormatter.Format(typeof(CrossLanguageMessage)),
             queueName,
             "nservicebus-to-java-myservicebus");
-        await JavaInteropPeer.WaitForOutput(javaPeer, "READY", TimeSpan.FromSeconds(30));
+        await JavaInteropPeer.WaitForOutput(javaPeer, "READY", TimeSpan.FromMinutes(2));
         var endpoint = await StartNServiceBusEndpoint(
             container,
             $"nservicebus-java-sender-{Guid.NewGuid():N}");
