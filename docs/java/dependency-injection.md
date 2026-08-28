@@ -3,10 +3,11 @@
 MyServiceBus defines a small DI abstraction that looks similar to .NET DI while
 staying container-agnostic at the library boundary.
 
-`ServiceCollection.create()` constructs the default `DefaultServiceCollection`.
-That implementation is currently backed by [Guice](https://github.com/google/guice),
-but Guice is an implementation detail of `myservicebus-di`, not part of the
-MyServiceBus application programming model.
+`ServiceCollection` is the application programming model. `ServiceCollection.create()`
+constructs the included `DefaultServiceCollection`, which is currently backed by
+[Guice](https://github.com/google/guice). An adapter can instead collect the same
+registrations and materialize them with another dependency-injection framework.
+Guice is an implementation detail of `myservicebus-di`, not part of the abstraction.
 
 Supporting lifetimes, scopes, and injecting `ServiceProvider`.
 
@@ -125,12 +126,14 @@ ServiceProvider provider = services.connectAndBuild(existing);
 ### Integrating another DI container
 
 `DefaultServiceCollection` uses Guice internally, but MyServiceBus does not
-require Guice-specific application code. To adapt MyServiceBus to another IoC
-framework, implement the `ServiceCollection` interface yourself. Your
-implementation can translate registrations into the container's API and return
-a custom `ServiceProvider` from `buildServiceProvider`. That provider must honor
-the `ServiceProvider` and `ServiceScope` interfaces so consumers can resolve
-services and create scopes just like the built-in implementation.
+require Guice-specific application code. To materialize the MyServiceBus service
+collection with another IoC framework, an adapter implements `ServiceCollection`,
+translates its registrations into the container's API, and returns a custom
+`ServiceProvider` from `buildServiceProvider`. Application and MyServiceBus setup
+can continue to register services through the same collection and decorator model.
+The resulting provider must honor the `ServiceProvider` and `ServiceScope`
+interfaces so consumers can resolve services and create scopes just like the
+included implementation.
 
 Third-party adapters should treat these MyServiceBus contracts as the stable
 integration boundary:
@@ -138,6 +141,15 @@ integration boundary:
 - `ServiceCollection` captures registrations.
 - `ServiceProvider` resolves services and creates child scopes.
 - `ServiceScope` defines the lifetime boundary for per-message dependencies.
+
+The adapter translates `SINGLETON`, `SCOPED`, and `TRANSIENT` into the target
+framework's closest native lifetimes. A MyServiceBus scoped lifetime means one
+instance per `ServiceProvider.createScope()` boundary; message dispatch keeps that
+scope alive until asynchronous consumption completes and then invokes its cleanup
+callback. Multi-bindings must remain complete through `getServices`, and
+provider-aware factories must receive the provider for the active scope. The target
+container may use child containers, request scopes, dependent objects, generated
+components, or another mechanism as long as those observable semantics are preserved.
 
 Application services, consumers, and MyServiceBus extensions should use
 standard `javax.inject.Inject` for constructor injection. This keeps user code

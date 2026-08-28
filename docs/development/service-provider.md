@@ -7,11 +7,19 @@ to wire up any IoC container. Implementations only need to honor the `ServicePro
 `ServiceScope` interfaces.
 
 Because `ServiceCollection` itself is an interface, integrations may supply their own
-implementation that forwards registrations to another container. The custom
-`buildServiceProvider` can then return a `ServiceProvider` wrapper around that
-container, as long as it implements the MyServiceBus `ServiceProvider` and
-`ServiceScope` contracts. This approach allows adapters for frameworks like
-Spring or Dagger without taking a dependency on Guice.
+implementation that collects the same registrations and materializes them in another
+container. The custom `buildServiceProvider` then returns a `ServiceProvider` wrapper
+around that container, as long as it implements the MyServiceBus `ServiceProvider` and
+`ServiceScope` contracts. Application setup can therefore keep using the collection
+and decorator programming model while an adapter for Spring, Dagger, or another
+framework replaces the included Guice-backed materialization.
+
+Adapters map MyServiceBus `SINGLETON`, `SCOPED`, and `TRANSIENT` descriptors to
+the target container's native lifetime mechanisms. `ServiceProvider.createScope()`
+defines the per-message boundary, and the `ServiceScope` cleanup callback keeps
+framework-owned scoped instances alive through asynchronous consumption before
+releasing them. Adapters must also preserve multi-bindings and pass the active scoped
+provider to provider-aware factories.
 
 Any custom `ServiceProvider` must also make itself available for injection into resolved
 services. Consumers are free to declare a constructor parameter of type `ServiceProvider` and

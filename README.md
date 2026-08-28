@@ -142,7 +142,7 @@ Unlike most Java messaging solutions, MyServiceBus does **not require a framewor
 - Middleware / pipeline behaviors
 - OpenTelemetry support
 - Java and C# implementations with aligned semantics
-- Optional generated consumer catalogs for compile-time discovery and direct invocation
+- Optional generated consumer catalogs and experimental AOT paths for .NET NativeAOT and GraalVM Native Image
 
 ---
 

@@ -1,8 +1,8 @@
 package com.myservicebus.di;
 
-import com.google.inject.Provider;
+import java.util.function.Supplier;
 
 @FunctionalInterface
 public interface ServiceProviderBasedProvider<T> {
-    Provider<T> create(ServiceProvider serviceProvider);
+    Supplier<? extends T> create(ServiceProvider serviceProvider);
 }

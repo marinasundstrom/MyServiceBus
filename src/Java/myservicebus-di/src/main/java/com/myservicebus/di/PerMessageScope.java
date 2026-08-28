@@ -9,7 +9,7 @@ import java.util.Deque;
 import java.util.HashMap;
 import java.util.Map;
 
-public class PerMessageScope implements Scope {
+final class PerMessageScope implements Scope {
     private final ThreadLocal<Deque<Map<Key<?>, Object>>> scopeContext = new ThreadLocal<>();
 
     public void enter() {

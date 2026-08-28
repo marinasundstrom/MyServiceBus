@@ -58,6 +58,15 @@ export default function Introduction() {
       </p>
       <LanguageTabs csharp={helloWorld.csharp} java={helloWorld.java} />
 
+      <div className="callout">
+        <strong>Adding MyServiceBus to an existing Java application?</strong>
+        <p>
+          Keep Spring, CDI, Dagger, or your application-owned object graph in charge and
+          connect it through the bus factory. Review the{' '}
+          <Link href="/docs/java-adoption">concrete Java adoption examples →</Link>
+        </p>
+      </div>
+
       <div className="next-card">
         <div><span>Next</span><strong>Build your first message flow</strong></div>
         <Link href="/docs/getting-started">Getting started →</Link>

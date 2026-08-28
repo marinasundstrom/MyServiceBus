@@ -1,6 +1,7 @@
 package com.myservicebus;
 
 import com.myservicebus.di.ServiceCollection;
+import com.myservicebus.di.ServiceProvider;
 import com.myservicebus.serialization.MessageSerializer;
 import com.myservicebus.serialization.MessageDeserializer;
 import com.myservicebus.BusFactoryConfigurator;
@@ -44,7 +45,9 @@ public interface BusRegistrationConfigurator {
     void configurePublish(java.util.function.Consumer<PipeConfigurator<PublishContext>> configure);
     void addHook(Class<? extends BusHook> hookClass);
     void setSerializer(Class<? extends MessageSerializer> serializerClass);
+    void setSerializer(java.util.function.Function<ServiceProvider, ? extends MessageSerializer> serializerFactory);
     void setDeserializer(Class<? extends MessageDeserializer> deserializerClass);
+    void setDeserializer(java.util.function.Function<ServiceProvider, ? extends MessageDeserializer> deserializerFactory);
     void requireTransportCapability(String capability, boolean requireNative);
     default void requireTransportCapability(String capability) {
         requireTransportCapability(capability, false);

@@ -2,20 +2,31 @@ using System;
 using Microsoft.Extensions.DependencyInjection;
 using MyServiceBus.Serialization;
 using System.Reflection;
+using System.Diagnostics.CodeAnalysis;
 
 namespace MyServiceBus;
 
 public interface IRegistrationConfigurator
 //: IServiceCollection
 {
+    [RequiresDynamicCode("Runtime consumer discovery closes generic registrations dynamically. Use AddGeneratedConsumers for NativeAOT.")]
+    [RequiresUnreferencedCode("Runtime consumer discovery cannot guarantee that consumer metadata is preserved. Use AddGeneratedConsumers for trimmed applications.")]
     void AddConsumer<T>() where T : class, IConsumer;
 
+    [RequiresDynamicCode("Runtime consumer method discovery closes generic registrations dynamically. Use AddGeneratedConsumers for NativeAOT.")]
+    [RequiresUnreferencedCode("Runtime consumer method discovery requires method and parameter metadata. Use AddGeneratedConsumers for trimmed applications.")]
     void AddConsumerMethods<TConsumer>(string? endpointName = null) where TConsumer : class;
 
+    [RequiresDynamicCode("Runtime consumer method discovery closes generic registration descriptors dynamically. Use AddGeneratedConsumers for NativeAOT.")]
+    [RequiresUnreferencedCode("Runtime consumer method discovery requires method and parameter metadata. Use AddGeneratedConsumers for trimmed applications.")]
     void AddConsumerMethods(Type declaringType, string? endpointName = null);
 
+    [RequiresDynamicCode("Assembly scanning closes generic consumer registrations dynamically. Use AddGeneratedConsumers for NativeAOT.")]
+    [RequiresUnreferencedCode("Assembly scanning cannot guarantee that consumer metadata is preserved. Use AddGeneratedConsumers for trimmed applications.")]
     void AddConsumers(params Assembly[] assemblies);
 
+    [RequiresDynamicCode("Assembly scanning closes generic consumer registrations dynamically. Use AddGeneratedConsumers for NativeAOT.")]
+    [RequiresUnreferencedCode("Assembly scanning cannot guarantee that consumer metadata is preserved. Use AddGeneratedConsumers for trimmed applications.")]
     void AddConsumers(Func<Type, bool> typeFilter, params Assembly[] assemblies);
 
     void AddConsumer<TConsumer, TMessage>(Action<PipeConfigurator<ConsumeContext<TMessage>>>? configure = null)
@@ -54,7 +65,12 @@ public interface IRegistrationConfigurator
 
     void ConfigurePublish(Action<PipeConfigurator<PublishContext>> configure);
 
-    void SetSerializer<TSerializer>() where TSerializer : class, IMessageSerializer;
+    void SetSerializer<
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TSerializer>()
+        where TSerializer : class, IMessageSerializer;
+
+    void SetSerializer<TSerializer>(Func<IServiceProvider, TSerializer> serializerFactory)
+        where TSerializer : class, IMessageSerializer;
 
     void RequireTransportCapability(string capability, bool requireNative = false);
 

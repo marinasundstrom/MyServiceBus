@@ -11,17 +11,43 @@ import java.util.Set;
 public class ServiceScope implements Closeable {
     private final Injector injector;
     private final PerMessageScope scope;
+    private final ServiceProvider directProvider;
+    private final Runnable directClose;
     private Map<Key<?>, Object> instances;
     private boolean detached;
     private boolean closed;
 
-    public ServiceScope(Injector injector, PerMessageScope scope) {
+    ServiceScope(Injector injector, PerMessageScope scope) {
         this.injector = injector;
         this.scope = scope;
+        this.directProvider = null;
+        this.directClose = null;
         this.scope.enter();
     }
 
+    /**
+     * Creates a scope owned by a custom service-provider implementation.
+     *
+     * @param directProvider provider exposed for this scope
+     * @param directClose cleanup action invoked once when the scope closes
+     */
+    public ServiceScope(ServiceProvider directProvider, Runnable directClose) {
+        if (directProvider == null) {
+            throw new IllegalArgumentException("directProvider must not be null");
+        }
+        if (directClose == null) {
+            throw new IllegalArgumentException("directClose must not be null");
+        }
+        this.injector = null;
+        this.scope = null;
+        this.directProvider = directProvider;
+        this.directClose = directClose;
+    }
+
     public ServiceProvider getServiceProvider() {
+        if (directProvider != null) {
+            return directProvider;
+        }
         return new ServiceProviderImpl(injector, scope);
     }
 
@@ -31,6 +57,10 @@ public class ServiceScope implements Closeable {
      * own scoped services until their completion without leaking ThreadLocal state.
      */
     public void detach() {
+        if (directProvider != null) {
+            detached = true;
+            return;
+        }
         if (!detached) {
             instances = scope.exit();
             detached = true;
@@ -40,6 +70,11 @@ public class ServiceScope implements Closeable {
     @Override
     public void close() {
         if (!closed) {
+            if (directClose != null) {
+                directClose.run();
+                closed = true;
+                return;
+            }
             detach();
             Set<Object> disposed = Collections.newSetFromMap(new IdentityHashMap<>());
             for (Object instance : instances.values()) {

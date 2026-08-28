@@ -4,6 +4,7 @@ using MyServiceBus.Topology;
 using MyServiceBus.Serialization;
 using System;
 using System.Reflection;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Text.RegularExpressions;
 
@@ -14,7 +15,7 @@ public class BusRegistrationConfigurator : IBusRegistrationConfigurator
     private TopologyRegistry _topology = new TopologyRegistry();
     private readonly PipeConfigurator<SendContext> sendConfigurator = new();
     private readonly PipeConfigurator<PublishContext> publishConfigurator = new();
-    private Type serializerType = typeof(EnvelopeMessageSerializer);
+    private Func<IServiceProvider, IMessageSerializer> serializerFactory = static _ => new EnvelopeMessageSerializer();
     private readonly TransportCapabilityRequirements capabilityRequirements = new();
 
     public IServiceCollection Services { get; }
@@ -22,10 +23,13 @@ public class BusRegistrationConfigurator : IBusRegistrationConfigurator
     public BusRegistrationConfigurator(IServiceCollection services)
     {
         Services = services;
-        sendConfigurator.UseFilter<OpenTelemetrySendFilter>();
-        publishConfigurator.UseFilter<OpenTelemetrySendFilter>();
+        var telemetryFilter = new OpenTelemetrySendFilter();
+        sendConfigurator.UseFilter((IFilter<SendContext>)telemetryFilter);
+        publishConfigurator.UseFilter((IFilter<PublishContext>)telemetryFilter);
     }
 
+    [RequiresDynamicCode("Runtime consumer discovery closes generic registrations dynamically. Use AddGeneratedConsumers for NativeAOT.")]
+    [RequiresUnreferencedCode("Runtime consumer discovery cannot guarantee that consumer metadata is preserved. Use AddGeneratedConsumers for trimmed applications.")]
     public void AddConsumer<TConsumer>() where TConsumer : class, IConsumer
     {
         var messageTypes = GetHandledMessageTypes(typeof(TConsumer));
@@ -49,9 +53,13 @@ public class BusRegistrationConfigurator : IBusRegistrationConfigurator
       );
     }
 
+    [RequiresDynamicCode("Runtime consumer method discovery closes generic registrations dynamically. Use AddGeneratedConsumers for NativeAOT.")]
+    [RequiresUnreferencedCode("Runtime consumer method discovery requires method and parameter metadata. Use AddGeneratedConsumers for trimmed applications.")]
     public void AddConsumerMethods<TConsumer>(string? endpointName = null) where TConsumer : class
         => AddConsumerMethods(typeof(TConsumer), endpointName);
 
+    [RequiresDynamicCode("Runtime consumer method discovery closes generic registration descriptors dynamically. Use AddGeneratedConsumers for NativeAOT.")]
+    [RequiresUnreferencedCode("Runtime consumer method discovery requires method and parameter metadata. Use AddGeneratedConsumers for trimmed applications.")]
     public void AddConsumerMethods(Type declaringType, string? endpointName = null)
     {
         ArgumentNullException.ThrowIfNull(declaringType);
@@ -156,11 +164,15 @@ public class BusRegistrationConfigurator : IBusRegistrationConfigurator
             endpointNameFormatterType: typeof(TConsumer));
     }
 
+    [RequiresDynamicCode("Assembly scanning closes generic consumer registrations dynamically. Use AddGeneratedConsumers for NativeAOT.")]
+    [RequiresUnreferencedCode("Assembly scanning cannot guarantee that consumer metadata is preserved. Use AddGeneratedConsumers for trimmed applications.")]
     public void AddConsumers(params Assembly[] assemblies)
     {
         AddConsumers(static _ => true, assemblies);
     }
 
+    [RequiresDynamicCode("Assembly scanning closes generic consumer registrations dynamically. Use AddGeneratedConsumers for NativeAOT.")]
+    [RequiresUnreferencedCode("Assembly scanning cannot guarantee that consumer metadata is preserved. Use AddGeneratedConsumers for trimmed applications.")]
     public void AddConsumers(Func<Type, bool> typeFilter, params Assembly[] assemblies)
     {
         ArgumentNullException.ThrowIfNull(typeFilter);
@@ -211,9 +223,19 @@ public class BusRegistrationConfigurator : IBusRegistrationConfigurator
         Services.AddSingleton<IBusHook, THook>();
     }
 
-    public void SetSerializer<TSerializer>() where TSerializer : class, IMessageSerializer
+    public void SetSerializer<
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TSerializer>()
+        where TSerializer : class, IMessageSerializer
     {
-        serializerType = typeof(TSerializer);
+        Services.AddSingleton<TSerializer>();
+        serializerFactory = static provider => provider.GetRequiredService<TSerializer>();
+    }
+
+    public void SetSerializer<TSerializer>(Func<IServiceProvider, TSerializer> serializerFactory)
+        where TSerializer : class, IMessageSerializer
+    {
+        ArgumentNullException.ThrowIfNull(serializerFactory);
+        this.serializerFactory = provider => serializerFactory(provider);
     }
 
     public void RequireTransportCapability(string capability, bool requireNative = false)
@@ -242,7 +264,7 @@ public class BusRegistrationConfigurator : IBusRegistrationConfigurator
         Services.AddSingleton<IPostBuildAction>(_ => new ConsumerRegistrationAction(_topology));
         Services.AddSingleton<ISendPipe>((sp) => new SendPipe(sendConfigurator.Build(sp)));
         Services.AddSingleton<IPublishPipe>((sp) => new PublishPipe(publishConfigurator.Build(sp)));
-        Services.AddSingleton(typeof(IMessageSerializer), serializerType);
+        Services.AddSingleton(serializerFactory);
         Services.AddSingleton(capabilityRequirements);
         Services.AddSingleton<ISendContextFactory, SendContextFactory>();
         Services.AddSingleton<IPublishContextFactory, PublishContextFactory>();

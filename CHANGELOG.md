@@ -5,6 +5,8 @@
 - Defined consumer-method endpoint precedence consistently across C# and Java: fluent overrides method attributes, method attributes override class attributes, and explicit endpoints override conventions and formatters.
 - Grouped all consumer-method bindings for one endpoint into a single receive transport, preserving multi-method dispatch in generated, reflection, and mediator paths.
 - Added C# static-container fluent registration and retained method-name conventions for bare method attributes, including generated catalogs.
+- Added a preview-pinned .NET 11 NativeAOT smoke that suspends and resumes a Runtime Async consumer method through generated dispatch.
+- Added an opt-in .NET 11 Runtime Async target for the core abstractions and mediator runtime while preserving .NET 10 as the default build and package target.
 
 This changelog summarizes the bigger themes in the repository history. It is intentionally thematic rather than exhaustive, and is based on work landed between April 4, 2025 and March 24, 2026.
 
@@ -12,11 +14,27 @@ This changelog summarizes the bigger themes in the repository history. It is int
 
 Release candidate: `0.1.0-preview.4`.
 
-### Generated consumer registration
+### NativeAOT registration
 
-- Added a C# incremental source generator that emits typed consumer catalogs for compile-time discovery and registration.
-- Added matching explicit Java consumer/message registration and a framework-neutral JSR 269 processor that emits ordinary consumer catalogs and direct method invokers.
-- Kept reflection discovery and hand-written catalogs as supported alternatives to generated registration.
+- Added the first .NET NativeAOT registration path: an incremental source generator now emits typed consumer catalogs, and consumer registration, broker endpoint configuration, retry configuration, and inbound consume-context construction avoid runtime generic reflection when using generated or explicit typed registration.
+- Kept reflection-based consumer and assembly discovery as a supported convenience mode while annotating its dynamic-code and trimming requirements; generated catalogs provide the optimized NativeAOT alternative.
+- Added a matching explicit Java consumer/message registration overload so manual and future generated catalogs share the same capability boundary without requiring Java to adopt Roslyn-style tooling.
+- Added a framework-neutral Java JSR 269 processor that emits ordinary consumer catalogs and direct method invokers, plus a GraalVM Native Image mediator smoke test in Java CI.
+- Added factory-based generated adapter activation on .NET so generated consumer methods execute in a BenchmarkDotNet NativeAOT child process without reflective constructor discovery.
+- Added a dedicated .NET NativeAOT CI application that publishes and runs generated mediator dispatch, giving both clients an end-to-end native executable smoke test.
+- Added service-provider serializer factories in .NET and Java, plus a Java deserializer factory, so AOT applications can construct custom serialization extensions without reflection.
+- Added `ServiceCollection.createAot()` as a factory-only Java container and removed tracing-agent metadata from the GraalVM mediator smoke path; the conventional Guice-backed container remains available. No-argument service factories can bridge an existing Java container without exposing the MyServiceBus provider abstraction.
+- Added reproducible BenchmarkDotNet and JMH harnesses. Local proof-of-concept results show lower typed-registration cost in both clients, while NativeAOT and GraalVM native steady-state dispatch still trail their JIT counterparts and remain optimization work.
+- Clarified that reflection is an AOT reachability and trimming responsibility rather than an automatic blocker; generated catalogs reduce the preservation metadata and retained code required from the application.
+- Consolidated the website's AOT proof, benchmark results, methodology, and remaining-work boundary on one page, while moving general consumer-method and reflection-discovery guidance out of the AOT narrative.
+- Standardized every standalone website code sample on the read-only Monaco viewer with language-aware syntax support and accessible labels.
+
+### Java adoption
+
+- Clarified the two Java adoption paths: prefer the established MyServiceBus-first decorator style for new projects and the bus-factory boundary when integrating with an existing application's container.
+- Added concrete Spring, Jakarta CDI, Dagger, and application-owned factory examples that keep the existing container responsible for consumer construction, injection, and lifetime management without connecting it to the included Guice implementation.
+- Replaced the custom zero-argument Java service-factory contract with the JDK-standard `Supplier`, allowing `javax.inject.Provider`, `jakarta.inject.Provider`, Spring `ObjectProvider`, Dagger providers, and application factories to adapt through method references without selecting one DI namespace.
+- Clarified that Java's service collection and provider contracts are the stable programming model: applications may use the included implementation, materialize the same registrations through another framework's adapter, or choose the direct bus-factory boundary. Documented the adapter mapping for singleton, per-message scoped, transient, cleanup, provider-aware factory, and multi-binding semantics.
 
 ### Attributed consumer methods
 

@@ -14,7 +14,50 @@ This folder contains the Java modules for MyServiceBus. The Gradle multi-project
   gradle test
   ```
 
-## Generated consumer catalogs
+## New project: decorator style
+
+For a new Java project, prefer the MyServiceBus service collection and decorator structure:
+
+```java
+ServiceCollection services = ServiceCollection.create();
+
+services.from(MessageBusServices.class)
+        .addServiceBus(cfg -> {
+            cfg.addConsumer(SubmitOrderConsumer.class);
+            cfg.using(RabbitMqFactoryConfigurator.class,
+                    (context, rabbit) -> rabbit.configureEndpoints(context));
+        });
+
+ServiceProvider provider = services.buildServiceProvider();
+MessageBus bus = provider.getRequiredService(MessageBus.class);
+bus.start();
+```
+
+The decorator structure is the Java equivalent of the extension-method composition style used by the C# client.
+
+## Existing application: bus factory
+
+Use the bus factory when adding MyServiceBus to a Java application that already owns its construction or dependency-injection model. Application code does not need to build or resolve through a MyServiceBus service provider:
+
+```java
+MessageBus bus = MessageBus.factory.create(RabbitMqFactoryConfigurator.class, cfg -> {
+    cfg.host("localhost");
+    cfg.receiveEndpoint("submit-order", endpoint ->
+            endpoint.handler(SubmitOrder.class, context ->
+                    new SubmitOrderConsumer().consume(context)));
+});
+
+bus.start();
+```
+
+The handler may resolve a consumer from an existing Spring, CDI, Dagger, Guice, or application-owned container. That container is not installed into the default Guice provider:
+
+```java
+endpoint.handler(SubmitOrder.class, context ->
+        applicationContext.getBean(SubmitOrderConsumer.class).consume(context));
+```
+
+## Generated consumer catalogs and AOT
 
 Java applications can register consumers explicitly or use the optional, framework-neutral JSR 269 processor:
 
@@ -25,7 +68,15 @@ dependencies {
 }
 ```
 
-Annotate consumer methods with `@MessageConsumer`, then register the generated catalog with `GeneratedConsumerCatalog.INSTANCE::register`. This moves discovery to compilation and avoids reflective method invocation.
+Annotate consumer methods with `@MessageConsumer`, then register the generated catalog with `GeneratedConsumerCatalog.INSTANCE::register`. This avoids runtime method discovery and reflective invocation. The GraalVM Native Image path is an MVP proof of concept and remains work in progress; run its end-to-end smoke test from the repository root with:
+
+```bash
+./eng/verify-java-aot.sh
+```
+
+The MyServiceBus `ServiceCollection` and decorator structure form a container-neutral programming model. `ServiceCollection.create()` materializes it with the included Guice-backed implementation, while a framework adapter can materialize the same registrations with another container. `ServiceCollection.createAot()` selects a factory-only implementation with no reflective constructor activation. An existing application may instead use an explicit bus factory that closes over Spring, CDI, Dagger, Guice, or an application-owned resolver without adopting the MyServiceBus provider model. See [Java dependency-injection boundary](../../docs/development/java-dependency-injection.md).
+
+Zero-argument service registrations accept the JDK-standard `Supplier<? extends T>`. Providers from `javax.inject`, `jakarta.inject`, Spring, Dagger, or another framework adapt through method references such as `provider::get` or `provider::getObject`; MyServiceBus does not select one DI namespace for its core API.
 
 ## Run locally
 ### 1) Start RabbitMQ

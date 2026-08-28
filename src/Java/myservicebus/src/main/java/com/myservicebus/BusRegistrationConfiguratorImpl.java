@@ -7,6 +7,7 @@ import java.lang.reflect.Type;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.function.Consumer;
+import java.util.function.Function;
 
 import com.myservicebus.di.ServiceCollection;
 import com.myservicebus.BusFactoryConfigurator;
@@ -23,8 +24,10 @@ public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigura
     private TopologyRegistry topology = new TopologyRegistry();
     private PipeConfigurator<SendContext> sendConfigurator = new PipeConfigurator<>();
     private PipeConfigurator<PublishContext> publishConfigurator = new PipeConfigurator<>();
-    private Class<? extends com.myservicebus.serialization.MessageSerializer> serializerClass = com.myservicebus.serialization.EnvelopeMessageSerializer.class;
-    private Class<? extends com.myservicebus.serialization.MessageDeserializer> deserializerClass = com.myservicebus.serialization.EnvelopeMessageDeserializer.class;
+    private Function<com.myservicebus.di.ServiceProvider, ? extends com.myservicebus.serialization.MessageSerializer> serializerFactory =
+            ignored -> new com.myservicebus.serialization.EnvelopeMessageSerializer();
+    private Function<com.myservicebus.di.ServiceProvider, ? extends com.myservicebus.serialization.MessageDeserializer> deserializerFactory =
+            ignored -> new com.myservicebus.serialization.EnvelopeMessageDeserializer();
     private final Set<Class<?>> consumerTypes = new HashSet<>();
     private final Logger logger = new ConsoleLoggerFactory(new ConsoleLoggerConfig())
             .create(BusRegistrationConfiguratorImpl.class);
@@ -204,11 +207,36 @@ public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigura
 
     @Override
     public void setSerializer(Class<? extends com.myservicebus.serialization.MessageSerializer> serializerClass) {
-        this.serializerClass = serializerClass;
+        if (serializerClass == null) {
+            throw new IllegalArgumentException("serializerClass must not be null");
+        }
+        serializerFactory = ignored -> instantiate(serializerClass, "serializer");
     }
 
+    @Override
+    public void setSerializer(
+            Function<com.myservicebus.di.ServiceProvider, ? extends com.myservicebus.serialization.MessageSerializer> serializerFactory) {
+        if (serializerFactory == null) {
+            throw new IllegalArgumentException("serializerFactory must not be null");
+        }
+        this.serializerFactory = serializerFactory;
+    }
+
+    @Override
     public void setDeserializer(Class<? extends com.myservicebus.serialization.MessageDeserializer> deserializerClass) {
-        this.deserializerClass = deserializerClass;
+        if (deserializerClass == null) {
+            throw new IllegalArgumentException("deserializerClass must not be null");
+        }
+        deserializerFactory = ignored -> instantiate(deserializerClass, "deserializer");
+    }
+
+    @Override
+    public void setDeserializer(
+            Function<com.myservicebus.di.ServiceProvider, ? extends com.myservicebus.serialization.MessageDeserializer> deserializerFactory) {
+        if (deserializerFactory == null) {
+            throw new IllegalArgumentException("deserializerFactory must not be null");
+        }
+        this.deserializerFactory = deserializerFactory;
     }
 
     @Override
@@ -293,20 +321,10 @@ public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigura
         }
         serviceCollection.addSingleton(SendPipe.class, sp -> () -> new SendPipe(sendConfigurator.build(sp)));
         serviceCollection.addSingleton(PublishPipe.class, sp -> () -> new PublishPipe(publishConfigurator.build(sp)));
-        serviceCollection.addSingleton(com.myservicebus.serialization.MessageSerializer.class, sp -> () -> {
-            try {
-                return serializerClass.getDeclaredConstructor().newInstance();
-            } catch (Exception ex) {
-                throw new RuntimeException(ex);
-            }
-        });
-        serviceCollection.addSingleton(com.myservicebus.serialization.MessageDeserializer.class, sp -> () -> {
-            try {
-                return deserializerClass.getDeclaredConstructor().newInstance();
-            } catch (Exception ex) {
-                throw new RuntimeException(ex);
-            }
-        });
+        serviceCollection.addSingleton(com.myservicebus.serialization.MessageSerializer.class,
+                sp -> () -> serializerFactory.apply(sp));
+        serviceCollection.addSingleton(com.myservicebus.serialization.MessageDeserializer.class,
+                sp -> () -> deserializerFactory.apply(sp));
         serviceCollection.addSingleton(com.myservicebus.serialization.MessageHeaderConvention.class,
                 sp -> () -> com.myservicebus.serialization.MassTransitHeaderConvention.INSTANCE);
         serviceCollection.addSingleton(com.myservicebus.serialization.InboundMessageResolver.class, sp -> () ->
@@ -326,5 +344,15 @@ public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigura
 
     Class<?> getFactoryConfiguratorClass() {
         return factoryConfiguratorClass;
+    }
+
+    private static <T> T instantiate(Class<? extends T> implementationClass, String role) {
+        try {
+            return implementationClass.getDeclaredConstructor().newInstance();
+        } catch (ReflectiveOperationException exception) {
+            throw new IllegalStateException(
+                    "Could not create " + role + " " + implementationClass.getName(),
+                    exception);
+        }
     }
 }

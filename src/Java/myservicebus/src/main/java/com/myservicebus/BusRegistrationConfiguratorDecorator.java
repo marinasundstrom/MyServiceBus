@@ -1,6 +1,7 @@
 package com.myservicebus;
 
 import com.myservicebus.di.ServiceCollection;
+import com.myservicebus.di.ServiceProvider;
 import com.myservicebus.serialization.MessageDeserializer;
 import com.myservicebus.serialization.MessageSerializer;
 import java.util.function.Consumer;
@@ -76,8 +77,20 @@ public abstract class BusRegistrationConfiguratorDecorator implements BusRegistr
     }
 
     @Override
+    public void setSerializer(
+            java.util.function.Function<ServiceProvider, ? extends MessageSerializer> serializerFactory) {
+        inner.setSerializer(serializerFactory);
+    }
+
+    @Override
     public void setDeserializer(Class<? extends MessageDeserializer> deserializerClass) {
         inner.setDeserializer(deserializerClass);
+    }
+
+    @Override
+    public void setDeserializer(
+            java.util.function.Function<ServiceProvider, ? extends MessageDeserializer> deserializerFactory) {
+        inner.setDeserializer(deserializerFactory);
     }
 
     @Override
