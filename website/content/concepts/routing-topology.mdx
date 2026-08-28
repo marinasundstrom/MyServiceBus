@@ -1,0 +1,42 @@
+<p className="docs-kicker">Concepts · Routing and topology</p>
+
+# Bind message identities to receive endpoints.
+
+<p className="docs-summary">The application works with messages and logical endpoints. A transport profile turns those concepts into native entities and externally meaningful addresses.</p>
+
+## Two common paths
+
+<div className="flow-line" aria-label="Send routing path"><span>Send command</span><b>→</b><span>named endpoint address</span><b>→</b><span>one queue</span></div>
+
+<div className="flow-line" aria-label="Publish routing path"><span>Publish event</span><b>→</b><span>message publish entity</span><b>→</b><span>bindings</span><b>→</b><span>zero or more endpoint queues</span></div>
+
+Send names the destination. Publish names the message contract and lets topology select destinations.
+
+## Portable concept, native projection
+
+| MyServiceBus concept | RabbitMQ profile | Azure Service Bus profile |
+| --- | --- | --- |
+| Published message contract | Exchange | Topic |
+| Receive endpoint | Queue | Queue |
+| Subscription to a contract | Exchange-to-queue binding | Topic subscription forwarding to the queue |
+| Successful delivery | Acknowledgement | Complete the peek-locked message |
+| Temporary response endpoint | Auto-delete queue | Temporary/native response queue according to topology mode |
+
+Azure Service Bus remains an experimental profile. Use each transport guide for its verified capability and provisioning boundary.
+
+## Topology is inspectable application state
+
+The configured topology records endpoints, consumers, message bindings, queue names, and formatter decisions before the bus starts. Generated, reflection-discovered, and manually registered consumers all contribute to the same model.
+
+This is important operationally: monitoring and provisioning should project from the topology model rather than infer relationships from log traffic after startup.
+
+## Unrecognized deliveries are preserved
+
+If a delivery reaches a receive endpoint but no registered consumer recognizes its message identity, the transport profile preserves it at the endpoint&apos;s `<endpoint>_skipped` destination. A skipped message indicates a topology or contract mismatch, not a consumer exception.
+
+<aside className="callout">
+  <strong>Transport-neutral does not mean transport-blind</strong>
+  <p>Ordering, durability, quotas, settlement, security, and throughput remain properties of the selected transport. MyServiceBus exposes one application model without pretending those properties are identical.</p>
+</aside>
+
+<NextCard href="/docs/concepts/consumers" title="Consumers and dispatch" />

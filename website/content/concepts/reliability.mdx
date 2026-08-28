@@ -1,0 +1,37 @@
+<p className="docs-kicker">Concepts · Reliability</p>
+
+# Settle only after the consume pipeline completes.
+
+<p className="docs-summary">Reliable messaging is shared work between the application, MyServiceBus, and the transport. Settlement records successful delivery; retries and failure destinations make unsuccessful processing visible.</p>
+
+## Successful completion settles the delivery
+
+The receive transport feeds an envelope into the consume pipeline. When every matched consumer completes successfully, RabbitMQ acknowledges the delivery and Azure Service Bus completes its peek lock. The exact mechanism belongs to the transport profile.
+
+## Retry and redelivery are not the same
+
+Retry re-invokes consumer processing in the current receive operation, immediately or after an in-process delay. Redelivery releases or schedules the message so the transport delivers it again later. The current RabbitMQ and in-memory profiles support retry but do not advertise transport redelivery as a supported capability.
+
+Every retry can execute application code again. Consumers must be idempotent around durable side effects.
+
+## Terminal outcomes have separate destinations
+
+| Destination | Contains | Meaning |
+| --- | --- | --- |
+| `<endpoint>_error` | The original envelope | Processing failed after configured retries, or failed before consumer execution |
+| `<endpoint>_fault` | A `Fault<T>` message | Structured information about the consumer exception |
+| `<endpoint>_skipped` | The original envelope | The endpoint received a message with no recognized consumer |
+
+Request clients observe a correlated `Fault<TRequest>` as a request fault. Other fault consumers can subscribe for operational or compensating behavior. A fault is evidence of failure; it is not permission to republish the original message blindly.
+
+## Design for duplicates and partial completion
+
+- Use stable business identifiers and make state transitions idempotent.
+- Record enough state to distinguish an already-applied operation from new work.
+- Assume a process can fail after a side effect but before broker settlement.
+- Keep external calls retry-safe or protect them with application-level deduplication.
+- Split endpoints when reactions need independent failure and retry boundaries.
+
+MyServiceBus does not yet provide an outbox or saga implementation. Those features can improve coordination later, but they do not remove the need to define idempotency and recovery behavior now.
+
+<NextCard href="/docs/distributed-systems" label="Continue" title="Distributed systems fundamentals" />

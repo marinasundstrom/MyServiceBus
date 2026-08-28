@@ -1,0 +1,41 @@
+<p className="docs-kicker">Concepts · Message intent</p>
+
+# Choose the interaction before the topology.
+
+<p className="docs-summary">Send, publish, and request express different ownership and coupling. Choose the intent first; MyServiceBus and the transport project it into destinations and routes.</p>
+
+| Intent | Producer knows | Delivery model | Typical use |
+| --- | --- | --- | --- |
+| Send | The endpoint that owns the work | One delivery to one logical receive endpoint | Commands and directed work |
+| Publish | Only the fact being announced | One independent delivery per subscribed endpoint | Domain and integration events |
+| Request | The endpoint and expected response types | A directed request plus a correlated response or fault | Queries and operations requiring an immediate outcome |
+
+## Send to an owner
+
+Send when the producer knows which capability owns the operation. The destination is a logical endpoint such as `queue:submit-order`.
+
+One send creates one delivery to that endpoint. That does **not** mean only one method can run: if the endpoint contains several matching consumer registrations for the delivered message type, MyServiceBus invokes all of them as part of that delivery.
+
+```csharp
+var endpoint = await provider.GetSendEndpoint(new Uri("queue:submit-order"));
+await endpoint.Send(new SubmitOrder(orderId));
+```
+
+```java
+SendEndpoint endpoint = provider.getSendEndpoint("queue:submit-order");
+endpoint.send(new SubmitOrder(orderId)).join();
+```
+
+## Publish a fact
+
+Publish when the producer should not know who reacts. MyServiceBus publishes by message identity. Each bound receive endpoint obtains its own delivery, so Billing and Analytics can process `OrderSubmitted` independently and fail independently.
+
+Adding a subscriber should not require changing the publisher. If the producer must name every recipient, the interaction is directed work rather than publication.
+
+## Request only when waiting is part of the contract
+
+Request-response adds a response address, request identifier, temporary receive infrastructure, a deadline, and an uncertain outcome when that deadline expires. Use it when the caller genuinely cannot continue without one of the declared replies.
+
+For long-running workflows, prefer commands and events that expose progress as durable state. A request timeout cannot prove that the remote operation did not complete.
+
+<NextCard href="/docs/concepts/receive-endpoints" title="Receive endpoints" />

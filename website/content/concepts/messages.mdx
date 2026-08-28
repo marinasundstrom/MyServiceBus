@@ -1,0 +1,48 @@
+<p className="docs-kicker">Concepts · Messages</p>
+
+# Messages are contracts, not transport packets.
+
+<p className="docs-summary">A message gives a distributed interaction a stable business name and schema. The transport moves its envelope; producers and consumers depend on the contract.</p>
+
+## Name the business meaning
+
+Commands describe requested work: `SubmitOrder`, `ReserveInventory`, or `ChargePayment`. Events describe facts that have already happened: `OrderSubmitted`, `InventoryReserved`, or `PaymentFailed`.
+
+Avoid vague names such as `OrderMessage`. A precise name tells a reader whether a producer is asking one capability to act or announcing a fact to any interested capability.
+
+```csharp
+public sealed record SubmitOrder(Guid OrderId);
+public sealed record OrderSubmitted(Guid OrderId, DateTimeOffset AcceptedAt);
+```
+
+```java
+public record SubmitOrder(UUID orderId) { }
+public record OrderSubmitted(UUID orderId, OffsetDateTime acceptedAt) { }
+```
+
+## Identity is part of the wire contract
+
+The envelope carries message-type identities independently of the serialized body. MyServiceBus uses those identities to select topology bindings and matching consumers. C# and Java types do not need to share an interface, but their configured wire identity and serialized shape must agree when they represent the same contract.
+
+Publishing is polymorphic. A concrete message is eligible for its concrete contract, implemented message interfaces, and non-root base contracts. One registered consumer is invoked at most once for a delivery even when several of those identities match it.
+
+## The envelope carries delivery metadata
+
+The portable envelope includes message and conversation identifiers, source and destination addresses, request and response addresses, headers, message-type URNs, and host metadata. The message body remains the business payload.
+
+Consumers access this metadata through `ConsumeContext<TMessage>`. A consumer method that only needs the message can omit the context; add it when the method needs headers, identifiers, addresses, cancellation, or follow-up send and publish operations.
+
+## Evolve contracts deliberately
+
+- Prefer additive fields that older consumers can ignore.
+- Do not silently change the meaning of an existing field.
+- Treat removing or changing a required field as a coordinated contract change.
+- Keep storage entities and framework-specific service types out of message schemas.
+- Verify the same fixture in C# and Java when a contract crosses runtime boundaries.
+
+<aside className="callout">
+  <strong>Compatibility is a wire property</strong>
+  <p>Consumer interfaces, attributes, and annotations stay local to each application. Interoperability depends on message identity, envelope metadata, serialization, topology, and transport behavior.</p>
+</aside>
+
+<NextCard href="/docs/concepts/message-intent" title="Send, publish, request" />

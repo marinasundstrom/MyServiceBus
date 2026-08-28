@@ -1,0 +1,57 @@
+<p className="docs-kicker">Concepts · Receive endpoints</p>
+
+# A receive endpoint owns a queue and its processing boundary.
+
+<p className="docs-summary">Consumers do not each require a queue. One receive endpoint can accept several message types and dispatch each delivery to the matching handlers on that endpoint.</p>
+
+## Endpoint, binding, and consumer are different things
+
+- The **receive endpoint** owns the queue, receive transport, pipeline, and settlement boundary.
+- A **message binding** makes a message type eligible to arrive at that endpoint.
+- A **consumer registration** defines code that can handle a matching delivery.
+
+<div className="flow-line" aria-label="Receive endpoint model">
+  <span>SubmitOrder binding</span><b>+</b><span>CancelOrder binding</span><b>→</b><span>orders queue + receive pipeline</span><b>→</b><span>matching handlers</span><b>→</b><span>one settlement</span>
+</div>
+
+This is why grouped consumer methods can share an endpoint:
+
+```csharp
+[Consumer("orders")]
+public static class OrderConsumers
+{
+    public static Task Submit(SubmitOrder message) => /* ... */;
+    public static Task Cancel(CancelOrder message) => /* ... */;
+}
+```
+
+```java
+@MessageConsumer("orders")
+public final class OrderConsumers {
+    public static CompletionStage<Void> submit(SubmitOrder message) { /* ... */ }
+    public static CompletionStage<Void> cancel(CancelOrder message) { /* ... */ }
+}
+```
+
+The `orders` queue receives both contracts. The message identities in each envelope determine which method is eligible.
+
+## Why share an endpoint?
+
+Sharing is useful when several message types belong to one operational boundary:
+
+- They are owned, deployed, and scaled by the same capability.
+- They need the same retry, middleware, telemetry, and failure policy.
+- Backpressure should apply to the group as a whole.
+- Their relative arrival order matters to one aggregate or workflow.
+
+The same property is likely to be useful for future saga support: one saga endpoint can bind every command and event that advances the saga. Sagas are not implemented yet, but the endpoint model does not require one queue per message type.
+
+## One queue is not a total processing-order guarantee
+
+A broker may preserve an arrival order within a documented scope. Prefetch, concurrent consumers, async handlers, retries, and redelivery can still change start or completion order. If correctness depends on ordering, define the required scope—usually an aggregate or saga identifier—and select a transport partition/session strategy plus compatible endpoint concurrency.
+
+## When to split endpoints
+
+Use separate endpoints when message types need independent scaling, failure isolation, deployment ownership, latency targets, or broker policies. A slow message type on a shared queue can create head-of-line pressure for every other type on that queue.
+
+<NextCard href="/docs/concepts/routing-topology" title="Routing and topology" />

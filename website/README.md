@@ -17,6 +17,23 @@ Create a production build with:
 npm run build
 ```
 
+## Content authoring
+
+Documentation prose belongs in `content/` as MDX, a Markdown-compatible format
+that also permits the small amount of structured HTML needed by the site. Route
+files under `app/docs/` should only select content and apply presentation
+components.
+
+Use ordinary fenced code blocks in MDX. The global MDX component mapping renders
+them with the read-only Monaco viewer, so content authors do not need to import or
+configure an editor component. Internal Markdown links are routed through Next.js
+and reusable presentation such as concept cards and next-page links is supplied by
+`mdx-components.tsx`.
+
+The concepts section under `content/concepts/` is the first section using this
+content/presentation split. Existing TSX-authored guides can move to the same model
+as they are revised rather than through a mechanical rewrite.
+
 ## Independent publishing
 
 The `Deploy documentation website` GitHub Actions workflow installs, builds,
@@ -46,7 +63,8 @@ into this project automatically.
 The public site currently covers:
 
 - introduction and getting started
-- core messaging concepts
+- detailed messaging concepts covering contracts, intent, receive endpoints,
+  topology, dispatch, requests, and reliability
 - RabbitMQ transport behavior
 - .NET NativeAOT registration modes and current support boundary
 - attributed C# consumer methods, parameter binding, and class-level discovery

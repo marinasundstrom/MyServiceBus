@@ -11,14 +11,19 @@
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next"
   },
   "dependencies": {
+    "@mdx-js/loader": "^3.1.1",
+    "@mdx-js/react": "^3.1.1",
     "@monaco-editor/react": "^4.7.0",
+    "@next/mdx": "^16.3.3",
     "monaco-editor": "^0.53.0",
     "next": "^16.3.3",
     "react": "19.2.6",
-    "react-dom": "19.2.6"
+    "react-dom": "19.2.6",
+    "remark-gfm": "^4.0.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "4.2.1",
+    "@types/mdx": "^2.0.14",
     "@types/node": "22.19.19",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",

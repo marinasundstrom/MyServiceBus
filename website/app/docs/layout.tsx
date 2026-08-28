@@ -12,9 +12,21 @@ const sections = [
     ],
   },
   {
-    label: 'Learn',
+    label: 'Concepts',
     links: [
-      ['Core concepts', '/docs/concepts'],
+      ['Overview', '/docs/concepts'],
+      ['Messages and contracts', '/docs/concepts/messages'],
+      ['Send, publish, request', '/docs/concepts/message-intent'],
+      ['Receive endpoints', '/docs/concepts/receive-endpoints'],
+      ['Routing and topology', '/docs/concepts/routing-topology'],
+      ['Consumers and dispatch', '/docs/concepts/consumers'],
+      ['Requests and responses', '/docs/concepts/requests'],
+      ['Reliability and faults', '/docs/concepts/reliability'],
+    ],
+  },
+  {
+    label: 'Guides',
+    links: [
       ['Distributed systems fundamentals', '/docs/distributed-systems'],
       ['RabbitMQ transport', '/docs/rabbitmq'],
       ['Azure Service Bus', '/docs/azure-service-bus'],

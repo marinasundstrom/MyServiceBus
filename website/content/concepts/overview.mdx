@@ -1,0 +1,34 @@
+<p className="docs-kicker">Concepts</p>
+
+# Understand the model one boundary at a time.
+
+<p className="docs-summary">Start with the portable messaging model, then follow it down to receive endpoints, routing, dispatch, and settlement. Each page explains one concept deeply enough to operate it without turning this guide into a broker manual.</p>
+
+<aside className="callout callout-accent">
+  <strong>Portable behavior, visible transport mechanics</strong>
+  <p>MyServiceBus aligns C# and Java and follows MassTransit-familiar semantics. The selected transport still owns durability, ordering scope, topology, settlement, quotas, and throughput characteristics.</p>
+</aside>
+
+<div className="concept-directory">
+  <ConceptCard href="/docs/concepts/messages" label="01 · Contract" title="Messages and contracts">Message identity, envelopes, headers, polymorphism, and cross-language schema design.</ConceptCard>
+  <ConceptCard href="/docs/concepts/message-intent" label="02 · Intent" title="Send, publish, request">Choose an interaction from ownership and coupling—not from the broker topology.</ConceptCard>
+  <ConceptCard href="/docs/concepts/receive-endpoints" label="03 · Boundary" title="Receive endpoints">How one queue, one receive pipeline, and several message bindings form an operational boundary.</ConceptCard>
+  <ConceptCard href="/docs/concepts/routing-topology" label="04 · Route" title="Routing and topology">How logical messages and endpoints project to exchanges, topics, queues, and bindings.</ConceptCard>
+  <ConceptCard href="/docs/concepts/consumers" label="05 · Execute" title="Consumers and dispatch">Handler matching, scopes, grouped consumer methods, concurrency, and completion semantics.</ConceptCard>
+  <ConceptCard href="/docs/concepts/requests" label="06 · Correlate" title="Requests and responses">Response addresses, request identifiers, typed replies, faults, cancellation, and timeouts.</ConceptCard>
+  <ConceptCard href="/docs/concepts/reliability" label="07 · Recover" title="Reliability and faults">Settlement, retry, redelivery, idempotency, and the error, fault, and skipped destinations.</ConceptCard>
+</div>
+
+## How the pieces connect
+
+<div className="flow-line" aria-label="Message delivery model">
+  <span>Message contract</span><b>→</b><span>Send or publish</span><b>→</b><span>Topology binding</span><b>→</b><span>Receive endpoint</span><b>→</b><span>Matching consumer</span><b>→</b><span>Settle or fault</span>
+</div>
+
+The most important distinction is between an endpoint and a consumer. A receive endpoint owns the queue and receive pipeline. Message bindings decide what can arrive there. Consumer registrations decide which handlers run for each delivery.
+
+## Where compatibility stops being the explanation
+
+Familiarity with MassTransit transfers well, but MyServiceBus documents its own verified behavior and platform parity. Use the interoperability guides when the other framework is actually present on the wire; use these concept pages to understand MyServiceBus itself.
+
+<NextCard href="/docs/concepts/messages" label="Start with" title="Messages and contracts" />

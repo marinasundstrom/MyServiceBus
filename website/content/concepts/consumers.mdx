@@ -1,0 +1,39 @@
+<p className="docs-kicker">Concepts · Consumers</p>
+
+# Dispatch a delivery to every matching registration.
+
+<p className="docs-summary">A consumer is application code registered for a message contract on a receive endpoint. Interfaces and attributed methods are declaration styles over the same pipeline.</p>
+
+## Declaration does not change runtime semantics
+
+A C# `IConsumer<T>` class, Java `Consumer<T>` class, attributed method, generated adapter, reflection descriptor, or hand-written invoker ultimately contributes a typed consumer registration. Once registered, it uses the endpoint&apos;s receive, retry, fault, telemetry, and dependency scope.
+
+Generated catalogs change discovery and invocation cost; they do not define a different messaging mode.
+
+## Matching is per endpoint delivery
+
+For one delivery, MyServiceBus finds every compatible registration on that endpoint and invokes all of them. If two methods on the same endpoint consume the same message type, both run.
+
+Independent consumers have no registration, start, or completion-order guarantee. MyServiceBus waits for every matched invocation before the endpoint settles the delivery. One failure makes the overall dispatch fail but does not prevent the other matching consumers from being invoked.
+
+## Context and scope
+
+Each delivery creates the configured consumer dependency scope. The consume context supplies:
+
+- The typed message.
+- Headers and message, request, correlation, conversation, and initiator identifiers.
+- Source, destination, response, fault, and error addresses when present.
+- Cancellation and scoped send, publish, and response operations.
+
+Consumer methods bind the context only when needed. Other ordinary parameters resolve as application services from the same message scope.
+
+## Filters wrap execution
+
+The endpoint and consumer pipelines are ordered pipe-and-filter chains. Filters can observe or transform context, short-circuit execution, propagate cancellation, and handle failures. Retry is a filter behavior: it re-enters the configured consume segment and invokes consumer code again.
+
+<aside className="callout">
+  <strong>One delivery, potentially several side effects</strong>
+  <p>Registering several handlers for the same message on one endpoint couples their settlement. Use separate endpoints when those reactions must retry, scale, or fail independently.</p>
+</aside>
+
+<NextCard href="/docs/concepts/requests" title="Requests and responses" />

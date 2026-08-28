@@ -2,6 +2,7 @@
 
 ## 2026-08-28
 
+- Reworked the website concepts area into concise technical pages for contracts, intent, receive endpoints, topology, dispatch, requests, and reliability, with prose stored separately as MDX and fenced samples rendered through Monaco.
 - Defined consumer-method endpoint precedence consistently across C# and Java: fluent overrides method attributes, method attributes override class attributes, and explicit endpoints override conventions and formatters.
 - Grouped all consumer-method bindings for one endpoint into a single receive transport, preserving multi-method dispatch in generated, reflection, and mediator paths.
 - Added C# static-container fluent registration and retained method-name conventions for bare method attributes, including generated catalogs.
