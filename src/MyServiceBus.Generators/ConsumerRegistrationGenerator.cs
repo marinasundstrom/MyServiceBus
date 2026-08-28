@@ -75,7 +75,7 @@ public sealed class ConsumerRegistrationGenerator : IIncrementalGenerator
         else if (!IsAccessibleFromGeneratedCode(method) || !IsAccessibleFromGeneratedCode(method.ContainingType))
             reason = "the method and its declaring type must be accessible from generated code";
         else if (!TryGetReturnKind(method.ReturnType, out _))
-            reason = "the return type must be void, Task, or ValueTask";
+            reason = "the return type must be void, Task, ValueTask, Task<TResponse>, or ValueTask<TResponse>, with a reference-type response";
         else if (method.Parameters.Any(static parameter => parameter.RefKind != RefKind.None))
             reason = "parameters cannot be passed by reference";
         else
@@ -274,6 +274,22 @@ public sealed class ConsumerRegistrationGenerator : IIncrementalGenerator
                 returnKind = ReturnKind.ValueTask;
                 return true;
             default:
+                if (returnType is INamedTypeSymbol { IsGenericType: true, TypeArguments.Length: 1 } named
+                    && named.TypeArguments[0].IsReferenceType)
+                {
+                    var originalType = named.OriginalDefinition.ToDisplayString();
+                    if (originalType == "System.Threading.Tasks.Task<TResult>")
+                    {
+                        returnKind = ReturnKind.TaskResponse;
+                        return true;
+                    }
+                    if (originalType == "System.Threading.Tasks.ValueTask<TResult>")
+                    {
+                        returnKind = ReturnKind.ValueTaskResponse;
+                        return true;
+                    }
+                }
+
                 returnKind = default;
                 return false;
         }
@@ -450,11 +466,18 @@ public sealed class ConsumerRegistrationGenerator : IIncrementalGenerator
             source.AppendLine();
         }
 
-        source.Append("    public global::System.Threading.Tasks.Task Consume(global::MyServiceBus.ConsumeContext<")
+        var returnsResponse = method.ReturnKind is ReturnKind.TaskResponse or ReturnKind.ValueTaskResponse;
+        source.Append("    public ");
+        if (returnsResponse)
+            source.Append("async ");
+        source.Append("global::System.Threading.Tasks.Task Consume(global::MyServiceBus.ConsumeContext<")
             .Append(method.MessageType)
             .AppendLine("> context)");
         source.AppendLine("    {");
-        source.Append(method.ReturnKind == ReturnKind.Void ? "        " : "        return ");
+        if (returnsResponse)
+            source.Append("        var response = await ");
+        else
+            source.Append(method.ReturnKind == ReturnKind.Void ? "        " : "        return ");
         source.Append(method.IsStatic ? method.DeclaringType : "_target")
             .Append('.')
             .Append(method.MethodName)
@@ -471,9 +494,13 @@ public sealed class ConsumerRegistrationGenerator : IIncrementalGenerator
         source.Append(')');
         if (method.ReturnKind == ReturnKind.ValueTask)
             source.Append(".AsTask()");
+        else if (returnsResponse)
+            source.Append(".ConfigureAwait(false)");
         source.AppendLine(";");
         if (method.ReturnKind == ReturnKind.Void)
             source.AppendLine("        return global::System.Threading.Tasks.Task.CompletedTask;");
+        else if (returnsResponse)
+            source.AppendLine("        await context.RespondAsync(response, null, context.CancellationToken).ConfigureAwait(false);");
         source.AppendLine("    }");
         source.AppendLine("}");
     }
@@ -555,5 +582,5 @@ public sealed class ConsumerRegistrationGenerator : IIncrementalGenerator
     }
 
     private enum ParameterBinding { None, Message, ConsumeContext, CancellationToken, Service }
-    private enum ReturnKind { Void, Task, ValueTask }
+    private enum ReturnKind { Void, Task, ValueTask, TaskResponse, ValueTaskResponse }
 }

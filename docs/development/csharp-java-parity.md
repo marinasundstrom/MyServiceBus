@@ -33,6 +33,7 @@ Runtime capability and language tooling are tracked separately. A feature implem
 | Attribute endpoint override for `IConsumer<T>` | Reflection path implemented | Implemented | Implemented | Implemented |
 | Message and context parameter binding | Implemented | Implemented | Implemented | Implemented |
 | Method parameter service injection | Implemented | Implemented typed binding | Implemented | Implemented typed binding |
+| Async consumer-method response | `Task<T>` and `ValueTask<T>` | Implemented | `CompletableFuture<T>` and `CompletionStage<T>` | Implemented |
 | Generated direct method invocation | Typed adapter path implemented | Implemented | Typed invoker path implemented | Implemented with JSR 269 |
 | Named endpoint on a method declaration | Attribute and fluent mapping implemented | Implemented | Annotation and explicit mapping implemented | Implemented |
 | Reflection-free consumer-method discovery and invocation | Typed path implemented | Implemented | Typed path implemented | Implemented |

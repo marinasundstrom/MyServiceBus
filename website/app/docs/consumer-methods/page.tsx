@@ -62,6 +62,25 @@ const javaMethodExample = `public final class OrderConsumers {
     }
 }`;
 
+const responseMethodExample = `public static class OrderConsumers
+{
+    [Consumer("submit-order")]
+    public static Task<SubmitOrderResponse> SubmitOrder(
+        SubmitOrder order,
+        IOrderService orders,
+        CancellationToken cancellationToken)
+        => orders.Submit(order, cancellationToken);
+}`;
+
+const javaResponseMethodExample = `public final class OrderConsumers {
+    @MessageConsumer("submit-order")
+    public static CompletionStage<SubmitOrderResponse> submitOrder(
+            SubmitOrder order,
+            OrderService orders) {
+        return orders.submit(order);
+    }
+}`;
+
 const javaGeneratedExample = `dependencies {
     annotationProcessor "io.github.marinasundstrom.myservicebus:myservicebus-processor:0.1.0-preview.4"
 }
@@ -88,6 +107,28 @@ export default function ConsumerMethods() {
         the C# declaration without requiring a shared attribute or interface.
       </p>
       <CodeViewer code={javaMethodExample} label="Java consumer method" language="java" />
+
+      <h2>Return a response</h2>
+      <p>
+        A request handler can return its response contract directly. MyServiceBus awaits
+        the operation and sends the value through the active consume context, preserving
+        the normal request correlation metadata. C# supports <code>Task&lt;T&gt;</code> and
+        <code>ValueTask&lt;T&gt;</code>; Java supports <code>CompletableFuture&lt;T&gt;</code> and
+        <code>CompletionStage&lt;T&gt;</code>.
+      </p>
+      <CodeViewer code={responseMethodExample} label="C# request-response consumer method" language="csharp" />
+      <CodeViewer code={javaResponseMethodExample} label="Java request-response consumer method" language="java" />
+      <p>
+        Returning a response does not make the context parameter mandatory. Add
+        <code> ConsumeContext&lt;TMessage&gt;</code> when the method needs headers, correlation
+        identifiers, addresses, or other receive metadata; otherwise the message and
+        application services are enough.
+      </p>
+      <p>
+        A response-bearing method requires an incoming request with a response address.
+        If the method fails—or no response address is present—consumption fails through
+        the normal retry and fault pipeline. Synchronous response values are not supported.
+      </p>
 
       <h2>Choose by size and grouping</h2>
       <p>

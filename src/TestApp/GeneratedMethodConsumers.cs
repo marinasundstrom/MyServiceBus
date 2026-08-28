@@ -41,6 +41,14 @@ public sealed record GeneratedClassMethodMessage(string Value);
 
 public sealed record GeneratedConventionMethodMessage(string Value);
 
+public sealed record GeneratedResponseRequest(string Value);
+
+public sealed record GeneratedResponse(string Value);
+
+public sealed record GeneratedValueTaskResponseRequest(string Value);
+
+public sealed record GeneratedValueTaskResponse(string Value);
+
 [Consumer("generated-methods")]
 public static class GeneratedMethodConsumers
 {
@@ -60,6 +68,14 @@ public static class GeneratedMethodConsumers
 
 public static class MethodAttributedConsumers
 {
+    [Consumer("generated-response")]
+    public static Task<GeneratedResponse> Respond(GeneratedResponseRequest request)
+        => Task.FromResult(new GeneratedResponse($"{request.Value}-response"));
+
+    [Consumer("generated-value-task-response")]
+    public static ValueTask<GeneratedValueTaskResponse> RespondValueTask(GeneratedValueTaskResponseRequest request)
+        => ValueTask.FromResult(new GeneratedValueTaskResponse($"{request.Value}-response"));
+
     [Consumer("generated-class-method")]
     public static Task Receive(
         GeneratedClassMethodMessage message,

@@ -5,6 +5,7 @@
 - Defined consumer-method endpoint precedence consistently across C# and Java: fluent overrides method attributes, method attributes override class attributes, and explicit endpoints override conventions and formatters.
 - Grouped all consumer-method bindings for one endpoint into a single receive transport, preserving multi-method dispatch in generated, reflection, and mediator paths.
 - Added C# static-container fluent registration and retained method-name conventions for bare method attributes, including generated catalogs.
+- Added automatic request-response semantics for C# `Task<T>`/`ValueTask<T>` and Java `CompletableFuture<T>`/`CompletionStage<T>` consumer methods in both reflection and generated dispatch.
 - Added a preview-pinned .NET 11 NativeAOT smoke that suspends and resumes a Runtime Async consumer method through generated dispatch.
 - Added an opt-in .NET 11 Runtime Async target for the core abstractions and mediator runtime while preserving .NET 10 as the default build and package target.
 

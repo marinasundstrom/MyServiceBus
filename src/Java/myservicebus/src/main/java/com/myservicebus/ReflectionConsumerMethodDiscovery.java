@@ -53,6 +53,7 @@ final class ReflectionConsumerMethodDiscovery {
                 && !CompletionStage.class.isAssignableFrom(returnType)) {
             throw invalid(method, "return type must be void, CompletableFuture, or CompletionStage");
         }
+        boolean returnsResponse = returnsResponse(method);
 
         Parameter[] parameters = method.getParameters();
         Binding[] bindings = new Binding[parameters.length];
@@ -98,7 +99,25 @@ final class ReflectionConsumerMethodDiscovery {
                 endpointName,
                 endpointNameExplicit,
                 endpointNameFormatterType,
-                bindings);
+                bindings,
+                returnsResponse);
+    }
+
+    private static boolean returnsResponse(Method method) {
+        Type genericReturnType = method.getGenericReturnType();
+        if (!(genericReturnType instanceof ParameterizedType parameterized)
+                || parameterized.getActualTypeArguments().length != 1) {
+            return false;
+        }
+
+        Type responseType = parameterized.getActualTypeArguments()[0];
+        if (responseType == Void.class) {
+            return false;
+        }
+        if (!(responseType instanceof Class<?> || responseType instanceof ParameterizedType)) {
+            throw invalid(method, "response type must be a concrete reference type");
+        }
+        return true;
     }
 
     private static void validateContextTypes(Method method, Class<?> messageType) {
@@ -124,7 +143,8 @@ final class ReflectionConsumerMethodDiscovery {
             String endpointName,
             boolean endpointNameExplicit,
             Class<?> endpointNameFormatterType,
-            Binding[] bindings) {
+            Binding[] bindings,
+            boolean returnsResponse) {
         return new Definition(
                 method.getDeclaringClass(),
                 messageType,
@@ -148,6 +168,11 @@ final class ReflectionConsumerMethodDiscovery {
                     try {
                         Object result = method.invoke(target, arguments);
                         if (result instanceof CompletionStage<?> stage) {
+                            if (returnsResponse) {
+                                return stage.thenCompose(response ->
+                                        context.respond(response, context.getCancellationToken()))
+                                        .toCompletableFuture();
+                            }
                             return stage.thenApply(ignored -> (Void) null).toCompletableFuture();
                         }
                         return CompletableFuture.completedFuture(null);

@@ -21,7 +21,7 @@ public class GeneratedConsumerRegistrationTests
         var consumers = topology.Consumers.OrderBy(consumer => consumer.ConsumerType.Name).ToArray();
 
         Assert.Equal(
-            ["__MethodConsumer0", "__MethodConsumer1", "__MethodConsumer2", "__MethodConsumer3", "OrderSubmittedConsumer", "SubmitOrderConsumer", "SubmitOrderFaultConsumer", "TestRequestConsumer"],
+            ["__MethodConsumer0", "__MethodConsumer1", "__MethodConsumer2", "__MethodConsumer3", "__MethodConsumer4", "__MethodConsumer5", "OrderSubmittedConsumer", "SubmitOrderConsumer", "SubmitOrderFaultConsumer", "TestRequestConsumer"],
             consumers.Select(consumer => consumer.ConsumerType.Name));
         Assert.All(consumers, consumer =>
         {
@@ -37,6 +37,25 @@ public class GeneratedConsumerRegistrationTests
         Assert.Equal(
             "test-request-override",
             consumers.Single(consumer => consumer.ConsumerType.Name == "TestRequestConsumer").QueueName);
+    }
+
+    [Fact]
+    public async Task Generated_response_methods_respond_with_task_and_value_task_results()
+    {
+        var services = new ServiceCollection();
+        services.AddServiceBusTestHarness(configurator => configurator.AddGeneratedConsumers());
+        await using var provider = services.BuildServiceProvider();
+        var harness = provider.GetRequiredService<InMemoryTestHarness>();
+        await harness.Start();
+
+        var taskResponse = await provider.GetRequiredService<IRequestClient<GeneratedResponseRequest>>()
+            .GetResponseAsync<GeneratedResponse>(new GeneratedResponseRequest("task"));
+        var valueTaskResponse = await provider.GetRequiredService<IRequestClient<GeneratedValueTaskResponseRequest>>()
+            .GetResponseAsync<GeneratedValueTaskResponse>(new GeneratedValueTaskResponseRequest("value-task"));
+
+        Assert.Equal("task-response", taskResponse.Message.Value);
+        Assert.Equal("value-task-response", valueTaskResponse.Message.Value);
+        await harness.Stop();
     }
 
     [Fact]

@@ -1,15 +1,18 @@
 package com.myservicebus.mediator;
 
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
+import com.myservicebus.BusRegistrationConfiguratorImpl;
 import com.myservicebus.ConsumeContext;
 import com.myservicebus.Consumer;
-import com.myservicebus.BusRegistrationConfiguratorImpl;
+import com.myservicebus.ConsumerMethodInvoker;
 import com.myservicebus.MessageConsumer;
+import com.myservicebus.SendEndpoint;
 import com.myservicebus.di.ServiceCollection;
 import com.myservicebus.tasks.CancellationToken;
 
@@ -24,6 +27,12 @@ public class ConsumerMethodRegistrationTest {
     }
 
     public record ConventionMappedOrder(String number) {
+    }
+
+    public record ResponseRequest(String value) {
+    }
+
+    public record ResponseMessage(String value) {
     }
 
     public static final class Audit {
@@ -68,6 +77,15 @@ public class ConsumerMethodRegistrationTest {
 
         @MessageConsumer
         public static void orderSubmittedConsumer(ConventionMappedOrder order) {
+        }
+    }
+
+    public static final class ResponseConsumers {
+        private ResponseConsumers() {
+        }
+
+        public static CompletableFuture<ResponseMessage> respond(ResponseRequest request) {
+            return CompletableFuture.completedFuture(new ResponseMessage(request.value() + "-response"));
         }
     }
 
@@ -130,6 +148,35 @@ public class ConsumerMethodRegistrationTest {
     }
 
     @Test
+    @SuppressWarnings("unchecked")
+    public void reflectionResponseMethodRespondsWithCompletedValue() throws Exception {
+        ServiceCollection services = ServiceCollection.create();
+        var configurator = new BusRegistrationConfiguratorImpl(services);
+        configurator.addConsumerMethods(ResponseConsumers.class);
+        configurator.complete();
+        var provider = services.buildServiceProvider();
+        var topology = provider.getRequiredService(com.myservicebus.topology.TopologyRegistry.class);
+        var consumer = topology.getConsumers().get(0);
+        ConsumerMethodInvoker<ResponseRequest> invoker =
+                (ConsumerMethodInvoker<ResponseRequest>) consumer.getMethodInvoker();
+        CapturingSendEndpoint endpoint = new CapturingSendEndpoint();
+        ConsumeContext<ResponseRequest> context = new ConsumeContext<>(
+                new ResponseRequest("reflection"),
+                Map.of(),
+                "queue:response",
+                null,
+                CancellationToken.none(),
+                ignored -> endpoint);
+
+        try (var scope = provider.createScope()) {
+            invoker.invoke(scope.getServiceProvider(), context).join();
+        }
+
+        ResponseMessage response = (ResponseMessage) endpoint.sent.join();
+        Assertions.assertEquals("reflection-response", response.value());
+    }
+
+    @Test
     public void endpointPrecedenceIsFluentThenMethodThenClassThenConvention() {
         ServiceCollection services = ServiceCollection.create();
         var configurator = new BusRegistrationConfiguratorImpl(services);
@@ -167,5 +214,15 @@ public class ConsumerMethodRegistrationTest {
                 .findFirst()
                 .orElseThrow()
                 .getQueueName();
+    }
+
+    private static final class CapturingSendEndpoint implements SendEndpoint {
+        private final CompletableFuture<Object> sent = new CompletableFuture<>();
+
+        @Override
+        public <T> CompletableFuture<Void> send(T message, CancellationToken cancellationToken) {
+            sent.complete(message);
+            return CompletableFuture.completedFuture(null);
+        }
     }
 }

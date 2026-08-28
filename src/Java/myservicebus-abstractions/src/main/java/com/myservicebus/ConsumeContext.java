@@ -178,6 +178,11 @@ public class ConsumeContext<T>
         return sendEndpointProvider.getSendEndpoint(uri);
     }
 
+    /**
+     * Sends a correlated response to the incoming request.
+     *
+     * @return a future that fails with {@link IllegalStateException} when the incoming message has no response address
+     */
     public <TMessage> CompletableFuture<Void> respond(TMessage message, CancellationToken cancellationToken) {
         SendContext ctx = new SendContext(message, cancellationToken);
         return respond(ctx);
@@ -222,7 +227,7 @@ public class ConsumeContext<T>
     @Override
     public CompletableFuture<Void> respond(SendContext context) {
         if (responseAddress == null) {
-            return CompletableFuture.completedFuture(null);
+            return CompletableFuture.failedFuture(new IllegalStateException("Response address not specified"));
         }
         context.setSourceAddress(busAddress);
         context.setIntent(com.myservicebus.serialization.MessageIntent.REPLY);

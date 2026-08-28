@@ -10,6 +10,7 @@ const rows = [
   ['Attribute endpoint override for IConsumer<T>', 'Reflection path', 'Available', 'Available', 'Available'],
   ['Message and context binding', 'Available', 'Available', 'Available', 'Available'],
   ['Method parameter service injection', 'Available', 'Typed generation', 'Available', 'Typed generation'],
+  ['Async consumer-method response', 'Task<T> + ValueTask<T>', 'Available', 'Future<T> + Stage<T>', 'Available'],
   ['Generated direct method invocation', 'Typed adapter path', 'Available', 'Typed invoker path', 'JSR 269'],
   ['Named method endpoint', 'Attribute or fluent', 'Available', 'Annotation or explicit', 'Available'],
   ['Reflection-free method discovery and invocation', 'Typed path', 'Available', 'Typed path', 'Available'],
@@ -68,8 +69,8 @@ export default function PlatformParity() {
       <p>
         The shared runtime direction is a consumer descriptor containing endpoint identity,
         message contract, activation, parameter binding, and invocation. Existing interface
-        consumers, reflection, generated C#, future Java annotation processing, hand-written
-        catalogs, and Java annotation processing can all produce that descriptor
+        consumers, reflection, generated C#, hand-written catalogs, and Java annotation
+        processing can all produce that descriptor
         without requiring identical language syntax.
       </p>
 
