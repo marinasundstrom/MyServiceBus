@@ -25,17 +25,17 @@ repositories {
 }
 
 dependencies {
-    implementation 'io.github.marinasundstrom.myservicebus:myservicebus-abstractions:0.1.0-preview.4'
-    implementation 'io.github.marinasundstrom.myservicebus:myservicebus-di:0.1.0-preview.4'
-    implementation 'io.github.marinasundstrom.myservicebus:myservicebus-logging:0.1.0-preview.4'
-    implementation 'io.github.marinasundstrom.myservicebus:myservicebus-tasks:0.1.0-preview.4'
-    implementation 'io.github.marinasundstrom.myservicebus:myservicebus:0.1.0-preview.4'
-    annotationProcessor 'io.github.marinasundstrom.myservicebus:myservicebus-processor:0.1.0-preview.4'
-    implementation 'io.github.marinasundstrom.myservicebus:myservicebus-inspection:0.1.0-preview.4'
-    implementation 'io.github.marinasundstrom.myservicebus:myservicebus-monitoring:0.1.0-preview.4'
-    implementation 'io.github.marinasundstrom.myservicebus:myservicebus-rabbitmq:0.1.0-preview.4'
-    implementation 'io.github.marinasundstrom.myservicebus:myservicebus-azure-service-bus:0.1.0-preview.4'
-    implementation 'io.github.marinasundstrom.myservicebus:myservicebus-testing:0.1.0-preview.4'
+    implementation 'io.github.marinasundstrom.myservicebus:myservicebus-abstractions:0.1.0-preview.5'
+    implementation 'io.github.marinasundstrom.myservicebus:myservicebus-di:0.1.0-preview.5'
+    implementation 'io.github.marinasundstrom.myservicebus:myservicebus-logging:0.1.0-preview.5'
+    implementation 'io.github.marinasundstrom.myservicebus:myservicebus-tasks:0.1.0-preview.5'
+    implementation 'io.github.marinasundstrom.myservicebus:myservicebus:0.1.0-preview.5'
+    annotationProcessor 'io.github.marinasundstrom.myservicebus:myservicebus-processor:0.1.0-preview.5'
+    implementation 'io.github.marinasundstrom.myservicebus:myservicebus-inspection:0.1.0-preview.5'
+    implementation 'io.github.marinasundstrom.myservicebus:myservicebus-monitoring:0.1.0-preview.5'
+    implementation 'io.github.marinasundstrom.myservicebus:myservicebus-rabbitmq:0.1.0-preview.5'
+    implementation 'io.github.marinasundstrom.myservicebus:myservicebus-azure-service-bus:0.1.0-preview.5'
+    implementation 'io.github.marinasundstrom.myservicebus:myservicebus-testing:0.1.0-preview.5'
 }
 
 application {

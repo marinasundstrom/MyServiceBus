@@ -2,7 +2,7 @@ import Link from 'next/link';
 import CodeViewer from '../../components/CodeViewer';
 
 const installGenerator = `dotnet add package Sundstrom.MyServiceBus.Generators \\
-  --version 0.1.0-preview.4`;
+  --version 0.1.0-preview.5`;
 
 const generatedCatalog = `using MyServiceBus.Generated;
 
@@ -24,8 +24,8 @@ const manualCatalog = `static void AddApplicationConsumers(
 }`;
 
 const javaDependencies = `dependencies {
-    implementation "io.github.marinasundstrom.myservicebus:myservicebus:0.1.0-preview.4"
-    annotationProcessor "io.github.marinasundstrom.myservicebus:myservicebus-processor:0.1.0-preview.4"
+    implementation "io.github.marinasundstrom.myservicebus:myservicebus:0.1.0-preview.5"
+    annotationProcessor "io.github.marinasundstrom.myservicebus:myservicebus-processor:0.1.0-preview.5"
 }`;
 
 const javaCatalog = `GeneratedConsumerCatalog.INSTANCE.register(configurator);`;

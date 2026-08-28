@@ -1,22 +1,22 @@
 # Changelog
 
-## 2026-08-28
+This changelog summarizes the bigger themes in the repository history rather than every individual commit.
+
+## Unreleased
+
+No changes yet.
+
+## 0.1.0-preview.5 - 2026-08-28
 
 - Reworked the website concepts area into concise technical pages for contracts, intent, receive endpoints, topology, dispatch, requests, and reliability, with prose stored separately as MDX and fenced samples rendered through Monaco.
+- Rebuilt the landing-page hero around a responsive messaging diagram and promoted its cream, deep-green, mint, and coral palette into shared site-wide design tokens with corresponding dark-theme contrast.
 - Defined consumer-method endpoint precedence consistently across C# and Java: fluent overrides method attributes, method attributes override class attributes, and explicit endpoints override conventions and formatters.
 - Grouped all consumer-method bindings for one endpoint into a single receive transport, preserving multi-method dispatch in generated, reflection, and mediator paths.
 - Added C# static-container fluent registration and retained method-name conventions for bare method attributes, including generated catalogs.
 - Added automatic request-response semantics for C# `Task<T>`/`ValueTask<T>` and Java `CompletableFuture<T>`/`CompletionStage<T>` consumer methods in both reflection and generated dispatch.
 - Added a preview-pinned .NET 11 NativeAOT smoke that suspends and resumes a Runtime Async consumer method through generated dispatch.
 - Added an opt-in .NET 11 Runtime Async target for the core abstractions and mediator runtime while preserving .NET 10 as the default build and package target.
-
-This changelog summarizes the bigger themes in the repository history. It is intentionally thematic rather than exhaustive, and is based on work landed between April 4, 2025 and March 24, 2026.
-
-## Unreleased
-
 - Completed the Java bus-factory container integration path with explicit endpoint consumer mappings for RabbitMQ and Azure Service Bus, allowing `ConsumerFactory` to resolve application consumers without binding them into the bus's isolated provider, and documented async-safe scope ownership.
-
-Release candidate: `0.1.0-preview.4`.
 
 ### NativeAOT registration
 

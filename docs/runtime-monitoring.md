@@ -64,7 +64,7 @@ Use the sample applications' `/publish`, `/send`, and `/request` routes to creat
 Install the optional exporter package, then register the addon after the bus:
 
 ```bash
-dotnet add package Sundstrom.MyServiceBus.Monitoring --version 0.1.0-preview.4
+dotnet add package Sundstrom.MyServiceBus.Monitoring --version 0.1.0-preview.5
 ```
 
 ```csharp
@@ -92,7 +92,7 @@ The exporter is registered as both an `IBusHook` and a hosted background service
 Reference `myservicebus-monitoring`, add monitoring before building the service provider, and start the exporter after the bus:
 
 ```groovy
-implementation 'io.github.marinasundstrom.myservicebus:myservicebus-monitoring:0.1.0-preview.4'
+implementation 'io.github.marinasundstrom.myservicebus:myservicebus-monitoring:0.1.0-preview.5'
 ```
 
 ```java
@@ -175,8 +175,8 @@ Failed-message inspection intentionally excludes message bodies and arbitrary he
 The collector and dashboard are independently deployable applications, not client-library packages. Versioned Linux images for AMD64 and ARM64 are published separately:
 
 ```text
-ghcr.io/marinasundstrom/myservicebus-monitoring-collector:0.1.0-preview.4
-ghcr.io/marinasundstrom/myservicebus-monitoring-dashboard:0.1.0-preview.4
+ghcr.io/marinasundstrom/myservicebus-monitoring-collector:0.1.0-preview.5
+ghcr.io/marinasundstrom/myservicebus-monitoring-dashboard:0.1.0-preview.5
 ```
 
 The collector listens on port `8080`. The dashboard also listens on port `8080` and reads its collector base address from the `MonitoringService` configuration key (for example, the `MonitoringService` environment variable). The current in-memory collector is intended for local development and controlled evaluation. Before exposing it outside a trusted network, add host-level authentication and authorization, request and payload limits, TLS, durable persistence if history is required, and an explicit retention policy. Do not send message bodies, arbitrary headers, credentials, or broker-management data through the monitoring protocol.
