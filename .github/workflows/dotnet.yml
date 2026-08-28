@@ -37,12 +37,6 @@ jobs:
         run: dotnet test --no-build --configuration Release --verbosity normal
       - name: Verify .NET NativeAOT application
         run: ./eng/verify-dotnet-aot.sh
-      - name: Setup .NET 11 preview
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '11.0.100-preview.7.26381.103'
-      - name: Verify .NET 11 Runtime Async NativeAOT application
-        run: ./eng/verify-dotnet11-runtime-async-aot.sh
       - name: Build NuGet packages
         run: |
           dotnet pack src/MyServiceBus.Abstractions/MyServiceBus.Abstractions.csproj --no-build --configuration Release --output artifacts/packages
@@ -56,3 +50,9 @@ jobs:
         run: ./eng/verify-dotnet-packages.sh
       - name: Verify NuGet package consumer
         run: ./eng/verify-dotnet-package-consumer.sh
+      - name: Setup .NET 11 preview
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '11.0.100-preview.7.26381.103'
+      - name: Verify .NET 11 Runtime Async NativeAOT application
+        run: ./eng/verify-dotnet11-runtime-async-aot.sh
