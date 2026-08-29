@@ -103,6 +103,22 @@ The detailed checklist is defined in the [Mediator and In-Memory Stability Gate]
 
 **Status:** implemented for the current preview scope. All shared scenarios are verified in C# and Java, including lifecycle, scopes, requests, retries, filters, metadata, type dispatch, deterministic scheduling, independent consumer failure behavior, eventual consumed observations, directed send, and publish fan-out.
 
+## Serialization Architecture Gate
+
+**Outcome:** additional serializers can be added without changing central receive logic, while C# and Java retain corresponding MassTransit-familiar serializer stages and platform-native implementation details.
+
+- Introduce clean serializer, deserializer, serializer-factory, message-body, and inbound-context boxes.
+- Keep content-type matching and multi-deserializer selection in an immutable internal registry.
+- Configure source-generated `System.Text.Json` metadata through the built-in .NET serializer without exposing it in the portable contract.
+- Add the optional MassTransit BSON envelope profile in C# and Java with shared fixtures and live interoperability coverage.
+- Verify explicit-metadata JSON paths under .NET Native AOT and GraalVM Native Image.
+
+The target architecture, capability boundary, and delivery slices are defined in the [Serialization Architecture Proposal](proposals/serialization-architecture.md).
+
+**Exit criteria:** existing JSON profiles retain their behavior; new formats register through corresponding factories in both clients; source-generated JSON works on send and receive with reflection disabled; and BSON passes the C#↔Java↔MassTransit matrix.
+
+**Status:** proposed.
+
 ## Phase 3: Inspection and Monitoring APIs
 
 **Outcome:** applications and tools can discover and observe a distributed MyServiceBus system without coupling clients to a UI or local monitoring store.

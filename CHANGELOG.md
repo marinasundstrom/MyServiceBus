@@ -4,7 +4,7 @@ This changelog summarizes the bigger themes in the repository history rather tha
 
 ## Unreleased
 
-No changes yet.
+- Proposed a bidirectional serialization registry that separates envelope protocols from application payload metadata, defines source-generated JSON and strict AOT boundaries, and scopes BSON to an optional cross-language MassTransit compatibility profile.
 
 ## 0.1.0-preview.5 - 2026-08-28
 

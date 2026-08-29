@@ -2,6 +2,8 @@
 
 MyServiceBus supports three distinct JSON wire formats. They are separate choices rather than aliases for one another.
 
+The proposed registry, source-generated JSON, BSON, and Native AOT direction is described separately in the [Serialization Architecture Proposal](proposals/serialization-architecture.md). That proposal is not yet implemented; this page documents current behavior.
+
 | Serializer | Content type | Wire shape | Purpose |
 | --- | --- | --- | --- |
 | `EnvelopeMessageSerializer` | `application/vnd.masstransit+json` | MyServiceBus/MassTransit envelope | Default portable messaging profile |
