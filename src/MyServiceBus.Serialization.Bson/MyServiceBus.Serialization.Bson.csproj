@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>true</IsPackable>
+    <PackageId>Sundstrom.MyServiceBus.Serialization.Bson</PackageId>
+    <Description>Optional MassTransit-compatible BSON envelope serialization for MyServiceBus.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" />
+    <PackageReference Include="Newtonsoft.Json.Bson" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../MyServiceBus/MyServiceBus.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,8 +1,11 @@
 package com.myservicebus.serialization;
 
-import java.lang.reflect.Type;
-import com.myservicebus.Envelope;
+import java.util.Map;
 
 public interface MessageDeserializer {
-    <T> Envelope<T> deserialize(byte[] data, Type type) throws Exception;
+    String getContentType();
+
+    InboundMessage deserialize(MessageBody body, Map<String, Object> headers) throws Exception;
+
+    MessageBody getMessageBody(String text);
 }

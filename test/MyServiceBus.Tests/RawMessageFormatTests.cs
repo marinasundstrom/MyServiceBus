@@ -23,12 +23,13 @@ public class RawMessageFormatTests
         public string? ContentType { get; private set; }
         public IDictionary<string, object>? Headers { get; private set; }
 
-        public async Task Send<T>(T message, SendContext context, CancellationToken cancellationToken = default)
+        public Task Send<T>(T message, SendContext context, CancellationToken cancellationToken = default)
             where T : class
         {
-            Body = (await context.Serialize(message)).ToArray();
+            Body = context.GetMessageBody(message).GetBytes();
             ContentType = context.Headers.TryGetValue("content_type", out var value) ? value?.ToString() : null;
             Headers = new Dictionary<string, object>(context.Headers);
+            return Task.CompletedTask;
         }
     }
 

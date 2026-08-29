@@ -2,6 +2,7 @@ using MyServiceBus;
 using MyServiceBus.Inspection;
 using MyServiceBus.Monitoring;
 using MyServiceBus.RabbitMq;
+using MyServiceBus.Serialization.Bson;
 
 var consumed = false;
 var harness = new InMemoryTestHarness();
@@ -23,6 +24,7 @@ _ = typeof(IBusInspectionProvider);
 _ = typeof(MonitoringExporterOptions);
 _ = typeof(RabbitMqFactoryConfigurator);
 _ = typeof(AzureServiceBusFactoryConfigurator);
+_ = typeof(BsonSerializerFactory);
 Console.WriteLine("Verified the staged MyServiceBus NuGet packages from a consumer project.");
 
 internal sealed record SmokeMessage(string Value);

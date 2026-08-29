@@ -3,6 +3,7 @@ package com.myservicebus;
 import com.myservicebus.serialization.MessageIntent;
 import com.myservicebus.serialization.MessageSerializationContext;
 import com.myservicebus.serialization.MessageSerializer;
+import com.myservicebus.serialization.MessageBody;
 import java.net.URI;
 import java.time.OffsetDateTime;
 import java.util.HashMap;
@@ -137,7 +138,7 @@ public class SendContext implements PipeContext, ScheduledMessage {
         this.scheduledEnqueueTime = scheduledTime;
     }
 
-    public byte[] serialize(MessageSerializer serializer) throws Exception {
+    public MessageBody getMessageBody(MessageSerializer serializer) throws Exception {
         MessageSerializationContext<Object> context = new MessageSerializationContext<>(message);
         context.setMessageId(UUID.randomUUID());
         context.setRequestId(requestId);
@@ -155,7 +156,11 @@ public class SendContext implements PipeContext, ScheduledMessage {
         context.setHeaders(headers);
         context.setSentTime(OffsetDateTime.now());
         context.setHostInfo(HostInfoProvider.capture());
-        return serializer.serialize(context);
+        return serializer.getMessageBody(context);
+    }
+
+    public byte[] serialize(MessageSerializer serializer) throws Exception {
+        return getMessageBody(serializer).getBytes();
     }
 
     @Override

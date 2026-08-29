@@ -10,6 +10,7 @@
   <ItemGroup>
     <PackageReference Include="Sundstrom.MyServiceBus.Abstractions" Version="0.1.0-preview.5" />
     <PackageReference Include="Sundstrom.MyServiceBus" Version="0.1.0-preview.5" />
+    <PackageReference Include="Sundstrom.MyServiceBus.Serialization.Bson" Version="0.1.0-preview.5" />
     <PackageReference Include="Sundstrom.MyServiceBus.Inspection" Version="0.1.0-preview.5" />
     <PackageReference Include="Sundstrom.MyServiceBus.Monitoring" Version="0.1.0-preview.5" />
     <PackageReference Include="Sundstrom.MyServiceBus.RabbitMq" Version="0.1.0-preview.5" />

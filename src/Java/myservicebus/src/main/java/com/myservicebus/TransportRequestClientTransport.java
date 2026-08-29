@@ -1,8 +1,9 @@
 package com.myservicebus;
 
+import com.myservicebus.serialization.InboundMessage;
+import com.myservicebus.serialization.InboundMessageResolver;
 import com.myservicebus.serialization.DefaultInboundMessageResolver;
 import com.myservicebus.serialization.EnvelopeMessageDeserializer;
-import com.myservicebus.serialization.InboundMessage;
 import com.myservicebus.serialization.MessageSerializer;
 import com.myservicebus.topology.MessageBinding;
 import com.myservicebus.topology.ReceiveEndpointTransportTopology;
@@ -21,12 +22,22 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public final class TransportRequestClientTransport implements RequestClientTransport {
     private final TransportFactory transportFactory;
     private final MessageSerializer serializer;
-    private final DefaultInboundMessageResolver inboundMessageResolver =
-            new DefaultInboundMessageResolver(new EnvelopeMessageDeserializer());
+    private final InboundMessageResolver inboundMessageResolver;
 
     public TransportRequestClientTransport(TransportFactory transportFactory, MessageSerializer serializer) {
+        this(
+                transportFactory,
+                serializer,
+                new DefaultInboundMessageResolver(new EnvelopeMessageDeserializer()));
+    }
+
+    public TransportRequestClientTransport(
+            TransportFactory transportFactory,
+            MessageSerializer serializer,
+            InboundMessageResolver inboundMessageResolver) {
         this.transportFactory = transportFactory;
         this.serializer = serializer;
+        this.inboundMessageResolver = inboundMessageResolver;
     }
 
     @Override

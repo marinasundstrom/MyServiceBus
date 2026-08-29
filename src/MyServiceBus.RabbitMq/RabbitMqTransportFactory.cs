@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using MyServiceBus.Serialization;
 using MyServiceBus.Topology;
 using RabbitMQ.Client;
 
@@ -15,15 +16,20 @@ public sealed class RabbitMqTransportFactory : ITransportFactory
     private readonly ushort _prefetchCount;
     private readonly Uri _baseAddress;
     private readonly Func<Type, string> _entityNameResolver;
+    private readonly IInboundMessageResolver _inboundMessageResolver;
 
     public TransportCapabilityDescriptor Capabilities => TransportCapabilityDescriptors.RabbitMq;
 
-    public RabbitMqTransportFactory(ConnectionProvider connectionProvider, IRabbitMqFactoryConfigurator configurator)
+    public RabbitMqTransportFactory(
+        ConnectionProvider connectionProvider,
+        IRabbitMqFactoryConfigurator configurator,
+        IInboundMessageResolver? inboundMessageResolver = null)
     {
         _connectionProvider = connectionProvider;
         _prefetchCount = configurator.PrefetchCount;
         _entityNameResolver = configurator.GetEntityName;
         _baseAddress = new UriBuilder("rabbitmq", configurator.ClientHost, configurator.ClientPort).Uri;
+        _inboundMessageResolver = inboundMessageResolver ?? new InboundMessageResolver();
     }
 
     public string GetPublishEntityName(Type messageType) => _entityNameResolver(messageType);
@@ -361,7 +367,14 @@ public sealed class RabbitMqTransportFactory : ITransportFactory
 
         var errorAddress = hasErrorQueue ? GetErrorAddress(rabbitMqTopology.QueueName) : null;
         var faultAddress = hasErrorQueue ? GetFaultAddress(rabbitMqTopology.QueueName) : null;
-        return new RabbitMqReceiveTransport(channel, rabbitMqTopology.QueueName, handler, errorAddress, faultAddress, isMessageTypeRegistered);
+        return new RabbitMqReceiveTransport(
+            channel,
+            rabbitMqTopology.QueueName,
+            handler,
+            errorAddress,
+            faultAddress,
+            isMessageTypeRegistered,
+            _inboundMessageResolver);
     }
 
     private static void ParseExchangeSettings(string? queryString, ref bool durable, ref bool autoDelete)

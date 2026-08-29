@@ -35,6 +35,7 @@ Continue with the [.NET quick start](#c) to register the bus, configure RabbitMQ
 | --- | --- |
 | [`Sundstrom.MyServiceBus`](https://www.nuget.org/packages/Sundstrom.MyServiceBus) | Core messaging runtime and in-memory mediator |
 | [`Sundstrom.MyServiceBus.Abstractions`](https://www.nuget.org/packages/Sundstrom.MyServiceBus.Abstractions) | Portable message contracts, contexts, and endpoint abstractions |
+| `Sundstrom.MyServiceBus.Serialization.Bson` | Optional MassTransit-compatible BSON envelope serialization |
 | `Sundstrom.MyServiceBus.Inspection` | Queryable bus metadata and topology inspection APIs |
 | `Sundstrom.MyServiceBus.Monitoring` | Optional batched runtime monitoring exporter and collector protocol |
 | [`Sundstrom.MyServiceBus.RabbitMq`](https://www.nuget.org/packages/Sundstrom.MyServiceBus.RabbitMq) | RabbitMQ transport and configuration integration |
@@ -73,6 +74,7 @@ Continue with the [Java quick start](#java) or the detailed [Java guide](src/Jav
 | --- | --- |
 | [`io.github.marinasundstrom.myservicebus:myservicebus`](https://central.sonatype.com/artifact/io.github.marinasundstrom.myservicebus/myservicebus) | Core messaging runtime and in-memory mediator |
 | `io.github.marinasundstrom.myservicebus:myservicebus-processor` | Optional JSR 269 processor for generated consumer catalogs and direct method invokers |
+| `io.github.marinasundstrom.myservicebus:myservicebus-serialization-bson` | Optional MassTransit-compatible BSON envelope serialization |
 | `io.github.marinasundstrom.myservicebus:myservicebus-inspection` | Queryable bus metadata and topology inspection APIs |
 | `io.github.marinasundstrom.myservicebus:myservicebus-monitoring` | Optional batched runtime monitoring exporter and collector protocol |
 | [`io.github.marinasundstrom.myservicebus:myservicebus-abstractions`](https://central.sonatype.com/artifact/io.github.marinasundstrom.myservicebus/myservicebus-abstractions) | Portable messaging contracts and abstractions |

@@ -23,6 +23,16 @@ The Java native smoke application accepts `--benchmark` for the identical genera
 
 The catalog benchmarks register the same interface consumer and attributed method consumer through each discovery path. This isolates registration-phase work performed during application startup without presenting it as total startup time. Current measurements and their limitations are recorded in `docs/development/native-aot.md` and the website AOT page. Process startup, memory measurements, and broker-backed throughput remain separate measurements.
 
+## JSON serialization metadata
+
+Run the reflective-versus-source-generated .NET comparison with:
+
+```bash
+dotnet run -c Release --project benchmarks/MyServiceBus.Benchmarks -- --filter '*JsonSerializationBenchmarks*'
+```
+
+The harness reports separate envelope/raw serialize and deserialize groups with memory diagnostics. Keep the reflective methods as each group's baseline. The published comparison matrix should additionally record cold first-use latency, process startup, and Native AOT published size from dedicated process-level runs; BenchmarkDotNet's warmed steady-state results do not represent those measurements.
+
 ## .NET 11 Runtime Async
 
 .NET 11 Runtime Async is a separate performance axis from generated registration. Registration benchmarks are synchronous and remain on the supported .NET 10 baseline. Async dispatch measurements should eventually compare .NET 11 builds with Runtime Async enabled and disabled so runtime improvements are not attributed to consumer generation.

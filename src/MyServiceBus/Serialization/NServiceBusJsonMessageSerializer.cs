@@ -1,21 +1,30 @@
 using System.Globalization;
 using System.Reflection;
 using System.Text.Json;
+using System.Text.Json.Serialization.Metadata;
 
 namespace MyServiceBus.Serialization;
 
-public sealed class NServiceBusJsonMessageSerializer : IMessageSerializer
+public sealed class NServiceBusJsonMessageSerializer : IMessageSerializer, IMessageSerializerMetadata
 {
-    private static readonly JsonSerializerOptions Options = new()
+    private readonly JsonSerializerOptions _jsonSerializerOptions;
+
+    public NServiceBusJsonMessageSerializer()
+        : this(JsonSerializationDefaults.CreateNServiceBusOptions())
     {
-        WriteIndented = false
-    };
+    }
+
+    public NServiceBusJsonMessageSerializer(JsonSerializerOptions jsonSerializerOptions)
+    {
+        ArgumentNullException.ThrowIfNull(jsonSerializerOptions);
+        _jsonSerializerOptions = jsonSerializerOptions;
+    }
 
     public string ContentType => InboundMessageResolver.RawJsonContentType;
 
     public MessageEnvelopeMode EnvelopeMode => MessageEnvelopeMode.Raw;
 
-    public Task<byte[]> SerializeAsync<T>(MessageSerializationContext<T> context)
+    public MessageBody GetMessageBody<T>(MessageSerializationContext<T> context)
         where T : class
     {
         var messageId = context.RequestId ?? context.MessageId;
@@ -44,7 +53,9 @@ public sealed class NServiceBusJsonMessageSerializer : IMessageSerializer
         context.Headers["_content_type"] = ContentType;
         context.Headers["_message_id"] = messageId.ToString();
 
-        return Task.FromResult(JsonSerializer.SerializeToUtf8Bytes(context.Message, Options));
+        var typeInfo = _jsonSerializerOptions.GetTypeInfo(typeof(T)) as JsonTypeInfo<T>
+            ?? throw new InvalidOperationException($"JSON metadata is not configured for {typeof(T)}.");
+        return new ByteArrayMessageBody(JsonSerializer.SerializeToUtf8Bytes(context.Message, typeInfo));
     }
 
     private static void SetIfMissing(IDictionary<string, object> headers, string name, string value)

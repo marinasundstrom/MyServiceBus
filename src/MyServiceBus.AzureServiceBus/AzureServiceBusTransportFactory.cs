@@ -3,6 +3,7 @@ using Azure.Messaging.ServiceBus;
 using Azure.Messaging.ServiceBus.Administration;
 using Microsoft.Extensions.Logging;
 using MyServiceBus.AzureServiceBus;
+using MyServiceBus.Serialization;
 using MyServiceBus.Topology;
 
 namespace MyServiceBus;
@@ -17,11 +18,13 @@ public sealed class AzureServiceBusTransportFactory : ITransportFactory
     private readonly Func<string, string> _temporaryEndpointNameFormatter;
     private readonly Uri _baseAddress;
     private readonly ILoggerFactory? _loggerFactory;
+    private readonly IInboundMessageResolver _inboundMessageResolver;
     private readonly ConcurrentDictionary<string, ISendTransport> _sendTransports = new(StringComparer.Ordinal);
 
     public AzureServiceBusTransportFactory(
         ServiceBusClient client,
         IAzureServiceBusFactoryConfigurator configurator,
+        IInboundMessageResolver? inboundMessageResolver = null,
         ILoggerFactory? loggerFactory = null)
     {
         ArgumentNullException.ThrowIfNull(client);
@@ -33,6 +36,7 @@ public sealed class AzureServiceBusTransportFactory : ITransportFactory
         _temporaryEndpointNameFormatter = configurator.TemporaryEndpointNameFormatter;
         _baseAddress = GetEndpoint(configurator.ConnectionString);
         _loggerFactory = loggerFactory;
+        _inboundMessageResolver = inboundMessageResolver ?? new InboundMessageResolver();
         if (_topologyMode == AzureServiceBusTopologyMode.Create)
         {
             _administrationClient = new ServiceBusAdministrationClient(
@@ -113,6 +117,7 @@ public sealed class AzureServiceBusTransportFactory : ITransportFactory
             isMessageTypeRegistered,
             projected.Temporary ? null : GetErrorAddress(projected.QueueName),
             projected.Temporary ? null : GetFaultAddress(projected.QueueName),
+            _inboundMessageResolver,
             _loggerFactory?.CreateLogger<AzureServiceBusReceiveTransport>());
     }
 

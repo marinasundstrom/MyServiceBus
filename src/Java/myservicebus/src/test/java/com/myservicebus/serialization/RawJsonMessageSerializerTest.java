@@ -19,7 +19,7 @@ public class RawJsonMessageSerializerTest {
         MessageSerializationContext<TestMessage> context = new MessageSerializationContext<>(message);
         context.setHeaders(new HashMap<>());
 
-        byte[] bytes = serializer.serialize(context);
+        byte[] bytes = serializer.getMessageBody(context).getBytes();
         String json = new String(bytes);
         assertTrue(json.contains("\"text\":\"hi\""));
         assertEquals("application/json", context.getHeaders().get("content_type"));

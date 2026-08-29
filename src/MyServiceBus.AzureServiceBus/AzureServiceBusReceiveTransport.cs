@@ -14,7 +14,7 @@ public sealed class AzureServiceBusReceiveTransport : IReceiveTransport
     private readonly Func<string?, bool>? _isMessageTypeRegistered;
     private readonly Uri? _errorAddress;
     private readonly Uri? _faultAddress;
-    private readonly IInboundMessageResolver _inboundMessageResolver = new InboundMessageResolver();
+    private readonly IInboundMessageResolver _inboundMessageResolver;
     private readonly ILogger<AzureServiceBusReceiveTransport>? _logger;
 
     internal AzureServiceBusReceiveTransport(
@@ -25,6 +25,7 @@ public sealed class AzureServiceBusReceiveTransport : IReceiveTransport
         Func<string?, bool>? isMessageTypeRegistered,
         Uri? errorAddress,
         Uri? faultAddress,
+        IInboundMessageResolver? inboundMessageResolver = null,
         ILogger<AzureServiceBusReceiveTransport>? logger = null)
     {
         _processor = processor;
@@ -34,6 +35,7 @@ public sealed class AzureServiceBusReceiveTransport : IReceiveTransport
         _isMessageTypeRegistered = isMessageTypeRegistered;
         _errorAddress = errorAddress;
         _faultAddress = faultAddress;
+        _inboundMessageResolver = inboundMessageResolver ?? new InboundMessageResolver();
         _logger = logger;
         _processor.ProcessMessageAsync += ProcessMessage;
         _processor.ProcessErrorAsync += ProcessError;

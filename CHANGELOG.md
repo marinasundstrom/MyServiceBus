@@ -4,7 +4,20 @@ This changelog summarizes the bigger themes in the repository history rather tha
 
 ## Unreleased
 
-No changes yet.
+- Added the BSON projects to NuGet and Maven release workflows, artifact verification, Maven Central bundling, staged package consumers, and the public artifact catalog.
+- Added an optional .NET MassTransit BSON envelope package with serializer/deserializer factories, Base64 body handling, configurable Newtonsoft BSON settings, and no dependency from the default JSON runtime.
+- Added the corresponding optional Java BSON module with application `ObjectMapper` payload mapping, .NET GUID byte-order normalization, Base64 bodies, and bidirectional C#↔Java fixtures.
+- Verified the .NET BSON adapter in both directions against MassTransit 8.5.1's own Newtonsoft BSON serializer and envelope contracts.
+- Documented optional BSON installation, symmetric C#/Java factory registration, migration-only deserializer registration, and the initial managed/JVM capability boundary.
+- Added a .NET JSON serialization comparison matrix covering reflective and source-generated metadata for MassTransit envelopes and raw payloads, including throughput and allocation measurements.
+- Documented source-generated JSON as a distinct .NET managed and NativeAOT mode in the repository and public AOT guides, including its native smoke proof and measurement boundaries.
+- Split AOT guidance and benchmark evidence by platform, distinguishing .NET NativeAOT from Java GraalVM Native Image and linking to each platform's official compatibility guidance.
+- Reframed native performance as an optimization ladder within each application platform rather than a C#-versus-Java selection, with separate metrics for throughput, startup, memory, allocation, size, and build time.
+- Added application-supplied `JsonSerializerOptions`/source-generated metadata to the .NET JSON factories on send and receive, plus corresponding application `ObjectMapper` configuration in Java.
+- Added MassTransit-shaped serializer registration and immutable inbound format selection in C# and Java, injected the resolver into broker transports, and moved raw dispatch metadata out of the portable serializer/deserializer contracts.
+- Added corresponding whole-format deserializer and serializer-factory contracts in C# and Java, with matching MassTransit-envelope, Raw JSON, and NServiceBus JSON implementations.
+- Aligned C# and Java outbound serializer contracts with MassTransit's message-body model, added corresponding byte-array body implementations, and moved transport byte materialization behind that boundary.
+- Proposed a bidirectional serialization registry that separates envelope protocols from application payload metadata, defines source-generated JSON and strict AOT boundaries, and scopes BSON to an optional cross-language MassTransit compatibility profile.
 
 ## 0.1.0-preview.5 - 2026-08-28
 

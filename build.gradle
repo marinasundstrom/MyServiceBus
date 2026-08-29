@@ -8,6 +8,7 @@ def publishedProjectDescriptions = [
     'myservicebus-logging'      : 'Logging abstractions and adapters for MyServiceBus.',
     'myservicebus-tasks'        : 'Asynchronous task abstractions for MyServiceBus.',
     'myservicebus'              : 'Idiomatic Java messaging runtime with MassTransit-compatible concepts and wire conventions.',
+    'myservicebus-serialization-bson': 'Optional MassTransit-compatible BSON envelope serialization for MyServiceBus.',
     'myservicebus-processor'    : 'Optional Java annotation processor for generated MyServiceBus consumer catalogs.',
     'myservicebus-inspection'   : 'Queryable bus metadata and topology inspection APIs for MyServiceBus.',
     'myservicebus-monitoring'   : 'Optional batched runtime monitoring exporter and collector protocol for MyServiceBus.',
@@ -19,6 +20,7 @@ def publishedProjectDescriptions = [
 ext {
     lombokVersion = '1.18.34'
     jacksonVersion = '2.17.2'
+    bson4jacksonVersion = '2.15.1'
     rabbitmqVersion = '5.20.0'
     azureServiceBusVersion = '7.17.20'
     guiceVersion = '5.1.0'

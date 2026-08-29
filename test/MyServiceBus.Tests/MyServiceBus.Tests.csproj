@@ -10,6 +10,7 @@
   <ItemGroup>
     <PackageReference Include="coverlet.collector" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="MassTransit.Newtonsoft" />
     <PackageReference Include="NSubstitute" />
     <PackageReference Include="Shouldly" />
     <PackageReference Include="xunit" />
@@ -17,6 +18,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="../../src/MyServiceBus.Serialization.Bson/MyServiceBus.Serialization.Bson.csproj" />
     <ProjectReference Include="../../src/MyServiceBus.Inspection/MyServiceBus.Inspection.csproj" />
     <ProjectReference Include="../../src/MyServiceBus.Monitoring.Server/MyServiceBus.Monitoring.Server.csproj" />
     <ProjectReference Include="../../src/MyServiceBus/MyServiceBus.csproj" />
@@ -34,6 +36,9 @@
           CopyToOutputDirectory="PreserveNewest" />
     <None Include="../fixtures/topology/v1/*.json"
           Link="topology-fixtures/%(Filename)%(Extension)"
+          CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../fixtures/serialization/v1/*.base64"
+          Link="serialization-fixtures/%(Filename)%(Extension)"
           CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 

@@ -8,8 +8,7 @@ import com.myservicebus.Consumer;
 import com.myservicebus.di.ServiceCollection;
 import com.myservicebus.generated.GeneratedConsumerCatalog;
 import com.myservicebus.mediator.MediatorBus;
-import com.myservicebus.serialization.EnvelopeMessageDeserializer;
-import com.myservicebus.serialization.EnvelopeMessageSerializer;
+import com.myservicebus.serialization.EnvelopeSerializerFactory;
 import com.myservicebus.tasks.CancellationToken;
 
 public final class AotSmokeMain {
@@ -56,8 +55,9 @@ public final class AotSmokeMain {
             GeneratedConsumerCatalog.INSTANCE.register(configurator);
             services.remove(SmokeConsumer.class);
             services.addScoped(SmokeConsumer.class, ignored -> () -> new SmokeConsumer(probe));
-            configurator.setSerializer(ignored -> new EnvelopeMessageSerializer());
-            configurator.setDeserializer(ignored -> new EnvelopeMessageDeserializer());
+            EnvelopeSerializerFactory serialization = new EnvelopeSerializerFactory();
+            configurator.addSerializer(serialization, true);
+            configurator.addDeserializer(serialization, true);
         });
 
         SmokeMessage message = new SmokeMessage("native-ready");

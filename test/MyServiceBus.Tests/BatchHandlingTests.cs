@@ -15,7 +15,7 @@ public class BatchHandlingTests
     }
 
     [Fact]
-    public async Task Envelope_serializer_handles_batch_message()
+    public void Envelope_serializer_handles_batch_message()
     {
         var batch = new Batch<SampleMessage>(
             new SampleMessage { Value = "A" },
@@ -46,7 +46,7 @@ public class BatchHandlingTests
             },
         };
 
-        var bytes = await serializer.SerializeAsync(context);
+        var bytes = serializer.GetMessageBody(context).GetBytes();
         using var doc = JsonDocument.Parse(bytes);
         var messageElement = doc.RootElement.GetProperty("message");
         Assert.Equal(JsonValueKind.Array, messageElement.ValueKind);

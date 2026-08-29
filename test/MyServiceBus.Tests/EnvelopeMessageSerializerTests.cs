@@ -14,7 +14,7 @@ public class EnvelopeMessageSerializerTests
     }
 
     [Fact]
-    public async Task Envelope_contains_addresses()
+    public void Envelope_contains_addresses()
     {
         var message = new SampleMessage
         {
@@ -24,8 +24,8 @@ public class EnvelopeMessageSerializerTests
         var serializer = new EnvelopeMessageSerializer();
         var sendContext = new SendContext([typeof(SampleMessage)], serializer);
 
-        var bytes = await sendContext.Serialize(message);
-        var envelope = System.Text.Json.JsonSerializer.Deserialize<Envelope<SampleMessage>>(bytes.Span);
+        var bytes = sendContext.GetMessageBody(message).GetBytes();
+        var envelope = System.Text.Json.JsonSerializer.Deserialize<Envelope<SampleMessage>>(bytes);
 
         Assert.NotNull(envelope);
         Assert.Equal(new Uri("loopback://localhost/source"), envelope!.SourceAddress);
@@ -33,7 +33,7 @@ public class EnvelopeMessageSerializerTests
     }
 
     [Fact]
-    public async Task Envelope_omits_mt_host_headers()
+    public void Envelope_omits_mt_host_headers()
     {
         var message = new SampleMessage { Value = "Test" };
 
@@ -42,8 +42,8 @@ public class EnvelopeMessageSerializerTests
         sendContext.Headers[MessageHeaders.HostMachineName] = "machine";
         sendContext.Headers[MessageHeaders.HostProcessName] = "proc";
 
-        var bytes = await sendContext.Serialize(message);
-        var envelope = JsonSerializer.Deserialize<Envelope<SampleMessage>>(bytes.Span);
+        var bytes = sendContext.GetMessageBody(message).GetBytes();
+        var envelope = JsonSerializer.Deserialize<Envelope<SampleMessage>>(bytes);
 
         Assert.NotNull(envelope);
         Assert.False(envelope!.Headers.ContainsKey(MessageHeaders.HostMachineName));

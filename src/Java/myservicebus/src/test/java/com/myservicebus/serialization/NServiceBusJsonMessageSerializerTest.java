@@ -29,7 +29,7 @@ class NServiceBusJsonMessageSerializerTest {
         context.setHeaders(new HashMap<>());
         context.setIntent(MessageIntent.PUBLISH);
 
-        byte[] body = new NServiceBusJsonMessageSerializer().serialize(context);
+        byte[] body = new NServiceBusJsonMessageSerializer().getMessageBody(context).getBytes();
 
         assertEquals("{\"Text\":\"hi\"}", new String(body, StandardCharsets.UTF_8));
         assertEquals("application/json", context.getHeaders().get(NServiceBusHeaders.CONTENT_TYPE));

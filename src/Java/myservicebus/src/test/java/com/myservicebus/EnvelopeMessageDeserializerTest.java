@@ -2,6 +2,8 @@ package com.myservicebus;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.myservicebus.serialization.EnvelopeMessageDeserializer;
+import com.myservicebus.serialization.ByteArrayMessageBody;
+import com.myservicebus.serialization.InboundMessage;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -33,9 +35,11 @@ public class EnvelopeMessageDeserializerTest {
         byte[] data = mapper.writeValueAsBytes(envelope);
 
         EnvelopeMessageDeserializer deserializer = new EnvelopeMessageDeserializer();
-        Envelope<Fault<InnerMessage>> result = deserializer.deserialize(data,
+        InboundMessage inbound = deserializer.deserialize(
+                new ByteArrayMessageBody(data), new java.util.HashMap<>());
+        Fault<InnerMessage> result = inbound.getMessage(
                 new com.fasterxml.jackson.core.type.TypeReference<Fault<InnerMessage>>() {}.getType());
 
-        assertEquals("oops", result.getMessage().getMessage().getText());
+        assertEquals("oops", result.getMessage().getText());
     }
 }

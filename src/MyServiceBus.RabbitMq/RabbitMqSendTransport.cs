@@ -16,7 +16,7 @@ public sealed class RabbitMqSendTransport : ISendTransport
     public async Task Send<T>(T message, SendContext context, CancellationToken cancellationToken = default)
         where T : class
     {
-        var body = await context.Serialize(message);
+        var body = context.GetMessageBody(message).GetBytes();
 
         var rabbitContext = context as RabbitMqSendContext;
         var props = rabbitContext?.Properties ?? new BasicProperties { Persistent = true };

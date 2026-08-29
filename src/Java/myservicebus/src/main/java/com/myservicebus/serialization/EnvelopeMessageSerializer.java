@@ -6,7 +6,7 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
-public class EnvelopeMessageSerializer implements MessageSerializer {
+public class EnvelopeMessageSerializer implements MessageSerializer, MessageSerializerMetadata {
     private final ObjectMapper mapper;
     private final MessageHeaderConvention headerConvention;
 
@@ -21,17 +21,27 @@ public class EnvelopeMessageSerializer implements MessageSerializer {
     }
 
     public EnvelopeMessageSerializer() {
-        this(MassTransitHeaderConvention.INSTANCE);
+        this(JsonSerializationDefaults.createObjectMapper(), MassTransitHeaderConvention.INSTANCE);
     }
 
     public EnvelopeMessageSerializer(MessageHeaderConvention headerConvention) {
+        this(JsonSerializationDefaults.createObjectMapper(), headerConvention);
+    }
+
+    public EnvelopeMessageSerializer(ObjectMapper mapper) {
+        this(mapper, MassTransitHeaderConvention.INSTANCE);
+    }
+
+    public EnvelopeMessageSerializer(ObjectMapper mapper, MessageHeaderConvention headerConvention) {
+        if (mapper == null) {
+            throw new IllegalArgumentException("mapper must not be null");
+        }
+        this.mapper = mapper;
         this.headerConvention = headerConvention;
-        this.mapper = new ObjectMapper();
-        this.mapper.findAndRegisterModules();
     }
 
     @Override
-    public <T> byte[] serialize(MessageSerializationContext<T> context) throws IOException {
+    public <T> MessageBody getMessageBody(MessageSerializationContext<T> context) throws IOException {
         context.getHeaders().put(headerConvention.getContentTypeHeader(), getContentType());
 
         Map<String, Object> headers = new HashMap<>();
@@ -60,6 +70,6 @@ public class EnvelopeMessageSerializer implements MessageSerializer {
         envelope.setHeaders(headers);
         envelope.setContentType("application/json");
         envelope.setHost(context.getHostInfo());
-        return mapper.writeValueAsBytes(envelope);
+        return new ByteArrayMessageBody(mapper.writeValueAsBytes(envelope));
     }
 }

@@ -11,6 +11,9 @@ import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.Test;
 
 import com.myservicebus.serialization.MessageSerializer;
+import com.myservicebus.serialization.MessageSerializerMetadata;
+import com.myservicebus.serialization.ByteArrayMessageBody;
+import com.myservicebus.serialization.MessageBody;
 import com.myservicebus.serialization.MessageEnvelopeMode;
 import com.myservicebus.serialization.MessageSerializationContext;
 import com.myservicebus.serialization.EnvelopeMessageSerializer;
@@ -23,7 +26,7 @@ class ReceiveEndpointSerializerTest {
     public static class InputMessage { public String value = "hi"; }
     public static class OutputMessage { }
 
-    static class CustomSerializer implements MessageSerializer {
+    static class CustomSerializer implements MessageSerializer, MessageSerializerMetadata {
         @Override
         public String getContentType() {
             return "application/custom";
@@ -35,9 +38,9 @@ class ReceiveEndpointSerializerTest {
         }
 
         @Override
-        public <T> byte[] serialize(MessageSerializationContext<T> context) {
+        public <T> MessageBody getMessageBody(MessageSerializationContext<T> context) {
             context.getHeaders().put("content_type", getContentType());
-            return new byte[0];
+            return new ByteArrayMessageBody(new byte[0]);
         }
     }
 
@@ -108,7 +111,7 @@ class ReceiveEndpointSerializerTest {
         mctx.setMessageId(java.util.UUID.randomUUID());
         mctx.setMessageType(List.of(MessageUrn.forClass(InputMessage.class)));
         mctx.setHeaders(new HashMap<>());
-        byte[] body = new EnvelopeMessageSerializer().serialize(mctx);
+        byte[] body = new EnvelopeMessageSerializer().getMessageBody(mctx).getBytes();
         factory.handler.apply(new TransportMessage(body, new HashMap<>())).join();
 
         assertEquals("application/custom", provider.contentType);

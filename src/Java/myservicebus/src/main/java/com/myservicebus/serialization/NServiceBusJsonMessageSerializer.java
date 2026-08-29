@@ -9,7 +9,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.Map;
 import java.util.UUID;
 
-public final class NServiceBusJsonMessageSerializer implements MessageSerializer {
+public final class NServiceBusJsonMessageSerializer implements MessageSerializer, MessageSerializerMetadata {
     private static final DateTimeFormatter SENT_TIME_FORMAT =
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss:SSSSSS 'Z'");
     private final ObjectMapper mapper = new ObjectMapper()
@@ -27,7 +27,7 @@ public final class NServiceBusJsonMessageSerializer implements MessageSerializer
     }
 
     @Override
-    public <T> byte[] serialize(MessageSerializationContext<T> context) throws IOException {
+    public <T> MessageBody getMessageBody(MessageSerializationContext<T> context) throws IOException {
         Map<String, Object> headers = context.getHeaders();
         UUID messageId = context.getRequestId() != null ? context.getRequestId() : context.getMessageId();
         Class<?> messageClass = context.getMessage().getClass();
@@ -55,7 +55,7 @@ public final class NServiceBusJsonMessageSerializer implements MessageSerializer
 
         headers.put("_content_type", getContentType());
         headers.put("_message_id", messageId.toString());
-        return mapper.writeValueAsBytes(context.getMessage());
+        return new ByteArrayMessageBody(mapper.writeValueAsBytes(context.getMessage()));
     }
 
     private static void putIfAbsent(Map<String, Object> headers, String name, String value) {

@@ -37,5 +37,5 @@ The ServiceBus C# client provides a lightweight messaging abstraction for buildi
 - Outgoing messages include host information such as machine name, process details, and framework version to aid in diagnostics and tracing.
 
 ## Behavior
-- Message serialization defaults to `EnvelopeMessageSerializer` but can be swapped via `SetSerializer<T>()` during registration. Raw mode supports neutral outbound and explicitly configured inbound JSON. `NServiceBusJsonMessageSerializer` is a separate RabbitMQ compatibility profile with the scope defined in [NServiceBus interoperability](../nservicebus-interoperability.md).
+- Message serialization defaults to the MassTransit JSON envelope factory. `AddSerializer(factory, isSerializer)` selects outbound formats, while `AddDeserializer(factory, isDefault)` adds accepted inbound formats independently. Raw JSON and NServiceBus JSON remain separate profiles, and MassTransit BSON is supplied by an optional package using the same contracts.
 - Send, publish, and respond operations are asynchronous and honor cancellation tokens.

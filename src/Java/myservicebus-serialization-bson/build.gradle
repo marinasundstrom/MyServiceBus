@@ -1,0 +1,14 @@
+dependencies {
+    api project(':myservicebus')
+    implementation "com.fasterxml.jackson.core:jackson-databind:${jacksonVersion}"
+    implementation "com.fasterxml.jackson.datatype:jackson-datatype-jsr310:${jacksonVersion}"
+    implementation "de.undercouch:bson4jackson:${bson4jacksonVersion}"
+}
+
+sourceSets {
+    test {
+        resources {
+            srcDir "${rootProject.projectDir}/test/fixtures"
+        }
+    }
+}

@@ -12,7 +12,7 @@ public class NServiceBusJsonMessageSerializerTests
     }
 
     [Fact]
-    public async Task Serializes_plain_json_with_nservicebus_metadata()
+    public void Serializes_plain_json_with_nservicebus_metadata()
     {
         var messageId = Guid.NewGuid();
         var conversationId = Guid.NewGuid();
@@ -25,7 +25,7 @@ public class NServiceBusJsonMessageSerializerTests
             Intent = MessageIntent.Publish
         };
 
-        var body = await new NServiceBusJsonMessageSerializer().SerializeAsync(context);
+        var body = new NServiceBusJsonMessageSerializer().GetMessageBody(context).GetBytes();
 
         Assert.Equal("{\"Text\":\"hi\"}", Encoding.UTF8.GetString(body));
         Assert.Equal("application/json", context.Headers[NServiceBusHeaders.ContentType]);

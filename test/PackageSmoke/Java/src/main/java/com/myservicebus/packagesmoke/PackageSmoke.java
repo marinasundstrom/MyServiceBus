@@ -14,6 +14,7 @@ import com.myservicebus.inspection.BusInspectionProvider;
 import com.myservicebus.mediator.MediatorBus;
 import com.myservicebus.monitoring.MonitoringExporterOptions;
 import com.myservicebus.rabbitmq.RabbitMqFactoryConfigurator;
+import com.myservicebus.serialization.bson.BsonSerializerFactory;
 
 public final class PackageSmoke {
     private static final AtomicBoolean generatedConsumerInvoked = new AtomicBoolean();
@@ -50,6 +51,7 @@ public final class PackageSmoke {
         requireType(MonitoringExporterOptions.class);
         requireType(RabbitMqFactoryConfigurator.class);
         requireType(AzureServiceBusFactoryConfigurator.class);
+        requireType(BsonSerializerFactory.class);
         System.out.println("Verified the staged MyServiceBus Maven packages from a consumer project.");
     }
 

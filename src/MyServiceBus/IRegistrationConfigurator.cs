@@ -65,12 +65,11 @@ public interface IRegistrationConfigurator
 
     void ConfigurePublish(Action<PipeConfigurator<PublishContext>> configure);
 
-    void SetSerializer<
-        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TSerializer>()
-        where TSerializer : class, IMessageSerializer;
+    void AddSerializer(ISerializerFactory factory, bool isSerializer = false);
 
-    void SetSerializer<TSerializer>(Func<IServiceProvider, TSerializer> serializerFactory)
-        where TSerializer : class, IMessageSerializer;
+    void AddDeserializer(ISerializerFactory factory, bool isDefault = false);
+
+    void ClearSerialization();
 
     void RequireTransportCapability(string capability, bool requireNative = false);
 

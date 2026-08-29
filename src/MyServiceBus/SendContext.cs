@@ -35,7 +35,7 @@ public class SendContext : BasePipeContext, ISendContext
     public DateTime? ScheduledEnqueueTime { get; set; }
     internal IReadOnlyList<string> MessageTypeUrns => messageTypes.Select(MessageUrn.For).ToArray();
 
-    public async Task<ReadOnlyMemory<byte>> Serialize<T>(T message)
+    public MessageBody GetMessageBody<T>(T message)
         where T : class
     {
         var context = new MessageSerializationContext<T>(message)
@@ -56,7 +56,7 @@ public class SendContext : BasePipeContext, ISendContext
             HostInfo = GetHostInfo<T>(),
         };
 
-        return await messageSerializer.SerializeAsync(context);
+        return messageSerializer.GetMessageBody(context);
     }
 
     private static HostInfo GetHostInfo<T>() where T : class => new HostInfo

@@ -52,7 +52,8 @@ public final class AzureServiceBusTransport {
         services.addSingleton(RequestClientTransport.class, provider -> () ->
                 new TransportRequestClientTransport(
                         provider.getService(com.myservicebus.TransportFactory.class),
-                        provider.getService(MessageSerializer.class)));
+                        provider.getService(MessageSerializer.class),
+                        provider.getService(com.myservicebus.serialization.InboundMessageResolver.class)));
         services.addScoped(ScopedClientFactory.class, provider -> () ->
                 new RequestClientFactory(provider.getService(RequestClientTransport.class)));
     }

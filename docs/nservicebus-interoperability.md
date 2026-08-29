@@ -29,7 +29,7 @@ Choose the NServiceBus serializer globally when a bus is dedicated to this profi
 ```csharp
 services.AddServiceBus(x =>
 {
-    x.SetSerializer<NServiceBusJsonMessageSerializer>();
+    x.AddSerializer(new NServiceBusJsonSerializerFactory(), isSerializer: true);
     x.UsingRabbitMq((context, rabbit) => rabbit.ConfigureEndpoints(context));
 });
 ```
@@ -39,7 +39,7 @@ services.AddServiceBus(x =>
 ```java
 services.from(MessageBusServices.class)
         .addServiceBus(cfg -> {
-            cfg.setSerializer(NServiceBusJsonMessageSerializer.class);
+            cfg.addSerializer(new NServiceBusJsonSerializerFactory(), true);
             cfg.using(RabbitMqFactoryConfigurator.class,
                     (context, rabbit) -> rabbit.configureEndpoints(context));
         });

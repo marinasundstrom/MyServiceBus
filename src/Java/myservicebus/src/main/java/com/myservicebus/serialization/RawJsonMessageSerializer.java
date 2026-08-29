@@ -3,7 +3,7 @@ package com.myservicebus.serialization;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 
-public class RawJsonMessageSerializer implements MessageSerializer {
+public class RawJsonMessageSerializer implements MessageSerializer, MessageSerializerMetadata {
     private final ObjectMapper mapper;
     private final MessageHeaderConvention headerConvention;
 
@@ -18,18 +18,28 @@ public class RawJsonMessageSerializer implements MessageSerializer {
     }
 
     public RawJsonMessageSerializer() {
-        this(MassTransitHeaderConvention.INSTANCE);
+        this(JsonSerializationDefaults.createObjectMapper(), MassTransitHeaderConvention.INSTANCE);
     }
 
     public RawJsonMessageSerializer(MessageHeaderConvention headerConvention) {
+        this(JsonSerializationDefaults.createObjectMapper(), headerConvention);
+    }
+
+    public RawJsonMessageSerializer(ObjectMapper mapper) {
+        this(mapper, MassTransitHeaderConvention.INSTANCE);
+    }
+
+    public RawJsonMessageSerializer(ObjectMapper mapper, MessageHeaderConvention headerConvention) {
+        if (mapper == null) {
+            throw new IllegalArgumentException("mapper must not be null");
+        }
+        this.mapper = mapper;
         this.headerConvention = headerConvention;
-        this.mapper = new ObjectMapper();
-        this.mapper.findAndRegisterModules();
     }
 
     @Override
-    public <T> byte[] serialize(MessageSerializationContext<T> context) throws IOException {
+    public <T> MessageBody getMessageBody(MessageSerializationContext<T> context) throws IOException {
         context.getHeaders().put(headerConvention.getContentTypeHeader(), getContentType());
-        return mapper.writeValueAsBytes(context.getMessage());
+        return new ByteArrayMessageBody(mapper.writeValueAsBytes(context.getMessage()));
     }
 }
