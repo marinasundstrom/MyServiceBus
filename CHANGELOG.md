@@ -18,6 +18,7 @@ This changelog summarizes the bigger themes in the repository history rather tha
 - Made RabbitMQ receivers cancel new delivery before waiting for active callbacks to settle during graceful shutdown in both C# and Java.
 - Added portable per-endpoint concurrent-message limits, independently of broker prefetch, mapped to RabbitMQ handler permits and Azure processor concurrency in C# and Java.
 - Added timed bus shutdown APIs with an explicit `BusStopTimeoutException`; RabbitMQ aborts timed-out receive channels so unsettled work remains redeliverable, while Azure initiates processor teardown.
+- Added RabbitMQ 4.1.8 broker-backed forced-stop gates in C# and Java, proving bounded return and same-identity redelivery to a replacement connection; also closed a C# deadline hole while consumer cancellation or channel abort is still completing.
 - Added the BSON projects to NuGet and Maven release workflows, artifact verification, Maven Central bundling, staged package consumers, and the public artifact catalog.
 - Added an optional .NET MassTransit BSON envelope package with serializer/deserializer factories, Base64 body handling, configurable Newtonsoft BSON settings, and no dependency from the default JSON runtime.
 - Added the corresponding optional Java BSON module with application `ObjectMapper` payload mapping, .NET GUID byte-order normalization, Base64 bodies, and bidirectional C#↔Java fixtures.

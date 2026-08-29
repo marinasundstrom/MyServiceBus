@@ -70,6 +70,91 @@ public class RabbitMqTestcontainerTests
         }
     }
 
+    [Fact]
+    public async Task Forced_stop_redelivers_unfinished_delivery_with_same_identity()
+    {
+        await using var container = new RabbitMqBuilder("rabbitmq:4.1.8-alpine").Build();
+        await container.StartAsync();
+
+        var transportFactory = CreateTransportFactory(container);
+        var replacementFactory = CreateTransportFactory(container);
+        var suffix = Guid.NewGuid().ToString("N");
+        var exchangeName = $"forced-stop-{suffix}";
+        var queueName = exchangeName;
+        var expectedUrn = MessageUrn.For(typeof(CompatibilityMessage));
+        var firstStarted = new TaskCompletionSource<Guid>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseFirst = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var redelivered = new TaskCompletionSource<Guid>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var topology = new ReceiveEndpointTopology
+        {
+            QueueName = queueName,
+            ExchangeName = exchangeName,
+            Durable = false,
+            AutoDelete = false,
+            PrefetchCount = 1,
+            ConcurrentMessageLimit = 1
+        };
+
+        var first = await transportFactory.CreateReceiveTransport(
+            topology,
+            async context =>
+            {
+                firstStarted.TrySetResult(context.MessageId);
+                await releaseFirst.Task;
+            },
+            messageType => messageType == expectedUrn);
+
+        await first.Start();
+        IReceiveTransport? second = null;
+        try
+        {
+            var serializer = new EnvelopeMessageSerializer();
+            var sendContext = new RabbitMqSendContext([typeof(CompatibilityMessage)], serializer)
+            {
+                DestinationAddress = new Uri($"rabbitmq://localhost/exchange/{exchangeName}"),
+                MessageId = Guid.NewGuid().ToString()
+            };
+            var sendTransport = await transportFactory.GetSendTransport(
+                new Uri($"exchange:{exchangeName}?durable=false&autodelete=false"));
+
+            await sendTransport.Send(new CompatibilityMessage { Value = "unfinished" }, sendContext);
+            var originalMessageId = await firstStarted.Task.WaitAsync(TimeSpan.FromSeconds(10));
+
+            using var stopSource = new CancellationTokenSource(TimeSpan.FromMilliseconds(200));
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => first.Stop(stopSource.Token));
+
+            second = await replacementFactory.CreateReceiveTransport(
+                topology,
+                context =>
+                {
+                    redelivered.TrySetResult(context.MessageId);
+                    return Task.CompletedTask;
+                },
+                messageType => messageType == expectedUrn);
+            await second.Start();
+
+            var redeliveredMessageId = await redelivered.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            Assert.Equal(originalMessageId, redeliveredMessageId);
+        }
+        finally
+        {
+            releaseFirst.TrySetResult();
+            if (second != null)
+                await second.Stop();
+        }
+    }
+
+    private static RabbitMqTransportFactory CreateTransportFactory(RabbitMqContainer container)
+    {
+        var connectionFactory = new ConnectionFactory
+        {
+            Uri = new Uri(container.GetConnectionString())
+        };
+        return new RabbitMqTransportFactory(
+            new ConnectionProvider(connectionFactory),
+            new RabbitMqFactoryConfigurator());
+    }
+
     public sealed class CompatibilityMessage
     {
         public string Value { get; set; } = string.Empty;

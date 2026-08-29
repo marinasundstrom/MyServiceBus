@@ -2,6 +2,7 @@ package com.myservicebus.rabbitmq;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.myservicebus.BusStopTimeoutException;
 import com.myservicebus.Envelope;
 import com.myservicebus.MessageUrn;
 import com.myservicebus.ReceiveTransport;
@@ -16,11 +17,14 @@ import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.RabbitMQContainer;
 import org.testcontainers.utility.DockerImageName;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 public class RabbitMqTestcontainerTest {
     @Test
@@ -83,6 +87,92 @@ public class RabbitMqTestcontainerTest {
             } finally {
                 receiveTransport.stop();
             }
+        }
+    }
+
+    @Test
+    public void forcedStopRedeliversUnfinishedDeliveryWithSameIdentity() throws Exception {
+        try (RabbitMQContainer container = new RabbitMQContainer(
+                DockerImageName.parse("rabbitmq:4.1.8-alpine"))) {
+            container.start();
+
+            RabbitMqTransportFactory transportFactory = createTransportFactory(container);
+            RabbitMqTransportFactory replacementFactory = createTransportFactory(container);
+            String suffix = java.util.UUID.randomUUID().toString().replace("-", "");
+            String exchangeName = "forced-stop-" + suffix;
+            String queueName = exchangeName;
+            String expectedUrn = MessageUrn.forClass(CompatibilityMessage.class);
+            CompletableFuture<String> firstStarted = new CompletableFuture<>();
+            CompletableFuture<Void> releaseFirst = new CompletableFuture<>();
+            CompletableFuture<String> redelivered = new CompletableFuture<>();
+            AtomicReference<ReceiveTransport> second = new AtomicReference<>();
+            MessageBinding binding = new MessageBinding();
+            binding.setMessageType(CompatibilityMessage.class);
+            binding.setEntityName(exchangeName);
+
+            ReceiveTransport first = transportFactory.createReceiveTransport(
+                    queueName,
+                    List.of(binding),
+                    transportMessage -> {
+                        firstStarted.complete(messageId(transportMessage.getBody()));
+                        return releaseFirst;
+                    },
+                    expectedUrn::equals,
+                    1);
+
+            first.start();
+            try {
+                CompatibilityMessage message = new CompatibilityMessage();
+                message.setValue("unfinished");
+                SendContext context = new SendContext(message, CancellationToken.none());
+                byte[] body = context.serialize(new EnvelopeMessageSerializer());
+                SendTransport sendTransport = transportFactory.getSendTransport(exchangeName, true, false);
+
+                sendTransport.send(body);
+                String originalMessageId = firstStarted.get(10, TimeUnit.SECONDS);
+
+                assertThrows(BusStopTimeoutException.class, () -> first.stop(Duration.ofMillis(200)));
+
+                ReceiveTransport replacement = replacementFactory.createReceiveTransport(
+                        queueName,
+                        List.of(binding),
+                        transportMessage -> {
+                            redelivered.complete(messageId(transportMessage.getBody()));
+                            return CompletableFuture.completedFuture(null);
+                        },
+                        expectedUrn::equals,
+                        1);
+                second.set(replacement);
+                replacement.start();
+
+                assertEquals(originalMessageId, redelivered.get(10, TimeUnit.SECONDS));
+            } finally {
+                releaseFirst.complete(null);
+                if (second.get() != null) {
+                    second.get().stop();
+                }
+            }
+        }
+    }
+
+    private static RabbitMqTransportFactory createTransportFactory(RabbitMQContainer container) {
+        ConnectionFactory connectionFactory = new ConnectionFactory();
+        connectionFactory.setHost(container.getHost());
+        connectionFactory.setPort(container.getAmqpPort());
+        connectionFactory.setUsername(container.getAdminUsername());
+        connectionFactory.setPassword(container.getAdminPassword());
+
+        return new RabbitMqTransportFactory(
+                new ConnectionProvider(connectionFactory),
+                new RabbitMqFactoryConfigurator(),
+                LoggerFactoryBuilder.create(builder -> builder.addConsole()));
+    }
+
+    private static String messageId(byte[] body) {
+        try {
+            return new ObjectMapper().readTree(body).path("messageId").asText();
+        } catch (Exception exception) {
+            throw new IllegalArgumentException("Could not read message identity", exception);
         }
     }
 

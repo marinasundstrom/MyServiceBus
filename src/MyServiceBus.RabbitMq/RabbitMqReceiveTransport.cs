@@ -147,33 +147,39 @@ public sealed class RabbitMqReceiveTransport : IReceiveTransport
             _stopping = true;
         }
 
-        if (!string.IsNullOrEmpty(_consumerTag))
-        {
-            await _channel.BasicCancelAsync(_consumerTag, cancellationToken: cancellationToken);
-        }
-
-        Task drainTask;
-        lock (_lifecycleSync)
-        {
-            drainTask = _drained.Task;
-        }
-
         try
         {
+            if (!string.IsNullOrEmpty(_consumerTag))
+            {
+                await _channel.BasicCancelAsync(_consumerTag, cancellationToken: cancellationToken)
+                    .WaitAsync(cancellationToken)
+                    .ConfigureAwait(false);
+            }
+
+            Task drainTask;
+            lock (_lifecycleSync)
+            {
+                drainTask = _drained.Task;
+            }
+
             await drainTask.WaitAsync(cancellationToken).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            try
-            {
-                await _channel.AbortAsync(CancellationToken.None).ConfigureAwait(false);
-            }
-            catch (Exception exception)
-            {
-                _logger?.LogError(exception, "Failed to abort RabbitMQ channel for queue {QueueName}", _queueName);
-            }
-
+            _ = AbortChannelAsync();
             throw;
+        }
+    }
+
+    private async Task AbortChannelAsync()
+    {
+        try
+        {
+            await _channel.AbortAsync(CancellationToken.None).ConfigureAwait(false);
+        }
+        catch (Exception exception)
+        {
+            _logger?.LogError(exception, "Failed to abort RabbitMQ channel for queue {QueueName}", _queueName);
         }
     }
 

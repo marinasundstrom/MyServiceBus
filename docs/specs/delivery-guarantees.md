@@ -179,7 +179,7 @@ Both clients expose an explicit timed stop (`StopAsync(TimeSpan, ...)` in C# and
 
 RabbitMQ C# and Java cancel the consumer before waiting for active callbacks, including deliveries waiting for a concurrency permit, to settle. On expiry they abort the receive channel, so unsettled sources remain eligible for broker redelivery and later handler completion cannot acknowledge them on that channel. Azure stops its processor; on expiry the clients initiate processor and sender teardown so active locks are not completed as successful work.
 
-These are runtime guarantees for the built-in transports. A third-party C# transport must observe the supplied cancellation token, and a third-party Java transport must override the timed `ReceiveTransport.stop(Duration)` method, before it can claim bounded shutdown. Real-broker deadline, redelivery, and settlement-race evidence remains required before the matrix can mark forced stop verified.
+These are runtime guarantees for the built-in transports. A third-party C# transport must observe the supplied cancellation token, and a third-party Java transport must override the timed `ReceiveTransport.stop(Duration)` method, before it can claim bounded shutdown. RabbitMQ 4.1.8 Testcontainers scenarios now verify in both clients that an incomplete handler cannot exceed the public stop deadline and that a replacement receiver on a separate connection receives the same message identity. Azure deadline/redelivery evidence and settlement-race evidence remain required.
 
 ## Ordering, Duplication, and Expiration
 
