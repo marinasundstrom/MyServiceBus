@@ -207,6 +207,34 @@ sequenceDiagram
     end
 ```
 
+## Transactional Messaging Boundary
+
+The transactional outbox belongs to a **logical producing service**. Its application state and outgoing messaging intent commit in the same database transaction. Every record has a service partition key. Replicas share that partition and compete for leases; unrelated services may use other partitions in the same database without reading or dispatching those records.
+
+```mermaid
+flowchart LR
+    subgraph Producer["Orders service boundary"]
+        App["Application state"]
+        Outbox["Orders outbox"]
+        ReplicaA["Replica A dispatcher"]
+        ReplicaB["Replica B dispatcher"]
+        App -->|"one transaction"| Outbox
+        Outbox -->|"competing leases"| ReplicaA
+        Outbox -->|"competing leases"| ReplicaB
+    end
+
+    ReplicaA --> Broker["Broker"]
+    ReplicaB --> Broker
+    Broker --> DotNet[".NET consumer"]
+    Broker --> Java["Java consumer"]
+```
+
+The PostgreSQL schema is one normalized MyServiceBus provider contract shared by the C# and Java implementations, so either implementation can write or lease a configured service partition. It is not a cross-service integration API: other services still communicate through the broker. The outbox stores the final serialized envelope, dispatch treats its body as opaque bytes, and the transport preserves content type, message identity, correlation, and reply metadata. A .NET or Java consumer then deserializes the same public wire contract. Live RabbitMQ gates verify persisted .NET envelopes consumed by Java and persisted Java envelopes consumed by .NET.
+
+The matching inbox belongs to the consuming service boundary. It commits the consumer's protected database effects, completed message identity, and any resulting outgoing outbox records together. Delivery remains at least once across the broker/database acknowledgement gap; stable message identity and inbox deduplication make protected database effects repeat-safe.
+
+A centralized dispatcher shared by unrelated services is possible only as an explicit deployment design. It must be configured for those service partitions and requires authorization, schema ownership, independent failure isolation, and operational accountability; it is not the default MyServiceBus model. See the [Transactional Outbox and Inbox guide](transactional-outbox.md) and its [normative specification](specs/outbox-inbox.md).
+
 ## Inspection, Monitoring, and Dashboard
 
 Operational features are first-party addons over stable programmatic contracts.
@@ -217,6 +245,7 @@ flowchart LR
     Pipelines["Pipeline events"] --> Hooks["General-purpose hooks"]
     Inspection --> Exporter["Optional monitoring exporter\nbounded local batches"]
     Hooks --> Exporter
+    Persistence["Optional persistence contributor\noutbox and inbox state"] -.-> Exporter
     Exporter --> Service["Monitoring service\ndistributed runtime model"]
     BrokerAdapter["Optional broker metrics adapter"] -.-> Service
     Service --> Query["HTTP query API"]
@@ -227,7 +256,7 @@ flowchart LR
     Telemetry["External OpenTelemetry backend"] -.-> Dashboard
 ```
 
-Inspection describes configured endpoints, consumers, contracts, instances, versions, and capabilities. General-purpose immutable hooks expose bus activity to any addon or application handler. The monitoring exporter is one hook implementation: it buffers bounded batches and sends them to the central service. Applications do not store monitoring history or expose monitoring query endpoints. Broker depth and broker-native health belong to optional broker-specific metrics adapters, not the core inspection contract.
+Inspection describes configured endpoints, consumers, contracts, instances, versions, and capabilities. General-purpose immutable hooks expose bus activity to any addon or application handler. The monitoring exporter is one hook implementation: it buffers bounded batches and sends them to the central service. Applications do not store monitoring history or expose monitoring query endpoints. Broker depth and broker-native health belong to optional broker-specific metrics adapters, while outbox and inbox state belongs to optional persistence-provider contributors. The monitoring read model may correlate these views, but it does not take ownership of dispatch or persistence.
 
 Inspection must consume the stable topology query API. It must not infer endpoint durability, exchange types, addresses, or terminal destinations from a broker scheme or naming suffix. The normalized model and transport projection are defined in the [Topology Model Specification](specs/topology-model-spec.md).
 

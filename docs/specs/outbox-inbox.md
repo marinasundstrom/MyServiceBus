@@ -6,7 +6,9 @@ This specification defines the portable transaction and failure boundary for MyS
 
 The first PostgreSQL implementation now provides corresponding C# and Java persistence behavior against real transactional storage. Provider APIs are idiomatic to each ecosystem, while their observable state transitions conform to this document. Production promotion still requires the complete [Delivery Failure Matrix](../development/delivery-failure-matrix.md).
 
-The PostgreSQL packages include a versioned schema, transaction-enlisted outbox writer, opt-in scoped Bus Outbox capture, shared-storage lease store, and transaction-enlisted inbox store. There is not yet a hosted polling loop, cleanup service, transparent Consumer Outbox middleware, application-framework unit-of-work adapter, or production transport adapter for persisted bodies. The provider's Testcontainers suites prove database atomicity, scoped send/publish capture, stable-envelope rehydration, competing leases, and duplicate-completed acquisition; they do not by themselves satisfy O01–O06.
+The PostgreSQL packages include a versioned schema, transaction-enlisted outbox writer, opt-in scoped Bus Outbox capture, shared-storage lease store, and transaction-enlisted inbox store. The portable core now includes transport dispatch that preserves the persisted body and identities, plus configurable .NET and Java background delivery lifecycles. There is not yet a cleanup service, transparent Consumer Outbox middleware, application-framework unit-of-work adapter, or automatic provider/host registration. The provider's Testcontainers suites prove database atomicity, scoped send/publish capture, stable-envelope rehydration, competing leases, and duplicate-completed acquisition; live RabbitMQ gates prove persisted-envelope consumption from C# to Java and Java to C#. These tests do not by themselves satisfy O01–O06.
+
+The Transactional Outbox MVP is the first supported Bus Outbox production path. It requires provider/host composition, startup validation, focused crash-window evidence, minimal dispatcher health and lag signals, and an end-to-end C#/Java showcase. Transparent Consumer Outbox middleware, retention automation, additional database providers, and durable scheduling are subsequent promotion work unless an MVP failure gate depends on them.
 
 ## Portable Runtime Surface
 
@@ -20,6 +22,7 @@ The corresponding runtime concepts are:
 | Atomic lease storage | `IOutboxStore` | `OutboxStore` |
 | Broker dispatch boundary | `IOutboxTransportDispatcher` | `OutboxTransportDispatcher` |
 | Deterministic batch algorithm | `OutboxDispatcher` | `OutboxDispatcher` |
+| Background delivery lifecycle | `OutboxDeliveryService` | `OutboxDeliveryService` |
 | Deduplication key | `InboxMessageKey` | `InboxMessageKey` |
 | Acquisition transaction | `IInboxTransaction` | `InboxTransaction` |
 | Acquisition storage | `IInboxStore` | `InboxStore` |
@@ -45,6 +48,8 @@ The inbound message identity must be non-empty and stable across broker redelive
 Every outbox message receives its final message identity before its record is committed. The dispatcher must reuse that identity for every attempt. It must never create a new identity because a previous broker outcome was ambiguous.
 
 ## Outbox Transaction Boundary
+
+An outbox is owned by one logical producing service. Every persisted record carries a non-empty service partition. Replicas share its records and compete through persisted leases inside that partition. Other services may use partitions in the same database without reading or dispatching those records. A centralized dispatcher may deliberately own several configured partitions, but it must preserve their ownership and failure boundaries.
 
 The application transaction atomically commits:
 

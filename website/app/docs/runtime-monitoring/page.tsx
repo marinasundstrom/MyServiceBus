@@ -129,6 +129,21 @@ export default function RuntimeMonitoring() {
         external telemetry integrations and remain separate from the portable model.
       </p>
 
+      <h2>Planned outbox and inbox operations</h2>
+      <p>
+        A future persistence-provider contribution will add service-owned outbox and
+        inbox health to this overview: pending and leased counts, oldest pending age,
+        dispatch latency and failures, lost leases, dispatcher health, and duplicate
+        inbox outcomes. This separates time waiting in an outbox from broker backlog
+        and consumer processing time.
+      </p>
+      <p>
+        The collector will receive bounded operational snapshots from each service;
+        it will not connect to application databases or mutate persisted records.
+        Message bodies, arbitrary headers, record identities, connection details,
+        and SQL remain outside the monitoring protocol.
+      </p>
+
       <h2>Follow one operation across services</h2>
       <p>
         MyServiceBus already creates OpenTelemetry producer and consumer spans in

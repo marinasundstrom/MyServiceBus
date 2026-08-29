@@ -366,6 +366,23 @@ Dimensions are bounded to application, instance, bus, endpoint, message type, co
 
 Message IDs, trace IDs, correlation IDs, conversation IDs, and exception messages must never become metric dimensions.
 
+### Outbox and Inbox Operations
+
+Persistence providers should contribute outbox and inbox state through an optional monitoring contract. This state is owned by the logical service that owns the persistence boundary, not discovered by having the central monitoring service query every application database directly. Each service replica reports a bounded snapshot or observations for its configured provider and service partition.
+
+The initial operational view should include:
+
+- pending, actively leased, retrying, dispatched, and dead outbox counts;
+- oldest pending age and commit-to-dispatch latency;
+- dispatch attempts, failures, lost leases, and expired-lease recovery;
+- dispatcher last-success time and provider/schema health;
+- completed-duplicate and in-progress-duplicate inbox outcomes; and
+- cleanup eligibility and last-success time when retention cleanup exists.
+
+Counts and ages may be grouped by application, provider, and bounded service partition. Record IDs, message IDs, destinations, serialized bodies, arbitrary headers, SQL text, connection strings, and exception messages are not metric dimensions or snapshot payloads. A drill-down API for individual persisted records would be a privileged control-plane feature and is outside the observational dashboard.
+
+The dashboard should distinguish three delays: time waiting in the service-owned outbox, broker transit/backlog, and consumer processing. This prevents an old pending record from being misdiagnosed as broker queue depth. The monitoring path must never lease, retry, mark dispatched, clean up, or otherwise mutate outbox/inbox state.
+
 ### Message Flow
 
 The monitoring service builds two graphs:

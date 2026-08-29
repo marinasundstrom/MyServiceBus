@@ -15,6 +15,8 @@ MyServiceBus follows MassTransit's useful distinction between a **Bus Outbox** f
 
 MyServiceBus documentation remains authoritative for setup, supported behavior, and release status. MassTransit configuration snippets are not source-compatible MyServiceBus examples, and behavior that MyServiceBus has not verified is not implied by conceptual compatibility.
 
+The persistence compatibility promise is MyServiceBus C# ↔ MyServiceBus Java. Both implementations use one normalized MyServiceBus PostgreSQL model. MassTransit outbox tables, storage providers, delivery services, and future commercial releases are not compatibility targets; broker-envelope interoperability is claimed only for named, tested versions.
+
 ## Replace two unrelated commits with one durable hand-off
 
 Publishing to a broker after updating a database creates a failure gap: the database can commit while publication fails, or publication can succeed while the database rolls back. A distributed transaction is rarely available across both resources.
@@ -37,15 +39,29 @@ The C# package `Sundstrom.MyServiceBus.PostgreSql` and Java module `io.github.ma
 - a factory that captures the final serialized send context and its envelope metadata;
 - atomic leasing with `FOR UPDATE SKIP LOCKED` for competing replicas;
 - persisted attempts, retry time, lease ownership, and dispatch state;
+- transport dispatch that preserves the stored body, content type, and identity;
+- a .NET hosted delivery lifecycle and an explicit Java start/close lifecycle;
 - complete envelope storage with stable message and correlation identities; and
 - inbox acquisition and completion keyed by consumer scope and message identity.
 
-Both implementations are tested against PostgreSQL 17.6 with Testcontainers. The suites cover rollback and commit behavior, scoped publish/send capture, envelope rehydration, concurrent disjoint leases, and atomic inbox completion with an outgoing outbox record.
+Both implementations are tested against PostgreSQL 17.6 with Testcontainers. The suites cover rollback and commit behavior, scoped publish/send capture, envelope rehydration, concurrent disjoint leases, and atomic inbox completion with an outgoing outbox record. Live RabbitMQ gates also dispatch a persisted C# envelope to Java and a persisted Java envelope to C# without reserializing the stored body.
 
 <div className="callout">
   <strong>Foundation status</strong>
-  <p>Bus Outbox capture and storage work, but the complete production experience is not finished. Hosted polling, broker transport dispatch, transparent Consumer Outbox middleware, retention cleanup, health, metrics, and the complete crash-injection matrix remain open.</p>
+  <p>Bus Outbox capture, storage, transport dispatch, and delivery lifecycles work, but the complete production experience is not finished. Automatic provider/host registration, transparent Consumer Outbox middleware, retention cleanup, health, metrics, and the complete crash-injection matrix remain open.</p>
 </div>
+
+## Transactional Outbox MVP gate
+
+The MVP is a supported Bus Outbox production path, not every persistence feature at once. It still requires one documented composition path per language, startup validation, focused crash-window evidence, minimal dispatcher health and lag signals, and an end-to-end C#/Java showcase.
+
+Transparent Consumer Outbox middleware, automatic retention cleanup, richer dashboard integration, SQL Server, and durable scheduling follow that MVP unless they are needed to close one of those gates.
+
+## Keep ownership inside the producing service
+
+An outbox normally belongs to one logical service. Every writer and delivery store uses that service name as a persisted partition key. Replicas share the partition and use leases to divide delivery work; other services can use their own partitions in the same PostgreSQL database without competing for those rows.
+
+The PostgreSQL rows use one normalized MyServiceBus model, so either the C# or Java implementation can write or lease a configured partition. Services still integrate through the broker rather than reading one another&apos;s rows. Dispatch preserves the final serialized envelope as opaque bytes, then a .NET or Java consumer deserializes the same public wire contract. A centralized dispatcher spanning several configured partitions is possible, but it is an explicit advanced topology with additional authorization and failure-isolation requirements.
 
 ## Write with the application transaction
 
@@ -70,7 +86,7 @@ await using var transaction = await connection.BeginTransactionAsync();
 // Execute the application UPDATE/INSERT using this transaction.
 
 using (scope.ServiceProvider.GetRequiredService<OutboxSession>()
-    .UsePostgreSql(connection, transaction))
+    .UsePostgreSql(connection, transaction, "orders-service"))
 {
     var publish = scope.ServiceProvider.GetRequiredService<IPublishEndpoint>();
     await publish.Publish(new OrderSubmitted(orderId), context =>
@@ -99,7 +115,7 @@ try (ServiceScope scope = serviceProvider.createScope();
     ServiceProvider scoped = scope.getServiceProvider();
     try (OutboxSession.Registration ignored =
             PostgreSqlOutboxSession.useTransaction(
-                    scoped.getRequiredService(OutboxSession.class), connection)) {
+                    scoped.getRequiredService(OutboxSession.class), connection, "orders-service")) {
         PublishEndpoint publish = scoped.getRequiredService(PublishEndpoint.class);
         publish.publish(new OrderSubmitted(orderId), context ->
                 context.setCorrelationId(orderId)).join();
@@ -121,6 +137,8 @@ For an acquired delivery, write responses and new messages through the acquisiti
 
 This design provides effectively-once protected PostgreSQL effects when the application uses the transaction boundary correctly. It does not promise globally exactly-once delivery, cross-database atomicity, or automatic idempotency for external API calls.
 
-The next implementation step is framework-owned hosted dispatch and broker adapters, followed by Consumer Outbox middleware for responses, publications, and faults produced while consuming a message.
+The next implementation step is automatic provider and host composition, followed by Consumer Outbox middleware for responses, publications, and faults produced while consuming a message. Retention cleanup and outbox-specific health and monitoring follow as production-hardening slices.
+
+PostgreSQL is the first provider. SQL Server is a natural future provider for the same portable MyServiceBus semantics, using its own transaction and locking mechanisms rather than promising compatibility with another framework's tables.
 
 <NextCard href="/docs/concepts/reliability" label="Related concept" title="Reliability and faults" />
