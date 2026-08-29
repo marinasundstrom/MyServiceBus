@@ -3,6 +3,7 @@ package com.myservicebus.persistence.postgresql;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.myservicebus.persistence.InboxAcquisition;
 import com.myservicebus.persistence.InboxMessageKey;
@@ -34,6 +35,8 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.Test;
 import org.postgresql.ds.PGSimpleDataSource;
@@ -166,6 +169,28 @@ class PostgreSqlPersistenceTest {
     }
 
     @Test
+    void composedDeliveryServiceDispatchesItsServicePartition() throws Exception {
+        try (PostgreSQLContainer container = startContainer()) {
+            DataSource dataSource = dataSource(container);
+            PostgreSqlSchema.ensureCreated(dataSource);
+            OutboxMessage expected = createMessage();
+            insertCommitted(dataSource, expected);
+            CapturingTransportFactory transport = new CapturingTransportFactory();
+
+            try (com.myservicebus.persistence.OutboxDeliveryService delivery =
+                    PostgreSqlOutboxDelivery.create(dataSource, transport, SERVICE_NAME, options -> {
+                        options.setOwnerId("orders-replica-a");
+                        options.setPollInterval(Duration.ofMillis(10));
+                    })) {
+                delivery.start();
+                assertTrue(transport.sent.await(5, TimeUnit.SECONDS));
+            }
+
+            assertArrayEquals(expected.body(), transport.body);
+        }
+    }
+
+    @Test
     void inboxCompletionAndOutboxWriteCommitAtomically() throws Exception {
         try (PostgreSQLContainer container = startContainer()) {
             DataSource dataSource = dataSource(container);
@@ -259,6 +284,29 @@ class PostgreSqlPersistenceTest {
         @Override
         public String getSendAddress(String queue) {
             return "loopback://" + queue;
+        }
+    }
+
+    private static final class CapturingTransportFactory implements TransportFactory {
+        private final CountDownLatch sent = new CountDownLatch(1);
+        private byte[] body;
+
+        @Override
+        public SendTransport getSendTransport(URI address) {
+            return (data, headers, contentType) -> {
+                body = data.clone();
+                sent.countDown();
+            };
+        }
+
+        @Override
+        public String getPublishAddress(String exchange) {
+            return "exchange:" + exchange;
+        }
+
+        @Override
+        public String getSendAddress(String queue) {
+            return "queue:" + queue;
         }
     }
 

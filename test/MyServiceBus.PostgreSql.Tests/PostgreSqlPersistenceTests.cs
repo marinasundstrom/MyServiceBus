@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using MyServiceBus.Persistence;
 using MyServiceBus.Persistence.PostgreSql;
 using MyServiceBus.Serialization;
@@ -144,6 +145,31 @@ public sealed class PostgreSqlPersistenceTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Composed_delivery_service_dispatches_its_service_partition()
+    {
+        var expected = CreateMessage();
+        await InsertCommitted(expected);
+        var transport = new CapturingTransportFactory();
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddSingleton(dataSource);
+        services.AddSingleton<ITransportFactory>(transport);
+        services.AddPostgreSqlOutboxDelivery(ServiceName, options =>
+        {
+            options.OwnerId = "orders-replica-a";
+            options.PollInterval = TimeSpan.FromMilliseconds(10);
+        });
+
+        await using var provider = services.BuildServiceProvider();
+        var hosted = Assert.Single(provider.GetServices<IHostedService>());
+        await hosted.StartAsync(CancellationToken.None);
+        var body = await transport.SentBody.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await hosted.StopAsync(CancellationToken.None);
+
+        Assert.Equal(expected.Body.ToArray(), body);
+    }
+
+    [Fact]
     public async Task Inbox_completion_and_outbox_write_commit_atomically()
     {
         var key = new InboxMessageKey("billing-charge-card", Guid.NewGuid());
@@ -201,4 +227,25 @@ public sealed class PostgreSqlPersistenceTests : IAsyncLifetime
     private sealed record OrderSubmitted(Guid OrderId);
 
     private sealed record SubmitOrder(Guid OrderId);
+
+    private sealed class CapturingTransportFactory : ITransportFactory
+    {
+        public TaskCompletionSource<byte[]> SentBody { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public Task<ISendTransport> GetSendTransport(
+            Uri address,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<ISendTransport>(new CapturingSendTransport(SentBody));
+    }
+
+    private sealed class CapturingSendTransport(TaskCompletionSource<byte[]> sentBody) : ISendTransport
+    {
+        public Task Send<T>(T message, SendContext context, CancellationToken cancellationToken = default)
+            where T : class
+        {
+            sentBody.TrySetResult(context.GetMessageBody(message).GetBytes());
+            return Task.CompletedTask;
+        }
+    }
 }
