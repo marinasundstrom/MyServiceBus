@@ -15,7 +15,7 @@ public class RawJsonMessageSerializerTests
     }
 
     [Fact]
-    public async Task Serializes_message_as_json()
+    public void Serializes_message_as_json()
     {
         var serializer = new RawJsonMessageSerializer();
         var message = new TestMessage { Text = "hi" };
@@ -25,7 +25,7 @@ public class RawJsonMessageSerializerTests
             Headers = headers
         };
 
-        var bytes = await serializer.SerializeAsync(context);
+        var bytes = serializer.GetMessageBody(context).GetBytes();
         var json = Encoding.UTF8.GetString(bytes);
         Assert.Contains("\"text\":\"hi\"", json);
         Assert.Equal("application/json", headers["content_type"]);

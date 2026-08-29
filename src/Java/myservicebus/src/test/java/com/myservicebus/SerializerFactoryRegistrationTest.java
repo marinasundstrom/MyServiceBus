@@ -9,6 +9,8 @@ import org.junit.jupiter.api.Test;
 import com.myservicebus.di.ServiceCollection;
 import com.myservicebus.di.ServiceProvider;
 import com.myservicebus.serialization.MessageDeserializer;
+import com.myservicebus.serialization.ByteArrayMessageBody;
+import com.myservicebus.serialization.MessageBody;
 import com.myservicebus.serialization.MessageEnvelopeMode;
 import com.myservicebus.serialization.MessageSerializationContext;
 import com.myservicebus.serialization.MessageSerializer;
@@ -56,8 +58,8 @@ class SerializerFactoryRegistrationTest {
         }
 
         @Override
-        public <T> byte[] serialize(MessageSerializationContext<T> context) {
-            return new byte[0];
+        public <T> MessageBody getMessageBody(MessageSerializationContext<T> context) {
+            return new ByteArrayMessageBody(new byte[0]);
         }
     }
 

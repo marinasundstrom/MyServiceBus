@@ -35,7 +35,7 @@ public class SerializerFactoryRegistrationTests
 
         public MessageEnvelopeMode EnvelopeMode => MessageEnvelopeMode.Raw;
 
-        public Task<byte[]> SerializeAsync<T>(MessageSerializationContext<T> context)
-            where T : class => Task.FromResult(Array.Empty<byte>());
+        public MessageBody GetMessageBody<T>(MessageSerializationContext<T> context)
+            where T : class => new ByteArrayMessageBody(Array.Empty<byte>());
     }
 }

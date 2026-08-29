@@ -5,5 +5,5 @@ public interface MessageSerializer {
 
     MessageEnvelopeMode getEnvelopeMode();
 
-    <T> byte[] serialize(MessageSerializationContext<T> context) throws Exception;
+    <T> MessageBody getMessageBody(MessageSerializationContext<T> context) throws Exception;
 }

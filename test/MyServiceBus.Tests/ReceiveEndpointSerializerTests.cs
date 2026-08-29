@@ -17,21 +17,22 @@ public class ReceiveEndpointSerializerTests
         public int Calls;
         public string ContentType => "application/custom";
         public MessageEnvelopeMode EnvelopeMode => MessageEnvelopeMode.Raw;
-        public Task<byte[]> SerializeAsync<T>(MessageSerializationContext<T> context) where T : class
+        public MessageBody GetMessageBody<T>(MessageSerializationContext<T> context) where T : class
         {
             Calls++;
             context.Headers["content_type"] = ContentType;
-            return Task.FromResult(Array.Empty<byte>());
+            return new ByteArrayMessageBody(Array.Empty<byte>());
         }
     }
 
     class StubSendTransport : ISendTransport
     {
         public string? ContentType;
-        public async Task Send<T>(T message, SendContext context, CancellationToken cancellationToken) where T : class
+        public Task Send<T>(T message, SendContext context, CancellationToken cancellationToken) where T : class
         {
-            await context.Serialize(message);
+            context.GetMessageBody(message);
             ContentType = context.Headers.TryGetValue("content_type", out var ct) ? ct?.ToString() : null;
+            return Task.CompletedTask;
         }
     }
 

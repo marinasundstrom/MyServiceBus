@@ -28,8 +28,8 @@ public class RawJsonMessageSerializer implements MessageSerializer {
     }
 
     @Override
-    public <T> byte[] serialize(MessageSerializationContext<T> context) throws IOException {
+    public <T> MessageBody getMessageBody(MessageSerializationContext<T> context) throws IOException {
         context.getHeaders().put(headerConvention.getContentTypeHeader(), getContentType());
-        return mapper.writeValueAsBytes(context.getMessage());
+        return new ByteArrayMessageBody(mapper.writeValueAsBytes(context.getMessage()));
     }
 }

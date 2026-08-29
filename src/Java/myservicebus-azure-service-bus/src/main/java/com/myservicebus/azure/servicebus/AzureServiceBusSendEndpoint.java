@@ -17,7 +17,7 @@ final class AzureServiceBusSendEndpoint {
 
     CompletableFuture<Void> send(SendContext context) {
         try {
-            byte[] body = context.serialize(serializer);
+            byte[] body = context.getMessageBody(serializer).getBytes();
             String contentType = context.getHeaders()
                     .getOrDefault("content_type", "application/vnd.masstransit+json")
                     .toString();

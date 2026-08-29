@@ -26,9 +26,9 @@ public class RawJsonMessageSerializer : IMessageSerializer
         WriteIndented = false
     };
 
-    public Task<byte[]> SerializeAsync<T>(MessageSerializationContext<T> context) where T : class
+    public MessageBody GetMessageBody<T>(MessageSerializationContext<T> context) where T : class
     {
         context.Headers[_headerConvention.ContentTypeHeader] = ContentType;
-        return Task.FromResult(JsonSerializer.SerializeToUtf8Bytes(context.Message!, _options));
+        return new ByteArrayMessageBody(JsonSerializer.SerializeToUtf8Bytes(context.Message!, _options));
     }
 }

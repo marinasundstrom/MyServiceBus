@@ -27,7 +27,7 @@ public class EnvelopeMessageSerializer : IMessageSerializer
         WriteIndented = false
     };
 
-    public Task<byte[]> SerializeAsync<T>(MessageSerializationContext<T> context) where T : class
+    public MessageBody GetMessageBody<T>(MessageSerializationContext<T> context) where T : class
     {
         context.Headers[_headerConvention.ContentTypeHeader] = ContentType;
 
@@ -53,6 +53,6 @@ public class EnvelopeMessageSerializer : IMessageSerializer
             Host = context.HostInfo,
             ContentType = "application/json"
         };
-        return Task.FromResult(JsonSerializer.SerializeToUtf8Bytes(envelope, _options));
+        return new ByteArrayMessageBody(JsonSerializer.SerializeToUtf8Bytes(envelope, _options));
     }
 }

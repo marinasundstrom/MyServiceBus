@@ -1,5 +1,3 @@
-using System.Threading.Tasks;
-
 namespace MyServiceBus.Serialization;
 
 public interface IMessageSerializer
@@ -8,6 +6,6 @@ public interface IMessageSerializer
 
     MessageEnvelopeMode EnvelopeMode { get; }
 
-    Task<byte[]> SerializeAsync<T>(MessageSerializationContext<T> context)
+    MessageBody GetMessageBody<T>(MessageSerializationContext<T> context)
         where T : class;
 }

@@ -82,7 +82,7 @@ class UnknownMessageTypeTest {
         ctx.setMessageId(UUID.randomUUID());
         ctx.setMessageType(List.of("urn:message:Unknown"));
         ctx.setHeaders(new java.util.HashMap<>());
-        byte[] body = new EnvelopeMessageSerializer().serialize(ctx);
+        byte[] body = new EnvelopeMessageSerializer().getMessageBody(ctx).getBytes();
         TransportMessage tm = new TransportMessage(body, new java.util.HashMap<>());
 
         assertDoesNotThrow(() -> transportFactory.handler.apply(tm).join());

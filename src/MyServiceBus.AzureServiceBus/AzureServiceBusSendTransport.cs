@@ -25,7 +25,7 @@ public sealed class AzureServiceBusSendTransport : ISendTransport
     {
         try
         {
-            var body = await context.Serialize(message).ConfigureAwait(false);
+            var body = context.GetMessageBody(message).GetBytes();
             var serviceBusMessage = AzureServiceBusMessageMapper.CreateMessage(
                 BinaryData.FromBytes(body),
                 context.Headers,

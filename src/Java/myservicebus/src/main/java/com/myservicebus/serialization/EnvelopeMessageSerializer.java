@@ -31,7 +31,7 @@ public class EnvelopeMessageSerializer implements MessageSerializer {
     }
 
     @Override
-    public <T> byte[] serialize(MessageSerializationContext<T> context) throws IOException {
+    public <T> MessageBody getMessageBody(MessageSerializationContext<T> context) throws IOException {
         context.getHeaders().put(headerConvention.getContentTypeHeader(), getContentType());
 
         Map<String, Object> headers = new HashMap<>();
@@ -60,6 +60,6 @@ public class EnvelopeMessageSerializer implements MessageSerializer {
         envelope.setHeaders(headers);
         envelope.setContentType("application/json");
         envelope.setHost(context.getHostInfo());
-        return mapper.writeValueAsBytes(envelope);
+        return new ByteArrayMessageBody(mapper.writeValueAsBytes(envelope));
     }
 }

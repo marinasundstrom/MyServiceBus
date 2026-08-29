@@ -15,7 +15,7 @@ public sealed class NServiceBusJsonMessageSerializer : IMessageSerializer
 
     public MessageEnvelopeMode EnvelopeMode => MessageEnvelopeMode.Raw;
 
-    public Task<byte[]> SerializeAsync<T>(MessageSerializationContext<T> context)
+    public MessageBody GetMessageBody<T>(MessageSerializationContext<T> context)
         where T : class
     {
         var messageId = context.RequestId ?? context.MessageId;
@@ -44,7 +44,7 @@ public sealed class NServiceBusJsonMessageSerializer : IMessageSerializer
         context.Headers["_content_type"] = ContentType;
         context.Headers["_message_id"] = messageId.ToString();
 
-        return Task.FromResult(JsonSerializer.SerializeToUtf8Bytes(context.Message, Options));
+        return new ByteArrayMessageBody(JsonSerializer.SerializeToUtf8Bytes(context.Message, Options));
     }
 
     private static void SetIfMissing(IDictionary<string, object> headers, string name, string value)
