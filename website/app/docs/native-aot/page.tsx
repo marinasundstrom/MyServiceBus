@@ -92,6 +92,60 @@ export default function NativeAot() {
         startup optimization without forcing the entire dependency graph onto the native path.
       </p>
 
+      <h2>Optimize within your application platform</h2>
+      <p>
+        This is not guidance for choosing .NET over Java or Java over .NET. MyServiceBus keeps the
+        messaging model familiar across both so a team can use the platform appropriate to each
+        service. The useful comparison is local to that platform: which registration, serializer,
+        and runtime mode gives an existing C# or Java application the best result for the metric it
+        actually values?
+      </p>
+      <h3>C# and .NET</h3>
+      <p>
+        .NET NativeAOT publishes IL as a platform-specific, self-contained executable without a
+        runtime JIT. Evaluate it for startup, cold-start consistency, memory footprint, deployment
+        shape, and environments where runtime code generation is unavailable. NativeAOT also
+        requires trimming and whole-application analysis; dynamic assembly loading and runtime code
+        generation are not available. Start with Microsoft&apos;s{' '}
+        <a href="https://learn.microsoft.com/dotnet/core/deploying/native-aot/">
+          Native AOT deployment overview
+        </a>{' '}and{' '}
+        <a href="https://learn.microsoft.com/dotnet/core/deploying/trimming/prepare-libraries-for-trimming">
+          trimming guidance for libraries
+        </a>.
+      </p>
+      <p>
+        Generated consumer registration and source-generated JSON metadata can both improve the
+        managed CoreCLR path; neither requires the application to publish with NativeAOT.
+      </p>
+      <p>
+        Compare reflection-capable defaults, generated registration, and source-generated JSON on
+        CoreCLR, then compare the same statically described application under NativeAOT. CoreCLR may
+        lead warmed throughput while NativeAOT may lead startup or memory. The matrix keeps those
+        dimensions separate instead of naming one universal winner.
+      </p>
+
+      <h3>Java and GraalVM</h3>
+      <p>
+        Java applications may compile the ordinary MyServiceBus API with GraalVM Native Image.
+        Native Image applies closed-world reachability analysis and emits an executable instead of
+        starting on HotSpot. Evaluate startup, memory, and deployment benefits against warmed JIT
+        throughput. Reflection, resources, proxies, serializers, and frameworks can require explicit
+        metadata. See GraalVM&apos;s official{' '}
+        <a href="https://www.graalvm.org/latest/reference-manual/native-image/">
+          Native Image reference
+        </a>{' '}and{' '}
+        <a href="https://www.graalvm.org/latest/reference-manual/native-image/metadata/">
+          reachability metadata guide
+        </a>.
+      </p>
+      <p>
+        Compare reflection-based and generated registration on the JVM, application-configured
+        Jackson, and the same statically described application as a Native Image executable. A
+        warmed JVM and Native Image optimize for different outcomes, so startup, resident memory,
+        peak throughput, allocation, image size, and build time belong in distinct columns.
+      </p>
+
       <div className="callout">
         <strong>Start with generated registration</strong>
         <p>
@@ -202,27 +256,29 @@ export default function NativeAot() {
 
       <h2>Current measurements</h2>
       <p>
-        The initial Apple M1 microbenchmarks show why AOT should be measured rather than assumed
-        faster. They exclude broker I/O and are evidence for this proof of concept, not production
-        capacity estimates.
+        C# and Java results are shown separately because their runtimes, native compilers, harnesses,
+        and historical test conditions differ. Each table compares modes within one platform; neither
+        is a C#-versus-Java ranking. The measurements exclude broker I/O and are proof-of-concept
+        evidence, not production capacity estimates.
       </p>
+
+      <h3>C# and .NET</h3>
       <div className="parity-table-wrap">
         <table className="parity-table">
-          <thead><tr><th>Client and workload</th><th>Managed/JIT</th><th>Native AOT</th><th>Result</th></tr></thead>
+          <thead><tr><th>Workload</th><th>.NET 10 CoreCLR</th><th>.NET NativeAOT</th><th>Observation</th></tr></thead>
           <tbody>
-            <tr><td>C# generated method invocation</td><td>165.4M ops/s</td><td>157.4M ops/s</td><td>Native 5% lower</td></tr>
-            <tr><td>Java generated mediator dispatch</td><td>136,724 ops/s</td><td>83,922 ops/s</td><td>Native 39% lower</td></tr>
+            <tr><td>Generated method invocation</td><td>165.4M ops/s</td><td>157.4M ops/s</td><td>Native measured 5% lower</td></tr>
           </tbody>
         </table>
       </div>
 
-      <h3>Typed registration cost</h3>
+      <h4>Typed registration cost on .NET 10</h4>
       <div className="parity-table-wrap">
         <table className="parity-table">
-          <thead><tr><th>Client</th><th>Reflection</th><th>Explicit typed</th><th>Result</th></tr></thead>
+          <thead><tr><th>Mode</th><th>Time</th><th>Allocation</th><th>Observation</th></tr></thead>
           <tbody>
-            <tr><td>.NET 10</td><td>2.282 µs, 7.21 KB</td><td>1.626 µs, 6.68 KB</td><td>29% lower time, 7% lower allocation</td></tr>
-            <tr><td>Java 21</td><td>0.718 µs</td><td>0.704 µs</td><td>2% lower; confidence intervals overlap</td></tr>
+            <tr><td>Reflection</td><td>2.282 µs</td><td>7.21 KB</td><td>Baseline</td></tr>
+            <tr><td>Explicit typed</td><td>1.626 µs</td><td>6.68 KB</td><td>29% lower time, 7% lower allocation</td></tr>
           </tbody>
         </table>
       </div>
@@ -240,10 +296,29 @@ export default function NativeAot() {
         recorded separately rather than inferred from warmed microbenchmarks.
       </p>
 
+      <h3>Java and GraalVM</h3>
+      <div className="parity-table-wrap">
+        <table className="parity-table">
+          <thead><tr><th>Workload</th><th>GraalVM 21 JIT</th><th>GraalVM Native Image</th><th>Observation</th></tr></thead>
+          <tbody>
+            <tr><td>Generated mediator dispatch</td><td>136,724 ops/s</td><td>83,922 ops/s</td><td>Native measured 39% lower</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h4>Typed registration cost on Java 21</h4>
+      <div className="parity-table-wrap">
+        <table className="parity-table">
+          <thead><tr><th>Reflection</th><th>Explicit typed</th><th>Observation</th></tr></thead>
+          <tbody>
+            <tr><td>0.718 µs</td><td>0.704 µs</td><td>2% lower; confidence intervals overlap</td></tr>
+          </tbody>
+        </table>
+      </div>
+
       <p>
-        Current JIT execution wins the steady-state dispatch measurements. The Java native result
-        predates the factory-only container. Startup time, memory, binary size, serialization,
-        and broker-backed throughput still need representative measurement.
+        The Java native result predates the factory-only container. Both platform paths still need
+        representative startup, memory, binary-size, serialization, and broker-backed measurements.
       </p>
 
       <div className="callout">

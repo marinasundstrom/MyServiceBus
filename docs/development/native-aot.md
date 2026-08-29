@@ -8,6 +8,28 @@ Reflection is not by itself an AOT blocker. It becomes a reachability requiremen
 
 Source generation and native compilation are separate decisions. A generated catalog avoids runtime discovery and reflective registration work during startup even when the application remains on the managed runtime. That may be the appropriate optimization boundary for an established application whose dependency graph was not designed for native compilation.
 
+## Two platform-specific native paths
+
+MyServiceBus shares a generated-or-explicit registration model across C# and Java, but native compilation is not one cross-language runtime feature. Each application follows the deployment model, constraints, and measurement methodology of its own platform.
+
+This guidance is not intended to help an organization choose .NET over Java or Java over .NET. MyServiceBus exists so teams can use the platform appropriate to each service while keeping the messaging model familiar. The performance question is therefore platform-local: for an application already written in C# or Java, which registration, serialization, and runtime mode best serves its startup, memory, throughput, and deployment goals?
+
+### C# and .NET applications
+
+.NET applications can publish with .NET NativeAOT. The publish step compiles IL to a platform-specific, self-contained executable without a runtime JIT. The practical benefits to evaluate are startup, cold-start consistency, memory footprint, deployment shape, and operation where runtime code generation is unavailable. The tradeoffs include mandatory trimming, no runtime code generation or dynamic assembly loading, platform-specific publishing, and AOT analysis across the complete dependency graph.
+
+MyServiceBus provides typed/generated consumer registration and application-owned source-generated JSON metadata to reduce two important dynamic boundaries. Applications may use either optimization on CoreCLR without choosing NativeAOT. See Microsoft's [Native AOT deployment overview](https://learn.microsoft.com/dotnet/core/deploying/native-aot/) and [library trimming guidance](https://learn.microsoft.com/dotnet/core/deploying/trimming/prepare-libraries-for-trimming) for the platform contract.
+
+The .NET comparison should therefore evaluate an optimization ladder within .NET: reflection-capable defaults on CoreCLR, generated registration on CoreCLR, source-generated JSON metadata on CoreCLR, and the same statically described application under NativeAOT. CoreCLR may provide the highest warmed throughput while NativeAOT may provide the strongest startup or memory result; the matrix records each dimension instead of declaring one configuration universally fastest.
+
+### Java applications
+
+Java applications keep the ordinary MyServiceBus API and may compile it with GraalVM Native Image. Native Image performs closed-world reachability analysis and emits a native executable instead of starting the application on HotSpot. The practical benefits to evaluate are startup, memory footprint, and executable deployment. Peak throughput can differ from a warmed JIT and must be measured rather than inferred.
+
+MyServiceBus provides explicit registrations, a JSR 269 generated catalog, and the factory-only `ServiceCollection.createAot()` container. Reflection, resources, proxies, serialization, and third-party frameworks may still need GraalVM reachability metadata. See the official [Native Image reference](https://www.graalvm.org/latest/reference-manual/native-image/) and [reachability metadata guide](https://www.graalvm.org/latest/reference-manual/native-image/metadata/) for that platform contract.
+
+The Java comparison should evaluate the corresponding ladder within Java: reflection-based registration on a warmed JVM, explicit or generated registration on the JVM, application-configured Jackson, and the statically described application as a Native Image executable. A warmed JVM and Native Image optimize for different outcomes, so startup, resident memory, peak throughput, allocation, image size, and build time remain separate columns.
+
 ## Generated consumer registration
 
 Reference the `Sundstrom.MyServiceBus.Generators` analyzer package from the application project and register the generated catalog:
@@ -132,9 +154,27 @@ Before AOT can be declared fully supported, .NET still needs a boundary for anon
 
 ## Proof-of-concept measurements
 
-Measurements on an Apple M1 show why this remains work in progress. BenchmarkDotNet measured generated C# method invocation at 6.046 ns on .NET 10 CoreCLR and 6.355 ns on NativeAOT (about 165.4M and 157.4M operations/second). The earlier generated-catalog Java mediator workload measured 136,724 operations/second on the GraalVM 21 JIT and 83,922 operations/second as a native executable. That Java measurement predates the factory-only container and must be rerun before drawing conclusions about the new path.
+The C# and Java results are intentionally separate. They use different runtimes, native compilers, harnesses, and historical test conditions; they are evidence within each platform, not a language comparison.
 
-Typed registration already reduces startup work: .NET explicit typed registration measured 1.626 µs versus 2.282 µs for reflection (29% lower, with 7% fewer allocations); Java measured 0.704 µs versus 0.718 µs, a small difference with overlapping confidence intervals. These are local proof-of-concept measurements, not general performance guarantees. See the website benchmark page and committed BenchmarkDotNet/JMH harnesses for methodology.
+### C# and .NET measurements
+
+| Workload | .NET 10 CoreCLR | .NET NativeAOT | Observation |
+| --- | ---: | ---: | --- |
+| Generated method invocation | 165.4M ops/s | 157.4M ops/s | Native measured about 5% lower |
+
+BenchmarkDotNet measured the invocation workload at 6.046 ns on CoreCLR and 6.355 ns on NativeAOT. Typed registration on CoreCLR measured 1.626 µs versus 2.282 µs for reflection (29% lower, with 7% fewer allocations). These local microbenchmarks exclude broker I/O and whole-process startup.
+
+The .NET JSON matrix separately compares reflective and source-generated metadata for envelope/raw serialization and deserialization. Cold startup, first use, memory, and published executable size remain process-level measurements.
+
+### Java measurements
+
+| Workload | GraalVM 21 JIT | GraalVM Native Image | Observation |
+| --- | ---: | ---: | --- |
+| Generated mediator dispatch | 136,724 ops/s | 83,922 ops/s | Native measured about 39% lower |
+
+The Java native measurement predates the factory-only container and must be rerun before drawing conclusions about the current path. Java typed registration measured 0.704 µs versus 0.718 µs for reflection, a small difference with overlapping confidence intervals.
+
+These are local proof-of-concept measurements, not general performance guarantees. See the committed BenchmarkDotNet and JMH harnesses for methodology.
 
 The harnesses now also compare reflection and generation over the same small application catalog containing one interface consumer and one attributed method consumer. This isolates registration-phase work from whole-process startup. Initial development runs favor generated catalogs in both runtimes, but a stable, controlled .NET run is still required before publishing a durable catalog-startup number.
 
