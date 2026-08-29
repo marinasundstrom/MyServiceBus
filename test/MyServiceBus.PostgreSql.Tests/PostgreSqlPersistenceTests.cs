@@ -349,7 +349,9 @@ public sealed class PostgreSqlPersistenceTests : IAsyncLifetime
         Assert.Equal(0, backlog.Dispatched);
         Assert.Equal(0, backlog.Dead);
         Assert.Equal(0, backlog.Cancelled);
-        Assert.Equal(ordersMessage.CreatedAtUtc, backlog.OldestUndispatchedAtUtc);
+        Assert.Equal(
+            TruncateToMicroseconds(ordersMessage.CreatedAtUtc),
+            TruncateToMicroseconds(backlog.OldestUndispatchedAtUtc!.Value));
     }
 
     [Fact]
@@ -513,4 +515,7 @@ public sealed class PostgreSqlPersistenceTests : IAsyncLifetime
 
         public override DateTimeOffset GetUtcNow() => UtcNow;
     }
+
+    private static DateTimeOffset TruncateToMicroseconds(DateTimeOffset value) =>
+        new(value.Ticks - (value.Ticks % TimeSpan.TicksPerMicrosecond), value.Offset);
 }
