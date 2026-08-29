@@ -144,6 +144,103 @@ public class RabbitMqTestcontainerTests
         }
     }
 
+    [Fact]
+    public async Task Prefetch_and_concurrency_bound_saturated_receiver()
+    {
+        await using var container = new RabbitMqBuilder("rabbitmq:4.1.8-alpine").Build();
+        await container.StartAsync();
+
+        var transportFactory = CreateTransportFactory(container);
+        var suffix = Guid.NewGuid().ToString("N");
+        var exchangeName = $"saturation-{suffix}";
+        var queueName = exchangeName;
+        var expectedUrn = MessageUrn.For(typeof(CompatibilityMessage));
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var twoStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var allCompleted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var stateSync = new object();
+        var activeHandlers = 0;
+        var maximumActiveHandlers = 0;
+        var startedHandlers = 0;
+        var completedHandlers = 0;
+        var topology = new ReceiveEndpointTopology
+        {
+            QueueName = queueName,
+            ExchangeName = exchangeName,
+            Durable = false,
+            AutoDelete = false,
+            PrefetchCount = 2,
+            ConcurrentMessageLimit = 2
+        };
+        var receiver = await transportFactory.CreateReceiveTransport(
+            topology,
+            async _ =>
+            {
+                lock (stateSync)
+                {
+                    activeHandlers++;
+                    maximumActiveHandlers = Math.Max(maximumActiveHandlers, activeHandlers);
+                    if (++startedHandlers == 2)
+                        twoStarted.TrySetResult();
+                }
+
+                try
+                {
+                    await release.Task;
+                }
+                finally
+                {
+                    lock (stateSync)
+                    {
+                        activeHandlers--;
+                        if (++completedHandlers == 5)
+                            allCompleted.TrySetResult();
+                    }
+                }
+            },
+            messageType => messageType == expectedUrn);
+
+        await receiver.Start();
+        try
+        {
+            var serializer = new EnvelopeMessageSerializer();
+            var sendTransport = await transportFactory.GetSendTransport(
+                new Uri($"exchange:{exchangeName}?durable=false&autodelete=false"));
+            for (var index = 0; index < 5; index++)
+            {
+                var context = new RabbitMqSendContext([typeof(CompatibilityMessage)], serializer)
+                {
+                    DestinationAddress = new Uri($"rabbitmq://localhost/exchange/{exchangeName}"),
+                    MessageId = Guid.NewGuid().ToString()
+                };
+                await sendTransport.Send(new CompatibilityMessage { Value = index.ToString() }, context);
+            }
+
+            await twoStarted.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            await Task.Delay(250);
+
+            var probeFactory = new ConnectionFactory { Uri = new Uri(container.GetConnectionString()) };
+            await using var probeConnection = await probeFactory.CreateConnectionAsync();
+            await using var probeChannel = await probeConnection.CreateChannelAsync();
+            var queueState = await probeChannel.QueueDeclarePassiveAsync(queueName);
+
+            lock (stateSync)
+            {
+                Assert.Equal(2, maximumActiveHandlers);
+                Assert.Equal(2, startedHandlers);
+            }
+            Assert.Equal(3u, queueState.MessageCount);
+
+            release.TrySetResult();
+            await allCompleted.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        }
+        finally
+        {
+            release.TrySetResult();
+            await receiver.Stop();
+        }
+    }
+
     private static RabbitMqTransportFactory CreateTransportFactory(RabbitMqContainer container)
     {
         var connectionFactory = new ConnectionFactory

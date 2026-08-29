@@ -97,10 +97,10 @@ These scenarios require a supported persistence provider and a real transactiona
 | L02 | Graceful stop with active work under deadline | New deliveries stop; active work completes and settles before stop returns | Partial | Partial | Open | Partial |
 | L03 | Drain deadline expires | Stop reports forced termination; unfinished sources remain eligible for redelivery | Verified | Verified | Partial | Partial |
 | L04 | Handler never completes | Stop remains bounded by the configured deadline | Verified | Verified | Open | Open |
-| L05 | Load exceeds configured concurrency | In-flight and queued work remain within declared bounds; broker backpressure is observable | Partial | Partial | Partial | Partial |
+| L05 | Load exceeds configured concurrency | In-flight and queued work remain within declared bounds; broker backpressure is observable | Verified | Verified | Partial | Partial |
 | L06 | Broker disconnects during drain | Completed and unfinished deliveries reach documented settlement or redelivery outcomes | Open | Open | Open | Open |
 
-RabbitMQ L03 and L04 are verified against RabbitMQ 4.1.8 by forcing a deadline while a handler remains incomplete, starting a replacement receiver on a separate connection, and asserting that the broker redelivers the same message identity. This does not prove process-crash or settlement-race rows.
+RabbitMQ L03 and L04 are verified against RabbitMQ 4.1.8 by forcing a deadline while a handler remains incomplete, starting a replacement receiver on a separate connection, and asserting that the broker redelivers the same message identity. L05 sends five messages into a receiver configured for prefetch and concurrency of two, proves exactly two handlers run, and observes the remaining three messages ready at the broker until capacity is released. This does not prove process-crash or settlement-race rows.
 
 ## Scheduling
 

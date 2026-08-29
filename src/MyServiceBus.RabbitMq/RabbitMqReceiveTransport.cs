@@ -61,6 +61,7 @@ public sealed class RabbitMqReceiveTransport : IReceiveTransport
                 return;
             }
 
+            var handlerOwnsCompletion = false;
             try
             {
                 await _concurrency.WaitAsync().ConfigureAwait(false);
@@ -104,40 +105,64 @@ public sealed class RabbitMqReceiveTransport : IReceiveTransport
                     return;
                 }
 
-                await _messageHandler.Invoke(context);
-
-                await _channel.BasicAckAsync(ea.DeliveryTag, multiple: false);
+                var handling = _messageHandler.Invoke(context);
+                handlerOwnsCompletion = true;
+                _ = CompleteDeliveryAsync(ea.DeliveryTag, handling);
+                return;
             }
             catch (Exception exc)
             {
-                _logger?.LogError(exc, "Message handling failed");
-                try
-                {
-                    if (ErrorTransportSettlement.WasMoved(exc))
-                    {
-                        await _channel.BasicAckAsync(ea.DeliveryTag, multiple: false);
-                    }
-                    else
-                    {
-                        await _channel.BasicNackAsync(ea.DeliveryTag, multiple: false, requeue: true);
-                    }
-                }
-                catch (Exception settlementException)
-                {
-                    _logger?.LogError(
-                        settlementException,
-                        "Failed to settle RabbitMQ delivery {DeliveryTag} from queue {QueueName}",
-                        ea.DeliveryTag,
-                        _queueName);
-                }
+                await SettleFailureAsync(ea.DeliveryTag, exc).ConfigureAwait(false);
             }
             finally
             {
-                EndDelivery();
+                if (!handlerOwnsCompletion)
+                    EndDelivery();
             }
         };
 
         _consumerTag = await _channel.BasicConsumeAsync(queue: _queueName, autoAck: false, consumer: consumer, cancellationToken: cancellationToken);
+    }
+
+    private async Task CompleteDeliveryAsync(ulong deliveryTag, Task handling)
+    {
+        try
+        {
+            await handling.ConfigureAwait(false);
+            await _channel.BasicAckAsync(deliveryTag, multiple: false).ConfigureAwait(false);
+        }
+        catch (Exception exception)
+        {
+            await SettleFailureAsync(deliveryTag, exception).ConfigureAwait(false);
+        }
+        finally
+        {
+            EndDelivery();
+        }
+    }
+
+    private async Task SettleFailureAsync(ulong deliveryTag, Exception exception)
+    {
+        _logger?.LogError(exception, "Message handling failed");
+        try
+        {
+            if (ErrorTransportSettlement.WasMoved(exception))
+            {
+                await _channel.BasicAckAsync(deliveryTag, multiple: false).ConfigureAwait(false);
+            }
+            else
+            {
+                await _channel.BasicNackAsync(deliveryTag, multiple: false, requeue: true).ConfigureAwait(false);
+            }
+        }
+        catch (Exception settlementException)
+        {
+            _logger?.LogError(
+                settlementException,
+                "Failed to settle RabbitMQ delivery {DeliveryTag} from queue {QueueName}",
+                deliveryTag,
+                _queueName);
+        }
     }
 
     public async Task Stop(CancellationToken cancellationToken = default)

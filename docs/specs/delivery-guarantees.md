@@ -164,7 +164,7 @@ Production documentation must label this mode non-durable. A transport may claim
 
 ## Shutdown and Flow Control
 
-Prefetch limits broker deliveries that have not been acknowledged. The portable concurrent-message limit independently bounds application handler execution, but it is not yet a complete overload policy because callback-queue bounds and saturation evidence remain open.
+Prefetch limits broker deliveries that have not been acknowledged. The portable concurrent-message limit independently bounds application handler execution. RabbitMQ 4.1.8 saturation tests verify this composition in both clients: with prefetch and concurrency set to two, exactly two handlers run while excess messages remain ready at the broker. This is not yet a complete overload policy because zero/unlimited prefetch, Azure saturation, and callback-queue bounds remain open.
 
 The production target requires:
 
