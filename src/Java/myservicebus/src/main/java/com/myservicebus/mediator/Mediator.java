@@ -16,6 +16,12 @@ public interface Mediator {
 
     CompletableFuture<Void> send(Object message, CancellationToken cancellationToken);
 
+    <TResponse> CompletableFuture<TResponse> send(Request<TResponse> request);
+
+    <TResponse> CompletableFuture<TResponse> send(
+            Request<TResponse> request,
+            CancellationToken cancellationToken);
+
     <TResponse> CompletableFuture<TResponse> send(Object message, Class<TResponse> responseType);
 
     <TResponse> CompletableFuture<TResponse> send(

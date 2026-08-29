@@ -17,8 +17,16 @@ public interface IMediator
     /// <exception cref="MediatorHandlerNotFoundException">No compatible handler is registered.</exception>
     /// <exception cref="MediatorHandlerCardinalityException">More than one compatible handler is registered.</exception>
     /// <exception cref="MediatorResponseTypeException">The selected handler produces a response.</exception>
-    Task Send<TRequest>(TRequest request, CancellationToken cancellationToken = default)
-        where TRequest : class;
+    Task Send(object request, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Sends a request whose contract declares its response type and returns the response.
+    /// </summary>
+    /// <exception cref="MediatorHandlerNotFoundException">No compatible handler is registered.</exception>
+    /// <exception cref="MediatorHandlerCardinalityException">More than one compatible handler is registered.</exception>
+    /// <exception cref="MediatorResponseTypeException">The selected handler cannot produce <typeparamref name="TResponse"/>.</exception>
+    Task<TResponse> Send<TResponse>(IRequest<TResponse> request, CancellationToken cancellationToken = default)
+        where TResponse : class;
 
     /// <summary>
     /// Sends a command or query to exactly one compatible local handler and returns its response.

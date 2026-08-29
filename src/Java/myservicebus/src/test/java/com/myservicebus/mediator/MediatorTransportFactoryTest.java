@@ -164,7 +164,7 @@ public class MediatorTransportFactoryTest {
         }
     }
 
-    public static class RequestMessage {
+    public static class RequestMessage implements Request<ResponseMessage> {
         private final String value;
 
         public RequestMessage(String value) {
@@ -173,6 +173,11 @@ public class MediatorTransportFactoryTest {
 
         public String getValue() {
             return value;
+        }
+
+        @Override
+        public Class<ResponseMessage> responseType() {
+            return ResponseMessage.class;
         }
     }
 
@@ -437,6 +442,8 @@ public class MediatorTransportFactoryTest {
 
         ResponseMessage response = bus.send(new RequestMessage("query"), ResponseMessage.class).join();
         Assertions.assertEquals("query-response", response.getValue());
+        ResponseMessage inferredResponse = bus.send(new RequestMessage("inferred")).join();
+        Assertions.assertEquals("inferred-response", inferredResponse.getValue());
         Assertions.assertThrows(
                 com.myservicebus.MediatorResponseTypeException.class,
                 () -> bus.send(new RequestMessage("wrong"), TestMessage.class));

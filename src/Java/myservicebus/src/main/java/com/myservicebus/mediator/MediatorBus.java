@@ -70,6 +70,19 @@ public class MediatorBus implements Mediator {
     }
 
     @Override
+    public <TResponse> CompletableFuture<TResponse> send(Request<TResponse> request) {
+        return send(request, CancellationToken.none());
+    }
+
+    @Override
+    public <TResponse> CompletableFuture<TResponse> send(
+            Request<TResponse> request,
+            CancellationToken cancellationToken) {
+        Objects.requireNonNull(request, "request");
+        return send(request, Objects.requireNonNull(request.responseType(), "request.responseType()"), cancellationToken);
+    }
+
+    @Override
     public <TResponse> CompletableFuture<TResponse> send(Object message, Class<TResponse> responseType) {
         return send(message, responseType, CancellationToken.none());
     }

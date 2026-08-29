@@ -42,7 +42,7 @@ public class MediatorTransportFactoryTests
         }
     }
 
-    class RequestMessage
+    class RequestMessage : IRequest<ResponseMessage>
     {
         public string Value { get; set; } = string.Empty;
     }
@@ -645,6 +645,9 @@ public class MediatorTransportFactoryTests
 
         var response = await mediator.Send<RequestMessage, ResponseMessage>(new RequestMessage { Value = "query" });
         Assert.Equal("query-response", response.Value);
+
+        ResponseMessage inferredResponse = await mediator.Send(new RequestMessage { Value = "inferred" });
+        Assert.Equal("inferred-response", inferredResponse.Value);
 
         var requestResponse = await mediator.CreateRequestClient<RequestMessage>()
             .GetResponseAsync<ResponseMessage>(new RequestMessage { Value = "client" });
