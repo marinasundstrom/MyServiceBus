@@ -35,6 +35,7 @@ public interface IMessageBus :
 
     Task AddHandler<TMessage>(string queueName, string exchangeName, Func<ConsumeContext<TMessage>, Task> handler,
         int? retryCount = null, TimeSpan? retryDelay = null, ushort? prefetchCount = null,
-        IDictionary<string, object?>? queueArguments = null, IMessageSerializer? serializer = null, CancellationToken cancellationToken = default)
+        IDictionary<string, object?>? queueArguments = null, IMessageSerializer? serializer = null,
+        CancellationToken cancellationToken = default, int? concurrentMessageLimit = null)
         where TMessage : class;
 }

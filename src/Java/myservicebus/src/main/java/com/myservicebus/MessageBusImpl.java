@@ -301,7 +301,8 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
                     false,
                     first.getPrefetchCount() != null ? first.getPrefetchCount() : 0,
                     bindings,
-                    first.getQueueArguments());
+                    first.getQueueArguments(),
+                    first.getConcurrentMessageLimit() != null ? first.getConcurrentMessageLimit() : 1);
             Function<String, Boolean> isRegistered = urn -> urn == null
                     ? rawConsumerEndpoints.contains(endpointName)
                     : registeredUrns.contains(urn);
@@ -321,6 +322,15 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
             java.util.function.Function<ConsumeContext<T>, CompletableFuture<Void>> handler,
             Integer retryCount, java.time.Duration retryDelay, Integer prefetchCount,
             java.util.Map<String, Object> queueArguments, MessageSerializer serializer) throws Exception {
+        addHandler(queueName, messageType, exchange, handler, retryCount, retryDelay, prefetchCount,
+                queueArguments, serializer, null);
+    }
+
+    public <T> void addHandler(String queueName, Class<T> messageType, String exchange,
+            java.util.function.Function<ConsumeContext<T>, CompletableFuture<Void>> handler,
+            Integer retryCount, java.time.Duration retryDelay, Integer prefetchCount,
+            java.util.Map<String, Object> queueArguments, MessageSerializer serializer,
+            Integer concurrentMessageLimit) throws Exception {
         PipeConfigurator<ConsumeContext<T>> configurator = new PipeConfigurator<>();
         configurator.useFilter(new OpenTelemetryConsumeFilter<>());
         configurator.useFilter(new BusHookConsumeFilter<>(hooks, queueName, messageType));
@@ -400,7 +410,8 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
                 false,
                 prefetchCount != null ? prefetchCount : 0,
                 bindings,
-                queueArguments);
+                queueArguments,
+                concurrentMessageLimit != null ? concurrentMessageLimit : 1);
         ReceiveTransport transport = transportFactory.createReceiveTransport(
                 endpointTopology, transportHandler, isRegisteredHandler);
         receiveTransports.add(transport);

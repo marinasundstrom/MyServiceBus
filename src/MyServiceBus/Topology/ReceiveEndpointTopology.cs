@@ -11,5 +11,6 @@ public class ReceiveEndpointTopology
     public bool Durable { get; init; } = true;
     public bool AutoDelete { get; init; } = false;
     public ushort PrefetchCount { get; init; } = 0;
+    public int ConcurrentMessageLimit { get; init; } = 1;
     public IDictionary<string, object?>? QueueArguments { get; init; }
 }

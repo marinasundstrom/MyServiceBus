@@ -105,7 +105,7 @@ public sealed class AzureServiceBusTransportFactory : ITransportFactory
             new ServiceBusProcessorOptions
             {
                 AutoCompleteMessages = false,
-                MaxConcurrentCalls = 1,
+                MaxConcurrentCalls = projected.ConcurrentMessageLimit,
                 PrefetchCount = prefetchCount
             });
 
@@ -165,7 +165,8 @@ public sealed class AzureServiceBusTransportFactory : ITransportFactory
             topology.Temporary,
             topology.PrefetchCount,
             topology.Bindings,
-            topology.TransportOptions);
+            topology.TransportOptions,
+            topology.ConcurrentMessageLimit);
     }
 
     private string FormatTemporaryEndpointName(string endpointName)

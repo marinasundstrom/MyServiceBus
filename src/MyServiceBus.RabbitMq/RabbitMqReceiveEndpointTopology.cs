@@ -13,7 +13,8 @@ public sealed record RabbitMqReceiveEndpointTopology(
     bool Durable,
     bool AutoDelete,
     ushort PrefetchCount,
-    IDictionary<string, object?>? QueueArguments)
+    IDictionary<string, object?>? QueueArguments,
+    int ConcurrentMessageLimit = 1)
 {
     public static RabbitMqReceiveEndpointTopology Project(ReceiveEndpointTopology endpoint)
     {
@@ -31,7 +32,8 @@ public sealed record RabbitMqReceiveEndpointTopology(
             endpoint.Durable,
             endpoint.AutoDelete,
             endpoint.PrefetchCount,
-            endpoint.QueueArguments);
+            endpoint.QueueArguments,
+            endpoint.ConcurrentMessageLimit);
     }
 
     public static RabbitMqReceiveEndpointTopology Project(ReceiveEndpointTransportTopology endpoint)
@@ -54,6 +56,7 @@ public sealed record RabbitMqReceiveEndpointTopology(
             endpoint.PrefetchCount,
             endpoint.TransportOptions is null
                 ? null
-                : new Dictionary<string, object?>(endpoint.TransportOptions, StringComparer.Ordinal));
+                : new Dictionary<string, object?>(endpoint.TransportOptions, StringComparer.Ordinal),
+            endpoint.ConcurrentMessageLimit);
     }
 }

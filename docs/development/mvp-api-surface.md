@@ -17,7 +17,7 @@ These concepts have corresponding C# and Java APIs, but construction patterns, a
 
 ## Transport extension point
 
-New transports implement `ITransportFactory.CreateReceiveTransport(ReceiveEndpointTransportTopology, ...)` in C# or `TransportFactory.createReceiveTransport(ReceiveEndpointTransportTopology, ...)` in Java. `ReceiveEndpointTransportTopology` is the supported runtime contract for endpoint name, durability and temporary intent, bindings, prefetch, and adapter-owned options.
+New transports implement `ITransportFactory.CreateReceiveTransport(ReceiveEndpointTransportTopology, ...)` in C# or `TransportFactory.createReceiveTransport(ReceiveEndpointTransportTopology, ...)` in Java. `ReceiveEndpointTransportTopology` is the supported runtime contract for endpoint name, durability and temporary intent, bindings, prefetch, concurrent-message limits, and adapter-owned options.
 
 The older C# `ReceiveEndpointTopology` overload and Java queue/binding parameter-list overloads are deprecated compatibility adapters. They remain callable during the MVP line so existing transport implementations are not broken abruptly, but new transports must not use them as their primary contract. Removal requires a declared breaking release.
 

@@ -65,6 +65,7 @@ public class ReceiveEndpointConfigurator
     private int? _retryCount;
     private TimeSpan? _retryDelay;
     private ushort? _prefetchCount;
+    private int? _concurrentMessageLimit;
     private IDictionary<string, object?>? _queueArguments;
     private Type? _serializerType;
 
@@ -127,6 +128,7 @@ public class ReceiveEndpointConfigurator
         }
 
         consumer.PrefetchCount = _prefetchCount;
+        consumer.ConcurrentMessageLimit = _concurrentMessageLimit;
         consumer.QueueArguments = _queueArguments;
         consumer.SerializerType = _serializerType;
 
@@ -169,13 +171,30 @@ public class ReceiveEndpointConfigurator
             IMessageSerializer? serializer = _serializerType != null
                 ? (IMessageSerializer)ActivatorUtilities.CreateInstance(provider, _serializerType)
                 : null;
-            bus.AddHandler(_queueName, exchangeName, handler, _retryCount, _retryDelay, _prefetchCount, _queueArguments, serializer, CancellationToken.None).GetAwaiter().GetResult();
+            bus.AddHandler(
+                    _queueName,
+                    exchangeName,
+                    handler,
+                    _retryCount,
+                    _retryDelay,
+                    _prefetchCount,
+                    _queueArguments,
+                    serializer,
+                    CancellationToken.None,
+                    _concurrentMessageLimit)
+                .GetAwaiter().GetResult();
         });
     }
 
     public void PrefetchCount(ushort prefetchCount)
     {
         _prefetchCount = prefetchCount;
+    }
+
+    public void ConcurrentMessageLimit(int concurrentMessageLimit)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(concurrentMessageLimit, 1);
+        _concurrentMessageLimit = concurrentMessageLimit;
     }
 
 }

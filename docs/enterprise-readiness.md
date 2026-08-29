@@ -17,7 +17,7 @@ The repository has a strong interoperability and conformance foundation, but the
 | Delivery failures | Retries, faults, `_error` and `_skipped` destinations, lock renewal, and explicit Azure at-least-once boundary | Partial | Document every acknowledgement and crash window; add failure-injection coverage |
 | Transactional consistency | Prospective topology model only | Gap | Provide outbox/inbox contracts and supported persistence integrations |
 | Idempotency | Duplicate risk is documented for Azure compatibility moves | Gap | Provide a portable message identity and deduplication strategy with tested storage semantics |
-| Lifecycle and flow control | Explicit lifecycle, RabbitMQ recovery, prefetch configuration, and Azure lock renewal | Partial | Add bounded concurrency, drain-on-shutdown, overload behavior, and broker-outage recovery gates |
+| Lifecycle and flow control | Explicit lifecycle, portable endpoint concurrency limits, RabbitMQ drain-on-shutdown, prefetch configuration, and Azure lock renewal | Partial | Add forced-stop deadlines, saturation evidence, bounded callback queues, and broker-outage recovery gates |
 | Observability | W3C trace propagation, OpenTelemetry spans, hooks, experimental monitoring, and RabbitMQ health checks | Partial | Define stable metrics, health semantics for both transports and languages, alert guidance, and cardinality limits |
 | Transport security | Username/password and connection-string configuration are available | Gap | Add TLS validation guidance and tests, secret rotation patterns, least-privilege broker policies, and managed identity for Azure |
 | Monitoring security | Payloads are excluded, but the collector is explicitly unauthenticated and in-memory | Experimental | Add authentication, authorization, TLS, request limits, durable retention, and audit behavior before production use |
@@ -38,7 +38,7 @@ This assessment does not make the existing preview unsuitable for evaluation or 
 - Identify duplicate and loss windows explicitly; never imply exactly-once delivery.
 - Add first-class transactional outbox and inbox/idempotent-consumer contracts with corresponding C# and Java behavior.
 - Select narrowly supported persistence integrations based on production demand and verify schema migration, cleanup, contention, and recovery behavior.
-- Add bounded endpoint concurrency independently of broker prefetch.
+- Validate bounded endpoint concurrency independently of broker prefetch under sustained saturation.
 - Drain in-flight work during graceful shutdown with a configurable deadline and an explicit forced-stop outcome.
 - Exercise process termination, connection loss, broker restart, lock expiry, ambiguous settlement, and partial error-move failures in automated tests.
 
@@ -99,7 +99,7 @@ This assessment does not make the existing preview unsuitable for evaluation or 
 Work should proceed in this order:
 
 1. Specify delivery guarantees and build the failure-injection matrix.
-2. Implement bounded concurrency and graceful draining in C# and Java.
+2. Complete forced-stop deadlines and saturation evidence for bounded concurrency and graceful draining in C# and Java.
 3. Design and implement the portable outbox/inbox boundary, then add the first supported persistence integration for each ecosystem.
 4. Complete secure transport configuration, managed identity, least-privilege guidance, and supply-chain evidence.
 5. Standardize metrics and cross-transport health semantics; publish the core operational runbooks.

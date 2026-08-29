@@ -49,7 +49,7 @@ public class RabbitMqFactoryConfiguratorTests
             return Task.CompletedTask;
         }
 
-        public Task AddHandler<TMessage>(string queueName, string exchangeName, Func<ConsumeContext<TMessage>, Task> handler, int? retryCount = null, TimeSpan? retryDelay = null, ushort? prefetchCount = null, IDictionary<string, object?>? queueArguments = null, IMessageSerializer? serializer = null, CancellationToken cancellationToken = default) where TMessage : class => Task.CompletedTask;
+        public Task AddHandler<TMessage>(string queueName, string exchangeName, Func<ConsumeContext<TMessage>, Task> handler, int? retryCount = null, TimeSpan? retryDelay = null, ushort? prefetchCount = null, IDictionary<string, object?>? queueArguments = null, IMessageSerializer? serializer = null, CancellationToken cancellationToken = default, int? concurrentMessageLimit = null) where TMessage : class => Task.CompletedTask;
 
         class StubSendEndpoint : ISendEndpoint
         {
@@ -70,6 +70,7 @@ public class RabbitMqFactoryConfiguratorTests
         var endpointActions = new List<Action<IMessageBus, IServiceProvider>>();
         var endpoint = new ReceiveEndpointConfigurator("external-orders", new Dictionary<Type, string>(), endpointActions);
 
+        endpoint.ConcurrentMessageLimit(4);
         endpoint.Consumer<MyConsumer, MyMessage>();
         endpointActions.Single()(bus, provider);
 
@@ -77,6 +78,7 @@ public class RabbitMqFactoryConfiguratorTests
         Assert.Equal(typeof(MyConsumer), consumer.ConsumerType);
         Assert.Equal(typeof(MyMessage), consumer.Bindings[0].MessageType);
         Assert.Equal("external-orders", consumer.QueueName);
+        Assert.Equal(4, consumer.ConcurrentMessageLimit);
         Assert.Same(consumer, bus.AddedConsumer);
         Assert.Null(provider.GetService<MyConsumer>());
     }

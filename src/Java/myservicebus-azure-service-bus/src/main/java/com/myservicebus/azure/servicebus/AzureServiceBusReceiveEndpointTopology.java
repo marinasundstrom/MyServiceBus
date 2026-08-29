@@ -10,7 +10,17 @@ record AzureServiceBusReceiveEndpointTopology(
         boolean durable,
         boolean temporary,
         int prefetchCount,
-        List<MessageBinding> bindings) {
+        List<MessageBinding> bindings,
+        int concurrentMessageLimit) {
+
+    AzureServiceBusReceiveEndpointTopology(
+            String queueName,
+            boolean durable,
+            boolean temporary,
+            int prefetchCount,
+            List<MessageBinding> bindings) {
+        this(queueName, durable, temporary, prefetchCount, bindings, 1);
+    }
 
     AzureServiceBusReceiveEndpointTopology {
         if (queueName == null || queueName.isBlank()) {
@@ -21,6 +31,9 @@ record AzureServiceBusReceiveEndpointTopology(
         }
         if (prefetchCount < 0) {
             throw new IllegalArgumentException("Azure Service Bus prefetch count cannot be negative");
+        }
+        if (concurrentMessageLimit < 1) {
+            throw new IllegalArgumentException("Azure Service Bus concurrent message limit must be at least one");
         }
         if (bindings == null || bindings.isEmpty()) {
             throw new IllegalArgumentException("Azure Service Bus endpoint must have at least one binding");
@@ -42,6 +55,7 @@ record AzureServiceBusReceiveEndpointTopology(
                 topology.durable(),
                 topology.temporary(),
                 topology.prefetchCount(),
-                topology.bindings());
+                topology.bindings(),
+                topology.concurrentMessageLimit());
     }
 }

@@ -8,6 +8,7 @@ import static org.mockito.Mockito.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 
 import org.junit.jupiter.api.Test;
@@ -123,5 +124,51 @@ class ErrorHandlingTest {
         stop.join();
         verify(channel).basicAck(1L, false);
         verify(channel).close();
+    }
+
+    @Test
+    void concurrentMessageLimitDelaysAdditionalHandlers() throws Exception {
+        Channel channel = mock(Channel.class);
+        ArgumentCaptor<DeliverCallback> captor = ArgumentCaptor.forClass(DeliverCallback.class);
+        when(channel.basicConsume(eq("input"), eq(false), captor.capture(), any(CancelCallback.class)))
+                .thenReturn("consumer-tag");
+
+        AtomicInteger invocationCount = new AtomicInteger();
+        CountDownLatch firstStarted = new CountDownLatch(1);
+        CountDownLatch secondStarted = new CountDownLatch(1);
+        CompletableFuture<Void> releaseFirst = new CompletableFuture<>();
+        Function<TransportMessage, CompletableFuture<Void>> handler = message -> {
+            if (invocationCount.incrementAndGet() == 1) {
+                firstStarted.countDown();
+                return releaseFirst;
+            }
+            secondStarted.countDown();
+            return CompletableFuture.completedFuture(null);
+        };
+        RabbitMqReceiveTransport transport = new RabbitMqReceiveTransport(
+                channel, "input", handler, "fault", ignored -> true, new Slf4jLoggerFactory(), 1);
+        transport.start();
+
+        byte[] body = "{\"messageType\":[\"urn:message:test\"],\"message\":{}}".getBytes();
+        DeliverCallback callback = captor.getValue();
+        callback.handle("consumer-tag", new Delivery(
+                new Envelope(1L, false, "ex", "rk"), new AMQP.BasicProperties(), body));
+        assertTrue(firstStarted.await(1, TimeUnit.SECONDS));
+
+        CompletableFuture<Void> secondDelivery = CompletableFuture.runAsync(() -> {
+            try {
+                callback.handle("consumer-tag", new Delivery(
+                        new Envelope(2L, false, "ex", "rk"), new AMQP.BasicProperties(), body));
+            } catch (Exception exception) {
+                throw new RuntimeException(exception);
+            }
+        });
+        assertFalse(secondStarted.await(100, TimeUnit.MILLISECONDS));
+
+        releaseFirst.complete(null);
+        assertTrue(secondStarted.await(1, TimeUnit.SECONDS));
+        secondDelivery.join();
+        verify(channel, timeout(1000)).basicAck(1L, false);
+        verify(channel, timeout(1000)).basicAck(2L, false);
     }
 }

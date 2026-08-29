@@ -57,6 +57,7 @@ public interface ITransportFactory
                 Durable = topology.Durable,
                 AutoDelete = topology.Temporary,
                 PrefetchCount = topology.PrefetchCount,
+                ConcurrentMessageLimit = topology.ConcurrentMessageLimit,
                 QueueArguments = topology.TransportOptions is null
                     ? null
                     : new Dictionary<string, object?>(topology.TransportOptions, StringComparer.Ordinal)

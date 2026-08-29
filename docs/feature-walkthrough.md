@@ -251,6 +251,29 @@ cfg.receiveEndpoint("submit-order", endpoint ->
     endpoint.handler(SubmitOrder.class, submitOrderConsumer::consume));
 ```
 
+### Bound endpoint concurrency independently of prefetch
+
+Prefetch controls how many unsettled deliveries the broker may send. The concurrent message limit controls how many application handlers an endpoint may run at once. Configure both when tuning a production endpoint:
+
+```csharp
+cfg.ReceiveEndpoint("submit-order", endpoint =>
+{
+    endpoint.PrefetchCount(32);
+    endpoint.ConcurrentMessageLimit(8);
+    endpoint.Consumer<SubmitOrderConsumer, SubmitOrder>();
+});
+```
+
+```java
+cfg.receiveEndpoint("submit-order", endpoint -> {
+    endpoint.prefetchCount(32);
+    endpoint.concurrentMessageLimit(8);
+    endpoint.consumer(SubmitOrder.class, SubmitOrderConsumer.class);
+});
+```
+
+The default concurrent message limit is one. RabbitMQ holds deliveries waiting for a permit unsettled; Azure Service Bus maps the limit to the processor's native concurrent-call setting.
+
 You can also decorate the factory with additional services or a logger factory before creating the bus:
 
 ```csharp

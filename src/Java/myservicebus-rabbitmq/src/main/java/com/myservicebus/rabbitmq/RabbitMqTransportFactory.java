@@ -212,7 +212,7 @@ public class RabbitMqTransportFactory implements TransportFactory {
 
         String faultAddress = getFaultAddress(topology.queueName());
         return new RabbitMqReceiveTransport(channel, topology.queueName(), handler, faultAddress, isMessageTypeRegistered,
-                loggerFactory);
+                loggerFactory, topology.concurrentMessageLimit());
     }
 
     @Override

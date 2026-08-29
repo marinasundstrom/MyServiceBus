@@ -23,14 +23,16 @@ public sealed class RabbitMqReceiveTransport : IReceiveTransport
     private readonly Uri? _faultAddress;
     private readonly Func<string?, bool>? _isMessageTypeRegistered;
     private readonly ILogger<RabbitMqReceiveTransport>? _logger;
+    private readonly SemaphoreSlim _concurrency;
     private readonly object _lifecycleSync = new();
     private TaskCompletionSource<bool> _drained = CompletedDrain();
     private int _activeDeliveries;
     private bool _stopping;
     private string _consumerTag;
 
-    public RabbitMqReceiveTransport(IChannel channel, string queueName, Func<ReceiveContext, Task> handler, Uri? errorAddress, Uri? faultAddress, Func<string?, bool>? isMessageTypeRegistered, IInboundMessageResolver? inboundMessageResolver = null, ILogger<RabbitMqReceiveTransport>? logger = null)
+    public RabbitMqReceiveTransport(IChannel channel, string queueName, Func<ReceiveContext, Task> handler, Uri? errorAddress, Uri? faultAddress, Func<string?, bool>? isMessageTypeRegistered, IInboundMessageResolver? inboundMessageResolver = null, ILogger<RabbitMqReceiveTransport>? logger = null, int concurrentMessageLimit = 1)
     {
+        ArgumentOutOfRangeException.ThrowIfLessThan(concurrentMessageLimit, 1);
         _channel = channel;
         _queueName = queueName;
         _messageHandler = handler;
@@ -39,6 +41,7 @@ public sealed class RabbitMqReceiveTransport : IReceiveTransport
         _isMessageTypeRegistered = isMessageTypeRegistered;
         _inboundMessageResolver = inboundMessageResolver ?? new InboundMessageResolver();
         _logger = logger;
+        _concurrency = new SemaphoreSlim(concurrentMessageLimit, concurrentMessageLimit);
     }
 
     public async Task Start(CancellationToken cancellationToken = default)
@@ -60,6 +63,7 @@ public sealed class RabbitMqReceiveTransport : IReceiveTransport
 
             try
             {
+                await _concurrency.WaitAsync().ConfigureAwait(false);
                 var payload = ea.Body.ToArray();
                 var props = ea.BasicProperties;
 
@@ -183,6 +187,7 @@ public sealed class RabbitMqReceiveTransport : IReceiveTransport
         }
 
         drained?.TrySetResult(true);
+        _concurrency.Release();
     }
 
     private static TaskCompletionSource<bool> CompletedDrain()

@@ -38,7 +38,10 @@ public class AzureServiceBusFactoryConsumerTests
         var configurator = new AzureServiceBusFactoryConfigurator();
 
         configurator.ReceiveEndpoint("external-orders", endpoint =>
-            endpoint.Consumer<TestConsumer, TestMessage>());
+        {
+            endpoint.ConcurrentMessageLimit(4);
+            endpoint.Consumer<TestConsumer, TestMessage>();
+        });
 
         var actionsField = typeof(AzureServiceBusFactoryConfigurator).GetField(
             "_endpointActions",
@@ -50,6 +53,7 @@ public class AzureServiceBusFactoryConsumerTests
         Assert.Equal(typeof(TestConsumer), consumer.ConsumerType);
         Assert.Equal(typeof(TestMessage), consumer.Bindings[0].MessageType);
         Assert.Equal("external-orders", consumer.QueueName);
+        Assert.Equal(4, consumer.ConcurrentMessageLimit);
         Assert.Same(consumer, bus.AddedConsumer);
         Assert.Null(provider.GetService<TestConsumer>());
     }
@@ -88,7 +92,7 @@ public class AzureServiceBusFactoryConsumerTests
             return Task.CompletedTask;
         }
 
-        public Task AddHandler<TMessage>(string queueName, string exchangeName, Func<ConsumeContext<TMessage>, Task> handler, int? retryCount = null, TimeSpan? retryDelay = null, ushort? prefetchCount = null, IDictionary<string, object?>? queueArguments = null, IMessageSerializer? serializer = null, CancellationToken cancellationToken = default)
+        public Task AddHandler<TMessage>(string queueName, string exchangeName, Func<ConsumeContext<TMessage>, Task> handler, int? retryCount = null, TimeSpan? retryDelay = null, ushort? prefetchCount = null, IDictionary<string, object?>? queueArguments = null, IMessageSerializer? serializer = null, CancellationToken cancellationToken = default, int? concurrentMessageLimit = null)
             where TMessage : class => Task.CompletedTask;
 
         private sealed class StubSendEndpoint : ISendEndpoint

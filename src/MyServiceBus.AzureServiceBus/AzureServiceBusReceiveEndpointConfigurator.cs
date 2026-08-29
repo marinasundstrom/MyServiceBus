@@ -12,6 +12,7 @@ public sealed class AzureServiceBusReceiveEndpointConfigurator
     private int? _retryCount;
     private TimeSpan? _retryDelay;
     private int? _prefetchCount;
+    private int? _concurrentMessageLimit;
     private Type? _serializerType;
 
     internal AzureServiceBusReceiveEndpointConfigurator(
@@ -38,6 +39,12 @@ public sealed class AzureServiceBusReceiveEndpointConfigurator
     {
         ArgumentOutOfRangeException.ThrowIfNegative(prefetchCount);
         _prefetchCount = prefetchCount;
+    }
+
+    public void ConcurrentMessageLimit(int concurrentMessageLimit)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(concurrentMessageLimit, 1);
+        _concurrentMessageLimit = concurrentMessageLimit;
     }
 
     public void SetSerializer<TSerializer>() where TSerializer : class, IMessageSerializer
@@ -77,6 +84,7 @@ public sealed class AzureServiceBusReceiveEndpointConfigurator
         }
 
         consumer.PrefetchCount = _prefetchCount is null ? null : checked((ushort)_prefetchCount.Value);
+        consumer.ConcurrentMessageLimit = _concurrentMessageLimit;
         consumer.SerializerType = _serializerType;
 
         if (_retryCount.HasValue)
@@ -125,7 +133,8 @@ public sealed class AzureServiceBusReceiveEndpointConfigurator
                     _retryDelay,
                     _prefetchCount is null ? null : checked((ushort)_prefetchCount.Value),
                     serializer: serializer,
-                    cancellationToken: CancellationToken.None)
+                    cancellationToken: CancellationToken.None,
+                    concurrentMessageLimit: _concurrentMessageLimit)
                 .GetAwaiter().GetResult();
         });
     }

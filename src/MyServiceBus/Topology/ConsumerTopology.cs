@@ -14,6 +14,7 @@ public class ConsumerTopology
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     public IConsumerRegistrationDescriptor? Registration { get; set; }
     public ushort? PrefetchCount { get; set; }
+    public int? ConcurrentMessageLimit { get; set; }
     public IDictionary<string, object?>? QueueArguments { get; set; }
     public Type? SerializerType { get; set; }
 

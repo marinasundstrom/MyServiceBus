@@ -117,7 +117,7 @@ This behavior closes the known unconfirmed-copy acknowledgement window and requi
 
 ### Current Azure Service Bus Preview
 
-Azure receivers use peek-lock with automatic completion disabled and one concurrent processor call per endpoint.
+Azure receivers use peek-lock with automatic completion disabled and a configurable portable concurrent-message limit, defaulting to one, mapped to the processor's native maximum-concurrent-calls option.
 
 - Success completes the source after the handler returns.
 - A skipped message is sent to `_skipped` before the source is completed.
@@ -164,7 +164,7 @@ Production documentation must label this mode non-durable. A transport may claim
 
 ## Shutdown and Flow Control
 
-Prefetch limits broker deliveries that have not been acknowledged, but it is not a complete portable concurrency or overload policy.
+Prefetch limits broker deliveries that have not been acknowledged. The portable concurrent-message limit independently bounds application handler execution, but it is not yet a complete overload policy because callback-queue bounds and saturation evidence remain open.
 
 The production target requires:
 
@@ -172,10 +172,10 @@ The production target requires:
 - a configurable drain deadline
 - source deliveries left unsettled when the deadline forces termination
 - no acknowledgement after a delivery has been released or its channel closed
-- explicit endpoint concurrency independent of prefetch
+- saturation evidence for endpoint concurrency independent of prefetch
 - bounded queues between broker callbacks and application handlers
 
-Current lifecycle behavior differs by transport and client. RabbitMQ C# and Java now cancel the consumer before waiting for active callbacks to settle; the C# wait observes the caller's cancellation token, while Java currently has no public drain deadline. Azure Java also waits for active callbacks without a deadline. No cross-language drain deadline or forced-stop result is currently guaranteed.
+Current lifecycle behavior differs by transport and client. RabbitMQ C# and Java now cancel the consumer before waiting for active callbacks, including deliveries waiting for a concurrency permit, to settle; the C# wait observes the caller's cancellation token, while Java currently has no public drain deadline. Azure Java also waits for active callbacks without a deadline. No cross-language drain deadline or forced-stop result is currently guaranteed.
 
 ## Ordering, Duplication, and Expiration
 

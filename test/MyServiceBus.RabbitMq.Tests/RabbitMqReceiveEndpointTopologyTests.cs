@@ -16,7 +16,8 @@ public class RabbitMqReceiveEndpointTopologyTests
             ExchangeType = "fanout",
             Durable = true,
             AutoDelete = false,
-            PrefetchCount = 16
+            PrefetchCount = 16,
+            ConcurrentMessageLimit = 4
         });
 
         projection.QueueName.ShouldBe("orders");
@@ -25,6 +26,7 @@ public class RabbitMqReceiveEndpointTopologyTests
         projection.Durable.ShouldBeTrue();
         projection.AutoDelete.ShouldBeFalse();
         projection.PrefetchCount.ShouldBe((ushort)16);
+        projection.ConcurrentMessageLimit.ShouldBe(4);
     }
 
     [Fact]

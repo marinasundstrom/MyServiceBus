@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Semaphore;
 import java.util.function.Function;
 import java.util.Objects;
 
@@ -30,6 +31,7 @@ public class RabbitMqReceiveTransport implements ReceiveTransport {
     private final Logger logger;
     private final MessageHeaderConvention headerConvention = MassTransitHeaderConvention.INSTANCE;
     private final Object lifecycleMonitor = new Object();
+    private final Semaphore concurrency;
     private int activeMessages;
     private boolean stopping;
     private String consumerTag;
@@ -37,12 +39,23 @@ public class RabbitMqReceiveTransport implements ReceiveTransport {
     public RabbitMqReceiveTransport(Channel channel, String queueName,
             Function<TransportMessage, CompletableFuture<Void>> handler, String faultAddress,
             Function<String, Boolean> isMessageTypeRegistered, LoggerFactory loggerFactory) {
+        this(channel, queueName, handler, faultAddress, isMessageTypeRegistered, loggerFactory, 1);
+    }
+
+    public RabbitMqReceiveTransport(Channel channel, String queueName,
+            Function<TransportMessage, CompletableFuture<Void>> handler, String faultAddress,
+            Function<String, Boolean> isMessageTypeRegistered, LoggerFactory loggerFactory,
+            int concurrentMessageLimit) {
+        if (concurrentMessageLimit < 1) {
+            throw new IllegalArgumentException("Concurrent message limit must be at least one");
+        }
         this.channel = channel;
         this.queueName = queueName;
         this.handler = handler;
         this.faultAddress = faultAddress;
         this.isMessageTypeRegistered = isMessageTypeRegistered;
         this.logger = loggerFactory.create(RabbitMqReceiveTransport.class);
+        this.concurrency = new Semaphore(concurrentMessageLimit, true);
     }
 
     @Override
@@ -59,6 +72,7 @@ public class RabbitMqReceiveTransport implements ReceiveTransport {
 
             boolean handlerOwnsCompletion = false;
             try {
+                concurrency.acquireUninterruptibly();
                 final Map<String, Object> headers = delivery.getProperties().getHeaders() != null
                         ? new HashMap<>(delivery.getProperties().getHeaders())
                         : new HashMap<>();
@@ -196,6 +210,7 @@ public class RabbitMqReceiveTransport implements ReceiveTransport {
     }
 
     private void endDelivery() {
+        concurrency.release();
         synchronized (lifecycleMonitor) {
             activeMessages--;
             if (activeMessages == 0) {

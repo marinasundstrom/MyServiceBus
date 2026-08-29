@@ -208,6 +208,10 @@ Receivers use peek-lock mode with automatic completion disabled.
 Prefetch maps to the native receiver prefetch option. Endpoint concurrency is a
 separate concern and must not be inferred solely from prefetch.
 
+Configure it per endpoint in C# with `endpoint.ConcurrentMessageLimit(8)` or in
+Java with `endpoint.concurrentMessageLimit(8)`. The default is one. The Azure
+processor maps this value to its native maximum-concurrent-calls option.
+
 ## Failed and Skipped Messages
 
 The initial profile deliberately uses MyServiceBus/MassTransit compatibility

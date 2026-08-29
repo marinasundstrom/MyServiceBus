@@ -87,6 +87,29 @@ factoryConfigurator.receiveEndpoint("orders", e -> {
 });
 ```
 
+## Concurrent Message Limit
+
+Prefetch bounds unacknowledged broker deliveries; it does not bound application handlers by itself. Configure the portable per-endpoint concurrency limit separately. The default is one.
+
+### C#
+```csharp
+cfg.ReceiveEndpoint("orders", e =>
+{
+    e.PrefetchCount(32);
+    e.ConcurrentMessageLimit(8);
+});
+```
+
+### Java
+```java
+factoryConfigurator.receiveEndpoint("orders", e -> {
+    e.prefetchCount(32);
+    e.concurrentMessageLimit(8);
+});
+```
+
+RabbitMQ keeps deliveries waiting for a handler permit unsettled. They therefore remain subject to broker prefetch and are included in graceful-drain accounting.
+
 ## Queue Arguments
 
 Queue arguments allow customizing RabbitMQ queues with broker-specific options. These arguments are passed directly to `queueDeclare` when the queue is created.

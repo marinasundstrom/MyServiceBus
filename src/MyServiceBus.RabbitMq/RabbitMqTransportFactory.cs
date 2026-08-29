@@ -389,7 +389,8 @@ public sealed class RabbitMqTransportFactory : ITransportFactory
             errorAddress,
             faultAddress,
             isMessageTypeRegistered,
-            _inboundMessageResolver);
+            _inboundMessageResolver,
+            concurrentMessageLimit: rabbitMqTopology.ConcurrentMessageLimit);
     }
 
     private static void ParseExchangeSettings(string? queryString, ref bool durable, ref bool autoDelete)

@@ -76,6 +76,7 @@ public class RabbitMqFactoryConfiguratorTests {
         });
         configurator.receiveEndpoint("external-orders", endpoint -> {
             endpoint.prefetchCount(12);
+            endpoint.concurrentMessageLimit(4);
             endpoint.setQueueArgument("x-queue-type", "quorum");
             endpoint.consumer(MyMessage.class, ExternalConsumer.class);
         });
@@ -92,6 +93,7 @@ public class RabbitMqFactoryConfiguratorTests {
         assertEquals("external-orders", definition.getQueueName());
         assertEquals("external-message", definition.getBindings().get(0).getEntityName());
         assertEquals(12, definition.getPrefetchCount());
+        assertEquals(4, definition.getConcurrentMessageLimit());
         assertEquals("quorum", definition.getQueueArguments().get("x-queue-type"));
 
         Field factoryField = MessageBusImpl.class.getDeclaredField("consumerFactoryFactory");

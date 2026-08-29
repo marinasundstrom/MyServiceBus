@@ -221,4 +221,64 @@ public class RabbitMqReceiveTransportTests
         await channel.Received(1)
             .BasicAckAsync(1, false, Arg.Any<CancellationToken>());
     }
+
+    [Fact]
+    public async Task Concurrent_message_limit_delays_additional_handlers()
+    {
+        var channel = Substitute.For<IChannel>();
+        AsyncEventingBasicConsumer? consumer = null;
+        channel
+            .BasicConsumeAsync(
+                Arg.Any<string>(),
+                Arg.Any<bool>(),
+                Arg.Any<string>(),
+                Arg.Any<bool>(),
+                Arg.Any<bool>(),
+                Arg.Any<IDictionary<string, object>>(),
+                Arg.Any<IAsyncBasicConsumer>(),
+                Arg.Any<CancellationToken>())
+            .Returns(callInfo =>
+            {
+                consumer = (AsyncEventingBasicConsumer)callInfo[6]!;
+                return Task.FromResult("consumer-tag");
+            });
+
+        var invocationCount = 0;
+        var firstStarted = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var secondStarted = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseFirst = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var transport = new RabbitMqReceiveTransport(
+            channel,
+            "input",
+            _ =>
+            {
+                if (Interlocked.Increment(ref invocationCount) == 1)
+                {
+                    firstStarted.SetResult(true);
+                    return releaseFirst.Task;
+                }
+
+                secondStarted.SetResult(true);
+                return Task.CompletedTask;
+            },
+            errorAddress: new Uri("rabbitmq://broker/exchange/input_error"),
+            faultAddress: new Uri("rabbitmq://broker/exchange/input_fault"),
+            isMessageTypeRegistered: null,
+            concurrentMessageLimit: 1);
+
+        await transport.Start();
+        var body = new ReadOnlyMemory<byte>(Encoding.UTF8.GetBytes("{}"));
+        var firstDelivery = consumer!.HandleBasicDeliverAsync(
+            "consumer-tag", 1, false, "ex", "rk", new BasicProperties(), body, CancellationToken.None);
+        await firstStarted.Task.WaitAsync(TimeSpan.FromSeconds(1));
+
+        var secondDelivery = consumer.HandleBasicDeliverAsync(
+            "consumer-tag", 2, false, "ex", "rk", new BasicProperties(), body, CancellationToken.None);
+        await Task.Delay(100);
+        Assert.False(secondStarted.Task.IsCompleted);
+
+        releaseFirst.SetResult(true);
+        await secondStarted.Task.WaitAsync(TimeSpan.FromSeconds(1));
+        await Task.WhenAll(firstDelivery, secondDelivery);
+    }
 }
