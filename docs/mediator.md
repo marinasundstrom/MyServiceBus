@@ -48,17 +48,25 @@ MediatorBus bus = MediatorBus.configure(services, cfg -> {
 });
 
 bus.publish(new SubmitOrder(UUID.randomUUID()));
-bus.send("queue:submit-order", new SubmitOrder(UUID.randomUUID()));
 ```
 
 Implement `Handler<T>` directly or derive from `HandlerBase<T>` for a one-way handler. Implement `HandlerWithResult<TMessage, TResult>` for a response-bearing handler. The standalone Java `MediatorBus` is ready for local dispatch after construction. Dispatch completes after every matched handler has settled, and a terminal handler failure is propagated to the caller.
 
-## Commands, Queries, and Notifications
+## How This Maps to MediatR
 
-- Use a directed send when the message represents work for a named local endpoint.
-- Use publish when a local notification may have multiple interested consumers.
-- Use request/response when the caller needs a correlated response through the messaging model.
-- Use consumer filters for cross-cutting behavior such as validation, logging, and opt-in retry.
+`Publish` is the closest match to MediatR notification publication. It routes by message type and waits for every compatible local handler pipeline. Multiple handlers are expected.
+
+The current directed `Send` API is a message-bus operation, not the equivalent of MediatR `ISender.Send`. It requires a destination (`GetSendEndpoint(...)` in C# or `send(destination, message)` in Java), and mediator dispatch currently reaches every compatible consumer rather than enforcing exactly one handler. A queue-named send can be useful when preserving a future broker boundary, but it should not be the default example for mediator-only adoption.
+
+For a command or query that returns a value, use the request client with an `IHandler<TMessage, TResult>` or `HandlerWithResult<TMessage, TResult>`. When no destination is supplied, the request client derives the local destination from the request type. This is the closest current equivalent to MediatR `Send<TResponse>`, but it deliberately uses MyServiceBus request/response semantics: request identifiers, a response endpoint, correlation, faults, and timeouts. It also does not yet reject registrations with multiple compatible request handlers.
+
+| Intent | Current MyServiceBus mediator API | MediatR similarity |
+| --- | --- | --- |
+| Local notification | `Publish(message)` | Close: type-routed fan-out and await all handlers |
+| Command/query with result | Type-routed request client | Similar outcome, messaging-style request/response contract |
+| One-way command | `Publish(message)` or directed bus `Send` | No exact MediatR `Send` equivalent yet |
+
+Use consumer filters for cross-cutting behavior such as validation, logging, telemetry, and opt-in retry.
 
 These operations retain messaging semantics even though execution is local. They are not ordinary method calls: dispatch may fan out, creates consumer scopes, passes a consume context, and can run asynchronous pipelines.
 
@@ -99,7 +107,7 @@ This is deliberately narrower than a blanket “zero reflection” claim. Serial
 
 ## Replacing MediatR
 
-MyServiceBus intends its mediator to be a practical MediatR replacement for local commands, queries, and notifications. MediatR is the established dedicated .NET mediator and has a broader mediator-specific ecosystem, but MyServiceBus has a distinct target:
+MyServiceBus intends its mediator to become a practical MediatR replacement for local commands, queries, and notifications. Today it covers type-routed notification fan-out and result-bearing request/response, but it is not a drop-in replacement for MediatR `ISender.Send`: a dedicated type-routed single-handler API and cardinality validation remain product work. MediatR is the established dedicated .NET mediator and has a broader mediator-specific ecosystem, but MyServiceBus has a distinct target:
 
 - dedicated `IHandler`/`Handler` APIs in C# and corresponding Java handler APIs
 - generated typed registration and direct invocation instead of reflection-based discovery and method invocation
