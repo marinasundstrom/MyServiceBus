@@ -117,6 +117,20 @@ export default function WhyMyServiceBus() {
         For an API-by-API adoption view, including readiness and likely pre-1.0 change,
         see <Link href="/docs/platform-parity">what you can use today and what could change</Link>.
       </p>
+      <div className="concept-comparison">
+        <section>
+          <span className="tag">EXISTING DISTRIBUTED SYSTEM</span>
+          <h2>Migrate from MassTransit</h2>
+          <p>Introduce one C# or Java participant through the verified wire subset, then move service ownership deliberately.</p>
+          <Link href="/docs/migrate-from-masstransit">Follow the MassTransit migration path →</Link>
+        </section>
+        <section>
+          <span className="tag">EXISTING LOCAL DISPATCH</span>
+          <h2>Migrate from MediatR</h2>
+          <p>Port commands, queries, notifications, handlers, and pipeline behavior in controlled application slices.</p>
+          <Link href="/docs/migrate-from-mediatr">Follow the MediatR migration path →</Link>
+        </section>
+      </div>
 
       <h2 id="shared-vocabulary">Carry the same vocabulary between ecosystems</h2>
       <p>

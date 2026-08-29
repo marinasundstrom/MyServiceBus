@@ -9,6 +9,8 @@ const sections = [
       ['Why MyServiceBus?', '/docs/why-myservicebus'],
       ['Getting started', '/docs/getting-started'],
       ['Mediator pattern', '/docs/mediator'],
+      ['Migrate from MassTransit', '/docs/migrate-from-masstransit'],
+      ['Migrate from MediatR', '/docs/migrate-from-mediatr'],
       ['Java adoption', '/docs/java-adoption'],
     ],
   },

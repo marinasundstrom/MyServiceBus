@@ -5,6 +5,7 @@ This changelog summarizes the bigger themes in the repository history rather tha
 ## Unreleased
 
 - Added an API-first C#/Java capability and readiness matrix that distinguishes verified preview, MVP preview, and experimental surfaces, shows likely pre-1.0 change, and separates MassTransit familiarity from the pinned interoperability promise.
+- Added incremental migration guides for introducing MyServiceBus at MassTransit service boundaries and for replacing MediatR one application slice at a time, including explicit API maps, ownership handoffs, and verification checkpoints.
 - Added matching C# and Java PostgreSQL outbox/inbox packages with a versioned, logical-service-partitioned schema, caller-transaction-enlisted writers and inbox acquisition, atomic shared-storage leasing, stable-envelope rehydration, Testcontainers integration tests, and complete NuGet/Maven artifact wiring. Consumer Outbox middleware, cleanup, monitoring, automatic host composition, and O01–O06 evidence remain explicitly open.
 - Added matching background outbox delivery lifecycles and transport dispatchers that preserve persisted bytes and message identity, plus live RabbitMQ gates for persisted C# envelopes consumed by Java and persisted Java envelopes consumed by C#.
 - Added supported PostgreSQL delivery composition: a .NET hosted-service registration and a Java explicit-lifecycle factory wire the service-partitioned store, transport dispatcher, retry policy, and polling service.
