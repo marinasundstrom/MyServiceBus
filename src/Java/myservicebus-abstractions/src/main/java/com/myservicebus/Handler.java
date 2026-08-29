@@ -8,7 +8,7 @@ import com.myservicebus.tasks.CancellationToken;
  * Compatibility interface for mediator handlers, providing a <code>handle</code>
  * method with MassTransit-style semantics.
  */
-public interface Handler<T> extends Consumer<T> {
+public interface Handler<T> extends MediatorHandler, Consumer<T> {
     /**
      * Handle the incoming message.
      *

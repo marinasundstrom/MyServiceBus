@@ -3,10 +3,17 @@ using System.Threading;
 namespace MyServiceBus;
 
 /// <summary>
+/// Marker interface for mediator-oriented handlers.
+/// </summary>
+public interface IHandler : IConsumer
+{
+}
+
+/// <summary>
 /// Compatibility interface for Mediator handlers, providing a <c>Handle</c> method similar to MassTransit.
 /// </summary>
 /// <typeparam name="TMessage">The message type.</typeparam>
-public interface IHandler<in TMessage> : IConsumer<TMessage>
+public interface IHandler<in TMessage> : IHandler, IConsumer<TMessage>
     where TMessage : class
 {
     /// <summary>
@@ -43,7 +50,7 @@ public abstract class Handler<TMessage> : IHandler<TMessage>
 /// </summary>
 /// <typeparam name="TMessage">The message type.</typeparam>
 /// <typeparam name="TResult">The response type.</typeparam>
-public interface IHandler<in TMessage, TResult> : IConsumer<TMessage>
+public interface IHandler<in TMessage, TResult> : IHandler, IConsumer<TMessage>
     where TMessage : class
     where TResult : class
 {
@@ -84,5 +91,4 @@ public abstract class Handler<TMessage, TResult> : IHandler<TMessage, TResult>
         await context.RespondAsync(result, null, context.CancellationToken).ConfigureAwait(false);
     }
 }
-
 

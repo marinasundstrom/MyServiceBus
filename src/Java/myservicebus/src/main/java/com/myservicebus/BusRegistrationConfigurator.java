@@ -7,6 +7,26 @@ import com.myservicebus.BusFactoryConfigurator;
 public interface BusRegistrationConfigurator {
     <T> void addConsumer(Class<T> consumerClass);
 
+    default <THandler extends MediatorHandler> void addHandler(Class<THandler> handlerClass) {
+        addConsumer(handlerClass);
+    }
+
+    default <TMessage, THandler extends Handler<TMessage>> void addHandler(
+            Class<THandler> handlerClass,
+            Class<TMessage> messageClass) {
+        addConsumer(handlerClass, messageClass);
+    }
+
+    default <TMessage, TResponse, THandler extends HandlerWithResult<TMessage, TResponse>> void addHandler(
+            Class<THandler> handlerClass,
+            Class<TMessage> messageClass,
+            Class<TResponse> responseClass) {
+        if (responseClass == null) {
+            throw new IllegalArgumentException("responseClass must not be null");
+        }
+        addConsumer(handlerClass, messageClass);
+    }
+
     void addConsumerMethods(Class<?>... declaringTypes);
 
     void addConsumerMethods(Class<?> declaringType, String endpointName);

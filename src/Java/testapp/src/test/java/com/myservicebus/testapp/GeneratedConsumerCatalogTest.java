@@ -24,7 +24,7 @@ public class GeneratedConsumerCatalogTest {
         MediatorBus bus = MediatorBus.configure(services, GeneratedConsumerCatalog.INSTANCE::register);
 
         GeneratedDispatchMessage message = new GeneratedDispatchMessage("native-ready");
-        bus.publish(message);
+        bus.publish(message).join();
 
         Assertions.assertSame(message, probe.getMessage());
         Assertions.assertSame(message, probe.getContext().getMessage());
