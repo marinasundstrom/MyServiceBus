@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted; implementation in progress. The serializer, deserializer, factory, message-body, registry, and configurable JSON metadata paths are implemented. BSON remains a follow-up slice. Current configuration is documented in [Message serialization](../message-serialization.md).
+Accepted; implementation in progress. The serializer, deserializer, factory, message-body, registry, configurable JSON metadata, and optional C# and Java BSON paths are implemented. BSON has direct .NET↔MassTransit conformance tests and bidirectional C#↔Java fixtures; the broader broker-backed send/publish/request/response/fault matrix remains follow-up work. Current configuration is documented in [Message serialization](../message-serialization.md).
 
 ## Recommendation
 

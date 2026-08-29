@@ -879,11 +879,42 @@ The serializer supplies NServiceBus message identity, intent, time, conversation
 
 Both clients register the same serializer-factory model without reflective activation. A factory creates the matching serializer and deserializer, and `AddSerializer`/`addSerializer` and `AddDeserializer`/`addDeserializer` independently select outbound and accepted inbound formats.
 
-#### Queue Arguments
+### Optional MassTransit BSON
+
+The optional BSON artifacts use the same factory registration model and the MassTransit content type `application/vnd.masstransit+bson`.
+
+#### C#
+
+```csharp
+using MyServiceBus.Serialization.Bson;
+
+builder.Services.AddServiceBus(x =>
+{
+    var bson = new BsonSerializerFactory();
+    x.AddSerializer(bson, isSerializer: true);
+    x.AddDeserializer(bson, isDefault: false);
+});
+```
+
+#### Java
+
+```java
+services.from(MessageBusServices.class)
+        .addServiceBus(cfg -> {
+            SerializerFactory bson =
+                    new BsonSerializerFactory(applicationObjectMapper());
+            cfg.addSerializer(bson, true);
+            cfg.addDeserializer(bson, false);
+        });
+```
+
+Registering only the deserializer accepts BSON without changing the default outbound JSON profile. BSON lives in `Sundstrom.MyServiceBus.Serialization.Bson` on .NET and `myservicebus-serialization-bson` on Java, so the default clients do not acquire BSON dependencies. The initial runtime claim covers managed .NET and the JVM.
+
+### Queue Arguments
 
 Customize RabbitMQ queues with broker-specific arguments.
 
-##### C#
+#### C#
 
 ```csharp
 cfg.ReceiveEndpoint("submit-order-queue", e =>
@@ -893,7 +924,7 @@ cfg.ReceiveEndpoint("submit-order-queue", e =>
 });
 ```
 
-##### Java
+#### Java
 
 ```java
 cfg.receiveEndpoint("submit-order-queue", e -> {

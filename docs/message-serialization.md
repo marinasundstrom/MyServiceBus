@@ -1,14 +1,15 @@
 # Message serialization
 
-MyServiceBus supports three distinct JSON wire formats. They are separate choices rather than aliases for one another.
+MyServiceBus supports three distinct JSON wire formats and an optional BSON envelope profile. They are separate choices rather than aliases for one another.
 
-The registry, source-generated JSON, BSON, and Native AOT direction is described in the [Serialization Architecture Proposal](proposals/serialization-architecture.md). The serializer contracts, registry, and configurable JSON metadata paths are implemented; BSON remains a follow-up slice.
+The registry, source-generated JSON, BSON, and Native AOT direction is described in the [Serialization Architecture Proposal](proposals/serialization-architecture.md). The serializer contracts, registry, configurable JSON metadata, and initial BSON profiles are implemented.
 
 | Serializer | Content type | Wire shape | Purpose |
 | --- | --- | --- | --- |
 | `EnvelopeMessageSerializer` | `application/vnd.masstransit+json` | MyServiceBus/MassTransit envelope | Default portable messaging profile |
 | `RawJsonMessageSerializer` | `application/json` | JSON payload only | Neutral integration with plain-JSON applications |
 | `NServiceBusJsonMessageSerializer` | `application/json` | NServiceBus JSON payload and headers | Explicit NServiceBus interoperability profile |
+| `BsonMessageSerializer` | `application/vnd.masstransit+bson` | MassTransit BSON envelope | Optional C#↔Java↔MassTransit compatibility profile |
 
 If a message arrives without a content type, MyServiceBus assumes the envelope format. Raw JSON does not manufacture NServiceBus headers and the presence of raw JSON alone does not imply NServiceBus compatibility.
 
@@ -70,6 +71,46 @@ These registrations are ordinary runtime configuration and do not require a sour
 
 Java's corresponding factories accept an application-configured Jackson `ObjectMapper` and reuse it for their serializer/deserializer pair. This is the same ownership model expressed through Java's serializer ecosystem; it is not presented as source generation.
 
+## MassTransit BSON
+
+BSON is an optional package/module. The default .NET runtime remains based on `System.Text.Json`, and the default Java runtime remains based on Jackson JSON. Adding BSON does not add a Newtonsoft JSON compatibility profile.
+
+Install the .NET package and register the same factory for send and receive:
+
+```bash
+dotnet add package Sundstrom.MyServiceBus.Serialization.Bson
+```
+
+```csharp
+using MyServiceBus.Serialization.Bson;
+
+services.AddServiceBus(x =>
+{
+    var bson = new BsonSerializerFactory();
+    x.AddSerializer(bson, isSerializer: true);
+    x.AddDeserializer(bson, isDefault: false);
+});
+```
+
+Add the corresponding Java module and use the same registration shape:
+
+```groovy
+implementation "io.github.marinasundstrom.myservicebus:myservicebus-serialization-bson:0.1.0-preview.5"
+```
+
+```java
+services.from(MessageBusServices.class)
+        .addServiceBus(cfg -> {
+            SerializerFactory bson = new BsonSerializerFactory(applicationObjectMapper());
+            cfg.addSerializer(bson, true);
+            cfg.addDeserializer(bson, false);
+        });
+```
+
+`isSerializer: true`/`true` selects BSON for outbound messages. Adding only the deserializer accepts BSON during migration while leaving outbound JSON unchanged. Selecting BSON does not remove the registered JSON deserializer.
+
+The .NET adapter uses the same Newtonsoft BSON stack and envelope contract as MassTransit 8.5.1. Direct tests verify MassTransit↔MyServiceBus decoding in both directions. Shared fixtures verify C#↔Java payloads, including the .NET GUID binary byte order. The initial capability is managed .NET and the Java JVM; NativeAOT and GraalVM Native Image are not yet claimed for the optional BSON libraries.
+
 ## NServiceBus JSON
 
 Use `NServiceBusJsonMessageSerializer` only for an endpoint or bus that communicates with NServiceBus. It writes the NServiceBus message identity, intent, conversation, correlation, reply, related-message, sent-time, content-type, and enclosed-message-type headers and reads the corresponding inbound form.
@@ -100,4 +141,4 @@ cfg.receiveEndpoint("input", endpoint -> {
 });
 ```
 
-Substitute `NServiceBusJsonMessageSerializer` when the endpoint belongs to the NServiceBus compatibility profile.
+Substitute `NServiceBusJsonMessageSerializer` when the endpoint belongs to the NServiceBus compatibility profile. Prefer bus-level factory registration for the optional BSON package so serializer construction remains explicit.

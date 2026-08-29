@@ -117,7 +117,7 @@ The target architecture, capability boundary, and delivery slices are defined in
 
 **Exit criteria:** existing JSON profiles retain their behavior; new formats register through corresponding factories in both clients; source-generated JSON works on send and receive with reflection disabled; and BSON passes the C#↔Java↔MassTransit matrix.
 
-**Status:** proposed.
+**Status:** in progress. Contracts, registry selection, configurable JSON metadata, the source-generated .NET NativeAOT smoke, optional C# and Java BSON artifacts, direct .NET↔MassTransit BSON decoding, and bidirectional C#↔Java BSON fixtures are implemented. The broader broker-backed BSON matrix and remaining AOT/native-image capability work are still open.
 
 ## Phase 3: Inspection and Monitoring APIs
 
