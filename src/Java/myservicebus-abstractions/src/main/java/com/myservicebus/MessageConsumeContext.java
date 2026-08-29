@@ -7,6 +7,8 @@ import java.util.function.Consumer;
 import com.myservicebus.tasks.CancellationToken;
 
 public interface MessageConsumeContext {
+    UUID getMessageId();
+
     UUID getRequestId();
 
     UUID getCorrelationId();

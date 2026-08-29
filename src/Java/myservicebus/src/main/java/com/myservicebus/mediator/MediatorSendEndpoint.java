@@ -138,6 +138,7 @@ public class MediatorSendEndpoint implements SendEndpoint {
                         contextProvider,
                         java.net.URI.create("loopback://localhost/"),
                         entityName -> "exchange:" + entityName,
+                        context.getMessageId(),
                         context.getRequestId(),
                         context.getCorrelationId(),
                         context.getConversationId(),

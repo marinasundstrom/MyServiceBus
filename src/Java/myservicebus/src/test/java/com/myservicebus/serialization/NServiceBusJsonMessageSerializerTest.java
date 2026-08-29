@@ -56,6 +56,7 @@ class NServiceBusJsonMessageSerializerTest {
                 .resolve(new TransportMessage("{\"text\":\"hi\"}".getBytes(StandardCharsets.UTF_8), headers));
 
         assertEquals(InboundMessageFormat.NSERVICEBUS_JSON, inbound.getFormat());
+        assertEquals(messageId, inbound.getMessageId());
         assertEquals(messageId, inbound.getRequestId());
         assertEquals(correlationId, inbound.getCorrelationId());
         assertEquals("urn:message:Contracts:SubmitOrder", inbound.getMessageType());

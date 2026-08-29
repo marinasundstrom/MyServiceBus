@@ -5,6 +5,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.UUID;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -60,6 +61,19 @@ public class RawJsonInboundMessage implements InboundMessage {
         }
 
         return value != null ? value.toString() : null;
+    }
+
+    @Override
+    public UUID getMessageId() {
+        Object value = headers.get("message_id");
+        if (value == null) {
+            value = headers.get("messageId");
+        }
+        try {
+            return value instanceof UUID id ? id : value != null ? UUID.fromString(value.toString()) : null;
+        } catch (IllegalArgumentException ignored) {
+            return null;
+        }
     }
 
     @SuppressWarnings("unchecked")

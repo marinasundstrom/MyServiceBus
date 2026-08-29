@@ -7,6 +7,7 @@ namespace MyServiceBus;
 
 public interface MessageConsumeContext
 {
+    Guid? MessageId => null;
     Guid? RequestId => null;
     Guid? CorrelationId => null;
     Guid? ConversationId => null;

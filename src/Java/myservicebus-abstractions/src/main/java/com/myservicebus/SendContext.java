@@ -24,6 +24,7 @@ public class SendContext implements PipeContext, ScheduledMessage {
     private URI responseAddress;
     private URI faultAddress;
     private Instant scheduledEnqueueTime;
+    private UUID messageId = UUID.randomUUID();
     private UUID requestId;
     private UUID correlationId;
     private UUID conversationId = UUID.randomUUID();
@@ -84,6 +85,14 @@ public class SendContext implements PipeContext, ScheduledMessage {
         this.faultAddress = faultAddress;
     }
 
+    public UUID getMessageId() {
+        return messageId;
+    }
+
+    public void setMessageId(UUID messageId) {
+        this.messageId = messageId;
+    }
+
     public UUID getRequestId() {
         return requestId;
     }
@@ -140,7 +149,7 @@ public class SendContext implements PipeContext, ScheduledMessage {
 
     public MessageBody getMessageBody(MessageSerializer serializer) throws Exception {
         MessageSerializationContext<Object> context = new MessageSerializationContext<>(message);
-        context.setMessageId(UUID.randomUUID());
+        context.setMessageId(messageId);
         context.setRequestId(requestId);
         context.setCorrelationId(correlationId);
         context.setConversationId(conversationId);
