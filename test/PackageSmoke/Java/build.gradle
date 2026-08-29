@@ -12,6 +12,7 @@ repositories {
         'myservicebus',
         'myservicebus-processor',
         'myservicebus-serialization-bson',
+        'myservicebus-postgresql',
         'myservicebus-inspection',
         'myservicebus-monitoring',
         'myservicebus-rabbitmq',
@@ -33,6 +34,7 @@ dependencies {
     implementation 'io.github.marinasundstrom.myservicebus:myservicebus:0.1.0-preview.5'
     annotationProcessor 'io.github.marinasundstrom.myservicebus:myservicebus-processor:0.1.0-preview.5'
     implementation 'io.github.marinasundstrom.myservicebus:myservicebus-serialization-bson:0.1.0-preview.5'
+    implementation 'io.github.marinasundstrom.myservicebus:myservicebus-postgresql:0.1.0-preview.5'
     implementation 'io.github.marinasundstrom.myservicebus:myservicebus-inspection:0.1.0-preview.5'
     implementation 'io.github.marinasundstrom.myservicebus:myservicebus-monitoring:0.1.0-preview.5'
     implementation 'io.github.marinasundstrom.myservicebus:myservicebus-rabbitmq:0.1.0-preview.5'

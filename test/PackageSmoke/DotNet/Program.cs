@@ -1,6 +1,7 @@
 using MyServiceBus;
 using MyServiceBus.Inspection;
 using MyServiceBus.Monitoring;
+using MyServiceBus.Persistence.PostgreSql;
 using MyServiceBus.RabbitMq;
 using MyServiceBus.Serialization.Bson;
 
@@ -25,6 +26,7 @@ _ = typeof(MonitoringExporterOptions);
 _ = typeof(RabbitMqFactoryConfigurator);
 _ = typeof(AzureServiceBusFactoryConfigurator);
 _ = typeof(BsonSerializerFactory);
+_ = typeof(PostgreSqlSchema);
 Console.WriteLine("Verified the staged MyServiceBus NuGet packages from a consumer project.");
 
 internal sealed record SmokeMessage(string Value);
