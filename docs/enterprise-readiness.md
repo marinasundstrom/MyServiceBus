@@ -120,4 +120,4 @@ Sagas, orchestration, additional brokers, stream transports, and control-plane o
 
 The [roadmap](roadmap.md) orders this work alongside the existing protocol, transport, inspection, and monitoring phases. The [compatibility policy](compatibility.md) defines the scope of interoperability claims, and [supported versions](supported-versions.md) records the current preview baseline.
 
-The first delivery-integrity artifacts are the [Delivery Guarantees Specification](specs/delivery-guarantees.md) and its executable [Delivery Failure Matrix](development/delivery-failure-matrix.md).
+The delivery-integrity artifacts are the [Delivery Guarantees Specification](specs/delivery-guarantees.md), its executable [Delivery Failure Matrix](development/delivery-failure-matrix.md), and the portable [Transactional Outbox and Inbox Specification](specs/outbox-inbox.md) that fixes the persistence boundary before provider APIs are introduced.

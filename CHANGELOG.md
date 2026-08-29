@@ -4,7 +4,8 @@ This changelog summarizes the bigger themes in the repository history rather tha
 
 ## Unreleased
 
-- Added first-class mediator `Send` and `Publish` APIs in C# and Java: publish fans out, send enforces exactly one type-routed handler, result-bearing send returns the handler response, and explicit `AddHandler` registration aliases complement `AddConsumer`.
+- Defined the portable transactional outbox and inbox boundary, including stable identity, shared-storage leasing, duplicate acquisition outcomes, broker/database commit gaps, cleanup, schema rollout, observability, and real-database promotion evidence.
+- Added first-class mediator semantics in C# and Java: publish fans out, send enforces exactly one type-routed handler, response-typed request contracts enable inferred result calls, and explicit `AddHandler` registration aliases complement `AddConsumer` without changing broker-backed bus contracts.
 - Clarified the project motivation—focused improvements on MassTransit with a continued permissively licensed core—the two primary adoption paths, and the MIT-versus-MassTransit-v9 commercial fit without hiding preview maturity or support trade-offs.
 - Added a dedicated mediator guide for local commands, queries, notifications, generated reflection-free consumer registration and direct invocation, the current MediatR licensing comparison, and the broker durability boundary in both C# and Java.
 - Elevated the mediator from a supporting local execution mode to a primary product path and explicit MediatR-replacement target, while accurately distinguishing it from MassTransit's distributed-framework positioning.

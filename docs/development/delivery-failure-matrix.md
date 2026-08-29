@@ -77,6 +77,8 @@ The RabbitMQ implementation now releases the source when preservation is unconfi
 
 These scenarios require a supported persistence provider and a real transactional database. In-memory substitutes are not release evidence.
 
+The portable acquisition, leasing, transaction, identity, cleanup, and rolling-upgrade rules are defined in the [Transactional Outbox and Inbox Specification](../specs/outbox-inbox.md). Provider APIs must implement that contract before any row is promoted from Open.
+
 ## Request and Response
 
 | ID | Scenario | Required outcome | RabbitMQ C# | RabbitMQ Java | Azure C# | Azure Java |

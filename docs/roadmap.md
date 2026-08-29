@@ -83,7 +83,7 @@ The precise scope and matrix for this phase are defined in the [Compatibility Po
 
 **Exit criteria:** equivalent C# and Java configurations produce the same canonical topology snapshot; RabbitMQ provisioning consumes a profile projection of that model; inspection can query it without inventing broker defaults; and the foundational compatibility contracts have an explicit versioning policy.
 
-The [Topology Model Specification](specs/topology-model-spec.md) defines the target boundary. This gate precedes expansion of inspection, dashboard, saga, outbox, and additional transport work.
+The [Topology Model Specification](specs/topology-model-spec.md) defines the target boundary. This gate precedes expansion of inspection, dashboard, saga, outbox, and additional transport work. The later [Transactional Outbox and Inbox Specification](specs/outbox-inbox.md) now defines the transaction and provider-conformance boundary without changing topology identity.
 
 The [MVP Release Gate](development/mvp-release-gate.md) defines the release boundary and the remaining packaging, documentation, and release-candidate work that follows this fundamentals gate.
 
@@ -103,7 +103,7 @@ The [MVP Release Gate](development/mvp-release-gate.md) defines the release boun
 
 The detailed checklist is defined in the [Mediator and In-Memory Stability Gate](development/in-memory-stability-gate.md).
 
-**Status:** implemented for the current preview scope. All shared scenarios are verified in C# and Java, including lifecycle, scopes, requests, retries, filters, metadata, type dispatch, deterministic scheduling, independent consumer failure behavior, eventual consumed observations, directed send, and publish fan-out. A separate MediatR-shaped, type-routed single-handler `Send` API with registration cardinality validation remains future product work; it must not change the existing message-bus directed-send fan-out contract.
+**Status:** implemented for the current preview scope. All shared scenarios are verified in C# and Java, including lifecycle, scopes, requests, retries, filters, metadata, type dispatch, deterministic scheduling, independent consumer failure behavior, eventual consumed observations, directed send, publish fan-out, and the separate mediator type-routed single-handler `Send` contract with cardinality validation and result dispatch. Handler, consumer, and consumer-method registrations share that mediator boundary without changing the existing message-bus directed-send fan-out contract.
 
 ## Serialization Architecture Gate
 
