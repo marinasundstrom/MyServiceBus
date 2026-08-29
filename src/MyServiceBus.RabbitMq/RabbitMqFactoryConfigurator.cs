@@ -22,8 +22,8 @@ public class RabbitMqFactoryConfigurator : IRabbitMqFactoryConfigurator, IBusFac
 
     public string ClientHost { get; private set; } = "localhost";
     public int ClientPort { get; private set; } = DefaultAmqpPort;
-    public string Password { get; internal set; }
-    public string Username { get; internal set; }
+    public string Password { get; internal set; } = "guest";
+    public string Username { get; internal set; } = "guest";
     public IEndpointNameFormatter? EndpointNameFormatter => _endpointNameFormatter;
     public IMessageEntityNameFormatter? EntityNameFormatter => _entityNameFormatter;
 
@@ -121,6 +121,8 @@ public class RabbitMqFactoryConfigurator : IRabbitMqFactoryConfigurator, IBusFac
             {
                 HostName = ClientHost,
                 Port = ClientPort,
+                UserName = Username,
+                Password = Password,
                 AutomaticRecoveryEnabled = true,
                 TopologyRecoveryEnabled = true,
             };

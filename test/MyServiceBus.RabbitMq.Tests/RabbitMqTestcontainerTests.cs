@@ -1,5 +1,7 @@
 using MyServiceBus.Serialization;
 using MyServiceBus.Topology;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using RabbitMQ.Client;
 using Testcontainers.RabbitMq;
 
@@ -7,6 +9,42 @@ namespace MyServiceBus.RabbitMq.Tests;
 
 public class RabbitMqTestcontainerTests
 {
+    [Fact]
+    public async Task Deferred_host_configuration_is_used_after_transport_resolution()
+    {
+        await using var container = new RabbitMqBuilder("rabbitmq:4.1.8-alpine").Build();
+        await container.StartAsync();
+
+        var port = container.GetMappedPublicPort(5672);
+        Assert.NotEqual(5672, port);
+        var connectionUri = new Uri(container.GetConnectionString());
+        var credentials = connectionUri.UserInfo.Split(':', 2);
+        var queueName = $"deferred-configuration-{Guid.NewGuid():N}";
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddServiceBus(configurator =>
+        {
+            configurator.AddConsumer<DeferredConfigurationConsumer>();
+            configurator.UsingRabbitMq((context, rabbit) =>
+            {
+                rabbit.Host(container.Hostname, port, host =>
+                {
+                    host.Username(Uri.UnescapeDataString(credentials[0]));
+                    host.Password(Uri.UnescapeDataString(credentials[1]));
+                });
+                rabbit.ReceiveEndpoint(queueName, endpoint =>
+                    endpoint.ConfigureConsumer<DeferredConfigurationConsumer>(context));
+            });
+        });
+
+        await using var provider = services.BuildServiceProvider();
+        _ = provider.GetRequiredService<ITransportFactory>();
+        var hostedService = provider.GetServices<IHostedService>().OfType<ServiceBusHostedService>().Single();
+
+        await hostedService.StartAsync(CancellationToken.None);
+        await hostedService.StopAsync(CancellationToken.None);
+    }
+
     [Fact]
     public async Task Transport_round_trips_an_envelope_through_rabbitmq()
     {
@@ -255,5 +293,10 @@ public class RabbitMqTestcontainerTests
     public sealed class CompatibilityMessage
     {
         public string Value { get; set; } = string.Empty;
+    }
+
+    public sealed class DeferredConfigurationConsumer : IConsumer<CompatibilityMessage>
+    {
+        public Task Consume(ConsumeContext<CompatibilityMessage> context) => Task.CompletedTask;
     }
 }

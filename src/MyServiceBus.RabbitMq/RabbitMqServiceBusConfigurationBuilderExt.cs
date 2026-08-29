@@ -23,16 +23,15 @@ public static class RabbitMqServiceBusConfigurationBuilderExt
         // Register connection provider
         builder.Services.AddSingleton<ConnectionProvider>(sp =>
         {
-            var factory = new ConnectionFactory
+            return new ConnectionProvider(() => new ConnectionFactory
             {
                 HostName = rabbitConfigurator.ClientHost,
                 Port = rabbitConfigurator.ClientPort,
+                UserName = rabbitConfigurator.Username,
+                Password = rabbitConfigurator.Password,
                 AutomaticRecoveryEnabled = true,
                 TopologyRecoveryEnabled = true,
-                //DispatchConsumersAsync = true
-            };
-
-            return new ConnectionProvider(factory);
+            });
         });
 
         builder.Services.AddSingleton<ITransportFactory, RabbitMqTransportFactory>();
@@ -54,13 +53,19 @@ public static class RabbitMqServiceBusConfigurationBuilderExt
 
 public sealed class ConnectionProvider
 {
-    private readonly IConnectionFactory connectionFactory;
+    private readonly Func<IConnectionFactory> connectionFactoryFactory;
+    private IConnectionFactory? connectionFactory;
     private IConnection? connection;
     private readonly SemaphoreSlim connectionLock = new(1, 1);
 
     public ConnectionProvider(IConnectionFactory connectionFactory)
+        : this(() => connectionFactory)
     {
-        this.connectionFactory = connectionFactory;
+    }
+
+    internal ConnectionProvider(Func<IConnectionFactory> connectionFactoryFactory)
+    {
+        this.connectionFactoryFactory = connectionFactoryFactory ?? throw new ArgumentNullException(nameof(connectionFactoryFactory));
     }
 
     public async Task<IConnection> GetOrCreateConnectionAsync(CancellationToken cancellationToken = default)
@@ -75,6 +80,7 @@ public sealed class ConnectionProvider
         var delay = TimeSpan.FromMilliseconds(100);
         while (!cancellationToken.IsCancellationRequested)
         {
+            connectionFactory ??= connectionFactoryFactory();
             var conn = await connectionFactory.CreateConnectionAsync(cancellationToken);
             conn.ConnectionShutdownAsync += (_, _) =>
             {
