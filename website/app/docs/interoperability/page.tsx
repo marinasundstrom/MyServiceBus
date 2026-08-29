@@ -44,6 +44,11 @@ export default function Interoperability() {
 
       <div className="callout"><strong>Preview support</strong><p>Before 1.0, only the newest published preview is actively supported. Fixes are delivered in a newer preview.</p></div>
 
+      <p>
+        The concise runtime and tooling policy is on the{' '}
+        <Link href="/docs/supported-versions">supported versions page</Link>.
+      </p>
+
       <div className="next-card"><div><span>Transport preview</span><strong>Configure Azure Service Bus and review its boundaries</strong></div><Link href="/docs/azure-service-bus">Azure Service Bus →</Link></div>
     </article>
   );

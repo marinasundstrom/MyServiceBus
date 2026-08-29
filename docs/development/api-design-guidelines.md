@@ -17,6 +17,8 @@ Do not reproduce repository layout mechanically. A C# namespace or assembly is n
 
 Language-specific facilities are legitimate design inputs. C# may use extension methods, optional parameters, delegates, records, `Task`, and `CancellationToken`; Java may use builders, factories, functional interfaces, records where appropriate, `CompletableFuture`, and Java lifecycle conventions. Each client may provide platform-only integration helpers as long as they do not change the portable semantics or create an undocumented protocol difference.
 
+Runtime baselines constrain available language and library features; they do not require lowest-common-denominator APIs. The current C# surface may use the .NET 10 framework and current C# features. Java must keep Java 17-compatible bytecode and public APIs while using modern features available in that baseline. Raising either target is a release-policy change with CI, package, and migration consequences.
+
 For every shared public concept, reviews should answer:
 
 1. What is the corresponding concept in each client?
@@ -55,12 +57,13 @@ Expose only the contracts necessary for application developers:
 - Consumer abstractions (`IConsumer<T>` / `Consumer<T>`), saga and endpoint configuration builders.
 - Exception types that callers might handle.
 - Extension points that allow customization (filters, observers, pipeline specifications).
+- Message-aware provider contracts whose guarantees applications must select explicitly, such as volatile or durable scheduling.
 
 ## Internal APIs
 
 Keep implementation details hidden to maintain flexibility and prevent misuse:
 
-- Transport, topology, serializer, retry and scheduling implementations.
+- Transport, topology, serializer, retry, timer, and provider implementations.
 - Connection handling, caching and pooling mechanisms.
 - Helper utilities and internal conventions.
 - Diagnostic infrastructure beyond lightweight logging and metrics abstractions.

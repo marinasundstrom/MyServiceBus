@@ -113,8 +113,10 @@ RabbitMQ L03 and L04 are verified against RabbitMQ 4.1.8 by forcing a deadline w
 | T01 | In-process scheduled delivery fires | Message is sent once within the documented timing tolerance while the process remains alive | Verified | Verified |
 | T02 | Schedule is cancelled before firing | No message is sent | Verified | Verified |
 | T03 | Process exits before due time | Current emulated schedule is documented as lost; no durable claim is made | Open | Open |
-| T04 | Durable scheduler is introduced and process restarts | Pending intent survives and dispatches with stable identity | Not implemented | Not implemented |
+| T04 | Durable scheduler is introduced and process restarts | Pending intent survives and dispatches with stable identity | Partial | Partial |
 | T05 | Dispatch result is ambiguous | Retry produces a detectable duplicate rather than a new identity | Open | Open |
+
+T04 is partial for PostgreSQL outbox-delayed intent: both Testcontainers suites prove a committed record is unavailable before its due time and becomes leasable with its original record and message identities. Process-level restart around the due boundary and persisted cancellation remain open. The default `IMessageScheduler` provider remains volatile by design.
 
 ## Test Harness Requirements
 

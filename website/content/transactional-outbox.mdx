@@ -42,7 +42,8 @@ The C# package `Sundstrom.MyServiceBus.PostgreSql` and Java module `io.github.ma
 - transport dispatch that preserves the stored body, content type, and identity;
 - a .NET hosted delivery lifecycle and an explicit Java start/close lifecycle;
 - per-service dispatcher status and PostgreSQL backlog health; and
-- complete envelope storage with stable message and correlation identities; and
+- complete envelope storage with stable message and correlation identities;
+- durable scheduled intent that remains unavailable to dispatchers until due; and
 - inbox acquisition and completion keyed by consumer scope and message identity.
 
 Both implementations are tested against PostgreSQL 17.6 with Testcontainers. The suites cover rollback and commit behavior, scoped publish/send capture, envelope rehydration, concurrent disjoint leases, and atomic inbox completion with an outgoing outbox record. Live RabbitMQ gates also dispatch a persisted C# envelope to Java and a persisted Java envelope to C# without reserializing the stored body.
@@ -56,7 +57,7 @@ Both implementations are tested against PostgreSQL 17.6 with Testcontainers. The
 
 The MVP is a coherent Bus Outbox evaluation path, not production promotion or every persistence feature at once. Both clients now have explicit startup validation, provider and lifecycle composition, focused PostgreSQL recovery evidence, dispatcher health and lag signals, and an end-to-end C#/Java Aspire showcase. Process-level broker crash injection remains part of the larger production-promotion matrix.
 
-Transparent Consumer Outbox middleware, automatic retention cleanup, richer dashboard integration, SQL Server, and durable scheduling follow that MVP unless they are needed to close one of those gates.
+Transparent Consumer Outbox middleware, automatic retention cleanup, richer dashboard integration, SQL Server, persisted schedule cancellation, and provider-specific schedulers follow that MVP unless they are needed to close one of those gates.
 
 ## Keep ownership inside the producing service
 
@@ -126,7 +127,7 @@ try (ServiceScope scope = serviceProvider.createScope();
 }
 ```
 
-Resolve endpoint contracts from the same scope as the session. Calling `IMessageBus` / `MessageBus` directly intentionally bypasses capture. Nested registrations are rejected. Scheduled messages inside an active outbox session currently fail clearly; durable scheduling will be handled in a separate slice.
+Resolve endpoint contracts from the same scope as the session. Calling `IMessageBus` / `MessageBus` directly intentionally bypasses capture. Nested registrations are rejected. Scheduled messages in the active session persist their due time and are not leased early. Persisted cancellation after commit is not exposed yet; see [message scheduling](/docs/scheduling).
 
 ## Run delivery for one service partition
 
@@ -198,7 +199,7 @@ For an acquired delivery, write responses and new messages through the acquisiti
 
 This design provides effectively-once protected PostgreSQL effects when the application uses the transaction boundary correctly. It does not promise globally exactly-once delivery, cross-database atomicity, or automatic idempotency for external API calls.
 
-The next production-hardening steps are transparent Consumer Outbox middleware, retention cleanup, monitoring export, and the remaining process-level failure matrix. Durable scheduling is a separate next feature slice and must persist delayed intent instead of relying on the current in-process timer.
+The next production-hardening steps are transparent Consumer Outbox middleware, retention cleanup, monitoring export, and the remaining process-level failure matrix. Delayed outbox intent is durable; persisted cancellation, recurring schedules, and provider-specific scheduler adapters remain separate work.
 
 PostgreSQL is the first provider. SQL Server is a natural future provider for the same portable MyServiceBus semantics, using its own transaction and locking mechanisms rather than promising compatibility with another framework's tables.
 

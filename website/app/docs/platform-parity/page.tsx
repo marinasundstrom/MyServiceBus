@@ -10,7 +10,7 @@ const apiRows = [
   ['Consumer methods and handlers', '[Consumer] + AddHandler', '@MessageConsumer + addHandler', 'MyServiceBus-native — explicit mediator-friendly handlers and generated/reflected method consumers.', 'Verified preview', 'Declaration and registration conveniences may grow.'],
   ['Transactional Bus Outbox', 'UsePostgreSql + AddPostgreSqlOutboxDelivery', 'useTransaction + PostgreSqlOutboxDelivery.create', 'Deliberate divergence — normalized MyServiceBus C# ↔ Java schema, not MassTransit table compatibility.', 'MVP preview', 'Consumer Outbox, cleanup, SQL Server, and production crash gates remain.'],
   ['Transport portfolio', 'RabbitMQ + Azure Service Bus', 'RabbitMQ + Azure Service Bus', 'Deliberate scope — one portable profile per supported broker, not MassTransit transport breadth.', 'Verified preview', 'New transports may be added only with matching C# and Java behavior and evidence.'],
-  ['Schedule or delay messages', 'IMessageScheduler / SchedulePublish / ScheduleSend', 'MessageScheduler.schedulePublish / scheduleSend', 'Temporary gap — familiar intent, but not MassTransit scheduler breadth or durability today.', 'Experimental', 'Durable scheduling and persisted outbox intent are next; this API may change materially.'],
+  ['Schedule or delay messages', 'IMessageScheduler + IScheduleMessageProvider', 'MessageScheduler + ScheduleMessageProvider', 'Idiomatic equivalent — MassTransit-familiar C# surface, Java-native time/async types, and explicit volatile or durable providers.', 'MVP preview', 'PostgreSQL outbox delayed intent works; persisted cancellation, recurring schedules, and broker/Quartz adapters remain.'],
   ['Runtime monitoring', 'AddServiceBusMonitoring + PostgreSqlOutboxHealth', 'MonitoringServices.addMonitoring + PostgreSqlOutboxHealth', 'MyServiceBus-native — own collector/dashboard model plus OpenTelemetry-compatible application telemetry.', 'Experimental', 'Outbox export, persistence, security, and dashboard operations are incomplete.'],
   ['Generated registration and dispatch', 'C# source generator', 'JSR 269 annotation processor', 'MyServiceBus-native — compile-time path for lower-reflection startup and mediator dispatch.', 'Verified preview', 'Generated coverage will expand with the runtime surface.'],
 ];
@@ -104,6 +104,8 @@ export default function PlatformParity() {
         <Link href="/docs/interoperability">interoperability matrix</Link>. For the
         PostgreSQL transaction boundary and remaining promotion work, use the{' '}
         <Link href="/docs/transactional-outbox">Transactional Outbox guide</Link>.
+        For volatile timers, persisted delayed intent, and provider guarantees, use the{' '}
+        <Link href="/docs/scheduling">message scheduling guide</Link>.
       </p>
 
       <h2>Equivalent experience does not mean identical syntax</h2>

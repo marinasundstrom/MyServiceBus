@@ -44,6 +44,7 @@ Applications that require isolated buses should use separate application hosts o
 - **One bus per application is the supported model.** Multiple hosted bus instances are currently out of scope and are not added solely for MassTransit API compatibility.
 - **Simplicity is a product feature.** New surface area must justify its long-term conceptual, operational, and cross-language cost.
 - **Language APIs are idiomatic.** C# remains familiar to MassTransit users, while Java and future clients express the same concepts using conventions natural to their ecosystems.
+- **Runtime baselines are explicit.** Modern APIs use the features available within the published target: currently .NET 10 for C# packages and Java 17-compatible bytecode/APIs for Java. A newer JDK runtime expectation is not the same decision as raising the Java publication target.
 - **Integration abstractions stay small and owned.** The portable core avoids selecting a framework-specific DI or logging stack; optional adapters connect it to the ecosystems applications already use.
 - **Transports declare capabilities.** The core does not assume every broker supports queues, fan-out, scheduling, ordering, replay, and dead-lettering in the same way.
 - **Operational tooling is optional.** Inspection, monitoring, and dashboard packages observe the runtime through stable APIs without becoming dependencies of message delivery.
@@ -178,6 +179,8 @@ Each adapter publishes a machine-readable capability descriptor. The initial voc
 Each capability records whether it is `native`, `emulated`, or `unsupported`, plus any relevant constraints. Configuration validation compares requested bus features with this descriptor before the bus starts.
 
 Transport profiles then add the rules needed for interoperability: address formats, entity naming, topology mapping, native-header mapping, error conventions, and settlement behavior. For example, MassTransit-compatible RabbitMQ and Azure Service Bus profiles are separate conformance targets even though both implement the portable core.
+
+Message scheduling has a separate provider boundary because it may be implemented by the transport, PostgreSQL outbox persistence, Quartz.NET or Quartz Scheduler, or an external service. The default provider is volatile and callback-based. Durable providers receive message intent rather than an executable callback and must make restart and cancellation capabilities explicit. PostgreSQL outbox capture currently persists one-time delayed intent; persisted cancellation, recurring schedules, and provider-specific adapters remain future slices.
 
 ## Message Flow
 

@@ -1313,7 +1313,7 @@ try (ServiceScope scope = provider.createScope()) {
 
 ### Scheduling Messages
 
-Delay message delivery by setting the scheduled enqueue time on the send or publish context or by using the `IMessageScheduler` service. `IMessageScheduler` returns a `ScheduledMessageHandle` that can be used to cancel a scheduled message. External schedulers such as Quartz or Hangfire can be plugged in by providing a custom `IJobScheduler`/`JobScheduler` implementation.
+Delay message delivery by setting the scheduled enqueue time on the send or publish context or by using the `IMessageScheduler` service. `IMessageScheduler` returns a `ScheduledMessageHandle` that can be used to cancel a scheduled message when the selected provider supports cancellation. The default provider is volatile and process-bound. Durable integrations implement the message-aware `IScheduleMessageProvider`/`ScheduleMessageProvider`; callback-only `IJobScheduler`/`JobScheduler` implementations cannot survive restart.
 
 #### C#
 
@@ -1326,9 +1326,9 @@ await bus.SchedulePublish(new OrderSubmitted(), TimeSpan.FromSeconds(30));
 await endpoint.ScheduleSend(new SubmitOrder(), TimeSpan.FromSeconds(30));
 
 var scheduler = provider.GetRequiredService<IMessageScheduler>();
-var handle = await scheduler.SchedulePublish(new OrderSubmitted(), TimeSpan.FromSeconds(30));
+var handle = await scheduler.SchedulePublish(DateTime.UtcNow.AddSeconds(30), new OrderSubmitted());
 await scheduler.CancelScheduledPublish(handle);
-await scheduler.ScheduleSend(new Uri("queue:submit-order"), new SubmitOrder(), TimeSpan.FromSeconds(30));
+await scheduler.ScheduleSend(new Uri("queue:submit-order"), DateTime.UtcNow.AddSeconds(30), new SubmitOrder());
 ```
 
 #### Java
@@ -1339,61 +1339,37 @@ SendEndpoint endpoint = bus.getSendEndpoint("queue:submit-order");
 endpoint.send(new SubmitOrder(), ctx -> ctx.setScheduledEnqueueTime(Duration.ofSeconds(30))).join();
 
 MessageScheduler scheduler = serviceProvider.getService(MessageScheduler.class);
-ScheduledMessageHandle handle = scheduler.schedulePublish(new OrderSubmitted(), Duration.ofSeconds(30))
+ScheduledMessageHandle handle = scheduler.schedulePublish(Instant.now().plusSeconds(30), new OrderSubmitted())
     .toCompletableFuture().join();
 scheduler.cancelScheduledPublish(handle).toCompletableFuture().join();
-scheduler.scheduleSend("queue:submit-order", new SubmitOrder(), Duration.ofSeconds(30))
+scheduler.scheduleSend("queue:submit-order", Instant.now().plusSeconds(30), new SubmitOrder())
     .toCompletableFuture().join();
 ```
 
-##### Custom schedulers
+##### Custom in-process timers
 
-`AddServiceBus` registers a simple timer-based `DefaultJobScheduler`. To integrate a production scheduler such as Quartz or Hangfire, implement `IJobScheduler`/`JobScheduler` and register it so it replaces the default.
+`AddServiceBus` registers a simple timer-based `DefaultJobScheduler`. Replace `IJobScheduler`/`JobScheduler` to control process-local timing or deterministic tests. Use `IScheduleMessageProvider`/`ScheduleMessageProvider` for a durable scheduler such as a future Quartz.NET adapter because a callback cannot be persisted safely.
 
-**C#**
+Register a message-aware provider before `AddServiceBus` so the default provider does not replace it.
+
+**C# durable-provider registration**
 
 ```csharp
-class HangfireJobScheduler : IJobScheduler
-{
-    readonly IBackgroundJobClient jobs;
-    public HangfireJobScheduler(IBackgroundJobClient jobs) => this.jobs = jobs;
-
-    public Task<Guid> Schedule(DateTime scheduledTime, Func<CancellationToken, Task> callback, CancellationToken token = default)
-    {
-        jobs.Schedule(() => callback(token), scheduledTime);
-        return Task.FromResult(Guid.NewGuid());
-    }
-
-    public Task Cancel(Guid tokenId) => Task.CompletedTask;
-}
-
-services.AddSingleton<IJobScheduler, HangfireJobScheduler>();
+services.AddScoped<IScheduleMessageProvider, QuartzScheduleMessageProvider>();
 services.AddServiceBus(cfg => { /* ... */ });
 ```
 
-**Java**
+**Java durable-provider registration**
 
 ```java
-class QuartzJobScheduler implements JobScheduler {
-    private final Scheduler scheduler;
-    QuartzJobScheduler(Scheduler scheduler) { this.scheduler = scheduler; }
-
-    public CompletionStage<UUID> schedule(Instant scheduledTime,
-            Function<CancellationToken, CompletionStage<Void>> callback,
-            CancellationToken token) {
-        scheduler.scheduleJob(() -> callback.apply(token), Date.from(scheduledTime));
-        return CompletableFuture.completedFuture(UUID.randomUUID());
-    }
-
-    public CompletionStage<Void> cancel(UUID tokenId) {
-        return CompletableFuture.completedFuture(null);
-    }
-}
-
 ServiceCollection services = ServiceCollection.create();
-services.addSingleton(JobScheduler.class, sp -> new QuartzJobScheduler(quartz));
-services.from(MessageBusServices.class).addServiceBus(cfg -> { /* ... */ });
+MessageBusServices busServices = services.from(MessageBusServices.class);
+busServices.tryAddScoped(ScheduleMessageProvider.class,
+    sp -> () -> new QuartzScheduleMessageProvider(/* ... */));
+busServices.addServiceBus(cfg -> { /* ... */ });
 ```
+
+These adapter names illustrate the extension boundary; first-party Quartz adapters are not shipped yet. A durable provider must persist a serializable message command or final envelope, not a delegate, lambda, or closure. See [Message Scheduling](scheduling.md) for the current PostgreSQL outbox path and promotion requirements.
 
 ---
 
@@ -1459,7 +1435,7 @@ try (ServiceScope scope = serviceProvider.createScope();
 
 The inbox follows the same rule. Create `PostgreSqlInboxStore` with the transaction and logical service name that own the protected application effect. Continue only for `Acquired`; `Completed` is a safe duplicate and `InProgress` must remain eligible for retry. Add responses or publications through the acquired transaction's outbox, complete the inbox record, commit the database transaction, and only then settle the broker message.
 
-Resolve `IPublishEndpoint` / `ISendEndpointProvider` and their Java equivalents from the same scope as `OutboxSession`. Calling the singleton bus directly bypasses capture. Scheduled messages in an active outbox session currently fail clearly and will be addressed in a separate scheduling slice.
+Resolve `IPublishEndpoint` / `ISendEndpointProvider` and their Java equivalents from the same scope as `OutboxSession`. Calling the singleton bus directly bypasses capture. Scheduled messages in an active outbox session persist their due time and remain unavailable to the dispatcher until then; persisted cancellation after commit is not yet exposed.
 
 Compose delivery once for the same logical service name. .NET hosts it with the application:
 

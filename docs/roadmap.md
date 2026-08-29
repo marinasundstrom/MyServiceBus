@@ -138,6 +138,8 @@ The detailed assessment, work slices, and evidence rules are defined in [Enterpr
 
 **Transactional consistency status:** Transactional Outbox MVP implemented for evaluation. Both clients provide scoped Bus Outbox capture, normalized PostgreSQL persistence, service-partitioned leasing, transport dispatch, delivery lifecycle composition, health/backlog inspection, and deterministic real-database recovery evidence. The separate Aspire topology proves application-state-plus-outbox commits and bidirectional C#/Java consumption through RabbitMQ. Transparent Consumer Outbox middleware, cleanup, monitoring export, and complete process-level O01–O06 evidence remain open; no production-promotion claim is made yet.
 
+**Scheduling status:** the default C# and Java message schedulers remain explicitly volatile and cancellable. Matching message-aware provider seams are implemented, and PostgreSQL outbox capture persists one-time delayed intent transactionally without leasing it early. Process-level restart evidence, persisted cancellation, recurring schedules, broker-native adapters, and Quartz.NET/Quartz Scheduler adapters remain open before a general durable-scheduling promotion claim.
+
 ## Phase 3: Inspection and Monitoring APIs
 
 **Outcome:** applications and tools can discover and observe a distributed MyServiceBus system without coupling clients to a UI or local monitoring store.

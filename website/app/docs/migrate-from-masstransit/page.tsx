@@ -6,7 +6,7 @@ const mappings = [
   ['Consume', 'IConsumer<T>.Consume', 'IConsumer<T>.Consume', 'Port registration and middleware deliberately; matching names do not make assemblies interchangeable.'],
   ['Request/response', 'IRequestClient<T>.GetResponse', 'IRequestClient<T>.GetResponseAsync', 'Re-test response, fault, timeout, and temporary endpoint behavior.'],
   ['Transactional outbox', 'Bus/Consumer Outbox providers', 'PostgreSQL Bus Outbox MVP', 'Do not point both products at the same outbox tables.'],
-  ['Scheduling', 'Transport or persistent scheduler', 'In-process experimental scheduler', 'Keep durable schedules on MassTransit until the durable MyServiceBus slice is complete.'],
+  ['Scheduling', 'Transport or persistent scheduler', 'Volatile provider, PostgreSQL outbox delay, or custom message-aware provider', 'Outbox delayed intent is durable; broker-native, Quartz, recurring, and persisted-cancellation adapters remain future work.'],
 ];
 
 export default function MigrateFromMassTransit() {

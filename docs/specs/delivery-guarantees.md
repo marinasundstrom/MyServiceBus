@@ -158,9 +158,11 @@ RabbitMQ response endpoints are non-durable and auto-delete. Azure response queu
 
 ## Scheduling
 
-Portable scheduling is currently emulated by an in-process job scheduler. Scheduling API completion does not mean a broker has durably stored the message for future delivery. Process termination can lose pending schedules.
+The default message scheduler uses an in-process provider. Its API reports `Volatile`; completion does not mean a broker or database durably stored the message, and process termination can lose pending schedules.
 
-Production documentation must label this mode non-durable. A transport may claim durable scheduling only after using a broker-native or persistent scheduler and passing restart, cancellation, duplicate, and clock-boundary tests.
+An active PostgreSQL Bus Outbox session instead persists the final serialized envelope and due time in the caller's transaction. The dispatcher does not lease the record before that time, and recovery preserves its record and message identities. Persisted cancellation is not yet a supported public operation.
+
+`IScheduleMessageProvider` / `ScheduleMessageProvider` is the portable extension boundary for broker-native, Quartz.NET, Hangfire, Quartz Scheduler, or external scheduling services. `IJobScheduler` / `JobScheduler` is callback-based and cannot make a durable claim. A provider may report durable scheduling only after passing restart, cancellation where advertised, duplicate, ambiguity, and clock-boundary tests.
 
 ## Shutdown and Flow Control
 

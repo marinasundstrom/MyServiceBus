@@ -4,6 +4,8 @@
 
 MyServiceBus `0.1.0-preview.5` is built and tested against the following baseline:
 
+The baseline distinguishes language/API compatibility from the build and runtime used to verify a release. C# packages target `net10.0`, which selects the available .NET reference assemblies and BCL surface. Java publishes Java 17-compatible bytecode and APIs; the implementation should use modern Java 17 language features and JDK types where useful without requiring a newer bytecode level. Running on a newer JDK is an expected compatibility path, not the same as moving the published Java target.
+
 | Component | Supported line | Reproducible CI baseline | Scope |
 | --- | --- | --- | --- |
 | .NET | .NET 10 | .NET SDK `10.0.100`, with latest-patch roll-forward | C# packages target `net10.0`. Use a supported .NET 10 servicing release. |

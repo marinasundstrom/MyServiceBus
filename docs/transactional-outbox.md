@@ -118,7 +118,7 @@ try (ServiceScope scope = serviceProvider.createScope();
 
 Resolve the scoped endpoint interfaces from the same scope as `OutboxSession`. Calling the singleton `IMessageBus` / `MessageBus` directly intentionally bypasses Bus Outbox capture, matching the familiar distinction between bus-level and scoped endpoint contracts. Nested outbox registrations in one scope are rejected.
 
-Scheduled or delayed messages are not yet supported inside an active outbox session and fail with a clear unsupported-operation exception instead of being delivered early. Scheduling persistence is a separate future slice.
+Scheduled or delayed messages are captured inside an active outbox session. The final envelope is committed with its due time and the delivery service cannot lease it early. This provides durable delayed intent across process restarts. Persisted cancellation after commit is not yet exposed; use the volatile message scheduler only when process-bound cancellation is acceptable. See [Message Scheduling](scheduling.md).
 
 ## Run the delivery service
 
