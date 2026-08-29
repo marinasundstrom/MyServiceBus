@@ -2,7 +2,7 @@ package com.myservicebus;
 
 import static org.junit.jupiter.api.Assertions.assertSame;
 
-import java.lang.reflect.Type;
+import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 
@@ -14,6 +14,7 @@ import com.myservicebus.serialization.MessageBody;
 import com.myservicebus.serialization.MessageEnvelopeMode;
 import com.myservicebus.serialization.MessageSerializationContext;
 import com.myservicebus.serialization.MessageSerializer;
+import com.myservicebus.serialization.InboundMessage;
 
 class SerializerFactoryRegistrationTest {
     @Test
@@ -71,8 +72,23 @@ class SerializerFactoryRegistrationTest {
         }
 
         @Override
-        public <T> Envelope<T> deserialize(byte[] data, Type type) {
+        public String getContentType() {
+            return "application/factory-test";
+        }
+
+        @Override
+        public MessageEnvelopeMode getEnvelopeMode() {
+            return MessageEnvelopeMode.RAW;
+        }
+
+        @Override
+        public InboundMessage deserialize(MessageBody body, Map<String, Object> headers) {
             return null;
+        }
+
+        @Override
+        public MessageBody getMessageBody(String text) {
+            return new ByteArrayMessageBody(text.getBytes(java.nio.charset.StandardCharsets.UTF_8));
         }
     }
 }

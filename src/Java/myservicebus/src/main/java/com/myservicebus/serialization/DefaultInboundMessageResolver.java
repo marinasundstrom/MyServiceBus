@@ -38,7 +38,8 @@ public class DefaultInboundMessageResolver implements InboundMessageResolver {
         }
 
         if (ENVELOPE_CONTENT_TYPE.equalsIgnoreCase(contentType)) {
-            return new EnvelopeInboundMessage(transportMessage.getBody(), transportMessage.getHeaders(), envelopeDeserializer, headerConvention);
+            return envelopeDeserializer.deserialize(
+                    new ByteArrayMessageBody(transportMessage.getBody()), transportMessage.getHeaders());
         }
 
         throw new IllegalArgumentException("Invalid Content Type: " + contentType);

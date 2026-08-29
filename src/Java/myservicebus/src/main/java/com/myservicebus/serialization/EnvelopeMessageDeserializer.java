@@ -9,18 +9,22 @@ import java.time.temporal.ChronoField;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.DeserializationContext;
 import com.fasterxml.jackson.databind.JsonDeserializer;
-import java.lang.reflect.Type;
-
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-import com.myservicebus.Envelope;
+import java.nio.charset.StandardCharsets;
+import java.util.Map;
 
 public class EnvelopeMessageDeserializer implements MessageDeserializer {
     private final ObjectMapper mapper;
+    private final MessageHeaderConvention headerConvention;
 
     public EnvelopeMessageDeserializer() {
+        this(MassTransitHeaderConvention.INSTANCE);
+    }
+
+    public EnvelopeMessageDeserializer(MessageHeaderConvention headerConvention) {
+        this.headerConvention = headerConvention;
         mapper = new ObjectMapper();
         mapper.findAndRegisterModules();
         mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
@@ -41,9 +45,22 @@ public class EnvelopeMessageDeserializer implements MessageDeserializer {
     }
 
     @Override
-    public <T> Envelope<T> deserialize(byte[] data, Type type) throws IOException {
-        JavaType messageType = mapper.getTypeFactory().constructType(type);
-        JavaType envelopeType = mapper.getTypeFactory().constructParametricType(Envelope.class, messageType);
-        return mapper.readValue(data, envelopeType);
+    public String getContentType() {
+        return DefaultInboundMessageResolver.ENVELOPE_CONTENT_TYPE;
+    }
+
+    @Override
+    public MessageEnvelopeMode getEnvelopeMode() {
+        return MessageEnvelopeMode.ENVELOPE;
+    }
+
+    @Override
+    public InboundMessage deserialize(MessageBody body, Map<String, Object> headers) throws IOException {
+        return new EnvelopeInboundMessage(body.getBytes(), headers, mapper, headerConvention);
+    }
+
+    @Override
+    public MessageBody getMessageBody(String text) {
+        return new ByteArrayMessageBody(text.getBytes(StandardCharsets.UTF_8));
     }
 }

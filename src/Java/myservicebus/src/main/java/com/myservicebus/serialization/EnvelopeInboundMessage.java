@@ -8,22 +8,24 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.UUID;
 
 import com.myservicebus.Envelope;
+import com.fasterxml.jackson.databind.JavaType;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 public class EnvelopeInboundMessage implements InboundMessage {
     private final byte[] body;
     private final Map<String, Object> transportHeaders;
-    private final MessageDeserializer deserializer;
+    private final ObjectMapper mapper;
     private final MessageHeaderConvention headerConvention;
     private final Envelope<Object> metadataEnvelope;
     private final Map<Type, Object> messageCache = new ConcurrentHashMap<>();
     private Map<String, Object> headers;
 
-    public EnvelopeInboundMessage(byte[] body, Map<String, Object> transportHeaders, MessageDeserializer deserializer, MessageHeaderConvention headerConvention) throws Exception {
+    public EnvelopeInboundMessage(byte[] body, Map<String, Object> transportHeaders, ObjectMapper mapper, MessageHeaderConvention headerConvention) throws java.io.IOException {
         this.body = body;
         this.transportHeaders = transportHeaders;
-        this.deserializer = deserializer;
+        this.mapper = mapper;
         this.headerConvention = headerConvention;
-        this.metadataEnvelope = deserializer.deserialize(body, Object.class);
+        this.metadataEnvelope = deserializeEnvelope(Object.class);
     }
 
     @Override
@@ -107,11 +109,17 @@ public class EnvelopeInboundMessage implements InboundMessage {
             return (T) cached;
         }
 
-        Envelope<T> typedEnvelope = deserializer.deserialize(body, type);
+        Envelope<T> typedEnvelope = deserializeEnvelope(type);
         T message = typedEnvelope.getMessage();
         if (message != null) {
             messageCache.put(type, message);
         }
         return message;
+    }
+
+    private <T> Envelope<T> deserializeEnvelope(Type type) throws java.io.IOException {
+        JavaType messageType = mapper.getTypeFactory().constructType(type);
+        JavaType envelopeType = mapper.getTypeFactory().constructParametricType(Envelope.class, messageType);
+        return mapper.readValue(body, envelopeType);
     }
 }
