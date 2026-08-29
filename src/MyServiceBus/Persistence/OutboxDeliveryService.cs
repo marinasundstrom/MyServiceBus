@@ -20,12 +20,23 @@ public sealed class OutboxDeliveryOptions
     }
 }
 
+public sealed record OutboxDeliveryStatus(
+    bool IsRunning,
+    DateTimeOffset? LastPollAtUtc,
+    DateTimeOffset? LastSuccessfulPollAtUtc,
+    DateTimeOffset? LastFailureAtUtc,
+    string? LastFailureCategory,
+    OutboxDispatchBatchResult? LastBatch);
+
 public sealed class OutboxDeliveryService : BackgroundService
 {
     private readonly OutboxDispatcher dispatcher;
     private readonly OutboxDeliveryOptions options;
     private readonly TimeProvider timeProvider;
     private readonly ILogger<OutboxDeliveryService> logger;
+    private OutboxDeliveryStatus status = new(false, null, null, null, null, null);
+
+    public OutboxDeliveryStatus Status => Volatile.Read(ref status);
 
     public OutboxDeliveryService(
         OutboxDispatcher dispatcher,
@@ -41,31 +52,56 @@ public sealed class OutboxDeliveryService : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        while (!stoppingToken.IsCancellationRequested)
+        UpdateStatus(Status with { IsRunning = true });
+        try
         {
-            try
+            while (!stoppingToken.IsCancellationRequested)
             {
-                var result = await dispatcher.DispatchBatchAsync(
-                    new OutboxLeaseRequest(
-                        options.OwnerId,
-                        options.BatchSize,
-                        timeProvider.GetUtcNow(),
-                        options.LeaseDuration),
-                    stoppingToken);
+                try
+                {
+                    var polledAt = timeProvider.GetUtcNow();
+                    var result = await dispatcher.DispatchBatchAsync(
+                        new OutboxLeaseRequest(
+                            options.OwnerId,
+                            options.BatchSize,
+                            polledAt,
+                            options.LeaseDuration),
+                        stoppingToken);
+                    UpdateStatus(Status with
+                    {
+                        LastPollAtUtc = polledAt,
+                        LastSuccessfulPollAtUtc = timeProvider.GetUtcNow(),
+                        LastFailureCategory = null,
+                        LastBatch = result
+                    });
 
-                if (result.Leased >= options.BatchSize)
-                    continue;
-            }
-            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
-            {
-                break;
-            }
-            catch (Exception exception)
-            {
-                logger.LogError(exception, "Transactional outbox polling failed");
-            }
+                    if (result.Leased >= options.BatchSize)
+                        continue;
+                }
+                catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+                {
+                    break;
+                }
+                catch (Exception exception)
+                {
+                    var failedAt = timeProvider.GetUtcNow();
+                    UpdateStatus(Status with
+                    {
+                        LastPollAtUtc = failedAt,
+                        LastFailureAtUtc = failedAt,
+                        LastFailureCategory = exception.GetType().Name
+                    });
+                    logger.LogError(exception, "Transactional outbox polling failed");
+                }
 
-            await Task.Delay(options.PollInterval, timeProvider, stoppingToken);
+                await Task.Delay(options.PollInterval, timeProvider, stoppingToken);
+            }
+        }
+        finally
+        {
+            UpdateStatus(Status with { IsRunning = false });
         }
     }
+
+    private void UpdateStatus(OutboxDeliveryStatus value) => Volatile.Write(ref status, value);
 }

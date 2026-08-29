@@ -31,12 +31,26 @@ public class OutboxDeliveryServiceTests
 
         await service.StartAsync(CancellationToken.None);
         var request = await store.FirstRequest.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await WaitUntilAsync(() => service.Status.LastSuccessfulPollAtUtc is not null);
+        var runningStatus = service.Status;
         await service.StopAsync(CancellationToken.None);
 
         Assert.Equal("orders-service-replica-a", request.OwnerId);
         Assert.Equal(25, request.MaximumCount);
         Assert.Equal(Now, request.NowUtc);
         Assert.Equal(TimeSpan.FromSeconds(30), request.LeaseDuration);
+        Assert.True(runningStatus.IsRunning);
+        Assert.Equal(Now, runningStatus.LastPollAtUtc);
+        Assert.Equal(Now, runningStatus.LastSuccessfulPollAtUtc);
+        Assert.Equal(new OutboxDispatchBatchResult(0, 0, 0, 0), runningStatus.LastBatch);
+        Assert.False(service.Status.IsRunning);
+    }
+
+    private static async Task WaitUntilAsync(Func<bool> condition)
+    {
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        while (!condition())
+            await Task.Delay(10, cancellation.Token);
     }
 
     private sealed class RecordingStore : IOutboxStore

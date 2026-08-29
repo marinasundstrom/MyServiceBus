@@ -170,6 +170,24 @@ public sealed class PostgreSqlPersistenceTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Health_reports_backlog_only_for_its_service_partition()
+    {
+        var ordersMessage = CreateMessage();
+        await InsertCommitted(ordersMessage, ServiceName);
+        await InsertCommitted(CreateMessage(), "billing-service");
+
+        var backlog = await new PostgreSqlOutboxHealth(dataSource, ServiceName).GetBacklogAsync();
+
+        Assert.Equal(ServiceName, backlog.ServiceName);
+        Assert.Equal(1, backlog.Pending);
+        Assert.Equal(0, backlog.Leased);
+        Assert.Equal(0, backlog.Retrying);
+        Assert.Equal(0, backlog.Dispatched);
+        Assert.Equal(0, backlog.Dead);
+        Assert.Equal(ordersMessage.CreatedAtUtc, backlog.OldestUndispatchedAtUtc);
+    }
+
+    [Fact]
     public async Task Inbox_completion_and_outbox_write_commit_atomically()
     {
         var key = new InboxMessageKey("billing-charge-card", Guid.NewGuid());

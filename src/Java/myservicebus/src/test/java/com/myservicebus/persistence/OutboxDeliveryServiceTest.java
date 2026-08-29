@@ -36,6 +36,12 @@ class OutboxDeliveryServiceTest {
                 dispatcher, options, Clock.fixed(NOW, ZoneOffset.UTC))) {
             service.start();
             assertTrue(store.polled.await(5, TimeUnit.SECONDS));
+            waitUntil(() -> service.getStatus().lastSuccessfulPollAtUtc() != null);
+            OutboxDeliveryStatus runningStatus = service.getStatus();
+            assertTrue(runningStatus.running());
+            assertEquals(NOW, runningStatus.lastPollAtUtc());
+            assertEquals(NOW, runningStatus.lastSuccessfulPollAtUtc());
+            assertEquals(new OutboxDispatchBatchResult(0, 0, 0, 0), runningStatus.lastBatch());
         }
 
         OutboxLeaseRequest request = store.firstRequest.get();
@@ -43,6 +49,16 @@ class OutboxDeliveryServiceTest {
         assertEquals(25, request.maximumCount());
         assertEquals(NOW, request.nowUtc());
         assertEquals(Duration.ofSeconds(30), request.leaseDuration());
+    }
+
+    private static void waitUntil(java.util.function.BooleanSupplier condition) throws Exception {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+        while (!condition.getAsBoolean()) {
+            if (System.nanoTime() >= deadline) {
+                throw new AssertionError("Timed out waiting for outbox delivery status.");
+            }
+            Thread.sleep(10);
+        }
     }
 
     private static final class RecordingStore implements OutboxStore {

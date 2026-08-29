@@ -191,6 +191,28 @@ class PostgreSqlPersistenceTest {
     }
 
     @Test
+    void healthReportsBacklogOnlyForItsServicePartition() throws Exception {
+        try (PostgreSQLContainer container = startContainer()) {
+            DataSource dataSource = dataSource(container);
+            PostgreSqlSchema.ensureCreated(dataSource);
+            OutboxMessage ordersMessage = createMessage();
+            insertCommitted(dataSource, ordersMessage, SERVICE_NAME);
+            insertCommitted(dataSource, createMessage(), "billing-service");
+
+            PostgreSqlOutboxBacklog backlog = new PostgreSqlOutboxHealth(dataSource, SERVICE_NAME)
+                    .getBacklog().join();
+
+            assertEquals(SERVICE_NAME, backlog.serviceName());
+            assertEquals(1, backlog.pending());
+            assertEquals(0, backlog.leased());
+            assertEquals(0, backlog.retrying());
+            assertEquals(0, backlog.dispatched());
+            assertEquals(0, backlog.dead());
+            assertEquals(ordersMessage.createdAtUtc(), backlog.oldestUndispatchedAtUtc());
+        }
+    }
+
+    @Test
     void inboxCompletionAndOutboxWriteCommitAtomically() throws Exception {
         try (PostgreSQLContainer container = startContainer()) {
             DataSource dataSource = dataSource(container);

@@ -25,6 +25,8 @@ public static class PostgreSqlOutboxDeliveryServiceExtensions
         services.AddSingleton(options);
         services.AddSingleton<IOutboxStore>(provider =>
             new PostgreSqlOutboxStore(provider.GetRequiredService<NpgsqlDataSource>(), serviceName));
+        services.AddSingleton(provider =>
+            new PostgreSqlOutboxHealth(provider.GetRequiredService<NpgsqlDataSource>(), serviceName));
         services.AddSingleton<IOutboxTransportDispatcher, TransportOutboxDispatcher>();
         services.AddSingleton<IOutboxRetryPolicy>(_ =>
             new ExponentialOutboxRetryPolicy(TimeSpan.FromSeconds(1), TimeSpan.FromMinutes(1)));
