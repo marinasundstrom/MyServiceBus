@@ -75,6 +75,43 @@ An application may also materialize the MyServiceBus collection with another con
 
 The corresponding .NET CI smoke application uses the Roslyn-generated catalog with the mediator, publishes the complete application with `PublishAot`, runs the native executable, and verifies message, context, cancellation-token, and service binding. Together, these smoke applications continuously test the application-level AOT claim on both runtimes.
 
+## Source-generated JSON metadata on .NET
+
+Consumer registration metadata and JSON metadata are independent. The MyServiceBus generator owns the consumer catalog; the application owns its `System.Text.Json` contract policy through an ordinary `JsonSerializerContext`:
+
+```csharp
+[JsonSerializable(typeof(SubmitOrder))]
+internal partial class ApplicationJsonContext : JsonSerializerContext
+{
+}
+
+var serialization = new EnvelopeSerializerFactory(
+    ApplicationJsonContext.Default.Options);
+
+services.AddServiceBus(configurator =>
+{
+    configurator.AddSerializer(serialization, isSerializer: true);
+    configurator.AddDeserializer(serialization, isDefault: true);
+});
+```
+
+The supplied metadata is used for application payloads on send and receive. MyServiceBus writes and reads its own envelope fields directly, so the application does not need to generate metadata for every closed `Envelope<T>` type. `RawJsonSerializerFactory` supports the same options boundary. Omitting options selects the reflection-capable managed default.
+
+The .NET NativeAOT smoke performs a source-generated envelope round trip before generated mediator dispatch. Its JSON options contain only the application context, with reflection fallback disabled by omission. This verifies that the supported built-in JSON envelope path does not need reflection metadata for library-owned envelope types.
+
+| .NET JSON mode | Managed runtime | NativeAOT claim | Comparison row |
+| --- | --- | --- | --- |
+| Default reflective `System.Text.Json` | Supported | Not the strict metadata path | Envelope and Raw JSON baseline |
+| Application source-generated metadata | Supported | Verified by native smoke | Envelope and Raw JSON generated |
+
+Run the committed throughput and allocation matrix with:
+
+```bash
+dotnet run -c Release --project benchmarks/MyServiceBus.Benchmarks -- --filter '*JsonSerializationBenchmarks*'
+```
+
+BenchmarkDotNet reports envelope/raw serialization and deserialization as separate groups. Cold process startup, first-use latency, retained memory, and NativeAOT published size require process-level measurements and must remain separate columns; warmed microbenchmark results do not stand in for them.
+
 ## .NET 11 Runtime Async preparation
 
 .NET 11 Runtime Async is a preview, compile-time opt-in that moves async suspension and resumption into the runtime. It supports NativeAOT and can improve async throughput, allocation pressure, diagnostics, and library size. Compiler-generated async state machines remain statically compilable by NativeAOT on .NET 10, so Runtime Async is an optimization direction rather than a prerequisite for native compilation.
@@ -89,9 +126,7 @@ See [What's new in the .NET 11 runtime](https://learn.microsoft.com/dotnet/core/
 
 Both runtimes now accept service-provider serializer factories, and Java has the corresponding deserializer factory. The class-based serializer APIs remain available for conventional applications; AOT applications can construct these extensions explicitly without reflection.
 
-The target bidirectional registry and application-metadata boundary are defined in the [Serialization Architecture Proposal](../proposals/serialization-architecture.md). It keeps source-generated payload metadata application-owned while allowing the built-in envelope profiles to use it on both send and receive paths.
-
-`System.Text.Json` source generation remains an application opt-in. MyServiceBus does not require its consumer generator to own application JSON contracts. Applications pass `JsonSerializerContext.Default.Options` to `EnvelopeSerializerFactory` or `RawJsonSerializerFactory`; the same options are used for payloads on send and receive. MyServiceBus writes and reads its envelope metadata without requesting generated metadata for closed `Envelope<T>` types. The reflection-capable managed defaults remain available when options are omitted.
+The bidirectional registry and application-metadata boundary are defined in the [Serialization Architecture Proposal](../proposals/serialization-architecture.md). Source-generated payload metadata remains application-owned while built-in envelope profiles use it on both send and receive paths.
 
 Before AOT can be declared fully supported, .NET still needs a boundary for anonymous interface messages. Both runtimes need broader typed factories for user filters, transports, interface-consumer activation, and broker serialization paths.
 
@@ -102,3 +137,5 @@ Measurements on an Apple M1 show why this remains work in progress. BenchmarkDot
 Typed registration already reduces startup work: .NET explicit typed registration measured 1.626 µs versus 2.282 µs for reflection (29% lower, with 7% fewer allocations); Java measured 0.704 µs versus 0.718 µs, a small difference with overlapping confidence intervals. These are local proof-of-concept measurements, not general performance guarantees. See the website benchmark page and committed BenchmarkDotNet/JMH harnesses for methodology.
 
 The harnesses now also compare reflection and generation over the same small application catalog containing one interface consumer and one attributed method consumer. This isolates registration-phase work from whole-process startup. Initial development runs favor generated catalogs in both runtimes, but a stable, controlled .NET run is still required before publishing a durable catalog-startup number.
+
+The JSON serialization harness now provides the corresponding .NET comparison rows for default reflective and application source-generated metadata. Publishable serialization numbers have not yet been recorded; they require a normal benchmark run on a controlled host rather than the dry validation job used to verify the matrix.

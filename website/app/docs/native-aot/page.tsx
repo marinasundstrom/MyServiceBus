@@ -23,6 +23,24 @@ const manualCatalog = `static void AddApplicationConsumers(
     configurator.AddConsumer<OrderSubmittedConsumer, OrderSubmitted>();
 }`;
 
+const generatedJson = `[JsonSerializable(typeof(SubmitOrder))]
+internal partial class ApplicationJsonContext : JsonSerializerContext
+{
+}
+
+var serialization = new EnvelopeSerializerFactory(
+    ApplicationJsonContext.Default.Options);
+
+builder.Services.AddServiceBus(configurator =>
+{
+    configurator.AddSerializer(serialization, isSerializer: true);
+    configurator.AddDeserializer(serialization, isDefault: true);
+});`;
+
+const jsonBenchmark = `dotnet run -c Release \\
+  --project benchmarks/MyServiceBus.Benchmarks -- \\
+  --filter '*JsonSerializationBenchmarks*'`;
+
 const javaDependencies = `dependencies {
     implementation "io.github.marinasundstrom.myservicebus:myservicebus:0.1.0-preview.5"
     annotationProcessor "io.github.marinasundstrom.myservicebus:myservicebus-processor:0.1.0-preview.5"
@@ -105,6 +123,30 @@ export default function NativeAot() {
       </p>
       <CodeViewer code={manualCatalog} label="Hand-written C# consumer catalog" language="csharp" />
 
+      <h2>Provide generated JSON metadata separately</h2>
+      <p>
+        Consumer catalogs and JSON contracts solve different problems. The MyServiceBus generator
+        owns consumer registration; the application owns its <code>System.Text.Json</code> policy.
+        Pass the application context to the built-in serializer factory without exposing JSON
+        metadata in the portable serializer contract.
+      </p>
+      <CodeViewer code={generatedJson} label="Configure source-generated JSON metadata" language="csharp" />
+      <p>
+        The same metadata handles application payloads on send and receive. MyServiceBus processes
+        its envelope fields directly, so the context only needs application message contracts—not
+        every closed envelope type. Omitting options keeps the reflection-capable managed default.
+      </p>
+
+      <div className="parity-table-wrap">
+        <table className="parity-table">
+          <thead><tr><th>.NET JSON mode</th><th>Managed runtime</th><th>NativeAOT</th><th>Comparison row</th></tr></thead>
+          <tbody>
+            <tr><td>Default reflective metadata</td><td>Supported</td><td>Not the strict path</td><td>Envelope and Raw baseline</td></tr>
+            <tr><td>Application source-generated metadata</td><td>Supported</td><td>Verified by native smoke</td><td>Envelope and Raw generated</td></tr>
+          </tbody>
+        </table>
+      </div>
+
       <h2>Use generated registration in Java</h2>
       <p>
         Add the optional JSR 269 annotation processor, then register its catalog. It does
@@ -134,6 +176,11 @@ export default function NativeAot() {
         Image application. Each uses a generated consumer method with the mediator and verifies
         message, context, cancellation, and service binding. This establishes application-level
         native execution for the supported path; it does not yet certify every transport and extension.
+      </p>
+      <p>
+        The .NET smoke also performs a source-generated JSON envelope round trip with no reflection
+        resolver fallback before dispatch. That verifies the built-in envelope&apos;s application-metadata
+        boundary in the published native executable.
       </p>
 
       <div className="callout">
@@ -179,6 +226,19 @@ export default function NativeAot() {
           </tbody>
         </table>
       </div>
+
+      <h3>JSON metadata comparison</h3>
+      <p>
+        The committed .NET harness compares reflective and source-generated metadata independently
+        for envelope/raw serialization and deserialization, with allocation diagnostics. Run the full
+        benchmark before publishing numbers:
+      </p>
+      <CodeViewer code={jsonBenchmark} label="Run the .NET JSON metadata matrix" language="shell" />
+      <p>
+        Warm throughput and allocation are only two columns. Cold startup, first-message cost,
+        retained memory, and NativeAOT published size need process-level measurements and will be
+        recorded separately rather than inferred from warmed microbenchmarks.
+      </p>
 
       <p>
         Current JIT execution wins the steady-state dispatch measurements. The Java native result
