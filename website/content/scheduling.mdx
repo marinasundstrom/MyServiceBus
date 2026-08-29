@@ -64,7 +64,37 @@ try (OutboxSession.Registration ignored = PostgreSqlOutboxSession.useTransaction
 connection.commit();
 ```
 
-This path survives process restart and retains stable record and message identities. Persisted cancellation after commit is not available yet.
+For the typed scheduler API, register the PostgreSQL provider before scheduling in the active transaction:
+
+```csharp
+services.AddPostgreSqlMessageScheduler("orders-service");
+
+ScheduledMessageHandle handle;
+using (outboxSession.UsePostgreSql(connection, transaction, "orders-service"))
+{
+    handle = await scheduler.SchedulePublish(dueAt, new PaymentReminder(orderId));
+}
+await transaction.CommitAsync();
+
+ScheduleCancellationResult result = await scheduler.CancelScheduledPublish(handle);
+```
+
+```java
+PostgreSqlScheduling.addMessageScheduler(services, dataSource, "orders-service");
+
+ScheduledMessageHandle handle;
+try (OutboxSession.Registration ignored = PostgreSqlOutboxSession.useTransaction(
+        outboxSession, connection, "orders-service")) {
+    handle = scheduler.schedulePublish(dueAt, new PaymentReminder(orderId))
+            .toCompletableFuture().join();
+}
+connection.commit();
+
+ScheduleCancellationResult result = scheduler.cancelScheduledPublish(handle)
+        .toCompletableFuture().join();
+```
+
+This path survives process restart and retains stable record and message identities. Cancel after the producing transaction commits. Cancellation and dispatcher leasing race atomically, so the result distinguishes cancellation from a dispatcher that already acquired the record. Repeated cancellation is idempotent.
 
 ## Plug in a durable scheduling service
 

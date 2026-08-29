@@ -138,7 +138,7 @@ The runtime must fail startup when inbox/outbox is enabled with missing transact
 
 ## Observability
 
-Providers expose bounded-cardinality metrics for pending, leased, dispatched, dead, duplicate-completed, duplicate-in-progress, dispatch attempts, and failures. They also expose oldest pending age and dispatcher/inbox health without placing message bodies or arbitrary headers in telemetry.
+Providers expose bounded-cardinality metrics per logical service partition for pending, leased, dispatched, cancelled, dead, duplicate-completed, duplicate-in-progress, dispatch attempts, and failures. They also expose oldest eligible age, lease acquisition and expiry, broker dispatch duration, drain rate, active dispatcher replicas, last successful cycle, and dispatcher/inbox health without placing message bodies or arbitrary headers in telemetry. These requirements apply equally to embedded delivery services and standalone dispatcher fleets.
 
 Logs and traces include provider name, logical consumer scope, operation, attempt, and outcome. Message identity may be logged only under the project's documented data-handling policy. Connection strings, credentials, serialized bodies, and application transaction contents are never emitted.
 

@@ -20,7 +20,7 @@ Parity in this document means equivalent concepts, behavior, and wire outcomes. 
 | Transport abstraction | Implemented | Implemented | RabbitMQ and Azure Service Bus are verified preview profiles with corresponding C# and Java adapters. |
 | Retries | Implemented | Implemented | Both clients require explicit configuration to retry consumers. |
 | PostgreSQL Bus Outbox MVP | `UsePostgreSql` scoped capture, `AddPostgreSqlOutboxDelivery`, and `PostgreSqlOutboxHealth` | `PostgreSqlOutboxSession.useTransaction`, `PostgreSqlOutboxDelivery.create`, and `PostgreSqlOutboxHealth` | The normalized, service-partitioned schema and delivery semantics align across C# and Java. Consumer Outbox middleware, cleanup, SQL Server, and production promotion remain open. The schema is not a MassTransit database-compatibility contract. |
-| Message scheduling | `IMessageScheduler`, `IScheduleMessageProvider`, and time-first absolute overloads | `MessageScheduler`, `ScheduleMessageProvider`, `Instant`/`Duration`, and `CompletionStage` | Default providers are explicitly volatile and cancellable. PostgreSQL outbox capture persists delayed intent in both clients. Persisted cancellation, recurring schedules, and provider-specific adapters remain open. |
+| Message scheduling | `IMessageScheduler`, `IScheduleMessageProvider`, time-first absolute overloads, and `ScheduleCancellationResult` | `MessageScheduler`, `ScheduleMessageProvider`, `Instant`/`Duration`, `CompletionStage`, and `ScheduleCancellationResult` | Default providers are explicitly volatile. PostgreSQL providers persist delayed intent and cancellation with equivalent lease-race outcomes. Recurring schedules and provider-specific adapters remain open. |
 | Configuration API (host, queue, message overrides, endpoint formatter) | Implemented | Implemented | Both clients support overriding names and automatic endpoint configuration with custom formatters. |
 | Logging and tracing flow | Implemented | Implemented | Both clients emit MassTransit-style lifecycle and message-flow logs and propagate OpenTelemetry context across send/publish/consume pipelines. |
 
@@ -39,7 +39,7 @@ API differences are also classified by intent:
 - **Aligned + interoperable** is the pinned common wire subset.
 - **Idiomatic equivalent** preserves the responsibility and observable behavior with a platform-native API shape.
 - **Deliberate divergence** or **MyServiceBus-native** is a boundary the project chooses and owns, such as the cross-platform outbox schema, Java composition model, mediator emphasis, and generated handler surfaces.
-- **Temporary gap** is unfinished parity or production work, such as persisted schedule cancellation or recurring scheduling; it must not be presented as an intentional design advantage.
+- **Temporary gap** is unfinished parity or production work, such as recurring scheduling or restart-boundary promotion evidence; it must not be presented as an intentional design advantage.
 
 Migration, feature, and compatibility guides should use these classifications so an adopter can distinguish a durable product choice from preview incompleteness.
 

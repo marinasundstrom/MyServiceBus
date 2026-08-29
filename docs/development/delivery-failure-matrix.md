@@ -114,9 +114,10 @@ RabbitMQ L03 and L04 are verified against RabbitMQ 4.1.8 by forcing a deadline w
 | T02 | Schedule is cancelled before firing | No message is sent | Verified | Verified |
 | T03 | Process exits before due time | Current emulated schedule is documented as lost; no durable claim is made | Open | Open |
 | T04 | Durable scheduler is introduced and process restarts | Pending intent survives and dispatches with stable identity | Partial | Partial |
+| T06 | Persisted cancellation races dispatcher leasing | Exactly one transition wins; cancelled work is never leased | Verified | Verified |
 | T05 | Dispatch result is ambiguous | Retry produces a detectable duplicate rather than a new identity | Open | Open |
 
-T04 is partial for PostgreSQL outbox-delayed intent: both Testcontainers suites prove a committed record is unavailable before its due time and becomes leasable with its original record and message identities. Process-level restart around the due boundary and persisted cancellation remain open. The default `IMessageScheduler` provider remains volatile by design.
+T04 is partial for PostgreSQL outbox-delayed intent: both Testcontainers suites prove a committed record is unavailable before its due time and becomes leasable with its original record and message identities. Process-level restart around the due boundary remains open. T06 is verified against real PostgreSQL in both clients with conditional pending-to-cancelled transitions, idempotent repeat results, non-scheduled and unknown identity results, and a concurrent lease race. The default `IMessageScheduler` provider remains volatile by design; the PostgreSQL provider reports durable.
 
 ## Test Harness Requirements
 

@@ -180,7 +180,7 @@ Each capability records whether it is `native`, `emulated`, or `unsupported`, pl
 
 Transport profiles then add the rules needed for interoperability: address formats, entity naming, topology mapping, native-header mapping, error conventions, and settlement behavior. For example, MassTransit-compatible RabbitMQ and Azure Service Bus profiles are separate conformance targets even though both implement the portable core.
 
-Message scheduling has a separate provider boundary because it may be implemented by the transport, PostgreSQL outbox persistence, Quartz.NET or Quartz Scheduler, or an external service. The default provider is volatile and callback-based. Durable providers receive message intent rather than an executable callback and must make restart and cancellation capabilities explicit. PostgreSQL outbox capture currently persists one-time delayed intent; persisted cancellation, recurring schedules, and provider-specific adapters remain future slices.
+Message scheduling has a separate provider boundary because it may be implemented by the transport, PostgreSQL outbox persistence, Quartz.NET or Quartz Scheduler, or an external service. The default provider is volatile and callback-based. Durable providers receive message intent rather than an executable callback and must make restart and cancellation capabilities explicit. PostgreSQL outbox scheduling persists one-time delayed intent and cancellation in both clients; recurring schedules and provider-specific adapters remain future slices.
 
 ## Message Flow
 
@@ -213,6 +213,8 @@ sequenceDiagram
 ## Transactional Messaging Boundary
 
 The transactional outbox belongs to a **logical producing service**. Its application state and outgoing messaging intent commit in the same database transaction. Every record has a service partition key. Replicas share that partition and compete for leases; unrelated services may use other partitions in the same database without reading or dispatching those records.
+
+Dispatch is a separate runtime responsibility. It may be embedded in each producer or hosted by a standalone worker fleet that polls explicitly assigned service partitions. In either topology, producer ownership and partition isolation remain unchanged. The standalone topology lets producers depend only on transactional storage while specialized workers own broker connectivity, delivery capacity, and dispatch operations.
 
 ```mermaid
 flowchart LR

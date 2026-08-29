@@ -1435,7 +1435,7 @@ try (ServiceScope scope = serviceProvider.createScope();
 
 The inbox follows the same rule. Create `PostgreSqlInboxStore` with the transaction and logical service name that own the protected application effect. Continue only for `Acquired`; `Completed` is a safe duplicate and `InProgress` must remain eligible for retry. Add responses or publications through the acquired transaction's outbox, complete the inbox record, commit the database transaction, and only then settle the broker message.
 
-Resolve `IPublishEndpoint` / `ISendEndpointProvider` and their Java equivalents from the same scope as `OutboxSession`. Calling the singleton bus directly bypasses capture. Scheduled messages in an active outbox session persist their due time and remain unavailable to the dispatcher until then; persisted cancellation after commit is not yet exposed.
+Resolve `IPublishEndpoint` / `ISendEndpointProvider` and their Java equivalents from the same scope as `OutboxSession`. Calling the singleton bus directly bypasses capture. Scheduled messages in an active outbox session persist their due time and remain unavailable to the dispatcher until then. Register `AddPostgreSqlMessageScheduler` / `PostgreSqlScheduling.addMessageScheduler` to receive a persisted handle and cancel after the producing transaction commits; cancellation reports whether it won or the dispatcher had already leased the record.
 
 Compose delivery once for the same logical service name. .NET hosts it with the application:
 
@@ -1461,7 +1461,7 @@ try (OutboxDeliveryService delivery = PostgreSqlOutboxDelivery.create(
 
 For EF Core, begin an explicit `Database.BeginTransactionAsync()`, obtain its `NpgsqlConnection` and `NpgsqlTransaction` through `GetDbConnection()` / `GetDbTransaction()`, and pass those objects to `UsePostgreSql`. Keep `SaveChangesAsync`, captured sends/publications, and commit inside that one caller-owned transaction. Do not rely on EF's implicit per-save transaction.
 
-`PostgreSqlOutboxStore` supplies atomic PostgreSQL leases within its required logical-service partition. Supported transport composition and delivery lifecycles are implemented; Consumer Outbox middleware, minimal health/lag signals, crash-window promotion evidence, monitoring, and cleanup remain in progress. See [Transactional Outbox and Inbox](transactional-outbox.md) for guarantees, status, and limits.
+`PostgreSqlOutboxStore` supplies atomic PostgreSQL leases within its required logical-service partition. Delivery may run embedded in a producer or in a standalone worker assigned to that partition. Supported transport composition, delivery lifecycles, backlog health, one-time durable scheduling, and persisted cancellation are implemented; Consumer Outbox middleware, crash-window promotion evidence, monitoring export, and cleanup remain in progress. See [Transactional Outbox and Inbox](transactional-outbox.md) for guarantees, status, and limits.
 
 ### Unit Testing with the In-Memory Test Harness
 

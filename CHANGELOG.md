@@ -4,6 +4,8 @@ This changelog summarizes the bigger themes in the repository history rather tha
 
 ## Unreleased
 
+- Added equivalent C# and Java PostgreSQL durable message schedulers with persisted handles, explicit cancellation outcomes, atomic cancellation-versus-lease behavior, and cancelled-backlog health state.
+- Documented embedded and standalone outbox dispatcher topologies and the bounded operational signals needed to identify dispatcher bottlenecks.
 - Added an API-first C#/Java capability and readiness matrix that distinguishes verified preview, MVP preview, and experimental surfaces, shows likely pre-1.0 change, and classifies aligned interoperability, idiomatic equivalents, deliberate divergence, MyServiceBus-native design, and temporary gaps.
 - Added incremental migration guides for introducing MyServiceBus at MassTransit service boundaries and for replacing MediatR one application slice at a time, including explicit API maps, ownership handoffs, and verification checkpoints.
 - Added matching C# and Java PostgreSQL outbox/inbox packages with a versioned, logical-service-partitioned schema, caller-transaction-enlisted writers and inbox acquisition, atomic shared-storage leasing, stable-envelope rehydration, supported delivery composition, backlog health, Testcontainers integration tests, and complete NuGet/Maven artifact wiring. Consumer Outbox middleware, cleanup, monitoring export, and complete O01–O06 production evidence remain explicitly open.

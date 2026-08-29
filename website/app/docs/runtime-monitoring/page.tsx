@@ -131,11 +131,13 @@ export default function RuntimeMonitoring() {
 
       <h2>Planned outbox and inbox operations</h2>
       <p>
-        A future persistence-provider contribution will add service-owned outbox and
-        inbox health to this overview: pending and leased counts, oldest pending age,
-        dispatch latency and failures, lost leases, dispatcher health, and duplicate
-        inbox outcomes. This separates time waiting in an outbox from broker backlog
-        and consumer processing time.
+        A future persistence-provider contribution will treat embedded and standalone
+        dispatchers as first-class runtime components. Per service partition it will
+        add pending and leased counts, oldest eligible age, lease and dispatch
+        throughput, broker dispatch latency, retries, terminal failures, lost leases,
+        last successful cycles, active worker replicas, and duplicate inbox outcomes.
+        This makes an undersized dispatcher fleet visible as a bottleneck and separates
+        time waiting in an outbox from broker backlog and consumer processing time.
       </p>
       <p>
         The collector will receive bounded operational snapshots from each service;

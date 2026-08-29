@@ -24,7 +24,7 @@ The C# package `Sundstrom.MyServiceBus.PostgreSql` and Java module `io.github.ma
 - persisted retry, lease, dispatch, and stable message-identity state;
 - transport dispatch that reuses the stored body, content type, and message identity;
 - configurable .NET hosted and Java start/close delivery lifecycles;
-- per-service dispatcher status and PostgreSQL backlog health, including pending, leased, retrying, dispatched, dead, and oldest-undispatched state;
+- per-service dispatcher status and PostgreSQL backlog health, including pending, leased, retrying, dispatched, dead, cancelled, and oldest-undispatched state;
 - inbox acquisition and completion using `(consumer scope, message identity)` uniqueness;
 - matching Testcontainers integration tests in C# and Java; and
 - live RabbitMQ gates for persisted C# envelopes consumed by Java and persisted Java envelopes consumed by C#.
@@ -41,7 +41,7 @@ The MVP is the first coherent Bus Outbox evaluation path, not production promoti
 - minimal health signals for dispatcher progress, failure, pending count, and oldest pending age — implemented; and
 - an end-to-end Aspire showcase that commits application state plus outbox intent and consumes the result in C# and Java — implemented and live-verified.
 
-Transparent Consumer Outbox middleware, automatic retention cleanup, richer dashboard integration, SQL Server, and durable scheduling follow the MVP unless required to close one of those gates.
+Transparent Consumer Outbox middleware, automatic retention cleanup, richer dashboard integration, and SQL Server follow the MVP unless required to close one of those gates. One-time durable PostgreSQL scheduling and persisted cancellation are available for evaluation; recurring schedules and external scheduler adapters remain later work.
 
 ## Why the boundary matters
 
@@ -118,7 +118,7 @@ try (ServiceScope scope = serviceProvider.createScope();
 
 Resolve the scoped endpoint interfaces from the same scope as `OutboxSession`. Calling the singleton `IMessageBus` / `MessageBus` directly intentionally bypasses Bus Outbox capture, matching the familiar distinction between bus-level and scoped endpoint contracts. Nested outbox registrations in one scope are rejected.
 
-Scheduled or delayed messages are captured inside an active outbox session. The final envelope is committed with its due time and the delivery service cannot lease it early. This provides durable delayed intent across process restarts. Persisted cancellation after commit is not yet exposed; use the volatile message scheduler only when process-bound cancellation is acceptable. See [Message Scheduling](scheduling.md).
+Scheduled or delayed messages are captured inside an active outbox session. The final envelope is committed with its due time and the delivery service cannot lease it early. The PostgreSQL message scheduler returns the persisted message identity as its handle and supports cancellation after commit. Cancellation cannot steal a lease: the cancellation request and dispatcher lease race atomically, and the result reports which side won. See [Message Scheduling](scheduling.md).
 
 ## Run the delivery service
 
@@ -204,6 +204,12 @@ The broker source must be settled only after that database commit. A crash after
 
 `TransportOutboxDispatcher` passes the stored envelope to the selected broker without reserializing its body. `AddPostgreSqlOutboxDelivery` composes and hosts the .NET delivery service. `PostgreSqlOutboxDelivery.create` composes the Java equivalent with explicit `start()` and `close()` lifecycle ownership.
 
+The delivery service may run **embedded** in the producing application or **standalone** as a specialized worker. Producers in the standalone topology need only commit application state and opaque outbox envelopes to PostgreSQL; they do not need broker publishing credentials or an active polling loop. The worker receives database lease/update access and broker publishing credentials, and is configured for one or more explicit service partitions. Multiple worker replicas may compete within a partition for scale and availability.
+
+Moving dispatch out of process does not transfer ownership of the records. Each logical producer still owns its partition, schema rollout, retention policy, and delivery objective. A centralized worker serving several partitions must preserve separate health, failure, and capacity reporting for each one.
+
+Dispatch is therefore an independently observable runtime role, not an invisible database task. Monitoring should report, per service partition and dispatcher fleet, pending and leased counts, oldest eligible age, lease acquisition and completion rates, broker dispatch latency, retry and terminal-failure rates, expired/lost leases, last successful cycle, and active worker replicas. Together these show whether producers are creating work faster than the dispatcher fleet can drain it. Message bodies, arbitrary headers, database credentials, and unbounded record identifiers remain outside telemetry.
+
 Other services never need to understand the producer's outbox rows. Cross-platform compatibility applies after dispatch: the broker receives the public envelope, identity, and content type, and either language client deserializes that same wire contract.
 
 ## Guarantees and limits
@@ -213,7 +219,7 @@ Other services never need to understand the producer's outbox rows. Cross-platfo
 - Broker delivery is at least once across the broker/database commit gap; it is not globally exactly once.
 - Inbox protection applies only to effects committed in its PostgreSQL transaction.
 - Calls to external APIs and writes to another database require their own idempotency or coordination strategy.
-- The current schema is version 2 and startup fails when it encounters an unsupported schema version. Version 2 intentionally adds the required logical-service partition without a version 1 migration.
+- The current schema is version 3 and startup fails when it encounters an unsupported schema version. Version 3 adds persisted scheduling and cancellation state and migrates version 2 in place.
 
 PostgreSQL is the first storage provider, not part of the portable semantic contract. A future SQL Server provider can implement the same normalized MyServiceBus behavior using SQL Server-native transactions and locking; it does not need to reproduce another framework's table layout.
 

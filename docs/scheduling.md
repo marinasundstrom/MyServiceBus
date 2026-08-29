@@ -7,7 +7,7 @@ MyServiceBus separates **volatile in-process scheduling** from **durable message
 | Mode | Persistence | Process restart | Cancellation | Current status |
 | --- | --- | --- | --- | --- |
 | Default in-memory provider | Process memory | Pending work is lost | Supported before the callback starts | Available in C# and Java |
-| PostgreSQL outbox delayed intent | Caller-owned PostgreSQL transaction | Persisted intent remains eligible after restart | Not yet supported after commit | Available for evaluation in C# and Java |
+| PostgreSQL outbox scheduler | Caller-owned PostgreSQL transaction | Persisted intent remains eligible after restart | Persisted, with an explicit race result | Available for evaluation in C# and Java |
 | Custom message-aware provider | Provider-defined | Provider-defined and reported as durable or volatile | Provider-defined | Extension point available |
 | Broker-native, Quartz.NET, Hangfire, or recurring adapters | Provider-defined | Not claimed until separately implemented and tested | Provider-defined | Future adapters |
 
@@ -81,7 +81,38 @@ try (OutboxSession.Registration ignored = PostgreSqlOutboxSession.useTransaction
 connection.commit();
 ```
 
-This path is durable and transactional, but it does not yet return a persisted cancellation handle. After commit, cancellation of that row is not a supported public operation. Retry after a failed or ambiguous dispatch reuses the same record and message identities.
+For the typed scheduler API, register the PostgreSQL provider and schedule while the same outbox transaction is active:
+
+```csharp
+services.AddSingleton(dataSource);
+services.AddPostgreSqlMessageScheduler("orders-service");
+
+ScheduledMessageHandle handle;
+using (outboxSession.UsePostgreSql(connection, transaction, "orders-service"))
+{
+    handle = await scheduler.SchedulePublish(dueAt, new PaymentReminder(orderId));
+}
+await transaction.CommitAsync();
+
+ScheduleCancellationResult result = await scheduler.CancelScheduledPublish(handle);
+```
+
+```java
+PostgreSqlScheduling.addMessageScheduler(services, dataSource, "orders-service");
+
+ScheduledMessageHandle handle;
+try (OutboxSession.Registration ignored = PostgreSqlOutboxSession.useTransaction(
+        outboxSession, connection, "orders-service")) {
+    handle = scheduler.schedulePublish(dueAt, new PaymentReminder(orderId))
+            .toCompletableFuture().join();
+}
+connection.commit();
+
+ScheduleCancellationResult result = scheduler.cancelScheduledPublish(handle)
+        .toCompletableFuture().join();
+```
+
+The handle token is the persisted message identity. Cancel after the producing transaction commits. Cancellation and dispatcher leasing compete through one conditional state transition: exactly one wins. Results distinguish `Cancelled`, `AlreadyCancelled`, `TooLate`, `NotScheduled`, and `NotFound` (uppercase enum names in Java). A cancelled row remains as operational history and cannot be leased. Retry after a failed or ambiguous dispatch reuses the same record and message identities.
 
 ## Add a durable provider
 

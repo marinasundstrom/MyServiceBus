@@ -41,9 +41,10 @@ The C# package `Sundstrom.MyServiceBus.PostgreSql` and Java module `io.github.ma
 - persisted attempts, retry time, lease ownership, and dispatch state;
 - transport dispatch that preserves the stored body, content type, and identity;
 - a .NET hosted delivery lifecycle and an explicit Java start/close lifecycle;
-- per-service dispatcher status and PostgreSQL backlog health; and
+- per-service dispatcher status and PostgreSQL backlog health, including cancelled work;
 - complete envelope storage with stable message and correlation identities;
 - durable scheduled intent that remains unavailable to dispatchers until due; and
+- persisted schedule handles and atomic cancellation-versus-lease outcomes; and
 - inbox acquisition and completion keyed by consumer scope and message identity.
 
 Both implementations are tested against PostgreSQL 17.6 with Testcontainers. The suites cover rollback and commit behavior, scoped publish/send capture, envelope rehydration, concurrent disjoint leases, and atomic inbox completion with an outgoing outbox record. Live RabbitMQ gates also dispatch a persisted C# envelope to Java and a persisted Java envelope to C# without reserializing the stored body.
@@ -57,13 +58,19 @@ Both implementations are tested against PostgreSQL 17.6 with Testcontainers. The
 
 The MVP is a coherent Bus Outbox evaluation path, not production promotion or every persistence feature at once. Both clients now have explicit startup validation, provider and lifecycle composition, focused PostgreSQL recovery evidence, dispatcher health and lag signals, and an end-to-end C#/Java Aspire showcase. Process-level broker crash injection remains part of the larger production-promotion matrix.
 
-Transparent Consumer Outbox middleware, automatic retention cleanup, richer dashboard integration, SQL Server, persisted schedule cancellation, and provider-specific schedulers follow that MVP unless they are needed to close one of those gates.
+Transparent Consumer Outbox middleware, automatic retention cleanup, richer dashboard integration, SQL Server, recurring schedules, and provider-specific schedulers follow that MVP unless they are needed to close one of those gates.
 
 ## Keep ownership inside the producing service
 
 An outbox normally belongs to one logical service. Every writer and delivery store uses that service name as a persisted partition key. Replicas share the partition and use leases to divide delivery work; other services can use their own partitions in the same PostgreSQL database without competing for those rows.
 
 The PostgreSQL rows use one normalized MyServiceBus model, so either the C# or Java implementation can write or lease a configured partition. Services still integrate through the broker rather than reading one another&apos;s rows. Dispatch preserves the final serialized envelope as opaque bytes, then a .NET or Java consumer deserializes the same public wire contract. A centralized dispatcher spanning several configured partitions is possible, but it is an explicit advanced topology with additional authorization and failure-isolation requirements.
+
+## Embed delivery or run a standalone dispatcher
+
+The delivery service is an ordinary runtime role. It may run inside each producer, or as a specialized worker that polls explicitly assigned service partitions. In the standalone topology, producers only commit application state and opaque outbox envelopes to PostgreSQL. Dispatcher workers own broker credentials, leasing, retries, and delivery capacity, and can scale independently.
+
+The partition still belongs to its logical producer in either topology. A worker serving several partitions keeps their health and failure boundaries separate. Monitoring should make dispatcher pressure visible with pending and leased counts, oldest eligible age, lease and dispatch throughput, broker dispatch latency, retries, lost leases, last successful cycles, and active worker replicas.
 
 ## Write with the application transaction
 
@@ -127,7 +134,7 @@ try (ServiceScope scope = serviceProvider.createScope();
 }
 ```
 
-Resolve endpoint contracts from the same scope as the session. Calling `IMessageBus` / `MessageBus` directly intentionally bypasses capture. Nested registrations are rejected. Scheduled messages in the active session persist their due time and are not leased early. Persisted cancellation after commit is not exposed yet; see [message scheduling](/docs/scheduling).
+Resolve endpoint contracts from the same scope as the session. Calling `IMessageBus` / `MessageBus` directly intentionally bypasses capture. Nested registrations are rejected. Scheduled messages in the active session persist their due time and are not leased early. The PostgreSQL scheduler returns a persisted handle and supports cancellation after commit; see [message scheduling](/docs/scheduling).
 
 ## Run delivery for one service partition
 
@@ -199,7 +206,7 @@ For an acquired delivery, write responses and new messages through the acquisiti
 
 This design provides effectively-once protected PostgreSQL effects when the application uses the transaction boundary correctly. It does not promise globally exactly-once delivery, cross-database atomicity, or automatic idempotency for external API calls.
 
-The next production-hardening steps are transparent Consumer Outbox middleware, retention cleanup, monitoring export, and the remaining process-level failure matrix. Delayed outbox intent is durable; persisted cancellation, recurring schedules, and provider-specific scheduler adapters remain separate work.
+The next production-hardening steps are transparent Consumer Outbox middleware, retention cleanup, monitoring export, and the remaining process-level failure matrix. One-time delayed outbox intent and cancellation are durable; recurring schedules and provider-specific scheduler adapters remain separate work.
 
 PostgreSQL is the first provider. SQL Server is a natural future provider for the same portable MyServiceBus semantics, using its own transaction and locking mechanisms rather than promising compatibility with another framework's tables.
 

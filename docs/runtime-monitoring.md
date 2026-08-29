@@ -124,7 +124,7 @@ Hooks are a core extension seam, not a monitoring-specific API. Applications and
 
 The monitoring exporter is one implementation of this seam. Its bounded local queue, batching, heartbeats, and collector protocol remain in the optional monitoring package.
 
-Outbox/inbox monitoring is not implemented in the current MVP. Its planned provider contribution will report service-owned operational state such as pending and leased counts, oldest pending age, dispatch failures and lost leases, dispatcher health, and duplicate inbox outcomes. The monitoring service will not connect directly to application databases or mutate persistence state. Message bodies, arbitrary headers, record identities, and connection details remain excluded. See the [runtime monitoring proposal](proposals/runtime-monitoring.md#outbox-and-inbox-operations) for the design boundary.
+Outbox/inbox monitoring is not implemented in the current MVP. Its planned provider contribution treats dispatchers as first-class runtime components, whether they are embedded in producers or run as standalone worker fleets. Per service partition it will report pending and leased counts, oldest eligible age, lease and dispatch throughput, broker dispatch latency, retries, terminal failures, lost leases, last successful cycle, active dispatcher replicas, and duplicate inbox outcomes. This makes a slow or undersized dispatcher fleet visible as a delivery bottleneck. The monitoring service will not connect directly to application databases or mutate persistence state. Message bodies, arbitrary headers, record identities, and connection details remain excluded. See the [runtime monitoring proposal](proposals/runtime-monitoring.md#outbox-and-inbox-operations) for the design boundary.
 
 ## Service API
 
