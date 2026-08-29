@@ -1,0 +1,16 @@
+plugins {
+    id 'application'
+}
+
+group = 'com.myservicebus.testapp.outbox'
+
+application {
+    mainClass = 'com.myservicebus.testapp.outbox.Main'
+}
+
+dependencies {
+    implementation project(':myservicebus-postgresql')
+    implementation project(':myservicebus-rabbitmq')
+    implementation "org.slf4j:slf4j-simple:${slf4jVersion}"
+    implementation "io.javalin:javalin:${javalinVersion}"
+}

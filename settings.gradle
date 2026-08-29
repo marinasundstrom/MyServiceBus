@@ -47,6 +47,9 @@ project(':myservicebus-azure-service-bus').projectDir = file("${javaDir}/myservi
 include 'testapp'
 project(':testapp').projectDir = file("${javaDir}/testapp")
 
+include 'testapp-outbox'
+project(':testapp-outbox').projectDir = file("${javaDir}/testapp-outbox")
+
 include 'myservicebus-testing'
 project(':myservicebus-testing').projectDir = file("${javaDir}/myservicebus-testing")
 
