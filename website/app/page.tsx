@@ -184,6 +184,7 @@ export default function Home() {
             <Link href="/docs/rabbitmq"><span>Transport</span><h3>RabbitMQ</h3><p>Understand recovery, failure queues, topology, and tuning.</p><b>Configure transport →</b></Link>
             <Link href="/docs/azure-service-bus"><span>Preview transport</span><h3>Azure Service Bus</h3><p>Provision Azure, configure either client, and understand the verified interoperability boundary.</p><b>Configure the transport →</b></Link>
             <Link href="/docs/testing"><span>Confidence</span><h3>Testing</h3><p>Exercise message flows with the aligned in-memory harness.</p><b>Write a test →</b></Link>
+            <Link href="/docs/transactional-outbox"><span>Production reliability</span><h3>Transactional outbox</h3><p>Commit PostgreSQL application state and outgoing messaging intent together in C# or Java.</p><b>Explore the outbox →</b></Link>
             <Link href="/docs/mediator"><span>In process</span><h3>Mediator pattern</h3><p>Use generated dispatch for local commands, queries, and notifications through reusable consumers and pipelines.</p><b>Use the mediator →</b></Link>
             <Link href="/docs/native-aot"><span>Work in progress</span><h3>AOT compilation</h3><p>Generate consumer dispatch for .NET NativeAOT and GraalVM Native Image.</p><b>See the proof of concept →</b></Link>
           </div>

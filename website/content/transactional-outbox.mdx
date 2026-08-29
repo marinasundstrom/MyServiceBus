@@ -1,0 +1,111 @@
+<p className="docs-kicker">Guide · Production reliability</p>
+
+# Commit application state and messaging intent together.
+
+<p className="docs-summary">The MyServiceBus PostgreSQL outbox gives C# and Java services one durable transaction for a database change and its outgoing message. The matching inbox protects consumer-side effects when brokers redeliver.</p>
+
+<div className="callout callout-accent">
+  <strong>Why this belongs in the framework</strong>
+  <p>An application should not have to rebuild durable envelope storage, multi-replica leasing, stable message identity, retry state, and duplicate detection for every service. These are shared messaging guarantees, so MyServiceBus is making them a primary production capability.</p>
+</div>
+
+## Replace two unrelated commits with one durable hand-off
+
+Publishing to a broker after updating a database creates a failure gap: the database can commit while publication fails, or publication can succeed while the database rolls back. A distributed transaction is rarely available across both resources.
+
+The outbox records the final serialized envelope in the same PostgreSQL transaction as the application change. A separate dispatcher leases only committed records and delivers them later.
+
+<div className="flow-line" aria-label="Transactional outbox flow">
+  <span>Update application state</span><b>+</b><span>Store outgoing intent</span><b>→ commit →</b><span>Lease and dispatch</span><b>→</b><span>Broker</span>
+</div>
+
+If the dispatcher exits after the broker accepts a message but before PostgreSQL records completion, the record becomes eligible again. MyServiceBus reuses its original message identity, allowing an inbox-protected consumer to recognize the duplicate.
+
+## What works today
+
+The C# package `Sundstrom.MyServiceBus.PostgreSql` and Java module `io.github.marinasundstrom.myservicebus:myservicebus-postgresql` provide equivalent behavior:
+
+- an idempotent, versioned PostgreSQL schema;
+- a writer that requires the application's active transaction;
+- atomic leasing with `FOR UPDATE SKIP LOCKED` for competing replicas;
+- persisted attempts, retry time, lease ownership, and dispatch state;
+- complete envelope storage with stable message and correlation identities; and
+- inbox acquisition and completion keyed by consumer scope and message identity.
+
+Both implementations are tested against PostgreSQL 17.6 with Testcontainers. The suites cover rollback and commit behavior, envelope rehydration, concurrent disjoint leases, and atomic inbox completion with an outgoing outbox record.
+
+<div className="callout">
+  <strong>Foundation status</strong>
+  <p>The storage provider works, but the one-line production bus experience is not finished. Transparent Send/Publish capture, hosted polling, broker transport dispatch, retention cleanup, health, metrics, and the complete crash-injection matrix remain open. Use the current API as an explicit persistence boundary, not as a claim that every production outbox layer is complete.</p>
+</div>
+
+## Write with the application transaction
+
+The caller owns commit and rollback. MyServiceBus refuses to write without an active caller-owned transaction, preventing the outbox record from silently committing separately from application state.
+
+### C#
+
+```csharp
+await PostgreSqlSchema.EnsureCreatedAsync(dataSource);
+
+await using var connection = await dataSource.OpenConnectionAsync();
+await using var transaction = await connection.BeginTransactionAsync();
+
+// Execute the application UPDATE/INSERT using this transaction.
+
+var outbox = new PostgreSqlOutboxWriter(connection, transaction);
+await outbox.AddAsync(new OutboxMessage(
+    Guid.NewGuid(),
+    Guid.NewGuid(),
+    OutboxDeliveryIntent.Publish,
+    new Uri("rabbitmq://broker/order-submitted"),
+    ["urn:message:Contracts:OrderSubmitted"],
+    serializedEnvelope,
+    "application/vnd.masstransit+json",
+    headers,
+    DateTimeOffset.UtcNow,
+    correlationId: orderId));
+
+await transaction.CommitAsync();
+```
+
+### Java
+
+```java
+PostgreSqlSchema.ensureCreated(dataSource);
+
+try (Connection connection = dataSource.getConnection()) {
+    connection.setAutoCommit(false);
+
+    // Execute the application UPDATE/INSERT using this connection.
+
+    OutboxWriter outbox = new PostgreSqlOutboxWriter(connection);
+    outbox.add(new OutboxMessage(
+            UUID.randomUUID(), UUID.randomUUID(),
+            OutboxDeliveryIntent.PUBLISH,
+            URI.create("rabbitmq://broker/order-submitted"),
+            List.of("urn:message:Contracts:OrderSubmitted"),
+            serializedEnvelope,
+            "application/vnd.masstransit+json",
+            headers,
+            Instant.now(),
+            null, orderId, null, null, null, null),
+        CancellationToken.none()).join();
+
+    connection.commit();
+}
+```
+
+## Protect consumer effects with the inbox
+
+Acquire the inbox identity in the transaction that owns the protected application change. `Acquired` may execute the effect. `Completed` is a safe duplicate and skips it. `InProgress` must remain eligible for retry.
+
+For an acquired delivery, write responses and new messages through the acquisition's outbox, mark the inbox record complete, commit PostgreSQL, and only then settle the broker delivery. A crash between the database commit and broker settlement produces a safe redelivery rather than a repeated database effect.
+
+## Understand the guarantee
+
+This design provides effectively-once protected PostgreSQL effects when the application uses the transaction boundary correctly. It does not promise globally exactly-once delivery, cross-database atomicity, or automatic idempotency for external API calls.
+
+The next implementation step is framework-owned capture and dispatch so ordinary bus `Send`, `Publish`, responses, and faults can enter this boundary without manually constructing persisted envelopes.
+
+<NextCard href="/docs/concepts/reliability" label="Related concept" title="Reliability and faults" />

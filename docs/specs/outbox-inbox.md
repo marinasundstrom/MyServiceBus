@@ -4,9 +4,9 @@
 
 This specification defines the portable transaction and failure boundary for MyServiceBus outbox and inbox persistence providers. Matching C# and Java contracts now model transactional writes, immutable persisted envelopes, inbox acquisition, shared-storage leasing, transport dispatch, retry scheduling, and lost-lease outcomes. It does not make the current preview runtime transactional, and an in-memory implementation cannot satisfy the enterprise release gate.
 
-The first production implementation must provide corresponding C# and Java behavior against a real transactional database. Provider APIs may be idiomatic to each ecosystem, but their observable state transitions and failure outcomes must conform to this document and the [Delivery Failure Matrix](../development/delivery-failure-matrix.md).
+The first PostgreSQL implementation now provides corresponding C# and Java persistence behavior against real transactional storage. Provider APIs are idiomatic to each ecosystem, while their observable state transitions conform to this document. Production promotion still requires the complete [Delivery Failure Matrix](../development/delivery-failure-matrix.md).
 
-The current foundation deliberately has no default persistence registration. There is not yet a database schema, migration package, application-unit-of-work adapter, transparent send/publish capture seam, hosted polling loop, cleanup service, or production transport adapter for persisted bodies. Applications must not register an in-memory `IOutboxStore`/`OutboxStore` and infer transactional guarantees from the dispatcher unit tests.
+The PostgreSQL packages include a versioned schema, transaction-enlisted outbox writer, shared-storage lease store, and transaction-enlisted inbox store. They deliberately have no default persistence registration yet. There is not yet a transparent send/publish capture seam, hosted polling loop, cleanup service, application-framework unit-of-work adapter, or production transport adapter for persisted bodies. The provider's Testcontainers suites prove database atomicity, stable-envelope rehydration, competing leases, and duplicate-completed acquisition; they do not by themselves satisfy O01–O06.
 
 ## Portable Runtime Surface
 

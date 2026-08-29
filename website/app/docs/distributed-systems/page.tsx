@@ -152,12 +152,17 @@ export default function DistributedSystemsFundamentals() {
         A transaction cannot normally span a service database and a broker safely.
         If a state change and an outgoing message must either both happen or neither
         happen, use a transactional outbox or another durable hand-off. MyServiceBus
-        does not currently provide a built-in transactional outbox, so this guarantee
-        belongs in your application or persistence integration.
+        now provides matching PostgreSQL persistence foundations for C# and Java. The
+        high-level bus capture and hosted dispatch layers are still being integrated,
+        so the current boundary is explicit rather than a one-line production option.
       </p>
       <div className="flow-line" aria-label="Transactional outbox flow">
         <span>Update domain state</span><b>+</b><span>Store outgoing message</span><b>→</b><span>Relay publishes</span><b>→</b><span>Consumer deduplicates</span>
       </div>
+      <p>
+        See the <Link href="/docs/transactional-outbox">transactional outbox guide</Link>{' '}
+        for the working provider surface, verified database behavior, and remaining gates.
+      </p>
       <div className="callout">
         <strong>Eventual consistency needs a product decision</strong>
         <p>Define what users see while data is catching up, how long is acceptable, and how operators detect and repair a stuck workflow.</p>

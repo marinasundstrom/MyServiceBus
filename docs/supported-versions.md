@@ -9,6 +9,9 @@ MyServiceBus `0.1.0-preview.5` is built and tested against the following baselin
 | .NET | .NET 10 | .NET SDK `10.0.100`, with latest-patch roll-forward | C# packages target `net10.0`. Use a supported .NET 10 servicing release. |
 | Java | Java 17 or newer | Temurin Java 17 | Published bytecode and APIs target Java 17. Newer Java releases are expected to work but are not release-gating environments. |
 | Gradle | Gradle 9.0 | Gradle `9.0.0` | Build and Maven publication tooling; not an application runtime dependency. |
+| PostgreSQL | PostgreSQL 17 | Docker image `postgres:17.6-alpine` | Transactional outbox/inbox persistence baseline. The provider is not production-promoted until the remaining integration and O01–O06 gates pass. |
+| .NET PostgreSQL client | Npgsql 10.0 | `10.0.3` | Implementation and public transaction boundary of the C# PostgreSQL provider. |
+| Java PostgreSQL client | pgJDBC 42.7 | `42.7.13` | Implementation and public transaction boundary of the Java PostgreSQL provider. |
 | RabbitMQ server | RabbitMQ 4.1 | Docker image `rabbitmq:4.1.8-alpine` | The declared RabbitMQ transport-profile baseline. Other broker lines are not yet claimed as supported. |
 | MassTransit | MassTransit 8.5 | `MassTransit.RabbitMQ` `8.5.1` | The exact interoperability peer. Compatibility with other MassTransit versions must not be inferred from this baseline. |
 | NServiceBus | NServiceBus 10.2 | `NServiceBus` `10.2.8` with `NServiceBus.RabbitMQ` `11.2.1` | Exact peer for the separate RabbitMQ directed-send profile. Other NServiceBus features and versions are not implied. |

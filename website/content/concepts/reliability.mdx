@@ -32,6 +32,6 @@ Request clients observe a correlated `Fault<TRequest>` as a request fault. Other
 - Keep external calls retry-safe or protect them with application-level deduplication.
 - Split endpoints when reactions need independent failure and retry boundaries.
 
-MyServiceBus does not yet provide an outbox or saga implementation. Those features can improve coordination later, but they do not remove the need to define idempotency and recovery behavior now.
+MyServiceBus now provides matching C# and Java PostgreSQL outbox/inbox persistence foundations. They make application state, outgoing intent, and inbox completion transactional when composed through the same caller-owned database transaction. Transparent bus capture and hosted broker dispatch are still being integrated, so review the [transactional outbox guide](/docs/transactional-outbox) before making a production claim. An outbox narrows the failure boundary; it does not remove the need to define idempotency and recovery behavior.
 
 <NextCard href="/docs/distributed-systems" label="Continue" title="Distributed systems fundamentals" />

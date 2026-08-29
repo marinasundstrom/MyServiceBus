@@ -31,6 +31,7 @@ const sections = [
       ['Distributed systems fundamentals', '/docs/distributed-systems'],
       ['RabbitMQ transport', '/docs/rabbitmq'],
       ['Azure Service Bus', '/docs/azure-service-bus'],
+      ['Transactional outbox', '/docs/transactional-outbox'],
       ['Consumer methods', '/docs/consumer-methods'],
       ['Platform parity', '/docs/platform-parity'],
       ['AOT compilation', '/docs/native-aot'],

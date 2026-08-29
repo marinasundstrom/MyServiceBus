@@ -28,6 +28,7 @@ For Java build and run instructions, including JDK 17 setup and how to run the t
   - [Health checks](#health-checks)
   - [Filters](#filters)
   - [Scheduling Messages](#scheduling-messages)
+  - [Transactional Outbox and Inbox](#transactional-outbox-and-inbox)
   - [Unit Testing with the In-Memory Test Harness](#unit-testing-with-the-in-memory-test-harness)
 
 ## Basics
@@ -1395,6 +1396,72 @@ services.from(MessageBusServices.class).addServiceBus(cfg -> { /* ... */ });
 ```
 
 ---
+
+### Transactional Outbox and Inbox
+
+Install `Sundstrom.MyServiceBus.PostgreSql` for C# or `myservicebus-postgresql` for Java. Initialize the versioned schema once at application startup or during deployment, then write outgoing intent using the same PostgreSQL transaction as the application change. The caller owns the transaction; MyServiceBus never commits it independently.
+
+#### C#
+
+```csharp
+await PostgreSqlSchema.EnsureCreatedAsync(dataSource);
+
+await using var connection = await dataSource.OpenConnectionAsync();
+await using var transaction = await connection.BeginTransactionAsync();
+
+// Execute the application UPDATE/INSERT with this connection and transaction.
+
+var outbox = new PostgreSqlOutboxWriter(connection, transaction);
+await outbox.AddAsync(new OutboxMessage(
+    recordId: Guid.NewGuid(),
+    messageId: Guid.NewGuid(),
+    intent: OutboxDeliveryIntent.Publish,
+    destinationAddress: new Uri("rabbitmq://broker/order-submitted"),
+    messageTypes: ["urn:message:Contracts:OrderSubmitted"],
+    body: serializedEnvelope,
+    contentType: "application/vnd.masstransit+json",
+    headers: headers,
+    createdAtUtc: DateTimeOffset.UtcNow,
+    correlationId: orderId));
+
+await transaction.CommitAsync();
+```
+
+#### Java
+
+```java
+PostgreSqlSchema.ensureCreated(dataSource);
+
+try (Connection connection = dataSource.getConnection()) {
+    connection.setAutoCommit(false);
+
+    // Execute the application UPDATE/INSERT with this connection.
+
+    OutboxWriter outbox = new PostgreSqlOutboxWriter(connection);
+    outbox.add(new OutboxMessage(
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            OutboxDeliveryIntent.PUBLISH,
+            URI.create("rabbitmq://broker/order-submitted"),
+            List.of("urn:message:Contracts:OrderSubmitted"),
+            serializedEnvelope,
+            "application/vnd.masstransit+json",
+            headers,
+            Instant.now(),
+            null,
+            orderId,
+            null,
+            null,
+            null,
+            null), CancellationToken.none()).join();
+
+    connection.commit();
+}
+```
+
+The inbox follows the same rule. Create `PostgreSqlInboxStore` with the transaction that owns the protected application effect. Continue only for `Acquired`; `Completed` is a safe duplicate and `InProgress` must remain eligible for retry. Add responses or publications through the acquired transaction's outbox, complete the inbox record, commit the database transaction, and only then settle the broker message.
+
+`PostgreSqlOutboxStore` supplies atomic, shared PostgreSQL leases to the portable dispatcher. Transparent bus capture, hosted polling, persisted-envelope transport adapters, and cleanup are still being integrated; the current provider is an explicit persistence foundation rather than a one-line production outbox configuration. See [Transactional Outbox and Inbox](transactional-outbox.md) for guarantees, status, and limits.
 
 ### Unit Testing with the In-Memory Test Harness
 

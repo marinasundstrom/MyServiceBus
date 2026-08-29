@@ -29,6 +29,19 @@ gradle test
 
 The first container-backed run may be slower while the RabbitMQ image is downloaded.
 
+## PostgreSQL Outbox and Inbox Integration Tests
+
+The PostgreSQL provider suites use Testcontainers with the exact server version declared in [Supported Versions](supported-versions.md). They validate idempotent schema creation, caller-transaction commit and rollback, complete persisted-envelope rehydration, disjoint leases across competing dispatcher stores, and atomic inbox completion with an outgoing outbox record.
+
+Run the focused suites from the repository root:
+
+```bash
+dotnet test test/MyServiceBus.PostgreSql.Tests/MyServiceBus.PostgreSql.Tests.csproj
+gradle :myservicebus-postgresql:test
+```
+
+These are provider integration tests, separate from the portable dispatcher unit suites. They are not yet the O01–O06 crash-injection, cleanup, schema-rollout, broker-dispatch, and source-settlement promotion matrix.
+
 ## Azure Service Bus Emulator Fixture
 
 A pinned Docker Compose fixture under `test/AzureServiceBusEmulator` prepares
