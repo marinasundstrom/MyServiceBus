@@ -5,6 +5,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
+import java.util.Objects;
 
 import com.myservicebus.MessageHeaders;
 import com.myservicebus.ErrorTransportSettlement;
@@ -28,6 +29,10 @@ public class RabbitMqReceiveTransport implements ReceiveTransport {
     private final Function<String, Boolean> isMessageTypeRegistered;
     private final Logger logger;
     private final MessageHeaderConvention headerConvention = MassTransitHeaderConvention.INSTANCE;
+    private final Object lifecycleMonitor = new Object();
+    private int activeMessages;
+    private boolean stopping;
+    private String consumerTag;
 
     public RabbitMqReceiveTransport(Channel channel, String queueName,
             Function<TransportMessage, CompletableFuture<Void>> handler, String faultAddress,
@@ -42,7 +47,17 @@ public class RabbitMqReceiveTransport implements ReceiveTransport {
 
     @Override
     public void start() throws Exception {
+        synchronized (lifecycleMonitor) {
+            stopping = false;
+        }
+
         DeliverCallback callback = (tag, delivery) -> {
+            if (!tryBeginDelivery()) {
+                rejectForRedelivery(delivery);
+                return;
+            }
+
+            boolean handlerOwnsCompletion = false;
             try {
                 final Map<String, Object> headers = delivery.getProperties().getHeaders() != null
                         ? new HashMap<>(delivery.getProperties().getHeaders())
@@ -91,17 +106,31 @@ public class RabbitMqReceiveTransport implements ReceiveTransport {
                 }
 
                 logger.debug("Received message of type {}", messageTypeUrn);
-                handler.apply(tm).whenComplete((v, ex) -> settle(delivery, ex));
+                CompletableFuture<Void> handling = Objects.requireNonNull(
+                        handler.apply(tm),
+                        "The RabbitMQ receive handler returned null");
+                handlerOwnsCompletion = true;
+                handling.whenComplete((v, ex) -> {
+                    try {
+                        settle(delivery, ex);
+                    } finally {
+                        endDelivery();
+                    }
+                });
             } catch (Exception exception) {
                 if (exception instanceof InterruptedException) {
                     Thread.currentThread().interrupt();
                 }
                 logger.error("Message receive processing failed", exception);
                 rejectForRedelivery(delivery);
+            } finally {
+                if (!handlerOwnsCompletion) {
+                    endDelivery();
+                }
             }
         };
 
-        channel.basicConsume(queueName, false, callback, tag -> {
+        consumerTag = channel.basicConsume(queueName, false, callback, tag -> {
         });
     }
 
@@ -139,8 +168,39 @@ public class RabbitMqReceiveTransport implements ReceiveTransport {
 
     @Override
     public void stop() throws Exception {
+        synchronized (lifecycleMonitor) {
+            stopping = true;
+        }
+
         if (channel != null && channel.isOpen()) {
+            if (consumerTag != null && !consumerTag.isBlank()) {
+                channel.basicCancel(consumerTag);
+            }
+            synchronized (lifecycleMonitor) {
+                while (activeMessages > 0) {
+                    lifecycleMonitor.wait();
+                }
+            }
             channel.close();
+        }
+    }
+
+    private boolean tryBeginDelivery() {
+        synchronized (lifecycleMonitor) {
+            if (stopping) {
+                return false;
+            }
+            activeMessages++;
+            return true;
+        }
+    }
+
+    private void endDelivery() {
+        synchronized (lifecycleMonitor) {
+            activeMessages--;
+            if (activeMessages == 0) {
+                lifecycleMonitor.notifyAll();
+            }
         }
     }
 }

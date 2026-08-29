@@ -23,6 +23,10 @@ public sealed class RabbitMqReceiveTransport : IReceiveTransport
     private readonly Uri? _faultAddress;
     private readonly Func<string?, bool>? _isMessageTypeRegistered;
     private readonly ILogger<RabbitMqReceiveTransport>? _logger;
+    private readonly object _lifecycleSync = new();
+    private TaskCompletionSource<bool> _drained = CompletedDrain();
+    private int _activeDeliveries;
+    private bool _stopping;
     private string _consumerTag;
 
     public RabbitMqReceiveTransport(IChannel channel, string queueName, Func<ReceiveContext, Task> handler, Uri? errorAddress, Uri? faultAddress, Func<string?, bool>? isMessageTypeRegistered, IInboundMessageResolver? inboundMessageResolver = null, ILogger<RabbitMqReceiveTransport>? logger = null)
@@ -39,10 +43,21 @@ public sealed class RabbitMqReceiveTransport : IReceiveTransport
 
     public async Task Start(CancellationToken cancellationToken = default)
     {
+        lock (_lifecycleSync)
+        {
+            _stopping = false;
+        }
+
         var consumer = new AsyncEventingBasicConsumer(_channel);
 
         consumer.ReceivedAsync += async (model, ea) =>
         {
+            if (!TryBeginDelivery())
+            {
+                await _channel.BasicNackAsync(ea.DeliveryTag, multiple: false, requeue: true);
+                return;
+            }
+
             try
             {
                 var payload = ea.Body.ToArray();
@@ -112,6 +127,10 @@ public sealed class RabbitMqReceiveTransport : IReceiveTransport
                         _queueName);
                 }
             }
+            finally
+            {
+                EndDelivery();
+            }
         };
 
         _consumerTag = await _channel.BasicConsumeAsync(queue: _queueName, autoAck: false, consumer: consumer, cancellationToken: cancellationToken);
@@ -119,9 +138,57 @@ public sealed class RabbitMqReceiveTransport : IReceiveTransport
 
     public async Task Stop(CancellationToken cancellationToken = default)
     {
+        lock (_lifecycleSync)
+        {
+            _stopping = true;
+        }
+
         if (!string.IsNullOrEmpty(_consumerTag))
         {
             await _channel.BasicCancelAsync(_consumerTag, cancellationToken: cancellationToken);
         }
+
+        Task drainTask;
+        lock (_lifecycleSync)
+        {
+            drainTask = _drained.Task;
+        }
+
+        await drainTask.WaitAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    private bool TryBeginDelivery()
+    {
+        lock (_lifecycleSync)
+        {
+            if (_stopping)
+                return false;
+
+            if (_activeDeliveries++ == 0)
+            {
+                _drained = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            }
+
+            return true;
+        }
+    }
+
+    private void EndDelivery()
+    {
+        TaskCompletionSource<bool>? drained = null;
+        lock (_lifecycleSync)
+        {
+            if (--_activeDeliveries == 0)
+                drained = _drained;
+        }
+
+        drained?.TrySetResult(true);
+    }
+
+    private static TaskCompletionSource<bool> CompletedDrain()
+    {
+        var completion = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        completion.SetResult(true);
+        return completion;
     }
 }

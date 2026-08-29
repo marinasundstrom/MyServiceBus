@@ -94,7 +94,7 @@ These scenarios require a supported persistence provider and a real transactiona
 | ID | Scenario | Required outcome | RabbitMQ C# | RabbitMQ Java | Azure C# | Azure Java |
 | --- | --- | --- | --- | --- | --- | --- |
 | L01 | Graceful stop with no active work | Receiver stops accepting deliveries and closes cleanly | Partial | Partial | Partial | Partial |
-| L02 | Graceful stop with active work under deadline | New deliveries stop; active work completes and settles before stop returns | Open | Open | Open | Partial |
+| L02 | Graceful stop with active work under deadline | New deliveries stop; active work completes and settles before stop returns | Partial | Partial | Open | Partial |
 | L03 | Drain deadline expires | Stop reports forced termination; unfinished sources remain eligible for redelivery | Open | Open | Open | Open |
 | L04 | Handler never completes | Stop remains bounded by the configured deadline | Open | Open | Open | Open |
 | L05 | Load exceeds configured concurrency | In-flight and queued work remain within declared bounds; broker backpressure is observable | Open | Open | Open | Open |

@@ -175,7 +175,7 @@ The production target requires:
 - explicit endpoint concurrency independent of prefetch
 - bounded queues between broker callbacks and application handlers
 
-Current lifecycle behavior differs by transport and client. Azure Java waits for active callbacks without a deadline; other stop paths rely mainly on broker-client stop or cancel behavior. No cross-language drain deadline or forced-stop result is currently guaranteed.
+Current lifecycle behavior differs by transport and client. RabbitMQ C# and Java now cancel the consumer before waiting for active callbacks to settle; the C# wait observes the caller's cancellation token, while Java currently has no public drain deadline. Azure Java also waits for active callbacks without a deadline. No cross-language drain deadline or forced-stop result is currently guaranteed.
 
 ## Ordering, Duplication, and Expiration
 
