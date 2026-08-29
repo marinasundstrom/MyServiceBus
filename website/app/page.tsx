@@ -66,11 +66,13 @@ export default function Home() {
       <main id="top">
         <section className="hero">
           <div className="hero-copy">
-            <p className="eyebrow">From local handlers to distributed services</p>
-            <h1>One messaging model. Local or distributed.</h1>
+            <p className="eyebrow">Asynchronous messaging for .NET and Java</p>
+            <h1>One messaging model for distributed services.</h1>
             <p className="lede">
-              Replace MediatR with generated in-process dispatch, add Java to a
-              MassTransit-based .NET estate, or start a new cross-platform system.
+              Publish events and send commands across C# and Java with RabbitMQ
+              or Azure Service Bus. Integrate Java into a MassTransit estate or
+              build cross-platform from the start—with MediatR-compatible
+              in-process dispatch when you need it.
             </p>
             <div className="hero-actions">
               <Link className="primary-button" href="/docs/getting-started">
