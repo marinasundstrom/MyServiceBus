@@ -1,7 +1,7 @@
 import Link from 'next/link';
 
 const versions = [
-  ['MyServiceBus', '0.1.0-preview.5', 'Only the newest preview is actively supported before 1.0.'],
+  ['MyServiceBus', '0.1.0-preview.6', 'Only the newest preview is actively supported before 1.0.'],
   ['.NET', '.NET 10', 'C# packages target net10.0 and use the .NET 10 BCL.'],
   ['Java', 'Java 17 or newer', 'Published bytecode and APIs target Java 17; Temurin 17 is the release-gating JDK.'],
   ['PostgreSQL', '17 / 17.6 baseline', 'Transactional outbox and inbox provider.'],

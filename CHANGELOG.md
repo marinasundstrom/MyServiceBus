@@ -4,6 +4,9 @@ This changelog summarizes the bigger themes in the repository history rather tha
 
 ## Unreleased
 
+## 0.1.0-preview.6 - 2026-08-29
+
+- Fixed Java scoped endpoint registration so an `OutboxSession` is resolved only when Bus Outbox is explicitly enabled, preserving ordinary test-harness and non-outbox send/publish resolution.
 - Added matching C# and Java outbox delivery observations, PostgreSQL backlog snapshots, collector aggregation, and a dashboard dispatcher-operations view for embedded and standalone workers. The bounded monitoring contract reports partition, worker, backlog, lag, throughput, failures, lost leases, and cycle latency without message or database-record data.
 - Added equivalent C# and Java PostgreSQL durable message schedulers with persisted handles, explicit cancellation outcomes, atomic cancellation-versus-lease behavior, and cancelled-backlog health state.
 - Documented embedded and standalone outbox dispatcher topologies and the bounded operational signals needed to identify dispatcher bottlenecks.

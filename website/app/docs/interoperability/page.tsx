@@ -34,7 +34,7 @@ export default function Interoperability() {
       <div className="callout"><strong>NServiceBus: separate directed-send profile</strong><p>Live RabbitMQ tests verify C# and Java directed sends in both directions against real NServiceBus endpoints. Raw JSON remains neutral and does not imply NServiceBus compatibility. <Link href="/docs/nservicebus">Review the exact profile →</Link></p></div>
 
       <div className="version-table" role="table" aria-label="Supported baseline">
-        <div role="row"><span role="cell">MyServiceBus</span><strong role="cell">0.1.0-preview.5</strong></div>
+        <div role="row"><span role="cell">MyServiceBus</span><strong role="cell">0.1.0-preview.6</strong></div>
         <div role="row"><span role="cell">.NET</span><strong role="cell">.NET 10</strong></div>
         <div role="row"><span role="cell">Java</span><strong role="cell">17 or newer</strong></div>
         <div role="row"><span role="cell">RabbitMQ</span><strong role="cell">4.1.8 baseline</strong></div>

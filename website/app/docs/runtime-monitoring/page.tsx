@@ -28,8 +28,8 @@ exporter.start(inspectionProvider);`,
 
 const exporterInstall = {
   csharp: `dotnet add package Sundstrom.MyServiceBus.Monitoring \\
-  --version 0.1.0-preview.5`,
-  java: `implementation 'io.github.marinasundstrom.myservicebus:myservicebus-monitoring:0.1.0-preview.5'`,
+  --version 0.1.0-preview.6`,
+  java: `implementation 'io.github.marinasundstrom.myservicebus:myservicebus-monitoring:0.1.0-preview.6'`,
 };
 
 const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? '';
@@ -188,8 +188,8 @@ export default function RuntimeMonitoring() {
         images for AMD64 and ARM64:
       </p>
       <CodeViewer
-        code={`ghcr.io/marinasundstrom/myservicebus-monitoring-collector:0.1.0-preview.5
-ghcr.io/marinasundstrom/myservicebus-monitoring-dashboard:0.1.0-preview.5`}
+        code={`ghcr.io/marinasundstrom/myservicebus-monitoring-collector:0.1.0-preview.6
+ghcr.io/marinasundstrom/myservicebus-monitoring-dashboard:0.1.0-preview.6`}
         label="Monitoring container images"
         language="plaintext"
       />

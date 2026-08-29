@@ -2,7 +2,7 @@ import Link from 'next/link';
 import CodeViewer from '../../components/CodeViewer';
 
 const installGenerator = `dotnet add package Sundstrom.MyServiceBus.Generators \\
-  --version 0.1.0-preview.5`;
+  --version 0.1.0-preview.6`;
 
 const generatedCatalog = `using MyServiceBus.Generated;
 
@@ -42,8 +42,8 @@ const jsonBenchmark = `dotnet run -c Release \\
   --filter '*JsonSerializationBenchmarks*'`;
 
 const javaDependencies = `dependencies {
-    implementation "io.github.marinasundstrom.myservicebus:myservicebus:0.1.0-preview.5"
-    annotationProcessor "io.github.marinasundstrom.myservicebus:myservicebus-processor:0.1.0-preview.5"
+    implementation "io.github.marinasundstrom.myservicebus:myservicebus:0.1.0-preview.6"
+    annotationProcessor "io.github.marinasundstrom.myservicebus:myservicebus-processor:0.1.0-preview.6"
 }`;
 
 const javaCatalog = `GeneratedConsumerCatalog.INSTANCE.register(configurator);`;

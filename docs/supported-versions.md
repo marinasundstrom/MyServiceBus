@@ -2,7 +2,7 @@
 
 ## MVP baseline
 
-MyServiceBus `0.1.0-preview.5` is built and tested against the following baseline:
+MyServiceBus `0.1.0-preview.6` is built and tested against the following baseline:
 
 The baseline distinguishes language/API compatibility from the build and runtime used to verify a release. C# packages target `net10.0`, which selects the available .NET reference assemblies and BCL surface. Java publishes Java 17-compatible bytecode and APIs; the implementation should use modern Java 17 language features and JDK types where useful without requiring a newer bytecode level. Running on a newer JDK is an expected compatibility path, not the same as moving the published Java target.
 
@@ -36,7 +36,7 @@ has been tested.
 
 Before `1.0`, only the newest published MyServiceBus preview is actively supported. A new preview replaces the previous preview's support window. Fixes are delivered in a newer preview; the project does not promise servicing releases for older previews.
 
-The runtime lines above remain the baseline for the lifetime of `0.1.0-preview.5`. Security and servicing patches within .NET 10 and Java 17 are supported and recommended. Changing the target framework, Java bytecode level, RabbitMQ minor line, or MassTransit interoperability peer requires an explicit update to this document and a passing release gate.
+The runtime lines above remain the baseline for the lifetime of `0.1.0-preview.6`. Security and servicing patches within .NET 10 and Java 17 are supported and recommended. Changing the target framework, Java bytecode level, RabbitMQ minor line, or MassTransit interoperability peer requires an explicit update to this document and a passing release gate.
 
 ## Compatibility boundaries
 

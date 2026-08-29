@@ -62,7 +62,7 @@ OrderView order = mediator.send(
 
 const generatedDispatch = {
   csharp: `dotnet add package Sundstrom.MyServiceBus.Generators \\
-  --version 0.1.0-preview.5
+  --version 0.1.0-preview.6
 
 builder.Services.AddServiceBus(x =>
 {
@@ -70,8 +70,8 @@ builder.Services.AddServiceBus(x =>
     x.UsingMediator();
 });`,
   java: `dependencies {
-    implementation "io.github.marinasundstrom.myservicebus:myservicebus:0.1.0-preview.5"
-    annotationProcessor "io.github.marinasundstrom.myservicebus:myservicebus-processor:0.1.0-preview.5"
+    implementation "io.github.marinasundstrom.myservicebus:myservicebus:0.1.0-preview.6"
+    annotationProcessor "io.github.marinasundstrom.myservicebus:myservicebus-processor:0.1.0-preview.6"
 }
 
 MediatorBus bus = MediatorBus.configure(
