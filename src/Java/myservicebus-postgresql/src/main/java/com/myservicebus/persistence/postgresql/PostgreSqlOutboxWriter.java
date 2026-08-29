@@ -67,7 +67,7 @@ public final class PostgreSqlOutboxWriter implements OutboxWriter {
             setNullable(statement, 14, message.initiatorId(), Types.OTHER);
             setNullable(statement, 15, message.responseAddress(), Types.VARCHAR);
             setNullable(statement, 16, message.faultAddress(), Types.VARCHAR);
-            statement.setObject(17, createdAt);
+            statement.setObject(17, message.availableAtUtc().atOffset(ZoneOffset.UTC));
             statement.executeUpdate();
         }
     }

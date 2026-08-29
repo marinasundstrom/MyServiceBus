@@ -60,11 +60,6 @@ public final class OutboxSendEndpoint implements SendEndpoint {
             context.setSourceAddress(source);
             context.setDestinationAddress(destination);
             context.setMessageTypes(MessageUrn.forMessageTypes(context.getMessage().getClass()));
-            if (context.getScheduledEnqueueTime() != null) {
-                return CompletableFuture.failedFuture(
-                        new UnsupportedOperationException(
-                                "Scheduled messages cannot yet be captured by the transactional outbox."));
-            }
             return sendPipe.send(context).thenCompose(ignored -> {
                 try {
                     return writer.add(

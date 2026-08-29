@@ -52,8 +52,6 @@ internal sealed class OutboxSendEndpoint : ISendEndpoint
         context.SourceAddress = source;
         context.DestinationAddress = destination;
         contextCallback?.Invoke(context);
-        if (context.ScheduledEnqueueTime is not null)
-            throw new NotSupportedException("Scheduled messages cannot yet be captured by the transactional outbox.");
 
         await sendPipe.Send(context);
         var typed = message is T value ? value : (T)MessageProxy.Create(typeof(T), message);

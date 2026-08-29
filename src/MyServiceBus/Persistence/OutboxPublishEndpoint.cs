@@ -57,8 +57,6 @@ internal sealed class OutboxPublishEndpoint : IPublishEndpoint
         context.DestinationAddress = destination;
         context.RoutingKey = transportFactory.GetPublishEntityName(typeof(T));
         contextCallback?.Invoke(context);
-        if (context.ScheduledEnqueueTime is not null)
-            throw new NotSupportedException("Scheduled messages cannot yet be captured by the transactional outbox.");
 
         await publishPipe.Send(context);
         await sendPipe.Send(context);

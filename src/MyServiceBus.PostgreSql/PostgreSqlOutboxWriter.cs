@@ -38,7 +38,7 @@ public sealed class PostgreSqlOutboxWriter : IOutboxWriter
             VALUES (
                 @record_id, @service_name, @message_id, @intent, @destination_address, @message_types, @body, @content_type,
                 @headers, @created_at_utc, @request_id, @correlation_id, @conversation_id, @initiator_id,
-                @response_address, @fault_address, 0, @created_at_utc);
+                @response_address, @fault_address, 0, @available_at_utc);
             """;
 
         await using var command = new NpgsqlCommand(sql, connection, transaction);
@@ -52,6 +52,7 @@ public sealed class PostgreSqlOutboxWriter : IOutboxWriter
         command.Parameters.AddWithValue("content_type", NpgsqlDbType.Text, message.ContentType);
         command.Parameters.AddWithValue("headers", NpgsqlDbType.Jsonb, JsonSerializer.Serialize(message.Headers));
         command.Parameters.AddWithValue("created_at_utc", NpgsqlDbType.TimestampTz, message.CreatedAtUtc);
+        command.Parameters.AddWithValue("available_at_utc", NpgsqlDbType.TimestampTz, message.AvailableAtUtc);
         AddNullableUuid(command, "request_id", message.RequestId);
         AddNullableUuid(command, "correlation_id", message.CorrelationId);
         AddNullableUuid(command, "conversation_id", message.ConversationId);

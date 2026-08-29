@@ -66,11 +66,6 @@ public final class OutboxPublishEndpoint implements PublishEndpoint {
             context.setSourceAddress(bus.getAddress());
             context.setDestinationAddress(URI.create(transportFactory.getPublishAddress(messageType)));
             context.setMessageTypes(MessageUrn.forMessageTypes(messageType));
-            if (context.getScheduledEnqueueTime() != null) {
-                return CompletableFuture.failedFuture(
-                        new UnsupportedOperationException(
-                                "Scheduled messages cannot yet be captured by the transactional outbox."));
-            }
             return publishPipe.send(context)
                     .thenCompose(ignored -> sendPipe.send(context))
                     .thenCompose(ignored -> {

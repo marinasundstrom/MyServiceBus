@@ -38,6 +38,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -150,6 +151,28 @@ class PostgreSqlPersistenceTest {
             assertEquals(1, leasesA.size());
             assertEquals(1, leasesB.size());
             assertNotEquals(leasesA.get(0).message().recordId(), leasesB.get(0).message().recordId());
+        }
+    }
+
+    @Test
+    void scheduledOutboxMessageIsNotLeasedBeforeItsDueTime() throws Exception {
+        try (PostgreSQLContainer container = startContainer()) {
+            DataSource dataSource = dataSource(container);
+            PostgreSqlSchema.ensureCreated(dataSource);
+            Instant now = Instant.now().truncatedTo(ChronoUnit.MILLIS);
+            Instant dueAt = now.plus(Duration.ofMinutes(5));
+            OutboxMessage message = createMessage(dueAt);
+            insertCommitted(dataSource, message);
+            PostgreSqlOutboxStore store = new PostgreSqlOutboxStore(dataSource, SERVICE_NAME);
+
+            List<OutboxLease> early = store.lease(requestAt("replica-a", 10, dueAt.minusMillis(1))).join();
+            List<OutboxLease> due = store.lease(requestAt("replica-b", 10, dueAt)).join();
+
+            assertTrue(early.isEmpty());
+            assertEquals(1, due.size());
+            assertEquals(message.recordId(), due.get(0).message().recordId());
+            assertEquals(message.messageId(), due.get(0).message().messageId());
+            assertEquals(dueAt, due.get(0).message().availableAtUtc());
         }
     }
 
@@ -347,11 +370,16 @@ class PostgreSqlPersistenceTest {
     }
 
     private static OutboxMessage createMessage() {
+        return createMessage(null);
+    }
+
+    private static OutboxMessage createMessage(Instant scheduledAt) {
         SendContext context = new SendContext(new OrderSubmitted(UUID.randomUUID()));
         context.setMessageId(UUID.randomUUID());
         context.setCorrelationId(UUID.randomUUID());
         context.setDestinationAddress(URI.create("rabbitmq://localhost/exchange/orders"));
         context.setIntent(MessageIntent.PUBLISH);
+        context.setScheduledEnqueueTime(scheduledAt);
         context.getHeaders().put("traceparent", "00-test");
         try {
             return OutboxMessageFactory.create(context, new EnvelopeMessageSerializer());

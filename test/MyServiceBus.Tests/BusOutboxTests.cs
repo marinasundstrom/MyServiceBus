@@ -67,7 +67,7 @@ public sealed class BusOutboxTests
     }
 
     [Fact]
-    public async Task Scheduled_messages_are_rejected_while_outbox_session_is_active()
+    public async Task Scheduled_messages_are_captured_with_their_due_time()
     {
         var services = new ServiceCollection();
         services.AddServiceBus(configurator =>
@@ -81,15 +81,15 @@ public sealed class BusOutboxTests
         await bus.StartAsync(CancellationToken.None);
 
         await using var scope = provider.CreateAsyncScope();
-        using var registration = scope.ServiceProvider.GetRequiredService<OutboxSession>()
-            .Begin(new RecordingOutboxWriter());
+        var writer = new RecordingOutboxWriter();
+        using var registration = scope.ServiceProvider.GetRequiredService<OutboxSession>().Begin(writer);
         var endpoint = scope.ServiceProvider.GetRequiredService<IPublishEndpoint>();
+        var scheduledAt = DateTime.UtcNow.AddMinutes(1);
 
-        var exception = await Assert.ThrowsAsync<NotSupportedException>(() =>
-            endpoint.Publish(new OrderSubmitted(Guid.NewGuid()), context =>
-                context.SetScheduledEnqueueTime(TimeSpan.FromMinutes(1))));
+        await endpoint.Publish(new OrderSubmitted(Guid.NewGuid()), context =>
+            context.SetScheduledEnqueueTime(scheduledAt));
 
-        Assert.Contains("transactional outbox", exception.Message);
+        Assert.Equal(new DateTimeOffset(scheduledAt), Assert.Single(writer.Messages).AvailableAtUtc);
         await bus.StopAsync(CancellationToken.None);
     }
 

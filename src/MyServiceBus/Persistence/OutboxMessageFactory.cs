@@ -24,6 +24,11 @@ public static class OutboxMessageFactory
             pair => Convert.ToString(pair.Value, CultureInfo.InvariantCulture) ?? string.Empty,
             StringComparer.Ordinal);
 
+        var createdAtUtc = (timeProvider ?? TimeProvider.System).GetUtcNow();
+        var availableAtUtc = context.ScheduledEnqueueTime is { } scheduled
+            ? new DateTimeOffset(scheduled.ToUniversalTime())
+            : createdAtUtc;
+
         return new OutboxMessage(
             Guid.NewGuid(),
             messageId,
@@ -33,13 +38,14 @@ public static class OutboxMessageFactory
             body,
             context.MessageSerializer.ContentType,
             headers,
-            (timeProvider ?? TimeProvider.System).GetUtcNow(),
+            createdAtUtc,
             context.RequestId,
             ParseNullableGuid(context.CorrelationId),
             context.ConversationId,
             context.InitiatorId,
             context.ResponseAddress,
-            context.FaultAddress);
+            context.FaultAddress,
+            availableAtUtc);
     }
 
     private static OutboxDeliveryIntent MapIntent(Serialization.MessageIntent intent) => intent switch

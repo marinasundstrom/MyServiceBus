@@ -17,12 +17,12 @@ import com.myservicebus.di.ServiceScope;
 import com.myservicebus.mediator.MediatorTransport;
 import com.myservicebus.tasks.CancellationToken;
 import java.time.Duration;
+import java.time.Instant;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
 import org.junit.jupiter.api.Test;
 
 class BusOutboxTest {
@@ -75,7 +75,7 @@ class BusOutboxTest {
     }
 
     @Test
-    void scheduledMessagesAreRejectedWhileOutboxSessionIsActive() throws Exception {
+    void scheduledMessagesAreCapturedWithTheirDueTime() throws Exception {
         ServiceCollection services = configuredServices();
         ServiceProvider provider = services.buildServiceProvider();
         MessageBus bus = provider.getRequiredService(MessageBus.class);
@@ -83,16 +83,15 @@ class BusOutboxTest {
 
         try (ServiceScope scope = provider.createScope()) {
             ServiceProvider scoped = scope.getServiceProvider();
-            try (OutboxSession.Registration ignored = scoped.getRequiredService(OutboxSession.class)
-                    .begin(new RecordingOutboxWriter())) {
+            RecordingOutboxWriter writer = new RecordingOutboxWriter();
+            try (OutboxSession.Registration ignored = scoped.getRequiredService(OutboxSession.class).begin(writer)) {
                 PublishEndpoint endpoint = scoped.getRequiredService(PublishEndpoint.class);
+                Instant scheduledAt = Instant.now().plus(Duration.ofMinutes(1));
 
-                CompletionException failure = assertThrows(CompletionException.class, () ->
-                        endpoint.publish(new OrderSubmitted(UUID.randomUUID()), context ->
-                                context.setScheduledEnqueueTime(Duration.ofMinutes(1))).join());
+                endpoint.publish(new OrderSubmitted(UUID.randomUUID()), context ->
+                        context.setScheduledEnqueueTime(scheduledAt)).join();
 
-                assertTrue(failure.getCause() instanceof UnsupportedOperationException);
-                assertTrue(failure.getCause().getMessage().contains("transactional outbox"));
+                assertEquals(scheduledAt, writer.messages.get(0).availableAtUtc());
             }
         } finally {
             bus.stop();

@@ -128,6 +128,25 @@ public sealed class PostgreSqlPersistenceTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Scheduled_outbox_message_is_not_leased_before_its_due_time()
+    {
+        var now = DateTimeOffset.FromUnixTimeMilliseconds(DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+        var dueAt = now.AddMinutes(5);
+        var message = CreateMessage(dueAt);
+        await InsertCommitted(message);
+        var store = new PostgreSqlOutboxStore(dataSource, ServiceName);
+
+        var early = await store.LeaseAsync(RequestAt("replica-a", 10, dueAt.AddMilliseconds(-1)));
+        var due = await store.LeaseAsync(RequestAt("replica-b", 10, dueAt));
+
+        Assert.Empty(early);
+        var lease = Assert.Single(due);
+        Assert.Equal(message.RecordId, lease.Message.RecordId);
+        Assert.Equal(message.MessageId, lease.Message.MessageId);
+        Assert.Equal(dueAt, lease.Message.AvailableAtUtc);
+    }
+
+    [Fact]
     public async Task Logical_services_lease_only_their_own_outbox_partition()
     {
         var ordersMessage = CreateMessage();
@@ -284,7 +303,7 @@ public sealed class PostgreSqlPersistenceTests : IAsyncLifetime
         now,
         TimeSpan.FromMinutes(1));
 
-    private static OutboxMessage CreateMessage()
+    private static OutboxMessage CreateMessage(DateTimeOffset? scheduledAt = null)
     {
         var context = new SendContext([typeof(OrderSubmitted)], new EnvelopeMessageSerializer())
         {
@@ -293,6 +312,8 @@ public sealed class PostgreSqlPersistenceTests : IAsyncLifetime
             DestinationAddress = new Uri("rabbitmq://localhost/exchange/orders"),
             Intent = MessageIntent.Publish
         };
+        if (scheduledAt is not null)
+            context.ScheduledEnqueueTime = scheduledAt.Value.UtcDateTime;
         context.Headers["traceparent"] = "00-test";
         return OutboxMessageFactory.Create(new OrderSubmitted(Guid.NewGuid()), context);
     }

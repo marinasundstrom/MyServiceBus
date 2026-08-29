@@ -9,6 +9,9 @@ import com.myservicebus.SendContext;
 import com.myservicebus.serialization.EnvelopeMessageSerializer;
 import com.myservicebus.serialization.MessageIntent;
 import java.net.URI;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
@@ -37,6 +40,25 @@ class OutboxMessageFactoryTest {
         assertEquals("application/vnd.masstransit+json", persisted.contentType());
         assertEquals("A-123", new ObjectMapper().readTree(persisted.body())
                 .get("message").get("orderId").asText());
+    }
+
+    @Test
+    void preservesScheduledDeliveryTimeAsOutboxAvailability() throws Exception {
+        Instant createdAt = Instant.parse("2026-08-29T08:00:00Z");
+        Instant scheduledAt = createdAt.plusSeconds(7200);
+        SendContext context = new SendContext(new OrderSubmitted("A-123"));
+        context.setMessageId(UUID.randomUUID());
+        context.setDestinationAddress(URI.create("rabbitmq://localhost/order-submitted"));
+        context.setIntent(MessageIntent.PUBLISH);
+        context.setScheduledEnqueueTime(scheduledAt);
+
+        OutboxMessage persisted = OutboxMessageFactory.create(
+                context,
+                new EnvelopeMessageSerializer(),
+                Clock.fixed(createdAt, ZoneOffset.UTC));
+
+        assertEquals(createdAt, persisted.createdAtUtc());
+        assertEquals(scheduledAt, persisted.availableAtUtc());
     }
 
     private record OrderSubmitted(String orderId) {

@@ -37,7 +37,8 @@ public sealed class OutboxMessage
         Guid? conversationId = null,
         Guid? initiatorId = null,
         Uri? responseAddress = null,
-        Uri? faultAddress = null)
+        Uri? faultAddress = null,
+        DateTimeOffset? availableAtUtc = null)
     {
         ArgumentOutOfRangeException.ThrowIfEqual(recordId, Guid.Empty);
         ArgumentOutOfRangeException.ThrowIfEqual(messageId, Guid.Empty);
@@ -64,6 +65,7 @@ public sealed class OutboxMessage
         InitiatorId = initiatorId;
         ResponseAddress = responseAddress;
         FaultAddress = faultAddress;
+        AvailableAtUtc = availableAtUtc ?? createdAtUtc;
     }
 
     public Guid RecordId { get; }
@@ -81,4 +83,5 @@ public sealed class OutboxMessage
     public Guid? InitiatorId { get; }
     public Uri? ResponseAddress { get; }
     public Uri? FaultAddress { get; }
+    public DateTimeOffset AvailableAtUtc { get; }
 }

@@ -22,7 +22,29 @@ public record OutboxMessage(
         UUID conversationId,
         UUID initiatorId,
         URI responseAddress,
-        URI faultAddress) {
+        URI faultAddress,
+        Instant availableAtUtc) {
+
+    public OutboxMessage(
+            UUID recordId,
+            UUID messageId,
+            OutboxDeliveryIntent intent,
+            URI destinationAddress,
+            List<String> messageTypes,
+            byte[] body,
+            String contentType,
+            Map<String, String> headers,
+            Instant createdAtUtc,
+            UUID requestId,
+            UUID correlationId,
+            UUID conversationId,
+            UUID initiatorId,
+            URI responseAddress,
+            URI faultAddress) {
+        this(recordId, messageId, intent, destinationAddress, messageTypes, body, contentType, headers,
+                createdAtUtc, requestId, correlationId, conversationId, initiatorId, responseAddress, faultAddress,
+                createdAtUtc);
+    }
 
     public OutboxMessage {
         requireNonEmpty(recordId, "recordId");
@@ -33,6 +55,7 @@ public record OutboxMessage(
         Objects.requireNonNull(body, "body");
         Objects.requireNonNull(headers, "headers");
         Objects.requireNonNull(createdAtUtc, "createdAtUtc");
+        Objects.requireNonNull(availableAtUtc, "availableAtUtc");
         if (messageTypes.isEmpty() || messageTypes.stream().anyMatch(value -> value == null || value.isBlank())) {
             throw new IllegalArgumentException("At least one non-empty message type is required.");
         }

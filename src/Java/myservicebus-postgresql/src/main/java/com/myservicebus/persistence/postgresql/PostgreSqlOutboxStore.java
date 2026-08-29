@@ -63,7 +63,7 @@ public final class PostgreSqlOutboxStore implements OutboxStore {
                     message.message_types, message.body, message.content_type, message.headers::text,
                     message.created_at_utc, message.request_id, message.correlation_id, message.conversation_id,
                     message.initiator_id, message.response_address, message.fault_address,
-                    message.lease_expires_at_utc, message.attempt_count - 1;
+                    message.next_attempt_at_utc, message.lease_expires_at_utc, message.attempt_count - 1;
                 """;
         try (Connection connection = dataSource.getConnection()) {
             connection.setAutoCommit(false);
@@ -83,8 +83,8 @@ public final class PostgreSqlOutboxStore implements OutboxStore {
                         leases.add(new OutboxLease(
                                 message,
                                 request.ownerId(),
-                                result.getObject(16, OffsetDateTime.class).toInstant(),
-                                result.getInt(17)));
+                                result.getObject(17, OffsetDateTime.class).toInstant(),
+                                result.getInt(18)));
                     }
                 }
                 connection.commit();
@@ -165,7 +165,8 @@ public final class PostgreSqlOutboxStore implements OutboxStore {
                 result.getObject(12, UUID.class),
                 result.getObject(13, UUID.class),
                 nullableUri(result, 14),
-                nullableUri(result, 15));
+                nullableUri(result, 15),
+                result.getObject(16, OffsetDateTime.class).toInstant());
     }
 
     private static URI nullableUri(ResultSet result, int index) throws SQLException {
