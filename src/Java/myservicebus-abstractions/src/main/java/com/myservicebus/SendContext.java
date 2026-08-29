@@ -134,7 +134,11 @@ public class SendContext implements PipeContext, ScheduledMessage {
     }
 
     public void setMessageTypes(List<String> messageTypes) {
-        this.messageTypes = messageTypes;
+        this.messageTypes = messageTypes == null ? null : List.copyOf(messageTypes);
+    }
+
+    public List<String> getMessageTypes() {
+        return messageTypes == null ? null : List.copyOf(messageTypes);
     }
 
     @Override

@@ -7,17 +7,19 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import com.myservicebus.persistence.InboxAcquisition;
 import com.myservicebus.persistence.InboxMessageKey;
 import com.myservicebus.persistence.InboxTransaction;
-import com.myservicebus.persistence.OutboxDeliveryIntent;
 import com.myservicebus.persistence.OutboxLease;
 import com.myservicebus.persistence.OutboxLeaseRequest;
 import com.myservicebus.persistence.OutboxMessage;
+import com.myservicebus.persistence.OutboxMessageFactory;
+import com.myservicebus.SendContext;
+import com.myservicebus.serialization.EnvelopeMessageSerializer;
+import com.myservicebus.serialization.MessageIntent;
 import com.myservicebus.tasks.CancellationToken;
 import java.net.URI;
 import java.sql.Connection;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import javax.sql.DataSource;
@@ -141,21 +143,19 @@ class PostgreSqlPersistenceTest {
     }
 
     private static OutboxMessage createMessage() {
-        return new OutboxMessage(
-                UUID.randomUUID(),
-                UUID.randomUUID(),
-                OutboxDeliveryIntent.PUBLISH,
-                URI.create("rabbitmq://localhost/exchange/orders"),
-                List.of("urn:message:Contracts:OrderSubmitted"),
-                new byte[] { 1, 2, 3 },
-                "application/vnd.masstransit+json",
-                Map.of("traceparent", "00-test"),
-                Instant.now(),
-                null,
-                UUID.randomUUID(),
-                null,
-                null,
-                null,
-                null);
+        SendContext context = new SendContext(new OrderSubmitted(UUID.randomUUID()));
+        context.setMessageId(UUID.randomUUID());
+        context.setCorrelationId(UUID.randomUUID());
+        context.setDestinationAddress(URI.create("rabbitmq://localhost/exchange/orders"));
+        context.setIntent(MessageIntent.PUBLISH);
+        context.getHeaders().put("traceparent", "00-test");
+        try {
+            return OutboxMessageFactory.create(context, new EnvelopeMessageSerializer());
+        } catch (Exception failure) {
+            throw new IllegalStateException("Could not create the persisted test envelope.", failure);
+        }
+    }
+
+    private record OrderSubmitted(UUID orderId) {
     }
 }

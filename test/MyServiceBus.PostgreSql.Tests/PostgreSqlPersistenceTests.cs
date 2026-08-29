@@ -1,5 +1,6 @@
 using MyServiceBus.Persistence;
 using MyServiceBus.Persistence.PostgreSql;
+using MyServiceBus.Serialization;
 using Npgsql;
 using Testcontainers.PostgreSql;
 
@@ -117,15 +118,18 @@ public sealed class PostgreSqlPersistenceTests : IAsyncLifetime
         DateTimeOffset.UtcNow,
         TimeSpan.FromMinutes(1));
 
-    private static OutboxMessage CreateMessage() => new(
-        Guid.NewGuid(),
-        Guid.NewGuid(),
-        OutboxDeliveryIntent.Publish,
-        new Uri("rabbitmq://localhost/exchange/orders"),
-        ["urn:message:Contracts:OrderSubmitted"],
-        [1, 2, 3],
-        "application/vnd.masstransit+json",
-        new Dictionary<string, string> { ["traceparent"] = "00-test" },
-        DateTimeOffset.UtcNow,
-        correlationId: Guid.NewGuid());
+    private static OutboxMessage CreateMessage()
+    {
+        var context = new SendContext([typeof(OrderSubmitted)], new EnvelopeMessageSerializer())
+        {
+            MessageId = Guid.NewGuid().ToString(),
+            CorrelationId = Guid.NewGuid().ToString(),
+            DestinationAddress = new Uri("rabbitmq://localhost/exchange/orders"),
+            Intent = MessageIntent.Publish
+        };
+        context.Headers["traceparent"] = "00-test";
+        return OutboxMessageFactory.Create(new OrderSubmitted(Guid.NewGuid()), context);
+    }
+
+    private sealed record OrderSubmitted(Guid OrderId);
 }

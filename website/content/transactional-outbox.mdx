@@ -27,6 +27,7 @@ The C# package `Sundstrom.MyServiceBus.PostgreSql` and Java module `io.github.ma
 
 - an idempotent, versioned PostgreSQL schema;
 - a writer that requires the application's active transaction;
+- a factory that captures the final serialized send context and its envelope metadata;
 - atomic leasing with `FOR UPDATE SKIP LOCKED` for competing replicas;
 - persisted attempts, retry time, lease ownership, and dispatch state;
 - complete envelope storage with stable message and correlation identities; and
@@ -54,17 +55,15 @@ await using var transaction = await connection.BeginTransactionAsync();
 // Execute the application UPDATE/INSERT using this transaction.
 
 var outbox = new PostgreSqlOutboxWriter(connection, transaction);
-await outbox.AddAsync(new OutboxMessage(
-    Guid.NewGuid(),
-    Guid.NewGuid(),
-    OutboxDeliveryIntent.Publish,
-    new Uri("rabbitmq://broker/order-submitted"),
-    ["urn:message:Contracts:OrderSubmitted"],
-    serializedEnvelope,
-    "application/vnd.masstransit+json",
-    headers,
-    DateTimeOffset.UtcNow,
-    correlationId: orderId));
+var context = new SendContext([typeof(OrderSubmitted)], serializer)
+{
+    MessageId = Guid.NewGuid().ToString(),
+    CorrelationId = orderId.ToString(),
+    DestinationAddress = new Uri("rabbitmq://broker/order-submitted"),
+    Intent = MessageIntent.Publish
+};
+await outbox.AddAsync(OutboxMessageFactory.Create(
+    new OrderSubmitted(orderId), context));
 
 await transaction.CommitAsync();
 ```
@@ -80,17 +79,14 @@ try (Connection connection = dataSource.getConnection()) {
     // Execute the application UPDATE/INSERT using this connection.
 
     OutboxWriter outbox = new PostgreSqlOutboxWriter(connection);
-    outbox.add(new OutboxMessage(
-            UUID.randomUUID(), UUID.randomUUID(),
-            OutboxDeliveryIntent.PUBLISH,
-            URI.create("rabbitmq://broker/order-submitted"),
-            List.of("urn:message:Contracts:OrderSubmitted"),
-            serializedEnvelope,
-            "application/vnd.masstransit+json",
-            headers,
-            Instant.now(),
-            null, orderId, null, null, null, null),
-        CancellationToken.none()).join();
+    SendContext context = new SendContext(new OrderSubmitted(orderId));
+    context.setMessageId(UUID.randomUUID());
+    context.setCorrelationId(orderId);
+    context.setDestinationAddress(
+            URI.create("rabbitmq://broker/order-submitted"));
+    context.setIntent(MessageIntent.PUBLISH);
+    outbox.add(OutboxMessageFactory.create(context, serializer),
+            CancellationToken.none()).join();
 
     connection.commit();
 }

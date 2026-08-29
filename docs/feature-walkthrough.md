@@ -1412,17 +1412,16 @@ await using var transaction = await connection.BeginTransactionAsync();
 // Execute the application UPDATE/INSERT with this connection and transaction.
 
 var outbox = new PostgreSqlOutboxWriter(connection, transaction);
-await outbox.AddAsync(new OutboxMessage(
-    recordId: Guid.NewGuid(),
-    messageId: Guid.NewGuid(),
-    intent: OutboxDeliveryIntent.Publish,
-    destinationAddress: new Uri("rabbitmq://broker/order-submitted"),
-    messageTypes: ["urn:message:Contracts:OrderSubmitted"],
-    body: serializedEnvelope,
-    contentType: "application/vnd.masstransit+json",
-    headers: headers,
-    createdAtUtc: DateTimeOffset.UtcNow,
-    correlationId: orderId));
+var context = new SendContext(
+    [typeof(OrderSubmitted)], serializer)
+{
+    MessageId = Guid.NewGuid().ToString(),
+    CorrelationId = orderId.ToString(),
+    DestinationAddress = new Uri("rabbitmq://broker/order-submitted"),
+    Intent = MessageIntent.Publish
+};
+await outbox.AddAsync(OutboxMessageFactory.Create(
+    new OrderSubmitted(orderId), context));
 
 await transaction.CommitAsync();
 ```
@@ -1438,22 +1437,14 @@ try (Connection connection = dataSource.getConnection()) {
     // Execute the application UPDATE/INSERT with this connection.
 
     OutboxWriter outbox = new PostgreSqlOutboxWriter(connection);
-    outbox.add(new OutboxMessage(
-            UUID.randomUUID(),
-            UUID.randomUUID(),
-            OutboxDeliveryIntent.PUBLISH,
-            URI.create("rabbitmq://broker/order-submitted"),
-            List.of("urn:message:Contracts:OrderSubmitted"),
-            serializedEnvelope,
-            "application/vnd.masstransit+json",
-            headers,
-            Instant.now(),
-            null,
-            orderId,
-            null,
-            null,
-            null,
-            null), CancellationToken.none()).join();
+    SendContext context = new SendContext(new OrderSubmitted(orderId));
+    context.setMessageId(UUID.randomUUID());
+    context.setCorrelationId(orderId);
+    context.setDestinationAddress(
+            URI.create("rabbitmq://broker/order-submitted"));
+    context.setIntent(MessageIntent.PUBLISH);
+    outbox.add(OutboxMessageFactory.create(context, serializer),
+            CancellationToken.none()).join();
 
     connection.commit();
 }

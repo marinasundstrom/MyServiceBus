@@ -5,6 +5,7 @@ This changelog summarizes the bigger themes in the repository history rather tha
 ## Unreleased
 
 - Added matching C# and Java PostgreSQL outbox/inbox packages with a versioned schema, caller-transaction-enlisted writers and inbox acquisition, atomic shared-storage leasing, stable-envelope rehydration, Testcontainers integration tests, and complete NuGet/Maven artifact wiring. Transparent bus capture, hosted transport dispatch, cleanup, and O01–O06 evidence remain explicitly open.
+- Added matching outbox message factories that capture the final serialized body, content type, contract URNs, headers, destination, intent, and correlation metadata directly from normal C# and Java send contexts.
 - Defined the portable transactional outbox and inbox boundary, including stable identity, shared-storage leasing, duplicate acquisition outcomes, broker/database commit gaps, cleanup, schema rollout, observability, and real-database promotion evidence.
 - Added first-class mediator semantics in C# and Java: publish fans out, send enforces exactly one type-routed handler, response-typed request contracts enable inferred result calls, and explicit `AddHandler` registration aliases complement `AddConsumer` without changing broker-backed bus contracts.
 - Clarified the project motivation—focused improvements on MassTransit with a continued permissively licensed core—the two primary adoption paths, and the MIT-versus-MassTransit-v9 commercial fit without hiding preview maturity or support trade-offs.
