@@ -747,14 +747,25 @@ builder.Services.AddServiceBus(x =>
 #### Java
 
 ```java
+public final class SubmitOrderHandler extends HandlerBase<SubmitOrder> {
+    @Override
+    public CompletableFuture<Void> handle(
+            SubmitOrder message,
+            CancellationToken cancellationToken) {
+        return submit(message, cancellationToken);
+    }
+}
+
 ServiceCollection services = ServiceCollection.create();
 MediatorBus bus = MediatorBus.configure(services, cfg -> {
-    cfg.addConsumer(SubmitOrderConsumer.class);
+    cfg.addConsumer(SubmitOrderHandler.class);
 });
 
-bus.publish(new SubmitOrder(UUID.randomUUID())).join();
-bus.send("queue:submit-order", new SubmitOrder(UUID.randomUUID())).join();
+bus.publish(new SubmitOrder(UUID.randomUUID()));
+bus.send("queue:submit-order", new SubmitOrder(UUID.randomUUID()));
 ```
+
+Java handlers implement `Handler<T>` directly or derive from `HandlerBase<T>`. Response-bearing handlers implement `HandlerWithResult<TMessage, TResult>`. All of these interfaces adapt to the ordinary consumer pipeline, so filters, scopes, retries, generated catalogs, and broker-backed reuse remain available.
 
 The Java in-memory test harness also implements `PublishEndpoint`, so tests can use `publish` for fan-out semantics and `getSendEndpoint(...).send(...)` for directed-send semantics without treating the two operations as interchangeable.
 

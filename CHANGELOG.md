@@ -4,6 +4,17 @@ This changelog summarizes the bigger themes in the repository history rather tha
 
 ## Unreleased
 
+- Clarified the project motivation—focused improvements on MassTransit with a continued permissively licensed core—the two primary adoption paths, and the MIT-versus-MassTransit-v9 commercial fit without hiding preview maturity or support trade-offs.
+- Added a dedicated mediator guide for local commands, queries, notifications, generated reflection-free consumer registration and direct invocation, the current MediatR licensing comparison, and the broker durability boundary in both C# and Java.
+- Elevated the mediator from a supporting local execution mode to a primary product path and explicit MediatR-replacement target, while accurately distinguishing it from MassTransit's distributed-framework positioning.
+- Reoriented the product roadmap toward enterprise production adoption, with evidence-based gates for delivery integrity, security and supply chain, operations, resilience, and stable support lifecycle.
+- Added an enterprise-readiness assessment that separates current interoperability strengths from transactional messaging, idempotency, secure deployment, observability, load evidence, and lifecycle gaps.
+- Specified the current and target broker delivery guarantees, including producer acceptance, settlement, duplicate and loss windows, request timeouts, non-durable scheduling, shutdown, and the outbox/inbox boundary.
+- Added an executable cross-language failure matrix for producer ambiguity, process crashes, retry, failed-message preservation, consume-and-produce consistency, requests, shutdown, overload, and scheduling.
+- Corrected RabbitMQ recovery guidance to distinguish automatic connection recovery from publish confirmation and the differing initial-connect behavior of the C# and Java clients.
+- Enabled RabbitMQ publisher confirmations in both clients, persistent Java messages, mandatory directed-queue and skipped-message routing, and confirmed Java request publication.
+- Changed RabbitMQ receive settlement so handler or compatibility-copy failures without a confirmed error move are negatively acknowledged for redelivery rather than acknowledged and lost.
+- Required RabbitMQ routing for error, fault, and skipped compatibility exchanges so a deleted or unbound preservation destination fails visibly before the source can settle.
 - Added the BSON projects to NuGet and Maven release workflows, artifact verification, Maven Central bundling, staged package consumers, and the public artifact catalog.
 - Added an optional .NET MassTransit BSON envelope package with serializer/deserializer factories, Base64 body handling, configurable Newtonsoft BSON settings, and no dependency from the default JSON runtime.
 - Added the corresponding optional Java BSON module with application `ObjectMapper` payload mapping, .NET GUID byte-order normalization, Base64 bodies, and bidirectional C#↔Java fixtures.

@@ -4,9 +4,13 @@ MyServiceBus is a cross-language, broker-backed service-bus runtime with a MassT
 
 The architecture deliberately separates compatibility, portable messaging behavior, broker integration, and optional operational tooling. This allows the project to interoperate with MassTransit without treating every MassTransit feature or historical API as a requirement.
 
+The project is motivated by building on MassTransit's proven foundation while improving the areas it deliberately owns: C#↔Java parity, generated consumer dispatch, explicit compatibility and delivery evidence, and a smaller portable core. Continued permissive open-source licensing of that core is an architectural and product constraint, not merely a current packaging detail.
+
 ## Product Boundary
 
-MyServiceBus is not intended to compete directly with MassTransit as a fully supported enterprise platform. It is a focused alternative for teams that want dependable messaging fundamentals, a smaller operational and conceptual footprint, and consistent clients across programming languages. Businesses may use it for production workloads, but the project does not claim MassTransit's breadth, maturity, commercial support model, or enterprise ecosystem.
+MyServiceBus is not intended to compete directly with MassTransit as a fully supported enterprise platform. It is a focused alternative for teams that want dependable messaging fundamentals, a smaller operational and conceptual footprint, and consistent clients across programming languages. Its two primary adoption paths are adding Java services to an existing MassTransit-based .NET estate through the verified common subset, and starting a greenfield C# and/or Java system on one shared model. Businesses may use it for production workloads, but the project does not claim MassTransit's breadth, maturity, commercial support model, or enterprise ecosystem.
+
+The MIT license is part of that product fit. MassTransit v9 and later use commercial licensing, which can be appropriate when its support and broader capability set are required. MyServiceBus serves projects whose basic needs or current stage do not justify that commitment, while making preview maturity and support limitations explicit. The verified MassTransit 8.5.1 peer remains a technical interoperability boundary and must not be confused with the v9 licensing comparison.
 
 Compatibility supports coexistence, incremental adoption, and migration. It is not a commitment to reproduce the entire product. Features enter the portable core because they provide current value across supported languages and transports, not merely because they exist in MassTransit. Specialized enterprise patterns remain demand-driven extensions or documented non-goals.
 
@@ -16,7 +20,7 @@ HTTP callbacks, webhooks, WebSockets, SignalR, and similar technologies may even
 
 ### Mediator boundary
 
-The in-process mediator is an alternative execution mode over reusable consumer and pipeline infrastructure. It supports testing, explicitly local commands and queries, modular-monolith boundaries, lightweight tools, and gradual migration to a broker. It does not provide broker durability, independent delivery, or externally observable publication.
+The in-process mediator is a primary product mode over reusable handler, consumer, and pipeline infrastructure. It is intended to replace MediatR for local commands, queries, response handlers, and notifications, while also supporting testing, modular-monolith boundaries, lightweight tools, and gradual migration to a broker. An application may adopt this mode without using or planning to use broker-backed messaging. It does not provide broker durability, independent delivery, or externally observable publication.
 
 When an application already uses a broker-backed bus, events that represent facts other processes may observe should ordinarily be published on that bus. Applications should not create mediator and broker paths for the same event by default: doing so creates different retry, durability, observability, and failure semantics. Any dual path must express a deliberate architectural distinction.
 

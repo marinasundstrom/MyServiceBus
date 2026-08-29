@@ -5,11 +5,24 @@
 [![NuGet](https://img.shields.io/nuget/vpre/Sundstrom.MyServiceBus.svg?logo=nuget&label=NuGet)](https://www.nuget.org/packages/Sundstrom.MyServiceBus)
 [![Maven Central](https://img.shields.io/maven-central/v/io.github.marinasundstrom.myservicebus/myservicebus?logo=apachemaven&label=Maven%20Central)](https://central.sonatype.com/artifact/io.github.marinasundstrom.myservicebus/myservicebus)
 
-MyServiceBus (working title) is a lightweight, asynchronous service-bus runtime for Java and .NET, inspired by **MassTransit**.
+MyServiceBus (working title) is a focused, asynchronous service-bus runtime for enterprises building production systems in Java and .NET, inspired by **MassTransit**.
 
 It provides a consistent, opinionated broker-backed messaging model while remaining compatible with documented **MassTransit** transport profiles and a separate, scoped **NServiceBus RabbitMQ** profile. This makes it possible for Java and .NET services to communicate across platforms and with verified peer runtimes.
 
+The project's motivation is to build on MassTransit's proven model and improve the boundaries MyServiceBus owns—cross-language parity, generated dispatch, explicit compatibility and delivery evidence, a first-class MediatR replacement, and a smaller portable core—while keeping that core permissively open source.
+
 See samples below.
+
+The project is currently in preview. Its production-readiness status, existing evidence, and the gates required before broad enterprise adoption are documented in [Enterprise Production Readiness](docs/enterprise-readiness.md).
+
+## Why choose MyServiceBus?
+
+- **Extend an existing MassTransit-based .NET estate with Java.** Use the documented common subset so Java services can participate without a custom messaging bridge.
+- **Start a new system in C#, Java, or both.** Keep one focused messaging model while choosing the most suitable language for each service.
+- **Replace MediatR for local application messaging.** Use dedicated handler APIs and generated dispatch for in-process commands, queries, and notifications, with no broker required.
+- **Match the commitment to the project stage.** MyServiceBus is MIT-licensed. For teams that do not need—or cannot yet justify—the commercial support and broader feature set of MassTransit v9+, it offers a smaller option with an explicit preview-status trade-off.
+
+The currently verified MassTransit interoperability peer is 8.5.1; that technical test pin is separate from MassTransit v9+ licensing. Read [Why Choose MyServiceBus?](docs/why-myservicebus.md) for the complete decision boundary and [Using MyServiceBus as a Mediator](docs/mediator.md) for deliberately in-process commands, queries, and notifications, including generated consumer registration and dispatch as an MIT-licensed alternative to current MediatR releases.
 
 ---
 
@@ -120,7 +133,8 @@ Unlike most Java messaging solutions, MyServiceBus does **not require a framewor
 
 ## Goals
 
-- Provide a focused, community-driven alternative for basic MassTransit-style broker-backed messaging scenarios.
+- Provide a focused, community-driven runtime for production-critical MassTransit-style broker-backed messaging scenarios.
+- Make delivery, failure, security, operational, compatibility, and support guarantees explicit and evidence-backed.
 - Preserve a **MassTransit-compatible messaging model** across Java and .NET.
 - Enable **Java services to easily connect with .NET/C# services** using shared messaging semantics.
 - Offer a familiar experience for developers coming from .NET.

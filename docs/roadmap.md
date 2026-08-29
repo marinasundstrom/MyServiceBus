@@ -7,14 +7,14 @@ This roadmap turns the project direction into an incremental delivery plan. It i
 MyServiceBus aims to become a modern, cross-language messaging runtime that:
 
 - interoperates with MassTransit through explicit protocol and transport profiles
-- provides a small, consistent messaging model across languages
+- provides a focused, production-grade messaging model across languages
 - supports multiple broker families without erasing their differences
 - exposes optional inspection and monitoring APIs for operational tools
-- supports a read-only dashboard before introducing control-plane operations
+- gives enterprise adopters explicit reliability, security, operability, and lifecycle guarantees
 
 The roadmap is centered on replacing MassTransit in basic broker-backed messaging scenarios. It does not currently seek to turn MyServiceBus into a general-purpose publisher/consumer abstraction for technologies without service-bus topology.
 
-It is positioned as a focused alternative for teams that do not need a large enterprise service-bus platform. Interoperability with MassTransit enables mixed systems and migration; it does not turn MassTransit's complete feature catalog into the destination of this roadmap.
+It is positioned as a focused runtime for enterprises that need production-critical messaging without adopting the feature breadth of a large enterprise service-bus platform. Interoperability with MassTransit enables mixed systems and migration; it does not turn MassTransit's complete feature catalog into the destination of this roadmap. The [Enterprise Production Readiness](enterprise-readiness.md) gates define the evidence required before production-ready claims are made.
 
 ## Decision Guardrails
 
@@ -27,12 +27,14 @@ Use these rules when accepting roadmap work:
 5. Inspection and monitoring remain optional addons. Message delivery must not depend on a dashboard or central registry.
 6. New language clients begin with conformance fixtures and one supported transport profile, not the full accumulated feature set.
 7. A MassTransit feature is not added solely for feature parity. It must materially improve interoperability, migration, or the focused MyServiceBus user experience.
-8. Prefer a small, coherent portable core over enterprise breadth; specialized patterns stay demand-driven.
+8. Prefer a coherent portable core with enterprise-grade guarantees over feature breadth; specialized patterns stay demand-driven.
 9. Keep shared concepts and useful counterpart types recognizable across clients, but never derive Java packages or APIs mechanically from C# namespaces and language features, or vice versa.
 10. Treat the normalized topology query model as a foundational API. Runtime provisioning, inspection, and dashboards must consume it rather than constructing separate topology interpretations.
 11. Keep broker-backed service-bus semantics as the stable product boundary. Explore HTTP, webhooks, realtime sessions, and similar delivery mechanisms separately and generalize the core only from demonstrated shared requirements.
 12. Treat mediator dispatch as an explicitly local execution mode. Externally observable events normally follow the broker-backed path.
 13. Support one logical bus per application. Do not add multiple hosted buses solely for MassTransit compatibility; reconsider them only for a concrete cross-platform use case with an idiomatic Java dependency-injection model.
+14. Prioritize delivery integrity, secure deployment, operability, resilience evidence, and a predictable support lifecycle ahead of dashboard depth, additional transports, or feature-catalog parity.
+15. Treat production readiness as an evidence-backed status for a named release and capability set, not as a general description of the project.
 
 ## Phase 1: Protocol Baseline
 
@@ -118,6 +120,21 @@ The target architecture, capability boundary, and delivery slices are defined in
 **Exit criteria:** existing JSON profiles retain their behavior; new formats register through corresponding factories in both clients; source-generated JSON works on send and receive with reflection disabled; and BSON passes the C#↔Java↔MassTransit matrix.
 
 **Status:** in progress. Contracts, registry selection, configurable JSON metadata, the source-generated .NET NativeAOT smoke, optional C# and Java BSON artifacts, direct .NET↔MassTransit BSON decoding, and bidirectional C#↔Java BSON fixtures are implemented. The broader broker-backed BSON matrix and remaining AOT/native-image capability work are still open.
+
+## Enterprise Production Gate
+
+**Outcome:** supported runtime capabilities are safe to adopt for production-critical enterprise workloads and are backed by explicit operational evidence.
+
+- Specify acknowledgement points, crash windows, duplicate behavior, and recovery outcomes for every supported transport operation.
+- Add outbox/inbox and idempotency foundations, bounded concurrency, graceful draining, and failure-injection coverage in both clients.
+- Complete secure broker configuration, managed identity, least-privilege guidance, vulnerability handling, SBOMs, and release provenance.
+- Standardize OpenTelemetry metrics and transport health semantics, then publish incident, upgrade, rollback, and capacity runbooks.
+- Establish broker-backed load, saturation, outage-recovery, and soak gates.
+- Define the stable API, compatibility, deprecation, servicing, and support policy required for `1.0`.
+
+**Exit criteria:** one immutable release candidate passes the applicable delivery, security, operations, resilience, mixed-version, package, and interoperability gates for both C# and Java.
+
+The detailed assessment, work slices, and evidence rules are defined in [Enterprise Production Readiness](enterprise-readiness.md). Inspection and dashboard work may continue experimentally, but must not be promoted as a substitute for these runtime gates.
 
 ## Phase 3: Inspection and Monitoring APIs
 
@@ -222,9 +239,12 @@ The following work remains demand-driven and is not automatically part of the po
 
 The next coherent investment is:
 
-1. run the complete release-candidate gate on one commit and publish the verified MVP packages
-2. stabilize the inspection addon DTOs against the released topology foundation without expanding the control plane
-3. build focused monitoring state and event records
-4. select a second durable broker only after demonstrated demand and capability-model validation
+1. run the complete preview release-candidate gate on one commit and publish only the scoped verified claims
+2. specify delivery guarantees and add failure-injection coverage for process, network, settlement, and broker failures
+3. implement bounded concurrency, graceful draining, and the portable outbox/inbox and idempotency foundation in C# and Java
+4. complete secure deployment, production telemetry and health, operational runbooks, and supply-chain evidence
+5. establish broker-backed load, soak, saturation, and recovery gates
+6. define the stable compatibility and support lifecycle, validate mixed-version upgrades, and prepare `1.0`
+7. promote monitoring, dashboard, and additional transport work only after the production gates on which they depend
 
-This sequence prioritizes predictable application fundamentals while reducing the architectural risk of adding transports, languages, or dashboard behavior too early.
+This sequence prioritizes the guarantees enterprise adopters need to approve and operate the runtime while reducing the architectural risk of adding transports, languages, or dashboard behavior too early.

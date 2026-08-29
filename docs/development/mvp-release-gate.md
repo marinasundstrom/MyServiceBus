@@ -28,4 +28,4 @@ The MVP is not an inspection, dashboard, saga, outbox, or multi-transport releas
 
 The MVP can be tagged when all remaining gates are complete and the candidate commit passes CI. Work from roadmap Phase 3 onward must not delay that tag unless it reveals a defect in an MVP contract.
 
-After the MVP tag, the next product increment is stabilization of the optional inspection DTOs against the released topology model. Monitoring history and a read-only dashboard follow only after those programmatic APIs are stable.
+After the MVP tag, the next product increment is the delivery-integrity slice of the [Enterprise Production Readiness](../enterprise-readiness.md) plan: explicit crash-window guarantees, failure injection, bounded concurrency, graceful draining, and the outbox/inbox foundation. Inspection DTOs may stabilize against the released topology model in parallel, but monitoring history and dashboard depth must not displace the production runtime gates.
