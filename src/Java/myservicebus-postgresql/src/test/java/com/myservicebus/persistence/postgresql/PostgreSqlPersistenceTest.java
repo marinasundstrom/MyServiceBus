@@ -11,7 +11,19 @@ import com.myservicebus.persistence.OutboxLease;
 import com.myservicebus.persistence.OutboxLeaseRequest;
 import com.myservicebus.persistence.OutboxMessage;
 import com.myservicebus.persistence.OutboxMessageFactory;
+import com.myservicebus.persistence.OutboxSession;
+import com.myservicebus.MessageBus;
+import com.myservicebus.MessageBusServices;
+import com.myservicebus.PublishEndpoint;
+import com.myservicebus.SendEndpoint;
+import com.myservicebus.SendEndpointProvider;
 import com.myservicebus.SendContext;
+import com.myservicebus.TransportFactory;
+import com.myservicebus.SendTransport;
+import com.myservicebus.di.ServiceCollection;
+import com.myservicebus.di.ServiceProvider;
+import com.myservicebus.di.ServiceScope;
+import com.myservicebus.mediator.MediatorTransport;
 import com.myservicebus.serialization.EnvelopeMessageSerializer;
 import com.myservicebus.serialization.MessageIntent;
 import com.myservicebus.tasks.CancellationToken;
@@ -29,6 +41,49 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
 class PostgreSqlPersistenceTest {
+    @Test
+    void scopedBusEndpointsCaptureMessagesInApplicationTransaction() throws Exception {
+        try (PostgreSQLContainer container = startContainer()) {
+            DataSource dataSource = dataSource(container);
+            PostgreSqlSchema.ensureCreated(dataSource);
+            ServiceCollection services = ServiceCollection.create();
+            services.addSingleton(TransportFactory.class, ignored -> () -> new NoOpTransportFactory());
+            services.from(MessageBusServices.class).addServiceBus(configurator -> {
+                configurator.useBusOutbox();
+                MediatorTransport.configure(configurator);
+            });
+            ServiceProvider provider = services.buildServiceProvider();
+            MessageBus bus = provider.getRequiredService(MessageBus.class);
+            bus.start();
+
+            try {
+                try (ServiceScope scope = provider.createScope();
+                        Connection connection = dataSource.getConnection()) {
+                    connection.setAutoCommit(false);
+                    ServiceProvider scoped = scope.getServiceProvider();
+                    try (OutboxSession.Registration ignored = PostgreSqlOutboxSession.useTransaction(
+                            scoped.getRequiredService(OutboxSession.class), connection)) {
+                        PublishEndpoint publishEndpoint = scoped.getRequiredService(PublishEndpoint.class);
+                        publishEndpoint.publish(new OrderSubmitted(UUID.randomUUID())).join();
+
+                        SendEndpointProvider endpointProvider = scoped.getRequiredService(SendEndpointProvider.class);
+                        SendEndpoint endpoint = endpointProvider.getSendEndpoint("loopback://localhost/orders");
+                        endpoint.send(new SubmitOrder(UUID.randomUUID())).join();
+                    }
+                    connection.commit();
+                }
+            } finally {
+                bus.stop();
+            }
+
+            List<OutboxLease> leases = new PostgreSqlOutboxStore(dataSource).lease(request("replica-a", 10)).join();
+            assertEquals(2, leases.size());
+            assertEquals(com.myservicebus.persistence.OutboxDeliveryIntent.PUBLISH, leases.get(0).message().intent());
+            assertEquals(com.myservicebus.persistence.OutboxDeliveryIntent.SEND, leases.get(1).message().intent());
+            assertEquals("loopback://localhost/orders", leases.get(1).message().destinationAddress().toString());
+        }
+    }
+
     @Test
     void outboxWriteCommitsAndRollsBackWithApplicationTransaction() throws Exception {
         try (PostgreSQLContainer container = startContainer()) {
@@ -156,6 +211,27 @@ class PostgreSqlPersistenceTest {
         }
     }
 
+    private static final class NoOpTransportFactory implements TransportFactory {
+        @Override
+        public SendTransport getSendTransport(URI address) {
+            return (data, headers, contentType) -> {
+            };
+        }
+
+        @Override
+        public String getPublishAddress(String exchange) {
+            return "loopback://" + exchange;
+        }
+
+        @Override
+        public String getSendAddress(String queue) {
+            return "loopback://" + queue;
+        }
+    }
+
     private record OrderSubmitted(UUID orderId) {
+    }
+
+    private record SubmitOrder(UUID orderId) {
     }
 }

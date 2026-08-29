@@ -3,6 +3,7 @@ package com.myservicebus;
 import com.myservicebus.di.ServiceCollection;
 import com.myservicebus.serialization.SerializerFactory;
 import com.myservicebus.BusFactoryConfigurator;
+import com.myservicebus.persistence.OutboxSession;
 
 public interface BusRegistrationConfigurator {
     <T> void addConsumer(Class<T> consumerClass);
@@ -70,6 +71,13 @@ public interface BusRegistrationConfigurator {
         requireTransportCapability(capability, false);
     }
     ServiceCollection getServiceCollection();
+
+    default void useBusOutbox() {
+        if (getServiceCollection().getDescriptors().stream()
+                .noneMatch(descriptor -> descriptor.getServiceType().equals(OutboxSession.class))) {
+            getServiceCollection().addScoped(OutboxSession.class, provider -> () -> new OutboxSession());
+        }
+    }
 
     default <TConfigurator extends BusFactoryConfigurator> BusRegistrationConfigurator using(
             Class<TConfigurator> configuratorClass,

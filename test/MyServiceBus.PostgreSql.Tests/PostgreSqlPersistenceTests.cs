@@ -1,3 +1,4 @@
+using Microsoft.Extensions.DependencyInjection;
 using MyServiceBus.Persistence;
 using MyServiceBus.Persistence.PostgreSql;
 using MyServiceBus.Serialization;
@@ -57,6 +58,54 @@ public sealed class PostgreSqlPersistenceTests : IAsyncLifetime
         Assert.Equal(committed.ContentType, lease.Message.ContentType);
         Assert.Equal(committed.Headers, lease.Message.Headers);
         Assert.Equal(committed.CorrelationId, lease.Message.CorrelationId);
+    }
+
+    [Fact]
+    public async Task Scoped_bus_endpoints_capture_messages_in_application_transaction()
+    {
+        var services = new ServiceCollection();
+        services.AddServiceBus(configurator =>
+        {
+            configurator.UseBusOutbox();
+            configurator.UsingMediator();
+        });
+
+        await using var provider = services.BuildServiceProvider();
+        var bus = provider.GetRequiredService<IMessageBus>();
+        await bus.StartAsync(CancellationToken.None);
+
+        try
+        {
+            await using var scope = provider.CreateAsyncScope();
+            await using var connection = await dataSource.OpenConnectionAsync();
+            await using var transaction = await connection.BeginTransactionAsync();
+            using (scope.ServiceProvider.GetRequiredService<OutboxSession>()
+                .UsePostgreSql(connection, transaction))
+            {
+                var publishEndpoint = scope.ServiceProvider.GetRequiredService<IPublishEndpoint>();
+                await publishEndpoint.Publish(new OrderSubmitted(Guid.NewGuid()));
+
+                var endpointProvider = scope.ServiceProvider.GetRequiredService<ISendEndpointProvider>();
+                var endpoint = await endpointProvider.GetSendEndpoint(new Uri("loopback://localhost/orders"));
+                await endpoint.Send(new SubmitOrder(Guid.NewGuid()));
+            }
+
+            await transaction.CommitAsync();
+        }
+        finally
+        {
+            await bus.StopAsync(CancellationToken.None);
+        }
+
+        var leases = await new PostgreSqlOutboxStore(dataSource).LeaseAsync(Request("replica-a", 10));
+        Assert.Collection(
+            leases.OrderBy(lease => lease.Message.CreatedAtUtc),
+            lease => Assert.Equal(OutboxDeliveryIntent.Publish, lease.Message.Intent),
+            lease =>
+            {
+                Assert.Equal(OutboxDeliveryIntent.Send, lease.Message.Intent);
+                Assert.Equal(new Uri("loopback://localhost/orders"), lease.Message.DestinationAddress);
+            });
     }
 
     [Fact]
@@ -132,4 +181,6 @@ public sealed class PostgreSqlPersistenceTests : IAsyncLifetime
     }
 
     private sealed record OrderSubmitted(Guid OrderId);
+
+    private sealed record SubmitOrder(Guid OrderId);
 }
