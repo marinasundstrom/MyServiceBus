@@ -57,6 +57,24 @@ public final class TransportCapabilityDescriptors {
                     Map.entry(TransportCapabilities.TEMPORARY_ENDPOINTS, TransportCapabilitySupport.NATIVE),
                     Map.entry(TransportCapabilities.TOPOLOGY_PROVISIONING, TransportCapabilitySupport.NATIVE)));
 
+    public static final TransportCapabilityDescriptor AMAZON_SQS = new TransportCapabilityDescriptor(
+            "amazon-sqs",
+            Map.ofEntries(
+                    Map.entry(TransportCapabilities.DIRECTED_SEND, TransportCapabilitySupport.NATIVE),
+                    Map.entry(TransportCapabilities.PUBLISH_SUBSCRIBE, TransportCapabilitySupport.NATIVE),
+                    Map.entry(TransportCapabilities.DURABILITY, TransportCapabilitySupport.NATIVE),
+                    Map.entry(TransportCapabilities.COMPETING_CONSUMERS, TransportCapabilitySupport.NATIVE),
+                    Map.entry(TransportCapabilities.ACKNOWLEDGEMENT, TransportCapabilitySupport.NATIVE),
+                    Map.entry(TransportCapabilities.REQUEST_RESPONSE, TransportCapabilitySupport.EMULATED),
+                    Map.entry(TransportCapabilities.SCHEDULING, TransportCapabilitySupport.EMULATED),
+                    Map.entry(TransportCapabilities.RETRY, TransportCapabilitySupport.EMULATED),
+                    Map.entry(TransportCapabilities.REDELIVERY, TransportCapabilitySupport.NATIVE),
+                    Map.entry(TransportCapabilities.ERROR_DESTINATIONS, TransportCapabilitySupport.EMULATED),
+                    Map.entry(TransportCapabilities.ORDERING, TransportCapabilitySupport.UNSUPPORTED),
+                    Map.entry(TransportCapabilities.REPLAY, TransportCapabilitySupport.UNSUPPORTED),
+                    Map.entry(TransportCapabilities.TEMPORARY_ENDPOINTS, TransportCapabilitySupport.EMULATED),
+                    Map.entry(TransportCapabilities.TOPOLOGY_PROVISIONING, TransportCapabilitySupport.NATIVE)));
+
     private TransportCapabilityDescriptors() {
     }
 

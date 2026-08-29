@@ -4,6 +4,8 @@ This changelog summarizes the bigger themes in the repository history rather tha
 
 ## Unreleased
 
+- Added matching experimental C# and Java Amazon SQS/SNS transports with standard-queue directed delivery, raw SNS subscriptions, bounded long polling, visibility renewal, native redelivery, temporary request queues, `_error`/`_skipped`/fault handling, create and pre-provisioned topology modes, LocalStack integration coverage, and complete NuGet/Maven artifact wiring. AWS cloud and MassTransit interoperability promotion evidence remains open.
+
 ## 0.1.0-preview.6 - 2026-08-29
 
 - Fixed Java scoped endpoint registration so an `OutboxSession` is resolved only when Bus Outbox is explicitly enabled, preserving ordinary test-harness and non-outbox send/publish resolution.

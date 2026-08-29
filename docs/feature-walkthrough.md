@@ -401,6 +401,38 @@ maps them to `msb-response` and therefore runs request scenarios sequentially.
 See the [Azure Service Bus transport profile](azure-service-bus-transport.md)
 for the exact capability and conformance status.
 
+#### Amazon SQS/SNS experimental transport
+
+Install `Sundstrom.MyServiceBus.AmazonSqs` or
+`io.github.marinasundstrom.myservicebus:myservicebus-amazon-sqs`. The adapters
+use SQS queues for endpoints and SNS topics with raw SQS subscriptions for
+publication:
+
+```csharp
+x.UsingAmazonSqs((context, cfg) =>
+{
+    cfg.Host("eu-north-1");
+    cfg.SetScope("orders-prod-");
+    cfg.ConfigureEndpoints(context);
+});
+```
+
+```java
+cfg.using(AmazonSqsFactoryConfigurator.class, (context, aws) -> {
+    aws.host("eu-north-1");
+    aws.setScope("orders-prod-");
+    aws.configureEndpoints(context);
+});
+```
+
+The normal AWS SDK credential chains are used for cloud hosts. Use
+`LocalstackHost()` or `localstackHost()` with the checked-in emulator fixture.
+Create mode provisions queues, topics, subscriptions, and queue policies;
+pre-provisioned mode resolves existing entities without mutating topology.
+Only standard queues are supported in this slice. See the
+[Amazon SQS/SNS transport profile](amazon-sqs-transport.md) for addressing,
+IAM, settlement, emulator, and compatibility details.
+
 ---
 
 ### Publishing

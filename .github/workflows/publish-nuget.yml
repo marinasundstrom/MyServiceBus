@@ -63,6 +63,7 @@ jobs:
           dotnet pack src/MyServiceBus.Monitoring/MyServiceBus.Monitoring.csproj --no-build --configuration Release --output artifacts/packages
           dotnet pack src/MyServiceBus.RabbitMq/MyServiceBus.RabbitMq.csproj --no-build --configuration Release --output artifacts/packages
           dotnet pack src/MyServiceBus.AzureServiceBus/MyServiceBus.AzureServiceBus.csproj --no-build --configuration Release --output artifacts/packages
+          dotnet pack src/MyServiceBus.AmazonSqs/MyServiceBus.AmazonSqs.csproj --no-build --configuration Release --output artifacts/packages
           dotnet pack src/MyServiceBus.Testing/MyServiceBus.Testing.csproj --no-build --configuration Release --output artifacts/packages
 
       - name: Verify NuGet packages

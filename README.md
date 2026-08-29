@@ -54,6 +54,7 @@ Continue with the [.NET quick start](#c) to register the bus, configure RabbitMQ
 | `Sundstrom.MyServiceBus.Monitoring` | Optional batched runtime monitoring exporter and collector protocol |
 | [`Sundstrom.MyServiceBus.RabbitMq`](https://www.nuget.org/packages/Sundstrom.MyServiceBus.RabbitMq) | RabbitMQ transport and configuration integration |
 | `Sundstrom.MyServiceBus.AzureServiceBus` | Verified-preview Azure Service Bus transport for direct send and publish/subscribe |
+| `Sundstrom.MyServiceBus.AmazonSqs` | Amazon SQS queues and SNS publish/subscribe transport |
 | [`Sundstrom.MyServiceBus.Testing`](https://www.nuget.org/packages/Sundstrom.MyServiceBus.Testing) | In-memory test harness and testing utilities |
 
 All packages currently use the same preview version. Install `Sundstrom.MyServiceBus.Testing` separately in test projects when the test harness is needed.
@@ -98,6 +99,7 @@ Continue with the [Java quick start](#java) or the detailed [Java guide](src/Jav
 | [`io.github.marinasundstrom.myservicebus:myservicebus-tasks`](https://central.sonatype.com/artifact/io.github.marinasundstrom.myservicebus/myservicebus-tasks) | Asynchronous task and cancellation abstractions |
 | [`io.github.marinasundstrom.myservicebus:myservicebus-rabbitmq`](https://central.sonatype.com/artifact/io.github.marinasundstrom.myservicebus/myservicebus-rabbitmq) | RabbitMQ transport and configuration integration |
 | `io.github.marinasundstrom.myservicebus:myservicebus-azure-service-bus` | Verified-preview Azure Service Bus transport for direct send and publish/subscribe |
+| `io.github.marinasundstrom.myservicebus:myservicebus-amazon-sqs` | Amazon SQS queues and SNS publish/subscribe transport |
 | [`io.github.marinasundstrom.myservicebus:myservicebus-testing`](https://central.sonatype.com/artifact/io.github.marinasundstrom.myservicebus/myservicebus-testing) | In-memory test harness and testing utilities |
 
 All Java artifacts use the same version as the corresponding NuGet release.

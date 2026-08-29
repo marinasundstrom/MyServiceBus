@@ -15,6 +15,7 @@ def publishedProjectDescriptions = [
     'myservicebus-monitoring'   : 'Optional batched runtime monitoring exporter and collector protocol for MyServiceBus.',
     'myservicebus-rabbitmq'     : 'RabbitMQ transport for MyServiceBus.',
     'myservicebus-azure-service-bus': 'Azure Service Bus transport for MyServiceBus.',
+    'myservicebus-amazon-sqs'      : 'Amazon SQS and SNS transport for MyServiceBus.',
     'myservicebus-testing'      : 'In-memory test harness and testing utilities for MyServiceBus.'
 ]
 
@@ -24,6 +25,7 @@ ext {
     bson4jacksonVersion = '2.15.1'
     rabbitmqVersion = '5.20.0'
     azureServiceBusVersion = '7.17.20'
+    awsSdkVersion = '2.54.7'
     guiceVersion = '5.1.0'
     javaxInjectVersion = '1'
     slf4jVersion = '2.0.13'

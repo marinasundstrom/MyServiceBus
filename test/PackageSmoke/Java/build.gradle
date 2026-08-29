@@ -17,6 +17,7 @@ repositories {
         'myservicebus-monitoring',
         'myservicebus-rabbitmq',
         'myservicebus-azure-service-bus',
+        'myservicebus-amazon-sqs',
         'myservicebus-testing'
     ].each { module ->
         maven {
@@ -39,6 +40,7 @@ dependencies {
     implementation 'io.github.marinasundstrom.myservicebus:myservicebus-monitoring:0.1.0-preview.6'
     implementation 'io.github.marinasundstrom.myservicebus:myservicebus-rabbitmq:0.1.0-preview.6'
     implementation 'io.github.marinasundstrom.myservicebus:myservicebus-azure-service-bus:0.1.0-preview.6'
+    implementation 'io.github.marinasundstrom.myservicebus:myservicebus-amazon-sqs:0.1.0-preview.6'
     implementation 'io.github.marinasundstrom.myservicebus:myservicebus-testing:0.1.0-preview.6'
 }
 

@@ -1,0 +1,16 @@
+name: myservicebus-amazon-sqs-tests
+
+services:
+  localstack:
+    # 4.14.0 is the final community image that starts without an account token.
+    image: localstack/localstack:4.14.0
+    environment:
+      SERVICES: sqs,sns
+      AWS_DEFAULT_REGION: us-east-1
+    ports:
+      - "4566:4566"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:4566/_localstack/health"]
+      interval: 2s
+      timeout: 2s
+      retries: 30

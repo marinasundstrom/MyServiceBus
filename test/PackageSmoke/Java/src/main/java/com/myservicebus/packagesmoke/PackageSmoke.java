@@ -8,6 +8,7 @@ import com.myservicebus.InMemoryTestHarness;
 import com.myservicebus.MessageConsumer;
 import com.myservicebus.MessageBus;
 import com.myservicebus.azure.servicebus.AzureServiceBusFactoryConfigurator;
+import com.myservicebus.amazon.sqs.AmazonSqsFactoryConfigurator;
 import com.myservicebus.di.ServiceCollection;
 import com.myservicebus.generated.GeneratedConsumerCatalog;
 import com.myservicebus.inspection.BusInspectionProvider;
@@ -52,6 +53,7 @@ public final class PackageSmoke {
         requireType(MonitoringExporterOptions.class);
         requireType(RabbitMqFactoryConfigurator.class);
         requireType(AzureServiceBusFactoryConfigurator.class);
+        requireType(AmazonSqsFactoryConfigurator.class);
         requireType(BsonSerializerFactory.class);
         requireType(PostgreSqlSchema.class);
         System.out.println("Verified the staged MyServiceBus Maven packages from a consumer project.");
