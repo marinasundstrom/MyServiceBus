@@ -2,8 +2,11 @@ package com.myservicebus.persistence;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 
 import com.myservicebus.tasks.CancellationToken;
+import com.myservicebus.SendTransport;
+import com.myservicebus.TransportFactory;
 import java.net.URI;
 import java.time.Clock;
 import java.time.Duration;
@@ -93,6 +96,29 @@ class OutboxDispatcherTest {
         assertEquals(new OutboxDispatchBatchResult(1, 0, 0, 1), result);
     }
 
+    @Test
+    void transportDispatcherSendsStoredBodyAndIdentityWithoutReserializing() {
+        UUID correlationId = UUID.randomUUID();
+        URI responseAddress = URI.create("queue:responses");
+        OutboxMessage message = new OutboxMessage(
+                UUID.randomUUID(), UUID.randomUUID(), OutboxDeliveryIntent.PUBLISH,
+                URI.create("exchange:orders"), List.of("urn:message:Contracts:OrderSubmitted"),
+                new byte[] { 1, 2, 3 }, "application/vnd.masstransit+json",
+                Map.of("traceparent", "00-test"), NOW,
+                null, correlationId, null, null, responseAddress, null);
+        CapturingTransportFactory factory = new CapturingTransportFactory();
+
+        new TransportOutboxDispatcher(factory).dispatch(message, CancellationToken.none()).join();
+
+        assertEquals(message.destinationAddress(), factory.address);
+        assertArrayEquals(message.body(), factory.transport.body);
+        assertEquals(message.contentType(), factory.transport.contentType);
+        assertEquals(message.messageId().toString(), factory.transport.headers.get("_message_id"));
+        assertEquals(correlationId.toString(), factory.transport.headers.get("_correlation_id"));
+        assertEquals(responseAddress.toString(), factory.transport.headers.get("_reply_to"));
+        assertEquals("00-test", factory.transport.headers.get("traceparent"));
+    }
+
     private static OutboxDispatcher createDispatcher(TestOutboxStore store, CapturingTransport transport) {
         return new OutboxDispatcher(
                 store,
@@ -138,6 +164,40 @@ class OutboxDispatcherTest {
             return failure == null
                     ? CompletableFuture.completedFuture(null)
                     : CompletableFuture.failedFuture(failure);
+        }
+    }
+
+    private static final class CapturingTransportFactory implements TransportFactory {
+        private final CapturingSendTransport transport = new CapturingSendTransport();
+        private URI address;
+
+        @Override
+        public SendTransport getSendTransport(URI address) {
+            this.address = address;
+            return transport;
+        }
+
+        @Override
+        public String getPublishAddress(String exchange) {
+            return "exchange:" + exchange;
+        }
+
+        @Override
+        public String getSendAddress(String queue) {
+            return "queue:" + queue;
+        }
+    }
+
+    private static final class CapturingSendTransport implements SendTransport {
+        private byte[] body;
+        private Map<String, Object> headers;
+        private String contentType;
+
+        @Override
+        public void send(byte[] data, Map<String, Object> headers, String contentType) {
+            body = data.clone();
+            this.headers = Map.copyOf(headers);
+            this.contentType = contentType;
         }
     }
 

@@ -75,6 +75,30 @@ public class OutboxDispatcherTests
         Assert.Equal(new OutboxDispatchBatchResult(1, 0, 0, 1), result);
     }
 
+    [Fact]
+    public async Task Transport_dispatcher_sends_stored_body_and_identity_without_reserializing()
+    {
+        var correlationId = Guid.NewGuid();
+        var responseAddress = new Uri("queue:responses");
+        var message = new OutboxMessage(
+            Guid.NewGuid(), Guid.NewGuid(), OutboxDeliveryIntent.Publish,
+            new Uri("exchange:orders"), ["urn:message:Contracts:OrderSubmitted"], [1, 2, 3],
+            "application/vnd.masstransit+json", new Dictionary<string, string> { ["traceparent"] = "00-test" },
+            Now, correlationId: correlationId, responseAddress: responseAddress);
+        var factory = new CapturingTransportFactory();
+
+        await new TransportOutboxDispatcher(factory).DispatchAsync(message);
+
+        Assert.Equal(message.DestinationAddress, factory.Address);
+        Assert.Equal(message.Body.ToArray(), factory.Transport.Body);
+        Assert.Equal(message.ContentType, factory.Transport.ContentType);
+        Assert.Equal(message.MessageId.ToString(), factory.Transport.Context!.MessageId);
+        Assert.Equal(correlationId.ToString(), factory.Transport.Context.CorrelationId);
+        Assert.Equal(message.MessageId.ToString(), factory.Transport.Context.Headers["_message_id"]);
+        Assert.Equal(responseAddress.ToString(), factory.Transport.Context.Headers["_reply_to"]);
+        Assert.Equal("00-test", factory.Transport.Context.Headers["traceparent"]);
+    }
+
     private static OutboxDispatcher CreateDispatcher(TestOutboxStore store, CapturingTransport transport) =>
         new(
             store,
@@ -116,6 +140,36 @@ public class OutboxDispatcherTests
     private sealed class FixedTimeProvider(DateTimeOffset utcNow) : TimeProvider
     {
         public override DateTimeOffset GetUtcNow() => utcNow;
+    }
+
+    private sealed class CapturingTransportFactory : ITransportFactory
+    {
+        public CapturingSendTransport Transport { get; } = new();
+        public Uri? Address { get; private set; }
+
+        public Task<ISendTransport> GetSendTransport(
+            Uri address,
+            CancellationToken cancellationToken = default)
+        {
+            Address = address;
+            return Task.FromResult<ISendTransport>(Transport);
+        }
+    }
+
+    private sealed class CapturingSendTransport : ISendTransport
+    {
+        public byte[]? Body { get; private set; }
+        public string? ContentType { get; private set; }
+        public SendContext? Context { get; private set; }
+
+        public Task Send<T>(T message, SendContext context, CancellationToken cancellationToken = default)
+            where T : class
+        {
+            Body = context.GetMessageBody(message).GetBytes();
+            ContentType = context.Headers["_content_type"].ToString();
+            Context = context;
+            return Task.CompletedTask;
+        }
     }
 
     private sealed class TestOutboxStore : IOutboxStore
