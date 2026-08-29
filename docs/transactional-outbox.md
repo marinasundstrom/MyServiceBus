@@ -25,11 +25,12 @@ The C# package `Sundstrom.MyServiceBus.PostgreSql` and Java module `io.github.ma
 - transport dispatch that reuses the stored body, content type, and message identity;
 - configurable .NET hosted and Java start/close delivery lifecycles;
 - per-service dispatcher status and PostgreSQL backlog health, including pending, leased, retrying, dispatched, dead, cancelled, and oldest-undispatched state;
+- optional C# and Java monitoring observations plus a collector/dashboard view of dispatcher backlog, throughput, failures, lease losses, and cycle latency;
 - inbox acquisition and completion using `(consumer scope, message identity)` uniqueness;
 - matching Testcontainers integration tests in C# and Java; and
 - live RabbitMQ gates for persisted C# envelopes consumed by Java and persisted Java envelopes consumed by C#.
 
-This is a complete Transactional Outbox MVP for evaluation, not yet the finished production experience. Supported capture, PostgreSQL persistence, delivery composition, health/backlog inspection, and a cross-platform Aspire showcase exist in both clients. Transparent Consumer Outbox middleware, retention cleanup, monitoring export, and the full O01–O06 production-promotion matrix remain open.
+This is a complete Transactional Outbox MVP for evaluation, not yet the finished production experience. Supported capture, PostgreSQL persistence, delivery composition, health/backlog inspection, optional monitoring export, and a cross-platform Aspire showcase exist in both clients. Transparent Consumer Outbox middleware, retention cleanup, and the full O01–O06 production-promotion matrix remain open.
 
 ### Transactional Outbox MVP gate
 
@@ -38,10 +39,10 @@ The MVP is the first coherent Bus Outbox evaluation path, not production promoti
 - one documented composition path that wires PostgreSQL storage, transport dispatch, retry policy, and lifecycle — implemented;
 - explicit startup schema validation plus service-partition, delivery-option, provider, and transport validation — implemented; applications currently call `EnsureCreated` before starting delivery;
 - focused PostgreSQL recovery evidence for failed dispatch and lease expiry after acceptance — implemented in both clients, with process-level broker crash injection still required for production promotion;
-- minimal health signals for dispatcher progress, failure, pending count, and oldest pending age — implemented; and
+- minimal health and monitoring signals for dispatcher progress, failure, pending count, oldest pending age, throughput, cycle latency, and lost leases — implemented; and
 - an end-to-end Aspire showcase that commits application state plus outbox intent and consumes the result in C# and Java — implemented and live-verified.
 
-Transparent Consumer Outbox middleware, automatic retention cleanup, richer dashboard integration, and SQL Server follow the MVP unless required to close one of those gates. One-time durable PostgreSQL scheduling and persisted cancellation are available for evaluation; recurring schedules and external scheduler adapters remain later work.
+Transparent Consumer Outbox middleware, automatic retention cleanup, inbox monitoring, alerting, historical monitoring storage, and SQL Server follow the MVP. One-time durable PostgreSQL scheduling and persisted cancellation are available for evaluation; recurring schedules and external scheduler adapters remain later work.
 
 ## Why the boundary matters
 
@@ -154,6 +155,23 @@ try (OutboxDeliveryService delivery = PostgreSqlOutboxDelivery.create(
 ```
 
 Use the same service name for the writer/session and delivery composition. Replica owner IDs must differ within that service partition. Reusing an owner ID across concurrent replicas weakens lease diagnostics and ownership fencing.
+
+## Monitor dispatcher operations
+
+When the optional monitoring exporter is registered, the .NET delivery composition discovers it automatically through `IBusHook`. Java passes the registered hooks explicitly when composing delivery:
+
+```java
+OutboxDeliveryService delivery = PostgreSqlOutboxDelivery.create(
+        dataSource,
+        provider.getRequiredService(TransportFactory.class),
+        "orders-service",
+        options -> options.setOwnerId("orders-" + instanceId),
+        provider.getServices(BusHook.class));
+```
+
+Every polling cycle emits one bounded `outbox_dispatch_cycle` observation. The monitoring service aggregates the latest backlog state and a configurable throughput window per application instance, bus, logical service partition, and dispatcher owner. The dashboard's **Dispatcher operations** view shows online state, pending work, oldest undispatched age, dispatch rate, failed records, lost leases, and cycle latency. This works for an embedded dispatcher and for a standalone dispatcher service because both use the same delivery lifecycle and service-partition identity.
+
+The application database remains authoritative. The monitoring service does not connect to it, lease records, or mutate outbox state. Observations exclude persisted row identities, message bodies, arbitrary headers, SQL, and connection details. Export failures are isolated from dispatch outcomes.
 
 ## Use the outbox with EF Core
 

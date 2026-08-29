@@ -109,6 +109,7 @@ export default function RuntimeMonitoring() {
         <li>Retries, failures, completeness, and observed cross-application flow</li>
         <li>Expandable failure metadata without capturing message bodies or arbitrary headers</li>
         <li>Recent observations and optional W3C trace correlation identifiers</li>
+        <li>Outbox dispatcher backlog, oldest-undispatched age, throughput, failures, lost leases, and cycle latency</li>
         <li>HTTP queries plus WebSocket change invalidations</li>
       </ul>
 
@@ -129,21 +130,21 @@ export default function RuntimeMonitoring() {
         external telemetry integrations and remain separate from the portable model.
       </p>
 
-      <h2>Planned outbox and inbox operations</h2>
+      <h2>Outbox dispatcher operations</h2>
       <p>
-        A future persistence-provider contribution will treat embedded and standalone
-        dispatchers as first-class runtime components. Per service partition it will
-        add pending and leased counts, oldest eligible age, lease and dispatch
-        throughput, broker dispatch latency, retries, terminal failures, lost leases,
-        last successful cycles, active worker replicas, and duplicate inbox outcomes.
+        C# and Java delivery services treat embedded and standalone dispatchers as
+        first-class runtime components. Per service partition and worker, the dashboard&apos;s
+        Dispatcher operations view shows current backlog, oldest-undispatched age,
+        dispatch throughput, failures, lost leases, cycle latency, and online state.
         This makes an undersized dispatcher fleet visible as a bottleneck and separates
         time waiting in an outbox from broker backlog and consumer processing time.
       </p>
       <p>
-        The collector will receive bounded operational snapshots from each service;
-        it will not connect to application databases or mutate persisted records.
+        The collector receives bounded cycle observations from each service; it does
+        not connect to application databases or mutate persisted records.
         Message bodies, arbitrary headers, record identities, connection details,
-        and SQL remain outside the monitoring protocol.
+        and SQL remain outside the monitoring protocol. Inbox duplicate outcomes,
+        cleanup progress, alerting, and durable monitoring history remain future work.
       </p>
 
       <h2>Follow one operation across services</h2>

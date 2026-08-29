@@ -42,8 +42,9 @@ The C# package `Sundstrom.MyServiceBus.PostgreSql` and Java module `io.github.ma
 - transport dispatch that preserves the stored body, content type, and identity;
 - a .NET hosted delivery lifecycle and an explicit Java start/close lifecycle;
 - per-service dispatcher status and PostgreSQL backlog health, including cancelled work;
+- optional monitoring of dispatcher backlog, lag, throughput, failures, lost leases, and polling latency;
 - complete envelope storage with stable message and correlation identities;
-- durable scheduled intent that remains unavailable to dispatchers until due; and
+- durable scheduled intent that remains unavailable to dispatchers until due;
 - persisted schedule handles and atomic cancellation-versus-lease outcomes; and
 - inbox acquisition and completion keyed by consumer scope and message identity.
 
@@ -51,14 +52,14 @@ Both implementations are tested against PostgreSQL 17.6 with Testcontainers. The
 
 <div className="callout">
   <strong>Foundation status</strong>
-  <p>The Transactional Outbox MVP is available for evaluation: Bus Outbox capture, PostgreSQL storage, transport dispatch, supported delivery composition, health/backlog inspection, and a cross-platform Aspire showcase work. Transparent Consumer Outbox middleware, retention cleanup, monitoring export, and the complete production crash matrix remain open.</p>
+  <p>The Transactional Outbox MVP is available for evaluation: Bus Outbox capture, PostgreSQL storage, transport dispatch, supported delivery composition, health/backlog inspection, optional monitoring export, and a cross-platform Aspire showcase work. Transparent Consumer Outbox middleware, retention cleanup, inbox monitoring, and the complete production crash matrix remain open.</p>
 </div>
 
 ## Transactional Outbox MVP gate
 
-The MVP is a coherent Bus Outbox evaluation path, not production promotion or every persistence feature at once. Both clients now have explicit startup validation, provider and lifecycle composition, focused PostgreSQL recovery evidence, dispatcher health and lag signals, and an end-to-end C#/Java Aspire showcase. Process-level broker crash injection remains part of the larger production-promotion matrix.
+The MVP is a coherent Bus Outbox evaluation path, not production promotion or every persistence feature at once. Both clients now have explicit startup validation, provider and lifecycle composition, focused PostgreSQL recovery evidence, dispatcher health and monitoring signals, and an end-to-end C#/Java Aspire showcase. Process-level broker crash injection remains part of the larger production-promotion matrix.
 
-Transparent Consumer Outbox middleware, automatic retention cleanup, richer dashboard integration, SQL Server, recurring schedules, and provider-specific schedulers follow that MVP unless they are needed to close one of those gates.
+Transparent Consumer Outbox middleware, automatic retention cleanup, inbox monitoring, alerting, durable monitoring history, SQL Server, recurring schedules, and provider-specific schedulers follow that MVP.
 
 ## Keep ownership inside the producing service
 
@@ -70,7 +71,9 @@ The PostgreSQL rows use one normalized MyServiceBus model, so either the C# or J
 
 The delivery service is an ordinary runtime role. It may run inside each producer, or as a specialized worker that polls explicitly assigned service partitions. In the standalone topology, producers only commit application state and opaque outbox envelopes to PostgreSQL. Dispatcher workers own broker credentials, leasing, retries, and delivery capacity, and can scale independently.
 
-The partition still belongs to its logical producer in either topology. A worker serving several partitions keeps their health and failure boundaries separate. Monitoring should make dispatcher pressure visible with pending and leased counts, oldest eligible age, lease and dispatch throughput, broker dispatch latency, retries, lost leases, last successful cycles, and active worker replicas.
+The partition still belongs to its logical producer in either topology. A worker serving several partitions keeps their health and failure boundaries separate. The optional monitoring addon makes dispatcher pressure visible with pending counts, oldest-undispatched age, dispatch throughput, failures, lost leases, cycle latency, and active worker replicas.
+
+The dashboard uses the same **Dispatcher operations** view for embedded and standalone delivery. Each worker exports a bounded cycle observation; the collector never connects to the application database or mutates outbox state. Message bodies, arbitrary headers, persisted record identities, connection details, and SQL stay outside the monitoring protocol.
 
 ## Write with the application transaction
 
@@ -154,7 +157,8 @@ Java returns the equivalent explicitly owned lifecycle:
 TransportFactory transport = provider.getRequiredService(TransportFactory.class);
 try (OutboxDeliveryService delivery = PostgreSqlOutboxDelivery.create(
         dataSource, transport, "orders-service",
-        options -> options.setOwnerId("orders-" + instanceId))) {
+        options -> options.setOwnerId("orders-" + instanceId),
+        provider.getServices(BusHook.class))) {
     bus.start();
     delivery.start();
     // Run the application.

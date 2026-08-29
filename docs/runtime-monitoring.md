@@ -34,6 +34,7 @@ The MVP includes:
 - WebSocket change invalidations
 - a standalone Blazor runtime overview with persisted light, dark, and system themes
 - equivalent exporter behavior for C# and Java
+- first-class outbox dispatcher operations for embedded and standalone workers, including latest backlog, oldest-undispatched age, windowed throughput, failures, lost leases, and cycle latency
 
 The MVP does not yet include authentication, durable storage, configurable retention, alerting or scaling recommendations, broker queue depth, host saturation, or payload-byte limits. The dashboard uses WebSocket invalidations to re-query HTTP snapshots, with a 15-second polling fallback.
 
@@ -124,7 +125,9 @@ Hooks are a core extension seam, not a monitoring-specific API. Applications and
 
 The monitoring exporter is one implementation of this seam. Its bounded local queue, batching, heartbeats, and collector protocol remain in the optional monitoring package.
 
-Outbox/inbox monitoring is not implemented in the current MVP. Its planned provider contribution treats dispatchers as first-class runtime components, whether they are embedded in producers or run as standalone worker fleets. Per service partition it will report pending and leased counts, oldest eligible age, lease and dispatch throughput, broker dispatch latency, retries, terminal failures, lost leases, last successful cycle, active dispatcher replicas, and duplicate inbox outcomes. This makes a slow or undersized dispatcher fleet visible as a delivery bottleneck. The monitoring service will not connect directly to application databases or mutate persistence state. Message bodies, arbitrary headers, record identities, and connection details remain excluded. See the [runtime monitoring proposal](proposals/runtime-monitoring.md#outbox-and-inbox-operations) for the design boundary.
+Outbox dispatcher monitoring is implemented for C# and Java delivery services. Each polling cycle contributes one bounded observation for its logical service partition and worker owner. The collector combines the latest backlog snapshot with windowed lease, dispatch, failure, and lost-lease counts, and the dashboard presents those signals in **Dispatcher operations**. Embedded delivery and standalone worker fleets use the same model, so a slow or undersized dispatcher remains visible as a delivery bottleneck.
+
+The monitoring service never connects directly to application databases or mutates persistence state. Message bodies, arbitrary headers, persisted record identities, SQL, and connection details remain excluded. Inbox duplicate outcomes, cleanup progress, alerting, and durable monitoring history are not yet implemented. See the [runtime monitoring proposal](proposals/runtime-monitoring.md#outbox-and-inbox-operations) for the longer-term boundary.
 
 ## Service API
 
@@ -142,6 +145,7 @@ The prototype uses `/api/monitoring/v1` for both ingest and query operations.
 | `GET` | `/metrics?application=...&windowSeconds=60&byInstance=true` | Query bounded-window rates, counts, and consume latency |
 | `GET` | `/metrics/timeseries?windowSeconds=300&bucketSeconds=5` | Query bucketed rates for real-time graphs |
 | `GET` | `/flow?application=...&windowSeconds=300` | Query observed correlated application flow |
+| `GET` | `/outbox?application=...&windowSeconds=60` | Query dispatcher state and windowed outbox throughput |
 | WebSocket | `/stream` | Receive change invalidations |
 
 WebSocket messages indicate that metadata or observations changed; clients should re-query the authoritative HTTP read model. They are not a durable event stream.

@@ -1201,7 +1201,7 @@ bus.start();
 exporter.start(provider.getRequiredService(BusInspectionProvider.class));
 ```
 
-The proof-of-concept service accepts metadata, observation batches, and heartbeats under `/api/monitoring/v1`. Its query API exposes applications, replicas, metadata, bounded-window metrics, bucketed real-time series, recent observations, observed flow, and a WebSocket invalidation stream. Replicas group automatically by application name; optional bounded labels such as `group`, `environment`, and `role` provide another display dimension. `MyServiceBus.Dashboard` is a separate Blazor application that consumes only those service APIs. OpenTelemetry collection remains separate; observations carry trace identifiers only as optional correlation references.
+The proof-of-concept service accepts metadata, observation batches, and heartbeats under `/api/monitoring/v1`. Its query API exposes applications, replicas, metadata, bounded-window metrics, bucketed real-time series, recent observations, observed flow, outbox dispatcher operations, and a WebSocket invalidation stream. Replicas group automatically by application name; optional bounded labels such as `group`, `environment`, and `role` provide another display dimension. `MyServiceBus.Dashboard` is a separate Blazor application that consumes only those service APIs. OpenTelemetry collection remains separate; observations carry trace identifiers only as optional correlation references.
 
 See [Runtime Monitoring](runtime-monitoring.md) for the complete Aspire walkthrough, service API, deployment boundary, and current MVP limitations.
 
@@ -1450,7 +1450,9 @@ Java owns the corresponding lifecycle explicitly:
 try (OutboxDeliveryService delivery = PostgreSqlOutboxDelivery.create(
         dataSource,
         provider.getRequiredService(TransportFactory.class),
-        "orders-service")) {
+        "orders-service",
+        options -> options.setOwnerId("orders-" + instanceId),
+        provider.getServices(BusHook.class))) {
     bus.start();
     delivery.start();
     // Run the application.
@@ -1461,7 +1463,7 @@ try (OutboxDeliveryService delivery = PostgreSqlOutboxDelivery.create(
 
 For EF Core, begin an explicit `Database.BeginTransactionAsync()`, obtain its `NpgsqlConnection` and `NpgsqlTransaction` through `GetDbConnection()` / `GetDbTransaction()`, and pass those objects to `UsePostgreSql`. Keep `SaveChangesAsync`, captured sends/publications, and commit inside that one caller-owned transaction. Do not rely on EF's implicit per-save transaction.
 
-`PostgreSqlOutboxStore` supplies atomic PostgreSQL leases within its required logical-service partition. Delivery may run embedded in a producer or in a standalone worker assigned to that partition. Supported transport composition, delivery lifecycles, backlog health, one-time durable scheduling, and persisted cancellation are implemented; Consumer Outbox middleware, crash-window promotion evidence, monitoring export, and cleanup remain in progress. See [Transactional Outbox and Inbox](transactional-outbox.md) for guarantees, status, and limits.
+`PostgreSqlOutboxStore` supplies atomic PostgreSQL leases within its required logical-service partition. Delivery may run embedded in a producer or in a standalone worker assigned to that partition. Supported transport composition, delivery lifecycles, backlog health, optional monitoring export, one-time durable scheduling, and persisted cancellation are implemented; Consumer Outbox middleware, crash-window promotion evidence, inbox monitoring, and cleanup remain in progress. The dashboard reports dispatcher backlog, oldest-undispatched age, throughput, failures, lost leases, and cycle latency without exporting record identities or message data. See [Transactional Outbox and Inbox](transactional-outbox.md) for guarantees, status, and limits.
 
 ### Unit Testing with the In-Memory Test Harness
 
