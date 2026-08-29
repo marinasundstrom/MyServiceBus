@@ -38,16 +38,26 @@ mediator.send(new SubmitOrder(UUID.randomUUID())).join();`,
 };
 
 const resultDispatch = {
-  csharp: `OrderView order = await mediator.Send<GetOrder, OrderView>(
+  csharp: `public sealed record GetOrder(Guid OrderId)
+    : IRequest<OrderView>;
+
+OrderView order = await mediator.Send(
     new GetOrder(orderId));
 
 // MassTransit-familiar alternative:
 var client = mediator.CreateRequestClient<GetOrder>();
 var response = await client.GetResponseAsync<OrderView>(
     new GetOrder(orderId));`,
-  java: `OrderView order = mediator.send(
-    new GetOrder(orderId),
-    OrderView.class).join();`,
+  java: `public record GetOrder(UUID orderId)
+        implements Request<OrderView> {
+    @Override
+    public Class<OrderView> responseType() {
+        return OrderView.class;
+    }
+}
+
+OrderView order = mediator.send(
+    new GetOrder(orderId)).join();`,
 };
 
 const generatedDispatch = {
@@ -88,6 +98,13 @@ export default function MediatorGuide() {
           interactions that may later move behind a broker boundary.
         </p>
       </div>
+      <p>
+        C# also provides optional mediator-only <code>IRequest</code>,{' '}
+        <code>IRequest&lt;TResponse&gt;</code>, and <code>INotification</code> intent markers.
+        Java uses <code>Command</code>, <code>Request&lt;TResponse&gt;</code>, and{' '}
+        <code>Notification</code>. They do not change broker, topology, serialization, or consumer
+        behavior, and unmarked contracts remain supported by the explicit mediator APIs.
+      </p>
 
       <h2 id="configure">Configure and dispatch</h2>
       <p>
@@ -142,7 +159,12 @@ export default function MediatorGuide() {
         </p>
       </div>
 
-      <h2 id="dispatch-semantics">How this maps to MediatR</h2>
+      <h2 id="dispatch-semantics">Mediator semantics</h2>
+      <p>
+        These semantics preserve familiar command, query, and notification intent without
+        claiming MediatR source compatibility or coupling broker-backed bus contracts to
+        mediator request markers.
+      </p>
       <p>
         <code>Publish(message)</code> is the close match to MediatR notification publication:
         dispatch is selected by message type, every compatible local handler runs, and the
@@ -159,10 +181,11 @@ export default function MediatorGuide() {
         </p>
       </div>
       <p>
-        Result handlers use the result-bearing overload. C# also exposes a request client for
-        teams that prefer the MassTransit-familiar request shape. Java provides the equivalent
-        asynchronous contract with <code>CompletableFuture&lt;T&gt;</code> and an explicit response
-        class token.
+        A request contract carries its response type, giving C# the inferred call expected from
+        mediator semantics. Java provides the equivalent typed future and exposes{' '}
+        <code>responseType()</code> because the JVM erases generic response types at runtime.
+        Explicit two-type/class-token overloads remain available for existing contracts, and C#
+        also exposes a request client for teams that prefer the MassTransit-familiar shape.
       </p>
       <LanguageTabs csharp={resultDispatch.csharp} java={resultDispatch.java} />
       <p>

@@ -809,11 +809,13 @@ bus.sendTo("queue:submit-order", new SubmitOrder(UUID.randomUUID())).join();
 
 Java handlers implement `Handler<T>` directly or derive from `HandlerBase<T>`. Response-bearing handlers implement `HandlerWithResult<TMessage, TResult>`. All of these interfaces adapt to the ordinary consumer pipeline, so filters, scopes, retries, generated catalogs, and broker-backed reuse remain available.
 
-Mediator `Send` selects exactly one compatible handler and rejects missing or ambiguous registrations. `Publish` invokes every compatible handler. Result-bearing sends use `Send<TRequest,TResponse>` in C# and `send(message, ResponseType.class)` in Java. Directed bus delivery is intentionally separate: use a C# send endpoint or Java `sendTo(...)` when the destination is part of the operation.
+Mediator `Send` selects exactly one compatible handler and rejects missing or ambiguous registrations. `Publish` invokes every compatible handler. A C# request implementing `IRequest<TResponse>` supports `TResponse result = await mediator.Send(request)`. Java provides the equivalent with `Request<TResponse>` and its runtime `responseType()` token. Explicit `Send<TRequest,TResponse>` and `send(message, ResponseType.class)` overloads remain available for existing contracts. Directed bus delivery is intentionally separate: use a C# send endpoint or Java `sendTo(...)` when the destination is part of the operation.
 
 Handlers, consumers, and consumer methods all use the same topology and consume pipeline. A handler can run behind a normal broker transport, while an ordinary consumer or a reflected/generated consumer method can satisfy mediator `Send` or `Publish`. `AddHandler` communicates mediator intent but remains an alias over consumer registration.
 
 Application code can depend on the smaller C# `IMediator` or Java `Mediator` contract. Destination-aware operations remain on `IMessageBus` and the concrete Java `MediatorBus`, keeping bus infrastructure out of command/query-facing components.
+
+C# contracts may use the optional mediator-only `IRequest`, `IRequest<TResponse>`, and `INotification` intent markers. Java provides the idiomatic counterparts `Command`, `Request<TResponse>`, and `Notification`. These markers do not alter broker, topology, serialization, or consumer behavior, and unmarked contracts remain supported.
 
 The Java in-memory test harness also implements `PublishEndpoint`, so tests can use `publish` for fan-out semantics and `getSendEndpoint(...).send(...)` for directed-send semantics without treating the two operations as interchangeable.
 

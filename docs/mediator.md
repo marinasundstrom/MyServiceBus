@@ -66,7 +66,11 @@ Choose the shape that best communicates intent:
 
 Depend on `IMediator` in C# or `Mediator` in Java when an application component should only express local command, query, and notification intent. These interfaces omit destination-aware bus operations. The wider `IMessageBus` and concrete Java `MediatorBus` remain available at composition and infrastructure boundaries that genuinely need bus-specific capabilities.
 
-## How This Maps to MediatR
+For contract intent, C# provides optional `IRequest`, `IRequest<TResponse>`, and `INotification` markers. Java uses `Command`, `Request<TResponse>`, and `Notification`, reflecting the JVM's inability to overload generic and non-generic interfaces by arity. The markers are mediator semantics only: broker transports, topology, serialization, and consumer eligibility do not depend on them. Unmarked messages remain valid with the explicit mediator APIs.
+
+## Mediator Semantics
+
+These are MyServiceBus mediator semantics. They deliberately preserve the familiar command, query, and notification intent associated with MediatR without claiming source compatibility or coupling the broker-backed bus API to mediator request markers.
 
 `Publish` is the close match to MediatR notification publication. It routes by message type and waits for every compatible local handler pipeline. Multiple handlers are expected, and publishing with no compatible handler completes successfully.
 
@@ -75,7 +79,12 @@ Mediator `Send` is type-routed and requires exactly one compatible local handler
 For a command or query that returns a value, use a result handler and the result-bearing overload:
 
 ```csharp
-OrderView order = await mediator.Send<GetOrder, OrderView>(new GetOrder(orderId));
+public sealed record GetOrder(Guid OrderId) : IRequest<OrderView>;
+
+OrderView order = await mediator.Send(new GetOrder(orderId));
+
+// Existing contracts can keep the explicit form:
+OrderView explicitOrder = await mediator.Send<GetOrder, OrderView>(new GetOrder(orderId));
 
 // MassTransit-familiar alternative when request-client options are useful:
 var client = mediator.CreateRequestClient<GetOrder>();
@@ -83,10 +92,23 @@ var response = await client.GetResponseAsync<OrderView>(new GetOrder(orderId));
 ```
 
 ```java
-OrderView order = mediator.send(new GetOrder(orderId), OrderView.class).join();
+public record GetOrder(UUID orderId) implements Request<OrderView> {
+    @Override
+    public Class<OrderView> responseType() {
+        return OrderView.class;
+    }
+}
+
+OrderView order = mediator.send(new GetOrder(orderId)).join();
+
+// Existing contracts can keep the explicit form:
+OrderView explicitOrder = mediator.send(
+    new ExistingGetOrder(orderId), OrderView.class).join();
 ```
 
-The C# result overload and request client retain MyServiceBus request/response behavior, including request identifiers, correlation, faults, cancellation, and timeouts. Java expresses the equivalent asynchronous result through `CompletableFuture<T>` and an explicit `Class<T>` token.
+The request contract carries the response type, which gives C# the inferred call expected from mediator semantics and familiar to MediatR users. C# cannot infer a generic type argument from the assignment target alone; it infers `TResponse` from `IRequest<TResponse>` on the argument. Java uses the corresponding `Request<TResponse>` contract for compile-time inference and exposes `responseType()` because the JVM erases the generic response type at runtime. The explicit overloads remain available when a message contract should not implement the marker.
+
+Result sends retain MyServiceBus request/response behavior, including request identifiers, correlation, faults, cancellation, and timeouts. C# also retains the MassTransit-familiar request-client alternative.
 
 Directed delivery remains a message-bus operation rather than mediator `Send`. In C#, resolve an `IMessageBus` endpoint with `GetSendEndpoint(...)`. In Java, call `sendTo(destination, message)`. Use this form when the destination itself is part of the contract or when preserving a broker-shaped boundary.
 
