@@ -26,8 +26,9 @@ export default function Introduction() {
       <p className="docs-kicker">Introduction</p>
       <h1>Messaging across .NET and Java, without changing the mental model.</h1>
       <p className="docs-summary">
-        MyServiceBus is a lightweight asynchronous service-bus runtime with aligned
-        C# and Java APIs. It provides RabbitMQ-backed messaging, an experimental
+        MyServiceBus is a focused asynchronous service-bus runtime with aligned
+        C# and Java APIs. It can extend a MassTransit-based .NET estate with Java or
+        provide one model for a new cross-platform system. It includes RabbitMQ-backed messaging, an experimental
         Azure Service Bus transport, an in-memory mediator, and familiar
         MassTransit-style concepts.
       </p>
@@ -48,6 +49,8 @@ export default function Introduction() {
         <div><span>02</span><h3>Focused</h3><p>Send, publish, consume, request, retry, and test—without a framework-wide commitment.</p></div>
         <div><span>03</span><h3>Familiar</h3><p>Use concepts that feel natural to developers who already know MassTransit.</p></div>
         <div><span>04</span><h3>Explicit</h3><p>Transport capabilities and compatibility boundaries are documented rather than implied.</p></div>
+        <div><span>05</span><h3>Permissive</h3><p>Adopt an MIT-licensed core when a commercial platform&apos;s support and breadth are not required.</p></div>
+        <div><span>06</span><h3>Mediator first</h3><p>Replace MediatR with dedicated handlers and generated C# and Java dispatch, with no broker required.</p></div>
       </div>
 
       <h2 id="same-concept">The same concept, idiomatic code</h2>
@@ -64,6 +67,14 @@ export default function Introduction() {
           Keep Spring, CDI, Dagger, or your application-owned object graph in charge and
           connect it through the bus factory. Review the{' '}
           <Link href="/docs/java-adoption">concrete Java adoption examples →</Link>
+        </p>
+      </div>
+
+      <div className="callout">
+        <strong>Looking for in-process dispatch?</strong>
+        <p>
+          The <Link href="/docs/mediator">mediator guide</Link> covers generated local
+          commands, queries, and notifications—and where broker durability becomes necessary.
         </p>
       </div>
 

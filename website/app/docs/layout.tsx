@@ -8,6 +8,7 @@ const sections = [
       ['Introduction', '/docs'],
       ['Why MyServiceBus?', '/docs/why-myservicebus'],
       ['Getting started', '/docs/getting-started'],
+      ['Mediator pattern', '/docs/mediator'],
       ['Java adoption', '/docs/java-adoption'],
     ],
   },

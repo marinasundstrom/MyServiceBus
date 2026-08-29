@@ -23,11 +23,11 @@ const siteUrl = isGitHubPages
 export const metadata: Metadata = {
   title: 'MyServiceBus — Messaging for .NET and Java',
   description:
-    'Get started with MyServiceBus, a lightweight service-bus runtime for .NET and Java.',
+    'A focused .NET and Java runtime for replacing MediatR, integrating MassTransit estates, or building new cross-platform services.',
   openGraph: {
     title: 'MyServiceBus — Messaging for .NET and Java',
     description:
-      'A focused service-bus runtime with aligned C# and Java APIs.',
+      'Replace MediatR, integrate MassTransit-based .NET systems with Java, or build new services on aligned C# and Java APIs.',
     type: 'website',
     url: siteUrl,
     images: [{ url: `${siteUrl}/og.png`, width: 1730, height: 909, alt: 'MyServiceBus — Messaging for .NET and Java' }],
@@ -36,7 +36,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: 'MyServiceBus — Messaging for .NET and Java',
     description:
-      'A focused service-bus runtime with aligned C# and Java APIs.',
+      'Replace MediatR, integrate MassTransit-based .NET systems with Java, or build new services on aligned C# and Java APIs.',
     images: [`${siteUrl}/og.png`],
   },
 };

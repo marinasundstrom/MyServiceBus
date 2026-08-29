@@ -1,0 +1,186 @@
+import Link from 'next/link';
+import LanguageTabs from '../../components/LanguageTabs';
+
+const configureMediator = {
+  csharp: `public sealed class SubmitOrderHandler : Handler<SubmitOrder>
+{
+    public override Task Handle(
+        SubmitOrder message,
+        CancellationToken cancellationToken = default) =>
+        Submit(message, cancellationToken);
+}
+
+builder.Services.AddServiceBus(x =>
+{
+    x.AddConsumer<SubmitOrderHandler>();
+    x.UsingMediator();
+});
+
+var bus = serviceProvider.GetRequiredService<IMessageBus>();
+await bus.Publish(new SubmitOrder(Guid.NewGuid()));`,
+  java: `public final class SubmitOrderHandler
+        extends HandlerBase<SubmitOrder> {
+    @Override
+    public CompletableFuture<Void> handle(
+            SubmitOrder message,
+            CancellationToken cancellationToken) {
+        return submit(message, cancellationToken);
+    }
+}
+
+ServiceCollection services = ServiceCollection.create();
+
+MediatorBus bus = MediatorBus.configure(services, cfg -> {
+    cfg.addConsumer(SubmitOrderHandler.class);
+});
+
+bus.publish(new SubmitOrder(UUID.randomUUID()));
+bus.send("queue:submit-order", new SubmitOrder(UUID.randomUUID()));`,
+};
+
+const generatedDispatch = {
+  csharp: `dotnet add package Sundstrom.MyServiceBus.Generators \\
+  --version 0.1.0-preview.5
+
+builder.Services.AddServiceBus(x =>
+{
+    x.AddGeneratedConsumers();
+    x.UsingMediator();
+});`,
+  java: `dependencies {
+    implementation "io.github.marinasundstrom.myservicebus:myservicebus:0.1.0-preview.5"
+    annotationProcessor "io.github.marinasundstrom.myservicebus:myservicebus-processor:0.1.0-preview.5"
+}
+
+MediatorBus bus = MediatorBus.configure(
+    services,
+    GeneratedConsumerCatalog.INSTANCE::register);`,
+};
+
+export default function MediatorGuide() {
+  return (
+    <article className="docs-article">
+      <p className="docs-kicker">Guide · Mediator</p>
+      <h1>A first-class mediator, not just an in-memory transport.</h1>
+      <p className="docs-summary">
+        Replace MediatR with dedicated handlers and generated in-process dispatch. No
+        broker is required, and the same model can cross a process boundary if the system evolves.
+      </p>
+
+      <div className="callout callout-accent">
+        <strong>Local by design</strong>
+        <p>
+          The mediator is an execution boundary for one application process. It is useful
+          for modular monoliths, application commands and queries, lightweight tools, and
+          interactions that may later move behind a broker boundary.
+        </p>
+      </div>
+
+      <h2 id="configure">Configure and dispatch</h2>
+      <p>
+        Use the mediator-oriented handler interfaces—<code>IHandler&lt;T&gt;</code> or{' '}
+        <code>Handler&lt;T&gt;</code> in C#, and <code>Handler&lt;T&gt;</code> or{' '}
+        <code>HandlerBase&lt;T&gt;</code> in Java—then select the mediator transport and
+        dispatch through the platform&apos;s local API. Handler dependency-injection scopes,
+        filters, retry configuration, consume contexts, and asynchronous completion still apply.
+      </p>
+      <LanguageTabs csharp={configureMediator.csharp} java={configureMediator.java} />
+      <p>
+        The hosted C# bus is started by the application host. Java&apos;s standalone{' '}
+        <code>MediatorBus</code> is ready after construction. In both clients, dispatch
+        completes only after the matched handler pipelines settle, and terminal failures
+        are returned to the caller.
+      </p>
+      <div className="callout">
+        <strong>Handlers can return results</strong>
+        <p>
+          Use C# <code>IHandler&lt;TMessage, TResult&gt;</code> / <code>Handler&lt;TMessage, TResult&gt;</code>
+          or Java <code>HandlerWithResult&lt;TMessage, TResult&gt;</code> for mediator requests.
+          The returned value is sent through the correlated response pipeline.
+        </p>
+      </div>
+
+      <h2 id="generated-dispatch">Generate the dispatch boundary</h2>
+      <p>
+        MyServiceBus provides a C# source generator and a Java JSR 269 annotation processor.
+        They emit explicit typed handler and consumer registrations with direct-call adapters,
+        avoiding reflection-based discovery and method invocation on the generated path.
+        That makes the mediator useful in trimmed and AOT-oriented applications as well as
+        ordinary managed runtimes.
+      </p>
+      <LanguageTabs csharp={generatedDispatch.csharp} java={generatedDispatch.java} />
+      <div className="callout">
+        <strong>Generation is an opt-in optimization, not a blanket “zero reflection” claim</strong>
+        <p>
+          Generated catalogs remove the consumer registration and dispatch reflection
+          boundaries. Serialization, dependency injection, proxies, and extensions may
+          still introduce reflection unless the application configures their corresponding
+          generated or explicit paths.
+        </p>
+      </div>
+
+      <h2 id="intent">Choose the local message intent</h2>
+      <div className="docs-feature-grid">
+        <div><span>01</span><h3>Commands</h3><p>Send work to a named local endpoint when the message has one intended destination.</p></div>
+        <div><span>02</span><h3>Queries</h3><p>Use request/response when the caller needs a correlated result through the messaging pipeline.</p></div>
+        <div><span>03</span><h3>Notifications</h3><p>Publish a local fact when multiple consumers inside the process may react.</p></div>
+        <div><span>04</span><h3>Behaviors</h3><p>Apply validation, logging, telemetry, and opt-in retry through consumer filters.</p></div>
+      </div>
+
+      <h2 id="mediatr">A practical MediatR replacement</h2>
+      <p>
+        Replacing MediatR is an explicit MyServiceBus goal. MediatR remains the established
+        dedicated .NET mediator with a broader mediator-specific ecosystem. MyServiceBus
+        differentiates through generated handler registration and direct invocation, aligned
+        Java support, permissive licensing, and one behavior model for local and distributed work.
+      </p>
+      <p>
+        MyServiceBus is MIT-licensed. MediatR 13 and later moved from Apache 2.0 to a dual
+        commercial/reciprocal license and require a license key. Review the{' '}
+        <a href="https://github.com/LuckyPennySoftware/MediatR/blob/main/LICENSE.md">current MediatR license ↗</a>{' '}
+        for the exact terms and available community eligibility rather than treating every
+        production use as necessarily paid.
+      </p>
+      <div className="callout callout-accent">
+        <strong>MassTransit supports this capability; it is not its product identity</strong>
+        <p>
+          MassTransit includes mediator-style in-process dispatch, but presents itself as a{' '}
+          <a href="https://masstransit.massient.com/">distributed application framework ↗</a>.
+          MyServiceBus can make mediator-only adoption a primary path, with no broker required
+          and no assumption that the application will become distributed.
+        </p>
+      </div>
+
+      <h2 id="not-method-call">Why use a mediator instead of a method call?</h2>
+      <p>
+        A method call is simplest when the caller should know the callee directly. A
+        mediator helps when the application benefits from message intent, handler
+        discovery, per-dispatch scopes, fan-out, or a consistent behavior pipeline.
+      </p>
+      <div className="concept-comparison">
+        <section><span className="tag">METHOD CALL</span><h2>Direct collaboration</h2><p>The caller selects a dependency and invokes a known operation.</p><strong>Best for:</strong><p>Simple, explicit application code with no dispatch behavior.</p></section>
+        <section><span className="tag">MEDIATOR</span><h2>Local message dispatch</h2><p>The caller expresses intent and registered consumers run through a shared pipeline.</p><strong>Best for:</strong><p>Local boundaries that benefit from decoupling, scopes, fan-out, or behaviors.</p></section>
+      </div>
+
+      <h2 id="durability">Know where the process boundary ends</h2>
+      <p>
+        The mediator does not provide broker durability, independent delivery, competing
+        consumers, acknowledgements, or redelivery after a process exit. Delayed retries
+        and scheduled work that exist only in memory disappear with the process.
+      </p>
+      <div className="callout">
+        <strong>Externally observable facts belong on the broker</strong>
+        <p>
+          If another process may need an event, publish it through the broker-backed bus.
+          Do not treat mediator and broker publication as interchangeable paths: their
+          delivery, retry, observability, and failure semantics differ.
+        </p>
+      </div>
+
+      <div className="next-card">
+        <div><span>Next</span><strong>Move from local dispatch to durable messaging</strong></div>
+        <Link href="/docs/concepts/reliability">Reliability and faults →</Link>
+      </div>
+    </article>
+  );
+}

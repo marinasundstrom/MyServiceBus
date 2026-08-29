@@ -56,12 +56,17 @@ export default function WhyMyServiceBus() {
   return (
     <article className="docs-article">
       <p className="docs-kicker">Why MyServiceBus?</p>
-      <h1>One messaging model across platforms.</h1>
+      <h1>Use one focused model locally or across services.</h1>
       <p className="docs-summary">
-        The main advantage of MyServiceBus today is cross-platform consistency. Use
-        the same family of concepts and closely aligned behavior for asynchronous
-        communication in C# and Java.
+        Replace MediatR for in-process application messaging, extend a MassTransit-based
+        .NET estate with Java, or start a new system in C#, Java, or both.
       </p>
+
+      <div className="docs-feature-grid">
+        <div><span>01</span><h3>Add Java to MassTransit</h3><p>Participate through the verified common protocol subset without building a custom bridge or a second messaging model.</p></div>
+        <div><span>02</span><h3>Replace MediatR</h3><p>Use dedicated handlers and generated dispatch for local commands, queries, notifications, and responses.</p></div>
+        <div><span>03</span><h3>Start cross-platform</h3><p>Choose C# or Java per service while message intent, requests, retries, and faults retain the same meaning.</p></div>
+      </div>
 
       <div className="callout callout-accent">
         <strong>Write for the platform, design for the system</strong>
@@ -75,10 +80,37 @@ export default function WhyMyServiceBus() {
       <div className="callout">
         <strong>Project status: evaluate it as a preview</strong>
         <p>
-          MyServiceBus is not currently a committed product and does not offer the
-          commercial support, maturity, or long-term stability of MassTransit. This
-          project is not a recommendation to replace MassTransit in systems that need
-          those assurances.
+          MyServiceBus is being developed toward enterprise production confidence, but
+          current releases remain previews. It does not offer MassTransit&apos;s commercial
+          support, maturity, long-term product assurances, or complete feature breadth.
+          Evaluate those differences as operational constraints.
+        </p>
+      </div>
+
+      <h2 id="commercial-fit">Match the commercial commitment to the system</h2>
+      <p>
+        MyServiceBus is MIT-licensed. MassTransit v9 and later require a commercial
+        license and pair that model with a mature product, support, and a much broader
+        capability set. Those benefits can be worth paying for when a system needs them.
+      </p>
+      <p>
+        When a project&apos;s needs fit the MyServiceBus common subset—or its current stage
+        does not yet justify that commercial commitment—MyServiceBus provides a smaller,
+        permissively licensed option. The licensing advantage does not remove the cost of
+        adopting a preview or replace an enterprise support relationship.
+      </p>
+      <p>
+        For local messaging, the same decision applies to MediatR 13 and later, which use
+        a dual commercial/reciprocal license. MyServiceBus keeps its core MIT-licensed and
+        makes generated mediator dispatch a primary product path rather than a supporting feature.
+      </p>
+      <div className="callout">
+        <strong>Version boundaries matter</strong>
+        <p>
+          The verified interoperability peer is MassTransit 8.5.1. That technical test
+          pin is separate from the v9+ licensing comparison. Check the{' '}
+          <a href="https://masstransit.massient.com/configuration/license/">official MassTransit licensing documentation ↗</a>{' '}
+          and the <Link href="/docs/interoperability">MyServiceBus interoperability matrix</Link> before deciding.
         </p>
       </div>
 
@@ -196,19 +228,20 @@ export default function WhyMyServiceBus() {
       </p>
       <LanguageTabs csharp={sameModel.csharp} java={sameModel.java} />
 
-      <h2 id="community">A community-driven foundation for the basics</h2>
+      <h2 id="community">Build on the model—and improve the boundaries we own</h2>
       <p>
-        The motivation behind MyServiceBus is to explore a more community-driven,
-        cross-platform foundation for the everyday needs of asynchronous and distributed
-        applications. The project focuses first on approachable fundamentals: typed
-        contracts, consumers, send and publish, request/response, retry, failure handling,
-        testing, transport adapters, and observability.
+        MyServiceBus starts from the parts of MassTransit that have proven useful: its
+        messaging vocabulary, envelope conventions, consumer model, and operational
+        semantics. It then concentrates improvement on first-class C# and Java parity,
+        generated registration and dispatch, explicit compatibility and delivery evidence,
+        and a smaller portable core.
       </p>
       <p>
         It is intentionally not a feature-for-feature reimplementation of MassTransit.
-        The hope is that a smaller owned core can evolve through real community use and
-        contributions while keeping C# and Java behavior aligned. That is a direction
-        and motivation—not yet a product commitment.
+        “Improve upon” means advancing those owned boundaries, not claiming universal
+        superiority. MassTransit remains the more mature and capable choice for many .NET
+        systems. MyServiceBus commits to keeping its core runtime permissively open source
+        while it evolves through production evidence and community contributions.
       </p>
 
       <h2 id="transport-choice">Change transport configuration, not business intent</h2>
@@ -237,6 +270,7 @@ export default function WhyMyServiceBus() {
       <h2 id="direct-is-better">When MassTransit or direct broker APIs are the better choice</h2>
       <ul className="check-list">
         <li>You need a mature, commercially supported .NET service bus: choose MassTransit.</li>
+        <li>You need sagas, transactional outbox/inbox behavior, or another advanced capability outside the verified MyServiceBus boundary.</li>
         <li>You need a broker feature or performance control that MyServiceBus does not expose.</li>
         <li>Your organization already has a mature, enforced messaging platform with equivalent conventions.</li>
         <li>The component is a very small bridge or infrastructure tool rather than a business service.</li>
@@ -250,10 +284,11 @@ export default function WhyMyServiceBus() {
 
       <h2 id="decision">A practical decision test</h2>
       <p>
-        If you need typed messaging across C# and Java, familiar MassTransit-style
-        semantics, consistent failure paths, and a smaller amount of repeated broker
-        plumbing, MyServiceBus may be worth evaluating and contributing to. Choose
-        MassTransit when its mature .NET ecosystem and commercial support matter.
+        If you need to add Java to a MassTransit-based .NET estate—or want to start a
+        C# and Java system on one focused model—MyServiceBus may be worth evaluating.
+        Its permissive license can fit an earlier-stage or deliberately smaller system,
+        provided the preview maturity, support, and feature boundaries are acceptable.
+        Choose MassTransit when its mature .NET ecosystem, broader features, and commercial support matter.
         If the problem is only one native queue with unusual broker requirements, start
         with the broker API and add abstraction only when the application-level
         conventions become real.
