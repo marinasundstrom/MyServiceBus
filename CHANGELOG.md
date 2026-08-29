@@ -4,6 +4,7 @@ This changelog summarizes the bigger themes in the repository history rather tha
 
 ## Unreleased
 
+- Added a .NET JSON serialization comparison matrix covering reflective and source-generated metadata for MassTransit envelopes and raw payloads, including throughput and allocation measurements.
 - Added application-supplied `JsonSerializerOptions`/source-generated metadata to the .NET JSON factories on send and receive, plus corresponding application `ObjectMapper` configuration in Java.
 - Added MassTransit-shaped serializer registration and immutable inbound format selection in C# and Java, injected the resolver into broker transports, and moved raw dispatch metadata out of the portable serializer/deserializer contracts.
 - Added corresponding whole-format deserializer and serializer-factory contracts in C# and Java, with matching MassTransit-envelope, Raw JSON, and NServiceBus JSON implementations.
