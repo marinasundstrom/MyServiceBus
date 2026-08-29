@@ -9,6 +9,8 @@ Parity in this document means equivalent concepts, behavior, and wire outcomes. 
 | Message sending | Implemented | Implemented | `ConsumeContext` resolves send endpoints in both clients. |
 | Publishing | Implemented | Implemented | Messages are routed to exchanges derived from message type conventions. |
 | Request–response helpers | Implemented | Implemented | Both clients provide `GenericRequestClient` and scoped client factories (`IRequestClientFactory` in C#, `RequestClientFactory` in Java). |
+| Mediator intent API | `IMediator` with `Task`-based `Send` and `Publish` | `Mediator` with `CompletableFuture`-based `send` and `publish` | Send requires exactly one type-routed handler; publish fans out. Destination-aware delivery remains outside the narrow interface. |
+| Mediator registration shapes | Handler, consumer, and reflected/generated consumer methods | Handler, consumer, and reflected/generated consumer methods | All shapes share topology and pipelines and can also be used with broker-backed transports. |
 | Fault handling | Implemented | Implemented | Java mediator dispatches faults when consumers throw. |
 | Telemetry & host metadata | Implemented | Implemented | Both clients capture detailed host metadata for diagnostics. |
 | Header mapping | Implemented | Implemented | Headers beginning with `_` map to native transport properties. |

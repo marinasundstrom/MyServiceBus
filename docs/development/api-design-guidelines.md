@@ -44,7 +44,7 @@ Multiple buses in one process are currently unsupported. Do not add C# marker-in
 
 Reconsider this boundary only when a concrete application requirement demonstrates that separate processes are inadequate. Any future proposal must define independent lifecycle, capabilities, endpoint ownership, topology, and telemetry in both reference clients without making single-bus applications more complex.
 
-The in-process mediator is not another hosted bus identity. It is a local dispatch mode that may reuse consumer and pipeline concepts without claiming broker delivery semantics.
+The in-process mediator is not another hosted bus identity. It is a local dispatch mode that reuses handler, consumer, consumer-method, topology, and pipeline concepts without claiming broker delivery semantics. Its narrow C# and Java interfaces expose local intent without destination-aware bus operations; application services should prefer those segregated contracts.
 
 ## Public APIs
 

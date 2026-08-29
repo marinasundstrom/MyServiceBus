@@ -12,12 +12,12 @@ const configureMediator = {
 
 builder.Services.AddServiceBus(x =>
 {
-    x.AddConsumer<SubmitOrderHandler>();
+    x.AddHandler<SubmitOrderHandler>();
     x.UsingMediator();
 });
 
-var bus = serviceProvider.GetRequiredService<IMessageBus>();
-await bus.Publish(new SubmitOrder(Guid.NewGuid()));`,
+var mediator = serviceProvider.GetRequiredService<IMediator>();
+await mediator.Send(new SubmitOrder(Guid.NewGuid()));`,
   java: `public final class SubmitOrderHandler
         extends HandlerBase<SubmitOrder> {
     @Override
@@ -30,11 +30,24 @@ await bus.Publish(new SubmitOrder(Guid.NewGuid()));`,
 
 ServiceCollection services = ServiceCollection.create();
 
-MediatorBus bus = MediatorBus.configure(services, cfg -> {
-    cfg.addConsumer(SubmitOrderHandler.class);
+Mediator mediator = MediatorBus.configure(services, cfg -> {
+    cfg.addHandler(SubmitOrderHandler.class, SubmitOrder.class);
 });
 
-bus.publish(new SubmitOrder(UUID.randomUUID()));`,
+mediator.send(new SubmitOrder(UUID.randomUUID())).join();`,
+};
+
+const resultDispatch = {
+  csharp: `OrderView order = await mediator.Send<GetOrder, OrderView>(
+    new GetOrder(orderId));
+
+// MassTransit-familiar alternative:
+var client = mediator.CreateRequestClient<GetOrder>();
+var response = await client.GetResponseAsync<OrderView>(
+    new GetOrder(orderId));`,
+  java: `OrderView order = mediator.send(
+    new GetOrder(orderId),
+    OrderView.class).join();`,
 };
 
 const generatedDispatch = {
@@ -100,30 +113,62 @@ export default function MediatorGuide() {
         </p>
       </div>
 
+      <h2 id="consumer-shapes">One runtime, three consumer shapes</h2>
+      <p>
+        Handlers are mediator-oriented consumer APIs, not a separate execution subsystem. A{' '}
+        <code>Handler</code> can run behind a broker transport; an ordinary <code>Consumer</code>{' '}
+        can satisfy mediator <code>Send</code> or <code>Publish</code>; and reflected or generated
+        consumer methods participate in both modes, including response-returning methods.
+        Choose the shape that communicates the application&apos;s intent most clearly.
+      </p>
+      <div className="docs-feature-grid">
+        <div><span>01</span><h3>Handler</h3><p>Clear intent for local application commands and queries, while remaining broker-capable.</p></div>
+        <div><span>02</span><h3>Consumer</h3><p>Natural when the contract is already modeled as bus messaging, while remaining mediator-capable.</p></div>
+        <div><span>03</span><h3>Consumer method</h3><p>A compact reflected or generated declaration using the same topology and pipeline.</p></div>
+      </div>
+      <p>
+        <code>AddHandler</code> is a mediator-friendly registration alias, not a semantic fence.{' '}
+        <code>AddConsumer</code> remains valid for handler types, and handler registration remains
+        valid with broker-backed transports.
+      </p>
+      <div className="callout callout-accent">
+        <strong>Depend on the smaller contract</strong>
+        <p>
+          Application components can depend on C# <code>IMediator</code> or Java{' '}
+          <code>Mediator</code>. Those interfaces expose local <code>Send</code> and{' '}
+          <code>Publish</code> intent without destination-aware bus operations. Keep{' '}
+          <code>IMessageBus</code> or the concrete Java <code>MediatorBus</code> at infrastructure
+          boundaries that genuinely need the wider contract.
+        </p>
+      </div>
+
       <h2 id="dispatch-semantics">How this maps to MediatR</h2>
       <p>
         <code>Publish(message)</code> is the close match to MediatR notification publication:
         dispatch is selected by message type, every compatible local handler runs, and the
-        operation completes after all handler pipelines settle.
+        operation completes after all handler pipelines settle. Publishing with no compatible
+        handler completes successfully.
       </p>
       <div className="callout callout-accent">
-        <strong>Directed Send is a bus operation, not MediatR Send</strong>
+        <strong>Send means exactly one local handler</strong>
         <p>
-          MyServiceBus&apos;s current directed <code>Send</code> requires a destination and
-          mediator dispatch can reach every compatible consumer. It does not enforce the
-          exactly-one-handler rule people expect from <code>ISender.Send</code>. Queue-named
-          sends are useful when preserving a future broker boundary, but they are not the
-          default mediator-only API.
+          Mediator <code>Send(message)</code> is selected by message type and fails immediately
+          when no compatible handler—or more than one—is registered. This matches the command
+          and query cardinality people expect from a mediator while keeping publish fan-out
+          explicit.
         </p>
       </div>
       <p>
-        For a command or query that returns a value, use the type-routed request client with
-        an <code>IHandler&lt;TMessage, TResult&gt;</code> or{' '}
-        <code>HandlerWithResult&lt;TMessage, TResult&gt;</code>. With no explicit destination,
-        the client derives one from the request type. This is the closest current equivalent
-        to MediatR <code>Send&lt;TResponse&gt;</code>, but retains messaging semantics such as
-        correlation, response endpoints, faults, and timeouts, and does not yet reject
-        multiple compatible request handlers.
+        Result handlers use the result-bearing overload. C# also exposes a request client for
+        teams that prefer the MassTransit-familiar request shape. Java provides the equivalent
+        asynchronous contract with <code>CompletableFuture&lt;T&gt;</code> and an explicit response
+        class token.
+      </p>
+      <LanguageTabs csharp={resultDispatch.csharp} java={resultDispatch.java} />
+      <p>
+        Directed delivery remains a bus-shaped operation. Use a C# send endpoint or Java{' '}
+        <code>sendTo(destination, message)</code> when the destination itself is part of the
+        contract or you want to preserve a future broker boundary.
       </p>
 
       <h2 id="generated-dispatch">Generate the dispatch boundary</h2>
@@ -147,21 +192,20 @@ export default function MediatorGuide() {
 
       <h2 id="intent">Choose the local message intent</h2>
       <div className="docs-feature-grid">
-        <div><span>01</span><h3>Commands</h3><p>Publish a one-way local command today, or use request/response when a result is required. Type-routed single-handler Send remains product work.</p></div>
-        <div><span>02</span><h3>Queries</h3><p>Use the type-routed request client when the caller needs a correlated result through the messaging pipeline.</p></div>
+        <div><span>01</span><h3>Commands</h3><p>Send a one-way command to exactly one type-routed local handler.</p></div>
+        <div><span>02</span><h3>Queries</h3><p>Send to one result handler and await its asynchronous response.</p></div>
         <div><span>03</span><h3>Notifications</h3><p>Publish a local fact when multiple consumers inside the process may react.</p></div>
         <div><span>04</span><h3>Behaviors</h3><p>Apply validation, logging, telemetry, and opt-in retry through consumer filters.</p></div>
       </div>
 
       <h2 id="mediatr">A practical MediatR replacement</h2>
       <p>
-        Replacing MediatR is an explicit MyServiceBus goal. Today, notification fan-out and
-        result-bearing request/response are supported, but MyServiceBus is not yet a drop-in
-        replacement for <code>ISender.Send</code>: a type-routed single-handler API and
-        cardinality validation remain product work. MediatR remains the established dedicated
-        .NET mediator with a broader mediator-specific ecosystem. MyServiceBus differentiates
-        through generated handler registration and direct invocation, aligned Java support,
-        permissive licensing, and one behavior model for local and distributed work.
+        Replacing MediatR is an explicit MyServiceBus goal. Notification fan-out, type-routed
+        single-handler send, cardinality validation, and result-bearing requests are supported.
+        MyServiceBus is not source-compatible with MediatR, and MediatR remains the established
+        dedicated .NET mediator with a broader mediator-specific ecosystem. MyServiceBus
+        differentiates through generated handler registration and direct invocation, aligned
+        Java support, permissive licensing, and one behavior model for local and distributed work.
       </p>
       <p>
         MyServiceBus is MIT-licensed. MediatR 13 and later moved from Apache 2.0 to a dual

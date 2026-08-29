@@ -20,7 +20,9 @@ HTTP callbacks, webhooks, WebSockets, SignalR, and similar technologies may even
 
 ### Mediator boundary
 
-The in-process mediator is a primary product mode over reusable handler, consumer, and pipeline infrastructure. It is intended to replace MediatR for local commands, queries, response handlers, and notifications, while also supporting testing, modular-monolith boundaries, lightweight tools, and gradual migration to a broker. An application may adopt this mode without using or planning to use broker-backed messaging. It does not provide broker durability, independent delivery, or externally observable publication.
+The in-process mediator is a primary product mode over reusable handler, consumer, consumer-method, and pipeline infrastructure. It is intended to replace MediatR for local commands, queries, response handlers, and notifications, while also supporting testing, modular-monolith boundaries, lightweight tools, and gradual migration to a broker. Handler and consumer shapes are interchangeable at the execution boundary: either can run locally or behind a broker, and reflected/generated consumer methods use the same topology and pipeline. An application may adopt this mode without using or planning to use broker-backed messaging. It does not provide broker durability, independent delivery, or externally observable publication.
+
+Application components should depend on the segregated mediator intent contract (`IMediator` in C# and `Mediator` in Java) when they need only local `Send` and `Publish`. Destination-aware operations remain on bus-specific contracts so command/query application code does not acquire transport responsibilities accidentally.
 
 When an application already uses a broker-backed bus, events that represent facts other processes may observe should ordinarily be published on that bus. Applications should not create mediator and broker paths for the same event by default: doing so creates different retry, durability, observability, and failure semantics. Any dual path must express a deliberate architectural distinction.
 
