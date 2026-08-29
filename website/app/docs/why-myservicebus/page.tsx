@@ -113,6 +113,10 @@ export default function WhyMyServiceBus() {
           and the <Link href="/docs/interoperability">MyServiceBus interoperability matrix</Link> before deciding.
         </p>
       </div>
+      <p>
+        For an API-by-API adoption view, including readiness and likely pre-1.0 change,
+        see <Link href="/docs/platform-parity">what you can use today and what could change</Link>.
+      </p>
 
       <h2 id="shared-vocabulary">Carry the same vocabulary between ecosystems</h2>
       <p>
@@ -270,7 +274,7 @@ export default function WhyMyServiceBus() {
       <h2 id="direct-is-better">When MassTransit or direct broker APIs are the better choice</h2>
       <ul className="check-list">
         <li>You need a mature, commercially supported .NET service bus: choose MassTransit.</li>
-        <li>You need a fully integrated, production-promoted outbox today; MyServiceBus has working PostgreSQL persistence, but transparent bus capture, hosted dispatch, operations, and crash-matrix promotion remain in progress.</li>
+        <li>You need a fully integrated, production-promoted outbox today; MyServiceBus has PostgreSQL Bus Outbox capture and hosted dispatch, but Consumer Outbox middleware, cleanup, and crash-matrix promotion remain in progress.</li>
         <li>You need a broker feature or performance control that MyServiceBus does not expose.</li>
         <li>Your organization already has a mature, enforced messaging platform with equivalent conventions.</li>
         <li>The component is a very small bridge or infrastructure tool rather than a business service.</li>
