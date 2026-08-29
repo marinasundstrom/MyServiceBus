@@ -15,8 +15,8 @@ The repository has a strong interoperability and conformance foundation, but the
 | Cross-language contracts | Versioned protocol and topology fixtures; C# and Java parity rules | Strong foundation | Add mixed-version rolling-upgrade tests for every supported release pair |
 | Broker interoperability | Bidirectional C#/Java/MassTransit matrices for RabbitMQ and Azure Service Bus within pinned versions | Strong foundation | Define the stable support matrix and repeat it for each release candidate |
 | Delivery failures | Retries, faults, `_error` and `_skipped` destinations, lock renewal, and explicit Azure at-least-once boundary | Partial | Document every acknowledgement and crash window; add failure-injection coverage |
-| Transactional consistency | Prospective topology model only | Gap | Provide outbox/inbox contracts and supported persistence integrations |
-| Idempotency | Duplicate risk is documented for Azure compatibility moves | Gap | Provide a portable message identity and deduplication strategy with tested storage semantics |
+| Transactional consistency | Matching outbox/inbox contracts and dispatcher state algorithm in C# and Java | Foundation only | Add transaction-integrated persistence providers and prove O01–O06 against real databases |
+| Idempotency | Stable inbound identity and portable `(consumer scope, message identity)` acquisition contracts | Foundation only | Implement database uniqueness, transaction integration, retention, and duplicate-race evidence |
 | Lifecycle and flow control | Explicit timed shutdown, portable endpoint concurrency limits, RabbitMQ 4.1.8 forced-stop/redelivery and saturation gates, prefetch configuration, and Azure lock renewal | Partial | Complete Azure saturation and forced-stop evidence, bounded callback queues, and broker-outage recovery gates |
 | Observability | W3C trace propagation, OpenTelemetry spans, hooks, experimental monitoring, and RabbitMQ health checks | Partial | Define stable metrics, health semantics for both transports and languages, alert guidance, and cardinality limits |
 | Transport security | Username/password and connection-string configuration are available | Gap | Add TLS validation guidance and tests, secret rotation patterns, least-privilege broker policies, and managed identity for Azure |
@@ -100,7 +100,7 @@ Work should proceed in this order:
 
 1. Specify delivery guarantees and build the failure-injection matrix.
 2. Complete broker-backed forced-stop and saturation evidence for bounded concurrency and graceful draining in C# and Java.
-3. Design and implement the portable outbox/inbox boundary, then add the first supported persistence integration for each ecosystem.
+3. Complete the portable outbox/inbox runtime integration, then add the first supported persistence integration for each ecosystem.
 4. Complete secure transport configuration, managed identity, least-privilege guidance, and supply-chain evidence.
 5. Standardize metrics and cross-transport health semantics; publish the core operational runbooks.
 6. Establish broker load, soak, saturation, and recovery gates.
@@ -120,4 +120,4 @@ Sagas, orchestration, additional brokers, stream transports, and control-plane o
 
 The [roadmap](roadmap.md) orders this work alongside the existing protocol, transport, inspection, and monitoring phases. The [compatibility policy](compatibility.md) defines the scope of interoperability claims, and [supported versions](supported-versions.md) records the current preview baseline.
 
-The delivery-integrity artifacts are the [Delivery Guarantees Specification](specs/delivery-guarantees.md), its executable [Delivery Failure Matrix](development/delivery-failure-matrix.md), and the portable [Transactional Outbox and Inbox Specification](specs/outbox-inbox.md) that fixes the persistence boundary before provider APIs are introduced.
+The delivery-integrity artifacts are the [Delivery Guarantees Specification](specs/delivery-guarantees.md), its executable [Delivery Failure Matrix](development/delivery-failure-matrix.md), and the portable [Transactional Outbox and Inbox Specification](specs/outbox-inbox.md). Provider-neutral contracts and the dispatcher algorithm now implement the first part of that boundary; transaction-integrated database providers and promotion evidence remain open.

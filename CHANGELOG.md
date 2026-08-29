@@ -4,6 +4,7 @@ This changelog summarizes the bigger themes in the repository history rather tha
 
 ## Unreleased
 
+- Added matching C# and Java outbox/inbox foundations: stable consumed identities, immutable persisted intents, transaction-enlisted writer and inbox-acquisition contracts, atomic shared-storage lease contracts, and deterministic dispatch/retry/lost-lease behavior. Production database providers and O01–O06 evidence remain explicitly open.
 - Defined the portable transactional outbox and inbox boundary, including stable identity, shared-storage leasing, duplicate acquisition outcomes, broker/database commit gaps, cleanup, schema rollout, observability, and real-database promotion evidence.
 - Added first-class mediator semantics in C# and Java: publish fans out, send enforces exactly one type-routed handler, response-typed request contracts enable inferred result calls, and explicit `AddHandler` registration aliases complement `AddConsumer` without changing broker-backed bus contracts.
 - Clarified the project motivation—focused improvements on MassTransit with a continued permissively licensed core—the two primary adoption paths, and the MIT-versus-MassTransit-v9 commercial fit without hiding preview maturity or support trade-offs.

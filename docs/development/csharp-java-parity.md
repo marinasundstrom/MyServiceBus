@@ -17,6 +17,7 @@ Parity in this document means equivalent concepts, behavior, and wire outcomes. 
 | Cancellation propagation | Implemented | Implemented | Pipe contexts expose cancellation tokens. |
 | Transport abstraction | Implemented | Implemented | RabbitMQ and Azure Service Bus are verified preview profiles with corresponding C# and Java adapters. |
 | Retries | Implemented | Implemented | Both clients require explicit configuration to retry consumers. |
+| Outbox/inbox foundation | `MyServiceBus.Persistence` contracts and deterministic dispatcher | `com.myservicebus.persistence` contracts and deterministic dispatcher | Portable identity, intent, acquisition, lease, retry, and lost-lease semantics align. No production database provider or transparent pipeline integration is shipped yet. |
 | Configuration API (host, queue, message overrides, endpoint formatter) | Implemented | Implemented | Both clients support overriding names and automatic endpoint configuration with custom formatters. |
 | Logging and tracing flow | Implemented | Implemented | Both clients emit MassTransit-style lifecycle and message-flow logs and propagate OpenTelemetry context across send/publish/consume pipelines. |
 

@@ -2,9 +2,28 @@
 
 ## Status and Scope
 
-This specification defines the portable transaction and failure boundary for future MyServiceBus outbox and inbox persistence providers. It does not make the current preview runtime transactional, and an in-memory implementation cannot satisfy the enterprise release gate.
+This specification defines the portable transaction and failure boundary for MyServiceBus outbox and inbox persistence providers. Matching C# and Java contracts now model transactional writes, immutable persisted envelopes, inbox acquisition, shared-storage leasing, transport dispatch, retry scheduling, and lost-lease outcomes. It does not make the current preview runtime transactional, and an in-memory implementation cannot satisfy the enterprise release gate.
 
 The first production implementation must provide corresponding C# and Java behavior against a real transactional database. Provider APIs may be idiomatic to each ecosystem, but their observable state transitions and failure outcomes must conform to this document and the [Delivery Failure Matrix](../development/delivery-failure-matrix.md).
+
+The current foundation deliberately has no default persistence registration. There is not yet a database schema, migration package, application-unit-of-work adapter, transparent send/publish capture seam, hosted polling loop, cleanup service, or production transport adapter for persisted bodies. Applications must not register an in-memory `IOutboxStore`/`OutboxStore` and infer transactional guarantees from the dispatcher unit tests.
+
+## Portable Runtime Surface
+
+The corresponding runtime concepts are:
+
+| Concept | C# | Java |
+| --- | --- | --- |
+| Transaction-enlisted write | `IOutboxWriter` | `OutboxWriter` |
+| Immutable persisted intent | `OutboxMessage` | `OutboxMessage` |
+| Atomic lease storage | `IOutboxStore` | `OutboxStore` |
+| Broker dispatch boundary | `IOutboxTransportDispatcher` | `OutboxTransportDispatcher` |
+| Deterministic batch algorithm | `OutboxDispatcher` | `OutboxDispatcher` |
+| Deduplication key | `InboxMessageKey` | `InboxMessageKey` |
+| Acquisition transaction | `IInboxTransaction` | `InboxTransaction` |
+| Acquisition storage | `IInboxStore` | `InboxStore` |
+
+The portable dispatcher preserves the stored message identity, conditionally marks only the current owner's lease as dispatched, reschedules failed attempts with a persisted due time, reports a lease lost after broker acceptance, and leaves a cancelled lease to expire for recovery. These are algorithm-level guarantees. Broker/database crash-window claims remain open until a supported provider passes O01–O06.
 
 ## Goals
 
@@ -138,4 +157,3 @@ The tests record application effects, broker messages, stable identities, persis
 - automatic idempotency for side effects outside the provider transaction
 - indefinite deduplication retention
 - a generic workflow or saga engine
-

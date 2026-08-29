@@ -136,6 +136,8 @@ The target architecture, capability boundary, and delivery slices are defined in
 
 The detailed assessment, work slices, and evidence rules are defined in [Enterprise Production Readiness](enterprise-readiness.md). Inspection and dashboard work may continue experimentally, but must not be promoted as a substitute for these runtime gates.
 
+**Transactional consistency status:** foundation implemented. Both clients expose stable consumed message identity and corresponding transactional-write, immutable-envelope, inbox-acquisition, atomic-lease, retry, and dispatcher contracts. Deterministic unit tests verify identity reuse, rescheduling, and lost-lease outcomes. Transparent pipeline capture, concrete database providers, schema and cleanup services, hosted dispatch, and O01–O06 real-database evidence remain open; no production outbox claim is made yet.
+
 ## Phase 3: Inspection and Monitoring APIs
 
 **Outcome:** applications and tools can discover and observe a distributed MyServiceBus system without coupling clients to a UI or local monitoring store.
@@ -241,7 +243,7 @@ The next coherent investment is:
 
 1. run the complete preview release-candidate gate on one commit and publish only the scoped verified claims
 2. specify delivery guarantees and add failure-injection coverage for process, network, settlement, and broker failures
-3. implement bounded concurrency, graceful draining, and the portable outbox/inbox and idempotency foundation in C# and Java
+3. integrate the portable outbox/inbox foundation with the pipelines and deliver the first transaction-backed C# and Java persistence providers
 4. complete secure deployment, production telemetry and health, operational runbooks, and supply-chain evidence
 5. establish broker-backed load, soak, saturation, and recovery gates
 6. define the stable compatibility and support lifecycle, validate mixed-version upgrades, and prepare `1.0`
