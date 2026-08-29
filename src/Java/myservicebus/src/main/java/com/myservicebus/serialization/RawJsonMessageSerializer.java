@@ -3,7 +3,7 @@ package com.myservicebus.serialization;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 
-public class RawJsonMessageSerializer implements MessageSerializer {
+public class RawJsonMessageSerializer implements MessageSerializer, MessageSerializerMetadata {
     private final ObjectMapper mapper;
     private final MessageHeaderConvention headerConvention;
 

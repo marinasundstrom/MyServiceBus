@@ -12,7 +12,7 @@ namespace MyServiceBus.Tests;
 
 public class ReceiveEndpointSerializerTests
 {
-    class CustomSerializer : IMessageSerializer
+    class CustomSerializer : IMessageSerializer, IMessageSerializerMetadata
     {
         public int Calls;
         public string ContentType => "application/custom";

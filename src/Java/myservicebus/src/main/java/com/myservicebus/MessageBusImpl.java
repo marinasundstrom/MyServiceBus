@@ -24,6 +24,7 @@ import com.myservicebus.logging.LoggerFactory;
 import com.myservicebus.serialization.InboundMessage;
 import com.myservicebus.serialization.InboundMessageResolver;
 import com.myservicebus.serialization.MessageEnvelopeMode;
+import com.myservicebus.serialization.MessageSerializerMetadata;
 import com.myservicebus.serialization.MessageDeserializer;
 import com.myservicebus.serialization.MessageSerializer;
 import com.myservicebus.tasks.CancellationToken;
@@ -431,7 +432,8 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
     }
 
     private static boolean isRawSerializer(MessageSerializer serializer) {
-        return serializer != null && serializer.getEnvelopeMode() == MessageEnvelopeMode.RAW;
+        return serializer instanceof MessageSerializerMetadata metadata
+                && metadata.getEnvelopeMode() == MessageEnvelopeMode.RAW;
     }
 
     public synchronized void stop() throws Exception {

@@ -24,11 +24,6 @@ public final class RawJsonMessageDeserializer implements MessageDeserializer {
     }
 
     @Override
-    public MessageEnvelopeMode getEnvelopeMode() {
-        return MessageEnvelopeMode.RAW;
-    }
-
-    @Override
     public InboundMessage deserialize(MessageBody body, Map<String, Object> headers) {
         return new RawJsonInboundMessage(body.getBytes(), headers, mapper, headerConvention);
     }

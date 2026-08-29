@@ -18,8 +18,6 @@ public sealed class RawJsonMessageDeserializer : IMessageDeserializer
 
     public string ContentType => InboundMessageResolver.RawJsonContentType;
 
-    public MessageEnvelopeMode EnvelopeMode => MessageEnvelopeMode.Raw;
-
     public IInboundMessage Deserialize(MessageBody body, IDictionary<string, object> headers)
         => new RawJsonMessageContext(body.GetBytes(), headers, _headerConvention);
 

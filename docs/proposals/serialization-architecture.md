@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed. This document defines the target architecture and delivery order. It does not describe implemented behavior. The currently supported formats and configuration APIs remain documented in [Message serialization](../message-serialization.md).
+Accepted; implementation in progress. The serializer, deserializer, factory, message-body, and registry foundations are implemented. Source-generated JSON integration and BSON remain follow-up slices. Current configuration is documented in [Message serialization](../message-serialization.md).
 
 ## Recommendation
 
@@ -180,7 +180,7 @@ The serializer owns outbound encoding:
 
 This should move the C# contract away from `Task<byte[]>` toward the MassTransit-style `GetMessageBody<T>(...)` shape. Serialization is not inherently asynchronous, and the body can decide when or how bytes are materialized. Use `GetMessageBody<T>` in C# and `getMessageBody` in Java so the central operation is recognizably aligned across MassTransit and both MyServiceBus clients. Java retains its own generic and checked-exception conventions around that operation.
 
-Remove `EnvelopeMode` from the serializer interface. Whether an inbound body contains an envelope or a raw payload affects receive matching and dispatch, not outbound byte production. The internal format registration and the returned inbound context carry that information. This removes the current coupling where selecting an outbound serializer changes how a consumer registration is classified.
+Keep `EnvelopeMode` out of the MassTransit-compatible serializer interface. MyServiceBus currently exposes raw dispatch as optional `IMessageSerializerMetadata`/`MessageSerializerMetadata`; a ported envelope serializer therefore implements only the base contract, while a raw serializer may opt into the additional dispatch metadata.
 
 #### Message deserializer
 
@@ -338,7 +338,7 @@ The design must also support these separate intentions:
 - explicitly choose the fallback for messages without content type
 - clear defaults only through an explicit advanced operation
 
-Existing `SetSerializer` APIs can remain compatibility conveniences and translate into registry configuration during a migration period. Factory overloads remain the preferred extension path for AOT-sensitive applications.
+The pre-release `SetSerializer` and Java serializer/deserializer class setters are replaced by the factory-based `AddSerializer`/`AddDeserializer` model. `ClearSerialization` is the explicit advanced operation for removing defaults.
 
 The examples deliberately align the configuration story without requiring the nested configuration types or serializer-library options to implement corresponding public interfaces.
 
@@ -463,6 +463,13 @@ Optimization work should be benchmark-driven and separated into:
 
 Source generation, Native AOT, pooling, and BSON are separate variables in those measurements.
 
+The published comparison matrix must show the .NET default reflective
+`System.Text.Json` path and the application-supplied source-generated metadata
+path as separate rows. At minimum, record startup, first serialize/deserialize,
+steady-state throughput, allocation per operation, and Native AOT published
+size. Do not merge source-generation gains with pooling or transport changes in
+the same comparison.
+
 ## Error Model and Safety
 
 Add domain-specific serialization exceptions with the original exception as `InnerException`/cause. Diagnostics should identify:
@@ -515,12 +522,12 @@ Responses, faults, and follow-up operations need an explicit policy. The initial
 ### Slice 1: Registry foundation
 
 - Evolve `IMessageSerializer`/`MessageSerializer` to return a message body rather than an asynchronously wrapped byte array.
-- Remove outbound `EnvelopeMode` from the serializer contract and move raw/envelope receive behavior into the internal format descriptor and inbound context.
+- Remove outbound `EnvelopeMode` from the base serializer contract; keep MyServiceBus-specific raw dispatch behavior in optional metadata until endpoint format descriptors replace it.
 - Add corresponding message-body, whole-format deserializer, and serializer-factory contracts in C# and Java.
 - Introduce the internal serializer/deserializer registry keyed by normalized content type and bounded protocol matchers.
 - Adapt existing MassTransit JSON, Raw JSON, and NServiceBus JSON behavior.
 - Inject the registry-backed inbound resolver into every receive and request path.
-- Preserve existing defaults and public conveniences.
+- Preserve wire defaults while replacing the pre-release class setters with MassTransit-shaped factory registration.
 - Add ambiguity and missing-content-type tests.
 
 No new wire format ships in this slice.

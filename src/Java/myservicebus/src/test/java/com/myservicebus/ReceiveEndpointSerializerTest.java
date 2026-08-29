@@ -11,6 +11,7 @@ import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.Test;
 
 import com.myservicebus.serialization.MessageSerializer;
+import com.myservicebus.serialization.MessageSerializerMetadata;
 import com.myservicebus.serialization.ByteArrayMessageBody;
 import com.myservicebus.serialization.MessageBody;
 import com.myservicebus.serialization.MessageEnvelopeMode;
@@ -25,7 +26,7 @@ class ReceiveEndpointSerializerTest {
     public static class InputMessage { public String value = "hi"; }
     public static class OutputMessage { }
 
-    static class CustomSerializer implements MessageSerializer {
+    static class CustomSerializer implements MessageSerializer, MessageSerializerMetadata {
         @Override
         public String getContentType() {
             return "application/custom";

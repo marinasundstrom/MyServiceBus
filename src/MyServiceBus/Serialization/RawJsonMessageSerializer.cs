@@ -2,7 +2,7 @@ using System.Text.Json;
 
 namespace MyServiceBus.Serialization;
 
-public class RawJsonMessageSerializer : IMessageSerializer
+public class RawJsonMessageSerializer : IMessageSerializer, IMessageSerializerMetadata
 {
     private readonly IMessageHeaderConvention _headerConvention;
 

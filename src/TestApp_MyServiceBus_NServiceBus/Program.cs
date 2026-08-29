@@ -8,7 +8,7 @@ builder.AddServiceDefaults();
 
 builder.Services.AddServiceBus(registration =>
 {
-    registration.SetSerializer<NServiceBusJsonMessageSerializer>();
+    registration.AddSerializer(new NServiceBusJsonSerializerFactory(), isSerializer: true);
     registration.UsingRabbitMq((_, rabbit) =>
     {
         var connectionUri = new Uri(

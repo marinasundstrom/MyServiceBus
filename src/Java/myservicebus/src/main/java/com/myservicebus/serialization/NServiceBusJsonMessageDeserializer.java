@@ -13,11 +13,6 @@ public final class NServiceBusJsonMessageDeserializer implements MessageDeserial
     }
 
     @Override
-    public MessageEnvelopeMode getEnvelopeMode() {
-        return MessageEnvelopeMode.RAW;
-    }
-
-    @Override
     public InboundMessage deserialize(MessageBody body, Map<String, Object> headers) {
         return new NServiceBusJsonInboundMessage(body.getBytes(), headers, mapper);
     }

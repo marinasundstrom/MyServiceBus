@@ -859,7 +859,7 @@ Raw JSON and NServiceBus compatibility are intentionally separate. Select `RawJs
 ```csharp
 builder.Services.AddServiceBus(x =>
 {
-    x.SetSerializer<NServiceBusJsonMessageSerializer>();
+    x.AddSerializer(new NServiceBusJsonSerializerFactory(), isSerializer: true);
     x.UsingRabbitMq((context, rabbit) => rabbit.ConfigureEndpoints(context));
 });
 ```
@@ -869,7 +869,7 @@ builder.Services.AddServiceBus(x =>
 ```java
 services.from(MessageBusServices.class)
         .addServiceBus(cfg -> {
-            cfg.setSerializer(NServiceBusJsonMessageSerializer.class);
+            cfg.addSerializer(new NServiceBusJsonSerializerFactory(), true);
             cfg.using(RabbitMqFactoryConfigurator.class,
                     (context, rabbit) -> rabbit.configureEndpoints(context));
         });
@@ -877,7 +877,7 @@ services.from(MessageBusServices.class)
 
 The serializer supplies NServiceBus message identity, intent, time, conversation, correlation, and reply headers. Use `NServiceBusMessageType` on a contract when its C# and Java names must map to a shared NServiceBus identity. See [NServiceBus interoperability](nservicebus-interoperability.md) for the verified versions, conventional topology requirement, and current directed-send boundary.
 
-For trimming and AOT scenarios, both clients also accept service-provider factories instead of activating serializer classes reflectively. Use `SetSerializer(provider => new CustomSerializer(...))` in C# and `setSerializer(provider -> new CustomSerializer(...))` in Java. Java provides the corresponding `setDeserializer` factory overload.
+Both clients register the same serializer-factory model without reflective activation. A factory creates the matching serializer and deserializer, and `AddSerializer`/`addSerializer` and `AddDeserializer`/`addDeserializer` independently select outbound and accepted inbound formats.
 
 #### Queue Arguments
 

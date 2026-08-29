@@ -3,7 +3,7 @@ using System.Linq;
 
 namespace MyServiceBus.Serialization;
 
-public class EnvelopeMessageSerializer : IMessageSerializer
+public class EnvelopeMessageSerializer : IMessageSerializer, IMessageSerializerMetadata
 {
     private readonly IMessageHeaderConvention _headerConvention;
 

@@ -15,7 +15,14 @@ public class BusRegistrationConfigurator : IBusRegistrationConfigurator
     private TopologyRegistry _topology = new TopologyRegistry();
     private readonly PipeConfigurator<SendContext> sendConfigurator = new();
     private readonly PipeConfigurator<PublishContext> publishConfigurator = new();
-    private Func<IServiceProvider, IMessageSerializer> serializerFactory = static _ => new EnvelopeMessageSerializer();
+    private ISerializerFactory? serializerFactory = new EnvelopeSerializerFactory();
+    private readonly List<ISerializerFactory> deserializerFactories =
+    [
+        new EnvelopeSerializerFactory(),
+        new RawJsonSerializerFactory(),
+        new NServiceBusJsonSerializerFactory()
+    ];
+    private string defaultContentType = InboundMessageResolver.EnvelopeContentType;
     private readonly TransportCapabilityRequirements capabilityRequirements = new();
 
     public IServiceCollection Services { get; }
@@ -223,19 +230,26 @@ public class BusRegistrationConfigurator : IBusRegistrationConfigurator
         Services.AddSingleton<IBusHook, THook>();
     }
 
-    public void SetSerializer<
-        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TSerializer>()
-        where TSerializer : class, IMessageSerializer
+    public void AddSerializer(ISerializerFactory factory, bool isSerializer = false)
     {
-        Services.AddSingleton<TSerializer>();
-        serializerFactory = static provider => provider.GetRequiredService<TSerializer>();
+        ArgumentNullException.ThrowIfNull(factory);
+        if (isSerializer)
+            serializerFactory = factory;
     }
 
-    public void SetSerializer<TSerializer>(Func<IServiceProvider, TSerializer> serializerFactory)
-        where TSerializer : class, IMessageSerializer
+    public void AddDeserializer(ISerializerFactory factory, bool isDefault = false)
     {
-        ArgumentNullException.ThrowIfNull(serializerFactory);
-        this.serializerFactory = provider => serializerFactory(provider);
+        ArgumentNullException.ThrowIfNull(factory);
+        deserializerFactories.Add(factory);
+        if (isDefault)
+            defaultContentType = factory.ContentType;
+    }
+
+    public void ClearSerialization()
+    {
+        serializerFactory = null;
+        deserializerFactories.Clear();
+        defaultContentType = string.Empty;
     }
 
     public void RequireTransportCapability(string capability, bool requireNative = false)
@@ -264,7 +278,15 @@ public class BusRegistrationConfigurator : IBusRegistrationConfigurator
         Services.AddSingleton<IPostBuildAction>(_ => new ConsumerRegistrationAction(_topology));
         Services.AddSingleton<ISendPipe>((sp) => new SendPipe(sendConfigurator.Build(sp)));
         Services.AddSingleton<IPublishPipe>((sp) => new PublishPipe(publishConfigurator.Build(sp)));
-        Services.AddSingleton(serializerFactory);
+        var configuredSerializerFactory = serializerFactory
+            ?? throw new InvalidOperationException("No message serializer is configured.");
+        if (deserializerFactories.Count == 0)
+            throw new InvalidOperationException("No message deserializers are configured.");
+
+        Services.AddSingleton(_ => configuredSerializerFactory.CreateSerializer());
+        Services.AddSingleton<IInboundMessageResolver>(_ => new InboundMessageResolver(
+            deserializerFactories.Select(factory => factory.CreateDeserializer()),
+            defaultContentType));
         Services.AddSingleton(capabilityRequirements);
         Services.AddSingleton<ISendContextFactory, SendContextFactory>();
         Services.AddSingleton<IPublishContextFactory, PublishContextFactory>();

@@ -6,7 +6,7 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
-public class EnvelopeMessageSerializer implements MessageSerializer {
+public class EnvelopeMessageSerializer implements MessageSerializer, MessageSerializerMetadata {
     private final ObjectMapper mapper;
     private final MessageHeaderConvention headerConvention;
 

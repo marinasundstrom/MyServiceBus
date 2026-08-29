@@ -9,7 +9,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.Map;
 import java.util.UUID;
 
-public final class NServiceBusJsonMessageSerializer implements MessageSerializer {
+public final class NServiceBusJsonMessageSerializer implements MessageSerializer, MessageSerializerMetadata {
     private static final DateTimeFormatter SENT_TIME_FORMAT =
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss:SSSSSS 'Z'");
     private final ObjectMapper mapper = new ObjectMapper()

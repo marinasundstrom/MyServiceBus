@@ -2,7 +2,7 @@
 
 MyServiceBus supports three distinct JSON wire formats. They are separate choices rather than aliases for one another.
 
-The proposed registry, source-generated JSON, BSON, and Native AOT direction is described separately in the [Serialization Architecture Proposal](proposals/serialization-architecture.md). That proposal is not yet implemented; this page documents current behavior.
+The registry, source-generated JSON, BSON, and Native AOT direction is described in the [Serialization Architecture Proposal](proposals/serialization-architecture.md). The serializer contracts and registry foundation are implemented; source-generated JSON and BSON remain follow-up slices.
 
 | Serializer | Content type | Wire shape | Purpose |
 | --- | --- | --- | --- |
@@ -21,7 +21,7 @@ Use raw JSON when another application wants only a JSON body and application-def
 ```csharp
 services.AddServiceBus(x =>
 {
-    x.SetSerializer<RawJsonMessageSerializer>();
+    x.AddSerializer(new RawJsonSerializerFactory(), isSerializer: true);
 });
 ```
 
@@ -30,7 +30,7 @@ services.AddServiceBus(x =>
 ```java
 services.from(MessageBusServices.class)
         .addServiceBus(cfg -> {
-            cfg.setSerializer(RawJsonMessageSerializer.class);
+            cfg.addSerializer(new RawJsonSerializerFactory(), true);
             cfg.using(RabbitMqFactoryConfigurator.class, (context, rabbit) -> {});
         });
 ```
@@ -39,28 +39,30 @@ Raw JSON covers outbound send and publish and inbound dispatch through endpoints
 
 ## Explicit factories for AOT
 
-The class-based APIs remain convenient when runtime activation is acceptable. Applications prioritizing trimming or AOT can construct serialization extensions explicitly and resolve their dependencies from the application service provider:
+Serializer factories are explicit objects and do not require reflective activation. Applications can pass generated metadata or application-owned dependencies into a custom factory constructor:
 
 ```csharp
 services.AddServiceBus(x =>
 {
-    x.SetSerializer(provider => new RawJsonMessageSerializer(
-        provider.GetRequiredService<IMessageHeaderConvention>()));
+    var serialization = new RawJsonSerializerFactory(headerConvention);
+    x.AddSerializer(serialization, isSerializer: true);
+    x.AddDeserializer(serialization, isDefault: true);
 });
 ```
 
 ```java
 services.from(MessageBusServices.class)
         .addServiceBus(cfg -> {
-            cfg.setSerializer(provider -> new RawJsonMessageSerializer(
-                    provider.getRequiredService(MessageHeaderConvention.class)));
-            cfg.setDeserializer(provider -> new EnvelopeMessageDeserializer());
+            SerializerFactory serialization =
+                    new RawJsonSerializerFactory(headerConvention);
+            cfg.addSerializer(serialization, true);
+            cfg.addDeserializer(serialization, true);
         });
 ```
 
-These factory overloads are ordinary runtime configuration and do not require a source generator or a particular application framework.
+These registrations are ordinary runtime configuration and do not require a source generator or a particular application framework.
 
-On .NET, `System.Text.Json` source generation remains owned by the application and its selected serializer. An AOT application can implement `IMessageSerializer` with its generated `JsonSerializerContext` and provide that implementation through the factory overload. MyServiceBus does not make source-generated JSON mandatory for managed applications or couple consumer-catalog generation to application serialization contracts.
+On .NET, `System.Text.Json` source generation remains owned by the application and its selected serializer factory. MyServiceBus does not make source-generated JSON mandatory for managed applications or couple consumer-catalog generation to application serialization contracts.
 
 ## NServiceBus JSON
 

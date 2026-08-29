@@ -4,7 +4,7 @@ using System.Text.Json;
 
 namespace MyServiceBus.Serialization;
 
-public sealed class NServiceBusJsonMessageSerializer : IMessageSerializer
+public sealed class NServiceBusJsonMessageSerializer : IMessageSerializer, IMessageSerializerMetadata
 {
     private static readonly JsonSerializerOptions Options = new()
     {

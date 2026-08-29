@@ -11,7 +11,7 @@ services.AddServiceBus(configurator =>
 {
     configurator.AddGeneratedConsumers();
     configurator.Services.AddScoped<AotSmokeConsumer>(_ => new AotSmokeConsumer(probe));
-    configurator.SetSerializer(static _ => new EnvelopeMessageSerializer());
+    configurator.AddSerializer(new EnvelopeSerializerFactory(), isSerializer: true);
     configurator.UsingMediator();
 });
 

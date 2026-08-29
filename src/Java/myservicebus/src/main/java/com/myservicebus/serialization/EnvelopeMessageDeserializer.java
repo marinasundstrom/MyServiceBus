@@ -50,11 +50,6 @@ public class EnvelopeMessageDeserializer implements MessageDeserializer {
     }
 
     @Override
-    public MessageEnvelopeMode getEnvelopeMode() {
-        return MessageEnvelopeMode.ENVELOPE;
-    }
-
-    @Override
     public InboundMessage deserialize(MessageBody body, Map<String, Object> headers) throws IOException {
         return new EnvelopeInboundMessage(body.getBytes(), headers, mapper, headerConvention);
     }

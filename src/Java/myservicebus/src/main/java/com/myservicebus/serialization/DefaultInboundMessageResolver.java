@@ -1,45 +1,81 @@
 package com.myservicebus.serialization;
 
 import java.nio.charset.StandardCharsets;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.myservicebus.TransportMessage;
 
 public class DefaultInboundMessageResolver implements InboundMessageResolver {
     public static final String ENVELOPE_CONTENT_TYPE = "application/vnd.masstransit+json";
     public static final String RAW_JSON_CONTENT_TYPE = "application/json";
 
-    private final MessageDeserializer envelopeDeserializer;
-    private final ObjectMapper rawMessageMapper;
+    private final Map<String, MessageDeserializer> deserializers;
+    private final MessageDeserializer nServiceBusDeserializer;
     private final MessageHeaderConvention headerConvention;
+    private final String defaultContentType;
 
     public DefaultInboundMessageResolver(MessageDeserializer envelopeDeserializer) {
-        this(envelopeDeserializer, MassTransitHeaderConvention.INSTANCE);
+        this(List.of(
+                envelopeDeserializer,
+                new RawJsonMessageDeserializer(),
+                new NServiceBusJsonMessageDeserializer()),
+                ENVELOPE_CONTENT_TYPE,
+                MassTransitHeaderConvention.INSTANCE);
     }
 
     public DefaultInboundMessageResolver(MessageDeserializer envelopeDeserializer, MessageHeaderConvention headerConvention) {
-        this.envelopeDeserializer = envelopeDeserializer;
+        this(List.of(
+                envelopeDeserializer,
+                new RawJsonMessageDeserializer(headerConvention),
+                new NServiceBusJsonMessageDeserializer()),
+                ENVELOPE_CONTENT_TYPE,
+                headerConvention);
+    }
+
+    public DefaultInboundMessageResolver(
+            List<MessageDeserializer> deserializers,
+            String defaultContentType,
+            MessageHeaderConvention headerConvention) {
+        if (deserializers == null || deserializers.isEmpty()) {
+            throw new IllegalArgumentException("deserializers must not be empty");
+        }
+        if (defaultContentType == null || defaultContentType.isBlank()) {
+            throw new IllegalArgumentException("defaultContentType must not be blank");
+        }
         this.headerConvention = headerConvention;
-        this.rawMessageMapper = new ObjectMapper();
-        this.rawMessageMapper.findAndRegisterModules();
+        this.defaultContentType = defaultContentType;
+        this.deserializers = new LinkedHashMap<>();
+        MessageDeserializer nServiceBus = null;
+        for (MessageDeserializer deserializer : deserializers) {
+            if (deserializer instanceof NServiceBusJsonMessageDeserializer) {
+                nServiceBus = deserializer;
+            } else {
+                this.deserializers.put(normalize(deserializer.getContentType()), deserializer);
+            }
+        }
+        this.nServiceBusDeserializer = nServiceBus;
     }
 
     @Override
     public InboundMessage resolve(TransportMessage transportMessage) throws Exception {
         if (transportMessage.getHeaders().containsKey(NServiceBusHeaders.ENCLOSED_MESSAGE_TYPES)
                 || transportMessage.getHeaders().containsKey(NServiceBusHeaders.CONTENT_TYPE)) {
-            return new NServiceBusJsonInboundMessage(
-                    transportMessage.getBody(), transportMessage.getHeaders(), rawMessageMapper);
+            if (nServiceBusDeserializer != null) {
+                return nServiceBusDeserializer.deserialize(
+                        new ByteArrayMessageBody(transportMessage.getBody()),
+                        transportMessage.getHeaders());
+            }
         }
 
         String contentType = readContentType(transportMessage);
-        if (RAW_JSON_CONTENT_TYPE.equalsIgnoreCase(contentType)) {
-            return new RawJsonInboundMessage(transportMessage.getBody(), transportMessage.getHeaders(), rawMessageMapper, headerConvention);
-        }
-
-        if (ENVELOPE_CONTENT_TYPE.equalsIgnoreCase(contentType)) {
-            return envelopeDeserializer.deserialize(
-                    new ByteArrayMessageBody(transportMessage.getBody()), transportMessage.getHeaders());
+        MessageDeserializer deserializer = deserializers.get(normalize(contentType));
+        if (deserializer != null) {
+            return deserializer.deserialize(
+                    new ByteArrayMessageBody(transportMessage.getBody()),
+                    transportMessage.getHeaders());
         }
 
         throw new IllegalArgumentException("Invalid Content Type: " + contentType);
@@ -51,6 +87,10 @@ public class DefaultInboundMessageResolver implements InboundMessageResolver {
             return new String(bytes, StandardCharsets.UTF_8);
         }
 
-        return value != null ? value.toString() : ENVELOPE_CONTENT_TYPE;
+        return value != null ? value.toString() : defaultContentType;
+    }
+
+    private static String normalize(String contentType) {
+        return contentType.toLowerCase(Locale.ROOT);
     }
 }

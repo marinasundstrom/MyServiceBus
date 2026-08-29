@@ -419,7 +419,7 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector, IConsumerMetho
     }
 
     private static bool IsRawSerializer(IMessageSerializer serializer)
-        => serializer.EnvelopeMode == MessageEnvelopeMode.Raw;
+        => serializer is IMessageSerializerMetadata { EnvelopeMode: MessageEnvelopeMode.Raw };
 
     private MessageBinding[] GetEndpointBindings(string queueName, ConsumerTopology currentConsumer)
         => _topology.Consumers

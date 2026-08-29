@@ -18,8 +18,6 @@ public sealed class EnvelopeMessageDeserializer : IMessageDeserializer
 
     public string ContentType => InboundMessageResolver.EnvelopeContentType;
 
-    public MessageEnvelopeMode EnvelopeMode => MessageEnvelopeMode.Envelope;
-
     public IInboundMessage Deserialize(MessageBody body, IDictionary<string, object> headers)
         => new EnvelopeMessageContext(body.GetBytes(), headers, _headerConvention);
 
