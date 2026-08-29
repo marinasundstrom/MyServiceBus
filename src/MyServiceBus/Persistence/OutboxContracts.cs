@@ -69,6 +69,20 @@ public interface IOutboxStore
         CancellationToken cancellationToken = default);
 }
 
+public sealed record OutboxBacklogSnapshot(
+    int Pending,
+    int Leased,
+    int Retrying,
+    int Dispatched,
+    int Dead,
+    int Cancelled,
+    DateTimeOffset? OldestUndispatchedAtUtc);
+
+public interface IOutboxBacklogProvider
+{
+    Task<OutboxBacklogSnapshot> GetSnapshotAsync(CancellationToken cancellationToken = default);
+}
+
 public interface IOutboxTransportDispatcher
 {
     /// <summary>

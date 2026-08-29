@@ -1,5 +1,6 @@
 package com.myservicebus.persistence.postgresql;
 
+import com.myservicebus.BusHook;
 import com.myservicebus.TransportFactory;
 import com.myservicebus.persistence.ExponentialOutboxRetryPolicy;
 import com.myservicebus.persistence.OutboxDeliveryOptions;
@@ -8,6 +9,7 @@ import com.myservicebus.persistence.OutboxDispatcher;
 import com.myservicebus.persistence.TransportOutboxDispatcher;
 import java.time.Duration;
 import java.util.Objects;
+import java.util.List;
 import java.util.function.Consumer;
 import javax.sql.DataSource;
 
@@ -25,6 +27,15 @@ public final class PostgreSqlOutboxDelivery {
             TransportFactory transportFactory,
             String serviceName,
             Consumer<OutboxDeliveryOptions> configure) {
+        return create(dataSource, transportFactory, serviceName, List.of(), configure);
+    }
+
+    public static OutboxDeliveryService create(
+            DataSource dataSource,
+            TransportFactory transportFactory,
+            String serviceName,
+            Iterable<? extends BusHook> hooks,
+            Consumer<OutboxDeliveryOptions> configure) {
         Objects.requireNonNull(dataSource, "dataSource");
         Objects.requireNonNull(transportFactory, "transportFactory");
         if (serviceName == null || serviceName.isBlank()) {
@@ -32,6 +43,7 @@ public final class PostgreSqlOutboxDelivery {
         }
 
         OutboxDeliveryOptions options = new OutboxDeliveryOptions();
+        options.setServiceName(serviceName);
         if (configure != null) {
             configure.accept(options);
         }
@@ -39,7 +51,11 @@ public final class PostgreSqlOutboxDelivery {
                 new PostgreSqlOutboxStore(dataSource, serviceName),
                 new TransportOutboxDispatcher(transportFactory),
                 new ExponentialOutboxRetryPolicy(Duration.ofSeconds(1), Duration.ofMinutes(1)));
-        return new OutboxDeliveryService(dispatcher, options);
+        return new OutboxDeliveryService(
+                dispatcher,
+                options,
+                new PostgreSqlOutboxHealth(dataSource, serviceName),
+                hooks);
     }
 
     public static OutboxDeliveryService create(

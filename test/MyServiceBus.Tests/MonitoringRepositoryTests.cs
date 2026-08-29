@@ -186,6 +186,38 @@ public class MonitoringRepositoryTests
         repository.GetInstances("workers", now).Count.ShouldBe(2);
     }
 
+    [Fact]
+    public void Repository_summarizes_outbox_dispatcher_state_and_windowed_throughput()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var repository = new MonitoringRepository();
+        repository.UpsertMetadata(CreateMetadata("orders-dispatcher", "replica-1", now, "commerce"));
+
+        repository.RecordBatch(CreateBatch(
+            "orders-dispatcher",
+            "replica-1",
+            now,
+            CreateOutboxObservation(1, now.AddSeconds(-30), true, 9, 8, 1, 0, 12, 2, 1_500),
+            CreateOutboxObservation(2, now.AddSeconds(-5), false, 7, 5, 2, 1, 9, 3, 2_500, "transport")));
+
+        var dispatcher = repository.GetOutboxDispatchers("orders-dispatcher", 60, now).ShouldHaveSingleItem();
+        dispatcher.ApplicationName.ShouldBe("orders-dispatcher");
+        dispatcher.InstanceId.ShouldBe("replica-1");
+        dispatcher.ServiceName.ShouldBe("orders");
+        dispatcher.OwnerId.ShouldBe("dispatcher-a");
+        dispatcher.Online.ShouldBeTrue();
+        dispatcher.LastCycleSucceeded.ShouldBeFalse();
+        dispatcher.LastFailureCategory.ShouldBe("transport");
+        dispatcher.Pending.ShouldBe(9);
+        dispatcher.Retrying.ShouldBe(3);
+        dispatcher.OldestUndispatchedAgeMs.ShouldBe(2_500);
+        dispatcher.WindowLeased.ShouldBe(16);
+        dispatcher.WindowDispatched.ShouldBe(13);
+        dispatcher.WindowFailed.ShouldBe(3);
+        dispatcher.WindowLostLeases.ShouldBe(1);
+        dispatcher.DispatchedPerSecond.ShouldBe(13d / 60d);
+    }
+
     private static MonitoringMetadata CreateMetadata(
         string applicationName,
         string instanceId,
@@ -220,6 +252,51 @@ public class MonitoringRepositoryTests
             0,
             now,
             observations);
+
+    private static MonitoringObservation CreateOutboxObservation(
+        long sequence,
+        DateTimeOffset occurredAtUtc,
+        bool succeeded,
+        int batchLeased,
+        int batchDispatched,
+        int batchFailed,
+        int batchLostLeases,
+        int pending,
+        int retrying,
+        double oldestUndispatchedAgeMs,
+        string? failureCategory = null)
+        => new(
+            sequence,
+            occurredAtUtc,
+            "outbox_dispatch_cycle",
+            succeeded,
+            null,
+            null,
+            "orders",
+            null,
+            12.5,
+            failureCategory,
+            null,
+            null,
+            null,
+            null,
+            null,
+            Properties: new Dictionary<string, string>
+            {
+                ["service_name"] = "orders",
+                ["owner_id"] = "dispatcher-a",
+                ["batch_leased"] = batchLeased.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                ["batch_dispatched"] = batchDispatched.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                ["batch_failed"] = batchFailed.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                ["batch_lost_leases"] = batchLostLeases.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                ["pending"] = pending.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                ["leased"] = "2",
+                ["retrying"] = retrying.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                ["stored_dispatched"] = "40",
+                ["dead"] = "1",
+                ["cancelled"] = "4",
+                ["oldest_undispatched_age_ms"] = oldestUndispatchedAgeMs.ToString(System.Globalization.CultureInfo.InvariantCulture)
+            });
 
     private sealed record TestMessage(string Value);
 }

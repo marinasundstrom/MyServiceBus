@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Globalization;
 using System.Net.Http.Json;
 using System.Threading.Channels;
 using Microsoft.Extensions.Hosting;
@@ -45,6 +46,7 @@ public sealed class MonitoringExporter : BackgroundService, IBusHook
         {
             BusLifecycleHookEvent lifecycle => CreateLifecycleObservation(lifecycle),
             MessageOperationHookEvent operation => CreateMessageObservation(operation),
+            OutboxDeliveryHookEvent outbox => CreateOutboxObservation(outbox),
             _ => null
         };
 
@@ -245,4 +247,43 @@ public sealed class MonitoringExporter : BackgroundService, IBusHook
             busEvent.SpanId,
             busEvent.RetryAttempt,
             busEvent.RetryLimit);
+
+    private MonitoringObservation CreateOutboxObservation(OutboxDeliveryHookEvent busEvent)
+        => new(
+            Interlocked.Increment(ref sequence),
+            busEvent.OccurredAtUtc,
+            "outbox_dispatch_cycle",
+            busEvent.Succeeded,
+            null,
+            null,
+            busEvent.ServiceName,
+            null,
+            busEvent.DurationMs,
+            busEvent.FailureCategory,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["service_name"] = busEvent.ServiceName,
+                ["owner_id"] = busEvent.OwnerId,
+                ["batch_leased"] = Format(busEvent.BatchLeased),
+                ["batch_dispatched"] = Format(busEvent.BatchDispatched),
+                ["batch_failed"] = Format(busEvent.BatchFailed),
+                ["batch_lost_leases"] = Format(busEvent.BatchLostLeases),
+                ["pending"] = Format(busEvent.Pending),
+                ["leased"] = Format(busEvent.Leased),
+                ["retrying"] = Format(busEvent.Retrying),
+                ["stored_dispatched"] = Format(busEvent.StoredDispatched),
+                ["dead"] = Format(busEvent.Dead),
+                ["cancelled"] = Format(busEvent.Cancelled),
+                ["oldest_undispatched_age_ms"] = Format(busEvent.OldestUndispatchedAgeMs)
+            });
+
+    private static string Format(IFormattable? value)
+        => value?.ToString(null, CultureInfo.InvariantCulture) ?? string.Empty;
 }

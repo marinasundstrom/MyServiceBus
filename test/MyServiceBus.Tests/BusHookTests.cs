@@ -149,6 +149,55 @@ public class BusHookTests
         await exporter.StopAsync(CancellationToken.None);
     }
 
+    [Fact]
+    public async Task Monitoring_exporter_maps_bounded_outbox_dispatch_properties()
+    {
+        var handler = new RecordingHttpHandler();
+        var services = new ServiceCollection()
+            .AddSingleton<IBusInspectionProvider>(new StubInspectionProvider());
+        await using var provider = services.BuildServiceProvider();
+        var options = new MonitoringExporterOptions
+        {
+            ServiceAddress = new Uri("http://monitoring.test"),
+            ApplicationName = "dispatcher-tests",
+            ExportInterval = TimeSpan.FromMilliseconds(20),
+            HeartbeatInterval = TimeSpan.FromMinutes(1)
+        };
+        var exporter = new MonitoringExporter(
+            new HttpClient(handler) { BaseAddress = options.ServiceAddress },
+            provider,
+            options,
+            NullLogger<MonitoringExporter>.Instance);
+
+        await exporter.StartAsync(CancellationToken.None);
+        exporter.Handle(new OutboxDeliveryHookEvent(
+            DateTimeOffset.UtcNow,
+            "orders-service",
+            "orders-dispatcher-a",
+            true,
+            12.5,
+            8,
+            7,
+            1,
+            0,
+            11,
+            2,
+            3,
+            40,
+            1,
+            4,
+            2_500,
+            null));
+
+        var batchJson = await handler.BatchReceived.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        batchJson.ShouldContain("\"kind\":\"outbox_dispatch_cycle\"");
+        batchJson.ShouldContain("\"service_name\":\"orders-service\"");
+        batchJson.ShouldContain("\"batch_dispatched\":\"7\"");
+        batchJson.ShouldContain("\"pending\":\"11\"");
+        batchJson.ShouldNotContain("message_id");
+        await exporter.StopAsync(CancellationToken.None);
+    }
+
     public sealed record TestMessage(string Value);
 
     public sealed class TestConsumer : IConsumer<TestMessage>

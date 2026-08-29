@@ -18,20 +18,25 @@ public class OutboxDeliveryServiceTests
             new FixedTimeProvider(Now));
         var options = new OutboxDeliveryOptions
         {
+            ServiceName = "orders-service",
             OwnerId = "orders-service-replica-a",
             BatchSize = 25,
             LeaseDuration = TimeSpan.FromSeconds(30),
             PollInterval = TimeSpan.FromMinutes(1)
         };
+        var hook = new RecordingHook();
         var service = new OutboxDeliveryService(
             dispatcher,
             options,
             NullLogger<OutboxDeliveryService>.Instance,
-            new FixedTimeProvider(Now));
+            new FixedTimeProvider(Now),
+            new FixedBacklogProvider(),
+            [hook]);
 
         await service.StartAsync(CancellationToken.None);
         var request = await store.FirstRequest.Task.WaitAsync(TimeSpan.FromSeconds(5));
         await WaitUntilAsync(() => service.Status.LastSuccessfulPollAtUtc is not null);
+        await WaitUntilAsync(() => hook.Event is not null);
         var runningStatus = service.Status;
         await service.StopAsync(CancellationToken.None);
 
@@ -44,6 +49,12 @@ public class OutboxDeliveryServiceTests
         Assert.Equal(Now, runningStatus.LastSuccessfulPollAtUtc);
         Assert.Equal(new OutboxDispatchBatchResult(0, 0, 0, 0), runningStatus.LastBatch);
         Assert.False(service.Status.IsRunning);
+        Assert.Equal("orders-service", hook.Event!.ServiceName);
+        Assert.Equal("orders-service-replica-a", hook.Event.OwnerId);
+        Assert.True(hook.Event.Succeeded);
+        Assert.Equal(7, hook.Event.Pending);
+        Assert.Equal(2, hook.Event.Retrying);
+        Assert.Equal(TimeSpan.FromMinutes(2).TotalMilliseconds, hook.Event.OldestUndispatchedAgeMs);
     }
 
     private static async Task WaitUntilAsync(Func<bool> condition)
@@ -94,5 +105,22 @@ public class OutboxDeliveryServiceTests
     private sealed class FixedTimeProvider(DateTimeOffset utcNow) : TimeProvider
     {
         public override DateTimeOffset GetUtcNow() => utcNow;
+    }
+
+    private sealed class FixedBacklogProvider : IOutboxBacklogProvider
+    {
+        public Task<OutboxBacklogSnapshot> GetSnapshotAsync(CancellationToken cancellationToken = default)
+            => Task.FromResult(new OutboxBacklogSnapshot(7, 1, 2, 10, 3, 4, Now.AddMinutes(-2)));
+    }
+
+    private sealed class RecordingHook : IBusHook
+    {
+        public OutboxDeliveryHookEvent? Event { get; private set; }
+
+        public void Handle(BusHookEvent busEvent)
+        {
+            if (busEvent is OutboxDeliveryHookEvent outbox)
+                Event = outbox;
+        }
     }
 }

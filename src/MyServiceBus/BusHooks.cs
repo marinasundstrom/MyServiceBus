@@ -75,6 +75,25 @@ public sealed record MessageOperationHookEvent(
     }
 }
 
+public sealed record OutboxDeliveryHookEvent(
+    DateTimeOffset OccurredAtUtc,
+    string ServiceName,
+    string OwnerId,
+    bool Succeeded,
+    double DurationMs,
+    int BatchLeased,
+    int BatchDispatched,
+    int BatchFailed,
+    int BatchLostLeases,
+    int? Pending,
+    int? Leased,
+    int? Retrying,
+    int? StoredDispatched,
+    int? Dead,
+    int? Cancelled,
+    double? OldestUndispatchedAgeMs,
+    string? FailureCategory) : BusHookEvent(OccurredAtUtc);
+
 internal sealed class BusHookRetryObserver : IRetryObserver
 {
     private readonly IBusHookDispatcher dispatcher;

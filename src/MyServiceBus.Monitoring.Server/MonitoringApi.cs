@@ -46,6 +46,8 @@ public static class MonitoringApi
             repository.GetTimeSeries(application, windowSeconds ?? 300, bucketSeconds ?? 5, byInstance ?? false, DateTimeOffset.UtcNow));
         query.MapGet("/flow", (string? application, int? windowSeconds, MonitoringRepository repository) =>
             repository.GetFlow(application, windowSeconds ?? 300, DateTimeOffset.UtcNow));
+        query.MapGet("/outbox", (string? application, int? windowSeconds, MonitoringRepository repository) =>
+            repository.GetOutboxDispatchers(application, windowSeconds ?? 60, DateTimeOffset.UtcNow));
         query.MapGet("/stream", (HttpContext context, MonitoringChangeFeed changes, CancellationToken cancellationToken) =>
             changes.Stream(context, cancellationToken));
 

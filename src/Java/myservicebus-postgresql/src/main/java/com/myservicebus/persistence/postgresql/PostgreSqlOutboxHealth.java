@@ -1,5 +1,7 @@
 package com.myservicebus.persistence.postgresql;
 
+import com.myservicebus.persistence.OutboxBacklogProvider;
+import com.myservicebus.persistence.OutboxBacklogSnapshot;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -8,7 +10,7 @@ import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import javax.sql.DataSource;
 
-public final class PostgreSqlOutboxHealth {
+public final class PostgreSqlOutboxHealth implements OutboxBacklogProvider {
     private final DataSource dataSource;
     private final String serviceName;
 
@@ -55,5 +57,17 @@ public final class PostgreSqlOutboxHealth {
         } catch (Exception failure) {
             return CompletableFuture.failedFuture(failure);
         }
+    }
+
+    @Override
+    public CompletableFuture<OutboxBacklogSnapshot> getSnapshot() {
+        return getBacklog().thenApply(backlog -> new OutboxBacklogSnapshot(
+                backlog.pending(),
+                backlog.leased(),
+                backlog.retrying(),
+                backlog.dispatched(),
+                backlog.dead(),
+                backlog.cancelled(),
+                backlog.oldestUndispatchedAtUtc()));
     }
 }

@@ -13,7 +13,7 @@ public sealed record PostgreSqlOutboxBacklog(
     int Cancelled,
     DateTimeOffset? OldestUndispatchedAtUtc);
 
-public sealed class PostgreSqlOutboxHealth
+public sealed class PostgreSqlOutboxHealth : IOutboxBacklogProvider
 {
     private readonly NpgsqlDataSource dataSource;
     private readonly string serviceName;
@@ -54,5 +54,19 @@ public sealed class PostgreSqlOutboxHealth
             checked((int)reader.GetInt64(4)),
             checked((int)reader.GetInt64(5)),
             reader.IsDBNull(6) ? null : reader.GetFieldValue<DateTimeOffset>(6));
+    }
+
+    async Task<OutboxBacklogSnapshot> IOutboxBacklogProvider.GetSnapshotAsync(
+        CancellationToken cancellationToken)
+    {
+        var backlog = await GetBacklogAsync(cancellationToken);
+        return new OutboxBacklogSnapshot(
+            backlog.Pending,
+            backlog.Leased,
+            backlog.Retrying,
+            backlog.Dispatched,
+            backlog.Dead,
+            backlog.Cancelled,
+            backlog.OldestUndispatchedAtUtc);
     }
 }

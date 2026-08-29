@@ -20,6 +20,7 @@ public static class PostgreSqlOutboxDeliveryServiceExtensions
         ArgumentException.ThrowIfNullOrWhiteSpace(serviceName);
 
         var options = new OutboxDeliveryOptions();
+        options.ServiceName = serviceName;
         configure?.Invoke(options);
 
         services.AddSingleton(options);
@@ -27,6 +28,8 @@ public static class PostgreSqlOutboxDeliveryServiceExtensions
             new PostgreSqlOutboxStore(provider.GetRequiredService<NpgsqlDataSource>(), serviceName));
         services.AddSingleton(provider =>
             new PostgreSqlOutboxHealth(provider.GetRequiredService<NpgsqlDataSource>(), serviceName));
+        services.AddSingleton<IOutboxBacklogProvider>(provider =>
+            provider.GetRequiredService<PostgreSqlOutboxHealth>());
         services.AddSingleton<IOutboxTransportDispatcher, TransportOutboxDispatcher>();
         services.AddSingleton<IOutboxRetryPolicy>(_ =>
             new ExponentialOutboxRetryPolicy(TimeSpan.FromSeconds(1), TimeSpan.FromMinutes(1)));

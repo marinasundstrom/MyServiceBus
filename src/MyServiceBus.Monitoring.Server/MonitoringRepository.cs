@@ -135,6 +135,75 @@ public sealed class MonitoringRepository
         }
     }
 
+    public IReadOnlyList<MonitoringOutboxDispatcherSummary> GetOutboxDispatchers(
+        string? applicationName,
+        int windowSeconds,
+        DateTimeOffset now)
+    {
+        var boundedWindow = Math.Clamp(windowSeconds, 10, (int)MetricRetention.TotalSeconds);
+        var windowStart = now.AddSeconds(-boundedWindow);
+        MonitoringObservationRecord[] observations;
+        lock (observationSync)
+        {
+            observations = recentObservations
+                .Where(record => record.Observation.Kind == "outbox_dispatch_cycle"
+                    && (applicationName is null || string.Equals(
+                        record.ApplicationName,
+                        applicationName,
+                        StringComparison.Ordinal))
+                    && TryGet(record.Observation.Properties, "service_name", out _)
+                    && TryGet(record.Observation.Properties, "owner_id", out _))
+                .ToArray();
+        }
+
+        return observations
+            .GroupBy(record => new OutboxDispatcherKey(
+                record.ApplicationName,
+                record.InstanceId,
+                record.BusId,
+                record.Observation.Properties!["service_name"],
+                record.Observation.Properties!["owner_id"]))
+            .Select(group =>
+            {
+                var latest = group.MaxBy(record => record.Observation.OccurredAtUtc)!;
+                var recent = group.Where(record => record.Observation.OccurredAtUtc >= windowStart).ToArray();
+                var properties = latest.Observation.Properties!;
+                var instanceKey = new InstanceKey(group.Key.ApplicationName, group.Key.InstanceId, group.Key.BusId);
+                var online = instances.TryGetValue(instanceKey, out var state)
+                    && state.CreateSummary(now, LeaseTimeout).Online;
+                var windowDispatched = recent.Sum(record => GetInt64(record.Observation.Properties, "batch_dispatched"));
+
+                return new MonitoringOutboxDispatcherSummary(
+                    group.Key.ApplicationName,
+                    group.Key.InstanceId,
+                    group.Key.BusId,
+                    group.Key.ServiceName,
+                    group.Key.OwnerId,
+                    online,
+                    latest.Observation.OccurredAtUtc,
+                    latest.Observation.Succeeded == true,
+                    latest.Observation.DurationMs ?? 0,
+                    latest.Observation.ExceptionType,
+                    GetNullableInt32(properties, "pending"),
+                    GetNullableInt32(properties, "leased"),
+                    GetNullableInt32(properties, "retrying"),
+                    GetNullableInt32(properties, "stored_dispatched"),
+                    GetNullableInt32(properties, "dead"),
+                    GetNullableInt32(properties, "cancelled"),
+                    GetNullableDouble(properties, "oldest_undispatched_age_ms"),
+                    recent.Sum(record => GetInt64(record.Observation.Properties, "batch_leased")),
+                    windowDispatched,
+                    recent.Sum(record => GetInt64(record.Observation.Properties, "batch_failed")),
+                    recent.Sum(record => GetInt64(record.Observation.Properties, "batch_lost_leases")),
+                    windowDispatched / (double)boundedWindow,
+                    boundedWindow);
+            })
+            .OrderBy(summary => summary.ServiceName, StringComparer.Ordinal)
+            .ThenBy(summary => summary.ApplicationName, StringComparer.Ordinal)
+            .ThenBy(summary => summary.InstanceId, StringComparer.Ordinal)
+            .ToArray();
+    }
+
     public IReadOnlyList<MonitoringRateSummary> GetRates(
         string? applicationName,
         int windowSeconds,
@@ -407,6 +476,12 @@ public sealed class MonitoringRepository
 
     private readonly record struct InstanceKey(string ApplicationName, string InstanceId, string BusId);
     private readonly record struct MetricKey(string ApplicationName, string? InstanceId);
+    private readonly record struct OutboxDispatcherKey(
+        string ApplicationName,
+        string InstanceId,
+        string BusId,
+        string ServiceName,
+        string OwnerId);
     private readonly record struct FlowEdgeKey(
         string SourceApplication,
         string TargetApplication,
@@ -414,6 +489,38 @@ public sealed class MonitoringRepository
         string? MessageUrn,
         string OperationKind);
     private sealed record FlowSource(string ApplicationName, string OperationKind);
+
+    private static bool TryGet(
+        IReadOnlyDictionary<string, string>? properties,
+        string key,
+        out string value)
+    {
+        value = string.Empty;
+        if (properties is null || !properties.TryGetValue(key, out var candidate) || string.IsNullOrWhiteSpace(candidate))
+            return false;
+
+        value = candidate;
+        return true;
+    }
+
+    private static long GetInt64(IReadOnlyDictionary<string, string>? properties, string key)
+        => properties is not null
+            && properties.TryGetValue(key, out var value)
+            && long.TryParse(value, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var parsed)
+                ? parsed
+                : 0;
+
+    private static int? GetNullableInt32(IReadOnlyDictionary<string, string> properties, string key)
+        => properties.TryGetValue(key, out var value)
+            && int.TryParse(value, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var parsed)
+                ? parsed
+                : null;
+
+    private static double? GetNullableDouble(IReadOnlyDictionary<string, string> properties, string key)
+        => properties.TryGetValue(key, out var value)
+            && double.TryParse(value, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var parsed)
+                ? parsed
+                : null;
 
     private sealed class MutableFlowEdge
     {

@@ -1,8 +1,12 @@
 package com.myservicebus.persistence;
 
+import com.myservicebus.BusHook;
+import com.myservicebus.OutboxDeliveryHookEvent;
 import com.myservicebus.tasks.CancellationTokenSource;
 import java.time.Clock;
 import java.util.Objects;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
@@ -17,6 +21,8 @@ public final class OutboxDeliveryService implements AutoCloseable {
     private final OutboxDispatcher dispatcher;
     private final OutboxDeliveryOptions options;
     private final Clock clock;
+    private final OutboxBacklogProvider backlogProvider;
+    private final List<BusHook> hooks;
     private final CancellationTokenSource cancellation = new CancellationTokenSource();
     private final AtomicBoolean started = new AtomicBoolean();
     private final AtomicBoolean closed = new AtomicBoolean();
@@ -29,14 +35,36 @@ public final class OutboxDeliveryService implements AutoCloseable {
     });
 
     public OutboxDeliveryService(OutboxDispatcher dispatcher, OutboxDeliveryOptions options) {
-        this(dispatcher, options, Clock.systemUTC());
+        this(dispatcher, options, Clock.systemUTC(), null, List.of());
     }
 
     OutboxDeliveryService(OutboxDispatcher dispatcher, OutboxDeliveryOptions options, Clock clock) {
+        this(dispatcher, options, clock, null, List.of());
+    }
+
+    public OutboxDeliveryService(
+            OutboxDispatcher dispatcher,
+            OutboxDeliveryOptions options,
+            OutboxBacklogProvider backlogProvider,
+            Iterable<? extends BusHook> hooks) {
+        this(dispatcher, options, Clock.systemUTC(), backlogProvider, hooks);
+    }
+
+    OutboxDeliveryService(
+            OutboxDispatcher dispatcher,
+            OutboxDeliveryOptions options,
+            Clock clock,
+            OutboxBacklogProvider backlogProvider,
+            Iterable<? extends BusHook> hooks) {
         this.dispatcher = Objects.requireNonNull(dispatcher, "dispatcher");
         this.options = Objects.requireNonNull(options, "options");
         this.options.validate();
         this.clock = Objects.requireNonNull(clock, "clock");
+        this.backlogProvider = backlogProvider;
+        this.hooks = new ArrayList<>();
+        if (hooks != null) {
+            hooks.forEach(this.hooks::add);
+        }
     }
 
     public void start() {
@@ -64,8 +92,8 @@ public final class OutboxDeliveryService implements AutoCloseable {
             return;
         }
         long nextDelayMillis = options.getPollInterval().toMillis();
+        java.time.Instant polledAt = clock.instant();
         try {
-            java.time.Instant polledAt = clock.instant();
             OutboxDispatchBatchResult result = dispatcher.dispatchBatch(
                     new OutboxLeaseRequest(
                             options.getOwnerId(),
@@ -80,18 +108,19 @@ public final class OutboxDeliveryService implements AutoCloseable {
                     current.lastFailureAtUtc(),
                     null,
                     result));
+            observe(polledAt, clock.instant(), result, null);
             if (result.leased() >= options.getBatchSize()) {
                 nextDelayMillis = 0;
             }
         } catch (CompletionException failure) {
             if (!cancellation.isCancelled()) {
                 Throwable cause = failure.getCause() == null ? failure : failure.getCause();
-                recordFailure(cause);
+                recordFailure(polledAt, cause);
                 LOGGER.log(System.Logger.Level.ERROR, "Transactional outbox polling failed", cause);
             }
         } catch (RuntimeException failure) {
             if (!cancellation.isCancelled()) {
-                recordFailure(failure);
+                recordFailure(polledAt, failure);
                 LOGGER.log(System.Logger.Level.ERROR, "Transactional outbox polling failed", failure);
             }
         } finally {
@@ -112,7 +141,7 @@ public final class OutboxDeliveryService implements AutoCloseable {
         }
     }
 
-    private void recordFailure(Throwable failure) {
+    private void recordFailure(java.time.Instant polledAt, Throwable failure) {
         java.time.Instant failedAt = clock.instant();
         updateStatus(current -> new OutboxDeliveryStatus(
                 !closed.get(),
@@ -121,6 +150,59 @@ public final class OutboxDeliveryService implements AutoCloseable {
                 failedAt,
                 failure.getClass().getSimpleName(),
                 current.lastBatch()));
+        observe(polledAt, failedAt, null, failure);
+    }
+
+    private void observe(
+            java.time.Instant startedAt,
+            java.time.Instant completedAt,
+            OutboxDispatchBatchResult batch,
+            Throwable failure) {
+        if (hooks.isEmpty()) {
+            return;
+        }
+
+        OutboxBacklogSnapshot backlog = null;
+        if (backlogProvider != null) {
+            try {
+                backlog = backlogProvider.getSnapshot().join();
+            } catch (RuntimeException snapshotFailure) {
+                LOGGER.log(System.Logger.Level.DEBUG,
+                        "Transactional outbox monitoring snapshot failed", snapshotFailure);
+            }
+        }
+
+        Double oldestAgeMs = backlog != null && backlog.oldestUndispatchedAtUtc() != null
+                ? Math.max(0, java.time.Duration.between(
+                        backlog.oldestUndispatchedAtUtc(), completedAt).toMillis()) * 1.0
+                : null;
+        OutboxDeliveryHookEvent event = new OutboxDeliveryHookEvent(
+                completedAt,
+                options.getServiceName(),
+                options.getOwnerId(),
+                failure == null,
+                Math.max(0, java.time.Duration.between(startedAt, completedAt).toNanos() / 1_000_000.0),
+                batch == null ? 0 : batch.leased(),
+                batch == null ? 0 : batch.dispatched(),
+                batch == null ? 0 : batch.failed(),
+                batch == null ? 0 : batch.lostLeases(),
+                backlog == null ? null : backlog.pending(),
+                backlog == null ? null : backlog.leased(),
+                backlog == null ? null : backlog.retrying(),
+                backlog == null ? null : backlog.dispatched(),
+                backlog == null ? null : backlog.dead(),
+                backlog == null ? null : backlog.cancelled(),
+                oldestAgeMs,
+                failure == null ? null : failure.getClass().getSimpleName());
+
+        for (BusHook hook : hooks) {
+            try {
+                hook.handle(event);
+            } catch (RuntimeException hookFailure) {
+                LOGGER.log(System.Logger.Level.WARNING,
+                        "MyServiceBus hook " + hook.getClass().getName() + " failed", hookFailure);
+            }
+        }
     }
 
     private void updateStatus(java.util.function.UnaryOperator<OutboxDeliveryStatus> update) {

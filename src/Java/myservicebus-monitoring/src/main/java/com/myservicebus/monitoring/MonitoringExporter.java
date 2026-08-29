@@ -7,6 +7,8 @@ import java.net.http.HttpResponse;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.Executors;
@@ -23,6 +25,7 @@ import com.myservicebus.BusHook;
 import com.myservicebus.BusHookEvent;
 import com.myservicebus.BusLifecycleHookEvent;
 import com.myservicebus.MessageOperationHookEvent;
+import com.myservicebus.OutboxDeliveryHookEvent;
 import com.myservicebus.inspection.BusInspectionProvider;
 
 public final class MonitoringExporter implements BusHook, AutoCloseable {
@@ -178,7 +181,7 @@ public final class MonitoringExporter implements BusHook, AutoCloseable {
         if (busEvent instanceof BusLifecycleHookEvent lifecycle) {
             return new MonitoringProtocol.Observation(
                     sequence.incrementAndGet(), lifecycle.occurredAtUtc(), "bus_" + lifecycle.state(), true,
-                    null, null, null, lifecycle.busAddress(), null, null, null, null, null, null, null, null, null);
+                    null, null, null, lifecycle.busAddress(), null, null, null, null, null, null, null, null, null, null);
         }
         if (busEvent instanceof MessageOperationHookEvent operation) {
             return new MonitoringProtocol.Observation(
@@ -186,9 +189,33 @@ public final class MonitoringExporter implements BusHook, AutoCloseable {
                     operation.messageType(), operation.messageUrn(), operation.endpointName(), operation.destinationAddress(),
                     operation.durationMs(), operation.exceptionType(), operation.exceptionMessage(), operation.correlationId(),
                     operation.conversationId(), operation.traceId(), operation.spanId(), operation.retryAttempt(),
-                    operation.retryLimit());
+                    operation.retryLimit(), null);
+        }
+        if (busEvent instanceof OutboxDeliveryHookEvent outbox) {
+            Map<String, String> properties = new LinkedHashMap<>();
+            properties.put("service_name", outbox.serviceName());
+            properties.put("owner_id", outbox.ownerId());
+            properties.put("batch_leased", format(outbox.batchLeased()));
+            properties.put("batch_dispatched", format(outbox.batchDispatched()));
+            properties.put("batch_failed", format(outbox.batchFailed()));
+            properties.put("batch_lost_leases", format(outbox.batchLostLeases()));
+            properties.put("pending", format(outbox.pending()));
+            properties.put("leased", format(outbox.leased()));
+            properties.put("retrying", format(outbox.retrying()));
+            properties.put("stored_dispatched", format(outbox.storedDispatched()));
+            properties.put("dead", format(outbox.dead()));
+            properties.put("cancelled", format(outbox.cancelled()));
+            properties.put("oldest_undispatched_age_ms", format(outbox.oldestUndispatchedAgeMs()));
+            return new MonitoringProtocol.Observation(
+                    sequence.incrementAndGet(), outbox.occurredAtUtc(), "outbox_dispatch_cycle", outbox.succeeded(),
+                    null, null, outbox.serviceName(), null, outbox.durationMs(), outbox.failureCategory(), null,
+                    null, null, null, null, null, null, properties);
         }
         return null;
+    }
+
+    private static String format(Object value) {
+        return value == null ? "" : value.toString();
     }
 
     @Override

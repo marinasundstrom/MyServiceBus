@@ -5,10 +5,19 @@ import java.time.Duration;
 import java.util.UUID;
 
 public final class OutboxDeliveryOptions {
+    private String serviceName = "outbox";
     private String ownerId = ManagementFactory.getRuntimeMXBean().getName() + "-" + UUID.randomUUID();
     private int batchSize = 100;
     private Duration leaseDuration = Duration.ofMinutes(1);
     private Duration pollInterval = Duration.ofSeconds(1);
+
+    public String getServiceName() {
+        return serviceName;
+    }
+
+    public void setServiceName(String serviceName) {
+        this.serviceName = serviceName;
+    }
 
     public String getOwnerId() {
         return ownerId;
@@ -43,6 +52,9 @@ public final class OutboxDeliveryOptions {
     }
 
     void validate() {
+        if (serviceName == null || serviceName.isBlank()) {
+            throw new IllegalArgumentException("serviceName must not be blank");
+        }
         if (ownerId == null || ownerId.isBlank()) {
             throw new IllegalArgumentException("ownerId must not be blank");
         }

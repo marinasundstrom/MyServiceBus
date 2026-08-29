@@ -47,6 +47,13 @@ public sealed class MonitoringApiClient
             cancellationToken).ConfigureAwait(false)
             ?? [];
 
+    public async Task<IReadOnlyList<MonitoringOutboxDispatcherSummary>> GetOutboxDispatchers(
+        CancellationToken cancellationToken)
+        => await httpClient.GetFromJsonAsync<MonitoringOutboxDispatcherSummary[]>(
+            "/api/monitoring/v1/outbox?windowSeconds=60",
+            cancellationToken).ConfigureAwait(false)
+            ?? [];
+
     public async IAsyncEnumerable<string> WatchChanges(
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
