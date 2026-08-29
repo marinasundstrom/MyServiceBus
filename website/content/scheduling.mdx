@@ -1,0 +1,114 @@
+<p className="docs-kicker">Guide · Delayed delivery</p>
+
+# Choose volatile or durable scheduling explicitly.
+
+<p className="docs-summary">MyServiceBus keeps one familiar scheduling model across C# and Java, while making the selected provider&apos;s durability visible instead of hiding it behind the same API.</p>
+
+<div className="callout callout-accent">
+  <strong>Two useful modes</strong>
+  <p>The default in-memory provider is lightweight and cancellable but loses pending work when the process exits. PostgreSQL Bus Outbox capture persists the final envelope and due time in the application transaction, then dispatches it when eligible.</p>
+</div>
+
+## Familiar concepts, platform-native APIs
+
+C# follows the MassTransit-familiar `IMessageScheduler`, `SchedulePublish`, `ScheduleSend`, scheduled handle, and cancellation vocabulary. Java exposes the equivalent model with `Instant`, `Duration`, `CompletionStage`, and Java naming.
+
+```csharp
+var scheduler = scope.ServiceProvider.GetRequiredService<IMessageScheduler>();
+var dueAt = DateTime.UtcNow.AddMinutes(5);
+
+var handle = await scheduler.SchedulePublish(
+    dueAt,
+    new PaymentReminder(orderId));
+
+if (scheduler.SupportsCancellation)
+    await scheduler.CancelScheduledPublish(handle);
+```
+
+```java
+MessageScheduler scheduler = scope.getRequiredService(MessageScheduler.class);
+Instant dueAt = Instant.now().plus(Duration.ofMinutes(5));
+
+ScheduledMessageHandle handle = scheduler
+    .schedulePublish(dueAt, new PaymentReminder(orderId))
+    .toCompletableFuture().join();
+
+if (scheduler.supportsCancellation()) {
+    scheduler.cancelScheduledPublish(handle).toCompletableFuture().join();
+}
+```
+
+The default provider reports `Volatile` / `VOLATILE`. Successful scheduling means the local process accepted the timer—not that a broker or database accepted durable work.
+
+## Persist delayed intent with the outbox
+
+Inside an active PostgreSQL Bus Outbox transaction, set the due time on the ordinary scoped publish or send context. MyServiceBus stores the serialized envelope immediately but does not lease it before the due time.
+
+```csharp
+using (outboxSession.UsePostgreSql(connection, transaction, "orders-service"))
+{
+    await publishEndpoint.Publish(new PaymentReminder(orderId), context =>
+        context.SetScheduledEnqueueTime(DateTime.UtcNow.AddHours(1)));
+}
+
+await transaction.CommitAsync();
+```
+
+```java
+try (OutboxSession.Registration ignored = PostgreSqlOutboxSession.useTransaction(
+        outboxSession, connection, "orders-service")) {
+    publishEndpoint.publish(new PaymentReminder(orderId), context ->
+        context.setScheduledEnqueueTime(Instant.now().plus(Duration.ofHours(1)))).join();
+}
+
+connection.commit();
+```
+
+For the typed scheduler API, register the PostgreSQL provider before scheduling in the active transaction:
+
+```csharp
+services.AddPostgreSqlMessageScheduler("orders-service");
+
+ScheduledMessageHandle handle;
+using (outboxSession.UsePostgreSql(connection, transaction, "orders-service"))
+{
+    handle = await scheduler.SchedulePublish(dueAt, new PaymentReminder(orderId));
+}
+await transaction.CommitAsync();
+
+ScheduleCancellationResult result = await scheduler.CancelScheduledPublish(handle);
+```
+
+```java
+PostgreSqlScheduling.addMessageScheduler(services, dataSource, "orders-service");
+
+ScheduledMessageHandle handle;
+try (OutboxSession.Registration ignored = PostgreSqlOutboxSession.useTransaction(
+        outboxSession, connection, "orders-service")) {
+    handle = scheduler.schedulePublish(dueAt, new PaymentReminder(orderId))
+            .toCompletableFuture().join();
+}
+connection.commit();
+
+ScheduleCancellationResult result = scheduler.cancelScheduledPublish(handle)
+        .toCompletableFuture().join();
+```
+
+This path survives process restart and retains stable record and message identities. Cancel after the producing transaction commits. Cancellation and dispatcher leasing race atomically, so the result distinguishes cancellation from a dispatcher that already acquired the record. Repeated cancellation is idempotent.
+
+## Plug in a durable scheduling service
+
+`IScheduleMessageProvider` in C# and `ScheduleMessageProvider` in Java are message-aware extension points. A provider can serialize and persist intent in Quartz.NET, Quartz Scheduler, a broker-native scheduler, or an external service. The older callback-level `IJobScheduler` / `JobScheduler` seam remains useful for in-process timing and deterministic tests, but callbacks cannot honestly be restart-safe.
+
+<div className="callout">
+  <strong>Quartz.NET is a target, not a current claim</strong>
+  <p>The provider boundary is ready for an adapter. A production claim waits for persisted acceptance, restart recovery, due-time boundaries, cancellation races, and ambiguous-dispatch tests. Recurring schedules are also future work.</p>
+</div>
+
+## How this relates to MassTransit
+
+MassTransit supports transport-based scheduling and service schedulers such as Quartz.NET and Hangfire. MyServiceBus preserves that useful distinction and familiar C# vocabulary. It deliberately adds an explicit volatile/durable capability and a corresponding Java provider contract. It does not yet claim MassTransit scheduler breadth or source-compatible scheduler providers.
+
+Use [MassTransit&apos;s scheduler guide](https://masstransit.massient.com/configuration/schedulers) as conceptual background, then use this page for the MyServiceBus guarantee.
+
+<NextCard href="/docs/transactional-outbox" label="Durable foundation" title="Commit scheduled intent with application state" />

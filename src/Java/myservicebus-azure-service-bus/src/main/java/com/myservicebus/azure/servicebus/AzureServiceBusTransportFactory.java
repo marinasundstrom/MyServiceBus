@@ -102,7 +102,7 @@ public final class AzureServiceBusTransportFactory implements TransportFactory, 
                 .processor()
                 .queueName(projected.queueName())
                 .disableAutoComplete()
-                .maxConcurrentCalls(1)
+                .maxConcurrentCalls(projected.concurrentMessageLimit())
                 .prefetchCount(prefetchCount)
                 .processMessage(context -> transportReference.get().process(context))
                 .processError(context -> transportReference.get().processError(context))
@@ -196,7 +196,8 @@ public final class AzureServiceBusTransportFactory implements TransportFactory, 
                 topology.temporary(),
                 topology.prefetchCount(),
                 topology.bindings(),
-                topology.transportOptions());
+                topology.transportOptions(),
+                topology.concurrentMessageLimit());
     }
 
     private String formatTemporaryEndpointName(String endpointName) {

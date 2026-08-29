@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.UUID;
 
 /**
  * Send endpoint for the in-memory mediator transport.
@@ -53,6 +54,46 @@ public class MediatorSendEndpoint implements SendEndpoint {
     }
 
     private CompletableFuture<Void> dispatch(SendContext context) {
+        return dispatch(context, provider, null);
+    }
+
+    public <TResponse> CompletableFuture<TResponse> request(
+            SendContext context,
+            Class<TResponse> responseType) {
+        String responseAddress = "loopback://mediator-response/"
+                + UUID.randomUUID().toString().replace("-", "");
+        context.setRequestId(context.getRequestId() != null ? context.getRequestId() : UUID.randomUUID());
+        context.setResponseAddress(java.net.URI.create(responseAddress));
+        CompletableFuture<Object> captured = new CompletableFuture<>();
+        com.myservicebus.SendEndpoint capturingEndpoint = new com.myservicebus.SendEndpoint() {
+            @Override
+            public <T> CompletableFuture<Void> send(T message, CancellationToken cancellationToken) {
+                if (!responseType.isInstance(message)) {
+                    return CompletableFuture.failedFuture(new com.myservicebus.MediatorResponseTypeException(
+                            context.getMessage().getClass(), responseType, message.getClass()));
+                }
+                captured.complete(message);
+                return CompletableFuture.completedFuture(null);
+            }
+        };
+        com.myservicebus.SendEndpointProvider responseProvider = uri -> responseAddress.equals(uri)
+                ? capturingEndpoint
+                : provider.getSendEndpoint(uri);
+
+        return dispatch(context, responseProvider, responseAddress).thenCompose(ignored -> {
+            if (!captured.isDone()) {
+                return CompletableFuture.failedFuture(new IllegalStateException(
+                        "Mediator handler completed without producing a response of type '"
+                                + responseType.getName() + "'."));
+            }
+            return captured.thenApply(responseType::cast);
+        });
+    }
+
+    private CompletableFuture<Void> dispatch(
+            SendContext context,
+            com.myservicebus.SendEndpointProvider contextProvider,
+            String responseAddress) {
         Object message = context.getMessage();
         TopologyRegistry registry = serviceProvider.getService(TopologyRegistry.class);
         List<ConsumerTopology> consumerTopologies = registry.getConsumers();
@@ -90,13 +131,14 @@ public class MediatorSendEndpoint implements SendEndpoint {
                 ConsumeContext<Object> ctx = new ConsumeContext<>(
                         message,
                         new HashMap<>(),
-                        null,
+                        responseAddress,
                         null,
                         null,
                         context.getCancellationToken(),
-                        provider,
+                        contextProvider,
                         java.net.URI.create("loopback://localhost/"),
                         entityName -> "exchange:" + entityName,
+                        context.getMessageId(),
                         context.getRequestId(),
                         context.getCorrelationId(),
                         context.getConversationId(),

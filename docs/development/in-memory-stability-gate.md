@@ -33,12 +33,15 @@ Matching C# and Java tests must define and verify:
 10. concurrent dispatch, ordering, and handler-failure behavior with explicit guarantees
 11. stable topology snapshots and capability descriptors that do not imply broker primitives
 12. equivalent harness observations and assertion timing in both languages
+13. mediator `Send` cardinality, result dispatch, and reuse across handlers, consumers, and consumer methods
 
 Every unsupported MassTransit mediator or in-memory feature must be documented rather than approximated silently.
 
 ## Multiple-consumer delivery contract
 
-Each compatible consumer registration is an independent local delivery. The mediator and in-memory harness invoke every matched consumer and complete the dispatch only after all matched deliveries settle. A failure from one consumer fails the overall dispatch, but it does not suppress invocation of the other matched consumers.
+Each compatible consumer registration is an independent local delivery for `Publish`, directed endpoint send, and harness delivery. Those operations invoke every matched consumer and complete only after all matched deliveries settle. A failure from one consumer fails the overall dispatch, but it does not suppress invocation of the other matched consumers.
+
+Mediator `Send` has a different, command/query-oriented contract: it requires exactly one compatible registration before dispatch begins. Missing and ambiguous registrations fail without invoking a consumer. Handler interfaces, ordinary consumer interfaces, and consumer-method registrations all participate in the same selection rule.
 
 No ordering is promised between independent consumers, including registration order, start order, or completion order. Filters within one consumer pipeline remain ordered according to their pipeline registration contract. Harness consumed observations represent successful consumer completions, so one message may produce multiple consumed records when multiple consumers succeed.
 

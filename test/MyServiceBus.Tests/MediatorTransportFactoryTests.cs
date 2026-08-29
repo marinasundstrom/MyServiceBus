@@ -42,7 +42,7 @@ public class MediatorTransportFactoryTests
         }
     }
 
-    class RequestMessage
+    class RequestMessage : IRequest<ResponseMessage>
     {
         public string Value { get; set; } = string.Empty;
     }
@@ -160,6 +160,33 @@ public class MediatorTransportFactoryTests
         {
             ReceivedToken.TrySetResult(cancellationToken);
             return Task.FromResult(new ResponseMessage { Value = message.Value + "-response" });
+        }
+    }
+
+    class CommandMessage
+    {
+        public string Value { get; set; } = string.Empty;
+    }
+
+    class CommandHandler : Handler<CommandMessage>
+    {
+        public static TaskCompletionSource<CommandMessage> Received = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public override Task Handle(CommandMessage message, CancellationToken cancellationToken)
+        {
+            Received.TrySetResult(message);
+            return Task.CompletedTask;
+        }
+    }
+
+    class SecondCommandHandler : Handler<CommandMessage>
+    {
+        public static int Count;
+
+        public override Task Handle(CommandMessage message, CancellationToken cancellationToken)
+        {
+            Count++;
+            return Task.CompletedTask;
         }
     }
 
@@ -525,5 +552,124 @@ public class MediatorTransportFactoryTests
 
         var token = await ResponseHandler.ReceivedToken.Task;
         Assert.Equal(cts.Token, token);
+    }
+
+    [Fact]
+    public async Task Mediator_send_routes_to_exactly_one_handler_without_destination()
+    {
+        CommandHandler.Received = new TaskCompletionSource<CommandMessage>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddServiceBus(cfg =>
+        {
+            cfg.AddHandler<CommandHandler>();
+            cfg.UsingMediator();
+        });
+
+        await using var provider = services.BuildServiceProvider();
+        var hosted = provider.GetRequiredService<IHostedService>();
+        await hosted.StartAsync(CancellationToken.None);
+
+        await provider.GetRequiredService<IMediator>().Send(new CommandMessage { Value = "sent" });
+
+        Assert.Equal("sent", (await CommandHandler.Received.Task).Value);
+        await hosted.StopAsync(CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task Mediator_send_accepts_an_ordinary_consumer()
+    {
+        SampleConsumer.Received = new TaskCompletionSource<ConsumerMessage>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddServiceBus(cfg =>
+        {
+            cfg.AddConsumer<SampleConsumer>();
+            cfg.UsingMediator();
+        });
+
+        await using var provider = services.BuildServiceProvider();
+        var hosted = provider.GetRequiredService<IHostedService>();
+        await hosted.StartAsync(CancellationToken.None);
+
+        await provider.GetRequiredService<IMediator>().Send(new ConsumerMessage { Value = "consumer" });
+
+        Assert.Equal("consumer", (await SampleConsumer.Received.Task).Value);
+        await hosted.StopAsync(CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task Mediator_publish_fans_out_but_send_rejects_multiple_handlers()
+    {
+        CommandHandler.Received = new TaskCompletionSource<CommandMessage>(TaskCreationOptions.RunContinuationsAsynchronously);
+        SecondCommandHandler.Count = 0;
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddServiceBus(cfg =>
+        {
+            cfg.AddHandler<CommandHandler, CommandMessage>();
+            cfg.AddHandler<SecondCommandHandler, CommandMessage>();
+            cfg.UsingMediator();
+        });
+
+        await using var provider = services.BuildServiceProvider();
+        var hosted = provider.GetRequiredService<IHostedService>();
+        await hosted.StartAsync(CancellationToken.None);
+        var mediator = provider.GetRequiredService<IMediator>();
+
+        await mediator.Publish(new CommandMessage { Value = "published" });
+        Assert.Equal("published", (await CommandHandler.Received.Task).Value);
+        Assert.Equal(1, SecondCommandHandler.Count);
+
+        var exception = await Assert.ThrowsAsync<MediatorHandlerCardinalityException>(() =>
+            mediator.Send(new CommandMessage { Value = "ambiguous" }));
+        Assert.Equal(2, exception.HandlerTypes.Count);
+        await hosted.StopAsync(CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task Mediator_send_returns_handler_result_and_validates_response_type()
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddServiceBus(cfg =>
+        {
+            cfg.AddHandler<ResponseHandler, RequestMessage, ResponseMessage>();
+            cfg.UsingMediator();
+        });
+
+        await using var provider = services.BuildServiceProvider();
+        var hosted = provider.GetRequiredService<IHostedService>();
+        await hosted.StartAsync(CancellationToken.None);
+        var mediator = provider.GetRequiredService<IMediator>();
+
+        var response = await mediator.Send<RequestMessage, ResponseMessage>(new RequestMessage { Value = "query" });
+        Assert.Equal("query-response", response.Value);
+
+        ResponseMessage inferredResponse = await mediator.Send(new RequestMessage { Value = "inferred" });
+        Assert.Equal("inferred-response", inferredResponse.Value);
+
+        var requestResponse = await mediator.CreateRequestClient<RequestMessage>()
+            .GetResponseAsync<ResponseMessage>(new RequestMessage { Value = "client" });
+        Assert.Equal("client-response", requestResponse.Message.Value);
+        await Assert.ThrowsAsync<MediatorResponseTypeException>(() =>
+            mediator.Send<RequestMessage, CommandMessage>(new RequestMessage { Value = "wrong" }));
+        await hosted.StopAsync(CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task Mediator_send_rejects_missing_handler()
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddServiceBus(cfg => cfg.UsingMediator());
+
+        await using var provider = services.BuildServiceProvider();
+        var hosted = provider.GetRequiredService<IHostedService>();
+        await hosted.StartAsync(CancellationToken.None);
+
+        await Assert.ThrowsAsync<MediatorHandlerNotFoundException>(() =>
+            provider.GetRequiredService<IMediator>().Send(new CommandMessage()));
+        await hosted.StopAsync(CancellationToken.None);
     }
 }

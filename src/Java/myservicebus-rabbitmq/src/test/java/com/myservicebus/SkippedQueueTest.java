@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
+import java.io.IOException;
 
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -42,7 +43,32 @@ class SkippedQueueTest {
         Delivery delivery = new Delivery(envelope, props, body);
         callback.handle("tag", delivery);
 
-        verify(channel).basicPublish(eq("input_skipped"), eq(""), eq(props), eq(body));
+        verify(channel).basicPublish(eq("input_skipped"), eq(""), eq(true), eq(props), eq(body));
+        verify(channel).waitForConfirmsOrDie();
         verify(channel).basicAck(1L, false);
+    }
+
+    @Test
+    void nacksUnknownMessageWhenSkippedMoveIsNotConfirmed() throws Exception {
+        Channel channel = mock(Channel.class);
+        ArgumentCaptor<DeliverCallback> captor = ArgumentCaptor.forClass(DeliverCallback.class);
+        when(channel.basicConsume(eq("input"), eq(false), captor.capture(), any(CancelCallback.class)))
+                .thenReturn("tag");
+        doThrow(new IOException("confirm failed")).when(channel).waitForConfirmsOrDie();
+
+        Function<TransportMessage, CompletableFuture<Void>> handler = tm -> CompletableFuture.completedFuture(null);
+        LoggerFactory loggerFactory = new Slf4jLoggerFactory();
+        RabbitMqReceiveTransport transport = new RabbitMqReceiveTransport(
+                channel, "input", handler, "fault", s -> false, loggerFactory);
+        transport.start();
+
+        DeliverCallback callback = captor.getValue();
+        AMQP.BasicProperties props = new AMQP.BasicProperties();
+        byte[] body = "{\"messageType\":[\"urn:message:test\"],\"message\":{}}".getBytes();
+        Envelope envelope = new Envelope(1L, false, "ex", "rk");
+        callback.handle("tag", new Delivery(envelope, props, body));
+
+        verify(channel, never()).basicAck(anyLong(), anyBoolean());
+        verify(channel).basicNack(1L, false, true);
     }
 }

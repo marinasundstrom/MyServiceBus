@@ -294,6 +294,8 @@ public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigura
     public void complete() {
         boolean hasLogger = serviceCollection.getDescriptors().stream()
                 .anyMatch(d -> d.getServiceType().equals(LoggerFactory.class));
+        boolean hasBusOutbox = serviceCollection.getDescriptors().stream()
+                .anyMatch(d -> d.getServiceType().equals(com.myservicebus.persistence.OutboxSession.class));
         if (!hasLogger) {
             serviceCollection.addSingleton(LoggerFactory.class,
                     sp -> () -> new ConsoleLoggerFactory(new ConsoleLoggerConfig()));
@@ -305,11 +307,21 @@ public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigura
                         sp.getService(ConsumeContextProvider.class),
                         sp.getService(TransportSendEndpointProvider.class),
                         sp.getService(LoggerFactory.class),
-                        sp.getService(MessageBus.class)));
+                        sp.getService(MessageBus.class),
+                        hasBusOutbox ? sp.getService(com.myservicebus.persistence.OutboxSession.class) : null,
+                        sp.getService(SendPipe.class),
+                        sp.getService(com.myservicebus.serialization.MessageSerializer.class),
+                        sp.getService(SendContextFactory.class)));
         serviceCollection.addScoped(PublishEndpointProvider.class,
                 sp -> () -> new PublishEndpointProviderImpl(
                         sp.getService(ConsumeContextProvider.class),
-                        sp.getService(MessageBus.class)));
+                        sp.getService(MessageBus.class),
+                        hasBusOutbox ? sp.getService(com.myservicebus.persistence.OutboxSession.class) : null,
+                        sp.getService(TransportFactory.class),
+                        sp.getService(SendPipe.class),
+                        sp.getService(PublishPipe.class),
+                        sp.getService(com.myservicebus.serialization.MessageSerializer.class),
+                        sp.getService(PublishContextFactory.class)));
         serviceCollection.addScoped(PublishEndpoint.class,
                 sp -> () -> sp.getService(PublishEndpointProvider.class).getPublishEndpoint());
         serviceCollection.addSingleton(TopologyRegistry.class, sp -> () -> topology);

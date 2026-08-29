@@ -14,6 +14,10 @@ public class MediatorSendEndpointProvider implements TransportSendEndpointProvid
 
     @Override
     public SendEndpoint getSendEndpoint(String uri) {
+        return getMediatorSendEndpoint();
+    }
+
+    MediatorSendEndpoint getMediatorSendEndpoint() {
         return new MediatorSendEndpoint(serviceProvider, this);
     }
 

@@ -35,13 +35,15 @@ class RabbitMqReceiveEndpointTopologyTest {
         ReceiveEndpointTransportTopology endpoint = new ReceiveEndpointTransportTopology(
                 "orders", true, false, 16,
                 List.of(binding("Contracts:OrderSubmitted"), binding("Contracts:OrderUpdated")),
-                Map.of("x-queue-type", "quorum"));
+                Map.of("x-queue-type", "quorum"),
+                4);
 
         RabbitMqReceiveEndpointTopology projection = RabbitMqReceiveEndpointTopology.project(endpoint);
 
         assertEquals(2, projection.bindings().size());
         assertEquals("Contracts:OrderUpdated", projection.bindings().get(1).getEntityName());
         assertEquals("quorum", projection.queueArguments().get("x-queue-type"));
+        assertEquals(4, projection.concurrentMessageLimit());
     }
 
     private static MessageBinding binding(String entityName) {

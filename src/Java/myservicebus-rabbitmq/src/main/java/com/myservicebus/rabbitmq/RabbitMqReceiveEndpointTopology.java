@@ -12,7 +12,16 @@ public record RabbitMqReceiveEndpointTopology(
         String queueName,
         List<MessageBinding> bindings,
         int prefetchCount,
-        Map<String, Object> queueArguments) {
+        Map<String, Object> queueArguments,
+        int concurrentMessageLimit) {
+
+    public RabbitMqReceiveEndpointTopology(
+            String queueName,
+            List<MessageBinding> bindings,
+            int prefetchCount,
+            Map<String, Object> queueArguments) {
+        this(queueName, bindings, prefetchCount, queueArguments, 1);
+    }
 
     public RabbitMqReceiveEndpointTopology {
         if (queueName == null || queueName.isBlank()) {
@@ -26,6 +35,9 @@ public record RabbitMqReceiveEndpointTopology(
         }
         if (prefetchCount < 0) {
             throw new IllegalArgumentException("RabbitMQ receive endpoint prefetch count cannot be negative");
+        }
+        if (concurrentMessageLimit < 1) {
+            throw new IllegalArgumentException("RabbitMQ receive endpoint concurrent message limit must be at least one");
         }
 
         bindings = List.copyOf(bindings);
@@ -50,6 +62,7 @@ public record RabbitMqReceiveEndpointTopology(
                 endpoint.name(),
                 endpoint.bindings(),
                 endpoint.prefetchCount(),
-                endpoint.transportOptions());
+                endpoint.transportOptions(),
+                endpoint.concurrentMessageLimit());
     }
 }

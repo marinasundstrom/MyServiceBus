@@ -22,7 +22,7 @@ await bus.Publish(new SubmitOrder(Guid.NewGuid()));`,
   java: {
     label: 'Java',
     install:
-      "implementation 'io.github.marinasundstrom.myservicebus:myservicebus-rabbitmq:0.1.0-preview.5'",
+      "implementation 'io.github.marinasundstrom.myservicebus:myservicebus-rabbitmq:0.1.0-preview.6'",
     code: `ServiceCollection services = ServiceCollection.create();
 
 services.from(MessageBusServices.class)
@@ -66,18 +66,20 @@ export default function Home() {
       <main id="top">
         <section className="hero">
           <div className="hero-copy">
-            <p className="eyebrow">Messaging that speaks both languages</p>
-            <h1>One service bus. Two ecosystems.</h1>
+            <p className="eyebrow">Asynchronous messaging for .NET and Java</p>
+            <h1>One messaging model for distributed services.</h1>
             <p className="lede">
-              Mix .NET and Java services with the same focused, MassTransit-inspired
-              messaging model—choose the best platform for each application.
+              Publish events and send commands across C# and Java with RabbitMQ
+              or Azure Service Bus. Integrate Java into a MassTransit estate or
+              build cross-platform from the start—with MediatR-compatible
+              in-process dispatch when you need it.
             </p>
             <div className="hero-actions">
               <Link className="primary-button" href="/docs/getting-started">
                 Get started <span aria-hidden="true">→</span>
               </Link>
-              <Link className="text-button" href="/docs/concepts">
-                Explore the concepts
+              <Link className="text-button" href="/docs/why-myservicebus">
+                Why MyServiceBus?
               </Link>
             </div>
             <div className="compatibility-line">
@@ -124,6 +126,30 @@ export default function Home() {
           </div>
         </section>
 
+        <section className="concept-strip" aria-labelledby="adoption-heading">
+          <div className="section-intro">
+            <p className="eyebrow">Where it fits</p>
+            <h2 id="adoption-heading">Three ways to adopt MyServiceBus.</h2>
+          </div>
+          <div className="concept-grid">
+            <article>
+              <span className="concept-number">01</span>
+              <h3>Extend a .NET estate</h3>
+              <p>Connect Java services to MassTransit through the documented common interoperability subset.</p>
+            </article>
+            <article>
+              <span className="concept-number">02</span>
+              <h3>Replace MediatR</h3>
+              <p>Handle local commands, queries, and notifications through dedicated APIs and generated dispatch.</p>
+            </article>
+            <article>
+              <span className="concept-number">03</span>
+              <h3>Start cross-platform</h3>
+              <p>Choose C# or Java per service while keeping one permissively licensed messaging core.</p>
+            </article>
+          </div>
+        </section>
+
         <section className="concept-strip" id="concepts" aria-labelledby="concept-heading">
           <div className="section-intro">
             <p className="eyebrow">The essentials</p>
@@ -160,6 +186,8 @@ export default function Home() {
             <Link href="/docs/rabbitmq"><span>Transport</span><h3>RabbitMQ</h3><p>Understand recovery, failure queues, topology, and tuning.</p><b>Configure transport →</b></Link>
             <Link href="/docs/azure-service-bus"><span>Preview transport</span><h3>Azure Service Bus</h3><p>Provision Azure, configure either client, and understand the verified interoperability boundary.</p><b>Configure the transport →</b></Link>
             <Link href="/docs/testing"><span>Confidence</span><h3>Testing</h3><p>Exercise message flows with the aligned in-memory harness.</p><b>Write a test →</b></Link>
+            <Link href="/docs/transactional-outbox"><span>Production reliability</span><h3>Transactional outbox</h3><p>Commit PostgreSQL application state and outgoing messaging intent together in C# or Java.</p><b>Explore the outbox →</b></Link>
+            <Link href="/docs/mediator"><span>In process</span><h3>Mediator pattern</h3><p>Use generated dispatch for local commands, queries, and notifications through reusable consumers and pipelines.</p><b>Use the mediator →</b></Link>
             <Link href="/docs/native-aot"><span>Work in progress</span><h3>AOT compilation</h3><p>Generate consumer dispatch for .NET NativeAOT and GraalVM Native Image.</p><b>See the proof of concept →</b></Link>
           </div>
         </section>

@@ -2,6 +2,8 @@
 
 This matrix tracks behavioral parity across the two client implementations. The expected semantics are defined in the [MyServiceBus Specification](../specs/myservicebus-spec.md).
 
+This is the **maintainer ledger**, not the public adoption matrix. It may enumerate runtime internals, generator coverage, partial implementation, and evidence gaps needed to plan development. The website keeps a separate, curated adopter view organized around public capabilities, compatibility choices, readiness, and likely change. An implementation entry here does not become a public production claim until its behavior and evidence can be stated at that higher level.
+
 Parity in this document means equivalent concepts, behavior, and wire outcomes. Shared concepts should normally have recognizable counterpart types in both clients when that helps users navigate between them. C# intentionally uses a MassTransit-familiar surface; Java intentionally expresses the same factory-based standalone setup, dependency-injection integration, and fluent configuration model in Java conventions. Type correspondence does not require matching namespace/package trees, modules, overloads, inheritance, or internal object graphs. Keeping the public model recognizable while allowing native platform structure reduces migration and polyglot-team costs. MyServiceBus-owned DI and logging contracts remain small integration seams with optional ecosystem adapters.
 
 | Feature | C# Implementation | Java Implementation | Notes |
@@ -9,14 +11,39 @@ Parity in this document means equivalent concepts, behavior, and wire outcomes. 
 | Message sending | Implemented | Implemented | `ConsumeContext` resolves send endpoints in both clients. |
 | Publishing | Implemented | Implemented | Messages are routed to exchanges derived from message type conventions. |
 | Request–response helpers | Implemented | Implemented | Both clients provide `GenericRequestClient` and scoped client factories (`IRequestClientFactory` in C#, `RequestClientFactory` in Java). |
+| Mediator intent API | `IMediator` with `Task`-based `Send` and `Publish` | `Mediator` with `CompletableFuture`-based `send` and `publish` | Send requires exactly one type-routed handler; publish fans out. Destination-aware delivery remains outside the narrow interface. |
+| Mediator registration shapes | Handler, consumer, and reflected/generated consumer methods | Handler, consumer, and reflected/generated consumer methods | All shapes share topology and pipelines and can also be used with broker-backed transports. |
 | Fault handling | Implemented | Implemented | Java mediator dispatches faults when consumers throw. |
 | Telemetry & host metadata | Implemented | Implemented | Both clients capture detailed host metadata for diagnostics. |
 | Header mapping | Implemented | Implemented | Headers beginning with `_` map to native transport properties. |
 | Cancellation propagation | Implemented | Implemented | Pipe contexts expose cancellation tokens. |
 | Transport abstraction | Implemented | Implemented | RabbitMQ and Azure Service Bus are verified preview profiles with corresponding C# and Java adapters. |
 | Retries | Implemented | Implemented | Both clients require explicit configuration to retry consumers. |
+| PostgreSQL Bus Outbox MVP | `UsePostgreSql` scoped capture, `AddPostgreSqlOutboxDelivery`, and `PostgreSqlOutboxHealth` | `PostgreSqlOutboxSession.useTransaction`, `PostgreSqlOutboxDelivery.create`, and `PostgreSqlOutboxHealth` | The normalized, service-partitioned schema and delivery semantics align across C# and Java. Consumer Outbox middleware, cleanup, SQL Server, and production promotion remain open. The schema is not a MassTransit database-compatibility contract. |
+| Message scheduling | `IMessageScheduler`, `IScheduleMessageProvider`, time-first absolute overloads, and `ScheduleCancellationResult` | `MessageScheduler`, `ScheduleMessageProvider`, `Instant`/`Duration`, `CompletionStage`, and `ScheduleCancellationResult` | Default providers are explicitly volatile. PostgreSQL providers persist delayed intent and cancellation with equivalent lease-race outcomes. Recurring schedules and provider-specific adapters remain open. |
 | Configuration API (host, queue, message overrides, endpoint formatter) | Implemented | Implemented | Both clients support overriding names and automatic endpoint configuration with custom formatters. |
 | Logging and tracing flow | Implemented | Implemented | Both clients emit MassTransit-style lifecycle and message-flow logs and propagate OpenTelemetry context across send/publish/consume pipelines. |
+
+## Readiness vocabulary
+
+The website API and capability status view tracks what adopters can use today and what could still change:
+
+- **Verified preview** means matching C# and Java capability with focused automated evidence. It does not mean a stable pre-1.0 API or that every production failure gate is closed.
+- **MVP preview** means a coherent evaluation path exists but named operational or promotion work remains.
+- **Experimental** means the design or operational contract can still change materially.
+
+MassTransit API familiarity and the pinned 8.5.1 wire subset are reported separately. Neither implies source compatibility, shared outbox tables, or compatibility with future MassTransit releases.
+
+API differences are also classified by intent:
+
+- **Aligned + interoperable** is the pinned common wire subset.
+- **Idiomatic equivalent** preserves the responsibility and observable behavior with a platform-native API shape.
+- **Deliberate divergence** or **MyServiceBus-native** is a boundary the project chooses and owns, such as the cross-platform outbox schema, Java composition model, mediator emphasis, and generated handler surfaces.
+- **Temporary gap** is unfinished parity or production work, such as recurring scheduling or restart-boundary promotion evidence; it must not be presented as an intentional design advantage.
+
+Migration, feature, and compatibility guides should use these classifications so an adopter can distinguish a durable product choice from preview incompleteness.
+
+Keep the two views synchronized by meaning, not by copying rows mechanically. This ledger is exhaustive and may change with implementation details. The website should promote only decision-relevant capabilities and link them to authoritative user guides; it should not expose generator bookkeeping, internal descriptor construction, or every test permutation.
 
 ## Consumer declaration and generation
 

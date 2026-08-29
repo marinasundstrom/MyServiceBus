@@ -3,8 +3,10 @@ package com.myservicebus;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.net.URI;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -96,6 +98,14 @@ class MessageBusLoggingTest {
         bus.publish(new TestMessage()).join();
         bus.stop();
 
+        bus.start();
+        transportFactory.timeoutOnStop = true;
+        Duration stopTimeout = Duration.ofMillis(50);
+        BusStopTimeoutException stopException = assertThrows(
+                BusStopTimeoutException.class,
+                () -> bus.stop(stopTimeout));
+        assertEquals(stopTimeout, stopException.getTimeout());
+
         String exchangeName = EntityNameFormatter.format(TestMessage.class);
         String destinationAddress = "loopback://localhost/exchange/" + exchangeName;
         String messageUrn = MessageUrn.forClass(TestMessage.class);
@@ -108,6 +118,7 @@ class MessageBusLoggingTest {
 
     static class InMemoryTransportFactory implements TransportFactory {
         private final HashMap<String, List<Function<TransportMessage, CompletableFuture<Void>>>> handlersByExchange = new HashMap<>();
+        private boolean timeoutOnStop;
 
         @Override
         public SendTransport getSendTransport(URI address) {
@@ -129,6 +140,13 @@ class MessageBusLoggingTest {
 
                 @Override
                 public void stop() {
+                }
+
+                @Override
+                public void stop(Duration timeout) {
+                    if (timeoutOnStop) {
+                        throw new BusStopTimeoutException(timeout);
+                    }
                 }
             };
         }

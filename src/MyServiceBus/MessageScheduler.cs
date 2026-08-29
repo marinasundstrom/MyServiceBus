@@ -6,49 +6,44 @@ namespace MyServiceBus;
 
 public class MessageScheduler : IMessageScheduler
 {
-    private readonly IPublishEndpoint _publishEndpoint;
-    private readonly ISendEndpointProvider _sendEndpointProvider;
-    private readonly IJobScheduler _jobScheduler;
+    private readonly IScheduleMessageProvider provider;
 
-    public MessageScheduler(IPublishEndpoint publishEndpoint, ISendEndpointProvider sendEndpointProvider, IJobScheduler jobScheduler)
+    public MessageScheduler(IScheduleMessageProvider provider)
     {
-        _publishEndpoint = publishEndpoint;
-        _sendEndpointProvider = sendEndpointProvider;
-        _jobScheduler = jobScheduler;
+        this.provider = provider;
     }
 
-    public async Task<ScheduledMessageHandle> SchedulePublish<T>(T message, DateTime scheduledTime, CancellationToken cancellationToken = default) where T : class
-    {
-        var tokenId = await _jobScheduler.Schedule(scheduledTime, ct => _publishEndpoint.Publish(message, cancellationToken: ct), cancellationToken);
-        return new ScheduledMessageHandle(tokenId, scheduledTime);
-    }
+    public ScheduleMessageProviderDurability Durability => provider.Durability;
+
+    public bool SupportsCancellation => provider.SupportsCancellation;
+
+    public Task<ScheduledMessageHandle> SchedulePublish<T>(DateTime scheduledTime, T message, CancellationToken cancellationToken = default) where T : class
+        => provider.SchedulePublish(scheduledTime, message, cancellationToken);
+
+    public Task<ScheduledMessageHandle> SchedulePublish<T>(T message, DateTime scheduledTime, CancellationToken cancellationToken = default) where T : class
+        => SchedulePublish(scheduledTime, message, cancellationToken);
 
     public Task<ScheduledMessageHandle> SchedulePublish<T>(T message, TimeSpan delay, CancellationToken cancellationToken = default) where T : class
-        => SchedulePublish(message, DateTime.UtcNow + delay, cancellationToken);
+        => SchedulePublish(DateTime.UtcNow + delay, message, cancellationToken);
 
-    public async Task<ScheduledMessageHandle> ScheduleSend<T>(Uri destination, T message, DateTime scheduledTime, CancellationToken cancellationToken = default) where T : class
-    {
-        async Task Callback(CancellationToken ct)
-        {
-            var endpoint = await _sendEndpointProvider.GetSendEndpoint(destination);
-            await endpoint.Send(message, cancellationToken: ct);
-        }
-        var tokenId = await _jobScheduler.Schedule(scheduledTime, Callback, cancellationToken);
-        return new ScheduledMessageHandle(tokenId, scheduledTime);
-    }
+    public Task<ScheduledMessageHandle> ScheduleSend<T>(Uri destination, DateTime scheduledTime, T message, CancellationToken cancellationToken = default) where T : class
+        => provider.ScheduleSend(destination, scheduledTime, message, cancellationToken);
+
+    public Task<ScheduledMessageHandle> ScheduleSend<T>(Uri destination, T message, DateTime scheduledTime, CancellationToken cancellationToken = default) where T : class
+        => ScheduleSend(destination, scheduledTime, message, cancellationToken);
 
     public Task<ScheduledMessageHandle> ScheduleSend<T>(Uri destination, T message, TimeSpan delay, CancellationToken cancellationToken = default) where T : class
-        => ScheduleSend(destination, message, DateTime.UtcNow + delay, cancellationToken);
+        => ScheduleSend(destination, DateTime.UtcNow + delay, message, cancellationToken);
 
-    public Task CancelScheduledPublish(Guid tokenId, CancellationToken cancellationToken = default)
-        => _jobScheduler.Cancel(tokenId);
+    public Task<ScheduleCancellationResult> CancelScheduledPublish(Guid tokenId, CancellationToken cancellationToken = default)
+        => provider.Cancel(tokenId, cancellationToken);
 
-    public Task CancelScheduledPublish(ScheduledMessageHandle handle, CancellationToken cancellationToken = default)
+    public Task<ScheduleCancellationResult> CancelScheduledPublish(ScheduledMessageHandle handle, CancellationToken cancellationToken = default)
         => CancelScheduledPublish(handle.TokenId, cancellationToken);
 
-    public Task CancelScheduledSend(Guid tokenId, CancellationToken cancellationToken = default)
-        => _jobScheduler.Cancel(tokenId);
+    public Task<ScheduleCancellationResult> CancelScheduledSend(Guid tokenId, CancellationToken cancellationToken = default)
+        => provider.Cancel(tokenId, cancellationToken);
 
-    public Task CancelScheduledSend(ScheduledMessageHandle handle, CancellationToken cancellationToken = default)
+    public Task<ScheduleCancellationResult> CancelScheduledSend(ScheduledMessageHandle handle, CancellationToken cancellationToken = default)
         => CancelScheduledSend(handle.TokenId, cancellationToken);
 }

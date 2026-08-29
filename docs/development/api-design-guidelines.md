@@ -17,6 +17,8 @@ Do not reproduce repository layout mechanically. A C# namespace or assembly is n
 
 Language-specific facilities are legitimate design inputs. C# may use extension methods, optional parameters, delegates, records, `Task`, and `CancellationToken`; Java may use builders, factories, functional interfaces, records where appropriate, `CompletableFuture`, and Java lifecycle conventions. Each client may provide platform-only integration helpers as long as they do not change the portable semantics or create an undocumented protocol difference.
 
+Runtime baselines constrain available language and library features; they do not require lowest-common-denominator APIs. The current C# surface may use the .NET 10 framework and current C# features. Java must keep Java 17-compatible bytecode and public APIs while using modern features available in that baseline. Raising either target is a release-policy change with CI, package, and migration consequences.
+
 For every shared public concept, reviews should answer:
 
 1. What is the corresponding concept in each client?
@@ -44,7 +46,7 @@ Multiple buses in one process are currently unsupported. Do not add C# marker-in
 
 Reconsider this boundary only when a concrete application requirement demonstrates that separate processes are inadequate. Any future proposal must define independent lifecycle, capabilities, endpoint ownership, topology, and telemetry in both reference clients without making single-bus applications more complex.
 
-The in-process mediator is not another hosted bus identity. It is a local dispatch mode that may reuse consumer and pipeline concepts without claiming broker delivery semantics.
+The in-process mediator is not another hosted bus identity. It is a local dispatch mode that reuses handler, consumer, consumer-method, topology, and pipeline concepts without claiming broker delivery semantics. Its narrow C# and Java interfaces expose local intent without destination-aware bus operations; application services should prefer those segregated contracts.
 
 ## Public APIs
 
@@ -55,12 +57,13 @@ Expose only the contracts necessary for application developers:
 - Consumer abstractions (`IConsumer<T>` / `Consumer<T>`), saga and endpoint configuration builders.
 - Exception types that callers might handle.
 - Extension points that allow customization (filters, observers, pipeline specifications).
+- Message-aware provider contracts whose guarantees applications must select explicitly, such as volatile or durable scheduling.
 
 ## Internal APIs
 
 Keep implementation details hidden to maintain flexibility and prevent misuse:
 
-- Transport, topology, serializer, retry and scheduling implementations.
+- Transport, topology, serializer, retry, timer, and provider implementations.
 - Connection handling, caching and pooling mechanisms.
 - Helper utilities and internal conventions.
 - Diagnostic infrastructure beyond lightweight logging and metrics abstractions.

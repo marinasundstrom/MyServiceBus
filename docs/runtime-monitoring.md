@@ -34,6 +34,7 @@ The MVP includes:
 - WebSocket change invalidations
 - a standalone Blazor runtime overview with persisted light, dark, and system themes
 - equivalent exporter behavior for C# and Java
+- first-class outbox dispatcher operations for embedded and standalone workers, including latest backlog, oldest-undispatched age, windowed throughput, failures, lost leases, and cycle latency
 
 The MVP does not yet include authentication, durable storage, configurable retention, alerting or scaling recommendations, broker queue depth, host saturation, or payload-byte limits. The dashboard uses WebSocket invalidations to re-query HTTP snapshots, with a 15-second polling fallback.
 
@@ -64,7 +65,7 @@ Use the sample applications' `/publish`, `/send`, and `/request` routes to creat
 Install the optional exporter package, then register the addon after the bus:
 
 ```bash
-dotnet add package Sundstrom.MyServiceBus.Monitoring --version 0.1.0-preview.5
+dotnet add package Sundstrom.MyServiceBus.Monitoring --version 0.1.0-preview.6
 ```
 
 ```csharp
@@ -92,7 +93,7 @@ The exporter is registered as both an `IBusHook` and a hosted background service
 Reference `myservicebus-monitoring`, add monitoring before building the service provider, and start the exporter after the bus:
 
 ```groovy
-implementation 'io.github.marinasundstrom.myservicebus:myservicebus-monitoring:0.1.0-preview.5'
+implementation 'io.github.marinasundstrom.myservicebus:myservicebus-monitoring:0.1.0-preview.6'
 ```
 
 ```java
@@ -124,6 +125,10 @@ Hooks are a core extension seam, not a monitoring-specific API. Applications and
 
 The monitoring exporter is one implementation of this seam. Its bounded local queue, batching, heartbeats, and collector protocol remain in the optional monitoring package.
 
+Outbox dispatcher monitoring is implemented for C# and Java delivery services. Each polling cycle contributes one bounded observation for its logical service partition and worker owner. The collector combines the latest backlog snapshot with windowed lease, dispatch, failure, and lost-lease counts, and the dashboard presents those signals in **Dispatcher operations**. Embedded delivery and standalone worker fleets use the same model, so a slow or undersized dispatcher remains visible as a delivery bottleneck.
+
+The monitoring service never connects directly to application databases or mutates persistence state. Message bodies, arbitrary headers, persisted record identities, SQL, and connection details remain excluded. Inbox duplicate outcomes, cleanup progress, alerting, and durable monitoring history are not yet implemented. See the [runtime monitoring proposal](proposals/runtime-monitoring.md#outbox-and-inbox-operations) for the longer-term boundary.
+
 ## Service API
 
 The prototype uses `/api/monitoring/v1` for both ingest and query operations.
@@ -140,6 +145,7 @@ The prototype uses `/api/monitoring/v1` for both ingest and query operations.
 | `GET` | `/metrics?application=...&windowSeconds=60&byInstance=true` | Query bounded-window rates, counts, and consume latency |
 | `GET` | `/metrics/timeseries?windowSeconds=300&bucketSeconds=5` | Query bucketed rates for real-time graphs |
 | `GET` | `/flow?application=...&windowSeconds=300` | Query observed correlated application flow |
+| `GET` | `/outbox?application=...&windowSeconds=60` | Query dispatcher state and windowed outbox throughput |
 | WebSocket | `/stream` | Receive change invalidations |
 
 WebSocket messages indicate that metadata or observations changed; clients should re-query the authoritative HTTP read model. They are not a durable event stream.
@@ -175,8 +181,8 @@ Failed-message inspection intentionally excludes message bodies and arbitrary he
 The collector and dashboard are independently deployable applications, not client-library packages. Versioned Linux images for AMD64 and ARM64 are published separately:
 
 ```text
-ghcr.io/marinasundstrom/myservicebus-monitoring-collector:0.1.0-preview.5
-ghcr.io/marinasundstrom/myservicebus-monitoring-dashboard:0.1.0-preview.5
+ghcr.io/marinasundstrom/myservicebus-monitoring-collector:0.1.0-preview.6
+ghcr.io/marinasundstrom/myservicebus-monitoring-dashboard:0.1.0-preview.6
 ```
 
 The collector listens on port `8080`. The dashboard also listens on port `8080` and reads its collector base address from the `MonitoringService` configuration key (for example, the `MonitoringService` environment variable). The current in-memory collector is intended for local development and controlled evaluation. Before exposing it outside a trusted network, add host-level authentication and authorization, request and payload limits, TLS, durable persistence if history is required, and an explicit retention policy. Do not send message bodies, arbitrary headers, credentials, or broker-management data through the monitoring protocol.

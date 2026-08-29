@@ -56,6 +56,9 @@ public class ServiceBusHostedServiceTests
             return Task.CompletedTask;
         }
 
+        public Task StopAsync(TimeSpan timeout, CancellationToken cancellationToken = default)
+            => StopAsync(cancellationToken);
+
         public Task Publish<T>(T message, Action<IPublishContext>? contextCallback = null, CancellationToken cancellationToken = default)
             where T : class => Task.CompletedTask;
 
@@ -70,7 +73,7 @@ public class ServiceBusHostedServiceTests
             where TMessage : class
             where TConsumer : class, IConsumer<TMessage> => throw new NotSupportedException();
 
-        public Task AddHandler<TMessage>(string queueName, string exchangeName, Func<ConsumeContext<TMessage>, Task> handler, int? retryCount = null, TimeSpan? retryDelay = null, ushort? prefetchCount = null, IDictionary<string, object?>? queueArguments = null, Serialization.IMessageSerializer? serializer = null, CancellationToken cancellationToken = default)
+        public Task AddHandler<TMessage>(string queueName, string exchangeName, Func<ConsumeContext<TMessage>, Task> handler, int? retryCount = null, TimeSpan? retryDelay = null, ushort? prefetchCount = null, IDictionary<string, object?>? queueArguments = null, Serialization.IMessageSerializer? serializer = null, CancellationToken cancellationToken = default, int? concurrentMessageLimit = null)
             where TMessage : class => throw new NotSupportedException();
     }
 }

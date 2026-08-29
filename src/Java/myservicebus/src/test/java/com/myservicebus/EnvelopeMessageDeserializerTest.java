@@ -28,7 +28,8 @@ public class EnvelopeMessageDeserializerTest {
         Envelope<Fault<InnerMessage>> envelope = new Envelope<>();
         envelope.setMessage(fault);
         envelope.setMessageType(List.of("urn:message:Fault", MessageUrn.forClass(InnerMessage.class)));
-        envelope.setMessageId(UUID.randomUUID());
+        UUID messageId = UUID.randomUUID();
+        envelope.setMessageId(messageId);
 
         ObjectMapper mapper = new ObjectMapper();
         mapper.findAndRegisterModules();
@@ -40,6 +41,7 @@ public class EnvelopeMessageDeserializerTest {
         Fault<InnerMessage> result = inbound.getMessage(
                 new com.fasterxml.jackson.core.type.TypeReference<Fault<InnerMessage>>() {}.getType());
 
+        assertEquals(messageId, inbound.getMessageId());
         assertEquals("oops", result.getMessage().getText());
     }
 }

@@ -68,5 +68,12 @@ public class HeaderEncodingTests
 
         captured.ShouldNotBeNull();
         captured!.Headers.ShouldContainKey("MT-Host-MachineName");
+        await channel.Received().BasicPublishAsync(
+            string.Empty,
+            "test-queue_error",
+            true,
+            Arg.Any<BasicProperties>(),
+            Arg.Any<ReadOnlyMemory<byte>>(),
+            Arg.Any<CancellationToken>());
     }
 }

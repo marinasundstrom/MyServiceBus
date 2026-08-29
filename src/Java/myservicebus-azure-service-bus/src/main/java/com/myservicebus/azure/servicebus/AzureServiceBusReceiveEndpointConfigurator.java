@@ -22,6 +22,7 @@ public final class AzureServiceBusReceiveEndpointConfigurator {
     private Integer retryCount;
     private Duration retryDelay;
     private Integer prefetchCount;
+    private Integer concurrentMessageLimit;
     private Class<? extends MessageSerializer> serializerClass;
 
     AzureServiceBusReceiveEndpointConfigurator(
@@ -49,6 +50,13 @@ public final class AzureServiceBusReceiveEndpointConfigurator {
         prefetchCount = value;
     }
 
+    public void concurrentMessageLimit(int value) {
+        if (value < 1) {
+            throw new IllegalArgumentException("Concurrent message limit must be at least one");
+        }
+        concurrentMessageLimit = value;
+    }
+
     public void setSerializer(Class<? extends MessageSerializer> value) {
         serializerClass = value;
     }
@@ -74,6 +82,7 @@ public final class AzureServiceBusReceiveEndpointConfigurator {
             binding.setEntityName(entityNameResolver.apply(binding.getMessageType()));
         }
         definition.setPrefetchCount(prefetchCount);
+        definition.setConcurrentMessageLimit(concurrentMessageLimit);
         definition.setSerializerClass(serializerClass);
         if (retryCount != null) {
             @SuppressWarnings("unchecked")
@@ -99,6 +108,7 @@ public final class AzureServiceBusReceiveEndpointConfigurator {
                 retryCount,
                 retryDelay,
                 prefetchCount,
+                concurrentMessageLimit,
                 serializerClass));
     }
 
@@ -113,6 +123,7 @@ public final class AzureServiceBusReceiveEndpointConfigurator {
                 retryCount,
                 retryDelay,
                 prefetchCount,
+                concurrentMessageLimit,
                 serializerClass));
     }
 
@@ -124,6 +135,7 @@ public final class AzureServiceBusReceiveEndpointConfigurator {
             Integer retryCount,
             Duration retryDelay,
             Integer prefetchCount,
+            Integer concurrentMessageLimit,
             Class<? extends MessageSerializer> serializerClass) {
     }
 
@@ -135,6 +147,7 @@ public final class AzureServiceBusReceiveEndpointConfigurator {
             Integer retryCount,
             Duration retryDelay,
             Integer prefetchCount,
+            Integer concurrentMessageLimit,
             Class<? extends MessageSerializer> serializerClass) {
     }
 }

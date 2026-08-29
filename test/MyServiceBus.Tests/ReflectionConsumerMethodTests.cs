@@ -44,7 +44,7 @@ public class ReflectionConsumerMethodTests
         using var cancellation = new CancellationTokenSource();
         var message = new GeneratedMethodMessage("reflection");
 
-        await provider.GetRequiredService<IMessageBus>().Publish(message, cancellationToken: cancellation.Token);
+        await provider.GetRequiredService<IMediator>().Send(message, cancellation.Token);
 
         var topology = provider.GetRequiredService<MyServiceBus.Topology.TopologyRegistry>();
         Assert.Contains(topology.Consumers, consumer => consumer.QueueName == "generated-methods");
@@ -53,6 +53,27 @@ public class ReflectionConsumerMethodTests
         Assert.Same(message, audit.Message);
         Assert.Same(message, audit.Context?.Message);
         Assert.Equal(audit.Context?.CancellationToken ?? default, audit.CancellationToken);
+        await hostedService.StopAsync(CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task Mediator_send_returns_a_consumer_method_result()
+    {
+        var services = new ServiceCollection();
+        services.AddServiceBus(configurator =>
+        {
+            configurator.UsingMediator();
+            configurator.AddConsumerMethods(typeof(ReflectionResponseConsumers));
+        });
+
+        await using var provider = services.BuildServiceProvider();
+        var hostedService = provider.GetRequiredService<IHostedService>();
+        await hostedService.StartAsync(CancellationToken.None);
+
+        var response = await provider.GetRequiredService<IMediator>()
+            .Send<ReflectionTaskRequest, ReflectionTaskResponse>(new ReflectionTaskRequest("mediator"));
+
+        Assert.Equal("mediator-response", response.Value);
         await hostedService.StopAsync(CancellationToken.None);
     }
 

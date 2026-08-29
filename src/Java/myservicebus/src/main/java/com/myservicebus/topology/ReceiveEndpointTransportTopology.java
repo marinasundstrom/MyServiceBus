@@ -11,7 +11,18 @@ public record ReceiveEndpointTransportTopology(
         boolean temporary,
         int prefetchCount,
         List<MessageBinding> bindings,
-        Map<String, Object> transportOptions) {
+        Map<String, Object> transportOptions,
+        int concurrentMessageLimit) {
+
+    public ReceiveEndpointTransportTopology(
+            String name,
+            boolean durable,
+            boolean temporary,
+            int prefetchCount,
+            List<MessageBinding> bindings,
+            Map<String, Object> transportOptions) {
+        this(name, durable, temporary, prefetchCount, bindings, transportOptions, 1);
+    }
 
     public ReceiveEndpointTransportTopology {
         if (name == null || name.isBlank()) {
@@ -22,6 +33,9 @@ public record ReceiveEndpointTransportTopology(
         }
         if (prefetchCount < 0) {
             throw new IllegalArgumentException("Receive endpoint prefetch count cannot be negative");
+        }
+        if (concurrentMessageLimit < 1) {
+            throw new IllegalArgumentException("Receive endpoint concurrent message limit must be at least one");
         }
         if (bindings == null || bindings.isEmpty()) {
             throw new IllegalArgumentException("A receive endpoint must have at least one binding");

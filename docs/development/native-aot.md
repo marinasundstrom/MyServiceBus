@@ -80,8 +80,8 @@ The catalog concept is shared without requiring identical build tooling. Java su
 
 ```java
 dependencies {
-    implementation "io.github.marinasundstrom.myservicebus:myservicebus:0.1.0-preview.5"
-    annotationProcessor "io.github.marinasundstrom.myservicebus:myservicebus-processor:0.1.0-preview.5"
+    implementation "io.github.marinasundstrom.myservicebus:myservicebus:0.1.0-preview.6"
+    annotationProcessor "io.github.marinasundstrom.myservicebus:myservicebus-processor:0.1.0-preview.6"
 }
 ```
 

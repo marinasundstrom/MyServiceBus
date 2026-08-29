@@ -7,7 +7,8 @@ internal sealed record AzureServiceBusReceiveEndpointTopology(
     bool Durable,
     bool Temporary,
     int PrefetchCount,
-    IReadOnlyList<MessageBinding> Bindings)
+    IReadOnlyList<MessageBinding> Bindings,
+    int ConcurrentMessageLimit = 1)
 {
     public static AzureServiceBusReceiveEndpointTopology Project(ReceiveEndpointTransportTopology topology)
     {
@@ -28,6 +29,7 @@ internal sealed record AzureServiceBusReceiveEndpointTopology(
             topology.Durable,
             topology.Temporary,
             topology.PrefetchCount,
-            topology.Bindings.ToArray());
+            topology.Bindings.ToArray(),
+            topology.ConcurrentMessageLimit);
     }
 }

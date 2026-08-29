@@ -5,11 +5,24 @@
 [![NuGet](https://img.shields.io/nuget/vpre/Sundstrom.MyServiceBus.svg?logo=nuget&label=NuGet)](https://www.nuget.org/packages/Sundstrom.MyServiceBus)
 [![Maven Central](https://img.shields.io/maven-central/v/io.github.marinasundstrom.myservicebus/myservicebus?logo=apachemaven&label=Maven%20Central)](https://central.sonatype.com/artifact/io.github.marinasundstrom.myservicebus/myservicebus)
 
-MyServiceBus (working title) is a lightweight, asynchronous service-bus runtime for Java and .NET, inspired by **MassTransit**.
+MyServiceBus (working title) is a focused, asynchronous service-bus runtime for enterprises building production systems in Java and .NET, inspired by **MassTransit**.
 
 It provides a consistent, opinionated broker-backed messaging model while remaining compatible with documented **MassTransit** transport profiles and a separate, scoped **NServiceBus RabbitMQ** profile. This makes it possible for Java and .NET services to communicate across platforms and with verified peer runtimes.
 
+The project's motivation is to build on MassTransit's proven model and improve the boundaries MyServiceBus owns—cross-language parity, generated dispatch, explicit compatibility and delivery evidence, a first-class MediatR replacement, and a smaller portable core—while keeping that core permissively open source.
+
 See samples below.
+
+The project is currently in preview. Its production-readiness status, existing evidence, and the gates required before broad enterprise adoption are documented in [Enterprise Production Readiness](docs/enterprise-readiness.md).
+
+## Why choose MyServiceBus?
+
+- **Extend an existing MassTransit-based .NET estate with Java.** Use the documented common subset so Java services can participate without a custom messaging bridge.
+- **Start a new system in C#, Java, or both.** Keep one focused messaging model while choosing the most suitable language for each service.
+- **Replace MediatR for local application messaging.** Use dedicated handler APIs and generated dispatch for in-process commands, queries, and notifications, with no broker required.
+- **Match the commitment to the project stage.** MyServiceBus is MIT-licensed. For teams that do not need—or cannot yet justify—the commercial support and broader feature set of MassTransit v9+, it offers a smaller option with an explicit preview-status trade-off.
+
+The currently verified MassTransit interoperability peer is 8.5.1; that technical test pin is separate from MassTransit v9+ licensing. Read [Why Choose MyServiceBus?](docs/why-myservicebus.md) for the complete decision boundary and [Using MyServiceBus as a Mediator](docs/mediator.md) for deliberately in-process commands, queries, and notifications, including generated consumer registration and dispatch as an MIT-licensed alternative to current MediatR releases.
 
 ---
 
@@ -18,13 +31,13 @@ See samples below.
 Install the RabbitMQ transport for a broker-backed application. It brings in the core runtime and abstractions transitively:
 
 ```bash
-dotnet add package Sundstrom.MyServiceBus.RabbitMq --version 0.1.0-preview.5
+dotnet add package Sundstrom.MyServiceBus.RabbitMq --version 0.1.0-preview.6
 ```
 
 For an application that only needs the core runtime and its in-memory mediator, install the main package directly:
 
 ```bash
-dotnet add package Sundstrom.MyServiceBus --version 0.1.0-preview.5
+dotnet add package Sundstrom.MyServiceBus --version 0.1.0-preview.6
 ```
 
 Continue with the [.NET quick start](#c) to register the bus, configure RabbitMQ, add a consumer, and publish a message. The [feature walkthrough](docs/feature-walkthrough.md) covers the complete C# and Java APIs.
@@ -36,6 +49,7 @@ Continue with the [.NET quick start](#c) to register the bus, configure RabbitMQ
 | [`Sundstrom.MyServiceBus`](https://www.nuget.org/packages/Sundstrom.MyServiceBus) | Core messaging runtime and in-memory mediator |
 | [`Sundstrom.MyServiceBus.Abstractions`](https://www.nuget.org/packages/Sundstrom.MyServiceBus.Abstractions) | Portable message contracts, contexts, and endpoint abstractions |
 | `Sundstrom.MyServiceBus.Serialization.Bson` | Optional MassTransit-compatible BSON envelope serialization |
+| `Sundstrom.MyServiceBus.PostgreSql` | PostgreSQL transactional outbox and inbox persistence |
 | `Sundstrom.MyServiceBus.Inspection` | Queryable bus metadata and topology inspection APIs |
 | `Sundstrom.MyServiceBus.Monitoring` | Optional batched runtime monitoring exporter and collector protocol |
 | [`Sundstrom.MyServiceBus.RabbitMq`](https://www.nuget.org/packages/Sundstrom.MyServiceBus.RabbitMq) | RabbitMQ transport and configuration integration |
@@ -52,7 +66,7 @@ Add the RabbitMQ module to a Gradle application. It brings in the Java runtime a
 
 ```groovy
 dependencies {
-    implementation 'io.github.marinasundstrom.myservicebus:myservicebus-rabbitmq:0.1.0-preview.5'
+    implementation 'io.github.marinasundstrom.myservicebus:myservicebus-rabbitmq:0.1.0-preview.6'
 }
 ```
 
@@ -62,7 +76,7 @@ For Maven applications:
 <dependency>
   <groupId>io.github.marinasundstrom.myservicebus</groupId>
   <artifactId>myservicebus-rabbitmq</artifactId>
-  <version>0.1.0-preview.5</version>
+  <version>0.1.0-preview.6</version>
 </dependency>
 ```
 
@@ -75,6 +89,7 @@ Continue with the [Java quick start](#java) or the detailed [Java guide](src/Jav
 | [`io.github.marinasundstrom.myservicebus:myservicebus`](https://central.sonatype.com/artifact/io.github.marinasundstrom.myservicebus/myservicebus) | Core messaging runtime and in-memory mediator |
 | `io.github.marinasundstrom.myservicebus:myservicebus-processor` | Optional JSR 269 processor for generated consumer catalogs and direct method invokers |
 | `io.github.marinasundstrom.myservicebus:myservicebus-serialization-bson` | Optional MassTransit-compatible BSON envelope serialization |
+| `io.github.marinasundstrom.myservicebus:myservicebus-postgresql` | PostgreSQL transactional outbox and inbox persistence |
 | `io.github.marinasundstrom.myservicebus:myservicebus-inspection` | Queryable bus metadata and topology inspection APIs |
 | `io.github.marinasundstrom.myservicebus:myservicebus-monitoring` | Optional batched runtime monitoring exporter and collector protocol |
 | [`io.github.marinasundstrom.myservicebus:myservicebus-abstractions`](https://central.sonatype.com/artifact/io.github.marinasundstrom.myservicebus/myservicebus-abstractions) | Portable messaging contracts and abstractions |
@@ -92,8 +107,8 @@ All Java artifacts use the same version as the corresponding NuGet release.
 The optional inspection and exporter APIs are client libraries in the package tables above. The collector and Blazor dashboard are separate deployable applications, published as versioned Linux container images:
 
 ```text
-ghcr.io/marinasundstrom/myservicebus-monitoring-collector:0.1.0-preview.5
-ghcr.io/marinasundstrom/myservicebus-monitoring-dashboard:0.1.0-preview.5
+ghcr.io/marinasundstrom/myservicebus-monitoring-collector:0.1.0-preview.6
+ghcr.io/marinasundstrom/myservicebus-monitoring-dashboard:0.1.0-preview.6
 ```
 
 See the [runtime monitoring guide](docs/runtime-monitoring.md) for configuration, the live dashboard model, OpenTelemetry boundaries, and the experimental security scope.
@@ -120,7 +135,8 @@ Unlike most Java messaging solutions, MyServiceBus does **not require a framewor
 
 ## Goals
 
-- Provide a focused, community-driven alternative for basic MassTransit-style broker-backed messaging scenarios.
+- Provide a focused, community-driven runtime for production-critical MassTransit-style broker-backed messaging scenarios.
+- Make delivery, failure, security, operational, compatibility, and support guarantees explicit and evidence-backed.
 - Preserve a **MassTransit-compatible messaging model** across Java and .NET.
 - Enable **Java services to easily connect with .NET/C# services** using shared messaging semantics.
 - Offer a familiar experience for developers coming from .NET.

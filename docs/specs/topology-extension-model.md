@@ -78,7 +78,7 @@ Azure Service Bus is used as the stress case because its topology differs materi
 | ordering requirement | queue/channel ordering constraints | session requirement and session key policy |
 | transport options | queue arguments | sessions, duplicate detection, partitioning, lock duration, rule options |
 
-The current `ReceiveEndpointTransportTopology` is sufficient as the portable runtime input because it carries endpoint identity, durability/temporary intent, bindings, prefetch, and adapter-owned options. An Azure Service Bus adapter would project those facts into its own typed topology and reject unsupported combinations through capability validation. It must not add topic, subscription, session, or dead-letter fields to the portable endpoint snapshot.
+The current `ReceiveEndpointTransportTopology` is sufficient as the portable runtime input because it carries endpoint identity, durability/temporary intent, bindings, prefetch, the concurrent-message limit, and adapter-owned options. An Azure Service Bus adapter projects those facts into its own typed topology and rejects unsupported combinations through capability validation. It must not add topic, subscription, session, or dead-letter fields to the portable endpoint snapshot.
 
 ## Inspection Contract
 

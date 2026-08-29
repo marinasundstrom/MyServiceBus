@@ -103,7 +103,11 @@ public sealed class RabbitMqTransportFactory : ITransportFactory
             if (!_queueTransports.TryGetValue(queue, out var queueTransport))
             {
                 var connection = await _connectionProvider.GetOrCreateConnectionAsync(cancellationToken);
-                var channel = await connection.CreateChannelAsync(cancellationToken: cancellationToken);
+                var channel = await connection.CreateChannelAsync(
+                    new CreateChannelOptions(
+                        publisherConfirmationsEnabled: true,
+                        publisherConfirmationTrackingEnabled: true),
+                    cancellationToken);
 
                 if (!autoDelete)
                 {
@@ -194,9 +198,16 @@ public sealed class RabbitMqTransportFactory : ITransportFactory
         if (!_sendTransports.TryGetValue(exchange, out var sendTransport))
         {
             var connection = await _connectionProvider.GetOrCreateConnectionAsync(cancellationToken);
-            var channel = await connection.CreateChannelAsync(cancellationToken: cancellationToken);
+            var channel = await connection.CreateChannelAsync(
+                new CreateChannelOptions(
+                    publisherConfirmationsEnabled: true,
+                    publisherConfirmationTrackingEnabled: true),
+                cancellationToken);
             await channel.ExchangeDeclareAsync(exchange, type: ExchangeType.Fanout, durable: durable, autoDelete: autoDelete, cancellationToken: cancellationToken);
-            sendTransport = new RabbitMqSendTransport(channel, exchange);
+            var requiresRouting = exchange.EndsWith("_error", StringComparison.Ordinal) ||
+                exchange.EndsWith("_fault", StringComparison.Ordinal) ||
+                exchange.EndsWith("_skipped", StringComparison.Ordinal);
+            sendTransport = new RabbitMqSendTransport(channel, exchange, requiresRouting);
 
             _sendTransports.TryAdd(exchange, sendTransport);
         }
@@ -233,7 +244,11 @@ public sealed class RabbitMqTransportFactory : ITransportFactory
         CancellationToken cancellationToken)
     {
         var connection = await _connectionProvider.GetOrCreateConnectionAsync(cancellationToken);
-        var channel = await connection.CreateChannelAsync(cancellationToken: cancellationToken);
+        var channel = await connection.CreateChannelAsync(
+            new CreateChannelOptions(
+                publisherConfirmationsEnabled: true,
+                publisherConfirmationTrackingEnabled: true),
+            cancellationToken);
 
         var prefetch = rabbitMqTopology.PrefetchCount > 0 ? rabbitMqTopology.PrefetchCount : _prefetchCount;
         if (prefetch > 0)
@@ -374,7 +389,8 @@ public sealed class RabbitMqTransportFactory : ITransportFactory
             errorAddress,
             faultAddress,
             isMessageTypeRegistered,
-            _inboundMessageResolver);
+            _inboundMessageResolver,
+            concurrentMessageLimit: rabbitMqTopology.ConcurrentMessageLimit);
     }
 
     private static void ParseExchangeSettings(string? queryString, ref bool durable, ref bool autoDelete)

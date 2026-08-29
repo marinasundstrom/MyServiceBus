@@ -28,8 +28,8 @@ exporter.start(inspectionProvider);`,
 
 const exporterInstall = {
   csharp: `dotnet add package Sundstrom.MyServiceBus.Monitoring \\
-  --version 0.1.0-preview.5`,
-  java: `implementation 'io.github.marinasundstrom.myservicebus:myservicebus-monitoring:0.1.0-preview.5'`,
+  --version 0.1.0-preview.6`,
+  java: `implementation 'io.github.marinasundstrom.myservicebus:myservicebus-monitoring:0.1.0-preview.6'`,
 };
 
 const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? '';
@@ -109,6 +109,7 @@ export default function RuntimeMonitoring() {
         <li>Retries, failures, completeness, and observed cross-application flow</li>
         <li>Expandable failure metadata without capturing message bodies or arbitrary headers</li>
         <li>Recent observations and optional W3C trace correlation identifiers</li>
+        <li>Outbox dispatcher backlog, oldest-undispatched age, throughput, failures, lost leases, and cycle latency</li>
         <li>HTTP queries plus WebSocket change invalidations</li>
       </ul>
 
@@ -127,6 +128,23 @@ export default function RuntimeMonitoring() {
         p95 duration, retries, and failures. It deliberately does not recommend a
         replica count. Queue depth and host saturation require transport-specific or
         external telemetry integrations and remain separate from the portable model.
+      </p>
+
+      <h2>Outbox dispatcher operations</h2>
+      <p>
+        C# and Java delivery services treat embedded and standalone dispatchers as
+        first-class runtime components. Per service partition and worker, the dashboard&apos;s
+        Dispatcher operations view shows current backlog, oldest-undispatched age,
+        dispatch throughput, failures, lost leases, cycle latency, and online state.
+        This makes an undersized dispatcher fleet visible as a bottleneck and separates
+        time waiting in an outbox from broker backlog and consumer processing time.
+      </p>
+      <p>
+        The collector receives bounded cycle observations from each service; it does
+        not connect to application databases or mutate persisted records.
+        Message bodies, arbitrary headers, record identities, connection details,
+        and SQL remain outside the monitoring protocol. Inbox duplicate outcomes,
+        cleanup progress, alerting, and durable monitoring history remain future work.
       </p>
 
       <h2>Follow one operation across services</h2>
@@ -170,8 +188,8 @@ export default function RuntimeMonitoring() {
         images for AMD64 and ARM64:
       </p>
       <CodeViewer
-        code={`ghcr.io/marinasundstrom/myservicebus-monitoring-collector:0.1.0-preview.5
-ghcr.io/marinasundstrom/myservicebus-monitoring-dashboard:0.1.0-preview.5`}
+        code={`ghcr.io/marinasundstrom/myservicebus-monitoring-collector:0.1.0-preview.6
+ghcr.io/marinasundstrom/myservicebus-monitoring-dashboard:0.1.0-preview.6`}
         label="Monitoring container images"
         language="plaintext"
       />

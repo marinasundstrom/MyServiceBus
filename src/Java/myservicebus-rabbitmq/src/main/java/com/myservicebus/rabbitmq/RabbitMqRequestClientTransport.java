@@ -44,6 +44,7 @@ public class RabbitMqRequestClientTransport implements RequestClientTransport {
         try {
             Connection connection = connectionProvider.getOrCreateConnection();
             Channel channel = connection.createChannel();
+            channel.confirmSelect();
 
             String responseExchange = "resp-" + UUID.randomUUID();
             String responseQueue = channel.queueDeclare().getQueue();
@@ -107,7 +108,8 @@ public class RabbitMqRequestClientTransport implements RequestClientTransport {
             AMQP.BasicProperties props = new AMQP.BasicProperties.Builder()
                     .contentType("application/vnd.masstransit+json")
                     .build();
-            channel.basicPublish(exchange, "", props, body);
+            channel.basicPublish(exchange, "", true, props, body);
+            channel.waitForConfirmsOrDie();
         } catch (Exception ex) {
             future.completeExceptionally(ex);
         }
@@ -122,6 +124,7 @@ public class RabbitMqRequestClientTransport implements RequestClientTransport {
         try {
             Connection connection = connectionProvider.getOrCreateConnection();
             Channel channel = connection.createChannel();
+            channel.confirmSelect();
 
             String responseExchange = "resp-" + UUID.randomUUID();
             String responseQueue = channel.queueDeclare().getQueue();
@@ -189,7 +192,8 @@ public class RabbitMqRequestClientTransport implements RequestClientTransport {
             AMQP.BasicProperties props = new AMQP.BasicProperties.Builder()
                     .contentType("application/vnd.masstransit+json")
                     .build();
-            channel.basicPublish(exchange, "", props, body);
+            channel.basicPublish(exchange, "", true, props, body);
+            channel.waitForConfirmsOrDie();
         } catch (Exception ex) {
             future.completeExceptionally(ex);
         }

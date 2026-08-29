@@ -37,7 +37,33 @@ public sealed record MonitoringObservation(
     string? TraceId,
     string? SpanId,
     int? RetryAttempt = null,
-    int? RetryLimit = null);
+    int? RetryLimit = null,
+    IReadOnlyDictionary<string, string>? Properties = null);
+
+public sealed record MonitoringOutboxDispatcherSummary(
+    string ApplicationName,
+    string InstanceId,
+    string BusId,
+    string ServiceName,
+    string OwnerId,
+    bool Online,
+    DateTimeOffset LastObservedAtUtc,
+    bool LastCycleSucceeded,
+    double LastCycleDurationMs,
+    string? LastFailureCategory,
+    int? Pending,
+    int? Leased,
+    int? Retrying,
+    int? StoredDispatched,
+    int? Dead,
+    int? Cancelled,
+    double? OldestUndispatchedAgeMs,
+    long WindowLeased,
+    long WindowDispatched,
+    long WindowFailed,
+    long WindowLostLeases,
+    double DispatchedPerSecond,
+    int WindowSeconds);
 
 public sealed record MonitoringObservationBatch(
     string ProtocolVersion,

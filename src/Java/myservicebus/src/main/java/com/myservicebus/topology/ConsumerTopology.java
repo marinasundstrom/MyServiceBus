@@ -19,6 +19,7 @@ public class ConsumerTopology {
     private List<MessageBinding> bindings = new ArrayList<>();
     private Consumer<PipeConfigurator<ConsumeContext<Object>>> configure;
     private Integer prefetchCount;
+    private Integer concurrentMessageLimit;
     private Map<String, Object> queueArguments;
     private Class<? extends MessageSerializer> serializerClass;
     private ConsumerMethodInvoker<?> methodInvoker;
@@ -83,6 +84,14 @@ public class ConsumerTopology {
 
     public void setPrefetchCount(Integer prefetchCount) {
         this.prefetchCount = prefetchCount;
+    }
+
+    public Integer getConcurrentMessageLimit() {
+        return concurrentMessageLimit;
+    }
+
+    public void setConcurrentMessageLimit(Integer concurrentMessageLimit) {
+        this.concurrentMessageLimit = concurrentMessageLimit;
     }
 
     public Map<String, Object> getQueueArguments() {

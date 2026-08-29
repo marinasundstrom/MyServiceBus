@@ -164,7 +164,7 @@ public class MediatorTransportFactoryTest {
         }
     }
 
-    public static class RequestMessage {
+    public static class RequestMessage implements Request<ResponseMessage> {
         private final String value;
 
         public RequestMessage(String value) {
@@ -173,6 +173,11 @@ public class MediatorTransportFactoryTest {
 
         public String getValue() {
             return value;
+        }
+
+        @Override
+        public Class<ResponseMessage> responseType() {
+            return ResponseMessage.class;
         }
     }
 
@@ -218,14 +223,14 @@ public class MediatorTransportFactoryTest {
     }
 
     @Test
-    public void publishDeliversMessageToConsumer() {
+    public void sendDeliversMessageToOrdinaryConsumer() {
         ServiceCollection services = ServiceCollection.create();
-        MediatorBus bus = MediatorBus.configure(services, cfg -> {
+        Mediator mediator = MediatorBus.configure(services, cfg -> {
             cfg.addConsumer(TestConsumer.class, TestMessage.class);
         });
 
         TestConsumer.received = new CompletableFuture<>();
-        bus.publish(new TestMessage("hello"));
+        mediator.send(new TestMessage("hello")).join();
 
         Assertions.assertEquals("hello", TestConsumer.received.join().getValue());
     }
@@ -240,12 +245,12 @@ public class MediatorTransportFactoryTest {
             cfg.addConsumer(SecondTestConsumer.class);
         });
 
-        bus.send("queue:test", new TestMessage("sent"));
+        bus.sendTo("queue:test", new TestMessage("sent")).join();
         Assertions.assertEquals("sent", TestConsumer.received.join().getValue());
         Assertions.assertEquals(1, SecondTestConsumer.count);
 
         TestConsumer.received = new CompletableFuture<>();
-        bus.publish(new TestMessage("published"));
+        bus.publish(new TestMessage("published")).join();
         Assertions.assertEquals("published", TestConsumer.received.join().getValue());
         Assertions.assertEquals(2, SecondTestConsumer.count);
     }
@@ -262,7 +267,7 @@ public class MediatorTransportFactoryTest {
             cfg.addConsumer(InterfaceAssignableConsumer.class);
         });
 
-        bus.publish(new DerivedAssignableEvent());
+        bus.publish(new DerivedAssignableEvent()).join();
 
         Assertions.assertEquals(1, ConcreteAssignableConsumer.count);
         Assertions.assertEquals(1, BaseAssignableConsumer.count);
@@ -281,7 +286,7 @@ public class MediatorTransportFactoryTest {
                     pipe.useFilter(new RecordingConsumeFilter("inner", RetryingConsumer.calls));
                 }));
 
-        bus.publish(new TestMessage("retry"));
+        bus.publish(new TestMessage("retry")).join();
 
         Assertions.assertEquals(2, RetryingConsumer.attempts);
         Assertions.assertEquals(
@@ -311,7 +316,7 @@ public class MediatorTransportFactoryTest {
 
         CompletionException exception = Assertions.assertThrows(
                 CompletionException.class,
-                () -> bus.publish(new TestMessage("fail")));
+                () -> bus.publish(new TestMessage("fail")).join());
 
         Assertions.assertInstanceOf(IllegalStateException.class, exception.getCause());
         Assertions.assertEquals("exhausted", exception.getCause().getMessage());
@@ -340,7 +345,7 @@ public class MediatorTransportFactoryTest {
 
         CompletionException exception = Assertions.assertThrows(
                 CompletionException.class,
-                () -> bus.publish(new TestMessage("fail")));
+                () -> bus.publish(new TestMessage("fail")).join());
 
         Assertions.assertInstanceOf(IllegalStateException.class, exception.getCause());
         Assertions.assertEquals("exhausted", exception.getCause().getMessage());
@@ -358,7 +363,7 @@ public class MediatorTransportFactoryTest {
         });
 
         TestHandler.received = new CompletableFuture<>();
-        bus.publish(new TestMessage("handler"));
+        bus.publish(new TestMessage("handler")).join();
 
         Assertions.assertEquals("handler", TestHandler.received.join().getValue());
     }
@@ -372,7 +377,7 @@ public class MediatorTransportFactoryTest {
         });
 
         ForwardedMessageConsumer.received = new CompletableFuture<>();
-        bus.publish(new TestMessage("async"));
+        bus.publish(new TestMessage("async")).join();
 
         Assertions.assertNotNull(ForwardedMessageConsumer.received.join());
     }
@@ -396,5 +401,60 @@ public class MediatorTransportFactoryTest {
         ResponseMessage response = (ResponseMessage) CapturingSendEndpoint.sent.join();
         Assertions.assertEquals("hi-response", response.getValue());
         Assertions.assertEquals(cts.token(), ResultHandler.token.join());
+    }
+
+    @Test
+    public void sendRoutesToExactlyOneHandlerWithoutDestination() {
+        ServiceCollection services = ServiceCollection.create();
+        MediatorBus bus = MediatorBus.configure(services, cfg ->
+                cfg.addHandler(TestHandler.class, TestMessage.class));
+
+        TestHandler.received = new CompletableFuture<>();
+        bus.send(new TestMessage("sent")).join();
+
+        Assertions.assertEquals("sent", TestHandler.received.join().getValue());
+    }
+
+    @Test
+    public void publishFansOutButSendRejectsMultipleHandlers() {
+        ServiceCollection services = ServiceCollection.create();
+        MediatorBus bus = MediatorBus.configure(services, cfg -> {
+            cfg.addHandler(TestHandler.class, TestMessage.class);
+            cfg.addConsumer(SecondTestConsumer.class, TestMessage.class);
+        });
+
+        TestHandler.received = new CompletableFuture<>();
+        SecondTestConsumer.count = 0;
+        bus.publish(new TestMessage("published")).join();
+        Assertions.assertEquals("published", TestHandler.received.join().getValue());
+        Assertions.assertEquals(1, SecondTestConsumer.count);
+
+        Assertions.assertThrows(
+                com.myservicebus.MediatorHandlerCardinalityException.class,
+                () -> bus.send(new TestMessage("ambiguous")));
+    }
+
+    @Test
+    public void sendReturnsHandlerResultAndValidatesResponseType() {
+        ServiceCollection services = ServiceCollection.create();
+        MediatorBus bus = MediatorBus.configure(services, cfg ->
+                cfg.addHandler(ResultHandler.class, RequestMessage.class, ResponseMessage.class));
+
+        ResponseMessage response = bus.send(new RequestMessage("query"), ResponseMessage.class).join();
+        Assertions.assertEquals("query-response", response.getValue());
+        ResponseMessage inferredResponse = bus.send(new RequestMessage("inferred")).join();
+        Assertions.assertEquals("inferred-response", inferredResponse.getValue());
+        Assertions.assertThrows(
+                com.myservicebus.MediatorResponseTypeException.class,
+                () -> bus.send(new RequestMessage("wrong"), TestMessage.class));
+    }
+
+    @Test
+    public void sendRejectsMissingHandler() {
+        MediatorBus bus = MediatorBus.configure(ServiceCollection.create(), cfg -> { });
+
+        Assertions.assertThrows(
+                com.myservicebus.MediatorHandlerNotFoundException.class,
+                () -> bus.send(new TestMessage("missing")));
     }
 }

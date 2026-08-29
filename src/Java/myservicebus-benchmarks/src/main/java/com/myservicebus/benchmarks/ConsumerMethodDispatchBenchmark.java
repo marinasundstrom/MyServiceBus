@@ -58,11 +58,11 @@ public class ConsumerMethodDispatchBenchmark {
 
     @Benchmark
     public void reflectionInvocation() {
-        reflectionBus.publish(message);
+        reflectionBus.publish(message).join();
     }
 
     @Benchmark
     public void generatedDirectInvocation() {
-        generatedBus.publish(message);
+        generatedBus.publish(message).join();
     }
 }

@@ -28,6 +28,7 @@ For Java build and run instructions, including JDK 17 setup and how to run the t
   - [Health checks](#health-checks)
   - [Filters](#filters)
   - [Scheduling Messages](#scheduling-messages)
+  - [Transactional Outbox and Inbox](#transactional-outbox-and-inbox)
   - [Unit Testing with the In-Memory Test Harness](#unit-testing-with-the-in-memory-test-harness)
 
 ## Basics
@@ -250,6 +251,43 @@ The explicit endpoint-handler form remains the smallest integration when an appl
 cfg.receiveEndpoint("submit-order", endpoint ->
     endpoint.handler(SubmitOrder.class, submitOrderConsumer::consume));
 ```
+
+### Bound endpoint concurrency independently of prefetch
+
+Prefetch controls how many unsettled deliveries the broker may send. The concurrent message limit controls how many application handlers an endpoint may run at once. Configure both when tuning a production endpoint:
+
+```csharp
+cfg.ReceiveEndpoint("submit-order", endpoint =>
+{
+    endpoint.PrefetchCount(32);
+    endpoint.ConcurrentMessageLimit(8);
+    endpoint.Consumer<SubmitOrderConsumer, SubmitOrder>();
+});
+```
+
+```java
+cfg.receiveEndpoint("submit-order", endpoint -> {
+    endpoint.prefetchCount(32);
+    endpoint.concurrentMessageLimit(8);
+    endpoint.consumer(SubmitOrder.class, SubmitOrderConsumer.class);
+});
+```
+
+The default concurrent message limit is one. RabbitMQ holds deliveries waiting for a permit unsettled; Azure Service Bus maps the limit to the processor's native concurrent-call setting.
+
+### Bound graceful shutdown
+
+Use the timed stop API when a host must not wait indefinitely for an application handler:
+
+```csharp
+await bus.StopAsync(TimeSpan.FromSeconds(30), appStopping);
+```
+
+```java
+bus.stop(Duration.ofSeconds(30));
+```
+
+Both clients throw `BusStopTimeoutException` when the deadline expires. RabbitMQ cancels intake and aborts the receive channel, leaving unsettled deliveries eligible for redelivery. Azure stops its processor and initiates client teardown so active message locks are not completed as successful work. Applications should log this outcome distinctly from a graceful drain and keep handlers idempotent because forced shutdown is an at-least-once boundary.
 
 You can also decorate the factory with additional services or a logger factory before creating the bus:
 
@@ -739,22 +777,46 @@ public class SubmitOrderHandler : Handler<SubmitOrder>
 
 builder.Services.AddServiceBus(x =>
 {
-    x.AddConsumer<SubmitOrderHandler>(); // uses compatibility handler
+    x.AddHandler<SubmitOrderHandler>();
     x.UsingMediator();
 });
+
+var mediator = serviceProvider.GetRequiredService<IMediator>();
+await mediator.Send(new SubmitOrder(Guid.NewGuid()));
 ```
 
 #### Java
 
 ```java
+public final class SubmitOrderHandler extends HandlerBase<SubmitOrder> {
+    @Override
+    public CompletableFuture<Void> handle(
+            SubmitOrder message,
+            CancellationToken cancellationToken) {
+        return submit(message, cancellationToken);
+    }
+}
+
 ServiceCollection services = ServiceCollection.create();
 MediatorBus bus = MediatorBus.configure(services, cfg -> {
-    cfg.addConsumer(SubmitOrderConsumer.class);
+    cfg.addHandler(SubmitOrderHandler.class, SubmitOrder.class);
 });
+Mediator mediator = bus;
 
-bus.publish(new SubmitOrder(UUID.randomUUID())).join();
-bus.send("queue:submit-order", new SubmitOrder(UUID.randomUUID())).join();
+mediator.send(new SubmitOrder(UUID.randomUUID())).join();
+mediator.publish(new OrderSubmitted(UUID.randomUUID())).join();
+bus.sendTo("queue:submit-order", new SubmitOrder(UUID.randomUUID())).join();
 ```
+
+Java handlers implement `Handler<T>` directly or derive from `HandlerBase<T>`. Response-bearing handlers implement `HandlerWithResult<TMessage, TResult>`. All of these interfaces adapt to the ordinary consumer pipeline, so filters, scopes, retries, generated catalogs, and broker-backed reuse remain available.
+
+Mediator `Send` selects exactly one compatible handler and rejects missing or ambiguous registrations. `Publish` invokes every compatible handler. A C# request implementing `IRequest<TResponse>` supports `TResponse result = await mediator.Send(request)`. Java provides the equivalent with `Request<TResponse>` and its runtime `responseType()` token. Explicit `Send<TRequest,TResponse>` and `send(message, ResponseType.class)` overloads remain available for existing contracts. Directed bus delivery is intentionally separate: use a C# send endpoint or Java `sendTo(...)` when the destination is part of the operation.
+
+Handlers, consumers, and consumer methods all use the same topology and consume pipeline. A handler can run behind a normal broker transport, while an ordinary consumer or a reflected/generated consumer method can satisfy mediator `Send` or `Publish`. `AddHandler` communicates mediator intent but remains an alias over consumer registration.
+
+Application code can depend on the smaller C# `IMediator` or Java `Mediator` contract. Destination-aware operations remain on `IMessageBus` and the concrete Java `MediatorBus`, keeping bus infrastructure out of command/query-facing components.
+
+C# contracts may use the optional mediator-only `IRequest`, `IRequest<TResponse>`, and `INotification` intent markers. Java provides the idiomatic counterparts `Command`, `Request<TResponse>`, and `Notification`. These markers do not alter broker, topology, serialization, or consumer behavior, and unmarked contracts remain supported.
 
 The Java in-memory test harness also implements `PublishEndpoint`, so tests can use `publish` for fan-out semantics and `getSendEndpoint(...).send(...)` for directed-send semantics without treating the two operations as interchangeable.
 
@@ -1139,7 +1201,7 @@ bus.start();
 exporter.start(provider.getRequiredService(BusInspectionProvider.class));
 ```
 
-The proof-of-concept service accepts metadata, observation batches, and heartbeats under `/api/monitoring/v1`. Its query API exposes applications, replicas, metadata, bounded-window metrics, bucketed real-time series, recent observations, observed flow, and a WebSocket invalidation stream. Replicas group automatically by application name; optional bounded labels such as `group`, `environment`, and `role` provide another display dimension. `MyServiceBus.Dashboard` is a separate Blazor application that consumes only those service APIs. OpenTelemetry collection remains separate; observations carry trace identifiers only as optional correlation references.
+The proof-of-concept service accepts metadata, observation batches, and heartbeats under `/api/monitoring/v1`. Its query API exposes applications, replicas, metadata, bounded-window metrics, bucketed real-time series, recent observations, observed flow, outbox dispatcher operations, and a WebSocket invalidation stream. Replicas group automatically by application name; optional bounded labels such as `group`, `environment`, and `role` provide another display dimension. `MyServiceBus.Dashboard` is a separate Blazor application that consumes only those service APIs. OpenTelemetry collection remains separate; observations carry trace identifiers only as optional correlation references.
 
 See [Runtime Monitoring](runtime-monitoring.md) for the complete Aspire walkthrough, service API, deployment boundary, and current MVP limitations.
 
@@ -1251,7 +1313,7 @@ try (ServiceScope scope = provider.createScope()) {
 
 ### Scheduling Messages
 
-Delay message delivery by setting the scheduled enqueue time on the send or publish context or by using the `IMessageScheduler` service. `IMessageScheduler` returns a `ScheduledMessageHandle` that can be used to cancel a scheduled message. External schedulers such as Quartz or Hangfire can be plugged in by providing a custom `IJobScheduler`/`JobScheduler` implementation.
+Delay message delivery by setting the scheduled enqueue time on the send or publish context or by using the `IMessageScheduler` service. `IMessageScheduler` returns a `ScheduledMessageHandle` that can be used to cancel a scheduled message when the selected provider supports cancellation. The default provider is volatile and process-bound. Durable integrations implement the message-aware `IScheduleMessageProvider`/`ScheduleMessageProvider`; callback-only `IJobScheduler`/`JobScheduler` implementations cannot survive restart.
 
 #### C#
 
@@ -1264,9 +1326,9 @@ await bus.SchedulePublish(new OrderSubmitted(), TimeSpan.FromSeconds(30));
 await endpoint.ScheduleSend(new SubmitOrder(), TimeSpan.FromSeconds(30));
 
 var scheduler = provider.GetRequiredService<IMessageScheduler>();
-var handle = await scheduler.SchedulePublish(new OrderSubmitted(), TimeSpan.FromSeconds(30));
+var handle = await scheduler.SchedulePublish(DateTime.UtcNow.AddSeconds(30), new OrderSubmitted());
 await scheduler.CancelScheduledPublish(handle);
-await scheduler.ScheduleSend(new Uri("queue:submit-order"), new SubmitOrder(), TimeSpan.FromSeconds(30));
+await scheduler.ScheduleSend(new Uri("queue:submit-order"), DateTime.UtcNow.AddSeconds(30), new SubmitOrder());
 ```
 
 #### Java
@@ -1277,63 +1339,131 @@ SendEndpoint endpoint = bus.getSendEndpoint("queue:submit-order");
 endpoint.send(new SubmitOrder(), ctx -> ctx.setScheduledEnqueueTime(Duration.ofSeconds(30))).join();
 
 MessageScheduler scheduler = serviceProvider.getService(MessageScheduler.class);
-ScheduledMessageHandle handle = scheduler.schedulePublish(new OrderSubmitted(), Duration.ofSeconds(30))
+ScheduledMessageHandle handle = scheduler.schedulePublish(Instant.now().plusSeconds(30), new OrderSubmitted())
     .toCompletableFuture().join();
 scheduler.cancelScheduledPublish(handle).toCompletableFuture().join();
-scheduler.scheduleSend("queue:submit-order", new SubmitOrder(), Duration.ofSeconds(30))
+scheduler.scheduleSend("queue:submit-order", Instant.now().plusSeconds(30), new SubmitOrder())
     .toCompletableFuture().join();
 ```
 
-##### Custom schedulers
+##### Custom in-process timers
 
-`AddServiceBus` registers a simple timer-based `DefaultJobScheduler`. To integrate a production scheduler such as Quartz or Hangfire, implement `IJobScheduler`/`JobScheduler` and register it so it replaces the default.
+`AddServiceBus` registers a simple timer-based `DefaultJobScheduler`. Replace `IJobScheduler`/`JobScheduler` to control process-local timing or deterministic tests. Use `IScheduleMessageProvider`/`ScheduleMessageProvider` for a durable scheduler such as a future Quartz.NET adapter because a callback cannot be persisted safely.
 
-**C#**
+Register a message-aware provider before `AddServiceBus` so the default provider does not replace it.
+
+**C# durable-provider registration**
 
 ```csharp
-class HangfireJobScheduler : IJobScheduler
-{
-    readonly IBackgroundJobClient jobs;
-    public HangfireJobScheduler(IBackgroundJobClient jobs) => this.jobs = jobs;
-
-    public Task<Guid> Schedule(DateTime scheduledTime, Func<CancellationToken, Task> callback, CancellationToken token = default)
-    {
-        jobs.Schedule(() => callback(token), scheduledTime);
-        return Task.FromResult(Guid.NewGuid());
-    }
-
-    public Task Cancel(Guid tokenId) => Task.CompletedTask;
-}
-
-services.AddSingleton<IJobScheduler, HangfireJobScheduler>();
+services.AddScoped<IScheduleMessageProvider, QuartzScheduleMessageProvider>();
 services.AddServiceBus(cfg => { /* ... */ });
 ```
 
-**Java**
+**Java durable-provider registration**
 
 ```java
-class QuartzJobScheduler implements JobScheduler {
-    private final Scheduler scheduler;
-    QuartzJobScheduler(Scheduler scheduler) { this.scheduler = scheduler; }
-
-    public CompletionStage<UUID> schedule(Instant scheduledTime,
-            Function<CancellationToken, CompletionStage<Void>> callback,
-            CancellationToken token) {
-        scheduler.scheduleJob(() -> callback.apply(token), Date.from(scheduledTime));
-        return CompletableFuture.completedFuture(UUID.randomUUID());
-    }
-
-    public CompletionStage<Void> cancel(UUID tokenId) {
-        return CompletableFuture.completedFuture(null);
-    }
-}
-
 ServiceCollection services = ServiceCollection.create();
-services.addSingleton(JobScheduler.class, sp -> new QuartzJobScheduler(quartz));
-services.from(MessageBusServices.class).addServiceBus(cfg -> { /* ... */ });
+MessageBusServices busServices = services.from(MessageBusServices.class);
+busServices.tryAddScoped(ScheduleMessageProvider.class,
+    sp -> () -> new QuartzScheduleMessageProvider(/* ... */));
+busServices.addServiceBus(cfg -> { /* ... */ });
 ```
 
+These adapter names illustrate the extension boundary; first-party Quartz adapters are not shipped yet. A durable provider must persist a serializable message command or final envelope, not a delegate, lambda, or closure. See [Message Scheduling](scheduling.md) for the current PostgreSQL outbox path and promotion requirements.
+
 ---
+
+### Transactional Outbox and Inbox
+
+Install `Sundstrom.MyServiceBus.PostgreSql` for C# or `myservicebus-postgresql` for Java. Enable Bus Outbox during registration, initialize the versioned schema once at application startup or deployment, and attach the scoped outbox session to the same PostgreSQL transaction as the application change. The caller owns the transaction; MyServiceBus never commits it independently.
+
+#### C#
+
+```csharp
+services.AddServiceBus(configurator =>
+{
+    configurator.UseBusOutbox();
+    configurator.UsingRabbitMq((_, rabbit) => rabbit.Host("localhost"));
+});
+
+await PostgreSqlSchema.EnsureCreatedAsync(dataSource);
+await using var scope = serviceProvider.CreateAsyncScope();
+await using var connection = await dataSource.OpenConnectionAsync();
+await using var transaction = await connection.BeginTransactionAsync();
+
+// Execute the application UPDATE/INSERT with this connection and transaction.
+
+using (scope.ServiceProvider.GetRequiredService<OutboxSession>()
+    .UsePostgreSql(connection, transaction, "orders-service"))
+{
+    var publish = scope.ServiceProvider.GetRequiredService<IPublishEndpoint>();
+    await publish.Publish(new OrderSubmitted(orderId), context =>
+        context.CorrelationId = orderId.ToString());
+}
+
+await transaction.CommitAsync();
+```
+
+#### Java
+
+```java
+services.from(MessageBusServices.class).addServiceBus(configurator -> {
+    configurator.useBusOutbox();
+    configurator.using(RabbitMqFactoryConfigurator.class,
+            (context, rabbit) -> rabbit.host("localhost"));
+});
+
+PostgreSqlSchema.ensureCreated(dataSource);
+try (ServiceScope scope = serviceProvider.createScope();
+     Connection connection = dataSource.getConnection()) {
+    connection.setAutoCommit(false);
+
+    // Execute the application UPDATE/INSERT with this connection.
+
+    ServiceProvider scoped = scope.getServiceProvider();
+    try (OutboxSession.Registration ignored =
+            PostgreSqlOutboxSession.useTransaction(
+                    scoped.getRequiredService(OutboxSession.class), connection, "orders-service")) {
+        PublishEndpoint publish = scoped.getRequiredService(PublishEndpoint.class);
+        publish.publish(new OrderSubmitted(orderId), context ->
+                context.setCorrelationId(orderId)).join();
+    }
+
+    connection.commit();
+}
+```
+
+The inbox follows the same rule. Create `PostgreSqlInboxStore` with the transaction and logical service name that own the protected application effect. Continue only for `Acquired`; `Completed` is a safe duplicate and `InProgress` must remain eligible for retry. Add responses or publications through the acquired transaction's outbox, complete the inbox record, commit the database transaction, and only then settle the broker message.
+
+Resolve `IPublishEndpoint` / `ISendEndpointProvider` and their Java equivalents from the same scope as `OutboxSession`. Calling the singleton bus directly bypasses capture. Scheduled messages in an active outbox session persist their due time and remain unavailable to the dispatcher until then. Register `AddPostgreSqlMessageScheduler` / `PostgreSqlScheduling.addMessageScheduler` to receive a persisted handle and cancel after the producing transaction commits; cancellation reports whether it won or the dispatcher had already leased the record.
+
+Compose delivery once for the same logical service name. .NET hosts it with the application:
+
+```csharp
+services.AddSingleton(dataSource);
+services.AddPostgreSqlOutboxDelivery("orders-service");
+```
+
+Java owns the corresponding lifecycle explicitly:
+
+```java
+try (OutboxDeliveryService delivery = PostgreSqlOutboxDelivery.create(
+        dataSource,
+        provider.getRequiredService(TransportFactory.class),
+        "orders-service",
+        options -> options.setOwnerId("orders-" + instanceId),
+        provider.getServices(BusHook.class))) {
+    bus.start();
+    delivery.start();
+    // Run the application.
+} finally {
+    bus.stop();
+}
+```
+
+For EF Core, begin an explicit `Database.BeginTransactionAsync()`, obtain its `NpgsqlConnection` and `NpgsqlTransaction` through `GetDbConnection()` / `GetDbTransaction()`, and pass those objects to `UsePostgreSql`. Keep `SaveChangesAsync`, captured sends/publications, and commit inside that one caller-owned transaction. Do not rely on EF's implicit per-save transaction.
+
+`PostgreSqlOutboxStore` supplies atomic PostgreSQL leases within its required logical-service partition. Delivery may run embedded in a producer or in a standalone worker assigned to that partition. Supported transport composition, delivery lifecycles, backlog health, optional monitoring export, one-time durable scheduling, and persisted cancellation are implemented; Consumer Outbox middleware, crash-window promotion evidence, inbox monitoring, and cleanup remain in progress. The dashboard reports dispatcher backlog, oldest-undispatched age, throughput, failures, lost leases, and cycle latency without exporting record identities or message data. See [Transactional Outbox and Inbox](transactional-outbox.md) for guarantees, status, and limits.
 
 ### Unit Testing with the In-Memory Test Harness
 

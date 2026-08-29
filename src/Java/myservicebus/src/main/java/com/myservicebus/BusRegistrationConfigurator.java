@@ -3,9 +3,30 @@ package com.myservicebus;
 import com.myservicebus.di.ServiceCollection;
 import com.myservicebus.serialization.SerializerFactory;
 import com.myservicebus.BusFactoryConfigurator;
+import com.myservicebus.persistence.OutboxSession;
 
 public interface BusRegistrationConfigurator {
     <T> void addConsumer(Class<T> consumerClass);
+
+    default <THandler extends MediatorHandler> void addHandler(Class<THandler> handlerClass) {
+        addConsumer(handlerClass);
+    }
+
+    default <TMessage, THandler extends Handler<TMessage>> void addHandler(
+            Class<THandler> handlerClass,
+            Class<TMessage> messageClass) {
+        addConsumer(handlerClass, messageClass);
+    }
+
+    default <TMessage, TResponse, THandler extends HandlerWithResult<TMessage, TResponse>> void addHandler(
+            Class<THandler> handlerClass,
+            Class<TMessage> messageClass,
+            Class<TResponse> responseClass) {
+        if (responseClass == null) {
+            throw new IllegalArgumentException("responseClass must not be null");
+        }
+        addConsumer(handlerClass, messageClass);
+    }
 
     void addConsumerMethods(Class<?>... declaringTypes);
 
@@ -50,6 +71,13 @@ public interface BusRegistrationConfigurator {
         requireTransportCapability(capability, false);
     }
     ServiceCollection getServiceCollection();
+
+    default void useBusOutbox() {
+        if (getServiceCollection().getDescriptors().stream()
+                .noneMatch(descriptor -> descriptor.getServiceType().equals(OutboxSession.class))) {
+            getServiceCollection().addScoped(OutboxSession.class, provider -> () -> new OutboxSession());
+        }
+    }
 
     default <TConfigurator extends BusFactoryConfigurator> BusRegistrationConfigurator using(
             Class<TConfigurator> configuratorClass,

@@ -21,6 +21,7 @@ public static class ServiceExtensions
         services.AddScoped(typeof(IRequestClient<>), typeof(GenericRequestClient<>));
         services.AddScoped<IRequestClientFactory, RequestClientFactory>();
         services.TryAddSingleton<IJobScheduler, DefaultJobScheduler>();
+        services.TryAddScoped<IScheduleMessageProvider, InMemoryScheduleMessageProvider>();
         services.AddScoped<IMessageScheduler, MessageScheduler>();
 
         return services;

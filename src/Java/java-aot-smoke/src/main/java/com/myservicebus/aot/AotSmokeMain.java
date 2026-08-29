@@ -67,7 +67,7 @@ public final class AotSmokeMain {
             return;
         }
 
-        bus.publish(message);
+        bus.publish(message).join();
 
         if (probe.message != message
                 || probe.context.getMessage() != message
@@ -84,14 +84,14 @@ public final class AotSmokeMain {
         int sampleCount = 10;
 
         for (int index = 0; index < warmupOperations; index++) {
-            bus.publish(message);
+            bus.publish(message).join();
         }
 
         double[] throughput = new double[sampleCount];
         for (int sample = 0; sample < sampleCount; sample++) {
             long started = System.nanoTime();
             for (int index = 0; index < operationsPerSample; index++) {
-                bus.publish(message);
+                bus.publish(message).join();
             }
             long elapsed = System.nanoTime() - started;
             throughput[sample] = operationsPerSample * 1_000_000_000.0 / elapsed;

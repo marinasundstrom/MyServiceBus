@@ -1,10 +1,10 @@
-# MVP Release Gate
+# Foundation MVP Release Gate
 
 ## Release outcome
 
-The MVP is a stable C# and Java messaging foundation for RabbitMQ. It supports the ordinary application path documented in the [MVP API Surface](mvp-api-surface.md) and makes only the scoped compatibility claims in the [Compatibility Policy](../compatibility.md).
+This gate records the foundation that later previews continue to protect. The C# and Java clients provide the ordinary RabbitMQ application path documented in the [MVP API Surface](mvp-api-surface.md) and make only the scoped compatibility claims in the [Compatibility Policy](../compatibility.md).
 
-The MVP is not an inspection, dashboard, saga, outbox, or multi-transport release. Those features build on the MVP after its protocol, topology, transport, and lifecycle contracts are released and can evolve deliberately.
+Preview releases after the foundation MVP also contain explicitly versioned inspection, monitoring, Azure Service Bus, mediator, scheduling, and PostgreSQL outbox surfaces. Their readiness is reported separately in the [API and Readiness Matrix](../api-readiness.md), [Enterprise Production Readiness](../enterprise-readiness.md), and feature-specific documentation. Including them in the same package line does not promote every surface to production-ready status.
 
 ## Completed product gates
 
@@ -20,12 +20,12 @@ The MVP is not an inspection, dashboard, saga, outbox, or multi-transport releas
 - The supported .NET, Java, RabbitMQ, MassTransit, and client-library baselines and the preview servicing window are explicit and checked against CI configuration.
 - The public quick starts, walkthrough, two-service sample, Aspire workflow, Java helper script, and local documentation links have been audited from clean source state; preview inspection endpoints are labeled as unstable.
 
-## Remaining release gates
+## Per-preview release gate
 
 1. **Release candidate gate** — require the ordinary unit suites, RabbitMQ integration suite, complete interoperability matrix, dependency audit, and package verification on the same candidate commit.
 
 ## Release decision
 
-The MVP can be tagged when all remaining gates are complete and the candidate commit passes CI. Work from roadmap Phase 3 onward must not delay that tag unless it reveals a defect in an MVP contract.
+Each preview can be tagged when the release-candidate gate is complete and the candidate commit passes CI. A failure in an experimental addon blocks the coordinated preview when that addon is one of its published artifacts, but its successful build does not upgrade the addon's documented readiness.
 
-After the MVP tag, the next product increment is stabilization of the optional inspection DTOs against the released topology model. Monitoring history and a read-only dashboard follow only after those programmatic APIs are stable.
+The current release work follows the [Enterprise Production Readiness](../enterprise-readiness.md) plan. Preview `0.1.0-preview.6` adds the Transactional Outbox evaluation MVP, durable one-time PostgreSQL scheduling and cancellation, and outbox dispatcher operations without claiming that the complete O01–O06 production matrix, Consumer Outbox middleware, retention cleanup, alerting, or durable monitoring history are finished.

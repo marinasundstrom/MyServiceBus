@@ -8,6 +8,9 @@ const sections = [
       ['Introduction', '/docs'],
       ['Why MyServiceBus?', '/docs/why-myservicebus'],
       ['Getting started', '/docs/getting-started'],
+      ['Mediator pattern', '/docs/mediator'],
+      ['Migrate from MassTransit', '/docs/migrate-from-masstransit'],
+      ['Migrate from MediatR', '/docs/migrate-from-mediatr'],
       ['Java adoption', '/docs/java-adoption'],
     ],
   },
@@ -30,8 +33,11 @@ const sections = [
       ['Distributed systems fundamentals', '/docs/distributed-systems'],
       ['RabbitMQ transport', '/docs/rabbitmq'],
       ['Azure Service Bus', '/docs/azure-service-bus'],
+      ['Transactional outbox', '/docs/transactional-outbox'],
+      ['Message scheduling', '/docs/scheduling'],
       ['Consumer methods', '/docs/consumer-methods'],
       ['Platform parity', '/docs/platform-parity'],
+      ['Supported versions', '/docs/supported-versions'],
       ['AOT compilation', '/docs/native-aot'],
       ['Runtime monitoring', '/docs/runtime-monitoring'],
       ['Testing', '/docs/testing'],
@@ -59,7 +65,7 @@ export default function DocumentationLayout({ children }: { children: React.Reac
           ))}
           <div className="sidebar-note">
             <span className="pulse" aria-hidden="true" />
-            <div><strong>0.1.0-preview.5</strong><br />Latest preview</div>
+            <div><strong>0.1.0-preview.6</strong><br />Latest preview</div>
           </div>
         </aside>
         <main className="docs-main">{children}</main>

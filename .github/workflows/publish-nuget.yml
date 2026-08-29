@@ -58,6 +58,7 @@ jobs:
           dotnet pack src/MyServiceBus.Abstractions/MyServiceBus.Abstractions.csproj --no-build --configuration Release --output artifacts/packages
           dotnet pack src/MyServiceBus/MyServiceBus.csproj --no-build --configuration Release --output artifacts/packages
           dotnet pack src/MyServiceBus.Serialization.Bson/MyServiceBus.Serialization.Bson.csproj --no-build --configuration Release --output artifacts/packages
+          dotnet pack src/MyServiceBus.PostgreSql/MyServiceBus.PostgreSql.csproj --no-build --configuration Release --output artifacts/packages
           dotnet pack src/MyServiceBus.Inspection/MyServiceBus.Inspection.csproj --no-build --configuration Release --output artifacts/packages
           dotnet pack src/MyServiceBus.Monitoring/MyServiceBus.Monitoring.csproj --no-build --configuration Release --output artifacts/packages
           dotnet pack src/MyServiceBus.RabbitMq/MyServiceBus.RabbitMq.csproj --no-build --configuration Release --output artifacts/packages

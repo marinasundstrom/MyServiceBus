@@ -15,6 +15,25 @@ using Xunit.Sdk;
 public class ConsumeContextTests
 {
     [Fact]
+    public void Exposes_inbound_message_id()
+    {
+        var messageId = Guid.NewGuid();
+        var json = Encoding.UTF8.GetBytes($"{{\"messageId\":\"{messageId}\",\"messageType\":[],\"message\":{{}}}}");
+        var envelope = new EnvelopeMessageContext(json, new Dictionary<string, object>());
+        var receiveContext = new ReceiveContextImpl(envelope, null, CancellationToken.None);
+
+        var context = new ConsumeContextImpl<FakeMessage>(receiveContext, new StubTransportFactory(),
+            new SendPipe(Pipe.Empty<SendContext>()),
+            new PublishPipe(Pipe.Empty<PublishContext>()),
+            new EnvelopeMessageSerializer(),
+            new Uri("rabbitmq://localhost/"),
+            new SendContextFactory(),
+            new PublishContextFactory());
+
+        Assert.Equal(messageId, context.MessageId);
+    }
+
+    [Fact]
     public async Task Passes_Message_Through_Pipeline()
     {
         var collected = new List<string>();

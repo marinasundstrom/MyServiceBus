@@ -140,7 +140,8 @@ public final class AzureServiceBusFactoryConfigurator implements BusFactoryConfi
                 handler.retryDelay(),
                 handler.prefetchCount(),
                 null,
-                serializer);
+                serializer,
+                handler.concurrentMessageLimit());
     }
 
     public String getConnectionString() {
@@ -215,6 +216,7 @@ public final class AzureServiceBusFactoryConfigurator implements BusFactoryConfi
         ConsumerTopology definition = registry.getConsumers().get(registry.getConsumers().size() - 1);
         definition.getBindings().get(0).setEntityName(registration.entityName());
         definition.setPrefetchCount(registration.prefetchCount());
+        definition.setConcurrentMessageLimit(registration.concurrentMessageLimit());
         definition.setSerializerClass(registration.serializerClass());
     }
 

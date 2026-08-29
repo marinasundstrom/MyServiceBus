@@ -65,6 +65,12 @@ public sealed class AzureServiceBusReceiveTransport : IReceiveTransport
         {
             await _processor.StopProcessingAsync(cancellationToken).ConfigureAwait(false);
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            _ = _processor.DisposeAsync();
+            _ = _skippedSender.DisposeAsync();
+            throw;
+        }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
             throw new AzureServiceBusTransportException("stop receive", _queueName, exception);

@@ -29,5 +29,5 @@ public interface JobScheduler {
         return schedule(delay, callback, CancellationToken.none());
     }
 
-    CompletionStage<Void> cancel(UUID tokenId);
+    CompletionStage<Boolean> cancel(UUID tokenId);
 }

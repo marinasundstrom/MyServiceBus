@@ -51,10 +51,15 @@ internal static class JavaInteropPeer
         catch (OperationCanceledException)
         {
             if (!process.HasExited)
+            {
                 process.Kill(entireProcessTree: true);
+                await process.WaitForExitAsync();
+            }
+
+            var timeoutError = await process.StandardError.ReadToEndAsync();
 
             throw new TimeoutException(
-                $"Java interoperability peer did not write '{expectedLine}' within {timeout}.");
+                $"Java interoperability peer did not write '{expectedLine}' within {timeout}. {timeoutError}");
         }
 
         var error = await process.StandardError.ReadToEndAsync();

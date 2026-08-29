@@ -79,6 +79,9 @@ public class InMemoryTestHarness : IMessageBus, ITransportFactory, IReceiveEndpo
         return Task.CompletedTask;
     }
 
+    public Task StopAsync(TimeSpan timeout, CancellationToken cancellationToken = default)
+        => StopAsync(cancellationToken);
+
     public void RegisterHandler<T>(Func<ConsumeContext<T>, Task> handler) where T : class
     {
         lock (handlerLock)
@@ -230,7 +233,8 @@ public class InMemoryTestHarness : IMessageBus, ITransportFactory, IReceiveEndpo
 
     public Task AddHandler<TMessage>(string queueName, string exchangeName, Func<ConsumeContext<TMessage>, Task> handler,
         int? retryCount = null, TimeSpan? retryDelay = null, ushort? prefetchCount = null,
-        IDictionary<string, object?>? queueArguments = null, IMessageSerializer? serializer = null, CancellationToken cancellationToken = default) where TMessage : class
+        IDictionary<string, object?>? queueArguments = null, IMessageSerializer? serializer = null,
+        CancellationToken cancellationToken = default, int? concurrentMessageLimit = null) where TMessage : class
     {
         RegisterHandler(handler);
         return Task.CompletedTask;

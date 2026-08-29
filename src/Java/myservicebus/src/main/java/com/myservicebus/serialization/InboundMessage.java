@@ -20,6 +20,10 @@ public interface InboundMessage {
 
     String getFaultAddress();
 
+    default UUID getMessageId() {
+        return null;
+    }
+
     default UUID getRequestId() {
         return null;
     }

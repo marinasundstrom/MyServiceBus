@@ -43,6 +43,7 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
     internal ReceiveContext ReceiveContext => receiveContext;
 
     public TMessage Message => message is null ? (receiveContext.TryGetMessage(out message) ? message : default) : message;
+    public Guid? MessageId => receiveContext.MessageId == Guid.Empty ? null : receiveContext.MessageId;
     public Guid? RequestId => receiveContext.RequestId;
     public Guid? CorrelationId => receiveContext.CorrelationId;
     public Guid? ConversationId => receiveContext.ConversationId;

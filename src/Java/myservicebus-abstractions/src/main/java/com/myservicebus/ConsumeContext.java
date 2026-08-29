@@ -36,6 +36,7 @@ public class ConsumeContext<T>
     private final SendEndpointProvider sendEndpointProvider;
     private final URI busAddress;
     private final PublishAddressProvider publishAddressProvider;
+    private final UUID messageId;
     private final UUID requestId;
     private final UUID correlationId;
     private final UUID conversationId;
@@ -83,6 +84,14 @@ public class ConsumeContext<T>
             String errorAddress, CancellationToken cancellationToken, SendEndpointProvider provider, URI busAddress,
             PublishAddressProvider publishAddressProvider, UUID requestId, UUID correlationId, UUID conversationId,
             UUID initiatorId) {
+        this(message, headers, responseAddress, faultAddress, errorAddress, cancellationToken, provider, busAddress,
+                publishAddressProvider, null, requestId, correlationId, conversationId, initiatorId);
+    }
+
+    public ConsumeContext(T message, Map<String, Object> headers, String responseAddress, String faultAddress,
+            String errorAddress, CancellationToken cancellationToken, SendEndpointProvider provider, URI busAddress,
+            PublishAddressProvider publishAddressProvider, UUID messageId, UUID requestId, UUID correlationId,
+            UUID conversationId, UUID initiatorId) {
         this.message = message;
         this.headers = headers;
         this.responseAddress = responseAddress;
@@ -92,6 +101,7 @@ public class ConsumeContext<T>
         this.sendEndpointProvider = provider;
         this.busAddress = busAddress;
         this.publishAddressProvider = publishAddressProvider;
+        this.messageId = messageId;
         this.requestId = requestId;
         this.correlationId = correlationId;
         this.conversationId = conversationId;
@@ -100,6 +110,11 @@ public class ConsumeContext<T>
 
     public T getMessage() {
         return message;
+    }
+
+    @Override
+    public UUID getMessageId() {
+        return messageId;
     }
 
     public Map<String, Object> getHeaders() {

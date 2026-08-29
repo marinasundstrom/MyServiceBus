@@ -9,11 +9,14 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Shouldly;
 using Xunit;
+using MyServiceBus.Serialization;
 
 namespace MyServiceBus.RabbitMq.Tests;
 
 public class RabbitMqTransportFactoryTests
 {
+    private sealed class TestMessage { }
+
     class TestRabbitMqFactoryConfigurator : IRabbitMqFactoryConfigurator
     {
         public IEndpointNameFormatter? EndpointNameFormatter => null;
@@ -350,6 +353,58 @@ public class RabbitMqTransportFactoryTests
     }
 
     [Fact]
+    public async Task Compatibility_exchange_transport_requires_routing()
+    {
+        var channel = Substitute.For<IChannel>();
+        channel.ExchangeDeclareAsync(
+                Arg.Any<string>(),
+                Arg.Any<string>(),
+                Arg.Any<bool>(),
+                Arg.Any<bool>(),
+                Arg.Any<IDictionary<string, object?>?>(),
+                Arg.Any<bool>(),
+                Arg.Any<bool>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.CompletedTask);
+        channel.BasicPublishAsync(
+                Arg.Any<string>(),
+                Arg.Any<string>(),
+                Arg.Any<bool>(),
+                Arg.Any<BasicProperties>(),
+                Arg.Any<ReadOnlyMemory<byte>>(),
+                Arg.Any<CancellationToken>())
+            .Returns(ValueTask.CompletedTask);
+
+        var connection = Substitute.For<IConnection>();
+        connection.IsOpen.Returns(true);
+        connection.CreateChannelAsync(Arg.Any<CreateChannelOptions?>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(channel));
+
+        var connectionFactory = Substitute.For<IConnectionFactory>();
+        connectionFactory.CreateConnectionAsync(Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(connection));
+
+        var transportFactory = new RabbitMqTransportFactory(
+            new ConnectionProvider(connectionFactory),
+            new TestRabbitMqFactoryConfigurator());
+        var transport = await transportFactory.GetSendTransport(new Uri("exchange:input_error"));
+        var context = new SendContext(MessageTypeCache.GetMessageTypes(typeof(TestMessage)), new EnvelopeMessageSerializer())
+        {
+            RoutingKey = string.Empty
+        };
+
+        await transport.Send(new TestMessage(), context);
+
+        await channel.Received(1).BasicPublishAsync(
+            "input_error",
+            string.Empty,
+            true,
+            Arg.Any<BasicProperties>(),
+            Arg.Any<ReadOnlyMemory<byte>>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task Supports_queue_scheme_uri()
     {
         var channel = Substitute.For<IChannel>();
@@ -395,6 +450,12 @@ public class RabbitMqTransportFactoryTests
         var transportFactory = new RabbitMqTransportFactory(provider, new TestRabbitMqFactoryConfigurator());
 
         await transportFactory.GetSendTransport(new Uri("queue:orders"));
+
+        await connection.Received(1).CreateChannelAsync(
+            Arg.Is<CreateChannelOptions>(options =>
+                options.PublisherConfirmationsEnabled
+                && options.PublisherConfirmationTrackingEnabled),
+            Arg.Any<CancellationToken>());
 
         await channel.Received(1).QueueDeclareAsync(
             "orders",

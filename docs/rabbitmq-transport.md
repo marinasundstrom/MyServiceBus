@@ -4,13 +4,13 @@ MyServiceBus currently ships with a RabbitMQ-based transport (aside from the in-
 
 ## Connection Recovery
 
-The RabbitMQ transports in both the C# and Java implementations handle lost connections transparently.
+The RabbitMQ client libraries have automatic connection and topology recovery enabled in both implementations. That recovery helps restore an established connection and its channels, but it does not confirm or replay an application publish whose outcome was ambiguous.
 
 - A shared `ConnectionProvider` caches the active connection and verifies it is still open before each use.
-- If the connection drops, the provider creates a new one using an exponential backoff strategy and resets the cached instance when RabbitMQ signals a shutdown.
+- Both providers reset the cached connection when RabbitMQ signals a shutdown. Java retries initial connection creation with exponential backoff; C# currently surfaces an initial connection failure to its caller.
 - `ConnectionFactory` enables `AutomaticRecoveryEnabled` and `TopologyRecoveryEnabled` so the client re-establishes TCP links and redeclares exchanges and queues.
 
-These safeguards allow application code to await a usable connection without implementing custom retry logic.
+These safeguards reduce recovery work for applications, but they are not a delivery guarantee. Transport channels now use publisher confirms, and directed queue sends and skipped-message moves require routing. Connection ambiguity, error-exchange routing, and process-failure behavior still require the gates in the [Delivery Guarantees Specification](specs/delivery-guarantees.md) before production promotion.
 
 ## Dead-letter Handling
 
@@ -86,6 +86,29 @@ factoryConfigurator.receiveEndpoint("orders", e -> {
     e.prefetchCount(32); // endpoint specific
 });
 ```
+
+## Concurrent Message Limit
+
+Prefetch bounds unacknowledged broker deliveries; it does not bound application handlers by itself. Configure the portable per-endpoint concurrency limit separately. The default is one.
+
+### C#
+```csharp
+cfg.ReceiveEndpoint("orders", e =>
+{
+    e.PrefetchCount(32);
+    e.ConcurrentMessageLimit(8);
+});
+```
+
+### Java
+```java
+factoryConfigurator.receiveEndpoint("orders", e -> {
+    e.prefetchCount(32);
+    e.concurrentMessageLimit(8);
+});
+```
+
+RabbitMQ keeps deliveries waiting for a handler permit unsettled. They therefore remain subject to broker prefetch and are included in graceful-drain accounting.
 
 ## Queue Arguments
 

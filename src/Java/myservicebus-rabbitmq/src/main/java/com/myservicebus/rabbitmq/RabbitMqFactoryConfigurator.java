@@ -108,7 +108,8 @@ public class RabbitMqFactoryConfigurator implements BusFactoryConfigurator {
         MessageSerializer serializer = reg.serializerClass != null
                 ? reg.serializerClass.getDeclaredConstructor().newInstance()
                 : null;
-        bus.addHandler(reg.queueName, reg.messageType, reg.exchange, reg.handler, reg.retryCount, reg.retryDelay, reg.prefetchCount, reg.queueArguments, serializer);
+        bus.addHandler(reg.queueName, reg.messageType, reg.exchange, reg.handler, reg.retryCount, reg.retryDelay,
+                reg.prefetchCount, reg.queueArguments, serializer, reg.concurrentMessageLimit);
     }
 
     public String getClientHost() {
@@ -200,6 +201,7 @@ public class RabbitMqFactoryConfigurator implements BusFactoryConfigurator {
         ConsumerTopology definition = registry.getConsumers().get(registry.getConsumers().size() - 1);
         definition.getBindings().get(0).setEntityName(registration.exchange);
         definition.setPrefetchCount(registration.prefetchCount);
+        definition.setConcurrentMessageLimit(registration.concurrentMessageLimit);
         definition.setQueueArguments(registration.queueArguments);
         definition.setSerializerClass(registration.serializerClass);
     }
@@ -228,6 +230,7 @@ public class RabbitMqFactoryConfigurator implements BusFactoryConfigurator {
         private Duration retryDelay;
         private java.util.function.Consumer<RetryConfigurator> retry;
         private Integer prefetchCount;
+        private Integer concurrentMessageLimit;
         private Map<String, Object> queueArguments;
         private Class<? extends MessageSerializer> serializerClass;
 
@@ -256,6 +259,14 @@ public class RabbitMqFactoryConfigurator implements BusFactoryConfigurator {
         @Override
         public void prefetchCount(int prefetchCount) {
             this.prefetchCount = prefetchCount;
+        }
+
+        @Override
+        public void concurrentMessageLimit(int concurrentMessageLimit) {
+            if (concurrentMessageLimit < 1) {
+                throw new IllegalArgumentException("Concurrent message limit must be at least one");
+            }
+            this.concurrentMessageLimit = concurrentMessageLimit;
         }
 
         @Override
@@ -315,6 +326,7 @@ public class RabbitMqFactoryConfigurator implements BusFactoryConfigurator {
                 }
 
                 def.setPrefetchCount(prefetchCount);
+                def.setConcurrentMessageLimit(concurrentMessageLimit);
                 def.setQueueArguments(queueArguments);
                 def.setSerializerClass(serializerClass);
             } catch (Exception ex) {
@@ -336,6 +348,7 @@ public class RabbitMqFactoryConfigurator implements BusFactoryConfigurator {
                     retryCount,
                     retryDelay,
                     prefetchCount,
+                    concurrentMessageLimit,
                     queueArguments,
                     serializerClass));
         }
@@ -345,7 +358,8 @@ public class RabbitMqFactoryConfigurator implements BusFactoryConfigurator {
             String exchange = exchangeNames.containsKey(messageType)
                     ? exchangeNames.get(messageType)
                     : EntityNameFormatter.format(messageType);
-            handlers.add(new HandlerRegistration<>(queueName, messageType, exchange, handler, retryCount, retryDelay, prefetchCount, queueArguments, serializerClass));
+            handlers.add(new HandlerRegistration<>(queueName, messageType, exchange, handler, retryCount, retryDelay,
+                    prefetchCount, concurrentMessageLimit, queueArguments, serializerClass));
         }
     }
 
@@ -357,6 +371,7 @@ public class RabbitMqFactoryConfigurator implements BusFactoryConfigurator {
         final Integer retryCount;
         final Duration retryDelay;
         final Integer prefetchCount;
+        final Integer concurrentMessageLimit;
         final Map<String, Object> queueArguments;
         final Class<? extends MessageSerializer> serializerClass;
 
@@ -368,6 +383,7 @@ public class RabbitMqFactoryConfigurator implements BusFactoryConfigurator {
                 Integer retryCount,
                 Duration retryDelay,
                 Integer prefetchCount,
+                Integer concurrentMessageLimit,
                 Map<String, Object> queueArguments,
                 Class<? extends MessageSerializer> serializerClass) {
             this.queueName = queueName;
@@ -377,6 +393,7 @@ public class RabbitMqFactoryConfigurator implements BusFactoryConfigurator {
             this.retryCount = retryCount;
             this.retryDelay = retryDelay;
             this.prefetchCount = prefetchCount;
+            this.concurrentMessageLimit = concurrentMessageLimit;
             this.queueArguments = queueArguments;
             this.serializerClass = serializerClass;
         }
@@ -390,12 +407,14 @@ public class RabbitMqFactoryConfigurator implements BusFactoryConfigurator {
         final Integer retryCount;
         final Duration retryDelay;
         final Integer prefetchCount;
+        final Integer concurrentMessageLimit;
         final Map<String, Object> queueArguments;
         final Class<? extends MessageSerializer> serializerClass;
 
         HandlerRegistration(String queueName, Class<T> messageType, String exchange,
                 java.util.function.Function<ConsumeContext<T>, java.util.concurrent.CompletableFuture<Void>> handler,
-                Integer retryCount, Duration retryDelay, Integer prefetchCount, Map<String, Object> queueArguments,
+                Integer retryCount, Duration retryDelay, Integer prefetchCount, Integer concurrentMessageLimit,
+                Map<String, Object> queueArguments,
                 Class<? extends MessageSerializer> serializerClass) {
             this.queueName = queueName;
             this.messageType = messageType;
@@ -404,6 +423,7 @@ public class RabbitMqFactoryConfigurator implements BusFactoryConfigurator {
             this.retryCount = retryCount;
             this.retryDelay = retryDelay;
             this.prefetchCount = prefetchCount;
+            this.concurrentMessageLimit = concurrentMessageLimit;
             this.queueArguments = queueArguments;
             this.serializerClass = serializerClass;
         }

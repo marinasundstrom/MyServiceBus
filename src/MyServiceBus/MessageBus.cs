@@ -112,7 +112,8 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector, IConsumerMetho
 
     public async Task AddHandler<TMessage>(string queueName, string exchangeName, Func<ConsumeContext<TMessage>, Task> handler,
         int? retryCount = null, TimeSpan? retryDelay = null, ushort? prefetchCount = null,
-        IDictionary<string, object?>? queueArguments = null, IMessageSerializer? serializer = null, CancellationToken cancellationToken = default)
+        IDictionary<string, object?>? queueArguments = null, IMessageSerializer? serializer = null,
+        CancellationToken cancellationToken = default, int? concurrentMessageLimit = null)
         where TMessage : class
     {
         var endpointSerializer = serializer ?? _messageSerializer;
@@ -123,7 +124,8 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector, IConsumerMetho
             temporary: false,
             prefetchCount ?? 0,
             [new MessageBinding { MessageType = typeof(TMessage), EntityName = exchangeName }],
-            queueArguments is null ? null : new Dictionary<string, object?>(queueArguments, StringComparer.Ordinal));
+            queueArguments is null ? null : new Dictionary<string, object?>(queueArguments, StringComparer.Ordinal),
+            concurrentMessageLimit ?? 1);
 
         var configurator = new PipeConfigurator<ConsumeContext<TMessage>>();
         configurator.UseFilter(new OpenTelemetryConsumeFilter<TMessage>());
@@ -169,7 +171,8 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector, IConsumerMetho
             GetEndpointBindings(queueName, consumer),
             consumer.QueueArguments is null
                 ? null
-                : new Dictionary<string, object?>(consumer.QueueArguments, StringComparer.Ordinal));
+                : new Dictionary<string, object?>(consumer.QueueArguments, StringComparer.Ordinal),
+            consumer.ConcurrentMessageLimit ?? 1);
 
         Func<string?, bool> isRegistered = mt =>
             _consumers.TryGetValue(queueName, out var regs)
@@ -250,7 +253,8 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector, IConsumerMetho
             GetEndpointBindings(queueName, consumer),
             consumer.QueueArguments is null
                 ? null
-                : new Dictionary<string, object?>(consumer.QueueArguments, StringComparer.Ordinal));
+                : new Dictionary<string, object?>(consumer.QueueArguments, StringComparer.Ordinal),
+            consumer.ConcurrentMessageLimit ?? 1);
 
         Func<string?, bool> isRegistered = messageUrnHeader =>
             _consumers.TryGetValue(queueName, out var existingRegistrations)
@@ -373,6 +377,30 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector, IConsumerMetho
         finally
         {
             _lifecycleLock.Release();
+        }
+    }
+
+    public async Task StopAsync(TimeSpan timeout, CancellationToken cancellationToken = default)
+    {
+        if (timeout <= TimeSpan.Zero && timeout != Timeout.InfiniteTimeSpan)
+            throw new ArgumentOutOfRangeException(nameof(timeout), "The stop timeout must be positive or infinite.");
+
+        if (timeout == Timeout.InfiniteTimeSpan)
+        {
+            await StopAsync(cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        using var timeoutSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeoutSource.CancelAfter(timeout);
+        try
+        {
+            await StopAsync(timeoutSource.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException exception)
+            when (!cancellationToken.IsCancellationRequested && timeoutSource.IsCancellationRequested)
+        {
+            throw new BusStopTimeoutException(timeout, exception);
         }
     }
 

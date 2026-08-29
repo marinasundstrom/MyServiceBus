@@ -98,6 +98,8 @@ This makes it easier to build systems where Java and .NET services communicate u
 
 The project aims to provide a smaller, community-driven option for teams that need basic MassTransit-style scenarios without adopting the breadth of an enterprise service-bus product.
 
+The project is MIT-licensed. This can suit a project whose requirements or development stage do not justify the commercial license and support model introduced with MassTransit v9. It is not a claim that the trade-off disappears: MyServiceBus remains a preview and does not provide MassTransit's maturity, commercial support, or complete feature breadth. The MassTransit 8.5.1 version used by the interoperability suite is a separate technical test pin.
+
 This motivation also led to the creation of an accompanying **C# implementation**, ensuring that the same abstractions and concepts are available on both sides of the Java/.NET boundary.
 
 ---

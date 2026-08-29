@@ -55,6 +55,7 @@ class BsonSerializerTest {
                 context.getHeaders().get(MassTransitHeaderConvention.INSTANCE.getContentTypeHeader()));
         assertEquals(BsonSerializerFactory.BSON_CONTENT_TYPE, inbound.getContentType());
         assertEquals(InboundMessageFormat.ENVELOPE, inbound.getFormat());
+        assertEquals(context.getMessageId(), inbound.getMessageId());
         assertEquals(context.getCorrelationId(), inbound.getCorrelationId());
         assertEquals(context.getConversationId(), inbound.getConversationId());
         assertEquals(context.getMessageType(), inbound.getMessageTypes());

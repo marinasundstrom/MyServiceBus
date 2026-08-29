@@ -86,6 +86,53 @@ else
         </section>
     }
 
+    @if (_outboxDispatchers.Count > 0)
+    {
+        <section class="panel instances outbox-operations">
+            <div class="section-heading">
+                <div>
+                    <p class="eyebrow">Transactional outbox</p>
+                    <h2>Dispatcher operations</h2>
+                </div>
+                <span>60-second delivery window · grouped by service partition</span>
+            </div>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Status</th>
+                            <th>Service partition</th>
+                            <th>Worker</th>
+                            <th>Pending</th>
+                            <th>Oldest</th>
+                            <th>Dispatch / sec</th>
+                            <th>Failed</th>
+                            <th>Lost leases</th>
+                            <th>Cycle latency</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var dispatcher in _outboxDispatchers)
+                        {
+                            var healthy = dispatcher.Online && dispatcher.LastCycleSucceeded;
+                            <tr>
+                                <td><span class="status-dot @(healthy ? "online" : "offline")"></span>@(healthy ? "Healthy" : "Attention")</td>
+                                <td><strong>@dispatcher.ServiceName</strong><small>@dispatcher.ApplicationName</small></td>
+                                <td class="mono">@dispatcher.OwnerId<small>@dispatcher.InstanceId</small></td>
+                                <td class="@(dispatcher.Pending > 0 ? "fault" : null)">@FormatCount(dispatcher.Pending)</td>
+                                <td class="@(dispatcher.OldestUndispatchedAgeMs > 30_000 ? "fault" : null)">@FormatAge(dispatcher.OldestUndispatchedAgeMs)</td>
+                                <td>@FormatRate(dispatcher.DispatchedPerSecond)</td>
+                                <td class="@(dispatcher.WindowFailed > 0 ? "fault" : null)">@dispatcher.WindowFailed.ToString("N0")</td>
+                                <td class="@(dispatcher.WindowLostLeases > 0 ? "fault" : null)">@dispatcher.WindowLostLeases.ToString("N0")</td>
+                                <td>@FormatDuration(dispatcher.LastCycleDurationMs)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    }
+
     <section class="panel instances">
         <div class="section-heading">
             <div>
@@ -213,6 +260,7 @@ else
     private IReadOnlyList<MonitoringTimeSeriesPoint> _timeSeries = [];
     private IReadOnlyList<MonitoringFlowEdge> _flow = [];
     private IReadOnlyList<MonitoringObservationRecord> _observations = [];
+    private IReadOnlyList<MonitoringOutboxDispatcherSummary> _outboxDispatchers = [];
     private DateTimeOffset _updatedAt = DateTimeOffset.UtcNow;
     private string? _error;
     private bool _liveConnected;
@@ -291,7 +339,8 @@ else
             var flow = Api.GetFlow(_stopping.Token);
             var timeSeries = Api.GetTimeSeries(_stopping.Token);
             var observations = Api.GetRecentObservations(_stopping.Token);
-            await Task.WhenAll(applications, instances, applicationRates, instanceRates, flow, timeSeries, observations);
+            var outboxDispatchers = Api.GetOutboxDispatchers(_stopping.Token);
+            await Task.WhenAll(applications, instances, applicationRates, instanceRates, flow, timeSeries, observations, outboxDispatchers);
             _applications = applications.Result;
             _instances = instances.Result;
             _applicationRates = applicationRates.Result;
@@ -299,6 +348,7 @@ else
             _flow = flow.Result;
             _timeSeries = timeSeries.Result;
             _observations = observations.Result;
+            _outboxDispatchers = outboxDispatchers.Result;
             _updatedAt = DateTimeOffset.UtcNow;
             _error = null;
         }
@@ -339,6 +389,13 @@ else
 
     private static string FormatRate(double? value) => value.HasValue ? value.Value.ToString("N2") : "—";
     private static string FormatDuration(double? value) => value.HasValue ? $"{value.Value:N0} ms" : "—";
+    private static string FormatAge(double? value) => value switch
+    {
+        null => "—",
+        < 1_000 => $"{value.Value:N0} ms",
+        < 60_000 => $"{value.Value / 1_000:N1} sec",
+        _ => $"{value.Value / 60_000:N1} min"
+    };
     private static string FormatCount(long? value) => value.HasValue ? value.Value.ToString("N0") : "—";
     private static string DisplayKind(string value) => value.Replace('_', ' ');
     private static string ValueOrDash(string? value) => string.IsNullOrWhiteSpace(value) ? "—" : value;

@@ -1,44 +1,60 @@
 import Link from 'next/link';
 
-const rows = [
-  ['Interface consumer', 'Available', 'Generated', 'Available', 'Not needed'],
-  ['Explicit consumer/message catalog', 'Available', 'Generated', 'Available', 'Generated'],
-  ['Runtime interface discovery', 'Available', 'N/A', 'Registered class', 'N/A'],
-  ['Filtered assembly discovery', 'Available', 'N/A', 'Not applicable', 'N/A'],
-  ['Attributed method consumer', 'Reflection path', 'Available', 'Available', 'Available'],
-  ['Grouped static consumer methods', 'Reflection path', 'Available', 'Available', 'Available'],
-  ['Attribute endpoint override for IConsumer<T>', 'Reflection path', 'Available', 'Available', 'Available'],
-  ['Message and context binding', 'Available', 'Available', 'Available', 'Available'],
-  ['Method parameter service injection', 'Available', 'Typed generation', 'Available', 'Typed generation'],
-  ['Async consumer-method response', 'Task<T> + ValueTask<T>', 'Available', 'Future<T> + Stage<T>', 'Available'],
-  ['Generated direct method invocation', 'Typed adapter path', 'Available', 'Typed invoker path', 'JSR 269'],
-  ['Named method endpoint', 'Attribute or fluent', 'Available', 'Annotation or explicit', 'Available'],
-  ['Reflection-free method discovery and invocation', 'Typed path', 'Available', 'Typed path', 'Available'],
-  ['Explicit serializer factory', 'Service-provider factory', 'Not needed', 'Serializer + deserializer', 'Not needed'],
-  ['Factory-only AOT dependency injection', 'Typed Microsoft DI', 'Not needed', 'No Guice activation', 'Not needed'],
-  ['External-container consumer activation', 'Consumer factory', 'Not needed', 'Consumer factory', 'Not needed'],
-  ['Native executable smoke', 'Available', '.NET NativeAOT CI', 'No tracing metadata', 'GraalVM CI'],
-  ['Runtime-managed async core and consumer in a native executable', 'Opt-in .NET 11 preview target', 'Generated dispatch verified', 'Different JVM model', 'Not applicable'],
-  ['Source-generated JSON metadata', 'Application opt-in', 'Serializer-owned', 'Serializer-specific', 'Serializer-owned'],
+const apiRows = [
+  ['Publish events', 'IPublishEndpoint.Publish', 'PublishEndpoint.publish', 'Aligned + interoperable — familiar intent and verified 8.5.1 wire subset.', 'Verified preview', 'Transport acceptance edge cases still have open production gates.'],
+  ['Send commands', 'ISendEndpoint.Send', 'SendEndpoint.send', 'Aligned + interoperable — familiar directed send and endpoint addressing.', 'Verified preview', 'Address normalization and broker options may evolve before 1.0.'],
+  ['Consume messages', 'IConsumer<T>.Consume', 'Consumer<T>.consume', 'Idiomatic equivalent — same responsibility and behavior; Java does not copy .NET syntax.', 'Verified preview', 'Registration overloads may simplify; the typed model is a core direction.'],
+  ['Request and response', 'IRequestClient<T>.GetResponseAsync', 'RequestClient<T>.getResponse', 'Idiomatic equivalent — familiar correlation and faults; Java uses class tokens where generic types are erased.', 'Verified preview', 'Convenience overloads and multi-response ergonomics may expand.'],
+  ['Bus configuration and DI', 'AddServiceBus + UsingRabbitMq / UsingAzureServiceBus', 'ServiceCollection or standalone bus factory + using…', 'Deliberate divergence — C# stays MassTransit-familiar; Java follows Java composition and lifecycle idioms.', 'Verified preview', 'Java ecosystem adapters may expand without forcing one container into the core API.'],
+  ['In-process mediator', 'IMediator.Send / Publish', 'Mediator.send / publish', 'MyServiceBus-native emphasis — MediatR-style semantics on the shared handler runtime; not MassTransit mediator compatibility.', 'Verified preview', 'Handler pipelines may grow; mediator remains segregated from the bus API.'],
+  ['Consumer methods and handlers', '[Consumer] + AddHandler', '@MessageConsumer + addHandler', 'MyServiceBus-native — explicit mediator-friendly handlers and generated/reflected method consumers.', 'Verified preview', 'Declaration and registration conveniences may grow.'],
+  ['Transactional Bus Outbox', 'UsePostgreSql + AddPostgreSqlOutboxDelivery', 'useTransaction + PostgreSqlOutboxDelivery.create', 'Deliberate divergence — normalized MyServiceBus C# ↔ Java schema, not MassTransit table compatibility.', 'MVP preview', 'Consumer Outbox, cleanup, SQL Server, and production crash gates remain.'],
+  ['Transport portfolio', 'RabbitMQ + Azure Service Bus', 'RabbitMQ + Azure Service Bus', 'Deliberate scope — one portable profile per supported broker, not MassTransit transport breadth.', 'Verified preview', 'New transports may be added only with matching C# and Java behavior and evidence.'],
+  ['Schedule or delay messages', 'IMessageScheduler + IScheduleMessageProvider', 'MessageScheduler + ScheduleMessageProvider', 'Idiomatic equivalent — MassTransit-familiar C# surface, Java-native time/async types, and explicit volatile or durable providers.', 'MVP preview', 'PostgreSQL outbox delayed intent works; persisted cancellation, recurring schedules, and broker/Quartz adapters remain.'],
+  ['Runtime monitoring', 'AddServiceBusMonitoring + PostgreSqlOutboxHealth', 'MonitoringServices.addMonitoring + PostgreSqlOutboxHealth', 'MyServiceBus-native — own collector/dashboard model plus OpenTelemetry-compatible application telemetry.', 'Experimental', 'Outbox export, persistence, security, and dashboard operations are incomplete.'],
+  ['Generated registration and dispatch', 'C# source generator', 'JSR 269 annotation processor', 'MyServiceBus-native — compile-time path for lower-reflection startup and mediator dispatch.', 'Verified preview', 'Generated coverage will expand with the runtime surface.'],
 ];
 
 export default function PlatformParity() {
   return (
     <article className="docs-article">
-      <p className="docs-kicker">Capability status · Preview 4</p>
-      <h1>Runtime support and language tooling are tracked separately.</h1>
+      <p className="docs-kicker">API and capability status · Current preview</p>
+      <h1>What can I use today, and what could change in the future?</h1>
       <p className="docs-summary">
-        MyServiceBus aims for behavioral parity without pretending every language has
-        identical compiler infrastructure. This matrix distinguishes runtime primitives
-        from the tooling that discovers or generates registrations for them.
+        Start with the developer capability, then compare the C# and Java entry points,
+        the alignment choice, the evidence behind it, and the remaining compatibility
+        risk. Similar means recognizable contract and behavior—not an unversioned promise
+        of source or database compatibility.
       </p>
 
       <div className="callout callout-accent">
-        <strong>How to read the matrix</strong>
+        <strong>Everything is still pre-1.0</strong>
         <p>
-          Available and generated capabilities ship today. Manual means the runtime
-          primitive exists but no build-time automation is shipped. Planned entries
-          describe direction and are not compatibility promises for the current preview.
+          Verified preview means the capability exists in both clients and has focused
+          automated evidence. MVP preview is usable for evaluation but has named production
+          gates left. Experimental means the design or operational contract can still change
+          materially. None of these labels means a long-term stable API yet.
+        </p>
+      </div>
+
+      <div className="callout">
+        <strong>Difference is classified, not hidden</strong>
+        <p>
+          <em>Aligned + interoperable</em> identifies the pinned common wire contract.{' '}
+          <em>Idiomatic equivalent</em> keeps behavior while adapting the API to C# or Java.{' '}
+          <em>Deliberate divergence</em> and <em>MyServiceBus-native</em> identify choices we
+          intend to own. <em>Temporary gap</em> means the current difference is incomplete
+          work, not a desired compatibility boundary.
+        </p>
+      </div>
+
+      <div className="callout">
+        <strong>This is the adopter view</strong>
+        <p>
+          The table is intentionally curated around decisions an application team makes.
+          It does not list every registration overload, generated adapter, internal descriptor,
+          or test case. The repository keeps that detailed maintainer ledger separately; a
+          capability reaches this page only when its public behavior and readiness can be stated clearly.
         </p>
       </div>
 
@@ -46,59 +62,64 @@ export default function PlatformParity() {
         <table className="parity-table">
           <thead>
             <tr>
-              <th>Consumer capability</th>
-              <th>.NET runtime</th>
-              <th>C# generator</th>
-              <th>Java runtime</th>
-              <th>Java tooling</th>
+              <th>Developer capability</th>
+              <th>C# API</th>
+              <th>Java API</th>
+              <th>Alignment or divergence</th>
+              <th>Readiness</th>
+              <th>What could change</th>
             </tr>
           </thead>
           <tbody>
-            {rows.map(([capability, ...statuses]) => (
+            {apiRows.map(([capability, csharp, java, relationship, readiness, future]) => (
               <tr key={capability}>
-                <td>{capability}</td>
-                {statuses.map((status, index) => (
-                  <td key={`${capability}-${index}`}><span className="parity-status">{status}</span></td>
-                ))}
+                <td><strong>{capability}</strong></td>
+                <td><code>{csharp}</code></td>
+                <td><code>{java}</code></td>
+                <td>{relationship}</td>
+                <td><span className="parity-status">{readiness}</span></td>
+                <td>{future}</td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
 
-      <h2>One descriptor model, different producers</h2>
-      <p>
-        The shared runtime direction is a consumer descriptor containing endpoint identity,
-        message contract, activation, parameter binding, and invocation. Existing interface
-        consumers, reflection, generated C#, hand-written catalogs, and Java annotation
-        processing can all produce that descriptor
-        without requiring identical language syntax.
-      </p>
-
-      <h2>Current practical choices</h2>
-      <ul className="check-list">
-        <li>C# can use reflection discovery, explicit typed registration, or the generated catalog.</li>
-        <li>Java can use interface consumers, explicit registrations, reflection over named classes, or a generated catalog.</li>
-        <li>C# and Java attributed static classes can group several message methods on one endpoint.</li>
-        <li>Both clients bind message, context, cancellation, and scoped service parameters.</li>
-        <li>Method-consumer classes do not require or use an <code>IConsumer</code> marker.</li>
-        <li>Java intentionally has no implicit classpath scan or scan predicate.</li>
-        <li>Java AOT applications can select a factory-only container; conventional Guice-backed setup remains available.</li>
-        <li>Full application AOT support remains work in progress in both runtimes.</li>
-      </ul>
-
       <div className="callout">
-        <strong>External language integration</strong>
+        <strong>MassTransit is a reference point, not a moving compatibility promise</strong>
         <p>
-          Raven is a separate product, not a MyServiceBus runtime or roadmap column.
-          Its namespace-level functions could consume this descriptor model through an
-          external integration without becoming part of MyServiceBus platform parity.
+          Wire interoperability is tested against MassTransit 8.5.1 and only for the
+          documented common subset. Current MassTransit documentation is useful background
+          for familiar concepts such as{' '}
+          <a href="https://masstransit.massient.com/concepts/producers">send and publish ↗</a>,{' '}
+          <a href="https://masstransit.massient.com/concepts/requests">requests ↗</a>,{' '}
+          <a href="https://masstransit.massient.com/concepts/outbox">the outbox ↗</a>, and{' '}
+          <a href="https://masstransit.massient.com/configuration/schedulers">scheduling ↗</a>.
+          MyServiceBus documents and tests its own contract because later releases may evolve independently.
         </p>
       </div>
 
+      <p>
+        For the exact wire boundary, transport versions, and exclusions, use the{' '}
+        <Link href="/docs/interoperability">interoperability matrix</Link>. For the
+        PostgreSQL transaction boundary and remaining promotion work, use the{' '}
+        <Link href="/docs/transactional-outbox">Transactional Outbox guide</Link>.
+        For volatile timers, persisted delayed intent, and provider guarantees, use the{' '}
+        <Link href="/docs/scheduling">message scheduling guide</Link>.
+      </p>
+
+      <h2>Equivalent experience does not mean identical syntax</h2>
+      <p>
+        C# deliberately keeps the MassTransit-familiar shape where it helps existing teams.
+        Java expresses the equivalent responsibility through Java naming, futures, class
+        tokens, explicit lifecycle, and composition idioms. Generated registration exists
+        in both ecosystems, but its compiler mechanics belong in the{' '}
+        <Link href="/docs/native-aot">AOT and generation guide</Link>, not in this adoption table.
+      </p>
+
       <div className="next-card">
-        <div><span>Next</span><strong>Use generated registration on .NET</strong></div>
-        <Link href="/docs/native-aot">NativeAOT for .NET →</Link>
+        <div><span>Next</span><strong>Inspect the verified wire boundary</strong></div>
+        <Link href="/docs/interoperability">Interoperability matrix →</Link>
       </div>
     </article>
   );

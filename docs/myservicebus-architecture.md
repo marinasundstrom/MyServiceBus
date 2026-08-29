@@ -4,9 +4,13 @@ MyServiceBus is a cross-language, broker-backed service-bus runtime with a MassT
 
 The architecture deliberately separates compatibility, portable messaging behavior, broker integration, and optional operational tooling. This allows the project to interoperate with MassTransit without treating every MassTransit feature or historical API as a requirement.
 
+The project is motivated by building on MassTransit's proven foundation while improving the areas it deliberately owns: C#↔Java parity, generated consumer dispatch, explicit compatibility and delivery evidence, and a smaller portable core. Continued permissive open-source licensing of that core is an architectural and product constraint, not merely a current packaging detail.
+
 ## Product Boundary
 
-MyServiceBus is not intended to compete directly with MassTransit as a fully supported enterprise platform. It is a focused alternative for teams that want dependable messaging fundamentals, a smaller operational and conceptual footprint, and consistent clients across programming languages. Businesses may use it for production workloads, but the project does not claim MassTransit's breadth, maturity, commercial support model, or enterprise ecosystem.
+MyServiceBus is not intended to compete directly with MassTransit as a fully supported enterprise platform. It is a focused alternative for teams that want dependable messaging fundamentals, a smaller operational and conceptual footprint, and consistent clients across programming languages. Its two primary adoption paths are adding Java services to an existing MassTransit-based .NET estate through the verified common subset, and starting a greenfield C# and/or Java system on one shared model. Businesses may use it for production workloads, but the project does not claim MassTransit's breadth, maturity, commercial support model, or enterprise ecosystem.
+
+The MIT license is part of that product fit. MassTransit v9 and later use commercial licensing, which can be appropriate when its support and broader capability set are required. MyServiceBus serves projects whose basic needs or current stage do not justify that commitment, while making preview maturity and support limitations explicit. The verified MassTransit 8.5.1 peer remains a technical interoperability boundary and must not be confused with the v9 licensing comparison.
 
 Compatibility supports coexistence, incremental adoption, and migration. It is not a commitment to reproduce the entire product. Features enter the portable core because they provide current value across supported languages and transports, not merely because they exist in MassTransit. Specialized enterprise patterns remain demand-driven extensions or documented non-goals.
 
@@ -16,7 +20,9 @@ HTTP callbacks, webhooks, WebSockets, SignalR, and similar technologies may even
 
 ### Mediator boundary
 
-The in-process mediator is an alternative execution mode over reusable consumer and pipeline infrastructure. It supports testing, explicitly local commands and queries, modular-monolith boundaries, lightweight tools, and gradual migration to a broker. It does not provide broker durability, independent delivery, or externally observable publication.
+The in-process mediator is a primary product mode over reusable handler, consumer, consumer-method, and pipeline infrastructure. It is intended to replace MediatR for local commands, queries, response handlers, and notifications, while also supporting testing, modular-monolith boundaries, lightweight tools, and gradual migration to a broker. Handler and consumer shapes are interchangeable at the execution boundary: either can run locally or behind a broker, and reflected/generated consumer methods use the same topology and pipeline. An application may adopt this mode without using or planning to use broker-backed messaging. It does not provide broker durability, independent delivery, or externally observable publication.
+
+Application components should depend on the segregated mediator intent contract (`IMediator` in C# and `Mediator` in Java) when they need only local `Send` and `Publish`. Destination-aware operations remain on bus-specific contracts so command/query application code does not acquire transport responsibilities accidentally.
 
 When an application already uses a broker-backed bus, events that represent facts other processes may observe should ordinarily be published on that bus. Applications should not create mediator and broker paths for the same event by default: doing so creates different retry, durability, observability, and failure semantics. Any dual path must express a deliberate architectural distinction.
 
@@ -38,6 +44,7 @@ Applications that require isolated buses should use separate application hosts o
 - **One bus per application is the supported model.** Multiple hosted bus instances are currently out of scope and are not added solely for MassTransit API compatibility.
 - **Simplicity is a product feature.** New surface area must justify its long-term conceptual, operational, and cross-language cost.
 - **Language APIs are idiomatic.** C# remains familiar to MassTransit users, while Java and future clients express the same concepts using conventions natural to their ecosystems.
+- **Runtime baselines are explicit.** Modern APIs use the features available within the published target: currently .NET 10 for C# packages and Java 17-compatible bytecode/APIs for Java. A newer JDK runtime expectation is not the same decision as raising the Java publication target.
 - **Integration abstractions stay small and owned.** The portable core avoids selecting a framework-specific DI or logging stack; optional adapters connect it to the ecosystems applications already use.
 - **Transports declare capabilities.** The core does not assume every broker supports queues, fan-out, scheduling, ordering, replay, and dead-lettering in the same way.
 - **Operational tooling is optional.** Inspection, monitoring, and dashboard packages observe the runtime through stable APIs without becoming dependencies of message delivery.
@@ -173,6 +180,8 @@ Each capability records whether it is `native`, `emulated`, or `unsupported`, pl
 
 Transport profiles then add the rules needed for interoperability: address formats, entity naming, topology mapping, native-header mapping, error conventions, and settlement behavior. For example, MassTransit-compatible RabbitMQ and Azure Service Bus profiles are separate conformance targets even though both implement the portable core.
 
+Message scheduling has a separate provider boundary because it may be implemented by the transport, PostgreSQL outbox persistence, Quartz.NET or Quartz Scheduler, or an external service. The default provider is volatile and callback-based. Durable providers receive message intent rather than an executable callback and must make restart and cancellation capabilities explicit. PostgreSQL outbox scheduling persists one-time delayed intent and cancellation in both clients; recurring schedules and provider-specific adapters remain future slices.
+
 ## Message Flow
 
 ```mermaid
@@ -201,6 +210,36 @@ sequenceDiagram
     end
 ```
 
+## Transactional Messaging Boundary
+
+The transactional outbox belongs to a **logical producing service**. Its application state and outgoing messaging intent commit in the same database transaction. Every record has a service partition key. Replicas share that partition and compete for leases; unrelated services may use other partitions in the same database without reading or dispatching those records.
+
+Dispatch is a separate runtime responsibility. It may be embedded in each producer or hosted by a standalone worker fleet that polls explicitly assigned service partitions. In either topology, producer ownership and partition isolation remain unchanged. The standalone topology lets producers depend only on transactional storage while specialized workers own broker connectivity, delivery capacity, and dispatch operations.
+
+```mermaid
+flowchart LR
+    subgraph Producer["Orders service boundary"]
+        App["Application state"]
+        Outbox["Orders outbox"]
+        ReplicaA["Replica A dispatcher"]
+        ReplicaB["Replica B dispatcher"]
+        App -->|"one transaction"| Outbox
+        Outbox -->|"competing leases"| ReplicaA
+        Outbox -->|"competing leases"| ReplicaB
+    end
+
+    ReplicaA --> Broker["Broker"]
+    ReplicaB --> Broker
+    Broker --> DotNet[".NET consumer"]
+    Broker --> Java["Java consumer"]
+```
+
+The PostgreSQL schema is one normalized MyServiceBus provider contract shared by the C# and Java implementations, so either implementation can write or lease a configured service partition. It is not a cross-service integration API: other services still communicate through the broker. The outbox stores the final serialized envelope, dispatch treats its body as opaque bytes, and the transport preserves content type, message identity, correlation, and reply metadata. A .NET or Java consumer then deserializes the same public wire contract. Live RabbitMQ gates verify persisted .NET envelopes consumed by Java and persisted Java envelopes consumed by .NET.
+
+The matching inbox belongs to the consuming service boundary. It commits the consumer's protected database effects, completed message identity, and any resulting outgoing outbox records together. Delivery remains at least once across the broker/database acknowledgement gap; stable message identity and inbox deduplication make protected database effects repeat-safe.
+
+A centralized dispatcher shared by unrelated services is possible only as an explicit deployment design. It must be configured for those service partitions and requires authorization, schema ownership, independent failure isolation, and operational accountability; it is not the default MyServiceBus model. See the [Transactional Outbox and Inbox guide](transactional-outbox.md) and its [normative specification](specs/outbox-inbox.md).
+
 ## Inspection, Monitoring, and Dashboard
 
 Operational features are first-party addons over stable programmatic contracts.
@@ -211,6 +250,7 @@ flowchart LR
     Pipelines["Pipeline events"] --> Hooks["General-purpose hooks"]
     Inspection --> Exporter["Optional monitoring exporter\nbounded local batches"]
     Hooks --> Exporter
+    Persistence["Optional persistence contributor\noutbox and inbox state"] -.-> Exporter
     Exporter --> Service["Monitoring service\ndistributed runtime model"]
     BrokerAdapter["Optional broker metrics adapter"] -.-> Service
     Service --> Query["HTTP query API"]
@@ -221,7 +261,7 @@ flowchart LR
     Telemetry["External OpenTelemetry backend"] -.-> Dashboard
 ```
 
-Inspection describes configured endpoints, consumers, contracts, instances, versions, and capabilities. General-purpose immutable hooks expose bus activity to any addon or application handler. The monitoring exporter is one hook implementation: it buffers bounded batches and sends them to the central service. Applications do not store monitoring history or expose monitoring query endpoints. Broker depth and broker-native health belong to optional broker-specific metrics adapters, not the core inspection contract.
+Inspection describes configured endpoints, consumers, contracts, instances, versions, and capabilities. General-purpose immutable hooks expose bus activity to any addon or application handler. The monitoring exporter is one hook implementation: it buffers bounded batches and sends them to the central service. Applications do not store monitoring history or expose monitoring query endpoints. Broker depth and broker-native health belong to optional broker-specific metrics adapters, while outbox and inbox state belongs to optional persistence-provider contributors. The monitoring read model may correlate these views, but it does not take ownership of dispatch or persistence.
 
 Inspection must consume the stable topology query API. It must not infer endpoint durability, exchange types, addresses, or terminal destinations from a broker scheme or naming suffix. The normalized model and transport projection are defined in the [Topology Model Specification](specs/topology-model-spec.md).
 

@@ -106,7 +106,7 @@ public class ConsumerMethodRegistrationTest {
                 configurator.addConsumerMethods(MethodOnlyConsumers.class));
 
         Order order = new Order("A-42");
-        bus.publish(order);
+        bus.send(order).join();
 
         Assertions.assertSame(order, audit.message);
         Assertions.assertSame(order, audit.context.getMessage());
@@ -142,7 +142,7 @@ public class ConsumerMethodRegistrationTest {
                         }));
 
         Order order = new Order("G-42");
-        bus.publish(order);
+        bus.publish(order).join();
 
         Assertions.assertSame(order, audit.message);
     }
@@ -174,6 +174,19 @@ public class ConsumerMethodRegistrationTest {
 
         ResponseMessage response = (ResponseMessage) endpoint.sent.join();
         Assertions.assertEquals("reflection-response", response.value());
+    }
+
+    @Test
+    public void mediatorSendReturnsConsumerMethodResult() {
+        ServiceCollection services = ServiceCollection.create();
+        MediatorBus bus = MediatorBus.configure(services, configurator ->
+                configurator.addConsumerMethods(ResponseConsumers.class));
+
+        ResponseMessage response = bus.send(
+                new ResponseRequest("mediator"),
+                ResponseMessage.class).join();
+
+        Assertions.assertEquals("mediator-response", response.value());
     }
 
     @Test

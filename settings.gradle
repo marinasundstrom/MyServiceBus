@@ -8,6 +8,9 @@ project(':myservicebus').projectDir = file("${javaDir}/myservicebus")
 include 'myservicebus-serialization-bson'
 project(':myservicebus-serialization-bson').projectDir = file("${javaDir}/myservicebus-serialization-bson")
 
+include 'myservicebus-postgresql'
+project(':myservicebus-postgresql').projectDir = file("${javaDir}/myservicebus-postgresql")
+
 include 'myservicebus-processor'
 project(':myservicebus-processor').projectDir = file("${javaDir}/myservicebus-processor")
 
@@ -43,6 +46,9 @@ project(':myservicebus-azure-service-bus').projectDir = file("${javaDir}/myservi
 
 include 'testapp'
 project(':testapp').projectDir = file("${javaDir}/testapp")
+
+include 'testapp-outbox'
+project(':testapp-outbox').projectDir = file("${javaDir}/testapp-outbox")
 
 include 'myservicebus-testing'
 project(':myservicebus-testing').projectDir = file("${javaDir}/myservicebus-testing")

@@ -98,6 +98,11 @@ final class BsonInboundMessage implements InboundMessage {
     }
 
     @Override
+    public UUID getMessageId() {
+        return uuid("messageId");
+    }
+
+    @Override
     public UUID getRequestId() {
         return uuid("requestId");
     }

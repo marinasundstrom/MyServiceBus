@@ -12,18 +12,26 @@ public class RabbitMqSendTransport implements SendTransport {
     private final Channel channel;
     private final String exchange;
     private final String routingKey;
+    private final boolean mandatory;
 
     public RabbitMqSendTransport(Channel channel, String exchange, String routingKey) {
+        this(channel, exchange, routingKey, false);
+    }
+
+    public RabbitMqSendTransport(Channel channel, String exchange, String routingKey, boolean mandatory) {
         this.channel = channel;
         this.exchange = exchange;
         this.routingKey = routingKey;
+        this.mandatory = mandatory;
     }
 
     @Override
-    public void send(byte[] data, Map<String, Object> headers, String contentType) {
+    public synchronized void send(byte[] data, Map<String, Object> headers, String contentType) {
         try {
             Map<String, Object> amqpHeaders = new HashMap<>();
-            AMQP.BasicProperties.Builder builder = new AMQP.BasicProperties.Builder().contentType(contentType);
+            AMQP.BasicProperties.Builder builder = new AMQP.BasicProperties.Builder()
+                    .contentType(contentType)
+                    .deliveryMode(2);
 
             headers.forEach((k, v) -> {
                 if (k.startsWith("_")) {
@@ -75,8 +83,12 @@ public class RabbitMqSendTransport implements SendTransport {
                 builder.headers(amqpHeaders);
 
             AMQP.BasicProperties props = builder.build();
-            channel.basicPublish(exchange, routingKey, props, data);
+            channel.basicPublish(exchange, routingKey, mandatory, props, data);
+            channel.waitForConfirmsOrDie();
         } catch (Exception e) {
+            if (e instanceof InterruptedException) {
+                Thread.currentThread().interrupt();
+            }
             throw new RuntimeException("Failed to send message", e);
         }
     }

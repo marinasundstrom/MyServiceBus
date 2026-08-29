@@ -67,7 +67,9 @@ class RabbitMqRequestClientTransportTest {
         transport.sendRequest(Ping.class, ctx, String.class);
 
         ArgumentCaptor<byte[]> body = ArgumentCaptor.forClass(byte[].class);
-        verify(channel).basicPublish(anyString(), anyString(), any(AMQP.BasicProperties.class), body.capture());
+        verify(channel).basicPublish(
+                anyString(), anyString(), eq(true), any(AMQP.BasicProperties.class), body.capture());
+        verify(channel).waitForConfirmsOrDie();
 
         ObjectMapper mapper = new ObjectMapper();
         mapper.findAndRegisterModules();
@@ -98,7 +100,9 @@ class RabbitMqRequestClientTransportTest {
         transport.sendRequest(Ping.class, context, String.class);
 
         ArgumentCaptor<byte[]> body = ArgumentCaptor.forClass(byte[].class);
-        verify(channel).basicPublish(eq("custom-requests"), eq(""), any(AMQP.BasicProperties.class), body.capture());
+        verify(channel).basicPublish(
+                eq("custom-requests"), eq(""), eq(true), any(AMQP.BasicProperties.class), body.capture());
+        verify(channel).waitForConfirmsOrDie();
         ObjectMapper mapper = new ObjectMapper().findAndRegisterModules();
         JavaType type = mapper.getTypeFactory().constructParametricType(Envelope.class, Ping.class);
         Envelope<Ping> envelope = mapper.readValue(body.getValue(), type);

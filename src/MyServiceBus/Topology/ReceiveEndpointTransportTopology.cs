@@ -8,7 +8,8 @@ public sealed class ReceiveEndpointTransportTopology
         bool temporary,
         ushort prefetchCount,
         IReadOnlyList<MessageBinding> bindings,
-        IReadOnlyDictionary<string, object?>? transportOptions = null)
+        IReadOnlyDictionary<string, object?>? transportOptions = null,
+        int concurrentMessageLimit = 1)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentNullException.ThrowIfNull(bindings);
@@ -19,10 +20,13 @@ public sealed class ReceiveEndpointTransportTopology
         if (bindings.Count == 0)
             throw new ArgumentException("A receive endpoint must have at least one binding.", nameof(bindings));
 
+        ArgumentOutOfRangeException.ThrowIfLessThan(concurrentMessageLimit, 1);
+
         Name = name;
         Durable = durable;
         Temporary = temporary;
         PrefetchCount = prefetchCount;
+        ConcurrentMessageLimit = concurrentMessageLimit;
         Bindings = bindings
             .Select(binding => new MessageBinding
             {
@@ -40,6 +44,7 @@ public sealed class ReceiveEndpointTransportTopology
     public bool Durable { get; }
     public bool Temporary { get; }
     public ushort PrefetchCount { get; }
+    public int ConcurrentMessageLimit { get; }
     public IReadOnlyList<MessageBinding> Bindings { get; }
     public IReadOnlyDictionary<string, object?>? TransportOptions { get; }
 }

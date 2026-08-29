@@ -1,4 +1,5 @@
 using MyServiceBus.Serialization;
+using MyServiceBus.Persistence;
 using MyServiceBus.Topology;
 using RabbitMQ.Client;
 using Testcontainers.RabbitMq;
@@ -61,6 +62,38 @@ public class CrossLanguageRabbitMqTests
     }
 
     [CrossLanguageFact]
+    public async Task Csharp_outbox_envelope_delivers_to_java_consumer()
+    {
+        await using var container = new RabbitMqBuilder("rabbitmq:4.1.8-alpine").Build();
+        await container.StartAsync();
+
+        var suffix = Guid.NewGuid().ToString("N");
+        var exchangeName = $"csharp-outbox-to-java-{suffix}";
+        var queueName = exchangeName;
+        const string expectedValue = "outbox-from-csharp";
+        using var javaPeer = JavaInteropPeer.Start(container, "consume", exchangeName, queueName, expectedValue);
+        await JavaInteropPeer.WaitForOutput(javaPeer, "READY", TimeSpan.FromMinutes(2));
+
+        var transportFactory = CreateTransportFactory(container);
+        var serializer = new EnvelopeMessageSerializer();
+        var context = new SendContext([typeof(CrossLanguageMessage)], serializer)
+        {
+            MessageId = Guid.NewGuid().ToString(),
+            CorrelationId = Guid.NewGuid().ToString(),
+            DestinationAddress = new Uri($"exchange:{exchangeName}"),
+            Intent = MyServiceBus.Serialization.MessageIntent.Publish
+        };
+        var persisted = OutboxMessageFactory.Create(
+            new CrossLanguageMessage { Value = expectedValue }, context);
+
+        await new TransportOutboxDispatcher(transportFactory).DispatchAsync(persisted);
+
+        await JavaInteropPeer.WaitForOutput(javaPeer, "RECEIVED", TimeSpan.FromSeconds(20));
+        await JavaInteropPeer.WaitForExit(javaPeer, TimeSpan.FromSeconds(10));
+        Assert.Equal(0, javaPeer.ExitCode);
+    }
+
+    [CrossLanguageFact]
     public async Task Java_producer_delivers_to_csharp_consumer()
     {
         await using var container = new RabbitMqBuilder("rabbitmq:4.1.8-alpine").Build();
@@ -94,6 +127,54 @@ public class CrossLanguageRabbitMqTests
         try
         {
             using var javaPeer = JavaInteropPeer.Start(container, "produce", exchangeName, queueName, expectedValue);
+            await JavaInteropPeer.WaitForOutput(javaPeer, "SENT", TimeSpan.FromMinutes(2));
+            var message = await received.Task.WaitAsync(TimeSpan.FromSeconds(20));
+            await JavaInteropPeer.WaitForExit(javaPeer, TimeSpan.FromSeconds(10));
+
+            Assert.Equal(0, javaPeer.ExitCode);
+            Assert.Equal(expectedValue, message.Value);
+        }
+        finally
+        {
+            await receiveTransport.Stop();
+        }
+    }
+
+    [CrossLanguageFact]
+    public async Task Java_outbox_envelope_delivers_to_csharp_consumer()
+    {
+        await using var container = new RabbitMqBuilder("rabbitmq:4.1.8-alpine").Build();
+        await container.StartAsync();
+
+        var suffix = Guid.NewGuid().ToString("N");
+        var exchangeName = $"java-outbox-to-csharp-{suffix}";
+        var queueName = exchangeName;
+        const string expectedValue = "outbox-from-java";
+        var transportFactory = CreateTransportFactory(container);
+        var received = new TaskCompletionSource<CrossLanguageMessage>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var receiveTransport = await transportFactory.CreateReceiveTransport(
+            new ReceiveEndpointTopology
+            {
+                QueueName = queueName,
+                ExchangeName = exchangeName,
+                Durable = true,
+                AutoDelete = false
+            },
+            context =>
+            {
+                if (context.TryGetMessage<CrossLanguageMessage>(out var message))
+                    received.TrySetResult(message);
+
+                return Task.CompletedTask;
+            },
+            messageType => messageType == MessageUrn.For(typeof(CrossLanguageMessage)));
+
+        await receiveTransport.Start();
+        try
+        {
+            using var javaPeer = JavaInteropPeer.Start(
+                container, "outbox-produce", exchangeName, queueName, expectedValue);
             await JavaInteropPeer.WaitForOutput(javaPeer, "SENT", TimeSpan.FromMinutes(2));
             var message = await received.Task.WaitAsync(TimeSpan.FromSeconds(20));
             await JavaInteropPeer.WaitForExit(javaPeer, TimeSpan.FromSeconds(10));

@@ -76,13 +76,18 @@ public final class NServiceBusJsonInboundMessage implements InboundMessage {
     }
 
     @Override
+    public UUID getMessageId() {
+        UUID messageId = readUuid(NServiceBusHeaders.MESSAGE_ID);
+        return messageId != null ? messageId : readUuid("message_id");
+    }
+
+    @Override
     public UUID getRequestId() {
         UUID relatedTo = readUuid(NServiceBusHeaders.RELATED_TO);
         if (relatedTo != null) {
             return relatedTo;
         }
-        UUID messageId = readUuid(NServiceBusHeaders.MESSAGE_ID);
-        return messageId != null ? messageId : readUuid("message_id");
+        return getMessageId();
     }
 
     @Override

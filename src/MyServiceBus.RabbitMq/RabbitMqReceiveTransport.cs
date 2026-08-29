@@ -23,10 +23,16 @@ public sealed class RabbitMqReceiveTransport : IReceiveTransport
     private readonly Uri? _faultAddress;
     private readonly Func<string?, bool>? _isMessageTypeRegistered;
     private readonly ILogger<RabbitMqReceiveTransport>? _logger;
+    private readonly SemaphoreSlim _concurrency;
+    private readonly object _lifecycleSync = new();
+    private TaskCompletionSource<bool> _drained = CompletedDrain();
+    private int _activeDeliveries;
+    private bool _stopping;
     private string _consumerTag;
 
-    public RabbitMqReceiveTransport(IChannel channel, string queueName, Func<ReceiveContext, Task> handler, Uri? errorAddress, Uri? faultAddress, Func<string?, bool>? isMessageTypeRegistered, IInboundMessageResolver? inboundMessageResolver = null, ILogger<RabbitMqReceiveTransport>? logger = null)
+    public RabbitMqReceiveTransport(IChannel channel, string queueName, Func<ReceiveContext, Task> handler, Uri? errorAddress, Uri? faultAddress, Func<string?, bool>? isMessageTypeRegistered, IInboundMessageResolver? inboundMessageResolver = null, ILogger<RabbitMqReceiveTransport>? logger = null, int concurrentMessageLimit = 1)
     {
+        ArgumentOutOfRangeException.ThrowIfLessThan(concurrentMessageLimit, 1);
         _channel = channel;
         _queueName = queueName;
         _messageHandler = handler;
@@ -35,16 +41,30 @@ public sealed class RabbitMqReceiveTransport : IReceiveTransport
         _isMessageTypeRegistered = isMessageTypeRegistered;
         _inboundMessageResolver = inboundMessageResolver ?? new InboundMessageResolver();
         _logger = logger;
+        _concurrency = new SemaphoreSlim(concurrentMessageLimit, concurrentMessageLimit);
     }
 
     public async Task Start(CancellationToken cancellationToken = default)
     {
+        lock (_lifecycleSync)
+        {
+            _stopping = false;
+        }
+
         var consumer = new AsyncEventingBasicConsumer(_channel);
 
         consumer.ReceivedAsync += async (model, ea) =>
         {
+            if (!TryBeginDelivery())
+            {
+                await _channel.BasicNackAsync(ea.DeliveryTag, multiple: false, requeue: true);
+                return;
+            }
+
+            var handlerOwnsCompletion = false;
             try
             {
+                await _concurrency.WaitAsync().ConfigureAwait(false);
                 var payload = ea.Body.ToArray();
                 var props = ea.BasicProperties;
 
@@ -76,7 +96,7 @@ public sealed class RabbitMqReceiveTransport : IReceiveTransport
                         await _channel.BasicPublishAsync(
                             exchange: _queueName + "_skipped",
                             routingKey: string.Empty,
-                            mandatory: false,
+                            mandatory: true,
                             basicProperties: new BasicProperties(props),
                             body: payload);
                     }
@@ -85,26 +105,142 @@ public sealed class RabbitMqReceiveTransport : IReceiveTransport
                     return;
                 }
 
-                await _messageHandler.Invoke(context);
-
-                await _channel.BasicAckAsync(ea.DeliveryTag, multiple: false);
+                var handling = _messageHandler.Invoke(context);
+                handlerOwnsCompletion = true;
+                _ = CompleteDeliveryAsync(ea.DeliveryTag, handling);
+                return;
             }
             catch (Exception exc)
             {
-                await _channel.BasicAckAsync(ea.DeliveryTag, multiple: false);
-
-                _logger?.LogError(exc, "Message handling failed");
+                await SettleFailureAsync(ea.DeliveryTag, exc).ConfigureAwait(false);
+            }
+            finally
+            {
+                if (!handlerOwnsCompletion)
+                    EndDelivery();
             }
         };
 
         _consumerTag = await _channel.BasicConsumeAsync(queue: _queueName, autoAck: false, consumer: consumer, cancellationToken: cancellationToken);
     }
 
+    private async Task CompleteDeliveryAsync(ulong deliveryTag, Task handling)
+    {
+        try
+        {
+            await handling.ConfigureAwait(false);
+            await _channel.BasicAckAsync(deliveryTag, multiple: false).ConfigureAwait(false);
+        }
+        catch (Exception exception)
+        {
+            await SettleFailureAsync(deliveryTag, exception).ConfigureAwait(false);
+        }
+        finally
+        {
+            EndDelivery();
+        }
+    }
+
+    private async Task SettleFailureAsync(ulong deliveryTag, Exception exception)
+    {
+        _logger?.LogError(exception, "Message handling failed");
+        try
+        {
+            if (ErrorTransportSettlement.WasMoved(exception))
+            {
+                await _channel.BasicAckAsync(deliveryTag, multiple: false).ConfigureAwait(false);
+            }
+            else
+            {
+                await _channel.BasicNackAsync(deliveryTag, multiple: false, requeue: true).ConfigureAwait(false);
+            }
+        }
+        catch (Exception settlementException)
+        {
+            _logger?.LogError(
+                settlementException,
+                "Failed to settle RabbitMQ delivery {DeliveryTag} from queue {QueueName}",
+                deliveryTag,
+                _queueName);
+        }
+    }
+
     public async Task Stop(CancellationToken cancellationToken = default)
     {
-        if (!string.IsNullOrEmpty(_consumerTag))
+        lock (_lifecycleSync)
         {
-            await _channel.BasicCancelAsync(_consumerTag, cancellationToken: cancellationToken);
+            _stopping = true;
         }
+
+        try
+        {
+            if (!string.IsNullOrEmpty(_consumerTag))
+            {
+                await _channel.BasicCancelAsync(_consumerTag, cancellationToken: cancellationToken)
+                    .WaitAsync(cancellationToken)
+                    .ConfigureAwait(false);
+            }
+
+            Task drainTask;
+            lock (_lifecycleSync)
+            {
+                drainTask = _drained.Task;
+            }
+
+            await drainTask.WaitAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            _ = AbortChannelAsync();
+            throw;
+        }
+    }
+
+    private async Task AbortChannelAsync()
+    {
+        try
+        {
+            await _channel.AbortAsync(CancellationToken.None).ConfigureAwait(false);
+        }
+        catch (Exception exception)
+        {
+            _logger?.LogError(exception, "Failed to abort RabbitMQ channel for queue {QueueName}", _queueName);
+        }
+    }
+
+    private bool TryBeginDelivery()
+    {
+        lock (_lifecycleSync)
+        {
+            if (_stopping)
+                return false;
+
+            if (_activeDeliveries++ == 0)
+            {
+                _drained = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            }
+
+            return true;
+        }
+    }
+
+    private void EndDelivery()
+    {
+        TaskCompletionSource<bool>? drained = null;
+        lock (_lifecycleSync)
+        {
+            if (--_activeDeliveries == 0)
+                drained = _drained;
+        }
+
+        drained?.TrySetResult(true);
+        _concurrency.Release();
+    }
+
+    private static TaskCompletionSource<bool> CompletedDrain()
+    {
+        var completion = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        completion.SetResult(true);
+        return completion;
     }
 }

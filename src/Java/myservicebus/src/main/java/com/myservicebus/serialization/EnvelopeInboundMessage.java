@@ -82,6 +82,11 @@ public class EnvelopeInboundMessage implements InboundMessage {
     }
 
     @Override
+    public UUID getMessageId() {
+        return metadataEnvelope.getMessageId();
+    }
+
+    @Override
     public UUID getRequestId() {
         return metadataEnvelope.getRequestId();
     }
