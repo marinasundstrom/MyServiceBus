@@ -8,11 +8,15 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.myservicebus.persistence.InboxAcquisition;
 import com.myservicebus.persistence.InboxMessageKey;
 import com.myservicebus.persistence.InboxTransaction;
+import com.myservicebus.persistence.ExponentialOutboxRetryPolicy;
+import com.myservicebus.persistence.OutboxDispatchBatchResult;
+import com.myservicebus.persistence.OutboxDispatcher;
 import com.myservicebus.persistence.OutboxLease;
 import com.myservicebus.persistence.OutboxLeaseRequest;
 import com.myservicebus.persistence.OutboxMessage;
 import com.myservicebus.persistence.OutboxMessageFactory;
 import com.myservicebus.persistence.OutboxSession;
+import com.myservicebus.persistence.OutboxTransportDispatcher;
 import com.myservicebus.MessageBus;
 import com.myservicebus.MessageBusServices;
 import com.myservicebus.PublishEndpoint;
@@ -30,8 +34,11 @@ import com.myservicebus.serialization.MessageIntent;
 import com.myservicebus.tasks.CancellationToken;
 import java.net.URI;
 import java.sql.Connection;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -213,6 +220,64 @@ class PostgreSqlPersistenceTest {
     }
 
     @Test
+    void failedDispatchRemainsRecoverableWithTheOriginalIdentity() throws Exception {
+        try (PostgreSQLContainer container = startContainer()) {
+            DataSource dataSource = dataSource(container);
+            PostgreSqlSchema.ensureCreated(dataSource);
+            OutboxMessage message = createMessage();
+            insertCommitted(dataSource, message);
+            Instant now = Instant.now();
+            MutableClock clock = new MutableClock(now);
+            RecordingOutboxTransport transport = new RecordingOutboxTransport(true);
+            OutboxDispatcher dispatcher = new OutboxDispatcher(
+                    new PostgreSqlOutboxStore(dataSource, SERVICE_NAME),
+                    transport,
+                    new ExponentialOutboxRetryPolicy(Duration.ofSeconds(1), Duration.ofMinutes(1)),
+                    clock);
+
+            OutboxDispatchBatchResult failed = dispatcher
+                    .dispatchBatch(requestAt("replica-a", 10, now), CancellationToken.none()).join();
+            clock.setInstant(now.plusSeconds(1));
+            OutboxDispatchBatchResult recovered = dispatcher
+                    .dispatchBatch(requestAt("replica-b", 10, clock.instant()), CancellationToken.none()).join();
+
+            assertEquals(new OutboxDispatchBatchResult(1, 0, 1, 0), failed);
+            assertEquals(new OutboxDispatchBatchResult(1, 1, 0, 0), recovered);
+            assertEquals(List.of(message.messageId(), message.messageId()), transport.messageIds);
+        }
+    }
+
+    @Test
+    void acceptedButUnmarkedDeliveryIsReclaimedWithTheOriginalIdentity() throws Exception {
+        try (PostgreSQLContainer container = startContainer()) {
+            DataSource dataSource = dataSource(container);
+            PostgreSqlSchema.ensureCreated(dataSource);
+            OutboxMessage message = createMessage();
+            insertCommitted(dataSource, message);
+            Instant now = Instant.now();
+            PostgreSqlOutboxStore store = new PostgreSqlOutboxStore(dataSource, SERVICE_NAME);
+            OutboxLease firstLease = store
+                    .lease(new OutboxLeaseRequest("replica-a", 1, now, Duration.ofSeconds(1))).join().get(0);
+            RecordingOutboxTransport transport = new RecordingOutboxTransport(false);
+
+            // Simulate broker acceptance followed by process exit before markDispatched.
+            transport.dispatch(firstLease.message(), CancellationToken.none()).join();
+
+            Instant recoveredAt = now.plusSeconds(2);
+            OutboxDispatcher dispatcher = new OutboxDispatcher(
+                    store,
+                    transport,
+                    new ExponentialOutboxRetryPolicy(Duration.ofSeconds(1), Duration.ofMinutes(1)),
+                    new MutableClock(recoveredAt));
+            OutboxDispatchBatchResult recovered = dispatcher
+                    .dispatchBatch(requestAt("replica-b", 1, recoveredAt), CancellationToken.none()).join();
+
+            assertEquals(new OutboxDispatchBatchResult(1, 1, 0, 0), recovered);
+            assertEquals(List.of(message.messageId(), message.messageId()), transport.messageIds);
+        }
+    }
+
+    @Test
     void inboxCompletionAndOutboxWriteCommitAtomically() throws Exception {
         try (PostgreSQLContainer container = startContainer()) {
             DataSource dataSource = dataSource(container);
@@ -277,6 +342,10 @@ class PostgreSqlPersistenceTest {
         return new OutboxLeaseRequest(ownerId, count, Instant.now(), Duration.ofMinutes(1));
     }
 
+    private static OutboxLeaseRequest requestAt(String ownerId, int count, Instant now) {
+        return new OutboxLeaseRequest(ownerId, count, now, Duration.ofMinutes(1));
+    }
+
     private static OutboxMessage createMessage() {
         SendContext context = new SendContext(new OrderSubmitted(UUID.randomUUID()));
         context.setMessageId(UUID.randomUUID());
@@ -329,6 +398,52 @@ class PostgreSqlPersistenceTest {
         @Override
         public String getSendAddress(String queue) {
             return "queue:" + queue;
+        }
+    }
+
+    private static final class RecordingOutboxTransport implements OutboxTransportDispatcher {
+        private final List<UUID> messageIds = new ArrayList<>();
+        private boolean shouldFail;
+
+        private RecordingOutboxTransport(boolean failFirst) {
+            shouldFail = failFirst;
+        }
+
+        @Override
+        public CompletableFuture<Void> dispatch(OutboxMessage message, CancellationToken cancellationToken) {
+            messageIds.add(message.messageId());
+            if (shouldFail) {
+                shouldFail = false;
+                return CompletableFuture.failedFuture(new IllegalStateException("broker unavailable"));
+            }
+            return CompletableFuture.completedFuture(null);
+        }
+    }
+
+    private static final class MutableClock extends Clock {
+        private Instant instant;
+
+        private MutableClock(Instant instant) {
+            this.instant = instant;
+        }
+
+        private void setInstant(Instant instant) {
+            this.instant = instant;
+        }
+
+        @Override
+        public ZoneId getZone() {
+            return ZoneId.of("UTC");
+        }
+
+        @Override
+        public Clock withZone(ZoneId zone) {
+            return this;
+        }
+
+        @Override
+        public Instant instant() {
+            return instant;
         }
     }
 

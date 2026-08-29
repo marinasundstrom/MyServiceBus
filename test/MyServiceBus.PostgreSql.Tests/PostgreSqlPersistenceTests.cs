@@ -188,6 +188,55 @@ public sealed class PostgreSqlPersistenceTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Failed_dispatch_remains_recoverable_with_the_original_identity()
+    {
+        var message = CreateMessage();
+        await InsertCommitted(message);
+        var now = DateTimeOffset.UtcNow;
+        var clock = new MutableTimeProvider(now);
+        var transport = new RecordingOutboxTransport(failFirst: true);
+        var dispatcher = new OutboxDispatcher(
+            new PostgreSqlOutboxStore(dataSource, ServiceName),
+            transport,
+            new ExponentialOutboxRetryPolicy(TimeSpan.FromSeconds(1), TimeSpan.FromMinutes(1)),
+            clock);
+
+        var failed = await dispatcher.DispatchBatchAsync(RequestAt("replica-a", 10, now));
+        clock.UtcNow = now.AddSeconds(1);
+        var recovered = await dispatcher.DispatchBatchAsync(RequestAt("replica-b", 10, clock.UtcNow));
+
+        Assert.Equal(new OutboxDispatchBatchResult(1, 0, 1, 0), failed);
+        Assert.Equal(new OutboxDispatchBatchResult(1, 1, 0, 0), recovered);
+        Assert.Equal([message.MessageId, message.MessageId], transport.MessageIds);
+    }
+
+    [Fact]
+    public async Task Accepted_but_unmarked_delivery_is_reclaimed_with_the_original_identity()
+    {
+        var message = CreateMessage();
+        await InsertCommitted(message);
+        var now = DateTimeOffset.UtcNow;
+        var store = new PostgreSqlOutboxStore(dataSource, ServiceName);
+        var firstLease = Assert.Single(await store.LeaseAsync(
+            new OutboxLeaseRequest("replica-a", 1, now, TimeSpan.FromSeconds(1))));
+        var transport = new RecordingOutboxTransport();
+
+        // Simulate broker acceptance followed by process exit before MarkDispatchedAsync.
+        await transport.DispatchAsync(firstLease.Message);
+
+        var recoveredAt = now.AddSeconds(2);
+        var dispatcher = new OutboxDispatcher(
+            store,
+            transport,
+            new ExponentialOutboxRetryPolicy(TimeSpan.FromSeconds(1), TimeSpan.FromMinutes(1)),
+            new MutableTimeProvider(recoveredAt));
+        var recovered = await dispatcher.DispatchBatchAsync(RequestAt("replica-b", 1, recoveredAt));
+
+        Assert.Equal(new OutboxDispatchBatchResult(1, 1, 0, 0), recovered);
+        Assert.Equal([message.MessageId, message.MessageId], transport.MessageIds);
+    }
+
+    [Fact]
     public async Task Inbox_completion_and_outbox_write_commit_atomically()
     {
         var key = new InboxMessageKey("billing-charge-card", Guid.NewGuid());
@@ -229,6 +278,12 @@ public sealed class PostgreSqlPersistenceTests : IAsyncLifetime
         DateTimeOffset.UtcNow,
         TimeSpan.FromMinutes(1));
 
+    private static OutboxLeaseRequest RequestAt(string owner, int count, DateTimeOffset now) => new(
+        owner,
+        count,
+        now,
+        TimeSpan.FromMinutes(1));
+
     private static OutboxMessage CreateMessage()
     {
         var context = new SendContext([typeof(OrderSubmitted)], new EnvelopeMessageSerializer())
@@ -265,5 +320,30 @@ public sealed class PostgreSqlPersistenceTests : IAsyncLifetime
             sentBody.TrySetResult(context.GetMessageBody(message).GetBytes());
             return Task.CompletedTask;
         }
+    }
+
+    private sealed class RecordingOutboxTransport(bool failFirst = false) : IOutboxTransportDispatcher
+    {
+        private bool shouldFail = failFirst;
+
+        public List<Guid> MessageIds { get; } = [];
+
+        public Task DispatchAsync(OutboxMessage message, CancellationToken cancellationToken = default)
+        {
+            MessageIds.Add(message.MessageId);
+            if (shouldFail)
+            {
+                shouldFail = false;
+                return Task.FromException(new IOException("broker unavailable"));
+            }
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class MutableTimeProvider(DateTimeOffset utcNow) : TimeProvider
+    {
+        public DateTimeOffset UtcNow { get; set; } = utcNow;
+
+        public override DateTimeOffset GetUtcNow() => UtcNow;
     }
 }
