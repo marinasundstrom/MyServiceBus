@@ -28,13 +28,13 @@ The C# package `Sundstrom.MyServiceBus.PostgreSql` and Java module `io.github.ma
 - matching Testcontainers integration tests in C# and Java; and
 - live RabbitMQ gates for persisted C# envelopes consumed by Java and persisted Java envelopes consumed by C#.
 
-This is a working Bus Outbox capture, persistence, and dispatch foundation, not yet the finished production experience. Automatic provider/host registration, transparent Consumer Outbox middleware, retention cleanup, health and metrics, and the full O01–O06 crash matrix remain open. Applications must still compose the PostgreSQL store, transport dispatcher, retry policy, and delivery lifecycle explicitly.
+This is a working Bus Outbox capture, persistence, and dispatch foundation, not yet the finished production experience. Supported provider/lifecycle composition now exists in both clients. Transparent Consumer Outbox middleware, retention cleanup, health and metrics, and the full O01–O06 crash matrix remain open.
 
 ### Transactional Outbox MVP gate
 
 The MVP is the first supported Bus Outbox production path, not the completion of every persistence feature. Before calling it complete, both clients need:
 
-- one documented composition path that wires PostgreSQL storage, transport dispatch, retry policy, and lifecycle;
+- one documented composition path that wires PostgreSQL storage, transport dispatch, retry policy, and lifecycle — implemented;
 - startup validation for schema version, service partition, provider, and transport;
 - focused crash-window evidence for committed recovery, broker acceptance before completion, retry, and shutdown;
 - minimal health signals for dispatcher progress, failure, pending count, and oldest pending age; and
@@ -119,6 +119,64 @@ Resolve the scoped endpoint interfaces from the same scope as `OutboxSession`. C
 
 Scheduled or delayed messages are not yet supported inside an active outbox session and fail with a clear unsupported-operation exception instead of being delivered early. Scheduling persistence is a separate future slice.
 
+## Run the delivery service
+
+In .NET, register the `NpgsqlDataSource` and add one hosted delivery service for the logical application service. This composes the partitioned store, transport dispatcher, exponential retry policy, and polling lifecycle. The generic host starts and stops it with the application.
+
+```csharp
+builder.Services.AddSingleton(dataSource);
+builder.Services.AddPostgreSqlOutboxDelivery("orders-service", options =>
+{
+    options.OwnerId = $"orders-{Environment.MachineName}-{Environment.ProcessId}";
+    options.BatchSize = 100;
+    options.LeaseDuration = TimeSpan.FromMinutes(1);
+    options.PollInterval = TimeSpan.FromSeconds(1);
+});
+```
+
+Java has no required host abstraction. Compose the same pieces after building the service provider, then own the lifecycle explicitly:
+
+```java
+TransportFactory transport = provider.getRequiredService(TransportFactory.class);
+try (OutboxDeliveryService delivery = PostgreSqlOutboxDelivery.create(
+        dataSource,
+        transport,
+        "orders-service",
+        options -> options.setOwnerId("orders-" + instanceId))) {
+    bus.start();
+    delivery.start();
+
+    // Run the application.
+} finally {
+    bus.stop();
+}
+```
+
+Use the same service name for the writer/session and delivery composition. Replica owner IDs must differ within that service partition. Reusing an owner ID across concurrent replicas weakens lease diagnostics and ownership fencing.
+
+## Use the outbox with EF Core
+
+The current C# integration uses EF Core's explicit transaction as the caller-owned PostgreSQL transaction. Do not rely on the implicit transaction created around an individual `SaveChangesAsync()` call: publish/send calls outside that call would not share its boundary.
+
+```csharp
+await using var efTransaction = await db.Database.BeginTransactionAsync();
+var connection = (NpgsqlConnection)db.Database.GetDbConnection();
+var transaction = (NpgsqlTransaction)efTransaction.GetDbTransaction();
+
+using (outboxSession.UsePostgreSql(connection, transaction, "orders-service"))
+{
+    db.Orders.Add(order);
+    await publish.Publish(new OrderSubmitted(order.Id));
+    await db.SaveChangesAsync();
+}
+
+await efTransaction.CommitAsync();
+```
+
+EF Core owns the connection and transaction in this example; do not dispose either underlying Npgsql object separately. Keep database work and captured messaging sequential because `DbContext` is not thread-safe. When an EF execution strategy retries transactions, place transaction creation, state changes, message creation, capture, `SaveChangesAsync()`, and commit inside the retried delegate so one attempt cannot reuse another attempt's transaction.
+
+An optional EF Core adapter can later remove the Npgsql casts and provide a unit-of-work helper. It must retain this visible transaction boundary and fail when no compatible explicit transaction is active.
+
 The canonical, maintained usage samples live in the [feature walkthrough](feature-walkthrough.md#transactional-outbox-and-inbox).
 
 ## Inbox transaction
@@ -131,7 +189,7 @@ The broker source must be settled only after that database commit. A crash after
 
 `PostgreSqlOutboxStore` implements the portable leasing contract consumed by `OutboxDispatcher`. The outbox belongs to one logical producing service. Writers and stores require the same service name. Multiple replicas can request batches concurrently; PostgreSQL chooses disjoint rows within that service partition, records a persisted owner and expiry, and allows another replica to reclaim an expired lease. Other services can use their own partitions in the same database without competing for those rows.
 
-`TransportOutboxDispatcher` passes the stored envelope to the selected broker without reserializing its body. `OutboxDeliveryService` supplies the polling lifecycle: .NET integrates with the generic host, while Java uses explicit `start()` and `close()` calls. Applications currently compose these pieces explicitly; automatic PostgreSQL and host registration remains open.
+`TransportOutboxDispatcher` passes the stored envelope to the selected broker without reserializing its body. `AddPostgreSqlOutboxDelivery` composes and hosts the .NET delivery service. `PostgreSqlOutboxDelivery.create` composes the Java equivalent with explicit `start()` and `close()` lifecycle ownership.
 
 Other services never need to understand the producer's outbox rows. Cross-platform compatibility applies after dispatch: the broker receives the public envelope, identity, and content type, and either language client deserializes that same wire contract.
 

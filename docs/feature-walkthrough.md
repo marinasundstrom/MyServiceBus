@@ -1461,7 +1461,31 @@ The inbox follows the same rule. Create `PostgreSqlInboxStore` with the transact
 
 Resolve `IPublishEndpoint` / `ISendEndpointProvider` and their Java equivalents from the same scope as `OutboxSession`. Calling the singleton bus directly bypasses capture. Scheduled messages in an active outbox session currently fail clearly and will be addressed in a separate scheduling slice.
 
-`PostgreSqlOutboxStore` supplies atomic PostgreSQL leases within its required logical-service partition. The portable transport dispatcher and delivery lifecycles are implemented; automatic provider/host composition, Consumer Outbox middleware, monitoring, and cleanup are still being integrated. See [Transactional Outbox and Inbox](transactional-outbox.md) for guarantees, status, and limits.
+Compose delivery once for the same logical service name. .NET hosts it with the application:
+
+```csharp
+services.AddSingleton(dataSource);
+services.AddPostgreSqlOutboxDelivery("orders-service");
+```
+
+Java owns the corresponding lifecycle explicitly:
+
+```java
+try (OutboxDeliveryService delivery = PostgreSqlOutboxDelivery.create(
+        dataSource,
+        provider.getRequiredService(TransportFactory.class),
+        "orders-service")) {
+    bus.start();
+    delivery.start();
+    // Run the application.
+} finally {
+    bus.stop();
+}
+```
+
+For EF Core, begin an explicit `Database.BeginTransactionAsync()`, obtain its `NpgsqlConnection` and `NpgsqlTransaction` through `GetDbConnection()` / `GetDbTransaction()`, and pass those objects to `UsePostgreSql`. Keep `SaveChangesAsync`, captured sends/publications, and commit inside that one caller-owned transaction. Do not rely on EF's implicit per-save transaction.
+
+`PostgreSqlOutboxStore` supplies atomic PostgreSQL leases within its required logical-service partition. Supported transport composition and delivery lifecycles are implemented; Consumer Outbox middleware, minimal health/lag signals, crash-window promotion evidence, monitoring, and cleanup remain in progress. See [Transactional Outbox and Inbox](transactional-outbox.md) for guarantees, status, and limits.
 
 ### Unit Testing with the In-Memory Test Harness
 

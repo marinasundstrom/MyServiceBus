@@ -48,12 +48,12 @@ Both implementations are tested against PostgreSQL 17.6 with Testcontainers. The
 
 <div className="callout">
   <strong>Foundation status</strong>
-  <p>Bus Outbox capture, storage, transport dispatch, and delivery lifecycles work, but the complete production experience is not finished. Automatic provider/host registration, transparent Consumer Outbox middleware, retention cleanup, health, metrics, and the complete crash-injection matrix remain open.</p>
+  <p>Bus Outbox capture, storage, transport dispatch, and supported delivery composition work, but the complete production experience is not finished. Transparent Consumer Outbox middleware, retention cleanup, health, metrics, and the complete crash-injection matrix remain open.</p>
 </div>
 
 ## Transactional Outbox MVP gate
 
-The MVP is a supported Bus Outbox production path, not every persistence feature at once. It still requires one documented composition path per language, startup validation, focused crash-window evidence, minimal dispatcher health and lag signals, and an end-to-end C#/Java showcase.
+The MVP is a supported Bus Outbox production path, not every persistence feature at once. Provider and lifecycle composition is now implemented in both clients. Startup validation, focused crash-window evidence, minimal dispatcher health and lag signals, and an end-to-end C#/Java showcase remain.
 
 Transparent Consumer Outbox middleware, automatic retention cleanup, richer dashboard integration, SQL Server, and durable scheduling follow that MVP unless they are needed to close one of those gates.
 
@@ -126,6 +126,56 @@ try (ServiceScope scope = serviceProvider.createScope();
 ```
 
 Resolve endpoint contracts from the same scope as the session. Calling `IMessageBus` / `MessageBus` directly intentionally bypasses capture. Nested registrations are rejected. Scheduled messages inside an active outbox session currently fail clearly; durable scheduling will be handled in a separate slice.
+
+## Run delivery for one service partition
+
+.NET composes the store, transport dispatcher, retry policy, and hosted polling lifecycle in one registration:
+
+```csharp
+builder.Services.AddSingleton(dataSource);
+builder.Services.AddPostgreSqlOutboxDelivery("orders-service", options =>
+{
+    options.OwnerId = $"orders-{Environment.MachineName}-{Environment.ProcessId}";
+});
+```
+
+Java returns the equivalent explicitly owned lifecycle:
+
+```java
+TransportFactory transport = provider.getRequiredService(TransportFactory.class);
+try (OutboxDeliveryService delivery = PostgreSqlOutboxDelivery.create(
+        dataSource, transport, "orders-service",
+        options -> options.setOwnerId("orders-" + instanceId))) {
+    bus.start();
+    delivery.start();
+    // Run the application.
+} finally {
+    bus.stop();
+}
+```
+
+The writer/session and delivery service must use the same logical service name. Each running replica uses a different owner ID.
+
+## Use an explicit EF Core transaction
+
+The current C# path bridges EF Core's explicit PostgreSQL transaction into the outbox session. Do not rely on EF's implicit per-`SaveChangesAsync()` transaction because captured messages outside that call would not share it.
+
+```csharp
+await using var efTransaction = await db.Database.BeginTransactionAsync();
+var connection = (NpgsqlConnection)db.Database.GetDbConnection();
+var transaction = (NpgsqlTransaction)efTransaction.GetDbTransaction();
+
+using (outboxSession.UsePostgreSql(connection, transaction, "orders-service"))
+{
+    db.Orders.Add(order);
+    await publish.Publish(new OrderSubmitted(order.Id));
+    await db.SaveChangesAsync();
+}
+
+await efTransaction.CommitAsync();
+```
+
+EF owns the underlying connection and transaction, and all `DbContext` work remains sequential. An optional EF Core adapter may remove these casts later, but it must preserve the explicit transaction and fail when none is active.
 
 ## Protect consumer effects with the inbox
 
