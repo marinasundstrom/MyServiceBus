@@ -18,13 +18,23 @@ public class RawJsonMessageSerializer implements MessageSerializer, MessageSeria
     }
 
     public RawJsonMessageSerializer() {
-        this(MassTransitHeaderConvention.INSTANCE);
+        this(JsonSerializationDefaults.createObjectMapper(), MassTransitHeaderConvention.INSTANCE);
     }
 
     public RawJsonMessageSerializer(MessageHeaderConvention headerConvention) {
+        this(JsonSerializationDefaults.createObjectMapper(), headerConvention);
+    }
+
+    public RawJsonMessageSerializer(ObjectMapper mapper) {
+        this(mapper, MassTransitHeaderConvention.INSTANCE);
+    }
+
+    public RawJsonMessageSerializer(ObjectMapper mapper, MessageHeaderConvention headerConvention) {
+        if (mapper == null) {
+            throw new IllegalArgumentException("mapper must not be null");
+        }
+        this.mapper = mapper;
         this.headerConvention = headerConvention;
-        this.mapper = new ObjectMapper();
-        this.mapper.findAndRegisterModules();
     }
 
     @Override

@@ -21,13 +21,23 @@ public class EnvelopeMessageSerializer implements MessageSerializer, MessageSeri
     }
 
     public EnvelopeMessageSerializer() {
-        this(MassTransitHeaderConvention.INSTANCE);
+        this(JsonSerializationDefaults.createObjectMapper(), MassTransitHeaderConvention.INSTANCE);
     }
 
     public EnvelopeMessageSerializer(MessageHeaderConvention headerConvention) {
+        this(JsonSerializationDefaults.createObjectMapper(), headerConvention);
+    }
+
+    public EnvelopeMessageSerializer(ObjectMapper mapper) {
+        this(mapper, MassTransitHeaderConvention.INSTANCE);
+    }
+
+    public EnvelopeMessageSerializer(ObjectMapper mapper, MessageHeaderConvention headerConvention) {
+        if (mapper == null) {
+            throw new IllegalArgumentException("mapper must not be null");
+        }
+        this.mapper = mapper;
         this.headerConvention = headerConvention;
-        this.mapper = new ObjectMapper();
-        this.mapper.findAndRegisterModules();
     }
 
     @Override

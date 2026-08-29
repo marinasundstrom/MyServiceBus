@@ -91,7 +91,7 @@ Both runtimes now accept service-provider serializer factories, and Java has the
 
 The target bidirectional registry and application-metadata boundary are defined in the [Serialization Architecture Proposal](../proposals/serialization-architecture.md). It keeps source-generated payload metadata application-owned while allowing the built-in envelope profiles to use it on both send and receive paths.
 
-`System.Text.Json` source generation remains an application opt-in. MyServiceBus does not require its consumer generator to own application JSON contracts; the selected serializer and its factory determine whether source-generated metadata is used. The built-in managed serializers remain available, while AOT applications can provide serializer implementations configured with their own generated `JsonSerializerContext`.
+`System.Text.Json` source generation remains an application opt-in. MyServiceBus does not require its consumer generator to own application JSON contracts. Applications pass `JsonSerializerContext.Default.Options` to `EnvelopeSerializerFactory` or `RawJsonSerializerFactory`; the same options are used for payloads on send and receive. MyServiceBus writes and reads its envelope metadata without requesting generated metadata for closed `Envelope<T>` types. The reflection-capable managed defaults remain available when options are omitted.
 
 Before AOT can be declared fully supported, .NET still needs a boundary for anonymous interface messages. Both runtimes need broader typed factories for user filters, transports, interface-consumer activation, and broker serialization paths.
 

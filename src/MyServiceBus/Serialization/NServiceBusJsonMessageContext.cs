@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization.Metadata;
 
 namespace MyServiceBus.Serialization;
 
@@ -8,14 +9,20 @@ public sealed class NServiceBusJsonMessageContext : IMessageContext
 {
     private readonly JsonDocument _jsonDocument;
     private readonly Dictionary<Type, object> _messageCache = new();
-    private readonly JsonSerializerOptions _serializerOptions = new()
-    {
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        PropertyNameCaseInsensitive = true
-    };
+    private readonly JsonSerializerOptions _serializerOptions;
 
     public NServiceBusJsonMessageContext(byte[] jsonBytes, IDictionary<string, object> transportHeaders)
+        : this(jsonBytes, transportHeaders, JsonSerializationDefaults.CreateNServiceBusOptions())
     {
+    }
+
+    public NServiceBusJsonMessageContext(
+        byte[] jsonBytes,
+        IDictionary<string, object> transportHeaders,
+        JsonSerializerOptions jsonSerializerOptions)
+    {
+        ArgumentNullException.ThrowIfNull(jsonSerializerOptions);
+        _serializerOptions = jsonSerializerOptions;
         _jsonDocument = JsonDocument.Parse(jsonBytes);
         Headers = new Dictionary<string, object>(transportHeaders);
         MessageId = (ReadNullableGuid(NServiceBusHeaders.MessageId) ?? ReadNullableGuid("message_id")).GetValueOrDefault();
@@ -50,7 +57,9 @@ public sealed class NServiceBusJsonMessageContext : IMessageContext
 
         try
         {
-            message = _jsonDocument.RootElement.Deserialize<T>(_serializerOptions);
+            var typeInfo = _serializerOptions.GetTypeInfo(typeof(T)) as JsonTypeInfo<T>
+                ?? throw new InvalidOperationException($"JSON metadata is not configured for {typeof(T)}.");
+            message = _jsonDocument.RootElement.Deserialize(typeInfo);
             if (message is not null)
                 _messageCache[typeof(T)] = message;
             return message is not null;

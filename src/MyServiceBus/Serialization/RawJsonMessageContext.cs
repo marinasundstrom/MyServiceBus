@@ -1,19 +1,34 @@
 using System.Net.Mime;
 using System.Text.Json;
+using System.Text.Json.Serialization.Metadata;
 
 namespace MyServiceBus.Serialization;
 
 public class RawJsonMessageContext : IMessageContext
 {
     private readonly JsonDocument _jsonDocument;
-    private readonly JsonSerializerOptions _jsonSerializerOptions = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
+    private readonly JsonSerializerOptions _jsonSerializerOptions;
     private readonly Dictionary<Type, object> _messageCache = new();
     private readonly IDictionary<string, object> _transportHeaders;
     private readonly IMessageHeaderConvention _headerConvention;
 
-    public RawJsonMessageContext(byte[] jsonBytes, IDictionary<string, object> transportHeaders, IMessageHeaderConvention? headerConvention = null)
+    public RawJsonMessageContext(
+        byte[] jsonBytes,
+        IDictionary<string, object> transportHeaders,
+        IMessageHeaderConvention? headerConvention = null)
+        : this(jsonBytes, transportHeaders, JsonSerializationDefaults.CreateOptions(), headerConvention)
     {
+    }
+
+    public RawJsonMessageContext(
+        byte[] jsonBytes,
+        IDictionary<string, object> transportHeaders,
+        JsonSerializerOptions jsonSerializerOptions,
+        IMessageHeaderConvention? headerConvention = null)
+    {
+        ArgumentNullException.ThrowIfNull(jsonSerializerOptions);
         _jsonDocument = JsonDocument.Parse(jsonBytes);
+        _jsonSerializerOptions = jsonSerializerOptions;
         _transportHeaders = transportHeaders;
         _headerConvention = headerConvention ?? MassTransitHeaderConvention.Instance;
 
@@ -53,7 +68,9 @@ public class RawJsonMessageContext : IMessageContext
 
         try
         {
-            message = _jsonDocument.RootElement.Deserialize<T>(_jsonSerializerOptions);
+            var typeInfo = _jsonSerializerOptions.GetTypeInfo(typeof(T)) as JsonTypeInfo<T>
+                ?? throw new InvalidOperationException($"JSON metadata is not configured for {typeof(T)}.");
+            message = _jsonDocument.RootElement.Deserialize(typeInfo);
             if (message != null)
                 _messageCache[typeof(T)] = message;
             return message != null;

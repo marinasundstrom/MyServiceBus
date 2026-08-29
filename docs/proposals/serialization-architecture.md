@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted; implementation in progress. The serializer, deserializer, factory, message-body, and registry foundations are implemented. Source-generated JSON integration and BSON remain follow-up slices. Current configuration is documented in [Message serialization](../message-serialization.md).
+Accepted; implementation in progress. The serializer, deserializer, factory, message-body, registry, and configurable JSON metadata paths are implemented. BSON remains a follow-up slice. Current configuration is documented in [Message serialization](../message-serialization.md).
 
 ## Recommendation
 

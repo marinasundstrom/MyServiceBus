@@ -2,7 +2,7 @@
 
 MyServiceBus supports three distinct JSON wire formats. They are separate choices rather than aliases for one another.
 
-The registry, source-generated JSON, BSON, and Native AOT direction is described in the [Serialization Architecture Proposal](proposals/serialization-architecture.md). The serializer contracts and registry foundation are implemented; source-generated JSON and BSON remain follow-up slices.
+The registry, source-generated JSON, BSON, and Native AOT direction is described in the [Serialization Architecture Proposal](proposals/serialization-architecture.md). The serializer contracts, registry, and configurable JSON metadata paths are implemented; BSON remains a follow-up slice.
 
 | Serializer | Content type | Wire shape | Purpose |
 | --- | --- | --- | --- |
@@ -39,12 +39,13 @@ Raw JSON covers outbound send and publish and inbound dispatch through endpoints
 
 ## Explicit factories for AOT
 
-Serializer factories are explicit objects and do not require reflective activation. Applications can pass generated metadata or application-owned dependencies into a custom factory constructor:
+Serializer factories are explicit objects and do not require reflective activation. .NET applications pass source-generated metadata through ordinary `JsonSerializerOptions`:
 
 ```csharp
 services.AddServiceBus(x =>
 {
-    var serialization = new RawJsonSerializerFactory(headerConvention);
+    var serialization = new EnvelopeSerializerFactory(
+        ApplicationJsonContext.Default.Options);
     x.AddSerializer(serialization, isSerializer: true);
     x.AddDeserializer(serialization, isDefault: true);
 });
@@ -53,8 +54,9 @@ services.AddServiceBus(x =>
 ```java
 services.from(MessageBusServices.class)
         .addServiceBus(cfg -> {
+            ObjectMapper mapper = applicationObjectMapper();
             SerializerFactory serialization =
-                    new RawJsonSerializerFactory(headerConvention);
+                    new EnvelopeSerializerFactory(mapper);
             cfg.addSerializer(serialization, true);
             cfg.addDeserializer(serialization, true);
         });
@@ -62,7 +64,11 @@ services.from(MessageBusServices.class)
 
 These registrations are ordinary runtime configuration and do not require a source generator or a particular application framework.
 
-On .NET, `System.Text.Json` source generation remains owned by the application and its selected serializer factory. MyServiceBus does not make source-generated JSON mandatory for managed applications or couple consumer-catalog generation to application serialization contracts.
+`EnvelopeSerializerFactory` and `RawJsonSerializerFactory` use the supplied options for payloads on both send and receive. The envelope writer handles MyServiceBus-owned metadata directly, so an application context only needs `[JsonSerializable]` entries for its message contracts—not closed `Envelope<T>` types. Omitting options retains the reflection-capable managed default.
+
+`NServiceBusJsonSerializerFactory` also accepts `JsonSerializerOptions` for applications that need an explicit metadata path while preserving that profile's PascalCase wire convention.
+
+Java's corresponding factories accept an application-configured Jackson `ObjectMapper` and reuse it for their serializer/deserializer pair. This is the same ownership model expressed through Java's serializer ecosystem; it is not presented as source generation.
 
 ## NServiceBus JSON
 

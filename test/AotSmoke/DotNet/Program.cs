@@ -3,15 +3,19 @@ using Microsoft.Extensions.Hosting;
 using MyServiceBus;
 using MyServiceBus.Generated;
 using MyServiceBus.Serialization;
+using System.Text.Json.Serialization;
 
 var services = new ServiceCollection();
 var probe = new AotSmokeProbe();
+var serialization = new EnvelopeSerializerFactory(AotSmokeJsonContext.Default.Options);
 services.AddSingleton(probe);
 services.AddServiceBus(configurator =>
 {
     configurator.AddGeneratedConsumers();
     configurator.Services.AddScoped<AotSmokeConsumer>(_ => new AotSmokeConsumer(probe));
-    configurator.AddSerializer(new EnvelopeSerializerFactory(), isSerializer: true);
+    configurator.ClearSerialization();
+    configurator.AddSerializer(serialization, isSerializer: true);
+    configurator.AddDeserializer(serialization, isDefault: true);
     configurator.UsingMediator();
 });
 
@@ -19,6 +23,31 @@ await using var provider = services.BuildServiceProvider();
 var bus = provider.GetRequiredService<IMessageBus>();
 var hostedService = provider.GetRequiredService<IHostedService>();
 var message = new AotSmokeMessage("native-ready");
+var serializationContext = new MessageSerializationContext<AotSmokeMessage>(message)
+{
+    MessageId = Guid.NewGuid(),
+    ConversationId = Guid.NewGuid(),
+    MessageType = [MessageUrn.For(typeof(AotSmokeMessage))],
+    Headers = new Dictionary<string, object>(),
+    SentTime = DateTimeOffset.UtcNow,
+    HostInfo = new HostInfo
+    {
+        MachineName = "aot-smoke",
+        ProcessName = "aot-smoke",
+        Assembly = "aot-smoke",
+        AssemblyVersion = "1.0.0",
+        FrameworkVersion = ".NET",
+        MassTransitVersion = "1.0.0",
+        OperatingSystemVersion = "test"
+    }
+};
+var body = serialization.CreateSerializer().GetMessageBody(serializationContext);
+var inbound = serialization.CreateDeserializer().Deserialize(body, new Dictionary<string, object>());
+if (!inbound.TryGetMessage<AotSmokeMessage>(out var deserialized)
+    || deserialized?.Value != message.Value)
+{
+    throw new InvalidOperationException("Source-generated JSON NativeAOT round trip failed.");
+}
 
 await hostedService.StartAsync(CancellationToken.None);
 try
@@ -43,6 +72,12 @@ if (!messageBound || !contextBound || !cancellationBound)
 Console.WriteLine("Generated interface-consumer dispatch .NET NativeAOT smoke test passed.");
 
 public sealed record AotSmokeMessage(string Value);
+
+[JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
+[JsonSerializable(typeof(AotSmokeMessage))]
+internal partial class AotSmokeJsonContext : JsonSerializerContext
+{
+}
 
 public sealed class AotSmokeProbe
 {

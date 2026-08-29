@@ -1,11 +1,12 @@
 using System.Text.Json;
+using System.Text.Json.Serialization.Metadata;
 
 namespace MyServiceBus.Serialization;
 
 public class EnvelopeMessageContext : IMessageContext
 {
     private readonly JsonDocument _jsonDocument;
-    private readonly JsonSerializerOptions _jsonSerializerOptions = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
+    private readonly JsonSerializerOptions _jsonSerializerOptions;
     private readonly Dictionary<Type, object> _messageCache = new();
     private readonly IDictionary<string, object> _transportHeaders;
     private readonly IMessageHeaderConvention _headerConvention;
@@ -21,9 +22,23 @@ public class EnvelopeMessageContext : IMessageContext
     private Uri? _responseAddress;
     private Uri? _faultAddress;
 
-    public EnvelopeMessageContext(byte[] jsonBytes, IDictionary<string, object> transportHeaders, IMessageHeaderConvention? headerConvention = null)
+    public EnvelopeMessageContext(
+        byte[] jsonBytes,
+        IDictionary<string, object> transportHeaders,
+        IMessageHeaderConvention? headerConvention = null)
+        : this(jsonBytes, transportHeaders, JsonSerializationDefaults.CreateOptions(), headerConvention)
     {
+    }
+
+    public EnvelopeMessageContext(
+        byte[] jsonBytes,
+        IDictionary<string, object> transportHeaders,
+        JsonSerializerOptions jsonSerializerOptions,
+        IMessageHeaderConvention? headerConvention = null)
+    {
+        ArgumentNullException.ThrowIfNull(jsonSerializerOptions);
         _jsonDocument = JsonDocument.Parse(jsonBytes);
+        _jsonSerializerOptions = jsonSerializerOptions;
         _transportHeaders = transportHeaders;
         _headerConvention = headerConvention ?? MassTransitHeaderConvention.Instance;
     }
@@ -44,7 +59,7 @@ public class EnvelopeMessageContext : IMessageContext
         _initiatorId ??= TryGetGuidProperty("initiatorId");
 
     public IList<string> MessageType =>
-        _messageType ??= TryGetProperty("messageType")?.Deserialize<List<string>>() ?? new();
+        _messageType ??= ReadMessageTypes();
 
     public Uri? ResponseAddress
     {
@@ -112,7 +127,9 @@ public class EnvelopeMessageContext : IMessageContext
 
         try
         {
-            message = value.Deserialize<T>(_jsonSerializerOptions);
+            var typeInfo = _jsonSerializerOptions.GetTypeInfo(typeof(T)) as JsonTypeInfo<T>
+                ?? throw new InvalidOperationException($"JSON metadata is not configured for {typeof(T)}.");
+            message = value.Deserialize(typeInfo);
             if (message != null)
                 _messageCache[typeof(T)] = message;
             return message != null;
@@ -139,11 +156,30 @@ public class EnvelopeMessageContext : IMessageContext
 
     private Dictionary<string, object> MergeHeaders()
     {
-        var envelopeHeaders = TryGetProperty("headers")?.Deserialize<Dictionary<string, object>>() ?? new();
+        var envelopeHeaders = new Dictionary<string, object>();
+        if (TryGetProperty("headers") is { ValueKind: JsonValueKind.Object } headers)
+        {
+            foreach (var property in headers.EnumerateObject())
+                envelopeHeaders[property.Name] = property.Value.Clone();
+        }
         foreach (var kv in _transportHeaders)
         {
             envelopeHeaders[kv.Key] = kv.Value;
         }
         return envelopeHeaders;
+    }
+
+    private List<string> ReadMessageTypes()
+    {
+        var messageTypes = new List<string>();
+        if (TryGetProperty("messageType") is not { ValueKind: JsonValueKind.Array } values)
+            return messageTypes;
+
+        foreach (var value in values.EnumerateArray())
+        {
+            if (value.ValueKind == JsonValueKind.String && value.GetString() is { } messageType)
+                messageTypes.Add(messageType);
+        }
+        return messageTypes;
     }
 }

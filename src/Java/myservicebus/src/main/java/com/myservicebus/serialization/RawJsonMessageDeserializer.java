@@ -9,13 +9,23 @@ public final class RawJsonMessageDeserializer implements MessageDeserializer {
     private final MessageHeaderConvention headerConvention;
 
     public RawJsonMessageDeserializer() {
-        this(MassTransitHeaderConvention.INSTANCE);
+        this(JsonSerializationDefaults.createObjectMapper(), MassTransitHeaderConvention.INSTANCE);
     }
 
     public RawJsonMessageDeserializer(MessageHeaderConvention headerConvention) {
+        this(JsonSerializationDefaults.createObjectMapper(), headerConvention);
+    }
+
+    public RawJsonMessageDeserializer(ObjectMapper mapper) {
+        this(mapper, MassTransitHeaderConvention.INSTANCE);
+    }
+
+    public RawJsonMessageDeserializer(ObjectMapper mapper, MessageHeaderConvention headerConvention) {
+        if (mapper == null) {
+            throw new IllegalArgumentException("mapper must not be null");
+        }
+        this.mapper = mapper;
         this.headerConvention = headerConvention;
-        mapper = new ObjectMapper();
-        mapper.findAndRegisterModules();
     }
 
     @Override

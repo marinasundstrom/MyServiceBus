@@ -1,7 +1,10 @@
 package com.myservicebus.serialization;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.myservicebus.HostInfo;
 import com.myservicebus.MessageUrn;
 import java.time.OffsetDateTime;
@@ -13,6 +16,10 @@ import org.junit.jupiter.api.Test;
 class SerializerContractTest {
     public static class TestMessage {
         public String text;
+    }
+
+    public static class ConfiguredMessage {
+        public String camelText;
     }
 
     @Test
@@ -57,6 +64,27 @@ class SerializerContractTest {
         MessageBody body = deserializer.getMessageBody("{\"text\":\"hello\"}");
 
         assertEquals("{\"text\":\"hello\"}", body.getString());
+    }
+
+    @Test
+    void jsonFactoriesUseApplicationObjectMapperOnSendAndReceive() throws Exception {
+        ObjectMapper mapper = new ObjectMapper();
+        mapper.findAndRegisterModules();
+        mapper.setPropertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE);
+
+        for (SerializerFactory factory : List.of(
+                new EnvelopeSerializerFactory(mapper),
+                new RawJsonSerializerFactory(mapper))) {
+            ConfiguredMessage message = new ConfiguredMessage();
+            message.camelText = "configured";
+            MessageSerializationContext<ConfiguredMessage> context = createContext(message);
+
+            MessageBody body = factory.createSerializer().getMessageBody(context);
+            InboundMessage inbound = factory.createDeserializer().deserialize(body, new HashMap<>());
+
+            assertTrue(body.getString().contains("\"camel_text\":\"configured\""));
+            assertEquals("configured", inbound.<ConfiguredMessage>getMessage(ConfiguredMessage.class).camelText);
+        }
     }
 
     private static <T> MessageSerializationContext<T> createContext(T message) {
