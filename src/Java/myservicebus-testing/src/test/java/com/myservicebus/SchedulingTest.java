@@ -1,6 +1,8 @@
 package com.myservicebus;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.Duration;
@@ -17,6 +19,45 @@ import org.junit.jupiter.api.Test;
 import com.myservicebus.tasks.CancellationToken;
 
 public class SchedulingTest {
+    static class RecordingScheduleMessageProvider implements ScheduleMessageProvider {
+        private Instant scheduledTime;
+        private Object message;
+
+        @Override
+        public ScheduleMessageProviderDurability getDurability() {
+            return ScheduleMessageProviderDurability.DURABLE;
+        }
+
+        @Override
+        public boolean supportsCancellation() {
+            return true;
+        }
+
+        @Override
+        public <T> CompletionStage<ScheduledMessageHandle> schedulePublish(
+                Instant scheduledTime,
+                T message,
+                CancellationToken cancellationToken) {
+            this.scheduledTime = scheduledTime;
+            this.message = message;
+            return CompletableFuture.completedFuture(new ScheduledMessageHandle(UUID.randomUUID(), scheduledTime));
+        }
+
+        @Override
+        public <T> CompletionStage<ScheduledMessageHandle> scheduleSend(
+                String destinationAddress,
+                Instant scheduledTime,
+                T message,
+                CancellationToken cancellationToken) {
+            return schedulePublish(scheduledTime, message, cancellationToken);
+        }
+
+        @Override
+        public CompletionStage<Void> cancel(UUID tokenId, CancellationToken cancellationToken) {
+            return CompletableFuture.completedFuture(null);
+        }
+    }
+
     static class ManualJobScheduler implements JobScheduler {
         private final Map<UUID, Function<CancellationToken, CompletionStage<Void>>> jobs = new HashMap<>();
 
@@ -42,6 +83,23 @@ public class SchedulingTest {
         boolean contains(UUID tokenId) {
             return jobs.containsKey(tokenId);
         }
+    }
+
+    @Test
+    void messageSchedulerDelegatesToMessageAwareProvider() {
+        RecordingScheduleMessageProvider provider = new RecordingScheduleMessageProvider();
+        MessageScheduler scheduler = new MessageSchedulerImpl(provider);
+        Instant scheduledTime = Instant.now().plus(Duration.ofHours(1));
+        Object message = new Object();
+
+        ScheduledMessageHandle handle = scheduler.schedulePublish(scheduledTime, message)
+                .toCompletableFuture().join();
+
+        assertEquals(ScheduleMessageProviderDurability.DURABLE, scheduler.getDurability());
+        assertTrue(scheduler.supportsCancellation());
+        assertEquals(scheduledTime, provider.scheduledTime);
+        assertSame(message, provider.message);
+        assertEquals(scheduledTime, handle.getScheduledTime());
     }
 
     @Test

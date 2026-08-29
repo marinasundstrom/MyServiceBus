@@ -8,6 +8,19 @@ import java.util.concurrent.CompletionStage;
 import com.myservicebus.tasks.CancellationToken;
 
 public interface MessageScheduler {
+    ScheduleMessageProviderDurability getDurability();
+
+    boolean supportsCancellation();
+
+    <T> CompletionStage<ScheduledMessageHandle> schedulePublish(
+            Instant scheduledTime,
+            T message,
+            CancellationToken cancellationToken);
+
+    default <T> CompletionStage<ScheduledMessageHandle> schedulePublish(Instant scheduledTime, T message) {
+        return schedulePublish(scheduledTime, message, CancellationToken.none());
+    }
+
     <T> CompletionStage<ScheduledMessageHandle> schedulePublish(T message,
             Instant scheduledTime,
             CancellationToken cancellationToken);
@@ -23,6 +36,18 @@ public interface MessageScheduler {
 
     default <T> CompletionStage<ScheduledMessageHandle> schedulePublish(T message, Duration delay) {
         return schedulePublish(message, delay, CancellationToken.none());
+    }
+
+    <T> CompletionStage<ScheduledMessageHandle> scheduleSend(String destination,
+            Instant scheduledTime,
+            T message,
+            CancellationToken cancellationToken);
+
+    default <T> CompletionStage<ScheduledMessageHandle> scheduleSend(
+            String destination,
+            Instant scheduledTime,
+            T message) {
+        return scheduleSend(destination, scheduledTime, message, CancellationToken.none());
     }
 
     <T> CompletionStage<ScheduledMessageHandle> scheduleSend(String destination,

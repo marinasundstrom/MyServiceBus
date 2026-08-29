@@ -75,6 +75,27 @@ public class SchedulingTests
         public bool Contains(Guid tokenId) => jobs.ContainsKey(tokenId);
     }
 
+    class RecordingScheduleMessageProvider : IScheduleMessageProvider
+    {
+        public ScheduleMessageProviderDurability Durability => ScheduleMessageProviderDurability.Durable;
+        public bool SupportsCancellation => true;
+        public DateTime? ScheduledTime { get; private set; }
+        public object? Message { get; private set; }
+
+        public Task<ScheduledMessageHandle> SchedulePublish<T>(DateTime scheduledTime, T message, CancellationToken cancellationToken = default)
+            where T : class
+        {
+            ScheduledTime = scheduledTime;
+            Message = message;
+            return Task.FromResult(new ScheduledMessageHandle(Guid.NewGuid(), scheduledTime));
+        }
+
+        public Task<ScheduledMessageHandle> ScheduleSend<T>(Uri destinationAddress, DateTime scheduledTime, T message, CancellationToken cancellationToken = default)
+            where T : class => SchedulePublish(scheduledTime, message, cancellationToken);
+
+        public Task Cancel(Guid tokenId, CancellationToken cancellationToken = default) => Task.CompletedTask;
+    }
+
     class StubSendContext : IPublishContext
     {
         public string MessageId { get; set; } = string.Empty;
@@ -120,6 +141,23 @@ public class SchedulingTests
 
         public Task Send<T>(object message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default) where T : class
             => Send((T)message, contextCallback, cancellationToken);
+    }
+
+    [Fact]
+    public async Task Message_scheduler_delegates_to_message_aware_provider()
+    {
+        var provider = new RecordingScheduleMessageProvider();
+        var scheduler = new MessageScheduler(provider);
+        var scheduledTime = DateTime.UtcNow.AddHours(1);
+        var message = new TestMessage();
+
+        var handle = await scheduler.SchedulePublish(scheduledTime, message);
+
+        Assert.Equal(ScheduleMessageProviderDurability.Durable, scheduler.Durability);
+        Assert.True(scheduler.SupportsCancellation);
+        Assert.Equal(scheduledTime, provider.ScheduledTime);
+        Assert.Same(message, provider.Message);
+        Assert.Equal(scheduledTime, handle.ScheduledTime);
     }
 
     [Fact]

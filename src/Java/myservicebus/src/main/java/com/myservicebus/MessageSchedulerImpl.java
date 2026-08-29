@@ -7,24 +7,50 @@ import java.util.concurrent.CompletionStage;
 import com.myservicebus.tasks.CancellationToken;
 
 public class MessageSchedulerImpl implements MessageScheduler {
-    private final PublishEndpoint publishEndpoint;
-    private final SendEndpointProvider sendEndpointProvider;
-    private final JobScheduler jobScheduler;
+    private final ScheduleMessageProvider provider;
+
+    public MessageSchedulerImpl(ScheduleMessageProvider provider) {
+        this.provider = provider;
+    }
 
     public MessageSchedulerImpl(PublishEndpoint publishEndpoint,
             SendEndpointProvider sendEndpointProvider,
             JobScheduler jobScheduler) {
-        this.publishEndpoint = publishEndpoint;
-        this.sendEndpointProvider = sendEndpointProvider;
-        this.jobScheduler = jobScheduler;
+        this(new InMemoryScheduleMessageProvider(publishEndpoint, sendEndpointProvider, jobScheduler));
+    }
+
+    @Override
+    public ScheduleMessageProviderDurability getDurability() {
+        return provider.getDurability();
+    }
+
+    @Override
+    public boolean supportsCancellation() {
+        return provider.supportsCancellation();
+    }
+
+    @Override
+    public <T> CompletionStage<ScheduledMessageHandle> schedulePublish(
+            Instant scheduledTime,
+            T message,
+            CancellationToken cancellationToken) {
+        return provider.schedulePublish(scheduledTime, message, cancellationToken);
     }
 
     @Override
     public <T> CompletionStage<ScheduledMessageHandle> schedulePublish(T message,
             Instant scheduledTime,
             CancellationToken cancellationToken) {
-        return jobScheduler.schedule(scheduledTime, token -> publishEndpoint.publish(message, token), cancellationToken)
-                .thenApply(ScheduledMessageHandle::new);
+        return schedulePublish(scheduledTime, message, cancellationToken);
+    }
+
+    @Override
+    public <T> CompletionStage<ScheduledMessageHandle> scheduleSend(
+            String destination,
+            Instant scheduledTime,
+            T message,
+            CancellationToken cancellationToken) {
+        return provider.scheduleSend(destination, scheduledTime, message, cancellationToken);
     }
 
     @Override
@@ -32,19 +58,16 @@ public class MessageSchedulerImpl implements MessageScheduler {
             T message,
             Instant scheduledTime,
             CancellationToken cancellationToken) {
-        return jobScheduler.schedule(scheduledTime, token -> {
-            SendEndpoint endpoint = sendEndpointProvider.getSendEndpoint(destination);
-            return endpoint.send(message, token);
-        }, cancellationToken).thenApply(ScheduledMessageHandle::new);
+        return scheduleSend(destination, scheduledTime, message, cancellationToken);
     }
 
     @Override
     public CompletionStage<Void> cancelScheduledPublish(UUID tokenId, CancellationToken cancellationToken) {
-        return jobScheduler.cancel(tokenId);
+        return provider.cancel(tokenId, cancellationToken);
     }
 
     @Override
     public CompletionStage<Void> cancelScheduledSend(UUID tokenId, CancellationToken cancellationToken) {
-        return jobScheduler.cancel(tokenId);
+        return provider.cancel(tokenId, cancellationToken);
     }
 }
