@@ -1,11 +1,71 @@
 using MyServiceBus.Serialization;
 using MyServiceBus.Serialization.Bson;
+using Newtonsoft.Json.Bson;
+using Newtonsoft.Json.Linq;
 using Shouldly;
 
 namespace MyServiceBus.Tests;
 
 public class BsonSerializerTests
 {
+    [Fact]
+    public void MassTransit_reads_the_MyServiceBus_BSON_envelope()
+    {
+        var body = new BsonSerializerFactory().CreateSerializer().GetMessageBody(CreateContext());
+
+        using var stream = body.GetStream();
+        using var reader = new BsonDataReader(stream);
+        var envelope = MassTransit.Serialization.BsonMessageSerializer.Deserializer
+            .Deserialize<MassTransit.Serialization.MessageEnvelope>(reader);
+
+        envelope.ShouldNotBeNull();
+        envelope.MessageId.ShouldBe("124f4bc4-bc2f-45a7-bf9a-ddeba5aab587");
+        envelope.CorrelationId.ShouldBe("cf46535d-f7d4-451d-857f-9c64b64339da");
+        var token = envelope.Message as JToken;
+        token.ShouldNotBeNull();
+        var message = token.ToObject<BsonTestMessage>();
+        message.ShouldNotBeNull();
+        message.OrderId.ShouldBe(Guid.Parse("f8f53c23-1fbb-4f18-970d-3a6d27fd9c19"));
+        message.Total.ShouldBe(1234.56m);
+    }
+
+    [Fact]
+    public void MyServiceBus_reads_the_MassTransit_BSON_envelope()
+    {
+        var envelope = new MassTransit.Serialization.JsonMessageEnvelope
+        {
+            MessageId = "124f4bc4-bc2f-45a7-bf9a-ddeba5aab587",
+            CorrelationId = "cf46535d-f7d4-451d-857f-9c64b64339da",
+            ConversationId = "c7bba23f-49a4-40c4-869d-20e36a0dd38c",
+            SentTime = DateTime.Parse("2026-08-29T12:34:56.123456Z").ToUniversalTime(),
+            MessageType = ["urn:message:MyServiceBus.Tests:BsonTestMessage"],
+            Message = new BsonTestMessage
+            {
+                OrderId = Guid.Parse("f8f53c23-1fbb-4f18-970d-3a6d27fd9c19"),
+                Total = 1234.56m
+            },
+            Headers = new Dictionary<string, object?> { ["attempt"] = 2 }
+        };
+        using var stream = new MemoryStream();
+        using (var writer = new BsonDataWriter(stream))
+        {
+            MassTransit.Serialization.BsonMessageSerializer.Serializer
+                .Serialize(writer, envelope, typeof(MassTransit.Serialization.MessageEnvelope));
+            writer.Flush();
+        }
+
+        var inbound = new BsonSerializerFactory()
+            .CreateDeserializer()
+            .Deserialize(new ByteArrayMessageBody(stream.ToArray()), new Dictionary<string, object>());
+
+        inbound.CorrelationId.ShouldBe(Guid.Parse("cf46535d-f7d4-451d-857f-9c64b64339da"));
+        inbound.TryGetMessage<BsonTestMessage>(out var message).ShouldBeTrue();
+        message.ShouldNotBeNull();
+        message.OrderId.ShouldBe(Guid.Parse("f8f53c23-1fbb-4f18-970d-3a6d27fd9c19"));
+        message.Total.ShouldBe(1234.56m);
+        Convert.ToInt32(inbound.Headers["attempt"]).ShouldBe(2);
+    }
+
     [Fact]
     public void Reads_the_Java_BSON_fixture()
     {

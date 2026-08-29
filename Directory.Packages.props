@@ -25,6 +25,7 @@
     <PackageVersion Include="RabbitMQ.Client" Version="7.2.1" />
     <PackageVersion Include="MassTransit.RabbitMQ" Version="8.5.1" />
     <PackageVersion Include="MassTransit.Azure.ServiceBus.Core" Version="8.5.1" />
+    <PackageVersion Include="MassTransit.Newtonsoft" Version="8.5.1" />
     <PackageVersion Include="NServiceBus" Version="10.2.8" />
     <PackageVersion Include="NServiceBus.RabbitMQ" Version="11.2.1" />
     <PackageVersion Include="Azure.Messaging.ServiceBus" Version="7.20.2" />
