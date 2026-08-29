@@ -11,9 +11,10 @@ public static class PostgreSqlOutboxSessionExtensions
     public static IDisposable UsePostgreSql(
         this OutboxSession session,
         NpgsqlConnection connection,
-        NpgsqlTransaction transaction)
+        NpgsqlTransaction transaction,
+        string serviceName)
     {
         ArgumentNullException.ThrowIfNull(session);
-        return session.Begin(new PostgreSqlOutboxWriter(connection, transaction));
+        return session.Begin(new PostgreSqlOutboxWriter(connection, transaction, serviceName));
     }
 }

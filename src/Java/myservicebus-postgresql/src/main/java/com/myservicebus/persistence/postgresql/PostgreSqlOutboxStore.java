@@ -27,9 +27,14 @@ public final class PostgreSqlOutboxStore implements OutboxStore {
     private static final TypeReference<Map<String, String>> HEADERS_TYPE = new TypeReference<>() {
     };
     private final DataSource dataSource;
+    private final String serviceName;
 
-    public PostgreSqlOutboxStore(DataSource dataSource) {
+    public PostgreSqlOutboxStore(DataSource dataSource, String serviceName) {
         this.dataSource = Objects.requireNonNull(dataSource, "dataSource");
+        if (serviceName == null || serviceName.isBlank()) {
+            throw new IllegalArgumentException("serviceName must not be blank");
+        }
+        this.serviceName = serviceName;
     }
 
     @Override
@@ -45,7 +50,8 @@ public final class PostgreSqlOutboxStore implements OutboxStore {
         String sql = """
                 WITH candidates AS (
                     SELECT record_id FROM myservicebus.outbox_message
-                    WHERE next_attempt_at_utc <= ?
+                    WHERE service_name = ?
+                      AND next_attempt_at_utc <= ?
                       AND (state = 0 OR (state = 1 AND lease_expires_at_utc <= ?))
                     ORDER BY created_at_utc, record_id
                     LIMIT ? FOR UPDATE SKIP LOCKED
@@ -63,11 +69,12 @@ public final class PostgreSqlOutboxStore implements OutboxStore {
             connection.setAutoCommit(false);
             try (PreparedStatement statement = connection.prepareStatement(sql)) {
                 OffsetDateTime now = OffsetDateTime.ofInstant(request.nowUtc(), java.time.ZoneOffset.UTC);
-                statement.setObject(1, now);
+                statement.setString(1, serviceName);
                 statement.setObject(2, now);
-                statement.setInt(3, request.maximumCount());
-                statement.setString(4, request.ownerId());
-                statement.setObject(5, OffsetDateTime.ofInstant(
+                statement.setObject(3, now);
+                statement.setInt(4, request.maximumCount());
+                statement.setString(5, request.ownerId());
+                statement.setObject(6, OffsetDateTime.ofInstant(
                         request.nowUtc().plus(request.leaseDuration()), java.time.ZoneOffset.UTC));
                 List<OutboxLease> leases = new ArrayList<>();
                 try (ResultSet result = statement.executeQuery()) {
@@ -94,7 +101,8 @@ public final class PostgreSqlOutboxStore implements OutboxStore {
         return ownedUpdate("""
                 UPDATE myservicebus.outbox_message
                 SET state = 2, dispatched_at_utc = ?, lease_owner = NULL, lease_expires_at_utc = NULL
-                WHERE record_id = ? AND state = 1 AND lease_owner = ? AND lease_expires_at_utc > ?;
+                WHERE record_id = ? AND service_name = ?
+                  AND state = 1 AND lease_owner = ? AND lease_expires_at_utc > ?;
                 """, recordId, ownerId, dispatchedAtUtc, null);
     }
 
@@ -108,7 +116,7 @@ public final class PostgreSqlOutboxStore implements OutboxStore {
                 UPDATE myservicebus.outbox_message
                 SET state = 0, next_attempt_at_utc = ?, failure_category = ?,
                     lease_owner = NULL, lease_expires_at_utc = NULL
-                WHERE record_id = ? AND state = 1 AND lease_owner = ?;
+                WHERE record_id = ? AND service_name = ? AND state = 1 AND lease_owner = ?;
                 """, recordId, ownerId, nextAttemptAtUtc, failureCategory);
     }
 
@@ -124,13 +132,15 @@ public final class PostgreSqlOutboxStore implements OutboxStore {
             if (failureCategory == null) {
                 statement.setObject(1, at);
                 statement.setObject(2, recordId);
-                statement.setString(3, ownerId);
-                statement.setObject(4, at);
+                statement.setString(3, serviceName);
+                statement.setString(4, ownerId);
+                statement.setObject(5, at);
             } else {
                 statement.setObject(1, at);
                 statement.setString(2, failureCategory);
                 statement.setObject(3, recordId);
-                statement.setString(4, ownerId);
+                statement.setString(4, serviceName);
+                statement.setString(5, ownerId);
             }
             return CompletableFuture.completedFuture(statement.executeUpdate() == 1);
         } catch (Exception failure) {

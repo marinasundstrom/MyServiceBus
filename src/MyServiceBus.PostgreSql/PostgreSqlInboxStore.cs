@@ -10,13 +10,16 @@ public sealed class PostgreSqlInboxStore : IInboxStore
     private readonly NpgsqlTransaction transaction;
     private readonly PostgreSqlOutboxWriter outbox;
 
-    public PostgreSqlInboxStore(NpgsqlConnection connection, NpgsqlTransaction transaction)
+    public PostgreSqlInboxStore(
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
+        string serviceName)
     {
         this.connection = connection ?? throw new ArgumentNullException(nameof(connection));
         this.transaction = transaction ?? throw new ArgumentNullException(nameof(transaction));
         if (!ReferenceEquals(transaction.Connection, connection))
             throw new ArgumentException("The transaction must belong to the supplied connection.", nameof(transaction));
-        outbox = new PostgreSqlOutboxWriter(connection, transaction);
+        outbox = new PostgreSqlOutboxWriter(connection, transaction, serviceName);
     }
 
     public async Task<IInboxTransaction> AcquireAsync(

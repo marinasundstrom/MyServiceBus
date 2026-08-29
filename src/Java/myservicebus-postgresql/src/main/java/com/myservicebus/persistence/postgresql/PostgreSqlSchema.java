@@ -7,7 +7,7 @@ import java.util.Objects;
 import javax.sql.DataSource;
 
 public final class PostgreSqlSchema {
-    public static final int CURRENT_VERSION = 1;
+    public static final int CURRENT_VERSION = 2;
 
     private PostgreSqlSchema() {
     }
@@ -41,12 +41,12 @@ public final class PostgreSqlSchema {
             );
 
             INSERT INTO myservicebus.schema_version (singleton, version)
-            VALUES (true, 1)
+            VALUES (true, 2)
             ON CONFLICT (singleton) DO NOTHING;
 
             DO $migration$
             BEGIN
-                IF (SELECT version FROM myservicebus.schema_version WHERE singleton) <> 1 THEN
+                IF (SELECT version FROM myservicebus.schema_version WHERE singleton) <> 2 THEN
                     RAISE EXCEPTION 'Unsupported MyServiceBus PostgreSQL schema version';
                 END IF;
             END
@@ -54,6 +54,7 @@ public final class PostgreSqlSchema {
 
             CREATE TABLE IF NOT EXISTS myservicebus.outbox_message (
                 record_id uuid PRIMARY KEY,
+                service_name text NOT NULL CHECK (length(service_name) > 0),
                 message_id uuid NOT NULL UNIQUE,
                 intent smallint NOT NULL CHECK (intent BETWEEN 0 AND 3),
                 destination_address text NOT NULL,
@@ -78,7 +79,7 @@ public final class PostgreSqlSchema {
             );
 
             CREATE INDEX IF NOT EXISTS ix_outbox_message_dispatch
-                ON myservicebus.outbox_message (next_attempt_at_utc, created_at_utc)
+                ON myservicebus.outbox_message (service_name, next_attempt_at_utc, created_at_utc)
                 WHERE state IN (0, 1);
 
             CREATE TABLE IF NOT EXISTS myservicebus.inbox_message (

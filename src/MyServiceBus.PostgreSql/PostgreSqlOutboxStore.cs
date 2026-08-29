@@ -8,10 +8,13 @@ namespace MyServiceBus.Persistence.PostgreSql;
 public sealed class PostgreSqlOutboxStore : IOutboxStore
 {
     private readonly NpgsqlDataSource dataSource;
+    private readonly string serviceName;
 
-    public PostgreSqlOutboxStore(NpgsqlDataSource dataSource)
+    public PostgreSqlOutboxStore(NpgsqlDataSource dataSource, string serviceName)
     {
         this.dataSource = dataSource ?? throw new ArgumentNullException(nameof(dataSource));
+        ArgumentException.ThrowIfNullOrWhiteSpace(serviceName);
+        this.serviceName = serviceName;
     }
 
     public async Task<IReadOnlyList<OutboxLease>> LeaseAsync(
@@ -23,7 +26,8 @@ public sealed class PostgreSqlOutboxStore : IOutboxStore
             WITH candidates AS (
                 SELECT record_id
                 FROM myservicebus.outbox_message
-                WHERE next_attempt_at_utc <= @now_utc
+                WHERE service_name = @service_name
+                  AND next_attempt_at_utc <= @now_utc
                   AND (state = 0 OR (state = 1 AND lease_expires_at_utc <= @now_utc))
                 ORDER BY created_at_utc, record_id
                 LIMIT @maximum_count
@@ -47,6 +51,7 @@ public sealed class PostgreSqlOutboxStore : IOutboxStore
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
         await using var command = new NpgsqlCommand(sql, connection, transaction);
         command.Parameters.AddWithValue("now_utc", NpgsqlDbType.TimestampTz, request.NowUtc);
+        command.Parameters.AddWithValue("service_name", NpgsqlDbType.Text, serviceName);
         command.Parameters.AddWithValue("maximum_count", NpgsqlDbType.Integer, request.MaximumCount);
         command.Parameters.AddWithValue("owner_id", NpgsqlDbType.Text, request.OwnerId);
         command.Parameters.AddWithValue("lease_expires_at_utc", NpgsqlDbType.TimestampTz, request.NowUtc + request.LeaseDuration);
@@ -92,7 +97,8 @@ public sealed class PostgreSqlOutboxStore : IOutboxStore
             """
             UPDATE myservicebus.outbox_message
             SET state = 2, dispatched_at_utc = @at_utc, lease_owner = NULL, lease_expires_at_utc = NULL
-            WHERE record_id = @record_id AND state = 1 AND lease_owner = @owner_id
+            WHERE record_id = @record_id AND service_name = @service_name
+              AND state = 1 AND lease_owner = @owner_id
               AND lease_expires_at_utc > @at_utc;
             """,
             recordId, ownerId, dispatchedAtUtc, null, cancellationToken);
@@ -107,7 +113,8 @@ public sealed class PostgreSqlOutboxStore : IOutboxStore
             UPDATE myservicebus.outbox_message
             SET state = 0, next_attempt_at_utc = @at_utc, failure_category = @failure_category,
                 lease_owner = NULL, lease_expires_at_utc = NULL
-            WHERE record_id = @record_id AND state = 1 AND lease_owner = @owner_id;
+            WHERE record_id = @record_id AND service_name = @service_name
+              AND state = 1 AND lease_owner = @owner_id;
             """,
             recordId, ownerId, nextAttemptAtUtc, failureCategory, cancellationToken);
 
@@ -123,6 +130,7 @@ public sealed class PostgreSqlOutboxStore : IOutboxStore
         await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
         await using var command = new NpgsqlCommand(sql, connection);
         command.Parameters.AddWithValue("record_id", NpgsqlDbType.Uuid, recordId);
+        command.Parameters.AddWithValue("service_name", NpgsqlDbType.Text, serviceName);
         command.Parameters.AddWithValue("owner_id", NpgsqlDbType.Text, ownerId);
         command.Parameters.AddWithValue("at_utc", NpgsqlDbType.TimestampTz, atUtc);
         if (failureCategory is not null)

@@ -9,6 +9,7 @@ namespace MyServiceBus.PostgreSql.Tests;
 
 public sealed class PostgreSqlPersistenceTests : IAsyncLifetime
 {
+    private const string ServiceName = "orders-service";
     private readonly PostgreSqlContainer container = new PostgreSqlBuilder("postgres:17.6-alpine").Build();
     private NpgsqlDataSource dataSource = null!;
 
@@ -33,7 +34,7 @@ public sealed class PostgreSqlPersistenceTests : IAsyncLifetime
         await using (var connection = await dataSource.OpenConnectionAsync())
         await using (var transaction = await connection.BeginTransactionAsync())
         {
-            await new PostgreSqlOutboxWriter(connection, transaction).AddAsync(rolledBack);
+            await new PostgreSqlOutboxWriter(connection, transaction, ServiceName).AddAsync(rolledBack);
             await transaction.RollbackAsync();
         }
 
@@ -41,11 +42,11 @@ public sealed class PostgreSqlPersistenceTests : IAsyncLifetime
         await using (var connection = await dataSource.OpenConnectionAsync())
         await using (var transaction = await connection.BeginTransactionAsync())
         {
-            await new PostgreSqlOutboxWriter(connection, transaction).AddAsync(committed);
+            await new PostgreSqlOutboxWriter(connection, transaction, ServiceName).AddAsync(committed);
             await transaction.CommitAsync();
         }
 
-        var store = new PostgreSqlOutboxStore(dataSource);
+        var store = new PostgreSqlOutboxStore(dataSource, ServiceName);
         var leases = await store.LeaseAsync(Request("replica-a", 10));
 
         var lease = Assert.Single(leases);
@@ -80,7 +81,7 @@ public sealed class PostgreSqlPersistenceTests : IAsyncLifetime
             await using var connection = await dataSource.OpenConnectionAsync();
             await using var transaction = await connection.BeginTransactionAsync();
             using (scope.ServiceProvider.GetRequiredService<OutboxSession>()
-                .UsePostgreSql(connection, transaction))
+                .UsePostgreSql(connection, transaction, ServiceName))
             {
                 var publishEndpoint = scope.ServiceProvider.GetRequiredService<IPublishEndpoint>();
                 await publishEndpoint.Publish(new OrderSubmitted(Guid.NewGuid()));
@@ -97,7 +98,7 @@ public sealed class PostgreSqlPersistenceTests : IAsyncLifetime
             await bus.StopAsync(CancellationToken.None);
         }
 
-        var leases = await new PostgreSqlOutboxStore(dataSource).LeaseAsync(Request("replica-a", 10));
+        var leases = await new PostgreSqlOutboxStore(dataSource, ServiceName).LeaseAsync(Request("replica-a", 10));
         Assert.Collection(
             leases.OrderBy(lease => lease.Message.CreatedAtUtc),
             lease => Assert.Equal(OutboxDeliveryIntent.Publish, lease.Message.Intent),
@@ -113,8 +114,8 @@ public sealed class PostgreSqlPersistenceTests : IAsyncLifetime
     {
         await InsertCommitted(CreateMessage());
         await InsertCommitted(CreateMessage());
-        var storeA = new PostgreSqlOutboxStore(dataSource);
-        var storeB = new PostgreSqlOutboxStore(dataSource);
+        var storeA = new PostgreSqlOutboxStore(dataSource, ServiceName);
+        var storeB = new PostgreSqlOutboxStore(dataSource, ServiceName);
 
         var leases = await Task.WhenAll(
             storeA.LeaseAsync(Request("replica-a", 1)),
@@ -126,6 +127,23 @@ public sealed class PostgreSqlPersistenceTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Logical_services_lease_only_their_own_outbox_partition()
+    {
+        var ordersMessage = CreateMessage();
+        var billingMessage = CreateMessage();
+        await InsertCommitted(ordersMessage, "orders-service");
+        await InsertCommitted(billingMessage, "billing-service");
+
+        var ordersLeases = await new PostgreSqlOutboxStore(dataSource, "orders-service")
+            .LeaseAsync(Request("orders-replica-a", 10));
+        var billingLeases = await new PostgreSqlOutboxStore(dataSource, "billing-service")
+            .LeaseAsync(Request("billing-replica-a", 10));
+
+        Assert.Equal(ordersMessage.RecordId, Assert.Single(ordersLeases).Message.RecordId);
+        Assert.Equal(billingMessage.RecordId, Assert.Single(billingLeases).Message.RecordId);
+    }
+
+    [Fact]
     public async Task Inbox_completion_and_outbox_write_commit_atomically()
     {
         var key = new InboxMessageKey("billing-charge-card", Guid.NewGuid());
@@ -133,7 +151,7 @@ public sealed class PostgreSqlPersistenceTests : IAsyncLifetime
         await using (var connection = await dataSource.OpenConnectionAsync())
         await using (var transaction = await connection.BeginTransactionAsync())
         {
-            var inbox = new PostgreSqlInboxStore(connection, transaction);
+            var inbox = new PostgreSqlInboxStore(connection, transaction, ServiceName);
             await using var acquisition = await inbox.AcquireAsync(key);
             Assert.Equal(InboxAcquisition.Acquired, acquisition.Acquisition);
             await acquisition.Outbox.AddAsync(message);
@@ -144,20 +162,20 @@ public sealed class PostgreSqlPersistenceTests : IAsyncLifetime
         await using (var connection = await dataSource.OpenConnectionAsync())
         await using (var transaction = await connection.BeginTransactionAsync())
         {
-            await using var duplicate = await new PostgreSqlInboxStore(connection, transaction).AcquireAsync(key);
+            await using var duplicate = await new PostgreSqlInboxStore(connection, transaction, ServiceName).AcquireAsync(key);
             Assert.Equal(InboxAcquisition.Completed, duplicate.Acquisition);
             await transaction.CommitAsync();
         }
 
-        var lease = Assert.Single(await new PostgreSqlOutboxStore(dataSource).LeaseAsync(Request("replica-a", 10)));
+        var lease = Assert.Single(await new PostgreSqlOutboxStore(dataSource, ServiceName).LeaseAsync(Request("replica-a", 10)));
         Assert.Equal(message.MessageId, lease.Message.MessageId);
     }
 
-    private async Task InsertCommitted(OutboxMessage message)
+    private async Task InsertCommitted(OutboxMessage message, string serviceName = ServiceName)
     {
         await using var connection = await dataSource.OpenConnectionAsync();
         await using var transaction = await connection.BeginTransactionAsync();
-        await new PostgreSqlOutboxWriter(connection, transaction).AddAsync(message);
+        await new PostgreSqlOutboxWriter(connection, transaction, serviceName).AddAsync(message);
         await transaction.CommitAsync();
     }
 

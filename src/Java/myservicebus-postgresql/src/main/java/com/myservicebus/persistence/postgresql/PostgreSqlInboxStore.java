@@ -17,9 +17,9 @@ public final class PostgreSqlInboxStore implements InboxStore {
     private final Connection connection;
     private final PostgreSqlOutboxWriter outbox;
 
-    public PostgreSqlInboxStore(Connection connection) {
+    public PostgreSqlInboxStore(Connection connection, String serviceName) {
         this.connection = Objects.requireNonNull(connection, "connection");
-        this.outbox = new PostgreSqlOutboxWriter(connection);
+        this.outbox = new PostgreSqlOutboxWriter(connection, serviceName);
     }
 
     @Override

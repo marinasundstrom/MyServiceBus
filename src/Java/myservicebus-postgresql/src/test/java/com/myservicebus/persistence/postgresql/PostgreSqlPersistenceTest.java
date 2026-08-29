@@ -41,6 +41,8 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
 class PostgreSqlPersistenceTest {
+    private static final String SERVICE_NAME = "orders-service";
+
     @Test
     void scopedBusEndpointsCaptureMessagesInApplicationTransaction() throws Exception {
         try (PostgreSQLContainer container = startContainer()) {
@@ -62,7 +64,7 @@ class PostgreSqlPersistenceTest {
                     connection.setAutoCommit(false);
                     ServiceProvider scoped = scope.getServiceProvider();
                     try (OutboxSession.Registration ignored = PostgreSqlOutboxSession.useTransaction(
-                            scoped.getRequiredService(OutboxSession.class), connection)) {
+                            scoped.getRequiredService(OutboxSession.class), connection, SERVICE_NAME)) {
                         PublishEndpoint publishEndpoint = scoped.getRequiredService(PublishEndpoint.class);
                         publishEndpoint.publish(new OrderSubmitted(UUID.randomUUID())).join();
 
@@ -76,7 +78,8 @@ class PostgreSqlPersistenceTest {
                 bus.stop();
             }
 
-            List<OutboxLease> leases = new PostgreSqlOutboxStore(dataSource).lease(request("replica-a", 10)).join();
+            List<OutboxLease> leases = new PostgreSqlOutboxStore(dataSource, SERVICE_NAME)
+                    .lease(request("replica-a", 10)).join();
             assertEquals(2, leases.size());
             assertEquals(com.myservicebus.persistence.OutboxDeliveryIntent.PUBLISH, leases.get(0).message().intent());
             assertEquals(com.myservicebus.persistence.OutboxDeliveryIntent.SEND, leases.get(1).message().intent());
@@ -94,13 +97,15 @@ class PostgreSqlPersistenceTest {
             OutboxMessage rolledBack = createMessage();
             try (Connection connection = dataSource.getConnection()) {
                 connection.setAutoCommit(false);
-                new PostgreSqlOutboxWriter(connection).add(rolledBack, CancellationToken.none()).join();
+                new PostgreSqlOutboxWriter(connection, SERVICE_NAME)
+                        .add(rolledBack, CancellationToken.none()).join();
                 connection.rollback();
             }
 
             OutboxMessage committed = createMessage();
             insertCommitted(dataSource, committed);
-            List<OutboxLease> leases = new PostgreSqlOutboxStore(dataSource).lease(request("replica-a", 10)).join();
+            List<OutboxLease> leases = new PostgreSqlOutboxStore(dataSource, SERVICE_NAME)
+                    .lease(request("replica-a", 10)).join();
 
             assertEquals(1, leases.size());
             assertEquals(committed.recordId(), leases.get(0).message().recordId());
@@ -123,8 +128,8 @@ class PostgreSqlPersistenceTest {
             insertCommitted(dataSource, createMessage());
             insertCommitted(dataSource, createMessage());
 
-            PostgreSqlOutboxStore storeA = new PostgreSqlOutboxStore(dataSource);
-            PostgreSqlOutboxStore storeB = new PostgreSqlOutboxStore(dataSource);
+            PostgreSqlOutboxStore storeA = new PostgreSqlOutboxStore(dataSource, SERVICE_NAME);
+            PostgreSqlOutboxStore storeB = new PostgreSqlOutboxStore(dataSource, SERVICE_NAME);
             CompletableFuture<List<OutboxLease>> leasesAFuture = CompletableFuture.supplyAsync(
                     () -> storeA.lease(request("replica-a", 1)).join());
             CompletableFuture<List<OutboxLease>> leasesBFuture = CompletableFuture.supplyAsync(
@@ -139,6 +144,28 @@ class PostgreSqlPersistenceTest {
     }
 
     @Test
+    void logicalServicesLeaseOnlyTheirOwnOutboxPartition() throws Exception {
+        try (PostgreSQLContainer container = startContainer()) {
+            DataSource dataSource = dataSource(container);
+            PostgreSqlSchema.ensureCreated(dataSource);
+            OutboxMessage ordersMessage = createMessage();
+            OutboxMessage billingMessage = createMessage();
+            insertCommitted(dataSource, ordersMessage, "orders-service");
+            insertCommitted(dataSource, billingMessage, "billing-service");
+
+            List<OutboxLease> ordersLeases = new PostgreSqlOutboxStore(dataSource, "orders-service")
+                    .lease(request("orders-replica-a", 10)).join();
+            List<OutboxLease> billingLeases = new PostgreSqlOutboxStore(dataSource, "billing-service")
+                    .lease(request("billing-replica-a", 10)).join();
+
+            assertEquals(ordersMessage.recordId(), ordersLeases.get(0).message().recordId());
+            assertEquals(1, ordersLeases.size());
+            assertEquals(billingMessage.recordId(), billingLeases.get(0).message().recordId());
+            assertEquals(1, billingLeases.size());
+        }
+    }
+
+    @Test
     void inboxCompletionAndOutboxWriteCommitAtomically() throws Exception {
         try (PostgreSQLContainer container = startContainer()) {
             DataSource dataSource = dataSource(container);
@@ -148,7 +175,7 @@ class PostgreSqlPersistenceTest {
 
             try (Connection connection = dataSource.getConnection()) {
                 connection.setAutoCommit(false);
-                InboxTransaction acquisition = new PostgreSqlInboxStore(connection)
+                InboxTransaction acquisition = new PostgreSqlInboxStore(connection, SERVICE_NAME)
                         .acquire(key, CancellationToken.none()).join();
                 assertEquals(InboxAcquisition.ACQUIRED, acquisition.getAcquisition());
                 acquisition.getOutbox().add(message, CancellationToken.none()).join();
@@ -158,13 +185,14 @@ class PostgreSqlPersistenceTest {
 
             try (Connection connection = dataSource.getConnection()) {
                 connection.setAutoCommit(false);
-                InboxTransaction duplicate = new PostgreSqlInboxStore(connection)
+                InboxTransaction duplicate = new PostgreSqlInboxStore(connection, SERVICE_NAME)
                         .acquire(key, CancellationToken.none()).join();
                 assertEquals(InboxAcquisition.COMPLETED, duplicate.getAcquisition());
                 connection.commit();
             }
 
-            List<OutboxLease> leases = new PostgreSqlOutboxStore(dataSource).lease(request("replica-a", 10)).join();
+            List<OutboxLease> leases = new PostgreSqlOutboxStore(dataSource, SERVICE_NAME)
+                    .lease(request("replica-a", 10)).join();
             assertEquals(1, leases.size());
             assertEquals(message.messageId(), leases.get(0).message().messageId());
         }
@@ -186,9 +214,14 @@ class PostgreSqlPersistenceTest {
     }
 
     private static void insertCommitted(DataSource dataSource, OutboxMessage message) throws Exception {
+        insertCommitted(dataSource, message, SERVICE_NAME);
+    }
+
+    private static void insertCommitted(DataSource dataSource, OutboxMessage message, String serviceName)
+            throws Exception {
         try (Connection connection = dataSource.getConnection()) {
             connection.setAutoCommit(false);
-            new PostgreSqlOutboxWriter(connection).add(message, CancellationToken.none()).join();
+            new PostgreSqlOutboxWriter(connection, serviceName).add(message, CancellationToken.none()).join();
             connection.commit();
         }
     }

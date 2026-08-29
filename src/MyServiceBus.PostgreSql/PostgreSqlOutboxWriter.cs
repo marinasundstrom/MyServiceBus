@@ -9,11 +9,17 @@ public sealed class PostgreSqlOutboxWriter : IOutboxWriter
 {
     private readonly NpgsqlConnection connection;
     private readonly NpgsqlTransaction transaction;
+    private readonly string serviceName;
 
-    public PostgreSqlOutboxWriter(NpgsqlConnection connection, NpgsqlTransaction transaction)
+    public PostgreSqlOutboxWriter(
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
+        string serviceName)
     {
         this.connection = connection ?? throw new ArgumentNullException(nameof(connection));
         this.transaction = transaction ?? throw new ArgumentNullException(nameof(transaction));
+        ArgumentException.ThrowIfNullOrWhiteSpace(serviceName);
+        this.serviceName = serviceName;
         if (!ReferenceEquals(transaction.Connection, connection))
             throw new ArgumentException("The transaction must belong to the supplied connection.", nameof(transaction));
     }
@@ -26,17 +32,18 @@ public sealed class PostgreSqlOutboxWriter : IOutboxWriter
 
         const string sql = """
             INSERT INTO myservicebus.outbox_message (
-                record_id, message_id, intent, destination_address, message_types, body, content_type, headers,
+                record_id, service_name, message_id, intent, destination_address, message_types, body, content_type, headers,
                 created_at_utc, request_id, correlation_id, conversation_id, initiator_id, response_address,
                 fault_address, state, next_attempt_at_utc)
             VALUES (
-                @record_id, @message_id, @intent, @destination_address, @message_types, @body, @content_type,
+                @record_id, @service_name, @message_id, @intent, @destination_address, @message_types, @body, @content_type,
                 @headers, @created_at_utc, @request_id, @correlation_id, @conversation_id, @initiator_id,
                 @response_address, @fault_address, 0, @created_at_utc);
             """;
 
         await using var command = new NpgsqlCommand(sql, connection, transaction);
         command.Parameters.AddWithValue("record_id", NpgsqlDbType.Uuid, message.RecordId);
+        command.Parameters.AddWithValue("service_name", NpgsqlDbType.Text, serviceName);
         command.Parameters.AddWithValue("message_id", NpgsqlDbType.Uuid, message.MessageId);
         command.Parameters.AddWithValue("intent", NpgsqlDbType.Smallint, (short)message.Intent);
         command.Parameters.AddWithValue("destination_address", NpgsqlDbType.Text, message.DestinationAddress.ToString());
