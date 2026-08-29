@@ -7,6 +7,27 @@ namespace MyServiceBus.Tests;
 public class BsonSerializerTests
 {
     [Fact]
+    public void Reads_the_Java_BSON_fixture()
+    {
+        var fixturePath = Path.Combine(
+            AppContext.BaseDirectory,
+            "serialization-fixtures",
+            "java-bson-envelope.base64");
+        var body = new ByteArrayMessageBody(Convert.FromBase64String(File.ReadAllText(fixturePath).Trim()));
+
+        var inbound = new BsonSerializerFactory()
+            .CreateDeserializer()
+            .Deserialize(body, new Dictionary<string, object>());
+
+        inbound.CorrelationId.ShouldBe(Guid.Parse("cf46535d-f7d4-451d-857f-9c64b64339da"));
+        inbound.TryGetMessage<BsonTestMessage>(out var message).ShouldBeTrue();
+        message.ShouldNotBeNull();
+        message.OrderId.ShouldBe(Guid.Parse("f8f53c23-1fbb-4f18-970d-3a6d27fd9c19"));
+        message.Total.ShouldBe(1234.56m);
+        Convert.ToInt32(inbound.Headers["attempt"]).ShouldBe(2);
+    }
+
+    [Fact]
     public void Factory_round_trips_the_MassTransit_envelope()
     {
         var factory = new BsonSerializerFactory();
