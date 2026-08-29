@@ -26,5 +26,9 @@ This repository contains a .NET solution for MyServiceBus and a Java project. Fo
 - `docs/feature-walkthrough.md` is the canonical source for usage samples of MyServiceBus.
 - Keep `CHANGELOG.md` up to date for significant repository changes. Prefer chronological entries that summarize the larger themes of a change set rather than exhaustive commit-by-commit notes.
 
+## Deployable artifacts
+- When adding a project that produces a NuGet package, Maven publication, container image, or other deployable artifact, add it to every applicable build and publish workflow, release bundle or manifest, artifact verifier, package-smoke consumer, and documented artifact catalog in the same change.
+- Validate new packages from a staged consumer project rather than relying only on the source-project build. Keep artifact counts and release-script summaries synchronized with the published set.
+
 ## Java project
 - The Java project resides in `src/Java`. See `src/Java/AGENTS.md` for instructions specific to that codebase.

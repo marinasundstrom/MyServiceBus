@@ -4,6 +4,7 @@ This changelog summarizes the bigger themes in the repository history rather tha
 
 ## Unreleased
 
+- Added the BSON projects to NuGet and Maven release workflows, artifact verification, Maven Central bundling, staged package consumers, and the public artifact catalog.
 - Added an optional .NET MassTransit BSON envelope package with serializer/deserializer factories, Base64 body handling, configurable Newtonsoft BSON settings, and no dependency from the default JSON runtime.
 - Added the corresponding optional Java BSON module with application `ObjectMapper` payload mapping, .NET GUID byte-order normalization, Base64 bodies, and bidirectional C#↔Java fixtures.
 - Verified the .NET BSON adapter in both directions against MassTransit 8.5.1's own Newtonsoft BSON serializer and envelope contracts.
