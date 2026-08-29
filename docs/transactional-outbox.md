@@ -24,21 +24,22 @@ The C# package `Sundstrom.MyServiceBus.PostgreSql` and Java module `io.github.ma
 - persisted retry, lease, dispatch, and stable message-identity state;
 - transport dispatch that reuses the stored body, content type, and message identity;
 - configurable .NET hosted and Java start/close delivery lifecycles;
+- per-service dispatcher status and PostgreSQL backlog health, including pending, leased, retrying, dispatched, dead, and oldest-undispatched state;
 - inbox acquisition and completion using `(consumer scope, message identity)` uniqueness;
 - matching Testcontainers integration tests in C# and Java; and
 - live RabbitMQ gates for persisted C# envelopes consumed by Java and persisted Java envelopes consumed by C#.
 
-This is a working Bus Outbox capture, persistence, and dispatch foundation, not yet the finished production experience. Supported provider/lifecycle composition now exists in both clients. Transparent Consumer Outbox middleware, retention cleanup, health and metrics, and the full O01–O06 crash matrix remain open.
+This is a complete Transactional Outbox MVP for evaluation, not yet the finished production experience. Supported capture, PostgreSQL persistence, delivery composition, health/backlog inspection, and a cross-platform Aspire showcase exist in both clients. Transparent Consumer Outbox middleware, retention cleanup, monitoring export, and the full O01–O06 production-promotion matrix remain open.
 
 ### Transactional Outbox MVP gate
 
-The MVP is the first supported Bus Outbox production path, not the completion of every persistence feature. Before calling it complete, both clients need:
+The MVP is the first coherent Bus Outbox evaluation path, not production promotion or the completion of every persistence feature. Its gates are now implemented:
 
 - one documented composition path that wires PostgreSQL storage, transport dispatch, retry policy, and lifecycle — implemented;
-- startup validation for schema version, service partition, provider, and transport;
-- focused crash-window evidence for committed recovery, broker acceptance before completion, retry, and shutdown;
-- minimal health signals for dispatcher progress, failure, pending count, and oldest pending age; and
-- an end-to-end showcase that runs the same scenario in C# and Java.
+- explicit startup schema validation plus service-partition, delivery-option, provider, and transport validation — implemented; applications currently call `EnsureCreated` before starting delivery;
+- focused PostgreSQL recovery evidence for failed dispatch and lease expiry after acceptance — implemented in both clients, with process-level broker crash injection still required for production promotion;
+- minimal health signals for dispatcher progress, failure, pending count, and oldest pending age — implemented; and
+- an end-to-end Aspire showcase that commits application state plus outbox intent and consumes the result in C# and Java — implemented and live-verified.
 
 Transparent Consumer Outbox middleware, automatic retention cleanup, richer dashboard integration, SQL Server, and durable scheduling follow the MVP unless required to close one of those gates.
 
@@ -178,6 +179,18 @@ EF Core owns the connection and transaction in this example; do not dispose eith
 An optional EF Core adapter can later remove the Npgsql casts and provide a unit-of-work helper. It must retain this visible transaction boundary and fail when no compatible explicit transaction is active.
 
 The canonical, maintained usage samples live in the [feature walkthrough](feature-walkthrough.md#transactional-outbox-and-inbox).
+
+## Run the cross-platform showcase
+
+The separate `AspireApp_Outbox` topology starts PostgreSQL 17.6, RabbitMQ 4.1.8, one C# service, and one Java service:
+
+```shell
+aspire run --apphost src/AspireApp_Outbox/AspireApp_Outbox.csproj
+```
+
+Each service exposes `POST /publish`, `GET /received`, and `GET /health/outbox`. Publishing through either service inserts an application record and captures the final envelope in one database transaction. The service-owned dispatcher publishes it later. After publishing once through each service, both consumers report both language origins, while PostgreSQL contains one dispatched record under each logical service partition.
+
+The showcase proves the supported composition and public envelope boundary. It does not replace process-crash, cleanup, schema-rollout, or transparent Consumer Outbox promotion tests.
 
 ## Inbox transaction
 

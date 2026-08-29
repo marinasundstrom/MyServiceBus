@@ -68,14 +68,16 @@ The RabbitMQ implementation now releases the source when preservation is unconfi
 
 | ID | Scenario | Required outcome before outbox/inbox promotion | C# | Java |
 | --- | --- | --- | --- | --- |
-| O01 | Application transaction commits; outgoing send fails | Outbox retains undispatched intent and later dispatches with the original identity | Open | Open |
-| O02 | Outgoing message is accepted; dispatcher exits before marking it sent | Redispatch produces a detectable duplicate with the same identity | Open | Open |
+| O01 | Application transaction commits; outgoing send fails | Outbox retains undispatched intent and later dispatches with the original identity | Partial | Partial |
+| O02 | Outgoing message is accepted; dispatcher exits before marking it sent | Redispatch produces a detectable duplicate with the same identity | Partial | Partial |
 | O03 | Consumer effect commits; process exits before source settlement | Inbox prevents the effect from being applied twice and permits safe source settlement | Open | Open |
 | O04 | Two replicas process the same message identity concurrently | Inbox storage admits one effect owner and gives the loser a defined outcome | Open | Open |
 | O05 | Outbox or inbox schema upgrade occurs during rolling deployment | Supported adjacent versions continue safely or startup fails before processing | Open | Open |
 | O06 | Cleanup races dispatch or duplicate detection | Undispatched work and active deduplication records are never removed early | Open | Open |
 
 These scenarios require a supported persistence provider and a real transactional database. In-memory substitutes are not release evidence.
+
+The C# and Java PostgreSQL suites now inject the O01 and O02 persistence boundaries against real PostgreSQL. O01 proves that a failed dispatch is rescheduled and later dispatched with its original identity. O02 deliberately leaves an accepted lease unmarked, advances beyond its expiry, and proves that a second owner redispatches the same identity. They are **Partial** because the transport boundary is deterministic rather than a process exit around acceptance by a real broker. The separate Aspire showcase and live RabbitMQ gates prove real transport dispatch and cross-language consumption, but composed process-crash injection is still required for production promotion.
 
 The portable acquisition, leasing, transaction, identity, cleanup, and rolling-upgrade rules are defined in the [Transactional Outbox and Inbox Specification](../specs/outbox-inbox.md). Provider APIs must implement that contract before any row is promoted from Open.
 

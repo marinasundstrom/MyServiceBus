@@ -40,7 +40,7 @@ dotnet test test/MyServiceBus.PostgreSql.Tests/MyServiceBus.PostgreSql.Tests.csp
 gradle :myservicebus-postgresql:test
 ```
 
-These are provider integration tests, separate from the portable dispatcher unit suites. They are not yet the O01–O06 crash-injection, cleanup, schema-rollout, broker-dispatch, and source-settlement promotion matrix.
+These are provider integration tests, separate from the portable dispatcher unit suites. The PostgreSQL suites now provide partial O01/O02 evidence by injecting failed dispatch and acceptance-before-mark boundaries against real storage. The separate Aspire showcase proves the composed C#/Java, PostgreSQL, and RabbitMQ path. Process-level broker crash injection, Consumer Outbox source settlement, cleanup, and schema-rollout evidence remain part of the O01–O06 production-promotion matrix.
 
 ## Azure Service Bus Emulator Fixture
 

@@ -136,7 +136,7 @@ The target architecture, capability boundary, and delivery slices are defined in
 
 The detailed assessment, work slices, and evidence rules are defined in [Enterprise Production Readiness](enterprise-readiness.md). Inspection and dashboard work may continue experimentally, but must not be promoted as a substitute for these runtime gates.
 
-**Transactional consistency status:** foundation implemented. Both clients expose stable consumed message identity and corresponding transactional-write, immutable-envelope, inbox-acquisition, atomic-lease, retry, and dispatcher contracts. Deterministic unit tests verify identity reuse, rescheduling, and lost-lease outcomes. Transparent pipeline capture, concrete database providers, schema and cleanup services, hosted dispatch, and O01–O06 real-database evidence remain open; no production outbox claim is made yet.
+**Transactional consistency status:** Transactional Outbox MVP implemented for evaluation. Both clients provide scoped Bus Outbox capture, normalized PostgreSQL persistence, service-partitioned leasing, transport dispatch, delivery lifecycle composition, health/backlog inspection, and deterministic real-database recovery evidence. The separate Aspire topology proves application-state-plus-outbox commits and bidirectional C#/Java consumption through RabbitMQ. Transparent Consumer Outbox middleware, cleanup, monitoring export, and complete process-level O01–O06 evidence remain open; no production-promotion claim is made yet.
 
 ## Phase 3: Inspection and Monitoring APIs
 
