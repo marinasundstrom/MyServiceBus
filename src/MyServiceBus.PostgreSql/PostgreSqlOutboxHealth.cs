@@ -10,6 +10,7 @@ public sealed record PostgreSqlOutboxBacklog(
     int Retrying,
     int Dispatched,
     int Dead,
+    int Cancelled,
     DateTimeOffset? OldestUndispatchedAtUtc);
 
 public sealed class PostgreSqlOutboxHealth
@@ -33,6 +34,7 @@ public sealed class PostgreSqlOutboxHealth
                 count(*) FILTER (WHERE state = 0 AND attempt_count > 0),
                 count(*) FILTER (WHERE state = 2),
                 count(*) FILTER (WHERE state = 3),
+                count(*) FILTER (WHERE state = 4),
                 min(created_at_utc) FILTER (WHERE state IN (0, 1))
             FROM myservicebus.outbox_message
             WHERE service_name = @service_name;
@@ -50,6 +52,7 @@ public sealed class PostgreSqlOutboxHealth
             checked((int)reader.GetInt64(2)),
             checked((int)reader.GetInt64(3)),
             checked((int)reader.GetInt64(4)),
-            reader.IsDBNull(5) ? null : reader.GetFieldValue<DateTimeOffset>(5));
+            checked((int)reader.GetInt64(5)),
+            reader.IsDBNull(6) ? null : reader.GetFieldValue<DateTimeOffset>(6));
     }
 }

@@ -40,7 +40,7 @@ public class SchedulingTests
             return Task.FromResult(Guid.NewGuid());
         }
 
-        public Task Cancel(Guid tokenId) => Task.CompletedTask;
+        public Task<bool> Cancel(Guid tokenId) => Task.FromResult(false);
     }
 
     class ManualJobScheduler : IJobScheduler
@@ -59,11 +59,7 @@ public class SchedulingTests
             CancellationToken cancellationToken = default)
             => Schedule(DateTime.UtcNow + delay, callback, cancellationToken);
 
-        public Task Cancel(Guid tokenId)
-        {
-            jobs.Remove(tokenId);
-            return Task.CompletedTask;
-        }
+        public Task<bool> Cancel(Guid tokenId) => Task.FromResult(jobs.Remove(tokenId));
 
         public async Task Run(Guid tokenId)
         {
@@ -93,7 +89,8 @@ public class SchedulingTests
         public Task<ScheduledMessageHandle> ScheduleSend<T>(Uri destinationAddress, DateTime scheduledTime, T message, CancellationToken cancellationToken = default)
             where T : class => SchedulePublish(scheduledTime, message, cancellationToken);
 
-        public Task Cancel(Guid tokenId, CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task<ScheduleCancellationResult> Cancel(Guid tokenId, CancellationToken cancellationToken = default)
+            => Task.FromResult(ScheduleCancellationResult.Cancelled);
     }
 
     class StubSendContext : IPublishContext

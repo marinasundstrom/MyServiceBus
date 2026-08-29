@@ -44,7 +44,8 @@ public sealed class PostgreSqlOutboxStore : IOutboxStore
                 message.message_types, message.body, message.content_type, message.headers::text,
                 message.created_at_utc, message.request_id, message.correlation_id, message.conversation_id,
                 message.initiator_id, message.response_address, message.fault_address,
-                message.next_attempt_at_utc, message.lease_expires_at_utc, message.attempt_count - 1;
+                message.next_attempt_at_utc, message.scheduled_at_utc,
+                message.lease_expires_at_utc, message.attempt_count - 1;
             """;
 
         await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
@@ -77,12 +78,13 @@ public sealed class PostgreSqlOutboxStore : IOutboxStore
                     GetNullableGuid(reader, 12),
                     GetNullableUri(reader, 13),
                     GetNullableUri(reader, 14),
-                    reader.GetFieldValue<DateTimeOffset>(15));
+                    reader.GetFieldValue<DateTimeOffset>(15),
+                    reader.IsDBNull(16) ? null : reader.GetFieldValue<DateTimeOffset>(16));
                 leases.Add(new OutboxLease(
                     message,
                     request.OwnerId,
-                    reader.GetFieldValue<DateTimeOffset>(16),
-                    reader.GetInt32(17)));
+                    reader.GetFieldValue<DateTimeOffset>(17),
+                    reader.GetInt32(18)));
             }
         }
 
@@ -118,6 +120,44 @@ public sealed class PostgreSqlOutboxStore : IOutboxStore
               AND state = 1 AND lease_owner = @owner_id;
             """,
             recordId, ownerId, nextAttemptAtUtc, failureCategory, cancellationToken);
+
+    public async Task<ScheduleCancellationResult> CancelScheduledAsync(
+        Guid messageId,
+        DateTimeOffset cancelledAtUtc,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentOutOfRangeException.ThrowIfEqual(messageId, Guid.Empty);
+        const string sql = """
+            WITH cancelled AS (
+                UPDATE myservicebus.outbox_message
+                SET state = 4, cancelled_at_utc = @cancelled_at_utc
+                WHERE message_id = @message_id AND service_name = @service_name
+                  AND scheduled_at_utc IS NOT NULL AND state = 0
+                RETURNING 1
+            )
+            SELECT CASE
+                WHEN EXISTS (SELECT 1 FROM cancelled) THEN 0
+                WHEN EXISTS (
+                    SELECT 1 FROM myservicebus.outbox_message
+                    WHERE message_id = @message_id AND service_name = @service_name
+                      AND scheduled_at_utc IS NOT NULL AND state = 4) THEN 1
+                WHEN EXISTS (
+                    SELECT 1 FROM myservicebus.outbox_message
+                    WHERE message_id = @message_id AND service_name = @service_name
+                      AND scheduled_at_utc IS NOT NULL) THEN 2
+                WHEN EXISTS (
+                    SELECT 1 FROM myservicebus.outbox_message
+                    WHERE message_id = @message_id AND service_name = @service_name) THEN 3
+                ELSE 4
+            END;
+            """;
+        await using var command = dataSource.CreateCommand(sql);
+        command.Parameters.AddWithValue("message_id", NpgsqlDbType.Uuid, messageId);
+        command.Parameters.AddWithValue("service_name", NpgsqlDbType.Text, serviceName);
+        command.Parameters.AddWithValue("cancelled_at_utc", NpgsqlDbType.TimestampTz, cancelledAtUtc);
+        var result = Convert.ToInt32(await command.ExecuteScalarAsync(cancellationToken));
+        return (ScheduleCancellationResult)result;
+    }
 
     private async Task<bool> ExecuteOwnedUpdateAsync(
         string sql,

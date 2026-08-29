@@ -83,5 +83,11 @@ class OutboxDeliveryServiceTest {
                 UUID recordId, String ownerId, Instant nextAttemptAtUtc, String failureCategory) {
             throw new UnsupportedOperationException();
         }
+
+        @Override
+        public CompletableFuture<com.myservicebus.ScheduleCancellationResult> cancelScheduled(
+                UUID messageId, Instant cancelledAtUtc) {
+            throw new UnsupportedOperationException();
+        }
     }
 }

@@ -215,5 +215,11 @@ public class OutboxDispatcherTests
             FailureCategory = failureCategory;
             return Task.FromResult(OwnsLease);
         }
+
+        public Task<ScheduleCancellationResult> CancelScheduledAsync(
+            Guid messageId,
+            DateTimeOffset cancelledAtUtc,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(ScheduleCancellationResult.NotFound);
     }
 }

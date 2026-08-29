@@ -62,12 +62,12 @@ public class MessageSchedulerImpl implements MessageScheduler {
     }
 
     @Override
-    public CompletionStage<Void> cancelScheduledPublish(UUID tokenId, CancellationToken cancellationToken) {
+    public CompletionStage<ScheduleCancellationResult> cancelScheduledPublish(UUID tokenId, CancellationToken cancellationToken) {
         return provider.cancel(tokenId, cancellationToken);
     }
 
     @Override
-    public CompletionStage<Void> cancelScheduledSend(UUID tokenId, CancellationToken cancellationToken) {
+    public CompletionStage<ScheduleCancellationResult> cancelScheduledSend(UUID tokenId, CancellationToken cancellationToken) {
         return provider.cancel(tokenId, cancellationToken);
     }
 }

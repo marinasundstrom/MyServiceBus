@@ -53,8 +53,8 @@ public class SchedulingTest {
         }
 
         @Override
-        public CompletionStage<Void> cancel(UUID tokenId, CancellationToken cancellationToken) {
-            return CompletableFuture.completedFuture(null);
+        public CompletionStage<ScheduleCancellationResult> cancel(UUID tokenId, CancellationToken cancellationToken) {
+            return CompletableFuture.completedFuture(ScheduleCancellationResult.CANCELLED);
         }
     }
 
@@ -71,9 +71,8 @@ public class SchedulingTest {
         }
 
         @Override
-        public CompletionStage<Void> cancel(UUID tokenId) {
-            jobs.remove(tokenId);
-            return CompletableFuture.completedFuture(null);
+        public CompletionStage<Boolean> cancel(UUID tokenId) {
+            return CompletableFuture.completedFuture(jobs.remove(tokenId) != null);
         }
 
         CompletionStage<Void> run(UUID tokenId) {
@@ -173,8 +172,8 @@ public class SchedulingTest {
             }
             
             
-            public CompletionStage<Void> cancel(UUID tokenId) {
-                return CompletableFuture.completedFuture(null);
+            public CompletionStage<Boolean> cancel(UUID tokenId) {
+                return CompletableFuture.completedFuture(false);
             }
         };
         MessageScheduler scheduler = new MessageSchedulerImpl(

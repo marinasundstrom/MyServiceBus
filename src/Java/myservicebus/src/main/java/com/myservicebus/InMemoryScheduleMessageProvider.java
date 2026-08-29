@@ -54,7 +54,9 @@ public final class InMemoryScheduleMessageProvider implements ScheduleMessagePro
     }
 
     @Override
-    public CompletionStage<Void> cancel(UUID tokenId, CancellationToken cancellationToken) {
-        return jobScheduler.cancel(tokenId);
+    public CompletionStage<ScheduleCancellationResult> cancel(UUID tokenId, CancellationToken cancellationToken) {
+        return jobScheduler.cancel(tokenId).thenApply(cancelled -> cancelled
+                ? ScheduleCancellationResult.CANCELLED
+                : ScheduleCancellationResult.NOT_FOUND);
     }
 }

@@ -7,6 +7,7 @@ import com.myservicebus.persistence.OutboxLease;
 import com.myservicebus.persistence.OutboxLeaseRequest;
 import com.myservicebus.persistence.OutboxMessage;
 import com.myservicebus.persistence.OutboxStore;
+import com.myservicebus.ScheduleCancellationResult;
 import java.net.URI;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -63,7 +64,8 @@ public final class PostgreSqlOutboxStore implements OutboxStore {
                     message.message_types, message.body, message.content_type, message.headers::text,
                     message.created_at_utc, message.request_id, message.correlation_id, message.conversation_id,
                     message.initiator_id, message.response_address, message.fault_address,
-                    message.next_attempt_at_utc, message.lease_expires_at_utc, message.attempt_count - 1;
+                    message.next_attempt_at_utc, message.scheduled_at_utc,
+                    message.lease_expires_at_utc, message.attempt_count - 1;
                 """;
         try (Connection connection = dataSource.getConnection()) {
             connection.setAutoCommit(false);
@@ -83,8 +85,8 @@ public final class PostgreSqlOutboxStore implements OutboxStore {
                         leases.add(new OutboxLease(
                                 message,
                                 request.ownerId(),
-                                result.getObject(17, OffsetDateTime.class).toInstant(),
-                                result.getInt(18)));
+                                result.getObject(18, OffsetDateTime.class).toInstant(),
+                                result.getInt(19)));
                     }
                 }
                 connection.commit();
@@ -118,6 +120,61 @@ public final class PostgreSqlOutboxStore implements OutboxStore {
                     lease_owner = NULL, lease_expires_at_utc = NULL
                 WHERE record_id = ? AND service_name = ? AND state = 1 AND lease_owner = ?;
                 """, recordId, ownerId, nextAttemptAtUtc, failureCategory);
+    }
+
+    @Override
+    public CompletableFuture<ScheduleCancellationResult> cancelScheduled(
+            UUID messageId,
+            java.time.Instant cancelledAtUtc) {
+        if (messageId == null || messageId.equals(new UUID(0, 0))) {
+            throw new IllegalArgumentException("messageId must not be empty");
+        }
+        String sql = """
+                WITH cancelled AS (
+                    UPDATE myservicebus.outbox_message
+                    SET state = 4, cancelled_at_utc = ?
+                    WHERE message_id = ? AND service_name = ?
+                      AND scheduled_at_utc IS NOT NULL AND state = 0
+                    RETURNING 1
+                )
+                SELECT CASE
+                    WHEN EXISTS (SELECT 1 FROM cancelled) THEN 0
+                    WHEN EXISTS (
+                        SELECT 1 FROM myservicebus.outbox_message
+                        WHERE message_id = ? AND service_name = ?
+                          AND scheduled_at_utc IS NOT NULL AND state = 4) THEN 1
+                    WHEN EXISTS (
+                        SELECT 1 FROM myservicebus.outbox_message
+                        WHERE message_id = ? AND service_name = ?
+                          AND scheduled_at_utc IS NOT NULL) THEN 2
+                    WHEN EXISTS (
+                        SELECT 1 FROM myservicebus.outbox_message
+                        WHERE message_id = ? AND service_name = ?) THEN 3
+                    ELSE 4
+                END;
+                """;
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setObject(1, OffsetDateTime.ofInstant(cancelledAtUtc, java.time.ZoneOffset.UTC));
+            statement.setObject(2, messageId);
+            statement.setString(3, serviceName);
+            statement.setObject(4, messageId);
+            statement.setString(5, serviceName);
+            statement.setObject(6, messageId);
+            statement.setString(7, serviceName);
+            statement.setObject(8, messageId);
+            statement.setString(9, serviceName);
+            try (ResultSet result = statement.executeQuery()) {
+                if (!result.next()) {
+                    return CompletableFuture.failedFuture(
+                            new IllegalStateException("PostgreSQL did not return a cancellation result."));
+                }
+                return CompletableFuture.completedFuture(
+                        ScheduleCancellationResult.values()[result.getInt(1)]);
+            }
+        } catch (Exception failure) {
+            return CompletableFuture.failedFuture(failure);
+        }
     }
 
     private CompletableFuture<Boolean> ownedUpdate(
@@ -166,11 +223,17 @@ public final class PostgreSqlOutboxStore implements OutboxStore {
                 result.getObject(13, UUID.class),
                 nullableUri(result, 14),
                 nullableUri(result, 15),
-                result.getObject(16, OffsetDateTime.class).toInstant());
+                result.getObject(16, OffsetDateTime.class).toInstant(),
+                nullableInstant(result, 17));
     }
 
     private static URI nullableUri(ResultSet result, int index) throws SQLException {
         String value = result.getString(index);
         return value == null ? null : URI.create(value);
+    }
+
+    private static java.time.Instant nullableInstant(ResultSet result, int index) throws SQLException {
+        OffsetDateTime value = result.getObject(index, OffsetDateTime.class);
+        return value == null ? null : value.toInstant();
     }
 }

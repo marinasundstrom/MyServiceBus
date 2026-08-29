@@ -25,9 +25,10 @@ public static class OutboxMessageFactory
             StringComparer.Ordinal);
 
         var createdAtUtc = (timeProvider ?? TimeProvider.System).GetUtcNow();
-        var availableAtUtc = context.ScheduledEnqueueTime is { } scheduled
+        var scheduledAtUtc = context.ScheduledEnqueueTime is { } scheduled
             ? new DateTimeOffset(scheduled.ToUniversalTime())
-            : createdAtUtc;
+            : (DateTimeOffset?)null;
+        var availableAtUtc = scheduledAtUtc ?? createdAtUtc;
 
         return new OutboxMessage(
             Guid.NewGuid(),
@@ -45,7 +46,8 @@ public static class OutboxMessageFactory
             context.InitiatorId,
             context.ResponseAddress,
             context.FaultAddress,
-            availableAtUtc);
+            availableAtUtc,
+            scheduledAtUtc);
     }
 
     private static OutboxDeliveryIntent MapIntent(Serialization.MessageIntent intent) => intent switch

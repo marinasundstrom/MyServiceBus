@@ -68,31 +68,31 @@ public interface MessageScheduler {
         return scheduleSend(destination, message, delay, CancellationToken.none());
     }
 
-    CompletionStage<Void> cancelScheduledPublish(UUID tokenId, CancellationToken cancellationToken);
+    CompletionStage<ScheduleCancellationResult> cancelScheduledPublish(UUID tokenId, CancellationToken cancellationToken);
 
-    default CompletionStage<Void> cancelScheduledPublish(UUID tokenId) {
+    default CompletionStage<ScheduleCancellationResult> cancelScheduledPublish(UUID tokenId) {
         return cancelScheduledPublish(tokenId, CancellationToken.none());
     }
 
-    default CompletionStage<Void> cancelScheduledPublish(ScheduledMessageHandle handle, CancellationToken cancellationToken) {
+    default CompletionStage<ScheduleCancellationResult> cancelScheduledPublish(ScheduledMessageHandle handle, CancellationToken cancellationToken) {
         return cancelScheduledPublish(handle.getTokenId(), cancellationToken);
     }
 
-    default CompletionStage<Void> cancelScheduledPublish(ScheduledMessageHandle handle) {
+    default CompletionStage<ScheduleCancellationResult> cancelScheduledPublish(ScheduledMessageHandle handle) {
         return cancelScheduledPublish(handle, CancellationToken.none());
     }
 
-    CompletionStage<Void> cancelScheduledSend(UUID tokenId, CancellationToken cancellationToken);
+    CompletionStage<ScheduleCancellationResult> cancelScheduledSend(UUID tokenId, CancellationToken cancellationToken);
 
-    default CompletionStage<Void> cancelScheduledSend(UUID tokenId) {
+    default CompletionStage<ScheduleCancellationResult> cancelScheduledSend(UUID tokenId) {
         return cancelScheduledSend(tokenId, CancellationToken.none());
     }
 
-    default CompletionStage<Void> cancelScheduledSend(ScheduledMessageHandle handle, CancellationToken cancellationToken) {
+    default CompletionStage<ScheduleCancellationResult> cancelScheduledSend(ScheduledMessageHandle handle, CancellationToken cancellationToken) {
         return cancelScheduledSend(handle.getTokenId(), cancellationToken);
     }
 
-    default CompletionStage<Void> cancelScheduledSend(ScheduledMessageHandle handle) {
+    default CompletionStage<ScheduleCancellationResult> cancelScheduledSend(ScheduledMessageHandle handle) {
         return cancelScheduledSend(handle, CancellationToken.none());
     }
 }

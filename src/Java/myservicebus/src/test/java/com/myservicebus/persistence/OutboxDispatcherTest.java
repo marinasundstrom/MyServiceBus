@@ -237,5 +237,11 @@ class OutboxDispatcherTest {
             this.failureCategory = failureCategory;
             return CompletableFuture.completedFuture(ownsLease);
         }
+
+        @Override
+        public CompletableFuture<com.myservicebus.ScheduleCancellationResult> cancelScheduled(
+                UUID messageId, Instant cancelledAtUtc) {
+            return CompletableFuture.completedFuture(com.myservicebus.ScheduleCancellationResult.NOT_FOUND);
+        }
     }
 }

@@ -15,7 +15,8 @@ public enum OutboxMessageState
     Pending,
     Leased,
     Dispatched,
-    Dead
+    Dead,
+    Cancelled
 }
 
 public sealed class OutboxMessage
@@ -38,7 +39,8 @@ public sealed class OutboxMessage
         Guid? initiatorId = null,
         Uri? responseAddress = null,
         Uri? faultAddress = null,
-        DateTimeOffset? availableAtUtc = null)
+        DateTimeOffset? availableAtUtc = null,
+        DateTimeOffset? scheduledAtUtc = null)
     {
         ArgumentOutOfRangeException.ThrowIfEqual(recordId, Guid.Empty);
         ArgumentOutOfRangeException.ThrowIfEqual(messageId, Guid.Empty);
@@ -66,6 +68,7 @@ public sealed class OutboxMessage
         ResponseAddress = responseAddress;
         FaultAddress = faultAddress;
         AvailableAtUtc = availableAtUtc ?? createdAtUtc;
+        ScheduledAtUtc = scheduledAtUtc;
     }
 
     public Guid RecordId { get; }
@@ -84,4 +87,5 @@ public sealed class OutboxMessage
     public Uri? ResponseAddress { get; }
     public Uri? FaultAddress { get; }
     public DateTimeOffset AvailableAtUtc { get; }
+    public DateTimeOffset? ScheduledAtUtc { get; }
 }

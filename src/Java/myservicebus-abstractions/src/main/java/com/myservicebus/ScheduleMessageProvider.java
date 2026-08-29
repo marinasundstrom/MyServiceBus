@@ -25,5 +25,5 @@ public interface ScheduleMessageProvider {
             T message,
             CancellationToken cancellationToken);
 
-    CompletionStage<Void> cancel(UUID tokenId, CancellationToken cancellationToken);
+    CompletionStage<ScheduleCancellationResult> cancel(UUID tokenId, CancellationToken cancellationToken);
 }

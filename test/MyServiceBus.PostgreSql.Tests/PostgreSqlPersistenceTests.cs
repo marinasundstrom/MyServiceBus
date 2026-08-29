@@ -29,6 +29,43 @@ public sealed class PostgreSqlPersistenceTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Version_two_schema_migrates_to_scheduling_and_cancellation()
+    {
+        await using (var command = dataSource.CreateCommand("""
+            UPDATE myservicebus.schema_version SET version = 2 WHERE singleton;
+            ALTER TABLE myservicebus.outbox_message
+                DROP COLUMN scheduled_at_utc,
+                DROP COLUMN cancelled_at_utc,
+                DROP CONSTRAINT outbox_message_state_check;
+            ALTER TABLE myservicebus.outbox_message
+                ADD CONSTRAINT outbox_message_state_check CHECK (state BETWEEN 0 AND 3);
+            """))
+        {
+            await command.ExecuteNonQueryAsync();
+        }
+
+        await PostgreSqlSchema.EnsureCreatedAsync(dataSource);
+
+        await using var verification = dataSource.CreateCommand("""
+            SELECT version,
+                EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_schema = 'myservicebus' AND table_name = 'outbox_message'
+                      AND column_name = 'scheduled_at_utc'),
+                EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_schema = 'myservicebus' AND table_name = 'outbox_message'
+                      AND column_name = 'cancelled_at_utc')
+            FROM myservicebus.schema_version WHERE singleton;
+            """);
+        await using var reader = await verification.ExecuteReaderAsync();
+        Assert.True(await reader.ReadAsync());
+        Assert.Equal(3, reader.GetInt32(0));
+        Assert.True(reader.GetBoolean(1));
+        Assert.True(reader.GetBoolean(2));
+    }
+
+    [Fact]
     public async Task Outbox_write_commits_and_rolls_back_with_application_transaction()
     {
         var rolledBack = CreateMessage();
@@ -111,6 +148,58 @@ public sealed class PostgreSqlPersistenceTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Durable_scheduler_persists_identity_and_can_cancel_after_commit()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton(dataSource);
+        services.AddPostgreSqlMessageScheduler(ServiceName);
+        services.AddServiceBus(configurator =>
+        {
+            configurator.UseBusOutbox();
+            configurator.UsingMediator();
+        });
+
+        await using var provider = services.BuildServiceProvider();
+        var bus = provider.GetRequiredService<IMessageBus>();
+        await bus.StartAsync(CancellationToken.None);
+        var dueAt = DateTime.UtcNow.AddMinutes(5);
+
+        try
+        {
+            await using var scope = provider.CreateAsyncScope();
+            var scheduler = scope.ServiceProvider.GetRequiredService<IMessageScheduler>();
+            Assert.Equal(ScheduleMessageProviderDurability.Durable, scheduler.Durability);
+
+            ScheduledMessageHandle handle;
+            await using (var connection = await dataSource.OpenConnectionAsync())
+            await using (var transaction = await connection.BeginTransactionAsync())
+            {
+                using (scope.ServiceProvider.GetRequiredService<OutboxSession>()
+                    .UsePostgreSql(connection, transaction, ServiceName))
+                {
+                    handle = await scheduler.SchedulePublish(dueAt, new OrderSubmitted(Guid.NewGuid()));
+                }
+
+                await transaction.CommitAsync();
+            }
+
+            var result = await scheduler.CancelScheduledPublish(handle);
+            Assert.Equal(ScheduleCancellationResult.Cancelled, result);
+            Assert.Equal(
+                ScheduleCancellationResult.AlreadyCancelled,
+                await scheduler.CancelScheduledPublish(handle));
+        }
+        finally
+        {
+            await bus.StopAsync(CancellationToken.None);
+        }
+
+        var leases = await new PostgreSqlOutboxStore(dataSource, ServiceName)
+            .LeaseAsync(RequestAt("replica-a", 10, new DateTimeOffset(dueAt.AddMinutes(1), TimeSpan.Zero)));
+        Assert.Empty(leases);
+    }
+
+    [Fact]
     public async Task Competing_dispatchers_lease_disjoint_records()
     {
         await InsertCommitted(CreateMessage());
@@ -144,6 +233,62 @@ public sealed class PostgreSqlPersistenceTests : IAsyncLifetime
         Assert.Equal(message.RecordId, lease.Message.RecordId);
         Assert.Equal(message.MessageId, lease.Message.MessageId);
         Assert.Equal(dueAt, lease.Message.AvailableAtUtc);
+        Assert.Equal(dueAt, lease.Message.ScheduledAtUtc);
+    }
+
+    [Fact]
+    public async Task Pending_schedule_can_be_cancelled_idempotently()
+    {
+        var dueAt = DateTimeOffset.UtcNow.AddMinutes(5);
+        var message = CreateMessage(dueAt);
+        await InsertCommitted(message);
+        var store = new PostgreSqlOutboxStore(dataSource, ServiceName);
+
+        var cancelled = await store.CancelScheduledAsync(message.MessageId, DateTimeOffset.UtcNow);
+        var repeated = await store.CancelScheduledAsync(message.MessageId, DateTimeOffset.UtcNow);
+        var leases = await store.LeaseAsync(RequestAt("replica-a", 10, dueAt));
+        var backlog = await new PostgreSqlOutboxHealth(dataSource, ServiceName).GetBacklogAsync();
+
+        Assert.Equal(ScheduleCancellationResult.Cancelled, cancelled);
+        Assert.Equal(ScheduleCancellationResult.AlreadyCancelled, repeated);
+        Assert.Empty(leases);
+        Assert.Equal(1, backlog.Cancelled);
+    }
+
+    [Fact]
+    public async Task Lease_and_cancellation_race_has_one_winner()
+    {
+        var dueAt = DateTimeOffset.UtcNow;
+        var message = CreateMessage(dueAt);
+        await InsertCommitted(message);
+        var store = new PostgreSqlOutboxStore(dataSource, ServiceName);
+
+        var leaseTask = store.LeaseAsync(RequestAt("replica-a", 1, dueAt));
+        var cancellationTask = store.CancelScheduledAsync(message.MessageId, dueAt);
+        await Task.WhenAll(leaseTask, cancellationTask);
+
+        var leases = await leaseTask;
+        var cancellation = await cancellationTask;
+        var leaseWon = leases.Count == 1;
+        var cancellationWon = cancellation == ScheduleCancellationResult.Cancelled;
+        Assert.NotEqual(leaseWon, cancellationWon);
+        Assert.Equal(
+            leaseWon ? ScheduleCancellationResult.TooLate : ScheduleCancellationResult.Cancelled,
+            cancellation);
+    }
+
+    [Fact]
+    public async Task Cancellation_distinguishes_unknown_and_non_scheduled_messages()
+    {
+        var message = CreateMessage();
+        await InsertCommitted(message);
+        var store = new PostgreSqlOutboxStore(dataSource, ServiceName);
+
+        var notScheduled = await store.CancelScheduledAsync(message.MessageId, DateTimeOffset.UtcNow);
+        var notFound = await store.CancelScheduledAsync(Guid.NewGuid(), DateTimeOffset.UtcNow);
+
+        Assert.Equal(ScheduleCancellationResult.NotScheduled, notScheduled);
+        Assert.Equal(ScheduleCancellationResult.NotFound, notFound);
     }
 
     [Fact]
@@ -203,6 +348,7 @@ public sealed class PostgreSqlPersistenceTests : IAsyncLifetime
         Assert.Equal(0, backlog.Retrying);
         Assert.Equal(0, backlog.Dispatched);
         Assert.Equal(0, backlog.Dead);
+        Assert.Equal(0, backlog.Cancelled);
         Assert.Equal(ordersMessage.CreatedAtUtc, backlog.OldestUndispatchedAtUtc);
     }
 

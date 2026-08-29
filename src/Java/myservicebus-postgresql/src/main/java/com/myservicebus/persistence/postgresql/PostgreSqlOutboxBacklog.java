@@ -9,5 +9,6 @@ public record PostgreSqlOutboxBacklog(
         int retrying,
         int dispatched,
         int dead,
+        int cancelled,
         Instant oldestUndispatchedAtUtc) {
 }

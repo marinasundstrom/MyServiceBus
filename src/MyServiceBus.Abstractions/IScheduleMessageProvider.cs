@@ -29,5 +29,5 @@ public interface IScheduleMessageProvider
         CancellationToken cancellationToken = default)
         where T : class;
 
-    Task Cancel(Guid tokenId, CancellationToken cancellationToken = default);
+    Task<ScheduleCancellationResult> Cancel(Guid tokenId, CancellationToken cancellationToken = default);
 }

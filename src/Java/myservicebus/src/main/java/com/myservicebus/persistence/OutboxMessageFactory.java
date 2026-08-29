@@ -39,9 +39,8 @@ public final class OutboxMessageFactory {
                 : MessageUrn.forMessageTypes(context.getMessage().getClass());
 
         var createdAtUtc = clock.instant();
-        var availableAtUtc = context.getScheduledEnqueueTime() != null
-                ? context.getScheduledEnqueueTime()
-                : createdAtUtc;
+        var scheduledAtUtc = context.getScheduledEnqueueTime();
+        var availableAtUtc = scheduledAtUtc != null ? scheduledAtUtc : createdAtUtc;
 
         return new OutboxMessage(
                 UUID.randomUUID(),
@@ -59,7 +58,8 @@ public final class OutboxMessageFactory {
                 context.getInitiatorId(),
                 context.getResponseAddress(),
                 context.getFaultAddress(),
-                availableAtUtc);
+                availableAtUtc,
+                scheduledAtUtc);
     }
 
     private static OutboxDeliveryIntent mapIntent(MessageIntent intent) {

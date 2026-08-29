@@ -50,5 +50,8 @@ public sealed class InMemoryScheduleMessageProvider : IScheduleMessageProvider
         return new ScheduledMessageHandle(tokenId, scheduledTime);
     }
 
-    public Task Cancel(Guid tokenId, CancellationToken cancellationToken = default) => jobScheduler.Cancel(tokenId);
+    public async Task<ScheduleCancellationResult> Cancel(Guid tokenId, CancellationToken cancellationToken = default)
+        => await jobScheduler.Cancel(tokenId)
+            ? ScheduleCancellationResult.Cancelled
+            : ScheduleCancellationResult.NotFound;
 }

@@ -17,6 +17,10 @@ import com.myservicebus.persistence.OutboxMessage;
 import com.myservicebus.persistence.OutboxMessageFactory;
 import com.myservicebus.persistence.OutboxSession;
 import com.myservicebus.persistence.OutboxTransportDispatcher;
+import com.myservicebus.ScheduleCancellationResult;
+import com.myservicebus.ScheduleMessageProviderDurability;
+import com.myservicebus.ScheduledMessageHandle;
+import com.myservicebus.MessageScheduler;
 import com.myservicebus.MessageBus;
 import com.myservicebus.MessageBusServices;
 import com.myservicebus.PublishEndpoint;
@@ -34,6 +38,8 @@ import com.myservicebus.serialization.MessageIntent;
 import com.myservicebus.tasks.CancellationToken;
 import java.net.URI;
 import java.sql.Connection;
+import java.sql.ResultSet;
+import java.sql.Statement;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -53,6 +59,48 @@ import org.testcontainers.utility.DockerImageName;
 
 class PostgreSqlPersistenceTest {
     private static final String SERVICE_NAME = "orders-service";
+
+    @Test
+    void versionTwoSchemaMigratesToSchedulingAndCancellation() throws Exception {
+        try (PostgreSQLContainer container = startContainer()) {
+            DataSource dataSource = dataSource(container);
+            PostgreSqlSchema.ensureCreated(dataSource);
+            try (Connection connection = dataSource.getConnection();
+                    Statement statement = connection.createStatement()) {
+                statement.execute("""
+                        UPDATE myservicebus.schema_version SET version = 2 WHERE singleton;
+                        ALTER TABLE myservicebus.outbox_message
+                            DROP COLUMN scheduled_at_utc,
+                            DROP COLUMN cancelled_at_utc,
+                            DROP CONSTRAINT outbox_message_state_check;
+                        ALTER TABLE myservicebus.outbox_message
+                            ADD CONSTRAINT outbox_message_state_check CHECK (state BETWEEN 0 AND 3);
+                        """);
+            }
+
+            PostgreSqlSchema.ensureCreated(dataSource);
+
+            try (Connection connection = dataSource.getConnection();
+                    Statement statement = connection.createStatement();
+                    ResultSet result = statement.executeQuery("""
+                            SELECT version,
+                                EXISTS (
+                                    SELECT 1 FROM information_schema.columns
+                                    WHERE table_schema = 'myservicebus' AND table_name = 'outbox_message'
+                                      AND column_name = 'scheduled_at_utc'),
+                                EXISTS (
+                                    SELECT 1 FROM information_schema.columns
+                                    WHERE table_schema = 'myservicebus' AND table_name = 'outbox_message'
+                                      AND column_name = 'cancelled_at_utc')
+                            FROM myservicebus.schema_version WHERE singleton;
+                            """)) {
+                assertTrue(result.next());
+                assertEquals(3, result.getInt(1));
+                assertTrue(result.getBoolean(2));
+                assertTrue(result.getBoolean(3));
+            }
+        }
+    }
 
     @Test
     void scopedBusEndpointsCaptureMessagesInApplicationTransaction() throws Exception {
@@ -95,6 +143,57 @@ class PostgreSqlPersistenceTest {
             assertEquals(com.myservicebus.persistence.OutboxDeliveryIntent.PUBLISH, leases.get(0).message().intent());
             assertEquals(com.myservicebus.persistence.OutboxDeliveryIntent.SEND, leases.get(1).message().intent());
             assertEquals("loopback://localhost/orders", leases.get(1).message().destinationAddress().toString());
+        }
+    }
+
+    @Test
+    void durableSchedulerPersistsIdentityAndCanCancelAfterCommit() throws Exception {
+        try (PostgreSQLContainer container = startContainer()) {
+            DataSource dataSource = dataSource(container);
+            PostgreSqlSchema.ensureCreated(dataSource);
+            ServiceCollection services = ServiceCollection.create();
+            services.addSingleton(TransportFactory.class, ignored -> () -> new NoOpTransportFactory());
+            PostgreSqlScheduling.addMessageScheduler(services, dataSource, SERVICE_NAME);
+            services.from(MessageBusServices.class).addServiceBus(configurator -> {
+                configurator.useBusOutbox();
+                MediatorTransport.configure(configurator);
+            });
+            ServiceProvider provider = services.buildServiceProvider();
+            MessageBus bus = provider.getRequiredService(MessageBus.class);
+            bus.start();
+            Instant dueAt = Instant.now().plus(Duration.ofMinutes(5));
+
+            try {
+                try (ServiceScope scope = provider.createScope();
+                        Connection connection = dataSource.getConnection()) {
+                    connection.setAutoCommit(false);
+                    ServiceProvider scoped = scope.getServiceProvider();
+                    MessageScheduler scheduler = scoped.getRequiredService(MessageScheduler.class);
+                    assertEquals(ScheduleMessageProviderDurability.DURABLE, scheduler.getDurability());
+
+                    ScheduledMessageHandle handle;
+                    try (OutboxSession.Registration ignored = PostgreSqlOutboxSession.useTransaction(
+                            scoped.getRequiredService(OutboxSession.class), connection, SERVICE_NAME)) {
+                        handle = scheduler.schedulePublish(
+                                dueAt,
+                                new OrderSubmitted(UUID.randomUUID())).toCompletableFuture().join();
+                    }
+                    connection.commit();
+
+                    assertEquals(
+                            ScheduleCancellationResult.CANCELLED,
+                            scheduler.cancelScheduledPublish(handle).toCompletableFuture().join());
+                    assertEquals(
+                            ScheduleCancellationResult.ALREADY_CANCELLED,
+                            scheduler.cancelScheduledPublish(handle).toCompletableFuture().join());
+                }
+            } finally {
+                bus.stop();
+            }
+
+            List<OutboxLease> leases = new PostgreSqlOutboxStore(dataSource, SERVICE_NAME)
+                    .lease(requestAt("replica-a", 10, dueAt.plus(Duration.ofMinutes(1)))).join();
+            assertTrue(leases.isEmpty());
         }
     }
 
@@ -173,6 +272,78 @@ class PostgreSqlPersistenceTest {
             assertEquals(message.recordId(), due.get(0).message().recordId());
             assertEquals(message.messageId(), due.get(0).message().messageId());
             assertEquals(dueAt, due.get(0).message().availableAtUtc());
+            assertEquals(dueAt, due.get(0).message().scheduledAtUtc());
+        }
+    }
+
+    @Test
+    void pendingScheduleCanBeCancelledIdempotently() throws Exception {
+        try (PostgreSQLContainer container = startContainer()) {
+            DataSource dataSource = dataSource(container);
+            PostgreSqlSchema.ensureCreated(dataSource);
+            Instant dueAt = Instant.now().plus(Duration.ofMinutes(5));
+            OutboxMessage message = createMessage(dueAt);
+            insertCommitted(dataSource, message);
+            PostgreSqlOutboxStore store = new PostgreSqlOutboxStore(dataSource, SERVICE_NAME);
+
+            ScheduleCancellationResult cancelled = store
+                    .cancelScheduled(message.messageId(), Instant.now()).join();
+            ScheduleCancellationResult repeated = store
+                    .cancelScheduled(message.messageId(), Instant.now()).join();
+            List<OutboxLease> leases = store.lease(requestAt("replica-a", 10, dueAt)).join();
+            PostgreSqlOutboxBacklog backlog = new PostgreSqlOutboxHealth(dataSource, SERVICE_NAME)
+                    .getBacklog().join();
+
+            assertEquals(ScheduleCancellationResult.CANCELLED, cancelled);
+            assertEquals(ScheduleCancellationResult.ALREADY_CANCELLED, repeated);
+            assertTrue(leases.isEmpty());
+            assertEquals(1, backlog.cancelled());
+        }
+    }
+
+    @Test
+    void leaseAndCancellationRaceHasOneWinner() throws Exception {
+        try (PostgreSQLContainer container = startContainer()) {
+            DataSource dataSource = dataSource(container);
+            PostgreSqlSchema.ensureCreated(dataSource);
+            Instant dueAt = Instant.now();
+            OutboxMessage message = createMessage(dueAt);
+            insertCommitted(dataSource, message);
+            PostgreSqlOutboxStore store = new PostgreSqlOutboxStore(dataSource, SERVICE_NAME);
+
+            CompletableFuture<List<OutboxLease>> leaseFuture = CompletableFuture.supplyAsync(
+                    () -> store.lease(requestAt("replica-a", 1, dueAt)).join());
+            CompletableFuture<ScheduleCancellationResult> cancellationFuture = CompletableFuture.supplyAsync(
+                    () -> store.cancelScheduled(message.messageId(), dueAt).join());
+            CompletableFuture.allOf(leaseFuture, cancellationFuture).join();
+
+            boolean leaseWon = leaseFuture.join().size() == 1;
+            boolean cancellationWon = cancellationFuture.join() == ScheduleCancellationResult.CANCELLED;
+            assertNotEquals(leaseWon, cancellationWon);
+            assertEquals(
+                    leaseWon
+                            ? ScheduleCancellationResult.TOO_LATE
+                            : ScheduleCancellationResult.CANCELLED,
+                    cancellationFuture.join());
+        }
+    }
+
+    @Test
+    void cancellationDistinguishesUnknownAndNonScheduledMessages() throws Exception {
+        try (PostgreSQLContainer container = startContainer()) {
+            DataSource dataSource = dataSource(container);
+            PostgreSqlSchema.ensureCreated(dataSource);
+            OutboxMessage message = createMessage();
+            insertCommitted(dataSource, message);
+            PostgreSqlOutboxStore store = new PostgreSqlOutboxStore(dataSource, SERVICE_NAME);
+
+            ScheduleCancellationResult notScheduled = store
+                    .cancelScheduled(message.messageId(), Instant.now()).join();
+            ScheduleCancellationResult notFound = store
+                    .cancelScheduled(UUID.randomUUID(), Instant.now()).join();
+
+            assertEquals(ScheduleCancellationResult.NOT_SCHEDULED, notScheduled);
+            assertEquals(ScheduleCancellationResult.NOT_FOUND, notFound);
         }
     }
 
@@ -238,6 +409,7 @@ class PostgreSqlPersistenceTest {
             assertEquals(0, backlog.retrying());
             assertEquals(0, backlog.dispatched());
             assertEquals(0, backlog.dead());
+            assertEquals(0, backlog.cancelled());
             assertEquals(ordersMessage.createdAtUtc(), backlog.oldestUndispatchedAtUtc());
         }
     }

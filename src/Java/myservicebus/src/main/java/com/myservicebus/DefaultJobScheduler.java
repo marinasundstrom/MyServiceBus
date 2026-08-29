@@ -57,12 +57,12 @@ public class DefaultJobScheduler implements JobScheduler {
     }
 
     @Override
-    public CompletionStage<Void> cancel(UUID tokenId) {
+    public CompletionStage<Boolean> cancel(UUID tokenId) {
         ScheduledJob job = jobs.remove(tokenId);
         if (job != null) {
             job.cts.cancel();
             job.future.cancel(false);
         }
-        return CompletableFuture.completedFuture(null);
+        return CompletableFuture.completedFuture(job != null);
     }
 }

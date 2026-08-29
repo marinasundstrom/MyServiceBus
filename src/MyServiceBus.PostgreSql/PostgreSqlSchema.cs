@@ -4,7 +4,7 @@ namespace MyServiceBus.Persistence.PostgreSql;
 
 public static class PostgreSqlSchema
 {
-    public const int CurrentVersion = 2;
+    public const int CurrentVersion = 3;
 
     public static async Task EnsureCreatedAsync(
         NpgsqlDataSource dataSource,
@@ -31,12 +31,12 @@ public static class PostgreSqlSchema
         );
 
         INSERT INTO myservicebus.schema_version (singleton, version)
-        VALUES (true, 2)
+        VALUES (true, 3)
         ON CONFLICT (singleton) DO NOTHING;
 
         DO $migration$
         BEGIN
-            IF (SELECT version FROM myservicebus.schema_version WHERE singleton) <> 2 THEN
+            IF (SELECT version FROM myservicebus.schema_version WHERE singleton) NOT IN (2, 3) THEN
                 RAISE EXCEPTION 'Unsupported MyServiceBus PostgreSQL schema version';
             END IF;
         END
@@ -59,14 +59,28 @@ public static class PostgreSqlSchema
             initiator_id uuid NULL,
             response_address text NULL,
             fault_address text NULL,
-            state smallint NOT NULL DEFAULT 0 CHECK (state BETWEEN 0 AND 3),
+            state smallint NOT NULL DEFAULT 0 CHECK (state BETWEEN 0 AND 4),
             next_attempt_at_utc timestamptz NOT NULL,
+            scheduled_at_utc timestamptz NULL,
             lease_owner text NULL,
             lease_expires_at_utc timestamptz NULL,
             attempt_count integer NOT NULL DEFAULT 0 CHECK (attempt_count >= 0),
             failure_category text NULL,
-            dispatched_at_utc timestamptz NULL
+            dispatched_at_utc timestamptz NULL,
+            cancelled_at_utc timestamptz NULL
         );
+
+        ALTER TABLE myservicebus.outbox_message
+            ADD COLUMN IF NOT EXISTS scheduled_at_utc timestamptz NULL,
+            ADD COLUMN IF NOT EXISTS cancelled_at_utc timestamptz NULL;
+
+        ALTER TABLE myservicebus.outbox_message
+            DROP CONSTRAINT IF EXISTS outbox_message_state_check;
+
+        ALTER TABLE myservicebus.outbox_message
+            ADD CONSTRAINT outbox_message_state_check CHECK (state BETWEEN 0 AND 4);
+
+        UPDATE myservicebus.schema_version SET version = 3 WHERE singleton AND version = 2;
 
         CREATE INDEX IF NOT EXISTS ix_outbox_message_dispatch
             ON myservicebus.outbox_message (service_name, next_attempt_at_utc, created_at_utc)

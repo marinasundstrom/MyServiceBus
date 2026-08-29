@@ -1,5 +1,6 @@
 package com.myservicebus.persistence;
 
+import com.myservicebus.ScheduleCancellationResult;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -24,4 +25,10 @@ public interface OutboxStore {
             String ownerId,
             Instant nextAttemptAtUtc,
             String failureCategory);
+
+    /**
+     * Cancels a scheduled record only while it is pending. Leasing and cancellation race through the persisted
+     * state transition, so a leased or terminal record reports {@link ScheduleCancellationResult#TOO_LATE}.
+     */
+    CompletableFuture<ScheduleCancellationResult> cancelScheduled(UUID messageId, Instant cancelledAtUtc);
 }

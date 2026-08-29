@@ -28,6 +28,7 @@ public final class PostgreSqlOutboxHealth {
                     count(*) FILTER (WHERE state = 0 AND attempt_count > 0),
                     count(*) FILTER (WHERE state = 2),
                     count(*) FILTER (WHERE state = 3),
+                    count(*) FILTER (WHERE state = 4),
                     min(created_at_utc) FILTER (WHERE state IN (0, 1))
                 FROM myservicebus.outbox_message
                 WHERE service_name = ?;
@@ -40,7 +41,7 @@ public final class PostgreSqlOutboxHealth {
                     return CompletableFuture.failedFuture(
                             new IllegalStateException("PostgreSQL did not return an outbox backlog snapshot."));
                 }
-                OffsetDateTime oldest = result.getObject(6, OffsetDateTime.class);
+                OffsetDateTime oldest = result.getObject(7, OffsetDateTime.class);
                 return CompletableFuture.completedFuture(new PostgreSqlOutboxBacklog(
                         serviceName,
                         result.getInt(1),
@@ -48,6 +49,7 @@ public final class PostgreSqlOutboxHealth {
                         result.getInt(3),
                         result.getInt(4),
                         result.getInt(5),
+                        result.getInt(6),
                         oldest == null ? null : oldest.toInstant()));
             }
         } catch (Exception failure) {

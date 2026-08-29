@@ -6,6 +6,8 @@ public sealed class OutboxSession
 
     internal IOutboxWriter? Writer => Volatile.Read(ref writer);
 
+    public bool IsActive => Writer is not null;
+
     /// <summary>
     /// Activates the supplied transactional writer for scoped publish and send endpoints until the returned
     /// registration is disposed.

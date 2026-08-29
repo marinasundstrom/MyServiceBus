@@ -4,5 +4,6 @@ public enum OutboxMessageState {
     PENDING,
     LEASED,
     DISPATCHED,
-    DEAD
+    DEAD,
+    CANCELLED
 }

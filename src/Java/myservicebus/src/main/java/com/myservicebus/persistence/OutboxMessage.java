@@ -23,7 +23,8 @@ public record OutboxMessage(
         UUID initiatorId,
         URI responseAddress,
         URI faultAddress,
-        Instant availableAtUtc) {
+        Instant availableAtUtc,
+        Instant scheduledAtUtc) {
 
     public OutboxMessage(
             UUID recordId,
@@ -43,7 +44,7 @@ public record OutboxMessage(
             URI faultAddress) {
         this(recordId, messageId, intent, destinationAddress, messageTypes, body, contentType, headers,
                 createdAtUtc, requestId, correlationId, conversationId, initiatorId, responseAddress, faultAddress,
-                createdAtUtc);
+                createdAtUtc, null);
     }
 
     public OutboxMessage {

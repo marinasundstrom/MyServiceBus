@@ -46,8 +46,8 @@ public final class PostgreSqlOutboxWriter implements OutboxWriter {
                 INSERT INTO myservicebus.outbox_message (
                     record_id, service_name, message_id, intent, destination_address, message_types, body, content_type, headers,
                     created_at_utc, request_id, correlation_id, conversation_id, initiator_id, response_address,
-                    fault_address, state, next_attempt_at_utc)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?, ?, ?, ?, ?, ?, ?, 0, ?);
+                    fault_address, scheduled_at_utc, state, next_attempt_at_utc)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?);
                 """;
         try (PreparedStatement statement = connection.prepareStatement(sql)) {
             statement.setObject(1, message.recordId());
@@ -67,7 +67,8 @@ public final class PostgreSqlOutboxWriter implements OutboxWriter {
             setNullable(statement, 14, message.initiatorId(), Types.OTHER);
             setNullable(statement, 15, message.responseAddress(), Types.VARCHAR);
             setNullable(statement, 16, message.faultAddress(), Types.VARCHAR);
-            statement.setObject(17, message.availableAtUtc().atOffset(ZoneOffset.UTC));
+            setInstant(statement, 17, message.scheduledAtUtc());
+            statement.setObject(18, message.availableAtUtc().atOffset(ZoneOffset.UTC));
             statement.executeUpdate();
         }
     }
@@ -84,6 +85,15 @@ public final class PostgreSqlOutboxWriter implements OutboxWriter {
             statement.setNull(index, sqlType);
         } else {
             statement.setObject(index, value.toString(), sqlType);
+        }
+    }
+
+    private static void setInstant(PreparedStatement statement, int index, java.time.Instant value)
+            throws SQLException {
+        if (value == null) {
+            statement.setNull(index, Types.TIMESTAMP_WITH_TIMEZONE);
+        } else {
+            statement.setObject(index, value.atOffset(ZoneOffset.UTC));
         }
     }
 }

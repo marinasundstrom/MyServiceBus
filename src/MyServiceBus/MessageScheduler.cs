@@ -35,15 +35,15 @@ public class MessageScheduler : IMessageScheduler
     public Task<ScheduledMessageHandle> ScheduleSend<T>(Uri destination, T message, TimeSpan delay, CancellationToken cancellationToken = default) where T : class
         => ScheduleSend(destination, DateTime.UtcNow + delay, message, cancellationToken);
 
-    public Task CancelScheduledPublish(Guid tokenId, CancellationToken cancellationToken = default)
+    public Task<ScheduleCancellationResult> CancelScheduledPublish(Guid tokenId, CancellationToken cancellationToken = default)
         => provider.Cancel(tokenId, cancellationToken);
 
-    public Task CancelScheduledPublish(ScheduledMessageHandle handle, CancellationToken cancellationToken = default)
+    public Task<ScheduleCancellationResult> CancelScheduledPublish(ScheduledMessageHandle handle, CancellationToken cancellationToken = default)
         => CancelScheduledPublish(handle.TokenId, cancellationToken);
 
-    public Task CancelScheduledSend(Guid tokenId, CancellationToken cancellationToken = default)
+    public Task<ScheduleCancellationResult> CancelScheduledSend(Guid tokenId, CancellationToken cancellationToken = default)
         => provider.Cancel(tokenId, cancellationToken);
 
-    public Task CancelScheduledSend(ScheduledMessageHandle handle, CancellationToken cancellationToken = default)
+    public Task<ScheduleCancellationResult> CancelScheduledSend(ScheduledMessageHandle handle, CancellationToken cancellationToken = default)
         => CancelScheduledSend(handle.TokenId, cancellationToken);
 }

@@ -21,14 +21,15 @@ public class DefaultJobScheduler : IJobScheduler
     public Task<Guid> Schedule(TimeSpan delay, Func<CancellationToken, Task> callback, CancellationToken cancellationToken = default)
         => Schedule(DateTime.UtcNow + delay, callback, cancellationToken);
 
-    public Task Cancel(Guid tokenId)
+    public Task<bool> Cancel(Guid tokenId)
     {
         if (_jobs.TryRemove(tokenId, out var cts))
         {
             cts.Cancel();
             cts.Dispose();
+            return Task.FromResult(true);
         }
-        return Task.CompletedTask;
+        return Task.FromResult(false);
     }
 
     private async Task Execute(Guid id, DateTime scheduledTime, Func<CancellationToken, Task> callback, CancellationTokenSource cts)

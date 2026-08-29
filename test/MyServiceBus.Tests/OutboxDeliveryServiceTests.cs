@@ -78,6 +78,11 @@ public class OutboxDeliveryServiceTests
             DateTimeOffset nextAttemptAtUtc,
             string failureCategory,
             CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
+        public Task<ScheduleCancellationResult> CancelScheduledAsync(
+            Guid messageId,
+            DateTimeOffset cancelledAtUtc,
+            CancellationToken cancellationToken = default) => throw new NotSupportedException();
     }
 
     private sealed class NoOpTransport : IOutboxTransportDispatcher

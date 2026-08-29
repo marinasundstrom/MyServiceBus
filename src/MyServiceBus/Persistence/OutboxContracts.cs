@@ -58,6 +58,15 @@ public interface IOutboxStore
         DateTimeOffset nextAttemptAtUtc,
         string failureCategory,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Cancels a scheduled record only while it is pending. Leasing and cancellation race through the persisted
+    /// state transition, so a leased or terminal record reports <see cref="ScheduleCancellationResult.TooLate"/>.
+    /// </summary>
+    Task<ScheduleCancellationResult> CancelScheduledAsync(
+        Guid messageId,
+        DateTimeOffset cancelledAtUtc,
+        CancellationToken cancellationToken = default);
 }
 
 public interface IOutboxTransportDispatcher
