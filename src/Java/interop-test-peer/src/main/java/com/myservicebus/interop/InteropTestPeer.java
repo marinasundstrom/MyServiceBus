@@ -24,6 +24,10 @@ import com.myservicebus.serialization.DefaultInboundMessageResolver;
 import com.myservicebus.serialization.EnvelopeMessageDeserializer;
 import com.myservicebus.serialization.NServiceBusHeaders;
 import com.myservicebus.serialization.NServiceBusJsonMessageSerializer;
+import com.myservicebus.serialization.MessageIntent;
+import com.myservicebus.persistence.OutboxMessage;
+import com.myservicebus.persistence.OutboxMessageFactory;
+import com.myservicebus.persistence.TransportOutboxDispatcher;
 import com.myservicebus.tasks.CancellationToken;
 import com.myservicebus.topology.MessageBinding;
 import com.rabbitmq.client.ConnectionFactory;
@@ -68,6 +72,8 @@ public final class InteropTestPeer {
             consumeFault(host, port, username, password, args[1], args[2]);
         } else if ("produce".equals(args[0])) {
             produce(transportFactory, args[1], args[3], Boolean.parseBoolean(args[4]));
+        } else if ("outbox-produce".equals(args[0])) {
+            produceThroughOutbox(transportFactory, args[1], args[3]);
         } else if ("send".equals(args[0])) {
             send(transportFactory, args[2], args[3]);
         } else if ("request".equals(args[0])) {
@@ -283,6 +289,22 @@ public final class InteropTestPeer {
         byte[] body = context.serialize(new EnvelopeMessageSerializer());
         SendTransport sendTransport = transportFactory.getSendTransport(exchangeName, durableExchange, !durableExchange);
         sendTransport.send(body);
+        System.out.println("SENT");
+        System.out.flush();
+        System.exit(0);
+    }
+
+    private static void produceThroughOutbox(
+            RabbitMqTransportFactory transportFactory, String exchangeName, String value) throws Exception {
+        CrossLanguageMessage message = new CrossLanguageMessage();
+        message.setValue(value);
+        SendContext context = new SendContext(message, CancellationToken.none());
+        context.setDestinationAddress(URI.create("exchange:" + exchangeName));
+        context.setIntent(MessageIntent.PUBLISH);
+        EnvelopeMessageSerializer serializer = new EnvelopeMessageSerializer();
+        OutboxMessage persisted = OutboxMessageFactory.create(context, serializer);
+        new TransportOutboxDispatcher(transportFactory)
+                .dispatch(persisted, CancellationToken.none()).join();
         System.out.println("SENT");
         System.out.flush();
         System.exit(0);
