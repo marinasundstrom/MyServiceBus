@@ -22,7 +22,7 @@ import com.rabbitmq.client.CancelCallback;
 
 class ErrorHandlingTest {
     @Test
-    void acksWhenHandlerFails() throws Exception {
+    void nacksForRedeliveryWhenHandlerFailsBeforeErrorMove() throws Exception {
         Channel channel = mock(Channel.class);
         ArgumentCaptor<DeliverCallback> captor = ArgumentCaptor.forClass(DeliverCallback.class);
         when(channel.basicConsume(eq("input"), eq(false), captor.capture(), any(CancelCallback.class))).thenReturn("tag");
@@ -43,6 +43,32 @@ class ErrorHandlingTest {
         Envelope envelope = new Envelope(1L, false, "ex", "rk");
         Delivery delivery = new Delivery(envelope, props, body);
         callback.handle("tag", delivery);
+
+        verify(channel, timeout(1000)).basicNack(1L, false, true);
+        verify(channel, never()).basicAck(anyLong(), anyBoolean());
+    }
+
+    @Test
+    void acksWhenFailedMessageWasMovedToErrorQueue() throws Exception {
+        Channel channel = mock(Channel.class);
+        ArgumentCaptor<DeliverCallback> captor = ArgumentCaptor.forClass(DeliverCallback.class);
+        when(channel.basicConsume(eq("input"), eq(false), captor.capture(), any(CancelCallback.class)))
+                .thenReturn("tag");
+
+        RuntimeException failure = new RuntimeException("boom");
+        ErrorTransportSettlement.markMoved(failure, "rabbitmq://localhost/exchange/input_error");
+        Function<TransportMessage, CompletableFuture<Void>> handler = tm -> CompletableFuture.failedFuture(failure);
+
+        LoggerFactory loggerFactory = new Slf4jLoggerFactory();
+        RabbitMqReceiveTransport transport = new RabbitMqReceiveTransport(
+                channel, "input", handler, "fault", s -> true, loggerFactory);
+        transport.start();
+
+        DeliverCallback callback = captor.getValue();
+        AMQP.BasicProperties props = new AMQP.BasicProperties();
+        byte[] body = "{\"messageType\":[\"urn:message:test\"],\"message\":{}}".getBytes();
+        Envelope envelope = new Envelope(1L, false, "ex", "rk");
+        callback.handle("tag", new Delivery(envelope, props, body));
 
         verify(channel, timeout(1000)).basicAck(1L, false);
         verify(channel, never()).basicNack(anyLong(), anyBoolean(), anyBoolean());

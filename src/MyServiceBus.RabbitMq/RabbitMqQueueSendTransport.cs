@@ -90,7 +90,7 @@ public sealed class RabbitMqQueueSendTransport : ISendTransport
         await _channel.BasicPublishAsync(
             exchange: string.Empty,
             routingKey: _queue,
-            mandatory: false,
+            mandatory: true,
             basicProperties: props,
             body: body,
             cancellationToken: cancellationToken);

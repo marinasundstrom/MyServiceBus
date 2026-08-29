@@ -76,7 +76,7 @@ public sealed class RabbitMqReceiveTransport : IReceiveTransport
                         await _channel.BasicPublishAsync(
                             exchange: _queueName + "_skipped",
                             routingKey: string.Empty,
-                            mandatory: false,
+                            mandatory: true,
                             basicProperties: new BasicProperties(props),
                             body: payload);
                     }
@@ -91,9 +91,26 @@ public sealed class RabbitMqReceiveTransport : IReceiveTransport
             }
             catch (Exception exc)
             {
-                await _channel.BasicAckAsync(ea.DeliveryTag, multiple: false);
-
                 _logger?.LogError(exc, "Message handling failed");
+                try
+                {
+                    if (ErrorTransportSettlement.WasMoved(exc))
+                    {
+                        await _channel.BasicAckAsync(ea.DeliveryTag, multiple: false);
+                    }
+                    else
+                    {
+                        await _channel.BasicNackAsync(ea.DeliveryTag, multiple: false, requeue: true);
+                    }
+                }
+                catch (Exception settlementException)
+                {
+                    _logger?.LogError(
+                        settlementException,
+                        "Failed to settle RabbitMQ delivery {DeliveryTag} from queue {QueueName}",
+                        ea.DeliveryTag,
+                        _queueName);
+                }
             }
         };
 

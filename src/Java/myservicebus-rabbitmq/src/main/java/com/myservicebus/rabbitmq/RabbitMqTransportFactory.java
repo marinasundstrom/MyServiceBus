@@ -52,8 +52,12 @@ public class RabbitMqTransportFactory implements TransportFactory {
             try {
                 Connection connection = connectionProvider.getOrCreateConnection();
                 Channel channel = connection.createChannel();
+                channel.confirmSelect();
                 channel.exchangeDeclare(exchange, "fanout", durable, autoDelete, null);
-                return new RabbitMqSendTransport(channel, exchange, "");
+                boolean requiresRouting = exchange.endsWith("_error")
+                        || exchange.endsWith("_fault")
+                        || exchange.endsWith("_skipped");
+                return new RabbitMqSendTransport(channel, exchange, "", requiresRouting);
             } catch (Exception e) {
                 throw new RuntimeException("Failed to create send transport", e);
             }
@@ -70,6 +74,7 @@ public class RabbitMqTransportFactory implements TransportFactory {
             try {
                 Connection connection = connectionProvider.getOrCreateConnection();
                 Channel channel = connection.createChannel();
+                channel.confirmSelect();
 
                 if (!autoDelete) {
                     String errorExchange = queue + "_error";
@@ -94,7 +99,7 @@ public class RabbitMqTransportFactory implements TransportFactory {
 
                 channel.queueDeclare(queue, durable, false, autoDelete, null);
 
-                return new RabbitMqSendTransport(channel, "", queue);
+                return new RabbitMqSendTransport(channel, "", queue, true);
             } catch (Exception e) {
                 throw new RuntimeException("Failed to create send transport", e);
             }
@@ -171,6 +176,7 @@ public class RabbitMqTransportFactory implements TransportFactory {
             Function<String, Boolean> isMessageTypeRegistered) throws Exception {
         Connection connection = connectionProvider.getOrCreateConnection();
         Channel channel = connection.createChannel();
+        channel.confirmSelect();
 
         int count = topology.prefetchCount() > 0 ? topology.prefetchCount() : defaultPrefetchCount;
         if (count > 0) {

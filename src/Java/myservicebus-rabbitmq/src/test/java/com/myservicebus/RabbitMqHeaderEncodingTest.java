@@ -25,8 +25,12 @@ public class RabbitMqHeaderEncodingTest {
                 Channel.class.getClassLoader(),
                 new Class[] { Channel.class },
                 (proxy, method, args) -> {
-                    if ("basicPublish".equals(method.getName()) && args.length >= 4) {
-                        captured.set((AMQP.BasicProperties) args[2]);
+                    if ("basicPublish".equals(method.getName())) {
+                        for (Object argument : args) {
+                            if (argument instanceof AMQP.BasicProperties properties) {
+                                captured.set(properties);
+                            }
+                        }
                     }
                     return null;
                 });

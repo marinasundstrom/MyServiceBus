@@ -6,11 +6,13 @@ public sealed class RabbitMqSendTransport : ISendTransport
 {
     private readonly IChannel _channel;
     private readonly string _exchange;
+    private readonly bool _mandatory;
 
-    public RabbitMqSendTransport(IChannel channel, string exchange)
+    public RabbitMqSendTransport(IChannel channel, string exchange, bool mandatory = false)
     {
         _channel = channel;
         _exchange = exchange;
+        _mandatory = mandatory;
     }
 
     public async Task Send<T>(T message, SendContext context, CancellationToken cancellationToken = default)
@@ -86,7 +88,7 @@ public sealed class RabbitMqSendTransport : ISendTransport
         await _channel.BasicPublishAsync(
             exchange: _exchange,
             routingKey: context.RoutingKey,
-            mandatory: false,
+            mandatory: _mandatory,
             basicProperties: props,
             body: body,
             cancellationToken: cancellationToken
