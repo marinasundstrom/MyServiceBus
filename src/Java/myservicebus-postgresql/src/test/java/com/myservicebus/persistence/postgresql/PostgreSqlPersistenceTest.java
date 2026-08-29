@@ -412,7 +412,7 @@ class PostgreSqlPersistenceTest {
             assertEquals(0, backlog.cancelled());
             assertEquals(
                     ordersMessage.createdAtUtc().truncatedTo(ChronoUnit.MICROS),
-                    backlog.oldestUndispatchedAtUtc());
+                    backlog.oldestUndispatchedAtUtc().truncatedTo(ChronoUnit.MICROS));
         }
     }
 
