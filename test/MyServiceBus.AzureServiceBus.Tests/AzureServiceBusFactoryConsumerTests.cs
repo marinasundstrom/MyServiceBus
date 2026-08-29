@@ -79,6 +79,7 @@ public class AzureServiceBusFactoryConsumerTests
         public IBusTopology Topology => new TopologyRegistry();
         public Task StartAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
         public Task StopAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task StopAsync(TimeSpan timeout, CancellationToken cancellationToken = default) => Task.CompletedTask;
         public Task Publish<T>(object message, Action<IPublishContext>? contextCallback = null, CancellationToken cancellationToken = default) where T : class => Task.CompletedTask;
         public Task Publish<T>(T message, Action<IPublishContext>? contextCallback = null, CancellationToken cancellationToken = default) where T : class => Task.CompletedTask;
         public IPublishEndpoint GetPublishEndpoint() => this;

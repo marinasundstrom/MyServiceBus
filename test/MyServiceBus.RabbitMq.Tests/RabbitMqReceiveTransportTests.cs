@@ -281,4 +281,61 @@ public class RabbitMqReceiveTransportTests
         await secondStarted.Task.WaitAsync(TimeSpan.FromSeconds(1));
         await Task.WhenAll(firstDelivery, secondDelivery);
     }
+
+    [Fact]
+    public async Task Stop_aborts_channel_when_active_delivery_exceeds_deadline()
+    {
+        var channel = Substitute.For<IChannel>();
+        AsyncEventingBasicConsumer? consumer = null;
+        channel
+            .BasicConsumeAsync(
+                Arg.Any<string>(),
+                Arg.Any<bool>(),
+                Arg.Any<string>(),
+                Arg.Any<bool>(),
+                Arg.Any<bool>(),
+                Arg.Any<IDictionary<string, object>>(),
+                Arg.Any<IAsyncBasicConsumer>(),
+                Arg.Any<CancellationToken>())
+            .Returns(callInfo =>
+            {
+                consumer = (AsyncEventingBasicConsumer)callInfo[6]!;
+                return Task.FromResult("consumer-tag");
+            });
+
+        var handlerStarted = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseHandler = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var transport = new RabbitMqReceiveTransport(
+            channel,
+            "input",
+            async _ =>
+            {
+                handlerStarted.SetResult(true);
+                await releaseHandler.Task;
+            },
+            errorAddress: new Uri("rabbitmq://broker/exchange/input_error"),
+            faultAddress: new Uri("rabbitmq://broker/exchange/input_fault"),
+            isMessageTypeRegistered: null);
+
+        await transport.Start();
+        var delivery = consumer!.HandleBasicDeliverAsync(
+            "consumer-tag",
+            1,
+            false,
+            "ex",
+            "rk",
+            new BasicProperties(),
+            new ReadOnlyMemory<byte>(Encoding.UTF8.GetBytes("{}")),
+            CancellationToken.None);
+        await handlerStarted.Task.WaitAsync(TimeSpan.FromSeconds(1));
+
+        using var timeout = new CancellationTokenSource(TimeSpan.FromMilliseconds(50));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => transport.Stop(timeout.Token));
+        Assert.Contains(
+            channel.ReceivedCalls(),
+            call => call.GetMethodInfo().Name == nameof(IChannel.CloseAsync));
+
+        releaseHandler.SetResult(true);
+        await delivery;
+    }
 }

@@ -175,7 +175,11 @@ The production target requires:
 - saturation evidence for endpoint concurrency independent of prefetch
 - bounded queues between broker callbacks and application handlers
 
-Current lifecycle behavior differs by transport and client. RabbitMQ C# and Java now cancel the consumer before waiting for active callbacks, including deliveries waiting for a concurrency permit, to settle; the C# wait observes the caller's cancellation token, while Java currently has no public drain deadline. Azure Java also waits for active callbacks without a deadline. No cross-language drain deadline or forced-stop result is currently guaranteed.
+Both clients expose an explicit timed stop (`StopAsync(TimeSpan, ...)` in C# and `stop(Duration)` in Java) and report expiry as `BusStopTimeoutException`. The timeout is shared across receive transports rather than restarted for every endpoint.
+
+RabbitMQ C# and Java cancel the consumer before waiting for active callbacks, including deliveries waiting for a concurrency permit, to settle. On expiry they abort the receive channel, so unsettled sources remain eligible for broker redelivery and later handler completion cannot acknowledge them on that channel. Azure stops its processor; on expiry the clients initiate processor and sender teardown so active locks are not completed as successful work.
+
+These are runtime guarantees for the built-in transports. A third-party C# transport must observe the supplied cancellation token, and a third-party Java transport must override the timed `ReceiveTransport.stop(Duration)` method, before it can claim bounded shutdown. Real-broker deadline, redelivery, and settlement-race evidence remains required before the matrix can mark forced stop verified.
 
 ## Ordering, Duplication, and Expiration
 

@@ -13,6 +13,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.util.Map;
+import java.time.Duration;
 import java.util.concurrent.CompletionException;
 import java.util.function.Function;
 
@@ -106,22 +107,81 @@ public final class AzureServiceBusReceiveTransport implements ReceiveTransport {
 
     @Override
     public void stop() {
+        stopInternal(null);
+    }
+
+    @Override
+    public void stop(Duration timeout) {
+        if (timeout == null || timeout.isZero() || timeout.isNegative()) {
+            throw new IllegalArgumentException("The stop timeout must be positive");
+        }
+        stopInternal(timeout);
+    }
+
+    private void stopInternal(Duration timeout) {
         try {
             synchronized (lifecycleMonitor) {
                 stopping = true;
+            }
+            long deadline = timeout == null ? Long.MAX_VALUE : System.nanoTime() + timeout.toNanos();
+            java.util.concurrent.CompletableFuture<Void> processorStop = timeout == null
+                    ? null
+                    : java.util.concurrent.CompletableFuture.runAsync(processor::stop);
+            if (processorStop == null) {
+                processor.stop();
+            }
+            boolean timedOut = false;
+            synchronized (lifecycleMonitor) {
                 while (activeMessages > 0) {
-                    lifecycleMonitor.wait();
+                    if (timeout == null) {
+                        lifecycleMonitor.wait();
+                        continue;
+                    }
+
+                    long remaining = deadline - System.nanoTime();
+                    if (remaining <= 0) {
+                        timedOut = true;
+                        break;
+                    }
+                    long millis = Math.max(1, java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(remaining));
+                    lifecycleMonitor.wait(millis);
                 }
             }
-            processor.stop();
-            processor.close();
-            skippedSender.close();
+            if (!timedOut && processorStop != null) {
+                long remaining = deadline - System.nanoTime();
+                if (remaining <= 0) {
+                    timedOut = true;
+                } else {
+                    try {
+                        processorStop.get(remaining, java.util.concurrent.TimeUnit.NANOSECONDS);
+                    } catch (java.util.concurrent.TimeoutException exception) {
+                        timedOut = true;
+                    } catch (java.util.concurrent.ExecutionException exception) {
+                        throw exception.getCause() instanceof RuntimeException runtimeException
+                                ? runtimeException
+                                : new AzureServiceBusTransportException(
+                                        "stop receive", queueName, exception.getCause());
+                    }
+                }
+            }
+            if (timedOut) {
+                java.util.concurrent.CompletableFuture.runAsync(this::closeClients);
+                throw new com.myservicebus.BusStopTimeoutException(timeout);
+            }
+            closeClients();
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
             throw new AzureServiceBusTransportException("stop receive", queueName, exception);
+        } catch (com.myservicebus.BusStopTimeoutException exception) {
+            throw exception;
         } catch (Exception exception) {
             throw new AzureServiceBusTransportException("stop receive", queueName, exception);
         }
+    }
+
+    private void closeClients() {
+        processor.close();
+        skippedSender.close();
     }
 
     private String readMessageType(byte[] body) {

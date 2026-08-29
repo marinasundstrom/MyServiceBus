@@ -380,6 +380,30 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector, IConsumerMetho
         }
     }
 
+    public async Task StopAsync(TimeSpan timeout, CancellationToken cancellationToken = default)
+    {
+        if (timeout <= TimeSpan.Zero && timeout != Timeout.InfiniteTimeSpan)
+            throw new ArgumentOutOfRangeException(nameof(timeout), "The stop timeout must be positive or infinite.");
+
+        if (timeout == Timeout.InfiniteTimeSpan)
+        {
+            await StopAsync(cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        using var timeoutSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeoutSource.CancelAfter(timeout);
+        try
+        {
+            await StopAsync(timeoutSource.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException exception)
+            when (!cancellationToken.IsCancellationRequested && timeoutSource.IsCancellationRequested)
+        {
+            throw new BusStopTimeoutException(timeout, exception);
+        }
+    }
+
     internal void EnsureStarted()
     {
         if (_state != BusState.Started)

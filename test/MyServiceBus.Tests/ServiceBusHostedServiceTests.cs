@@ -56,6 +56,9 @@ public class ServiceBusHostedServiceTests
             return Task.CompletedTask;
         }
 
+        public Task StopAsync(TimeSpan timeout, CancellationToken cancellationToken = default)
+            => StopAsync(cancellationToken);
+
         public Task Publish<T>(T message, Action<IPublishContext>? contextCallback = null, CancellationToken cancellationToken = default)
             where T : class => Task.CompletedTask;
 

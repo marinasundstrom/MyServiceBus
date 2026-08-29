@@ -79,6 +79,9 @@ public class InMemoryTestHarness : IMessageBus, ITransportFactory, IReceiveEndpo
         return Task.CompletedTask;
     }
 
+    public Task StopAsync(TimeSpan timeout, CancellationToken cancellationToken = default)
+        => StopAsync(cancellationToken);
+
     public void RegisterHandler<T>(Func<ConsumeContext<T>, Task> handler) where T : class
     {
         lock (handlerLock)

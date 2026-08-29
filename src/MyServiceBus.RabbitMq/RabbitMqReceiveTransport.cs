@@ -158,7 +158,23 @@ public sealed class RabbitMqReceiveTransport : IReceiveTransport
             drainTask = _drained.Task;
         }
 
-        await drainTask.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await drainTask.WaitAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            try
+            {
+                await _channel.AbortAsync(CancellationToken.None).ConfigureAwait(false);
+            }
+            catch (Exception exception)
+            {
+                _logger?.LogError(exception, "Failed to abort RabbitMQ channel for queue {QueueName}", _queueName);
+            }
+
+            throw;
+        }
     }
 
     private bool TryBeginDelivery()

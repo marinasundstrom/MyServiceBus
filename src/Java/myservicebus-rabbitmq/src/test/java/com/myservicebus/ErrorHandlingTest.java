@@ -9,6 +9,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.time.Duration;
 import java.util.function.Function;
 
 import org.junit.jupiter.api.Test;
@@ -170,5 +171,41 @@ class ErrorHandlingTest {
         secondDelivery.join();
         verify(channel, timeout(1000)).basicAck(1L, false);
         verify(channel, timeout(1000)).basicAck(2L, false);
+    }
+
+    @Test
+    void stopAbortsChannelWhenActiveDeliveryExceedsDeadline() throws Exception {
+        Channel channel = mock(Channel.class);
+        when(channel.isOpen()).thenReturn(true);
+        ArgumentCaptor<DeliverCallback> captor = ArgumentCaptor.forClass(DeliverCallback.class);
+        when(channel.basicConsume(eq("input"), eq(false), captor.capture(), any(CancelCallback.class)))
+                .thenReturn("consumer-tag");
+
+        CountDownLatch handlerStarted = new CountDownLatch(1);
+        CompletableFuture<Void> releaseHandler = new CompletableFuture<>();
+        RabbitMqReceiveTransport transport = new RabbitMqReceiveTransport(
+                channel,
+                "input",
+                message -> {
+                    handlerStarted.countDown();
+                    return releaseHandler;
+                },
+                "fault",
+                ignored -> true,
+                new Slf4jLoggerFactory());
+        transport.start();
+
+        byte[] body = "{\"messageType\":[\"urn:message:test\"],\"message\":{}}".getBytes();
+        captor.getValue().handle("consumer-tag", new Delivery(
+                new Envelope(1L, false, "ex", "rk"), new AMQP.BasicProperties(), body));
+        assertTrue(handlerStarted.await(1, TimeUnit.SECONDS));
+
+        org.junit.jupiter.api.Assertions.assertThrows(
+                BusStopTimeoutException.class,
+                () -> transport.stop(Duration.ofMillis(50)));
+        verify(channel).basicCancel("consumer-tag");
+        verify(channel).abort();
+
+        releaseHandler.complete(null);
     }
 }

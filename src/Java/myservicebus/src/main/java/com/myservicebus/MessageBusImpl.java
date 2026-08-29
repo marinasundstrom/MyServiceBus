@@ -448,15 +448,41 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
     }
 
     public synchronized void stop() throws Exception {
+        stopInternal(null);
+    }
+
+    @Override
+    public synchronized void stop(Duration timeout) throws Exception {
+        if (timeout == null || timeout.isZero() || timeout.isNegative()) {
+            throw new IllegalArgumentException("The stop timeout must be positive");
+        }
+        stopInternal(timeout);
+    }
+
+    private void stopInternal(Duration timeout) throws Exception {
         if (state == BusState.STOPPED) {
             return;
         }
 
         state = BusState.STOPPING;
+        long deadline = timeout == null ? Long.MAX_VALUE : System.nanoTime() + timeout.toNanos();
         try {
             for (int i = receiveTransports.size() - 1; i >= 0; i--) {
-                receiveTransports.get(i).stop();
+                if (timeout == null) {
+                    receiveTransports.get(i).stop();
+                } else {
+                    long remaining = deadline - System.nanoTime();
+                    if (remaining <= 0) {
+                        throw new BusStopTimeoutException(timeout);
+                    }
+                    receiveTransports.get(i).stop(Duration.ofNanos(remaining));
+                }
             }
+        } catch (BusStopTimeoutException exception) {
+            if (timeout == null || timeout.equals(exception.getTimeout())) {
+                throw exception;
+            }
+            throw new BusStopTimeoutException(timeout, exception);
         } finally {
             try {
                 if (transportFactory instanceof AutoCloseable closeable) {

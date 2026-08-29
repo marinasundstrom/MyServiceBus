@@ -1,6 +1,7 @@
 package com.myservicebus;
 
 import java.net.URI;
+import java.time.Duration;
 
 import com.myservicebus.topology.BusTopology;
 
@@ -18,4 +19,13 @@ public interface MessageBus extends PublishEndpoint, PublishEndpointProvider, Se
     void start() throws Exception;
 
     void stop() throws Exception;
+
+    /**
+     * Stops receiving and allows active work to drain within the supplied timeout.
+     *
+     * @throws BusStopTimeoutException when the timeout elapses before the drain completes
+     */
+    default void stop(Duration timeout) throws Exception {
+        stop();
+    }
 }

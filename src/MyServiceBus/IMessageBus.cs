@@ -29,6 +29,36 @@ public interface IMessageBus :
 
     Task StopAsync(CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Stops receiving and allows active work to drain within the supplied timeout.
+    /// </summary>
+    /// <exception cref="BusStopTimeoutException">
+    /// The timeout elapsed before every receive transport completed its drain.
+    /// </exception>
+    async Task StopAsync(TimeSpan timeout, CancellationToken cancellationToken = default)
+    {
+        if (timeout <= TimeSpan.Zero && timeout != Timeout.InfiniteTimeSpan)
+            throw new ArgumentOutOfRangeException(nameof(timeout), "The stop timeout must be positive or infinite.");
+
+        if (timeout == Timeout.InfiniteTimeSpan)
+        {
+            await StopAsync(cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        using var timeoutSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeoutSource.CancelAfter(timeout);
+        try
+        {
+            await StopAsync(timeoutSource.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException exception)
+            when (!cancellationToken.IsCancellationRequested && timeoutSource.IsCancellationRequested)
+        {
+            throw new BusStopTimeoutException(timeout, exception);
+        }
+    }
+
     Task AddConsumer<TMessage, TConsumer>(ConsumerTopology consumer, Delegate? configure = null, CancellationToken cancellationToken = default)
         where TConsumer : class, IConsumer<TMessage>
         where TMessage : class;

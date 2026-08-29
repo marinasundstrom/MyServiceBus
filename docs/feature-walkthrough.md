@@ -274,6 +274,20 @@ cfg.receiveEndpoint("submit-order", endpoint -> {
 
 The default concurrent message limit is one. RabbitMQ holds deliveries waiting for a permit unsettled; Azure Service Bus maps the limit to the processor's native concurrent-call setting.
 
+### Bound graceful shutdown
+
+Use the timed stop API when a host must not wait indefinitely for an application handler:
+
+```csharp
+await bus.StopAsync(TimeSpan.FromSeconds(30), appStopping);
+```
+
+```java
+bus.stop(Duration.ofSeconds(30));
+```
+
+Both clients throw `BusStopTimeoutException` when the deadline expires. RabbitMQ cancels intake and aborts the receive channel, leaving unsettled deliveries eligible for redelivery. Azure stops its processor and initiates client teardown so active message locks are not completed as successful work. Applications should log this outcome distinctly from a graceful drain and keep handlers idempotent because forced shutdown is an at-least-once boundary.
+
 You can also decorate the factory with additional services or a logger factory before creating the bus:
 
 ```csharp

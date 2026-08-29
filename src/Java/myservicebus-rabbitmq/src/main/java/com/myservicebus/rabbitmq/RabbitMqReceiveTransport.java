@@ -5,6 +5,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Semaphore;
+import java.time.Duration;
 import java.util.function.Function;
 import java.util.Objects;
 
@@ -182,6 +183,18 @@ public class RabbitMqReceiveTransport implements ReceiveTransport {
 
     @Override
     public void stop() throws Exception {
+        stopInternal(null);
+    }
+
+    @Override
+    public void stop(Duration timeout) throws Exception {
+        if (timeout == null || timeout.isZero() || timeout.isNegative()) {
+            throw new IllegalArgumentException("The stop timeout must be positive");
+        }
+        stopInternal(timeout);
+    }
+
+    private void stopInternal(Duration timeout) throws Exception {
         synchronized (lifecycleMonitor) {
             stopping = true;
         }
@@ -190,10 +203,27 @@ public class RabbitMqReceiveTransport implements ReceiveTransport {
             if (consumerTag != null && !consumerTag.isBlank()) {
                 channel.basicCancel(consumerTag);
             }
+            boolean timedOut = false;
             synchronized (lifecycleMonitor) {
+                long deadline = timeout == null ? Long.MAX_VALUE : System.nanoTime() + timeout.toNanos();
                 while (activeMessages > 0) {
-                    lifecycleMonitor.wait();
+                    if (timeout == null) {
+                        lifecycleMonitor.wait();
+                        continue;
+                    }
+
+                    long remaining = deadline - System.nanoTime();
+                    if (remaining <= 0) {
+                        timedOut = true;
+                        break;
+                    }
+                    long millis = Math.max(1, java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(remaining));
+                    lifecycleMonitor.wait(millis);
                 }
+            }
+            if (timedOut) {
+                channel.abort();
+                throw new com.myservicebus.BusStopTimeoutException(timeout);
             }
             channel.close();
         }
