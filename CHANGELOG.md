@@ -4,6 +4,7 @@ This changelog summarizes the bigger themes in the repository history rather tha
 
 ## Unreleased
 
+- Added an optional .NET MassTransit BSON envelope package with serializer/deserializer factories, Base64 body handling, configurable Newtonsoft BSON settings, and no dependency from the default JSON runtime.
 - Added a .NET JSON serialization comparison matrix covering reflective and source-generated metadata for MassTransit envelopes and raw payloads, including throughput and allocation measurements.
 - Documented source-generated JSON as a distinct .NET managed and NativeAOT mode in the repository and public AOT guides, including its native smoke proof and measurement boundaries.
 - Split AOT guidance and benchmark evidence by platform, distinguishing .NET NativeAOT from Java GraalVM Native Image and linking to each platform's official compatibility guidance.
