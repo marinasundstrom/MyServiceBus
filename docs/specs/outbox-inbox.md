@@ -6,7 +6,7 @@ This specification defines the portable transaction and failure boundary for MyS
 
 The first PostgreSQL implementation now provides corresponding C# and Java persistence behavior against real transactional storage. Provider APIs are idiomatic to each ecosystem, while their observable state transitions conform to this document. Production promotion still requires the complete [Delivery Failure Matrix](../development/delivery-failure-matrix.md).
 
-The PostgreSQL packages include a versioned schema, transaction-enlisted outbox writer, shared-storage lease store, and transaction-enlisted inbox store. They deliberately have no default persistence registration yet. There is not yet a transparent send/publish capture seam, hosted polling loop, cleanup service, application-framework unit-of-work adapter, or production transport adapter for persisted bodies. The provider's Testcontainers suites prove database atomicity, stable-envelope rehydration, competing leases, and duplicate-completed acquisition; they do not by themselves satisfy O01–O06.
+The PostgreSQL packages include a versioned schema, transaction-enlisted outbox writer, opt-in scoped Bus Outbox capture, shared-storage lease store, and transaction-enlisted inbox store. There is not yet a hosted polling loop, cleanup service, transparent Consumer Outbox middleware, application-framework unit-of-work adapter, or production transport adapter for persisted bodies. The provider's Testcontainers suites prove database atomicity, scoped send/publish capture, stable-envelope rehydration, competing leases, and duplicate-completed acquisition; they do not by themselves satisfy O01–O06.
 
 ## Portable Runtime Surface
 
@@ -15,6 +15,7 @@ The corresponding runtime concepts are:
 | Concept | C# | Java |
 | --- | --- | --- |
 | Transaction-enlisted write | `IOutboxWriter` | `OutboxWriter` |
+| Scoped Bus Outbox transaction | `OutboxSession` | `OutboxSession` |
 | Immutable persisted intent | `OutboxMessage` | `OutboxMessage` |
 | Atomic lease storage | `IOutboxStore` | `OutboxStore` |
 | Broker dispatch boundary | `IOutboxTransportDispatcher` | `OutboxTransportDispatcher` |

@@ -1399,29 +1399,31 @@ services.from(MessageBusServices.class).addServiceBus(cfg -> { /* ... */ });
 
 ### Transactional Outbox and Inbox
 
-Install `Sundstrom.MyServiceBus.PostgreSql` for C# or `myservicebus-postgresql` for Java. Initialize the versioned schema once at application startup or during deployment, then write outgoing intent using the same PostgreSQL transaction as the application change. The caller owns the transaction; MyServiceBus never commits it independently.
+Install `Sundstrom.MyServiceBus.PostgreSql` for C# or `myservicebus-postgresql` for Java. Enable Bus Outbox during registration, initialize the versioned schema once at application startup or deployment, and attach the scoped outbox session to the same PostgreSQL transaction as the application change. The caller owns the transaction; MyServiceBus never commits it independently.
 
 #### C#
 
 ```csharp
-await PostgreSqlSchema.EnsureCreatedAsync(dataSource);
+services.AddServiceBus(configurator =>
+{
+    configurator.UseBusOutbox();
+    configurator.UsingRabbitMq((_, rabbit) => rabbit.Host("localhost"));
+});
 
+await PostgreSqlSchema.EnsureCreatedAsync(dataSource);
+await using var scope = serviceProvider.CreateAsyncScope();
 await using var connection = await dataSource.OpenConnectionAsync();
 await using var transaction = await connection.BeginTransactionAsync();
 
 // Execute the application UPDATE/INSERT with this connection and transaction.
 
-var outbox = new PostgreSqlOutboxWriter(connection, transaction);
-var context = new SendContext(
-    [typeof(OrderSubmitted)], serializer)
+using (scope.ServiceProvider.GetRequiredService<OutboxSession>()
+    .UsePostgreSql(connection, transaction))
 {
-    MessageId = Guid.NewGuid().ToString(),
-    CorrelationId = orderId.ToString(),
-    DestinationAddress = new Uri("rabbitmq://broker/order-submitted"),
-    Intent = MessageIntent.Publish
-};
-await outbox.AddAsync(OutboxMessageFactory.Create(
-    new OrderSubmitted(orderId), context));
+    var publish = scope.ServiceProvider.GetRequiredService<IPublishEndpoint>();
+    await publish.Publish(new OrderSubmitted(orderId), context =>
+        context.CorrelationId = orderId.ToString());
+}
 
 await transaction.CommitAsync();
 ```
@@ -1429,22 +1431,27 @@ await transaction.CommitAsync();
 #### Java
 
 ```java
-PostgreSqlSchema.ensureCreated(dataSource);
+services.from(MessageBusServices.class).addServiceBus(configurator -> {
+    configurator.useBusOutbox();
+    configurator.using(RabbitMqFactoryConfigurator.class,
+            (context, rabbit) -> rabbit.host("localhost"));
+});
 
-try (Connection connection = dataSource.getConnection()) {
+PostgreSqlSchema.ensureCreated(dataSource);
+try (ServiceScope scope = serviceProvider.createScope();
+     Connection connection = dataSource.getConnection()) {
     connection.setAutoCommit(false);
 
     // Execute the application UPDATE/INSERT with this connection.
 
-    OutboxWriter outbox = new PostgreSqlOutboxWriter(connection);
-    SendContext context = new SendContext(new OrderSubmitted(orderId));
-    context.setMessageId(UUID.randomUUID());
-    context.setCorrelationId(orderId);
-    context.setDestinationAddress(
-            URI.create("rabbitmq://broker/order-submitted"));
-    context.setIntent(MessageIntent.PUBLISH);
-    outbox.add(OutboxMessageFactory.create(context, serializer),
-            CancellationToken.none()).join();
+    ServiceProvider scoped = scope.getServiceProvider();
+    try (OutboxSession.Registration ignored =
+            PostgreSqlOutboxSession.useTransaction(
+                    scoped.getRequiredService(OutboxSession.class), connection)) {
+        PublishEndpoint publish = scoped.getRequiredService(PublishEndpoint.class);
+        publish.publish(new OrderSubmitted(orderId), context ->
+                context.setCorrelationId(orderId)).join();
+    }
 
     connection.commit();
 }
@@ -1452,7 +1459,9 @@ try (Connection connection = dataSource.getConnection()) {
 
 The inbox follows the same rule. Create `PostgreSqlInboxStore` with the transaction that owns the protected application effect. Continue only for `Acquired`; `Completed` is a safe duplicate and `InProgress` must remain eligible for retry. Add responses or publications through the acquired transaction's outbox, complete the inbox record, commit the database transaction, and only then settle the broker message.
 
-`PostgreSqlOutboxStore` supplies atomic, shared PostgreSQL leases to the portable dispatcher. Transparent bus capture, hosted polling, persisted-envelope transport adapters, and cleanup are still being integrated; the current provider is an explicit persistence foundation rather than a one-line production outbox configuration. See [Transactional Outbox and Inbox](transactional-outbox.md) for guarantees, status, and limits.
+Resolve `IPublishEndpoint` / `ISendEndpointProvider` and their Java equivalents from the same scope as `OutboxSession`. Calling the singleton bus directly bypasses capture. Scheduled messages in an active outbox session currently fail clearly and will be addressed in a separate scheduling slice.
+
+`PostgreSqlOutboxStore` supplies atomic, shared PostgreSQL leases to the portable dispatcher. Hosted polling, persisted-envelope transport adapters, Consumer Outbox middleware, and cleanup are still being integrated. See [Transactional Outbox and Inbox](transactional-outbox.md) for guarantees, status, and limits.
 
 ### Unit Testing with the In-Memory Test Harness
 

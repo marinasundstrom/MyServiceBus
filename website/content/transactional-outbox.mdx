@@ -9,6 +9,12 @@
   <p>An application should not have to rebuild durable envelope storage, multi-replica leasing, stable message identity, retry state, and duplicate detection for every service. These are shared messaging guarantees, so MyServiceBus is making them a primary production capability.</p>
 </div>
 
+## A familiar MassTransit model
+
+MyServiceBus follows MassTransit's useful distinction between a **Bus Outbox** for messages produced in an application scope and a **Consumer Outbox** that combines inbox deduplication with outgoing capture around a consumer. Teams can use [MassTransit's outbox documentation](https://masstransit.massient.com/concepts/outbox) as conceptual background instead of learning new terminology for the same architectural boundary.
+
+MyServiceBus documentation remains authoritative for setup, supported behavior, and release status. MassTransit configuration snippets are not source-compatible MyServiceBus examples, and behavior that MyServiceBus has not verified is not implied by conceptual compatibility.
+
 ## Replace two unrelated commits with one durable hand-off
 
 Publishing to a broker after updating a database creates a failure gap: the database can commit while publication fails, or publication can succeed while the database rolls back. A distributed transaction is rarely available across both resources.
@@ -27,43 +33,49 @@ The C# package `Sundstrom.MyServiceBus.PostgreSql` and Java module `io.github.ma
 
 - an idempotent, versioned PostgreSQL schema;
 - a writer that requires the application's active transaction;
+- opt-in Bus Outbox capture through ordinary scoped publish and send endpoints;
 - a factory that captures the final serialized send context and its envelope metadata;
 - atomic leasing with `FOR UPDATE SKIP LOCKED` for competing replicas;
 - persisted attempts, retry time, lease ownership, and dispatch state;
 - complete envelope storage with stable message and correlation identities; and
 - inbox acquisition and completion keyed by consumer scope and message identity.
 
-Both implementations are tested against PostgreSQL 17.6 with Testcontainers. The suites cover rollback and commit behavior, envelope rehydration, concurrent disjoint leases, and atomic inbox completion with an outgoing outbox record.
+Both implementations are tested against PostgreSQL 17.6 with Testcontainers. The suites cover rollback and commit behavior, scoped publish/send capture, envelope rehydration, concurrent disjoint leases, and atomic inbox completion with an outgoing outbox record.
 
 <div className="callout">
   <strong>Foundation status</strong>
-  <p>The storage provider works, but the one-line production bus experience is not finished. Transparent Send/Publish capture, hosted polling, broker transport dispatch, retention cleanup, health, metrics, and the complete crash-injection matrix remain open. Use the current API as an explicit persistence boundary, not as a claim that every production outbox layer is complete.</p>
+  <p>Bus Outbox capture and storage work, but the complete production experience is not finished. Hosted polling, broker transport dispatch, transparent Consumer Outbox middleware, retention cleanup, health, metrics, and the complete crash-injection matrix remain open.</p>
 </div>
 
 ## Write with the application transaction
 
 The caller owns commit and rollback. MyServiceBus refuses to write without an active caller-owned transaction, preventing the outbox record from silently committing separately from application state.
 
+Enable Bus Outbox during registration. In an application service scope, attach the scoped session to the active PostgreSQL transaction. Calls through the scoped publish and send contracts then store the final envelope rather than contacting the broker.
+
 ### C#
 
 ```csharp
-await PostgreSqlSchema.EnsureCreatedAsync(dataSource);
+services.AddServiceBus(configurator =>
+{
+    configurator.UseBusOutbox();
+    configurator.UsingRabbitMq((_, rabbit) => rabbit.Host("localhost"));
+});
 
+await PostgreSqlSchema.EnsureCreatedAsync(dataSource);
+await using var scope = serviceProvider.CreateAsyncScope();
 await using var connection = await dataSource.OpenConnectionAsync();
 await using var transaction = await connection.BeginTransactionAsync();
 
 // Execute the application UPDATE/INSERT using this transaction.
 
-var outbox = new PostgreSqlOutboxWriter(connection, transaction);
-var context = new SendContext([typeof(OrderSubmitted)], serializer)
+using (scope.ServiceProvider.GetRequiredService<OutboxSession>()
+    .UsePostgreSql(connection, transaction))
 {
-    MessageId = Guid.NewGuid().ToString(),
-    CorrelationId = orderId.ToString(),
-    DestinationAddress = new Uri("rabbitmq://broker/order-submitted"),
-    Intent = MessageIntent.Publish
-};
-await outbox.AddAsync(OutboxMessageFactory.Create(
-    new OrderSubmitted(orderId), context));
+    var publish = scope.ServiceProvider.GetRequiredService<IPublishEndpoint>();
+    await publish.Publish(new OrderSubmitted(orderId), context =>
+        context.CorrelationId = orderId.ToString());
+}
 
 await transaction.CommitAsync();
 ```
@@ -71,26 +83,33 @@ await transaction.CommitAsync();
 ### Java
 
 ```java
-PostgreSqlSchema.ensureCreated(dataSource);
+services.from(MessageBusServices.class).addServiceBus(configurator -> {
+    configurator.useBusOutbox();
+    configurator.using(RabbitMqFactoryConfigurator.class,
+            (context, rabbit) -> rabbit.host("localhost"));
+});
 
-try (Connection connection = dataSource.getConnection()) {
+PostgreSqlSchema.ensureCreated(dataSource);
+try (ServiceScope scope = serviceProvider.createScope();
+     Connection connection = dataSource.getConnection()) {
     connection.setAutoCommit(false);
 
     // Execute the application UPDATE/INSERT using this connection.
 
-    OutboxWriter outbox = new PostgreSqlOutboxWriter(connection);
-    SendContext context = new SendContext(new OrderSubmitted(orderId));
-    context.setMessageId(UUID.randomUUID());
-    context.setCorrelationId(orderId);
-    context.setDestinationAddress(
-            URI.create("rabbitmq://broker/order-submitted"));
-    context.setIntent(MessageIntent.PUBLISH);
-    outbox.add(OutboxMessageFactory.create(context, serializer),
-            CancellationToken.none()).join();
+    ServiceProvider scoped = scope.getServiceProvider();
+    try (OutboxSession.Registration ignored =
+            PostgreSqlOutboxSession.useTransaction(
+                    scoped.getRequiredService(OutboxSession.class), connection)) {
+        PublishEndpoint publish = scoped.getRequiredService(PublishEndpoint.class);
+        publish.publish(new OrderSubmitted(orderId), context ->
+                context.setCorrelationId(orderId)).join();
+    }
 
     connection.commit();
 }
 ```
+
+Resolve endpoint contracts from the same scope as the session. Calling `IMessageBus` / `MessageBus` directly intentionally bypasses capture. Nested registrations are rejected. Scheduled messages inside an active outbox session currently fail clearly; durable scheduling will be handled in a separate slice.
 
 ## Protect consumer effects with the inbox
 
@@ -102,6 +121,6 @@ For an acquired delivery, write responses and new messages through the acquisiti
 
 This design provides effectively-once protected PostgreSQL effects when the application uses the transaction boundary correctly. It does not promise globally exactly-once delivery, cross-database atomicity, or automatic idempotency for external API calls.
 
-The next implementation step is framework-owned capture and dispatch so ordinary bus `Send`, `Publish`, responses, and faults can enter this boundary without manually constructing persisted envelopes.
+The next implementation step is framework-owned hosted dispatch and broker adapters, followed by Consumer Outbox middleware for responses, publications, and faults produced while consuming a message.
 
 <NextCard href="/docs/concepts/reliability" label="Related concept" title="Reliability and faults" />
