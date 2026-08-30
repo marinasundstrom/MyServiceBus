@@ -59,6 +59,21 @@ public static class OrderConsumers
 
 The union supplies a closed accepted-input set and exhaustive local matching. MyServiceBus supplies transport routing, deserialization, scoped activation, retry, settlement, faulting, and topology.
 
+### Unions and closed hierarchies
+
+Unions provide a second way to express a closed set of variants; they are not merely shorter syntax for an inheritance hierarchy.
+
+| Model | How the set is formed | Best fit |
+| --- | --- | --- |
+| Union | A declaration or use site composes otherwise independent types into a closed set. The variants do not need a common application base type. | Unrelated message contracts that one operation wants to accept or return together. |
+| Closed hierarchy | A base interface or class owns a closed family of permitted derived types. Variants participate through inheritance and the language's hierarchy rules. | Variants that share a genuine domain abstraction, behavior, or polymorphic contract. |
+
+This distinction is especially useful at messaging boundaries. Message types may be owned by different packages, generated from schemas, shared with older applications, or already committed to another inheritance model. A consumer can group those contracts with an ad-hoc union without editing them, introducing a marker interface, or claiming that they are subtypes of a new wire contract. The same contract can participate in different unions at different API boundaries.
+
+Closed hierarchies remain valuable when inheritance is part of the model. Upcoming language support can make such hierarchies closed and exhaustively matchable, but their expression still depends on a common base relationship and the relevant language and compiler rules. They should not be required merely to gain exhaustive handling of several independent messages.
+
+MyServiceBus should therefore support both projections over the same portable idea of “one of these declared alternatives.” Use a hierarchy when the variants are related by domain substitution; use a union when the relationship belongs to the consuming or responding operation. In either case, MyServiceBus must continue to route and serialize the concrete message contract rather than inventing a carrier contract.
+
 ## Goals
 
 - Allow one consumer method to handle a closed set of message contracts.
@@ -79,7 +94,7 @@ The union supplies a closed accepted-input set and exhaustive local matching. My
 - Treating union declaration order as a broker ordering guarantee.
 - Delivering partition-key configuration as part of the initial feature.
 - Adding header-parameter or payload-parameter binding that consumer methods do not otherwise support.
-- Replacing polymorphic message interfaces or inheritance-based routing.
+- Replacing polymorphic message interfaces, closed hierarchies, or inheritance-based routing where those relationships are intentional.
 - Treating every type with a `Value` property as a union.
 - Supporting open generic unions, runtime-generated case sets, or value-type message contracts in the first implementation.
 - Defining Raven syntax or changing the Raven compiler.

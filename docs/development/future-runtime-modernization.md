@@ -90,6 +90,8 @@ For each proposed feature, define it in this order:
 
 The portable contract must not name a C#, Raven, or Java implementation mechanism. For example, “one of these declared response outcomes, handled exhaustively” is portable. “A .NET transparent union,” “a Raven ad-hoc union,” and “a Java sealed hierarchy” are projections of that concept.
 
+Unions and closed hierarchies are complementary projections. A union composes a closed set from types that can remain unrelated and can be declared at the API boundary. A closed hierarchy makes variants inherit from a common base and relies on the language's rules for restricting and exhaustively matching that family. Prefer unions when the operation creates the relationship between otherwise independent message contracts; prefer a hierarchy when the variants share a real domain abstraction or substitutability relationship. This lets MyServiceBus gain exhaustive APIs without forcing inheritance into portable contracts solely for dispatch convenience.
+
 Raven is a .NET language projection, not a third wire implementation. It shares the .NET package, runtime, serializer, transport, and compatibility matrix. Raven-specific work belongs at metadata discovery, binding, and result-consumption boundaries; it must not fork the message protocol.
 
 ### Idiom mapping
