@@ -1,0 +1,61 @@
+namespace MyServiceBus.RavenUnionConsumer
+
+import System.Collections.Generic.*
+import Microsoft.Extensions.DependencyInjection.*
+import Microsoft.Extensions.Hosting.*
+import MyServiceBus.*
+import MyServiceBus.Topology.*
+
+async func Main() -> Task {
+    let services = ServiceCollection()
+    let audit = UnionConsumerAudit()
+    services.AddSingleton<UnionConsumerAudit>(audit)
+    services.AddServiceBus(func (bus) => {
+        bus.UsingMediator()
+        bus.AddConsumers(typeof(SubmitOrder).Assembly)
+    })
+
+    use provider = services.BuildServiceProvider()
+    let topology = provider.GetRequiredService<TopologyRegistry>()
+    Assert(topology.Consumers.Count == 2, "The Raven union consumer should expand into two registrations.")
+    Assert(topology.ReceiveEndpoints.Count == 1, "Both Raven union cases should share one endpoint.")
+    Assert(topology.Messages.All(message => message.MessageType != typeof(System.Union<SubmitOrder, CancelOrder>)), "The Raven union carrier leaked into topology.")
+
+    let hostedService = provider.GetRequiredService<IHostedService>()
+    await hostedService.StartAsync(CancellationToken.None)
+    try {
+        let mediator = provider.GetRequiredService<IMediator>()
+        await mediator.Send(SubmitOrder("R-42"))
+        await mediator.Send(CancelOrder("R-42"))
+        Assert(audit.Events.SequenceEqual(["submit:R-42", "cancel:R-42"]), "Raven union dispatch selected the wrong cases.")
+    } finally {
+        await hostedService.StopAsync(CancellationToken.None)
+    }
+
+    Console.WriteLine("Raven union package consumer passed.")
+}
+
+func Assert(condition: bool, message: string) {
+    if !condition {
+        throw InvalidOperationException(message)
+    }
+}
+
+record SubmitOrder(OrderId: string)
+record CancelOrder(OrderId: string)
+
+class UnionConsumerAudit {
+    val Events = List<string>()
+}
+
+[Consumer("orders")]
+class OrderConsumers {
+    func Consume(
+        message: SubmitOrder | CancelOrder,
+        audit: UnionConsumerAudit) {
+        match message {
+            SubmitOrder(let orderId) => audit.Events.Add("submit:$orderId")
+            CancelOrder(let orderId) => audit.Events.Add("cancel:$orderId")
+        }
+    }
+}

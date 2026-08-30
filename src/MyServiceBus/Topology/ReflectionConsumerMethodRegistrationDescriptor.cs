@@ -12,17 +12,20 @@ internal sealed class ReflectionConsumerMethodRegistrationDescriptor<TMessage> :
     private readonly ConsumerMethodParameterBinding[] bindings;
     private readonly string consumerId;
     private readonly IConsumerMethodResponseHandler? responseHandler;
+    private readonly Func<object, object>? messageFactory;
 
     public ReflectionConsumerMethodRegistrationDescriptor(
         MethodInfo method,
         ConsumerMethodParameterBinding[] bindings,
         string consumerId,
-        IConsumerMethodResponseHandler? responseHandler)
+        IConsumerMethodResponseHandler? responseHandler,
+        Func<object, object>? messageFactory)
     {
         this.method = method;
         this.bindings = bindings;
         this.consumerId = consumerId;
         this.responseHandler = responseHandler;
+        this.messageFactory = messageFactory;
     }
 
     public Type ConsumerType => method.DeclaringType!;
@@ -54,7 +57,9 @@ internal sealed class ReflectionConsumerMethodRegistrationDescriptor<TMessage> :
         {
             arguments[index] = bindings[index] switch
             {
-                ConsumerMethodParameterBinding.Message => context.Message,
+                ConsumerMethodParameterBinding.Message => messageFactory is null
+                    ? context.Message
+                    : messageFactory(context.Message),
                 ConsumerMethodParameterBinding.ConsumeContext => context,
                 ConsumerMethodParameterBinding.CancellationToken => context.CancellationToken,
                 ConsumerMethodParameterBinding.Service => provider.GetRequiredService(parameters[index].ParameterType),
@@ -150,7 +155,8 @@ internal sealed class ConsumerMethodDefinition
         Type? endpointNameFormatterType,
         ConsumerMethodParameterBinding[] bindings,
         ConsumerMethodReturnKind returnKind,
-        Type? responseType)
+        Type? responseType,
+        Func<object, object>? messageFactory)
     {
         Method = method;
         MessageType = messageType;
@@ -160,6 +166,7 @@ internal sealed class ConsumerMethodDefinition
         Bindings = bindings;
         ReturnKind = returnKind;
         ResponseType = responseType;
+        MessageFactory = messageFactory;
     }
 
     public MethodInfo Method { get; }
@@ -170,14 +177,17 @@ internal sealed class ConsumerMethodDefinition
     public ConsumerMethodParameterBinding[] Bindings { get; }
     public ConsumerMethodReturnKind ReturnKind { get; }
     public Type? ResponseType { get; }
+    public Func<object, object>? MessageFactory { get; }
 }
 
 internal static class ReflectionConsumerMethodDiscovery
 {
+    [RequiresDynamicCode("Union-aware consumer discovery compiles case construction delegates at runtime.")]
     [RequiresUnreferencedCode("Attributed consumer method discovery requires method and parameter metadata.")]
     public static IEnumerable<ConsumerMethodDefinition> Discover(Assembly assembly)
         => Discover(assembly, static _ => true);
 
+    [RequiresDynamicCode("Union-aware consumer discovery compiles case construction delegates at runtime.")]
     [RequiresUnreferencedCode("Attributed consumer method discovery requires method and parameter metadata.")]
     public static IEnumerable<ConsumerMethodDefinition> Discover(Assembly assembly, Func<Type, bool> typeFilter)
     {
@@ -194,7 +204,8 @@ internal static class ReflectionConsumerMethodDiscovery
                 if (method.IsPrivate || method.IsFamily || method.IsFamilyAndAssembly || method.IsAbstract || method.IsGenericMethodDefinition)
                     continue;
 
-                yield return CreateDefinition(method, methodAttribute, typeAttribute);
+                foreach (var definition in CreateDefinitions(method, methodAttribute, typeAttribute))
+                    yield return definition;
             }
         }
     }
@@ -204,6 +215,7 @@ internal static class ReflectionConsumerMethodDiscovery
             implementedInterface.IsGenericType
             && implementedInterface.GetGenericTypeDefinition() == typeof(IConsumer<>));
 
+    [RequiresDynamicCode("Union-aware consumer discovery compiles case construction delegates at runtime.")]
     [RequiresUnreferencedCode("Consumer method discovery requires method and parameter metadata.")]
     public static IEnumerable<ConsumerMethodDefinition> Discover(Type consumerType)
     {
@@ -219,11 +231,13 @@ internal static class ReflectionConsumerMethodDiscovery
         {
             if (method.IsPrivate || method.IsFamily || method.IsFamilyAndAssembly || method.IsAbstract || method.IsGenericMethodDefinition)
                 continue;
-            yield return CreateDefinition(method, method.GetCustomAttribute<ConsumerAttribute>(), typeAttribute);
+            foreach (var definition in CreateDefinitions(method, method.GetCustomAttribute<ConsumerAttribute>(), typeAttribute))
+                yield return definition;
         }
     }
 
-    private static ConsumerMethodDefinition CreateDefinition(
+    [RequiresDynamicCode("Union-aware consumer discovery compiles case construction delegates at runtime.")]
+    private static IEnumerable<ConsumerMethodDefinition> CreateDefinitions(
         MethodInfo method,
         ConsumerAttribute? methodAttribute,
         ConsumerAttribute? typeAttribute)
@@ -260,16 +274,34 @@ internal static class ReflectionConsumerMethodDiscovery
             }
         }
 
-        if (messageType is null || !messageType.IsClass)
+        if (messageType is null)
             throw Invalid(method, "exactly one reference-type message parameter is required");
+
+        ReflectionUnionDescriptor? unionDescriptor;
+        try
+        {
+            ReflectionUnionDescriptor.TryGet(messageType, out unionDescriptor);
+        }
+        catch (InvalidOperationException exception)
+        {
+            throw Invalid(method, exception.Message);
+        }
+
+        var messageTypes = unionDescriptor?.CaseTypes ?? [messageType];
+        if (messageTypes.Any(static candidate => !candidate.IsClass))
+            throw Invalid(method, "every message or union case must be a reference type");
 
         foreach (var parameter in parameters)
         {
             if (parameter.ParameterType.IsGenericType
                 && parameter.ParameterType.GetGenericTypeDefinition() == typeof(ConsumeContext<>)
-                && parameter.ParameterType.GetGenericArguments()[0] != messageType)
+                && (unionDescriptor is not null
+                    || parameter.ParameterType.GetGenericArguments()[0] != messageType))
             {
-                throw Invalid(method, $"context type must be ConsumeContext<{messageType.Name}>");
+                var reason = unionDescriptor is null
+                    ? $"context type must be ConsumeContext<{messageType.Name}>"
+                    : "union consumers currently support only non-generic ConsumeContext";
+                throw Invalid(method, reason);
             }
         }
 
@@ -282,15 +314,19 @@ internal static class ReflectionConsumerMethodDiscovery
         var endpointNameFormatterType = endpointNameIsExplicit || methodAttribute is not null
             ? null
             : method.DeclaringType;
-        return new ConsumerMethodDefinition(
-            method,
-            messageType,
-            endpointName,
-            endpointNameIsExplicit,
-            endpointNameFormatterType,
-            bindings,
-            returnKind,
-            responseType);
+        foreach (var concreteMessageType in messageTypes)
+        {
+            yield return new ConsumerMethodDefinition(
+                method,
+                concreteMessageType,
+                endpointName,
+                endpointNameIsExplicit,
+                endpointNameFormatterType,
+                bindings,
+                returnKind,
+                responseType,
+                unionDescriptor?.GetFactory(concreteMessageType));
+        }
     }
 
     private static (ConsumerMethodReturnKind ReturnKind, Type? ResponseType) GetReturnShape(MethodInfo method)
@@ -328,14 +364,15 @@ internal static class ReflectionConsumerMethodRegistrationDescriptorFactory
     public static IConsumerRegistrationDescriptor Create(ConsumerMethodDefinition definition)
     {
         var descriptorType = typeof(ReflectionConsumerMethodRegistrationDescriptor<>).MakeGenericType(definition.MessageType);
-        var consumerId = $"{definition.Method.Module.ModuleVersionId:N}:{definition.Method.MetadataToken}";
+        var consumerId = $"{definition.Method.Module.ModuleVersionId:N}:{definition.Method.MetadataToken}:{definition.MessageType.AssemblyQualifiedName}";
         var responseHandler = CreateResponseHandler(definition);
         return (IConsumerRegistrationDescriptor)(Activator.CreateInstance(
             descriptorType,
             definition.Method,
             definition.Bindings,
             consumerId,
-            responseHandler) ?? throw new InvalidOperationException($"Failed to create a registration descriptor for {definition.Method}."));
+            responseHandler,
+            definition.MessageFactory) ?? throw new InvalidOperationException($"Failed to create a registration descriptor for {definition.Method}."));
     }
 
     private static IConsumerMethodResponseHandler? CreateResponseHandler(ConsumerMethodDefinition definition)

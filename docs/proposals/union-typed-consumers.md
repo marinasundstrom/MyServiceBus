@@ -8,6 +8,50 @@ Target: MyServiceBus for .NET 11 / C# 15, with an idiomatic Raven projection ove
 
 Feature area: consumer-method discovery, binding, dispatch, endpoint topology, and related request/response result handling.
 
+### Executable prototype
+
+An executable spike lives in [`test/Experiments/DotNet11Unions`](../../test/Experiments/DotNet11Unions/README.md). It currently proves the following against .NET 11 Preview 7:
+
+- a C# named union emits `UnionAttribute`, implements `IUnion`, and exposes one public constructor per case;
+- reflection discovery can normalize that carrier into one concrete registration per case while retaining one receive endpoint;
+- mediator delivery of either case constructs the local union and invokes the same exhaustive handler;
+- the union carrier is absent from message topology;
+- Raven's `T1 | T2` source form lowers to Raven.Core's `System.Union<T1, T2>` and follows the same path without Raven-specific MyServiceBus runtime code;
+- `Response<T1, T2>` can provide implicit case conversion, exhaustive C# matching, `TryGetValue`, and transparent STJ serialization on the `net11.0` build; and
+- independently restored C# and Raven applications can consume locally packed MyServiceBus NuGet packages and execute these behaviors.
+
+The prototype is intentionally narrower than this proposal. It supports reflection-discovered input unions with public case constructors, mediator dispatch, and two-case response results. It does not yet implement generated registration, NativeAOT, broker conformance, union-valued handler returns, typed `ConsumeContext<TUnion>`, provider-based ABI construction, general outbound union values, or a Java convenience API.
+
+### What the experiment establishes
+
+The result should be read by layer:
+
+| Layer | Prototype conclusion |
+| --- | --- |
+| Portable messaging capability | One operation may declare several accepted contracts; every case keeps its ordinary identity, envelope, serialization contract, topology, failure behavior, and cross-language interoperability. |
+| .NET runtime adaptation | A cached descriptor can recognize the standard union ABI and expand it before the ordinary strongly typed consume pipeline is closed. |
+| C# projection | Named unions and union-semantic `Response<T...>` provide concise exhaustive APIs as an alternative to separate handlers or inheritance hierarchies. |
+| Raven projection | Raven's standard `System.Union<T...>` works through the same ABI adapter and can expose Raven-native `match` syntax. |
+| Java participation | Java requires no union feature to exchange any case. A future Java API may project the portable capability through sealed types or a registration builder, but that is a separate design choice. |
+
+This separation is deliberate. A successful platform experiment may justify an idiomatic client feature without requiring every client language to copy its syntax or local carrier type.
+
+### Compatibility with future runtime optimization
+
+Union support should normalize into the same concrete registration model used by ordinary consumers. The transport, deserializer, filters, retry pipeline, and settlement path continue to operate on `TCase`; only the final method adapter constructs `TUnion`. This keeps the feature compatible with later runtime work because union awareness does not spread through the hot transport path.
+
+The prototype reflection path performs metadata inspection once, caches the descriptor by carrier type, and compiles one constructor delegate per case. It does not rediscover constructors for each delivery. It still inherits the allocation and reflection costs of the existing reflection consumer path: the union struct is boxed for `MethodInfo.Invoke`, and invocation uses an argument array.
+
+The optimized path should teach the C# registration generator to emit the normalized case registrations and direct construction:
+
+```text
+case registration: SubmitOrder
+deserialize:        SubmitOrder
+invoke:             Consume(new OrderCommand(context.Message), ...)
+```
+
+That generated path needs neither runtime ABI discovery, expression compilation, boxing, nor `MethodInfo.Invoke`. Raven source is not visible to the C# generator, so an optimized Raven/AOT path would need a Raven-generated registration manifest or equivalent compiler integration. Both optimized paths must produce the same concrete descriptors and topology as reflection discovery.
+
 ## Summary
 
 MyServiceBus should allow one consumer method to accept a closed union of message types. Every union case remains an independent wire-level message contract and contributes its ordinary transport binding, while all cases are delivered through one receive endpoint and dispatched to one method.
