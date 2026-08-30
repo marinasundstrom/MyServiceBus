@@ -33,11 +33,22 @@ The emulator suite currently proves direct delivery, topic forwarding, and the
 public factory path independently for each client. It also proves bidirectional
 C# and Java delivery for directed send and publish, plus retry recovery,
 retry exhaustion, `_error` and `_skipped` settlement, and endpoint fault
-publication in both clients.
-The live Azure acceptance gate proves cloud administration, publication,
-forwarding, consumption, lock renewal, request/response, terminal failure
-settlement, and bidirectional MassTransit interoperability from both
-implementations.
+publication in both clients. A dedicated emulator matrix additionally proves
+directed sends and publications in both directions between MassTransit 8.5.1
+and each MyServiceBus client.
+
+The live Azure acceptance gate is deliberately narrower in purpose: it proves
+the cloud administration surface, Create-mode topology, default topology names,
+lock renewal, native temporary queues, request/response, correlated faults, and
+terminal failure settlement that the emulator cannot faithfully establish. It
+also retains the complete MassTransit matrix as a periodic cloud-fidelity check.
+
+Use the emulator as the routine acceptance gate. Run the ephemeral live-Azure
+gate before a preview or stable release, after changing the Azure SDK,
+MassTransit peer, topology management, locks, temporary endpoints, or
+authentication, and whenever an emulator discrepancy is suspected. Ordinary
+message-mapping, send, publish, and settlement changes do not require a duplicate
+cloud run when the emulator matrix passes.
 
 The first slice does not expose sessions, duplicate detection, native scheduled
 enqueue, deferral, delayed redelivery, transactions, partitioning, or custom

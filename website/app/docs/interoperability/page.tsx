@@ -20,7 +20,7 @@ export default function Interoperability() {
           <thead><tr><th>Transport</th><th>Verified</th><th>Not yet verified</th></tr></thead>
           <tbody>
             <tr><td><strong>RabbitMQ</strong></td><td>Full C# / Java / MassTransit 8.5.1 matrix</td><td>Features outside the documented portable profile</td></tr>
-            <tr><td><strong>Azure Service Bus</strong></td><td>Live-cloud send, publish, request, fault, naming, lock renewal, and settlement</td><td>Promotion review against every current MassTransit convention</td></tr>
+            <tr><td><strong>Azure Service Bus</strong></td><td>Emulator send/publish matrix plus periodic live topology, request, fault, naming, lock, and settlement checks</td><td>Sessions, managed identity, transactions, and native scheduling</td></tr>
             <tr><td><strong>Amazon SQS/SNS</strong></td><td>Standard-queue send and raw SNS publication in both directions for C#, Java, and MassTransit 8.5.1</td><td>FIFO queues and FIFO-specific ordering, grouping, and deduplication</td></tr>
           </tbody>
         </table>
@@ -32,7 +32,7 @@ export default function Interoperability() {
       <h2>Contract for every supported transport</h2>
       <p>Both MyServiceBus clients must follow the supported MassTransit peer’s addressing, entity naming, topology, native-property, and settlement conventions. A transport is not promoted from experimental to supported until C#, Java, and MassTransit can communicate in both directions through that profile’s documented conformance matrix.</p>
 
-      <div className="callout"><strong>Azure Service Bus: verified preview</strong><p>Live Azure verifies cloud topology, default message and consumer endpoint naming, bidirectional publish, directed queue sends, correlated responses and faults, lock renewal, and terminal failure settlement between MassTransit and both MyServiceBus clients.</p></div>
+      <div className="callout"><strong>Azure Service Bus: verified preview</strong><p>The emulator is the routine gate for bidirectional directed sends and publications between MassTransit 8.5.1 and both MyServiceBus clients. Periodic live Azure runs verify cloud topology, default naming, correlated responses and faults, lock renewal, native temporary queues, and terminal failure settlement.</p></div>
 
       <div className="callout"><strong>Amazon SQS/SNS: standard-queue preview</strong><p>LocalStack verifies bidirectional directed sends and raw SNS-to-SQS publication between MassTransit 8.5.1 and both MyServiceBus clients. It is the default acceptance environment; the narrow real-AWS gate is reserved for emulator differences and AWS-only concerns. FIFO behavior is not part of this preview.</p></div>
 
