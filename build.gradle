@@ -1,6 +1,6 @@
 
 group = 'io.github.marinasundstrom.myservicebus'
-version = '0.1.0-preview.6'
+version = '0.1.0-preview.7'
 
 def publishedProjectDescriptions = [
     'myservicebus-abstractions': 'Portable messaging contracts and abstractions for MyServiceBus.',

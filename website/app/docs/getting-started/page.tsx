@@ -10,9 +10,9 @@ const startRabbitMq = `docker run --rm --detach \\
 
 const install = {
   csharp: `dotnet add package Sundstrom.MyServiceBus.RabbitMq \\
-  --version 0.1.0-preview.6`,
+  --version 0.1.0-preview.7`,
   java: `dependencies {
-    implementation 'io.github.marinasundstrom.myservicebus:myservicebus-rabbitmq:0.1.0-preview.6'
+    implementation 'io.github.marinasundstrom.myservicebus:myservicebus-rabbitmq:0.1.0-preview.7'
 }`,
 };
 

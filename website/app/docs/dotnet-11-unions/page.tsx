@@ -101,9 +101,11 @@ export default function DotNet11Unions() {
 
       <h2>Raven makes the same model feel native</h2>
       <p>
-        Raven is a .NET programming language that compiles to CLR assemblies and is designed to
-        express modern .NET features with concise syntax. It can reference the same NuGet packages,
-        types, and runtime contracts as a C# application.
+        <a href="https://marinasundstrom.github.io/raven/">Raven</a> is a preview .NET
+        programming language that compiles to CLR assemblies and is designed to express modern
+        .NET features with concise syntax. It can reference the same NuGet packages, types, and
+        runtime contracts as a C# application. Raven&apos;s syntax and behavior may change while it
+        remains in preview.
       </p>
       <p>
         Raven writes <code>System.Union&lt;SubmitOrder, CancelOrder&gt;</code> as

@@ -82,7 +82,7 @@ const javaResponseMethodExample = `public final class OrderConsumers {
 }`;
 
 const javaGeneratedExample = `dependencies {
-    annotationProcessor "io.github.marinasundstrom.myservicebus:myservicebus-processor:0.1.0-preview.6"
+    annotationProcessor "io.github.marinasundstrom.myservicebus:myservicebus-processor:0.1.0-preview.7"
 }
 
 GeneratedConsumerCatalog.INSTANCE.register(configurator);`;

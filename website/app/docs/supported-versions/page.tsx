@@ -1,8 +1,8 @@
 import Link from 'next/link';
 
 const versions = [
-  ['MyServiceBus', '0.1.0-preview.6', 'Only the newest preview is actively supported before 1.0.'],
-  ['.NET', '.NET 10', 'C# packages target net10.0 and use the .NET 10 BCL.'],
+  ['MyServiceBus', '0.1.0-preview.7', 'Only the newest preview is actively supported before 1.0.'],
+  ['.NET', '.NET 10', 'All C# packages target net10.0; the abstractions and core runtime also carry experimental net11.0 assets.'],
   ['Java', 'Java 17 or newer', 'Published bytecode and APIs target Java 17; Temurin 17 is the release-gating JDK.'],
   ['PostgreSQL', '17 / 17.6 baseline', 'Transactional outbox and inbox provider.'],
   ['RabbitMQ', '4.1 / 4.1.8 baseline', 'Declared RabbitMQ transport profile.'],
@@ -25,10 +25,12 @@ export default function SupportedVersions() {
       <div className="callout callout-accent">
         <strong>Language target and runtime target are not the same decision</strong>
         <p>
-          The C# packages target <code>net10.0</code>, which defines the available .NET
-          framework surface. Java publishes Java 17-compatible class files and APIs while
-          using modern Java 17 features and idioms. Newer JDKs are expected to run the
-          packages, but they are not release-gating environments today.
+          All C# packages target <code>net10.0</code>, which defines the ordinary supported
+          .NET framework surface. The abstractions and core runtime additionally include
+          experimental <code>net11.0</code> assets for union semantics. Java publishes Java
+          17-compatible class files and APIs while using modern Java 17 features and idioms.
+          Newer JDKs are expected to run the packages, but they are not release-gating
+          environments today.
         </p>
       </div>
 
