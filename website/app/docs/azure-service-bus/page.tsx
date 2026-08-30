@@ -102,7 +102,7 @@ export default function AzureServiceBus() {
       <h1>Run MyServiceBus on Azure Service Bus.</h1>
       <p className="docs-summary">Provision a namespace, connect the C# or Java client, and let MyServiceBus create the queues, topics, and subscriptions needed by your consumers.</p>
 
-      <div className="callout callout-accent"><strong>Verified preview</strong><p>The documented C# and Java flows are verified against live Azure and MassTransit 8.5.1. The project is still pre-1.0, so preview releases may make breaking configuration changes.</p></div>
+      <div className="callout callout-accent"><strong>Verified preview</strong><p>Routine emulator tests verify directed sends and publications in every direction between MassTransit 8.5.1 and the C# and Java clients. Periodic live-Azure tests cover the management and broker behavior the emulator cannot reproduce. The project is still pre-1.0, so preview releases may make breaking configuration changes.</p></div>
 
       <h2>1. Provision a namespace</h2>
       <p>Install the Azure CLI, sign in, and create an isolated Service Bus namespace. Replace the namespace placeholder with a globally unique name. Use Standard or Premium: the Basic tier does not support the topics and subscriptions required for publish/subscribe.</p>
@@ -137,7 +137,9 @@ export default function AzureServiceBus() {
       <p className="small-note">Request clients normally create unique auto-delete response queues. A pre-provisioned environment must also map temporary response endpoint names to infrastructure-owned queues.</p>
 
       <h2>MassTransit interoperability</h2>
-      <p>Azure entity names are part of the wire contract. Automatic consumer endpoint names follow MassTransit’s default suffix rules in both clients, and corresponding message contracts resolve to the same topic names. Use matching explicit entity-name overrides in MyServiceBus and MassTransit when defaults are not suitable. Live tests cover the resulting queues, subscriptions, companions, directed sends, publication, correlated responses and faults, and terminal failure preservation in <code>_error</code>.</p>
+      <p>Azure entity names are part of the wire contract. Automatic consumer endpoint names follow MassTransit’s default suffix rules in both clients, and corresponding message contracts resolve to the same topic names. Use matching explicit entity-name overrides in MyServiceBus and MassTransit when defaults are not suitable. Emulator tests cover bidirectional directed sends and publication for C# and Java. Live tests cover cloud topology, subscriptions, companions, correlated responses and faults, lock renewal, native temporary queues, and terminal failure preservation in <code>_error</code>.</p>
+
+      <div className="callout"><strong>Cloud tests are periodic, not routine</strong><p>Use the emulator for ordinary transport changes. Run an isolated live namespace for releases, relevant SDK or topology changes, authentication work, or a suspected emulator discrepancy, then delete it immediately to limit cost.</p></div>
 
       <h2>Remove an evaluation environment</h2>
       <p>If the resource group is dedicated to this evaluation, delete it when you finish to stop further Azure charges. This removes the namespace and every entity inside it.</p>

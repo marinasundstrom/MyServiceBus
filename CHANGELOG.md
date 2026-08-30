@@ -4,6 +4,7 @@ This changelog summarizes the bigger themes in the repository history rather tha
 
 ## Unreleased
 
+- Added an eight-direction Azure Service Bus emulator matrix for bidirectional C#/Java and MassTransit 8.5.1 sends and publications, and documented an emulator-first policy with periodic ephemeral Azure runs limited to management-plane and cloud-fidelity gaps.
 - Added matching experimental C# and Java Amazon SQS/SNS transports with standard-queue directed delivery, raw SNS subscriptions, bounded long polling, visibility renewal, native redelivery, temporary request queues, `_error`/`_skipped`/fault handling, create and pre-provisioned topology modes, LocalStack integration coverage, and complete NuGet/Maven artifact wiring. The low-level profile now has real-AWS acceptance evidence and bidirectional C#/Java interoperability coverage with MassTransit 8.5.1 for direct sends and publications.
 
 ## 0.1.0-preview.6 - 2026-08-29

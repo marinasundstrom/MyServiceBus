@@ -35,6 +35,11 @@ docker compose -f test/AzureServiceBusEmulator/compose.yaml down --volumes
 Set `MSB_SERVICEBUS_SQL_PASSWORD` to override the local fixture password. Do not
 use that development password outside this disposable Compose project.
 
+The MassTransit interoperability cases require the declared `localhost:5672`
+endpoint because the emulator uses that address as part of its namespace
+identity. Do not remap the AMQP port for those cases; stop any conflicting local
+broker for the duration of the emulator run.
+
 ## Test topology
 
 | Entity | Kind | Purpose |

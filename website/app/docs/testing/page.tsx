@@ -47,9 +47,11 @@ export default function Testing() {
       <div className="callout callout-accent"><strong>Harness vs mediator</strong><p>The test harness models a hosted transport lifecycle. The standalone in-memory mediator is immediately usable after construction and is intended for in-process messaging.</p></div>
 
       <h2>Integration and interoperability tests</h2>
-      <p>For transport-level confidence, the project uses pinned local brokers and emulators. RabbitMQ runs through Testcontainers; Amazon SQS/SNS runs through LocalStack. Cross-language and MassTransit scenarios are transport-specific. LocalStack is the default Amazon acceptance environment; live AWS is reserved for documented emulator differences, observed discrepancies, and AWS-only concerns.</p>
+      <p>For transport-level confidence, the project uses pinned local brokers and emulators. RabbitMQ runs through Testcontainers, Amazon SQS/SNS through LocalStack, and Azure Service Bus through Microsoft&apos;s emulator. Cross-language and MassTransit scenarios are transport-specific. Emulators are the default acceptance environments; live cloud is reserved for documented fidelity gaps, observed discrepancies, and cloud-only concerns.</p>
 
       <div className="callout"><strong>Trust the emulator by default</strong><p>LocalStack runs bidirectional C#, Java, and MassTransit 8.5.1 send/publication checks. The narrower AWS gate is not a routine duplicate run; use it only when the emulator cannot establish the behavior under test.</p></div>
+
+      <div className="callout"><strong>Azure evidence is split by fidelity</strong><p>The Azure emulator runs the same eight bidirectional send/publication directions across C#, Java, and MassTransit 8.5.1. A short-lived live namespace is reserved for releases, management topology, locks, temporary queues, authentication, SDK changes, and suspected emulator discrepancies.</p></div>
 
       <div className="next-card"><div><span>Next</span><strong>See what compatibility means</strong></div><Link href="/docs/interoperability">Interoperability →</Link></div>
     </article>

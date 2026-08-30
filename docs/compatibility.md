@@ -186,14 +186,17 @@ The current RabbitMQ baseline uses RabbitMQ `4.1.8-alpine` and MassTransit `8.5.
 
 This baseline is **verified with documented limitations** for the scenarios in the matrix. It is not a claim of complete MassTransit feature or API compatibility.
 
-The Azure Service Bus preview baseline uses a live Standard-tier namespace and
-MassTransit `8.5.1`. It verifies corresponding C# and Java Create-mode topology,
-default and explicit naming, publish and directed send in both MassTransit
-directions, cross-language delivery, correlated responses and faults, lock
-renewal, and terminal failure preservation in `_error` followed by source
-completion. It is likewise **verified with documented limitations**; sessions,
-managed identity, transactions, native scheduling, and the other capabilities
-listed as unsupported or unexposed in the transport profile are not implied.
+The Azure Service Bus preview baseline uses emulator `2.0.1`, a periodic live
+Standard-tier namespace, and MassTransit `8.5.1`. The routine emulator gate
+verifies publish and directed send in every C#, Java, and MassTransit direction,
+alongside cross-language delivery and settlement behavior. The ephemeral cloud
+gate verifies Create-mode topology, default naming, correlated responses and
+faults, lock renewal, native temporary queues, and terminal failure preservation
+in `_error` followed by source completion. It runs for releases, relevant SDK or
+topology changes, and suspected emulator discrepancies rather than duplicating
+every passing emulator run. The profile is **verified with documented
+limitations**; sessions, managed identity, transactions, native scheduling, and
+the other capabilities listed as unsupported or unexposed are not implied.
 
 ## Compatibility Status Labels
 

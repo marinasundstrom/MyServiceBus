@@ -55,10 +55,11 @@ once while both competing consumers participate. Request tests map
 generated temporary endpoint names to the fixture's sequential `msb-response`
 queue and cover responses and faults. The .NET suite also launches the Java
 interoperability peer to prove directed send and publish in both language
-directions, including correlated requests and responses. Those cross-language
-delivery checks also verify envelope identifiers, addresses, application
-headers, and native message, correlation, reply-to, subject, and destination
-properties.
+directions, including correlated requests and responses. A separate eight-case
+matrix verifies directed sends and publications in both directions between
+MassTransit 8.5.1 and each MyServiceBus client. Those cross-language delivery
+checks also verify envelope identifiers, addresses, application headers, and
+native message, correlation, reply-to, subject, and destination properties.
 
 Validate the checked-in JSON and Compose configuration with:
 
@@ -76,9 +77,9 @@ RUN_AZURE_SERVICEBUS_EMULATOR_TESTS=1 \
 ```
 
 Ordinary test runs skip the emulator scenarios. The cross-language cases also
-require Java 17 and system Gradle. These tests prove the local data plane only;
-cloud topology creation, identity, and MassTransit Azure Service Bus
-interoperability remain separate gates.
+require Java 17 and system Gradle. These tests are the routine Azure data-plane
+and MassTransit compatibility gate. Cloud topology creation, identity, native
+temporary entities, and other management-plane behavior remain a separate gate.
 
 The optional cloud gate includes C# and Java acceptance tests that start with
 unique entity names, use MyServiceBus `Create` mode to provision queues,
@@ -190,6 +191,12 @@ AZURE_SERVICEBUS_CLOUD_CONNECTION_STRING='<connection-string>' \
 
 The self-provisioning MassTransit cloud cases are included by the runner. To run
 only those cases, use the `MassTransitAzureServiceBusInteropTests` .NET filter.
+
+Use the emulator by default. Run the ephemeral cloud gate before preview or
+stable releases; after changing the Azure SDK, MassTransit version, topology
+management, lock renewal, temporary endpoints, or authentication; or when an
+emulator discrepancy is suspected. Do not duplicate ordinary send, publish, or
+settlement checks in Azure merely because cloud access is available.
 
 See the fixture README and the [Azure Service Bus transport profile](azure-service-bus-transport.md)
 for its topology, connection string, sequential-test constraint, and cloud
