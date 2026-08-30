@@ -118,16 +118,17 @@ pre { font-family: var(--font-geist-mono), monospace; font-size: clamp(10px, .9v
 .docs-article > p { color: var(--muted); font-size: 15.5px; line-height: 1.8; max-width: 700px; }
 .markdown-content > ul, .markdown-content > ol { color: var(--muted); font-size: 14px; line-height: 1.7; margin: 20px 0 34px; max-width: 700px; padding-left: 24px; }
 .markdown-content > ul li, .markdown-content > ol li { margin: 7px 0; padding-left: 5px; }
-.markdown-content > table { border-collapse: collapse; margin: 28px 0 44px; width: 100%; }
-.markdown-content > table th, .markdown-content > table td { border: 1px solid var(--line); font-size: 12.5px; line-height: 1.5; padding: 13px 14px; text-align: left; vertical-align: top; }
-.markdown-content > table th { background: var(--cream); color: var(--ink); font-weight: 700; }
-.markdown-content > table td { color: var(--muted); }
+.markdown-table-wrap { margin: 28px 0 44px; max-width: 100%; overflow-x: auto; }
+.markdown-table-wrap > table { border-collapse: collapse; min-width: 600px; width: 100%; }
+.markdown-table-wrap th, .markdown-table-wrap td { border: 1px solid var(--line); font-size: 12.5px; line-height: 1.5; padding: 13px 14px; text-align: left; vertical-align: top; }
+.markdown-table-wrap th { background: var(--cream); color: var(--ink); font-weight: 700; }
+.markdown-table-wrap td { color: var(--muted); }
 .markdown-content li code, .markdown-content td code { background: #e5e0d3; border-radius: 3px; color: #304038; font-family: var(--font-geist-mono), monospace; font-size: .86em; padding: 2px 5px; }
 .dashboard-screenshots { display: grid; gap: 16px; grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 28px 0 8px; }
 .dashboard-screenshots figure { margin: 0; }
 .dashboard-screenshots img { border: 1px solid var(--line); border-radius: 10px; display: block; height: auto; width: 100%; }
 .dashboard-screenshots figcaption { color: #667169; font-size: 12px; margin-top: 8px; text-align: center; }
-.docs-article p code, .callout code, .queue-map code, .check-list code { background: color-mix(in srgb, var(--cream) 78%, var(--line)); border-radius: 3px; color: var(--ink); font-family: var(--font-geist-mono), monospace; font-size: .86em; padding: 2px 5px; }
+.docs-article p code, .callout code, .queue-map code, .check-list code { background: color-mix(in srgb, var(--cream) 78%, var(--line)); border-radius: 3px; color: var(--ink); font-family: var(--font-geist-mono), monospace; font-size: .86em; overflow-wrap: anywhere; padding: 2px 5px; }
 .callout { background: color-mix(in srgb, var(--cream) 82%, var(--paper)); border-left: 3px solid var(--muted); border-radius: 0 6px 6px 0; margin: 46px 0; padding: 20px 23px; }
 .callout-accent { background: color-mix(in srgb, var(--mint) 30%, var(--paper)); border-left-color: var(--signal); }
 .callout strong { display: block; font-size: 13px; margin-bottom: 7px; }
@@ -179,7 +180,7 @@ pre { font-family: var(--font-geist-mono), monospace; font-size: clamp(10px, .9v
 .queue-map span { font-family: var(--font-geist-mono), monospace; font-size: 12px; font-weight: 650; }
 .queue-map p { color: var(--muted); font-size: 12px; line-height: 1.5; margin: 17px 0 0; }
 .check-list { list-style: none; margin: 24px 0 36px; padding: 0; }
-.check-list li { border-bottom: 1px solid var(--line); color: var(--muted); font-size: 14px; line-height: 1.5; padding: 14px 8px 14px 31px; position: relative; }
+.markdown-content > .check-list li { border-bottom: 1px solid var(--line); color: var(--muted); font-size: 14px; line-height: 1.5; padding: 14px 8px 14px 31px; position: relative; }
 .check-list li::before { color: var(--signal-dark); content: '✓'; font-weight: 800; left: 7px; position: absolute; }
 .interop-matrix { background: var(--code); border-radius: 8px; color: white; margin: 34px 0 48px; padding: 13px 24px; }
 .interop-matrix div { align-items: center; border-bottom: 1px solid #314137; display: grid; font-size: 12px; grid-template-columns: 1fr 36px 1fr; padding: 17px 0; text-align: center; }

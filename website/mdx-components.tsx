@@ -28,6 +28,14 @@ function MarkdownCodeBlock({ children }: ComponentPropsWithoutRef<'pre'>) {
   return <CodeViewer code={value} label={`${language} code example`} language={language} />;
 }
 
+function MarkdownTable(props: ComponentPropsWithoutRef<'table'>) {
+  return (
+    <div className="markdown-table-wrap">
+      <table {...props} />
+    </div>
+  );
+}
+
 function ConceptCard({
   children,
   href,
@@ -63,6 +71,7 @@ const components: MDXComponents = {
   ConceptCard,
   NextCard,
   pre: MarkdownCodeBlock,
+  table: MarkdownTable,
 };
 
 export function useMDXComponents(): MDXComponents {
