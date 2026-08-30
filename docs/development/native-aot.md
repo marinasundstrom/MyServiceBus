@@ -140,7 +140,7 @@ BenchmarkDotNet reports envelope/raw serialization and deserialization as separa
 
 The preview-pinned CI smoke targets `net11.0`, enables `runtime-async=on`, and forces an ordinary `IConsumer<TMessage>` implementation to suspend at `Task.Yield()`. It also sets `EnableNet11RuntimeAsyncTarget=true`, which rebuilds `MyServiceBus.Abstractions` and the core `MyServiceBus` runtime for `net11.0` with Runtime Async before publishing the native executable. The generated catalog registers the consumer and verifies completion through that rebuilt mediator pipeline.
 
-The opt-in property is an experimental source-compatibility gate, not a published target framework. Ordinary builds and packages remain on .NET 10. A future stable .NET 11 target slice must decide the package targeting policy and benchmark async dispatch with Runtime Async enabled and disabled before attributing gains to either the runtime or generated dispatch.
+The opt-in property remains the gate used by this NativeAOT project. The core NuGet packages now publish an experimental `net11.0` asset alongside `net10.0`; ordinary repository builds remain on .NET 10. Before .NET 11 becomes a stable target, benchmark async dispatch with Runtime Async enabled and disabled rather than attributing gains to either the runtime or generated dispatch without evidence.
 
 See [What's new in the .NET 11 runtime](https://learn.microsoft.com/dotnet/core/whats-new/dotnet-11/runtime#runtime-async) for the current preview status and configuration.
 

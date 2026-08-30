@@ -1,9 +1,10 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework Condition="'$(EnableNet11RuntimeAsyncTarget)' != 'true'">net10.0</TargetFramework>
-    <TargetFramework Condition="'$(EnableNet11RuntimeAsyncTarget)' == 'true'">net11.0</TargetFramework>
-    <Features Condition="'$(EnableNet11RuntimeAsyncTarget)' == 'true'">$(Features);runtime-async=on</Features>
+    <TargetFrameworks Condition="'$(IncludeExperimentalNet11Target)' == 'true'">net10.0;net11.0</TargetFrameworks>
+    <TargetFramework Condition="'$(IncludeExperimentalNet11Target)' != 'true' and '$(EnableNet11RuntimeAsyncTarget)' != 'true'">net10.0</TargetFramework>
+    <TargetFramework Condition="'$(IncludeExperimentalNet11Target)' != 'true' and '$(EnableNet11RuntimeAsyncTarget)' == 'true'">net11.0</TargetFramework>
+    <Features Condition="'$(TargetFramework)' == 'net11.0'">$(Features);runtime-async=on</Features>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>true</IsPackable>

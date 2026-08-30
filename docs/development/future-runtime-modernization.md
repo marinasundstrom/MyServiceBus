@@ -123,7 +123,7 @@ This classification prevents a .NET runtime optimization from becoming an artifi
 The repository currently has these relevant characteristics:
 
 - Production C# projects target `net10.0` through the .NET SDK pinned in `global.json`.
-- A .NET 11 NativeAOT smoke already rebuilds the abstractions and core runtime for `net11.0` with `runtime-async=on`. This is a useful experiment, not a published target.
+- The abstractions and core runtime packages publish an experimental `net11.0` asset alongside `net10.0`. A .NET 11 NativeAOT smoke rebuilds those projects with `runtime-async=on` and verifies generated mediator dispatch.
 - Java publishes Java 17-compatible APIs and bytecode. The build uses a Java 17 toolchain even when Gradle itself runs on a newer JDK.
 - C# exposes `Response<T>` and `Response<T1, T2>`. Multiple results are inspected with `Is(out Response<T>)`.
 - Java returns `T` for one expected response, exposes `Response2<T1, T2>` for the request client, and also contains unused or not-yet-integrated `Response3` through `Response8` wrappers. These wrappers repeat the same object-and-runtime-type implementation.

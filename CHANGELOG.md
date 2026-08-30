@@ -4,7 +4,7 @@ This changelog summarizes the bigger themes in the repository history rather tha
 
 ## Unreleased
 
-- Added an executable .NET 11 union prototype with ABI-based reflection consumer expansion, C# union-semantic response results, concrete-case topology, and staged NuGet consumers in both C# and Raven. The experiment keeps Java interoperability at the ordinary message-contract boundary and records the generated/AOT optimization path still required before promotion.
+- Added experimental .NET 11 union support with ABI-based reflection consumer expansion, C# union-semantic response results, concrete-case topology, and staged NuGet consumers in both C# and Raven. The two core NuGet packages now carry both `net10.0` and experimental `net11.0` assets, while Java interoperability remains at the ordinary concrete message-contract boundary. Published guidance positions C# as the primary .NET API and highlights Raven's idiomatic `Message1 | Message2` projection.
 - Added an eight-direction Azure Service Bus emulator matrix for bidirectional C#/Java and MassTransit 8.5.1 sends and publications, and documented an emulator-first policy with periodic ephemeral Azure runs limited to management-plane and cloud-fidelity gaps.
 - Added matching experimental C# and Java Amazon SQS/SNS transports with standard-queue directed delivery, raw SNS subscriptions, bounded long polling, visibility renewal, native redelivery, temporary request queues, `_error`/`_skipped`/fault handling, create and pre-provisioned topology modes, LocalStack integration coverage, and complete NuGet/Maven artifact wiring. The low-level profile now has real-AWS acceptance evidence and bidirectional C#/Java interoperability coverage with MassTransit 8.5.1 for direct sends and publications.
 

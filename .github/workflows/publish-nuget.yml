@@ -53,24 +53,22 @@ jobs:
       - name: Test
         run: dotnet test --no-build --configuration Release --verbosity normal
 
+      - name: Setup .NET 11 preview
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '11.0.100-preview.7.26381.103'
+
       - name: Build NuGet packages
-        run: |
-          dotnet pack src/MyServiceBus.Abstractions/MyServiceBus.Abstractions.csproj --no-build --configuration Release --output artifacts/packages
-          dotnet pack src/MyServiceBus/MyServiceBus.csproj --no-build --configuration Release --output artifacts/packages
-          dotnet pack src/MyServiceBus.Serialization.Bson/MyServiceBus.Serialization.Bson.csproj --no-build --configuration Release --output artifacts/packages
-          dotnet pack src/MyServiceBus.PostgreSql/MyServiceBus.PostgreSql.csproj --no-build --configuration Release --output artifacts/packages
-          dotnet pack src/MyServiceBus.Inspection/MyServiceBus.Inspection.csproj --no-build --configuration Release --output artifacts/packages
-          dotnet pack src/MyServiceBus.Monitoring/MyServiceBus.Monitoring.csproj --no-build --configuration Release --output artifacts/packages
-          dotnet pack src/MyServiceBus.RabbitMq/MyServiceBus.RabbitMq.csproj --no-build --configuration Release --output artifacts/packages
-          dotnet pack src/MyServiceBus.AzureServiceBus/MyServiceBus.AzureServiceBus.csproj --no-build --configuration Release --output artifacts/packages
-          dotnet pack src/MyServiceBus.AmazonSqs/MyServiceBus.AmazonSqs.csproj --no-build --configuration Release --output artifacts/packages
-          dotnet pack src/MyServiceBus.Testing/MyServiceBus.Testing.csproj --no-build --configuration Release --output artifacts/packages
+        run: ./eng/pack-dotnet-packages.sh
 
       - name: Verify NuGet packages
         run: ./eng/verify-dotnet-packages.sh artifacts/packages "${{ steps.package-version.outputs.version }}"
 
       - name: Verify NuGet package consumer
         run: ./eng/verify-dotnet-package-consumer.sh
+
+      - name: Verify .NET 11 union package consumers
+        run: ./eng/verify-dotnet11-union-package-consumers.sh artifacts/packages "${{ steps.package-version.outputs.version }}"
 
       - name: Upload package artifacts
         uses: actions/upload-artifact@v4

@@ -7,10 +7,11 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
+    <MyServiceBusPackageVersion Condition="'$(MyServiceBusPackageVersion)' == ''">0.1.0-unionprototype</MyServiceBusPackageVersion>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Sundstrom.MyServiceBus" Version="0.1.0-unionprototype" />
+    <PackageReference Include="Sundstrom.MyServiceBus" Version="$(MyServiceBusPackageVersion)" />
   </ItemGroup>
 
 </Project>

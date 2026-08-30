@@ -243,9 +243,10 @@ export default function NativeAot() {
           .NET 11 introduces preview runtime-managed async with NativeAOT support. An experimental
           CI smoke now compiles a consumer with the feature enabled, suspends it at an actual{' '}
           <code>await</code>, and resumes it through generated dispatch. The same gate rebuilds
-          the core abstractions and mediator runtime for .NET 11 with Runtime Async. Normal packages
-          still target .NET 10; the preview target is an opt-in source-compatibility proof. A future
-          stable target should compare async performance with the feature enabled and disabled.
+          the core abstractions and mediator runtime for .NET 11 with Runtime Async. The core NuGet
+          packages now include an experimental <code>net11.0</code> asset alongside their stable
+          <code>net10.0</code> asset. A future stable target should compare async performance with
+          the feature enabled and disabled.
           Runtime Async is an optimization, not a requirement for compiling today&apos;s async state
           machines with NativeAOT. See the{' '}
           <a href="https://learn.microsoft.com/dotnet/core/whats-new/dotnet-11/runtime#runtime-async">

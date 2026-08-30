@@ -37,6 +37,7 @@ const sections = [
       ['Transactional outbox', '/docs/transactional-outbox'],
       ['Message scheduling', '/docs/scheduling'],
       ['Consumer methods', '/docs/consumer-methods'],
+      ['.NET 11 and unions', '/docs/dotnet-11-unions'],
       ['Platform parity', '/docs/platform-parity'],
       ['Supported versions', '/docs/supported-versions'],
       ['AOT compilation', '/docs/native-aot'],

@@ -5,10 +5,11 @@
     <TargetFramework>net11.0</TargetFramework>
     <AssemblyName>MyServiceBus.RavenUnionConsumer</AssemblyName>
     <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
+    <MyServiceBusPackageVersion Condition="'$(MyServiceBusPackageVersion)' == ''">0.1.0-unionprototype</MyServiceBusPackageVersion>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Sundstrom.MyServiceBus" Version="0.1.0-unionprototype" />
+    <PackageReference Include="Sundstrom.MyServiceBus" Version="$(MyServiceBusPackageVersion)" />
   </ItemGroup>
 
 </Project>

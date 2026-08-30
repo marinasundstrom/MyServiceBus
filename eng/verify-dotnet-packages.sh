@@ -19,7 +19,18 @@ for package_id in $packages; do
   printf '%s' "$nuspec" | grep -Fq '<projectUrl>https://github.com/marinasundstrom/MyServiceBus</projectUrl>'
 done
 
+for package_id in Sundstrom.MyServiceBus.Abstractions Sundstrom.MyServiceBus; do
+  package="$package_dir/$package_id.$version.nupkg"
+  contents="$(unzip -Z1 "$package")"
+  case "$package_id" in
+    Sundstrom.MyServiceBus.Abstractions) assembly="MyServiceBus.Abstractions.dll" ;;
+    Sundstrom.MyServiceBus) assembly="MyServiceBus.dll" ;;
+  esac
+  printf '%s\n' "$contents" | grep -Fq "lib/net10.0/$assembly"
+  printf '%s\n' "$contents" | grep -Fq "lib/net11.0/$assembly"
+done
+
 actual_packages="$(find "$package_dir" -maxdepth 1 -type f \( -name '*.nupkg' -o -name '*.snupkg' \) | wc -l | tr -d ' ')"
 test "$actual_packages" = 20
 
-echo "Verified ten NuGet packages and ten symbol packages for $version."
+echo "Verified ten NuGet packages and ten symbol packages for $version, including the experimental .NET 11 core assets."
