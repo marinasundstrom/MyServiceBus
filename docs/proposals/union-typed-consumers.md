@@ -381,6 +381,41 @@ Ordinary `Publish(unionValue)` and `Send(unionValue)` should not gain implicit u
 
 Any outbound union operation must reject an inactive/default carrier before acquiring the transport and must never write the carrier into `messageType`.
 
+### .NET 11 `System.Text.Json` behavior
+
+Union serialization is not an ASP.NET Core-only feature. In .NET 11, `System.Text.Json` recognizes union contracts in both its reflection and source-generated modes. ASP.NET Core inherits that behavior on JSON request and response bodies because those paths use STJ. The same does not automatically apply to Newtonsoft.Json, MessagePack, or a transport serializer with its own contract model.
+
+STJ's default union representation is transparent:
+
+- writing a union unwraps it and writes only the active case using that case's JSON contract;
+- it writes no union envelope, case tag, or `$type` discriminator;
+- reading initially classifies the JSON by token shape; and
+- cases with the same compatible shape, such as two object cases, require a `JsonTypeClassifier` configured through `[JsonUnion]` or serializer options.
+
+That behavior is useful for HTTP APIs that want `anyOf`-like payloads without a synthetic wrapper, but it must not become MyServiceBus's case-selection mechanism. Most message DTOs begin with a JSON object token, so structural classification alone is commonly ambiguous. MyServiceBus already has stronger information in the envelope's concrete message identity.
+
+The receive path should therefore:
+
+1. select the concrete case from the message URN and registered contract metadata;
+2. deserialize directly as that case type using the endpoint's configured serializer; and
+3. construct the local union carrier after deserialization.
+
+The send and response paths should perform the reverse: unwrap first, select the concrete message contract, and ask the configured serializer to write that case. This makes JSON emitted by STJ compatible with the transparent union payload shape without depending on STJ, and it gives non-STJ serializers the same MyServiceBus semantics.
+
+Serializer-specific union classifiers remain application concerns for boundaries that genuinely deserialize a union value, such as an ASP.NET Core JSON body. They are not broker-routing metadata and must not be inferred from transport topology or copied into the portable envelope.
+
+### `Response<T...>` serialization compatibility
+
+Marking the existing `Response<T...>` classes as .NET unions may change how STJ serializes those wrappers outside MyServiceBus. Code that previously serialized the wrapper's public object shape may instead emit only the selected response message once STJ recognizes the union contract. MyServiceBus does not put the response wrapper on the broker wire, but applications may serialize it for HTTP responses, caches, logs, snapshots, or persistence.
+
+Before adapting the existing classes, the implementation proof must compare their .NET 10 and .NET 11 STJ contracts in reflection and source-generated modes. If the change cannot preserve a documented compatibility promise, choose explicitly among:
+
+- accepting and documenting the new transparent JSON representation for the `net11.0` asset;
+- providing an opt-in converter or compatibility DTO for callers that need the old wrapper shape; or
+- introducing a new union-semantic result type instead of changing the serialization contract of the existing class.
+
+The decision must not add a response-wrapper representation to the MyServiceBus wire protocol. It is about application-facing serialization of a local result object.
+
 ## Filters, retry, faults, and observability
 
 Method-level configuration applies to every case expanded from the method. Existing endpoint-level configuration also applies uniformly because all cases share the endpoint.
@@ -470,6 +505,7 @@ Raven.Core compatibility-carrier recognition on .NET 10 can be an experiment. It
 
 - Compile representative C# named and Raven ad-hoc unions.
 - Verify public metadata, constructor/provider discovery, `Value`, `HasValue`, and `TryGetValue` behavior.
+- Verify STJ reflection and source-generated serialization for named unions, Raven carriers, and `Response<T1, T2>`, including ambiguous object-shaped cases and the previous response-wrapper JSON shape.
 - Define `UnionDescriptor` and malformed-carrier diagnostics.
 - Prove direct `Response<T1, T2>` construction and matching with C# and Raven package consumers.
 
@@ -531,6 +567,8 @@ Raven.Core compatibility-carrier recognition on .NET 10 can be an experiment. It
 2. A C# union-valued handler returns each declared response to Raven.
 3. Raven exhaustively matches the C#-implemented `Response<T1, T2>` from the staged `net11.0` package.
 4. Fault, timeout, late response, and cleanup behavior remain unchanged.
+5. STJ reflection and source-generated modes serialize the selected response case as deliberately documented.
+6. Newtonsoft.Json, MessagePack, and transport serializers do not accidentally receive the union carrier when the selected case should be serialized.
 
 ## Alternatives considered
 
@@ -565,8 +603,12 @@ Rejected. Raven emits ordinary .NET types and should use the same descriptor and
 7. What is the supported maximum arity, and should it follow Raven.Core's current `Union<T1, ...>` family or a general ABI limit?
 8. Can the same descriptor manifest support Raven NativeAOT and other .NET languages?
 9. Should named union carriers ever be accepted as explicitly serialized message contracts, or should that remain prohibited?
+10. Is transparent STJ serialization of the existing `Response<T...>` classes an acceptable `net11.0` behavior change, or does it require a new result type or compatibility converter?
 
 ## References
+
+- [.NET 11 union support in ASP.NET Core](https://learn.microsoft.com/aspnet/core/fundamentals/unions?view=aspnetcore-11.0)
+- [.NET 11 library changes: C# union type serialization](https://learn.microsoft.com/dotnet/core/whats-new/dotnet-11/libraries#c-union-type-serialization)
 
 - [Future Runtime and Language Modernization](../development/future-runtime-modernization.md)
 - [Consumer Method Dispatch](../development/consumer-method-dispatch.md)

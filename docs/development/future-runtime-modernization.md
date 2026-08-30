@@ -146,6 +146,8 @@ Raven is where this projection becomes especially idiomatic: `Message1 | Message
 
 The union carrier remains local. Each case retains its own message URN, serializer contract, topology, retry, fault, and diagnostic identity. Consumer input unions expand topology; adapting `Response<T1, T2>` changes only local result consumption because the request client already declares its expected response contracts.
 
+.NET 11 union serialization is implemented by `System.Text.Json`, with ASP.NET Core inheriting it for STJ-backed JSON bodies. STJ writes only the active case without a discriminator and may require a classifier to read cases with the same JSON shape. MyServiceBus should not depend on that structural classification: it should select the concrete contract from the envelope, deserialize that type, and construct the local carrier afterward. Marking existing `Response<T...>` classes as unions may also change their application-facing STJ shape even though those wrappers never cross the broker wire, so that compatibility must be measured before adoption.
+
 Detailed binding rules, topology expansion, response unwrapping, validation, AOT strategy, delivery phases, and open decisions live in the [Union-Typed Consumers Proposal](../proposals/union-typed-consumers.md).
 
 ## Response results
@@ -268,7 +270,7 @@ The same rule applies to request overloads and transport adapters: support an ar
 | Runtime Async | Lower async overhead, clearer stacks, and potentially smaller NativeAOT output | Continue the existing smoke; add controlled benchmarks and failure-path tests. |
 | NativeAOT interface dispatch improvements | Consumer/filter/transport interfaces are common in the hot path | Treat as a runtime gain; re-run committed AOT benchmarks without API changes. |
 | `System.Text.Json` generic metadata lookup | Simplify source-generated metadata integration | Evaluate in the serialization registry work. Preserve application ownership of payload metadata. |
-| `System.Text.Json` union support | Local diagnostics or management DTOs | Do not use for transport envelopes merely because response classes become unions. |
+| `System.Text.Json` union support | Transparent active-case JSON for HTTP APIs, local diagnostics, or management DTOs | Do not use structural JSON classification for broker routing. Test the application-facing JSON compatibility of existing response wrappers before marking them as unions. |
 | Declarative `Activity` tracing rules | Easier host-side trace sampling/configuration | Evaluate as an optional hosting integration; keep `ActivitySource` as the library emission boundary. |
 | Reduced `System.IO.Pipelines` contention | Broker and monitoring paths if they adopt pipelines | Free runtime improvement; no reason to introduce pipelines where byte arrays or streams remain simpler. |
 | `dotnet test` filtering and current-runtime options | Faster CI slices and compatibility testing | Adopt in CI after the SDK migration if they reduce duplicated build work. |
@@ -474,6 +476,8 @@ Primary sources used for this review:
 - [Breaking changes in .NET 11](https://learn.microsoft.com/dotnet/core/compatibility/11)
 - [What's new in C# 15](https://learn.microsoft.com/dotnet/csharp/whats-new/csharp-15)
 - [C# union types](https://learn.microsoft.com/dotnet/csharp/language-reference/builtin-types/union)
+- [.NET 11 union support in ASP.NET Core](https://learn.microsoft.com/aspnet/core/fundamentals/unions?view=aspnetcore-11.0)
+- [.NET 11 library changes: C# union type serialization](https://learn.microsoft.com/dotnet/core/whats-new/dotnet-11/libraries#c-union-type-serialization)
 - [Raven programming language](https://github.com/marinasundstrom/raven)
 - [Raven.Core standard `System.Union<T...>` declarations](https://github.com/marinasundstrom/raven/blob/main/src/Raven.Core/Union.rvn)
 - [JEP 409: Sealed Classes](https://openjdk.org/jeps/409)
