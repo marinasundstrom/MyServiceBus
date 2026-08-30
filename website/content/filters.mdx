@@ -1,0 +1,133 @@
+import Link from 'next/link';
+import LanguageTabs from '../app/components/LanguageTabs';
+
+export const filterDefinition = {
+  csharp: `public sealed class ValidateSubmitOrderFilter
+    : IFilter<ConsumeContext<SubmitOrder>>
+{
+    public async Task Send(
+        ConsumeContext<SubmitOrder> context,
+        IPipe<ConsumeContext<SubmitOrder>> next)
+    {
+        if (string.IsNullOrWhiteSpace(context.Message.OrderId))
+            throw new ArgumentException("OrderId is required");
+
+        await next.Send(context);
+    }
+}`,
+  java: `public final class ValidateSubmitOrderFilter
+        implements Filter<ConsumeContext<SubmitOrder>> {
+    @Override
+    public CompletableFuture<Void> send(
+            ConsumeContext<SubmitOrder> context,
+            Pipe<ConsumeContext<SubmitOrder>> next) {
+        if (context.getMessage().orderId().isBlank()) {
+            return CompletableFuture.failedFuture(
+                    new IllegalArgumentException("orderId is required"));
+        }
+
+        return next.send(context);
+    }
+}`,
+};
+
+export const mediatorRegistration = {
+  csharp: `builder.Services.AddScoped<ValidateSubmitOrderFilter>();
+
+builder.Services.AddServiceBus(x =>
+{
+    x.AddHandler<SubmitOrderHandler, SubmitOrder>(pipe =>
+    {
+        pipe.UseScopedFilter<ValidateSubmitOrderFilter>();
+        pipe.UseMessageRetry(retry => retry.Immediate(3));
+    });
+
+    x.UsingMediator();
+});
+
+await mediator.Send(new SubmitOrder("A-42"));`,
+  java: `ServiceCollection services = ServiceCollection.create();
+services.addScoped(ValidateSubmitOrderFilter.class);
+
+Mediator mediator = MediatorBus.configure(services, cfg ->
+    cfg.addConsumer(
+        SubmitOrderHandler.class,
+        SubmitOrder.class,
+        pipe -> {
+            pipe.useScopedFilter(ValidateSubmitOrderFilter.class);
+            pipe.useMessageRetry(retry -> retry.immediate(3));
+        }));
+
+mediator.send(new SubmitOrder("A-42")).join();`,
+};
+
+<p className="docs-kicker">Core concept · Middleware</p>
+
+# Wrap message handling with ordered filters.
+
+<p className="docs-summary">Filters add validation, logging, authorization, transactions, telemetry, retry, and other cross-cutting behavior around consumers and mediator handlers. C# and Java share the same ordering, lifetime, cancellation, and failure semantics.</p>
+
+<div className="callout callout-accent">
+  <strong>The pipeline does not depend on a broker</strong>
+  <p>Mediator dispatch and broker-backed delivery enter the same consume pipeline. A filter attached to a handler therefore behaves the same way before and after that handler moves across a process boundary.</p>
+</div>
+
+## Think in contexts and continuations
+
+Every filter receives the current context and the next pipe segment. Code before <code>next</code> runs in registration order; code after it completes runs in reverse order.
+
+<div className="flow-line" aria-label="Consume filter execution order">
+  <span>Validation enters</span><b>→</b><span>Logging enters</span><b>→</b><span>Handler</span><b>→</b><span>Logging exits</span><b>→</b><span>Validation exits</span>
+</div>
+
+The first registered filter is the outermost filter. It can inspect or enrich the context, await the remaining pipeline, observe failures, or deliberately stop execution by not calling <code>next</code>. The same context instance and cancellation signal flow through the whole operation.
+
+## Define a consume filter
+
+This validation filter rejects an invalid command before the handler runs. The two clients expose idiomatic asynchronous APIs while preserving the same pipeline contract.
+
+<LanguageTabs csharp={filterDefinition.csharp} java={filterDefinition.java} />
+
+Keep application-supplied filter instances thread-safe because a built pipe may execute concurrently. When a filter depends on scoped services, register the filter in the container and use the scoped registration API shown below.
+
+## Replace a MediatR pipeline behavior
+
+A MediatR <code>IPipelineBehavior&lt;TRequest, TResponse&gt;</code> and a MyServiceBus consume filter both wrap handler execution. Port the responsibility rather than copying the type: validation becomes a validation filter, request logging becomes a logging filter, and transaction handling becomes a scoped filter that owns the transaction around <code>next</code>.
+
+| MediatR concept | MyServiceBus equivalent | Migration note |
+| --- | --- | --- |
+| `IPipelineBehavior<TRequest, TResponse>` | `IFilter<ConsumeContext<TMessage>>` / `Filter<ConsumeContext<T>>` | Port the before/after logic and failure policy. |
+| `RequestHandlerDelegate<TResponse>` | `next.Send(context)` / `next.send(context)` | Await or compose the returned asynchronous operation. |
+| Open generic behavior registration | Per-message consumer or handler pipe configuration | Register the filter for each applicable message boundary. |
+| Scoped behavior dependency | `UseScopedFilter<TFilter>` / `useScopedFilter(FilterClass.class)` | The scope remains alive until downstream asynchronous work completes. |
+
+Attach the filter while registering the handler. In Java, the configurable <code>addConsumer</code> overload is used because every handler is also a consumer; it still participates in mediator <code>send</code> and <code>publish</code> dispatch.
+
+<LanguageTabs csharp={mediatorRegistration.csharp} java={mediatorRegistration.java} />
+
+<div className="callout">
+  <strong>Short-circuit result-bearing requests carefully</strong>
+  <p>Completing a filter without calling <code>next</code> also prevents the handler from producing its response. A result-bearing mediator request must still receive an intentional response or fault; otherwise the caller can wait until its request timeout.</p>
+</div>
+
+## Choose the right lifetime
+
+<div className="docs-feature-grid">
+  <div><span>01 · INSTANCE</span><h3>Application supplied</h3><p><code>UseFilter(instance)</code> reuses that instance. It must be safe for concurrent calls.</p></div>
+  <div><span>02 · PIPE</span><h3>Type based</h3><p><code>UseFilter&lt;T&gt;</code> or <code>useFilter(Class)</code> creates or resolves one instance when the pipe is built.</p></div>
+  <div><span>03 · SCOPED</span><h3>Per operation</h3><p><code>UseScopedFilter</code> creates a scope for one execution and disposes it after downstream work settles.</p></div>
+  <div><span>04 · INLINE</span><h3>Execute callback</h3><p><code>UseExecute</code> / <code>useExecute</code> runs a callback and then always continues to the next segment.</p></div>
+</div>
+
+## Place retry deliberately
+
+Retry re-invokes only the filters and handler after it. Filters registered before retry enter once and observe the final outcome; filters registered after retry enter for every attempt. Put operation-level logging outside retry and attempt-level measurements inside it.
+
+Retry is opt-in. When all attempts fail, the last handler failure remains the terminal failure and flows back through the outer filters. Cancellation during a fixed-delay retry stops the wait and prevents another attempt.
+
+For local command, query, and notification semantics, continue with the <Link href="/docs/mediator">mediator guide</Link>.
+
+<div className="next-card">
+  <div><span>Next</span><strong>Use the same pipeline locally</strong></div>
+  <Link href="/docs/mediator">Mediator guide →</Link>
+</div>

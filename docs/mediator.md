@@ -119,7 +119,7 @@ Directed delivery remains a message-bus operation rather than mediator `Send`. I
 | Command/query with result | Result-bearing `Send` / `send` | Exactly one handler and an asynchronous result |
 | Directed delivery | C# send endpoint / Java `sendTo(...)` | Bus operation; destination is explicit |
 
-Use consumer filters for cross-cutting behavior such as validation, logging, telemetry, and opt-in retry.
+Use [consumer filters](feature-walkthrough.md#filters) for cross-cutting behavior such as validation, logging, telemetry, and opt-in retry. The filter walkthrough also shows how to attach a scoped filter to a mediator handler as the equivalent of a MediatR pipeline behavior.
 
 These operations retain messaging semantics even though execution is local. They are not ordinary method calls: dispatch may fan out, creates consumer scopes, passes a consume context, and can run asynchronous pipelines.
 

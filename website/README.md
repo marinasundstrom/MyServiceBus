@@ -65,6 +65,7 @@ The public site currently covers:
 - introduction and getting started
 - detailed messaging concepts covering contracts, intent, receive endpoints,
   topology, dispatch, requests, and reliability
+- ordered filters and middleware, including mediator pipeline behavior migration
 - RabbitMQ transport behavior
 - Amazon SQS/SNS preview behavior and its verified interoperability boundary
 - .NET NativeAOT registration modes and current support boundary

@@ -1341,6 +1341,45 @@ try (ServiceScope scope = provider.createScope()) {
 }
 ```
 
+#### Replacing Mediator Pipeline Behaviors
+
+Mediator handlers use the same consume pipeline as broker-backed consumers. Attach validation, logging, authorization, transaction, and retry filters while registering the handler. This is the MyServiceBus equivalent of wrapping a MediatR handler with `IPipelineBehavior<TRequest, TResponse>`.
+
+In C#, `AddHandler<THandler, TMessage>` exposes the pipe configurator directly:
+
+```csharp
+builder.Services.AddScoped<LoggingFilter<SubmitOrder>>();
+
+builder.Services.AddServiceBus(x =>
+{
+    x.AddHandler<SubmitOrderHandler, SubmitOrder>(pipe =>
+    {
+        pipe.UseScopedFilter<LoggingFilter<SubmitOrder>>();
+        pipe.UseMessageRetry(retry => retry.Immediate(3));
+    });
+
+    x.UsingMediator();
+});
+```
+
+In Java, handlers implement `Consumer<T>`, so use the configurable `addConsumer` overload when attaching the pipe. The handler still participates in mediator `send` and `publish` dispatch:
+
+```java
+ServiceCollection services = ServiceCollection.create();
+services.addScoped(LoggingFilter.class);
+
+Mediator mediator = MediatorBus.configure(services, cfg ->
+    cfg.addConsumer(
+        SubmitOrderHandler.class,
+        SubmitOrder.class,
+        pipe -> {
+            pipe.useScopedFilter(LoggingFilter.class);
+            pipe.useMessageRetry(retry -> retry.immediate(3));
+        }));
+```
+
+Registration order defines wrapping order. The first filter is outermost; code before `next` runs in registration order and code after `next` runs in reverse order. A scoped filter's scope remains alive until the asynchronous downstream pipeline completes.
+
 ---
 
 ### Scheduling Messages

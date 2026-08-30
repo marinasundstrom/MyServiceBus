@@ -23,6 +23,7 @@ const sections = [
       ['Receive endpoints', '/docs/concepts/receive-endpoints'],
       ['Routing and topology', '/docs/concepts/routing-topology'],
       ['Consumers and dispatch', '/docs/concepts/consumers'],
+      ['Filters and middleware', '/docs/filters'],
       ['Requests and responses', '/docs/concepts/requests'],
       ['Reliability and faults', '/docs/concepts/reliability'],
     ],

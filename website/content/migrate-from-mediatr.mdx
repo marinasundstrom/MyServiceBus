@@ -51,7 +51,7 @@ Commands and queries use exactly-one-handler <code>Send</code>. Notifications us
 
 ## 3. Rebuild pipeline behavior intentionally
 
-MediatR pipeline behaviors are not copied automatically. Map validation, logging, authorization, transactions, and exception policy to MyServiceBus consume pipeline filters or application decorators, then assert ordering, scope, cancellation, and exception behavior. A handler test passing does not prove the surrounding pipeline has equivalent semantics.
+MediatR pipeline behaviors are not copied automatically. Map validation, logging, authorization, transactions, and exception policy to MyServiceBus consume pipeline filters or application decorators, then assert ordering, scope, cancellation, and exception behavior. The <Link href="/docs/filters">filters and middleware guide</Link> shows the equivalent C# and Java mediator registration. A handler test passing does not prove the surrounding pipeline has equivalent semantics.
 
 ## 4. Choose generated or explicit registration
 

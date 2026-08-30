@@ -159,6 +159,8 @@ MyServiceBus provides a C# source generator and a Java JSR 269 annotation proces
   <div><span>04</span><h3>Behaviors</h3><p>Apply validation, logging, telemetry, and opt-in retry through consumer filters.</p></div>
 </div>
 
+Use the <Link href="/docs/filters">filters and middleware guide</Link> to map validation, logging, authorization, transactions, and retry onto the shared handler pipeline.
+
 <h2 id="mediatr">Behavior and migration differences from MediatR</h2>
 
 MyServiceBus supports notification fan-out, type-routed single-handler send, cardinality validation, and result-bearing requests. It is not source-compatible with MediatR: contracts, handler interfaces, registration, pipeline filters, and result access must be migrated deliberately. Generated handler registration and direct invocation are available in C# and Java, and the same consumer types can also run behind a broker transport.
