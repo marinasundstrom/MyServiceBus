@@ -32,6 +32,8 @@
     <PackageVersion Include="Azure.Messaging.ServiceBus" Version="7.20.2" />
     <PackageVersion Include="AWSSDK.SQS" Version="4.0.100.11" />
     <PackageVersion Include="AWSSDK.SimpleNotificationService" Version="4.0.100.11" />
+    <PackageVersion Include="AWSSDK.SSO" Version="4.0.100.13" />
+    <PackageVersion Include="AWSSDK.SSOOIDC" Version="4.0.100.12" />
     <PackageVersion Include="Newtonsoft.Json" Version="13.0.4" />
     <PackageVersion Include="Newtonsoft.Json.Bson" Version="1.0.3" />
     <PackageVersion Include="Npgsql" Version="10.0.3" />

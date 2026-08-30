@@ -12,6 +12,8 @@
   <ItemGroup>
     <PackageReference Include="AWSSDK.SQS" />
     <PackageReference Include="AWSSDK.SimpleNotificationService" />
+    <PackageReference Include="AWSSDK.SSO" />
+    <PackageReference Include="AWSSDK.SSOOIDC" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
   </ItemGroup>
 

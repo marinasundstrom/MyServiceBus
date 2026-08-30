@@ -109,7 +109,7 @@ public sealed class AmazonSqsCloudTests
             if (topic is not null)
             {
                 var subscriptions = await sns.ListSubscriptionsByTopicAsync(topic.TopicArn);
-                foreach (var subscription in subscriptions.Subscriptions)
+                foreach (var subscription in subscriptions.Subscriptions ?? [])
                     if (!string.IsNullOrWhiteSpace(subscription.SubscriptionArn) &&
                         subscription.SubscriptionArn != "PendingConfirmation")
                         await sns.UnsubscribeAsync(subscription.SubscriptionArn);
