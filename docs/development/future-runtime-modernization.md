@@ -33,6 +33,38 @@ Runtime Async and virtual threads are worthwhile experiments, not reasons to red
 
 Most other new features are opportunistic implementation tools. Stable features already available on the published target can be adopted continuously when they remove code or improve correctness; they should not be held back for a synchronized C# and Java release. A baseline migration should not trigger a mechanical rewrite.
 
+### Evolution beyond compatibility
+
+MassTransit compatibility is an adoption, migration, and interoperability foundation. It is not the permanent ceiling for MyServiceBus API design.
+
+The project should evolve in two stages:
+
+1. **Stabilize the fundamentals** — message identity, envelopes, send, publish, consume, request/response, correlation, topology, retry, faults, settlement, cancellation, lifecycle, inspection, and cross-language conformance.
+2. **Become idiomatic by platform** — project those stable semantics through the strongest appropriate idioms on each platform, even when C#, Raven, and Java no longer have similarly shaped source APIs.
+
+This means MyServiceBus can become its own framework while retaining deliberate compatibility promises. C# and Raven may use .NET custom unions, exhaustive matching, generated binding, and platform-specific asynchronous features. Java may use records, sealed hierarchies, pattern switches, builders, `CompletionStage`, or virtual-thread integrations where they fit. These projections need semantic correspondence, not syntactic symmetry.
+
+The intended layering is:
+
+| Layer | Responsibility |
+| --- | --- |
+| Portable semantic kernel | Defines messaging behavior shared by every client and transport profile. |
+| Idiomatic platform API | Makes that behavior feel native in C#, Raven, Java, and future supported languages. |
+| Compatibility adapters | Preserve targeted MassTransit or ecosystem integration without dictating the primary MyServiceBus API. |
+
+The idiomatic platform API should become the normal way to use MyServiceBus. Compatibility-shaped APIs may remain when they provide migration value, but new design should not copy another framework by default.
+
+Platform divergence is healthy when all of the following remain true:
+
+- the portable operation has one documented language-neutral meaning;
+- wire and transport-profile compatibility are unchanged unless deliberately versioned;
+- cross-language applications observe equivalent success, failure, correlation, cancellation, and lifecycle behavior;
+- unsupported behavior is explicit rather than silently weakened;
+- each language follows its own established conventions; and
+- conformance tests prove the shared boundary independently of API resemblance.
+
+MassTransit familiarity should remain where it helps users transfer knowledge or interoperate with existing systems. It should not block a clearer MyServiceBus abstraction once the underlying behavior is stable and the migration impact is understood.
+
 ### Baseline policy
 
 The project should distinguish four independent decisions:
@@ -98,185 +130,21 @@ The repository currently has these relevant characteristics:
 
 The last point matters. A result case must preserve which declared alternative won. Inferring the case later with `message is T` or `Class.isInstance` is not sufficient when response types are identical, inherit from one another, or share an interface.
 
-## Raven union projection
+## Union-aware consumer projection
 
-Raven makes the .NET 11 union work more than a C# syntax improvement. A Raven application can use unions at both messaging boundaries: one handler can consume one of several contracts, and one request can return one of several declared outcomes. MyServiceBus should adapt to those idioms without requiring Raven-specific transports or wire formats.
+.NET 11 unions should enable three related MyServiceBus conveniences:
 
-| Raven surface | Local carrier | MyServiceBus adaptation |
-| --- | --- | --- |
-| Consumer parameter `Message1 | Message2` | `System.Union<Message1, Message2>` | Register both message contracts and construct the carrier around the received variant. |
-| Request result `Response<Message1, Message2>` | C#-implemented MyServiceBus response class | Implement the .NET 11 union ABI so Raven can match the response variants directly. |
-| Consumer return `Task<Response1 | Response2>` | `Task<System.Union<Response1, Response2>>` | Await, unwrap, and send the active response through the existing response pipeline. |
-
-### Case 1: ad-hoc union consumers
-
-The intended Raven surface is:
-
-```raven
-[Consumer]
-func HandleMessage(message: Message1 | Message2) {
-    match message {
-        Message1(let name) => ...
-        Message2(42) => ...
-    }
-}
-```
-
-`Message1 | Message2` is represented in metadata as `System.Union<Message1, Message2>`. Consumer discovery must treat that carrier as a declaration that the method consumes both member contracts. It must not register `System.Union<...>` as a message contract.
-
-For a union parameter `U = Union<T1, T2>`, registration behaves as if the application had declared two handlers sharing one method body:
-
-```text
-endpoint consumes T1 -> construct U(T1) -> invoke HandleMessage(U)
-endpoint consumes T2 -> construct U(T2) -> invoke HandleMessage(U)
-```
-
-The required rules are:
-
-1. Detect a well-formed union carrier from metadata rather than only hard-coding Raven syntax. On .NET 11 this means `UnionAttribute` plus the standard union member pattern. On earlier targets, the reflection path may recognize the same full metadata names emitted by Raven.Core.
-2. Enumerate case types from the public single-argument constructors, or from a nested `IUnionMembers` provider when the standard ABI uses factory members.
-3. Require each case used as a message to satisfy the normal MyServiceBus message-contract rules. The initial implementation should continue to require reference-type message cases even though Raven unions can also contain value types.
-4. Create one case registration and topology binding per distinct case contract under one logical endpoint. All case registrations share the method's endpoint name, retry policy, dependency-injection scope, and concurrency configuration.
-5. Deserialize the received envelope directly as the selected case type, construct the union carrier from that value, and pass the carrier to the method.
-6. Invoke the method once when an envelope advertises more than one compatible message URN. Selection uses MyServiceBus's ordered, exact contract-identity rules rather than repeated CLR assignability checks.
-7. Acknowledge, retry, fault, and route errors against the original delivery and selected message contract. The local union wrapper does not create another delivery boundary.
-8. Reject an empty, open-generic, malformed, duplicate-case, nullable-wrapper, or unsupported value-type union during registration with a diagnostic that names the consumer method and offending case.
-
-### Topology expansion
-
-A union-valued consumer changes topology declaration because the handler expresses interest in several independently addressable message contracts. Expansion happens before the transport topology is built:
-
-```text
-HandleMessage(Message1 | Message2)
-  endpoint: HandleMessage
-  consumes: Message1, Message2
-  binds:    entity(Message1), entity(Message2)
-  excludes: entity(System.Union<Message1, Message2>)
-```
-
-The expansion is transport-neutral in the registration model and transport-specific only when materialized:
-
-| Runtime/transport | Expanded effect |
+| Source-level idea | MyServiceBus behavior |
 | --- | --- |
-| Mediator/in-memory | Add the same invocation adapter to the handler map for `Message1` and `Message2`. |
-| RabbitMQ | Bind the endpoint queue to each variant's message exchange using the ordinary contract topology. |
-| Azure Service Bus | Add the ordinary subscription/rule or entity mapping for each variant supported by the profile. |
-| Other broker profiles | Apply exactly the same topology operation that two separately declared consumer methods would produce. |
+| Consumer parameter with several message cases | Bind every case to one endpoint and invoke one exhaustive handler. |
+| Consumer returning one of several response cases | Unwrap the local result and send the selected response contract. |
+| `Response<T1, T2>` consumed as a custom union | Let C# and Raven match the existing C#-implemented response class directly. |
 
-Topology rules are:
+Raven is where this projection becomes especially idiomatic: `Message1 | Message2` lowers to Raven.Core's standard `System.Union<Message1, Message2>`, and namespace-level functions can remain ordinary attributed CLR methods. C# named unions use the same standardized runtime contract.
 
-- The union carrier is registration metadata, never a broker entity or portable message contract.
-- Preserve member declaration order in the registration descriptor for deterministic inspection and diagnostics, but do not make broker correctness depend on binding order.
-- Deduplicate identical case contracts and bindings within an endpoint. A duplicate binding must not cause duplicate delivery or duplicate method invocation.
-- If two different consumer methods on the same endpoint consume the same variant, preserve the existing multiple-consumer dispatch semantics; union expansion must not silently coalesce application handlers.
-- Apply entity-name overrides, exclude-from-topology rules, implemented-message contracts, and transport capabilities to each variant exactly as if it had been registered separately.
-- Topology inspection should show the endpoint consuming `Message1` and `Message2`, optionally recording the union method as provenance. It should not claim that the endpoint consumes `System.Union<...>`.
-- Error, skipped, retry, and fault topology remains endpoint/delivery topology. Failures retain the original selected variant's message identity.
+The union carrier remains local. Each case retains its own message URN, serializer contract, topology, retry, fault, and diagnostic identity. Consumer input unions expand topology; adapting `Response<T1, T2>` changes only local result consumption because the request client already declares its expected response contracts.
 
-This is subscription expansion, not message fan-out. One incoming envelope selects one variant registration and invokes the union method once. Add a conformance case where an envelope advertises multiple implemented message URNs that are also union members, proving that topology and dispatch do not duplicate the delivery.
-
-Request-response topology has a different impact:
-
-- `GetResponseAsync<Message1, Message2>` already declares both expected response contracts, so making `Response<Message1, Message2>` implement the union ABI does not add new broker entities. It changes only the local result projection.
-- A Raven handler returning `Response1 | Response2` does not create response subscriptions on the service endpoint. It sends the active variant to the request's existing response address.
-- The requesting endpoint or temporary response endpoint must still be prepared for every declared response variant and the ordinary fault contract. This remains the request client's responsibility.
-- General outbound `Publish`/`Send` of an active union, if supported later, resolves topology from the unwrapped variant at call time.
-
-The reflection implementation needs a cached union descriptor conceptually shaped as:
-
-```text
-UnionDescriptor
-  carrier type
-  ordered case types
-  create(case type, value) -> carrier
-  unwrap(carrier) -> selected value
-```
-
-`ReflectionConsumerMethodDiscovery` currently requires the message parameter itself to be a reference type. Union-aware discovery must expand the carrier before applying that check. Each expanded registration then uses the ordinary `TCase : class` consume pipeline and an invocation adapter that constructs the carrier before calling the Raven method.
-
-The C# source generator cannot discover methods written in Raven source. Raven consumers therefore need the reflection registration path initially. If Raven applications later require trimming or NativeAOT, add a Raven macro/compiler integration or a language-neutral generated registration manifest rather than making reflection metadata preservation implicit.
-
-For the first version, support a union-valued message parameter together with non-generic `ConsumeContext` and `CancellationToken`. `ConsumeContext<Message1 | Message2>` needs a typed context adapter whose `Message` is the constructed carrier; it should be added deliberately rather than accidentally binding a context that still resolves the wire message as `Union<...>`.
-
-### Outbound union values
-
-The same resolver can make outbound APIs union-aware, but this should follow consumer support. If `PublishAsync`, `SendAsync`, or `RespondAsync` receives a value implementing the standard union ABI, MyServiceBus can unwrap its active value and dispatch using that variant's registered contract.
-
-The invariant is strict:
-
-- the concrete variant determines the message URN, entity name, serializer contract, headers, and topology;
-- `System.Union<...>` is never written into `messageType` and is never treated as a broker entity;
-- an inactive/default struct union is rejected before transport acquisition; and
-- an active variant that is not a registered message contract produces the normal unsupported-contract error.
-
-Do not enable outbound unwrapping merely by checking for any public `Value` property. Require the standardized union marker and a valid ABI descriptor.
-
-### Case 2: union-semantic request responses
-
-The Raven request surface should remain the existing MyServiceBus API:
-
-```raven
-let response: Response<Message1, Message2> =
-    await client.GetResponseAsync<Message1, Message2>(request)
-
-match response {
-    Message1(let name) => ...
-    Message2(42) => ...
-}
-```
-
-No Raven-specific response type is necessary. The `net11.0` MyServiceBus abstractions asset should make `Response<T>` and `Response<T1, T2>` well-formed custom unions by implementing the standard ABI:
-
-- apply `UnionAttribute`;
-- implement `IUnion`;
-- expose one public construction member for each response variant;
-- retain an explicit discriminator assigned when the transport selects the response;
-- expose `Value` for standard runtime access;
-- expose `HasValue` and `TryGetValue(out TCase)` for direct typed extraction; and
-- retain `Message`, `FromT1`, `FromT2`, `Is`, and baseline-neutral `Match` APIs for compatibility.
-
-The response wrapper remains local to the requester. The received `Message1` or `Message2` envelope is unchanged, and the request client constructs the corresponding response-union case only after matching the response message identity.
-
-### Related case: one request handler returning different response types
-
-A request consumer may also need to choose one of several valid response contracts. Raven can express that directly:
-
-```raven
-[Consumer]
-async func CheckOrder(request: CheckOrderStatus) -> Task<OrderStatus | OrderNotFound> {
-    let order = await orders.Find(request.OrderId)
-
-    return order match {
-        Some(let value) => OrderStatus(value.State)
-        None => OrderNotFound(request.OrderId)
-    }
-}
-```
-
-The emitted async return is a task-like value whose result is `System.Union<OrderStatus, OrderNotFound>`. Consumer-method discovery should recognize the union-valued response shape, await the method normally, unwrap the active case, and call the existing response pipeline with that case as the response contract.
-
-This feature is useful because it preserves the concise return-value consumer idiom for domain outcomes. Without it, a Raven handler must either collapse distinct outcomes into one less-precise DTO or inject/use `ConsumeContext` and call `RespondAsync` manually.
-
-The rules mirror outbound union handling:
-
-- only the selected response variant is serialized;
-- its contract supplies the response message URN;
-- request, correlation, conversation, response-address, and fault semantics are unchanged;
-- an inactive/default union result is a consumer failure, not an empty response;
-- throwing still produces `Fault<CheckOrderStatus>` through the normal fault pipeline; and
-- returning a declared `Fault<T>` variant is only supported if ordinary explicit fault-response contracts support the same behavior.
-
-Current consumer-method discovery accepts `Task<TResponse>` and `ValueTask<TResponse>` only when `TResponse` is a reference type. Union-aware discovery must inspect the result carrier first, validate each response case as an ordinary response contract, and install a cached result-unwrapping response handler. The serializer and transport should never receive the union carrier itself.
-
-The minimal implementation should support `Task<Union<T1, T2>>` and `ValueTask<Union<T1, T2>>` as emitted by Raven. Synchronous union-valued returns can follow only if synchronous response-returning consumer methods become a generally supported MyServiceBus shape.
-
-### Union recognition boundary
-
-Keep union recognition in one internal component shared by consumer discovery and optional outbound unwrapping. Do not spread checks for `System.Union<,>`, `UnionAttribute`, constructors, or `TryGetValue` across transports and serializers.
-
-Recognition should prefer the standardized shape over assembly identity because Raven.Core supplies compatibility contracts on pre-.NET 11 targets and uses the runtime contracts on .NET 11. The `net11.0` implementation can use direct type references; a baseline-compatible reflection prototype can compare full metadata names and then validate every required member before trusting the type.
-
-Raven union integration is API and dispatch compatibility, not wire compatibility. Cross-language C#/Java broker tests continue to validate the selected member message exactly as before. Raven-specific tests validate that metadata expansion and carrier construction do not change that message.
+Detailed binding rules, topology expansion, response unwrapping, validation, AOT strategy, delivery phases, and open decisions live in the [Union-Typed Consumers Proposal](../proposals/union-typed-consumers.md).
 
 ## Response results
 
@@ -300,201 +168,21 @@ The recommended portable rule is to reject identical or assignable response alte
 
 ### Implement on the current baselines
 
-Add an explicit discriminator to each multiple-response wrapper and use it for a new exhaustive `Match` operation. Keep `Is`/`as` temporarily for compatibility, but document their runtime-type behavior and avoid using them in new examples.
+Add an explicit discriminator to multiple-response wrappers and use it for exhaustive `Match`/`match` operations on C#/.NET 10 and Java 17. Keep `Is`/`as` temporarily for compatibility, but move new examples toward the case-preserving operations.
 
-An illustrative C# shape is:
-
-```csharp
-public sealed class Response<T1, T2>
-    where T1 : class
-    where T2 : class
-{
-    private readonly object _message;
-    private readonly byte _case;
-
-    private Response(object message, byte @case) =>
-        (_message, _case) = (message, @case);
-
-    public static Response<T1, T2> FromT1(T1 message)
-    {
-        ArgumentNullException.ThrowIfNull(message);
-        return new(message, 1);
-    }
-
-    public static Response<T1, T2> FromT2(T2 message)
-    {
-        ArgumentNullException.ThrowIfNull(message);
-        return new(message, 2);
-    }
-
-    public TResult Match<TResult>(
-        Func<T1, TResult> onT1,
-        Func<T2, TResult> onT2) => _case switch
-    {
-        1 => onT1((T1)_message),
-        2 => onT2((T2)_message),
-        _ => throw new InvalidOperationException("Invalid response case."),
-    };
-}
-```
-
-Usage is exhaustive by construction:
-
-```csharp
-string text = response.Match(
-    status => status.Status,
-    fault => fault.Exceptions[0].Message);
-```
-
-Java can expose the same semantic operation on Java 17:
-
-```java
-String text = response.match(
-    status -> status.status(),
-    fault -> fault.getExceptions().get(0).getMessage());
-```
-
-The Java implementation should also dispatch by a stored case tag, not by `Class.isInstance`. A separate `visit(Consumer<? super T1>, Consumer<? super T2>)` is optional; `match` is sufficient because callers can return `null` for side-effect-only branches, though a `void` visitor may read better in application code.
-
-This work does not require .NET 11 or a newer Java baseline. It also gives both clients a stable fallback if the preview C# union design changes.
+Both clients must select branches from the stored case identity rather than repeating runtime assignability checks. This work supplies the portable fallback before .NET 11 union syntax is available and does not require a newer Java baseline.
 
 Do not extend public request-client overloads to three through eight alternatives merely because Java currently has wrapper classes with those arities. First establish a real use case and an API-generation strategy. Each extra generic arity multiplies request-client, transport, test-harness, documentation, and compatibility surface.
 
 ### .NET 11 custom-union ABI on the C# response types
 
-The implementation remains entirely in MyServiceBus C#. Raven does not need a MyServiceBus-specific response class, adapter package, or compiler special case. It consumes the existing `Response<T...>` types because those types satisfy the standard .NET 11 union ABI.
+Keep the implementation in the existing MyServiceBus C# response classes. A `net11.0` asset can add `UnionAttribute`, `IUnion`, variant construction members, `Value`, `HasValue`, and typed `TryGetValue` members while retaining the existing factories and inspection APIs.
 
-C# 15 union types provide implicit case conversions, transparent type patterns, exhaustiveness checking, and enhanced null-state tracking. A generated declaration such as `public union Response<T1, T2>(T1, T2);` is tempting, but it lowers to a struct and would replace the existing MyServiceBus class API. That is an unnecessary binary and behavioral break.
+This enables transparent exhaustive matching from C# and ordinary `match` from Raven without introducing a Raven-specific response wrapper or changing the wire protocol. Continue to expose baseline-neutral `Match` on `net10.0` and Java 17.
 
-The preferred direction is to adapt the existing C# class with `UnionAttribute`, `IUnion`, public variant constructors, and the optional typed access pattern. `Response<T>` already has the required public one-argument constructor:
+The direct-constructor and typed-access shape was compiled and run locally with .NET SDK `11.0.100-preview.7`. Package-level Raven, allocation, NativeAOT, overlap, nullability, and API-compatibility proofs remain required, and preview evidence must be repeated against the release SDK.
 
-```csharp
-[System.Runtime.CompilerServices.Union]
-public sealed class Response<T> : System.Runtime.CompilerServices.IUnion
-    where T : class
-{
-    public Response(T message)
-    {
-        ArgumentNullException.ThrowIfNull(message);
-        Message = message;
-    }
-
-    public T Message { get; }
-
-    public object Value => Message;
-
-    public bool HasValue => true;
-
-    public bool TryGetValue(out T value)
-    {
-        value = Message;
-        return true;
-    }
-}
-```
-
-The intended usage then compiles as:
-
-```csharp
-Response<OrderStatus> response =
-    await client.GetResponseAsync<OrderStatus>(new CheckOrderStatus(orderId));
-
-string status = response switch
-{
-    OrderStatus orderStatus => orderStatus.Status,
-};
-```
-
-`Response<T1, T2>` should store an explicit case tag and expose one public constructor and one `TryGetValue` overload per variant. The factories remain compatibility conveniences over those constructors:
-
-```csharp
-[System.Runtime.CompilerServices.Union]
-public sealed class Response<T1, T2> : System.Runtime.CompilerServices.IUnion
-    where T1 : class
-    where T2 : class
-{
-    private readonly byte _case;
-    private readonly T1? _message1;
-    private readonly T2? _message2;
-
-    public Response(T1 message)
-    {
-        ArgumentNullException.ThrowIfNull(message);
-        _message1 = message;
-        _case = 1;
-    }
-
-    public Response(T2 message)
-    {
-        ArgumentNullException.ThrowIfNull(message);
-        _message2 = message;
-        _case = 2;
-    }
-
-    public object Value => _case switch
-    {
-        1 => _message1!,
-        2 => _message2!,
-        _ => throw new InvalidOperationException("Invalid response case."),
-    };
-
-    public bool HasValue => _case is 1 or 2;
-
-    public bool TryGetValue(out T1 value)
-    {
-        value = _message1!;
-        return _case == 1;
-    }
-
-    public bool TryGetValue(out T2 value)
-    {
-        value = _message2!;
-        return _case == 2;
-    }
-
-    public static Response<T1, T2> FromT1(T1 message) => new(message);
-    public static Response<T1, T2> FromT2(T2 message) => new(message);
-}
-```
-
-This is an illustrative ABI shape, not the final implementation patch. The implementation must retain the existing `Is` behavior and add the baseline-neutral discriminator-backed `Match` API described above. The public constructors establish the union case types; `Value` provides standard runtime access; `HasValue` and `TryGetValue` let Raven and C# match the selected variant directly. Because current response cases are reference types, `TryGetValue` chiefly avoids repeated runtime type inspection and temporary `Response<T>` allocation rather than value-type boxing.
-
-With C# 15, callers can then switch directly over the contained messages:
-
-```csharp
-string text = response switch
-{
-    OrderStatus status => status.Status,
-    Fault<CheckOrderStatus> fault => fault.Exceptions[0].Message,
-};
-```
-
-The same C#-implemented type is idiomatic from Raven:
-
-```raven
-match response {
-    OrderStatus(let status) => status
-    Fault<CheckOrderStatus>(let fault) => fault.Exceptions[0].Message
-}
-```
-
-The direct-constructor and typed-access shape above was compiled and run locally with .NET SDK `11.0.100-preview.7`; C# accepted both generic constructors and both `TryGetValue` overloads and exhaustively matched the contained alternatives. Raven package-consumer and allocation proofs remain required. All results are preview evidence and must be repeated against the release SDK.
-
-Before adoption, verify:
-
-- the final C# 15 custom-union contract and diagnostics;
-- binary and source compatibility of adding the attribute, interface, constructors, and typed accessors;
-- behavior when generic alternatives are identical or overlap;
-- overload resolution for public constructors and `TryGetValue` when generic arguments are identical or assignable;
-- null-state behavior after deserialization and across nullable annotations;
-- trimming and NativeAOT behavior;
-- C# and Raven matching behavior against the same packaged `net11.0` assembly;
-- whether the typed access path allocates or adds measurable overhead;
-- that `System.Text.Json` union support does not accidentally serialize response wrappers as part of the MyServiceBus wire protocol.
-
-Keep `Message`, `FromT1`, `FromT2`, and `Is` for a migration period. The union syntax should be an additional consumption idiom, not an immediate removal of the MassTransit-familiar surface.
-
-A transitional NuGet strategy could multi-target `net10.0;net11.0`: both target assets expose `Match`, while only the `net11.0` asset adds the compiler-recognized union attribute and members. Consumers then gain the idiom by moving their application target without forcing all package consumers to move at once. This must be validated with API-compatibility tooling, package-smoke consumers for both TFMs, NativeAOT, and a check that documentation does not imply union syntax is available to a `net10.0` consumer.
+The normative ABI shape and validation plan are maintained in the [Union-Typed Consumers Proposal](../proposals/union-typed-consumers.md#companion-request-client-response-results).
 
 ### Java sealed result hierarchy
 
