@@ -28,18 +28,17 @@ export default function Introduction() {
       <p className="docs-summary">
         MyServiceBus is a focused asynchronous service-bus runtime with aligned
         C# and Java APIs. It can extend a MassTransit-based .NET estate with Java or
-        provide one model for a new cross-platform system. It includes RabbitMQ-backed messaging, an experimental
-        Azure Service Bus transport, an in-memory mediator, and familiar
+        provide one model for a new cross-platform system. It includes RabbitMQ-backed messaging, preview
+        Azure Service Bus and Amazon SQS/SNS transports, an in-memory mediator, and familiar
         MassTransit-style concepts.
       </p>
 
       <div className="callout callout-accent">
         <strong>Current scope</strong>
         <p>
-          RabbitMQ is the verified broker profile. Azure Service Bus is
-          experimental while its C#, Java, and MassTransit cloud matrix is being
-          completed. MyServiceBus is not a drop-in replacement for every
-          MassTransit feature.
+          RabbitMQ is the verified broker profile. Azure Service Bus and Amazon
+          SQS/SNS are preview profiles with explicitly documented verification
+          boundaries. MyServiceBus is not a drop-in replacement for every MassTransit feature.
         </p>
       </div>
 

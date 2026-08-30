@@ -62,12 +62,12 @@ public final class AmazonSqsFactoryConfigurator implements BusFactoryConfigurato
     }
 
     public String getEntityName(Class<?> messageType) {
-        return applyScope(entityNames.getOrDefault(messageType, entityNameFormatter.formatEntityName(messageType)));
+        return applyScope(entityNames.getOrDefault(messageType, entityNameFormatter.formatEntityName(messageType)), true);
     }
 
     public void receiveEndpoint(String queueName, Consumer<AmazonSqsReceiveEndpointConfigurator> configure) {
         configure.accept(new AmazonSqsReceiveEndpointConfigurator(
-                applyScope(queueName), this::getEntityName, handlers, consumers));
+                applyScope(queueName, false), this::getEntityName, handlers, consumers));
     }
 
     public void configureEndpoints(BusRegistrationContext context) {
@@ -77,10 +77,12 @@ public final class AmazonSqsFactoryConfigurator implements BusFactoryConfigurato
         }
     }
 
-    String applyScope(String name) {
-        AmazonSqsEntityNames.validate(name);
+    String applyScope(String name, boolean topic) {
+        if (topic) AmazonSqsEntityNames.validateTopic(name);
+        else AmazonSqsEntityNames.validate(name);
         String result = scope + name;
-        AmazonSqsEntityNames.validate(result);
+        if (topic) AmazonSqsEntityNames.validateTopic(result);
+        else AmazonSqsEntityNames.validate(result);
         return result;
     }
 

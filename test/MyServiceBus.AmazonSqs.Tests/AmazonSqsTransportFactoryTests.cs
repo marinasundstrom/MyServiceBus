@@ -28,6 +28,9 @@ public sealed class AmazonSqsTransportFactoryTests
         Should.Throw<ArgumentOutOfRangeException>(() => configurator.SetWaitTimeSeconds(21));
         Should.Throw<ArgumentOutOfRangeException>(() => configurator.SetVisibilityTimeout(43201));
         Should.Throw<ArgumentException>(() => configurator.ReceiveEndpoint("invalid.name", _ => { }));
+        Should.Throw<ArgumentException>(() => configurator.ReceiveEndpoint(new string('q', 81), _ => { }));
+        configurator.Message<Probe>(message => message.SetEntityName(new string('t', 81)));
+        configurator.GetEntityName(typeof(Probe)).Length.ShouldBe(81);
     }
 
     [AmazonSqsLocalStackFact]

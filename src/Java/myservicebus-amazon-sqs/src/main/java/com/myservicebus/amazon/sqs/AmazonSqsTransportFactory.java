@@ -173,7 +173,8 @@ public final class AmazonSqsTransportFactory implements TransportFactory, AutoCl
     }
 
     private String address(String entityName, boolean topic, String extraQuery) {
-        AmazonSqsEntityNames.validate(entityName);
+        if (topic) AmazonSqsEntityNames.validateTopic(entityName);
+        else AmazonSqsEntityNames.validate(entityName);
         String query = topic ? "type=topic" : "";
         if (extraQuery != null) query = query.isEmpty() ? extraQuery : query + "&" + extraQuery;
         return baseAddress.resolve(entityName).toString() + (query.isEmpty() ? "" : "?" + query);
@@ -184,7 +185,7 @@ public final class AmazonSqsTransportFactory implements TransportFactory, AutoCl
         if (topology.durable() && topology.temporary()) throw new IllegalArgumentException(
                 "An Amazon SQS endpoint cannot be both durable and temporary");
         if (topology.bindings().isEmpty()) throw new IllegalArgumentException("At least one binding is required");
-        topology.bindings().forEach(binding -> AmazonSqsEntityNames.validate(binding.getEntityName()));
+        topology.bindings().forEach(binding -> AmazonSqsEntityNames.validateTopic(binding.getEntityName()));
         if (topology.transportOptions() != null && !topology.transportOptions().isEmpty()) {
             throw new java.lang.UnsupportedOperationException("Amazon SQS transport options are not supported yet");
         }

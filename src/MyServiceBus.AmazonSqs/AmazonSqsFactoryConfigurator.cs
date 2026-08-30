@@ -85,13 +85,13 @@ public sealed class AmazonSqsFactoryConfigurator : IAmazonSqsFactoryConfigurator
         var name = _entityNames.TryGetValue(messageType, out var configured)
             ? configured
             : EntityNameFormatter.FormatEntityName(messageType);
-        return ApplyScope(name);
+        return ApplyScope(name, topic: true);
     }
 
     public void ReceiveEndpoint(string queueName, Action<AmazonSqsReceiveEndpointConfigurator> configure)
     {
         ArgumentNullException.ThrowIfNull(configure);
-        configure(new AmazonSqsReceiveEndpointConfigurator(ApplyScope(queueName), GetEntityName, _endpointActions));
+        configure(new AmazonSqsReceiveEndpointConfigurator(ApplyScope(queueName, topic: false), GetEntityName, _endpointActions));
     }
 
     public void ConfigureEndpoints(IBusRegistrationContext context)
@@ -104,11 +104,17 @@ public sealed class AmazonSqsFactoryConfigurator : IAmazonSqsFactoryConfigurator
     public void SetConsumerFactory(Type consumerFactoryType) =>
         _consumerFactoryType = consumerFactoryType ?? throw new ArgumentNullException(nameof(consumerFactoryType));
 
-    internal string ApplyScope(string name)
+    internal string ApplyScope(string name, bool topic)
     {
-        AmazonSqsEntityName.Validate(name);
+        if (topic)
+            AmazonSqsEntityName.ValidateTopic(name);
+        else
+            AmazonSqsEntityName.Validate(name);
         var scoped = Scope + name;
-        AmazonSqsEntityName.Validate(scoped);
+        if (topic)
+            AmazonSqsEntityName.ValidateTopic(scoped);
+        else
+            AmazonSqsEntityName.Validate(scoped);
         return scoped;
     }
 

@@ -2,6 +2,25 @@
 
 The Amazon transport uses standard Amazon SQS queues for directed delivery and Amazon SNS topics for publication. Matching C# and Java adapters share the same entity names, MassTransit JSON envelope, raw SNS delivery, settlement rules, and companion destinations.
 
+## Verification status
+
+Verified for the preview:
+
+- C# and Java directed sends through standard SQS queues;
+- C# and Java publication through SNS topics with raw SQS subscriptions;
+- both directions between each MyServiceBus client and MassTransit 8.5.1 on LocalStack;
+- MassTransit-compatible default message-topic naming;
+- topology creation, direct delivery, raw SNS forwarding, receive/delete settlement, and cleanup in a narrow real-AWS acceptance run.
+
+Not verified or supported by this preview:
+
+- FIFO queues, ordering, message groups, and deduplication;
+- compatibility with MassTransit versions other than 8.5.1;
+- every MassTransit middleware, saga, scheduler, routing-slip, or persistence feature;
+- cross-region SNS-to-SQS delivery or production-scale throughput and resilience characteristics.
+
+Portable request, retry, fault, correlation, and consume-pipeline behavior is covered by the shared suites; the Amazon tests intentionally concentrate on the transport-specific boundary.
+
 Install `Sundstrom.MyServiceBus.AmazonSqs` for C# or `io.github.marinasundstrom.myservicebus:myservicebus-amazon-sqs` for Java.
 
 ## Configuration
@@ -64,7 +83,7 @@ Typical create-mode permissions are `sqs:CreateQueue`, `sqs:GetQueueUrl`, `sqs:G
 - FIFO queues, message groups, deduplication, and ordered delivery are not implemented in this first slice. Entity names ending in `.fifo` are therefore invalid.
 - SNS inheritance routing is not inferred by AWS. A concrete publication is sent to its configured concrete topic; consumers of base classes or interfaces require explicit publication to those entity topics.
 
-The transport is currently experimental. Its C#↔Java behavior is covered by LocalStack integration tests, but Amazon SQS/SNS interoperability with MassTransit has not yet passed the promotion matrix.
+The transport is currently an experimental preview. LocalStack tests verify directed SQS sends and raw SNS-to-SQS publication in both directions between MassTransit 8.5.1 and the C# and Java adapters. The profile deliberately remains limited to standard queues; FIFO-specific semantics are outside the MVP.
 
 ## Local emulator
 
@@ -77,9 +96,11 @@ RUN_AMAZON_SQS_LOCALSTACK_TESTS=1 gradle :myservicebus-amazon-sqs:test
 docker compose -f test/AmazonSqsLocalStack/compose.yaml down
 ```
 
-Configure `LocalstackHost()` in C# or `localstackHost()` in Java. Newer unified LocalStack images require a LocalStack auth token; the repository fixture intentionally has no account dependency. LocalStack verifies the SQS/SNS protocol path, not AWS IAM or service-operation behavior, so cloud acceptance remains a separate promotion requirement.
+Configure `LocalstackHost()` in C# or `localstackHost()` in Java. Newer unified LocalStack images require a LocalStack auth token; the repository fixture intentionally has no account dependency. LocalStack is the default acceptance environment for SQS/SNS transport semantics. Do not duplicate a passing emulator scenario against AWS unless a documented LocalStack limitation, an observed discrepancy, or a cloud-only concern such as IAM requires it.
 
-Like the Azure Service Bus cloud suite, this gate is manual and opt-in; routine local tests and CI skip it. Run it only when validating transport-specific behavior against AWS, using temporary, least-privilege credentials. The narrow C# and Java cases cover topology creation, direct SQS delivery, raw SNS-to-SQS forwarding, receive/delete settlement, and cleanup. Portable retry, request, serialization, and consume-pipeline behavior stays in the shared suites. Each cloud case creates uniquely named queues and topics and removes those exact resources in a `finally` block. The runner refuses an AWS root identity:
+The .NET test project also launches the Java interoperability peer and a pinned MassTransit 8.5.1 bus. Those cases verify the default Amazon message-topic formatter plus bidirectional directed sends and publications for both MyServiceBus languages. Emulator clients explicitly use the same `us-east-1` authentication region so LocalStack does not partition otherwise identical topology by request-signing region.
+
+The AWS gate is manual and opt-in; routine local tests and CI skip it. Run it only for a known or suspected emulator difference or for an AWS-only concern, using temporary, least-privilege credentials. The narrow C# and Java cases cover topology creation, direct SQS delivery, raw SNS-to-SQS forwarding, receive/delete settlement, and cleanup. Portable retry, request, serialization, and consume-pipeline behavior stays in the shared suites. Each cloud case creates uniquely named queues and topics and removes those exact resources in a `finally` block. The runner refuses an AWS root identity:
 
 ```bash
 AWS_REGION=eu-north-1 ./eng/run-amazon-sqs-cloud-tests.sh

@@ -12,10 +12,11 @@ record AmazonSqsEndpointAddress(String entityName, EntityKind kind) {
         }
         String path = address.isOpaque() ? address.getSchemeSpecificPart().split("\\?", 2)[0] : address.getPath();
         String name = path.substring(path.lastIndexOf('/') + 1);
-        AmazonSqsEntityNames.validate(name);
         boolean topic = scheme.equals("topic") || (address.getQuery() != null &&
                 java.util.Arrays.stream(address.getQuery().split("&"))
                         .anyMatch(value -> value.equalsIgnoreCase("type=topic")));
+        if (topic) AmazonSqsEntityNames.validateTopic(name);
+        else AmazonSqsEntityNames.validate(name);
         return new AmazonSqsEndpointAddress(name, topic ? EntityKind.TOPIC : EntityKind.QUEUE);
     }
 }

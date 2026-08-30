@@ -42,7 +42,7 @@ public sealed class AmazonSqsMessageConfigurator
     public void SetEntityName(string name)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        AmazonSqsEntityName.Validate(name);
+        AmazonSqsEntityName.ValidateTopic(name);
         _entityNames[_messageType] = name;
     }
 }

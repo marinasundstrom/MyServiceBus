@@ -33,6 +33,7 @@ const sections = [
       ['Distributed systems fundamentals', '/docs/distributed-systems'],
       ['RabbitMQ transport', '/docs/rabbitmq'],
       ['Azure Service Bus', '/docs/azure-service-bus'],
+      ['Amazon SQS/SNS', '/docs/amazon-sqs'],
       ['Transactional outbox', '/docs/transactional-outbox'],
       ['Message scheduling', '/docs/scheduling'],
       ['Consumer methods', '/docs/consumer-methods'],

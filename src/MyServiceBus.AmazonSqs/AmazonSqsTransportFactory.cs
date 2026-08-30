@@ -136,7 +136,8 @@ public sealed class AmazonSqsTransportFactory : ITransportFactory
         {
             var response = await _sns.ListTopicsAsync(new ListTopicsRequest { NextToken = nextToken }, cancellationToken)
                 .ConfigureAwait(false);
-            var topic = response.Topics.FirstOrDefault(x => x.TopicArn.EndsWith(':' + name, StringComparison.Ordinal));
+            var topic = (response.Topics ?? []).FirstOrDefault(x =>
+                x.TopicArn.EndsWith(':' + name, StringComparison.Ordinal));
             if (topic is not null)
                 return topic.TopicArn;
             nextToken = response.NextToken;
@@ -214,7 +215,10 @@ public sealed class AmazonSqsTransportFactory : ITransportFactory
 
     private Uri CreateAddress(string entityName, bool topic, string? extraQuery = null)
     {
-        AmazonSqsEntityName.Validate(entityName);
+        if (topic)
+            AmazonSqsEntityName.ValidateTopic(entityName);
+        else
+            AmazonSqsEntityName.Validate(entityName);
         var builder = new UriBuilder(new Uri(_baseAddress, Uri.EscapeDataString(entityName)));
         var query = topic ? "type=topic" : string.Empty;
         if (!string.IsNullOrWhiteSpace(extraQuery))

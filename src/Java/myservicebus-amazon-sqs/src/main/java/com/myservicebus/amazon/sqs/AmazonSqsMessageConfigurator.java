@@ -13,7 +13,7 @@ public final class AmazonSqsMessageConfigurator<T> {
     }
 
     public void setEntityName(String name) {
-        AmazonSqsEntityNames.validate(name);
+        AmazonSqsEntityNames.validateTopic(name);
         entityNames.put(messageType, name);
     }
 

@@ -49,6 +49,19 @@ class AmazonSqsTransportTest {
         assertThrows(IllegalArgumentException.class, () -> configurator.setVisibilityTimeout(43201));
         assertThrows(IllegalArgumentException.class,
                 () -> configurator.receiveEndpoint("invalid.name", endpoint -> { }));
+        assertThrows(IllegalArgumentException.class,
+                () -> configurator.receiveEndpoint("q".repeat(81), endpoint -> { }));
+        configurator.message(Probe.class, message -> message.setEntityName("t".repeat(81)));
+        assertEquals(81, configurator.getEntityName(Probe.class).length());
+    }
+
+    @Test
+    void defaultMessageEntityNameUsesMassTransitAmazonConvention() {
+        AmazonSqsFactoryConfigurator configurator = new AmazonSqsFactoryConfigurator();
+
+        assertEquals(
+                "com_myservicebus_amazon_sqs-AmazonSqsTransportTest_Probe",
+                configurator.getEntityName(Probe.class));
     }
 
     @Test

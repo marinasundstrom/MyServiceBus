@@ -21,13 +21,15 @@ internal readonly record struct AmazonSqsEndpointAddress(string EntityName, Amaz
         var name = logicalScheme
             ? address.OriginalString[(address.Scheme.Length + 1)..].Split('?', 2)[0].TrimStart('/')
             : address.Segments.LastOrDefault()?.Trim('/');
-        AmazonSqsEntityName.Validate(name ?? string.Empty);
-
         var query = System.Web.HttpUtility.ParseQueryString(address.Query);
         var kind = address.Scheme.Equals("topic", StringComparison.OrdinalIgnoreCase) ||
                    string.Equals(query["type"], "topic", StringComparison.OrdinalIgnoreCase)
             ? AmazonSqsEntityKind.Topic
             : AmazonSqsEntityKind.Queue;
+        if (kind == AmazonSqsEntityKind.Topic)
+            AmazonSqsEntityName.ValidateTopic(name ?? string.Empty);
+        else
+            AmazonSqsEntityName.Validate(name ?? string.Empty);
         return new AmazonSqsEndpointAddress(name!, kind);
     }
 }

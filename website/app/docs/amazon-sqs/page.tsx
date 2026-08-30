@@ -1,0 +1,66 @@
+import Link from 'next/link';
+
+export default function AmazonSqs() {
+  return (
+    <article className="docs-article">
+      <p className="docs-kicker">Transport preview · Amazon Web Services</p>
+      <h1>Amazon SQS/SNS, with a deliberately narrow compatibility promise.</h1>
+      <p className="docs-summary">
+        MyServiceBus uses standard SQS queues for directed delivery and SNS topics
+        with raw SQS subscriptions for publication. C# and Java follow the same
+        MassTransit-oriented transport profile.
+      </p>
+
+      <div className="callout callout-accent">
+        <strong>Verified preview boundary</strong>
+        <p>
+          Directed sends and publications pass in both directions between MassTransit
+          8.5.1 and the C# and Java clients on LocalStack. A separate, manual AWS run
+          verifies topology creation, delivery, settlement, and exact-resource cleanup.
+        </p>
+      </div>
+
+      <h2>Verified to work</h2>
+      <ul className="check-list">
+        <li>Standard SQS queue creation and directed delivery</li>
+        <li>SNS publication through raw SQS subscriptions</li>
+        <li>MassTransit-compatible message envelopes and default topic names</li>
+        <li>MassTransit 8.5.1 ↔ MyServiceBus C# in both directions</li>
+        <li>MassTransit 8.5.1 ↔ MyServiceBus Java in both directions</li>
+        <li>Visibility renewal and successful receive/delete settlement</li>
+      </ul>
+
+      <h2>Not verified or supported</h2>
+      <ul>
+        <li>FIFO queues, ordering, message groups, or deduplication</li>
+        <li>MassTransit versions other than 8.5.1</li>
+        <li>Cross-region SNS-to-SQS delivery</li>
+        <li>Every MassTransit middleware, saga, scheduler, routing-slip, or persistence feature</li>
+        <li>Production-scale throughput, throttling, and resilience characteristics</li>
+      </ul>
+
+      <h2>Topology used by the preview</h2>
+      <p>
+        A durable endpoint uses one SQS queue, companion <code>_error</code> and{' '}
+        <code>_skipped</code> queues, SNS topics for consumed contracts, raw SNS
+        subscriptions, and a least-privilege queue policy. Infrastructure-owned
+        environments can select pre-provisioned topology mode.
+      </p>
+
+      <div className="callout">
+        <strong>Why the cloud test is manual</strong>
+        <p>
+          LocalStack is the default acceptance environment. The AWS account is used
+          only for a documented emulator limitation, an observed discrepancy, or an
+          AWS-only concern such as IAM. Portable pipeline behavior belongs to the
+          shared suites.
+        </p>
+      </div>
+
+      <div className="next-card">
+        <div><span>Compatibility</span><strong>See every verified transport boundary</strong></div>
+        <Link href="/docs/interoperability">Interoperability →</Link>
+      </div>
+    </article>
+  );
+}

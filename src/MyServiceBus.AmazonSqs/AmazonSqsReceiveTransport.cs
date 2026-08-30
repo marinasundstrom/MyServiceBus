@@ -130,11 +130,12 @@ public sealed class AmazonSqsReceiveTransport : IReceiveTransport
                     throw;
                 }
 
-                var unused = reserved - response.Messages.Count;
+                var messages = response.Messages ?? [];
+                var unused = reserved - messages.Count;
                 if (unused > 0)
                     availableDeliveries.Release(unused);
 
-                foreach (var message in response.Messages)
+                foreach (var message in messages)
                 {
                     var task = ProcessMessage(message, handlerConcurrency, cancellationToken).ContinueWith(
                         _ => availableDeliveries.Release(), CancellationToken.None,
