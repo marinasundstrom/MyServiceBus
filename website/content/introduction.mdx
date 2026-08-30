@@ -1,0 +1,64 @@
+import Link from 'next/link';
+import LanguageTabs from '../app/components/LanguageTabs';
+
+export const helloWorld = {
+  csharp: `public record SubmitOrder(Guid OrderId);
+
+public class SubmitOrderConsumer : IConsumer<SubmitOrder>
+{
+    public Task Consume(ConsumeContext<SubmitOrder> context) =>
+        Console.Out.WriteLineAsync($"Order {context.Message.OrderId}");
+}`,
+  java: `public record SubmitOrder(UUID orderId) { }
+
+public class SubmitOrderConsumer implements Consumer<SubmitOrder> {
+    public CompletableFuture<Void> consume(
+            ConsumeContext<SubmitOrder> context) {
+        System.out.println("Order " + context.getMessage().orderId());
+        return CompletableFuture.completedFuture(null);
+    }
+}`,
+};
+
+<p className="docs-kicker">Introduction</p>
+
+# Messaging across .NET and Java, without changing the mental model.
+
+<p className="docs-summary">MyServiceBus is a focused asynchronous service-bus runtime with aligned C# and Java APIs. It can extend a MassTransit-based .NET estate with Java or provide one model for a new cross-platform system. It includes RabbitMQ-backed messaging, preview Azure Service Bus and Amazon SQS/SNS transports, an in-memory mediator, and familiar MassTransit-style concepts.</p>
+
+<div className="callout callout-accent">
+  <strong>Current scope</strong>
+  <p>RabbitMQ is the verified broker profile. Azure Service Bus and Amazon SQS/SNS are preview profiles with explicitly documented verification boundaries. MyServiceBus is not a drop-in replacement for every MassTransit feature.</p>
+</div>
+
+<h2 id="why">Why MyServiceBus?</h2>
+
+<div className="docs-feature-grid">
+  <div><span>01</span><h3>Cross-language</h3><p>Share contracts and messaging behavior across .NET and Java services.</p></div>
+  <div><span>02</span><h3>Focused</h3><p>Send, publish, consume, request, retry, and test—without a framework-wide commitment.</p></div>
+  <div><span>03</span><h3>Familiar</h3><p>Use concepts that feel natural to developers who already know MassTransit.</p></div>
+  <div><span>04</span><h3>Explicit</h3><p>Transport capabilities and compatibility boundaries are documented rather than implied.</p></div>
+  <div><span>05</span><h3>Permissive</h3><p>Adopt an MIT-licensed core when a commercial platform&apos;s support and breadth are not required.</p></div>
+  <div><span>06</span><h3>Mediator first</h3><p>Replace MediatR with dedicated handlers and generated C# and Java dispatch, with no broker required.</p></div>
+</div>
+
+<h2 id="same-concept">The same concept, idiomatic code</h2>
+
+The APIs do not try to look identical. They preserve the same behavior while following each platform’s conventions for dependency injection, asynchronous work, and type systems.
+
+<LanguageTabs csharp={helloWorld.csharp} java={helloWorld.java} />
+
+<div className="callout">
+  <strong>Adding MyServiceBus to an existing Java application?</strong>
+  <p>Keep Spring, CDI, Dagger, or your application-owned object graph in charge and connect it through the bus factory. Review the{' '} <Link href="/docs/java-adoption">concrete Java adoption examples →</Link></p>
+</div>
+
+<div className="callout">
+  <strong>Looking for in-process dispatch?</strong>
+  <p>The <Link href="/docs/mediator">mediator guide</Link> covers generated local commands, queries, and notifications—and where broker durability becomes necessary.</p>
+</div>
+
+<div className="next-card">
+  <div><span>Next</span><strong>Build your first message flow</strong></div>
+  <Link href="/docs/getting-started">Getting started →</Link>
+</div>

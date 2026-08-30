@@ -30,9 +30,9 @@ configure an editor component. Internal Markdown links are routed through Next.j
 and reusable presentation such as concept cards and next-page links is supplied by
 `mdx-components.tsx`.
 
-The concepts section under `content/concepts/` is the first section using this
-content/presentation split. Existing TSX-authored guides can move to the same model
-as they are revised rather than through a mechanical rewrite.
+All documentation routes use this content/presentation split. The route files stay
+as small wrappers so they can apply the shared documentation layout and, where
+needed, route metadata. The interactive landing page remains in React.
 
 ## Independent publishing
 

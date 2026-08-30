@@ -4,6 +4,8 @@ This changelog summarizes the bigger themes in the repository history rather tha
 
 ## Unreleased
 
+- Moved all public documentation prose into Markdown-compatible MDX sources while preserving the existing routes, interactive components, design, and copy; documentation route files are now thin presentation wrappers.
+
 ## 0.1.0-preview.7 - 2026-08-30
 
 - Added experimental .NET 11 union support with ABI-based reflection consumer expansion, C# union-semantic response results, concrete-case topology, and staged NuGet consumers in both C# and Raven. The two core NuGet packages now carry both `net10.0` and experimental `net11.0` assets, while Java interoperability remains at the ordinary concrete message-contract boundary. Published guidance positions C# as the primary .NET API and highlights Raven's idiomatic `Message1 | Message2` projection.
