@@ -32,7 +32,7 @@ export default function CodeViewer({ code, language, label, height }: CodeViewer
           fontFamily: 'var(--font-geist-mono), ui-monospace, monospace',
           fontSize: 12,
           glyphMargin: false,
-          lineDecorationsWidth: 8,
+          lineDecorationsWidth: 16,
           lineHeight: 20,
           lineNumbers: 'on',
           lineNumbersMinChars: 2,
