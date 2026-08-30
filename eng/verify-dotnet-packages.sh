@@ -3,7 +3,7 @@ set -eu
 
 package_dir="${1:-artifacts/packages}"
 version="${2:-0.1.0-preview.6}"
-packages="Sundstrom.MyServiceBus.Abstractions Sundstrom.MyServiceBus Sundstrom.MyServiceBus.Serialization.Bson Sundstrom.MyServiceBus.PostgreSql Sundstrom.MyServiceBus.Inspection Sundstrom.MyServiceBus.Monitoring Sundstrom.MyServiceBus.RabbitMq Sundstrom.MyServiceBus.AzureServiceBus Sundstrom.MyServiceBus.Testing"
+packages="Sundstrom.MyServiceBus.Abstractions Sundstrom.MyServiceBus Sundstrom.MyServiceBus.Serialization.Bson Sundstrom.MyServiceBus.PostgreSql Sundstrom.MyServiceBus.Inspection Sundstrom.MyServiceBus.Monitoring Sundstrom.MyServiceBus.RabbitMq Sundstrom.MyServiceBus.AzureServiceBus Sundstrom.MyServiceBus.AmazonSqs Sundstrom.MyServiceBus.Testing"
 
 for package_id in $packages; do
   package="$package_dir/$package_id.$version.nupkg"
@@ -20,6 +20,6 @@ for package_id in $packages; do
 done
 
 actual_packages="$(find "$package_dir" -maxdepth 1 -type f \( -name '*.nupkg' -o -name '*.snupkg' \) | wc -l | tr -d ' ')"
-test "$actual_packages" = 18
+test "$actual_packages" = 20
 
-echo "Verified nine NuGet packages and nine symbol packages for $version."
+echo "Verified ten NuGet packages and ten symbol packages for $version."

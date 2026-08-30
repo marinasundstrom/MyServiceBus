@@ -135,6 +135,8 @@ The immediate target explicitly does not include:
 - multiple bus instances in one host or MassTransit's marker-interface registration model
 - complete feature parity with the latest MassTransit release
 
+Amazon SQS/SNS is an experimental preview profile. Matching C# and Java adapters pass directed SQS and raw SNS-to-SQS publication scenarios in both directions with MassTransit 8.5.1 against the checked-in LocalStack fixture. LocalStack is the default acceptance environment; the manual AWS gate is reserved for documented emulator differences, observed discrepancies, and AWS-only concerns such as IAM. Portable pipeline behavior remains covered by the shared suites. FIFO queues and FIFO-specific semantics are not part of this MVP profile.
+
 ## Immediate Conformance Matrix
 
 The following scenarios should become required integration tests:

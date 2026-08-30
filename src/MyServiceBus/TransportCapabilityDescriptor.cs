@@ -93,6 +93,26 @@ public static class TransportCapabilityDescriptors
             [TransportCapabilities.TopologyProvisioning] = TransportCapabilitySupport.Native
         });
 
+    public static TransportCapabilityDescriptor AmazonSqs { get; } = new(
+        "amazon-sqs",
+        new Dictionary<string, TransportCapabilitySupport>
+        {
+            [TransportCapabilities.DirectedSend] = TransportCapabilitySupport.Native,
+            [TransportCapabilities.PublishSubscribe] = TransportCapabilitySupport.Native,
+            [TransportCapabilities.Durability] = TransportCapabilitySupport.Native,
+            [TransportCapabilities.CompetingConsumers] = TransportCapabilitySupport.Native,
+            [TransportCapabilities.Acknowledgement] = TransportCapabilitySupport.Native,
+            [TransportCapabilities.RequestResponse] = TransportCapabilitySupport.Emulated,
+            [TransportCapabilities.Scheduling] = TransportCapabilitySupport.Emulated,
+            [TransportCapabilities.Retry] = TransportCapabilitySupport.Emulated,
+            [TransportCapabilities.Redelivery] = TransportCapabilitySupport.Native,
+            [TransportCapabilities.ErrorDestinations] = TransportCapabilitySupport.Emulated,
+            [TransportCapabilities.Ordering] = TransportCapabilitySupport.Unsupported,
+            [TransportCapabilities.Replay] = TransportCapabilitySupport.Unsupported,
+            [TransportCapabilities.TemporaryEndpoints] = TransportCapabilitySupport.Emulated,
+            [TransportCapabilities.TopologyProvisioning] = TransportCapabilitySupport.Native
+        });
+
     public static TransportCapabilityDescriptor InMemory { get; } = new(
         "in-memory",
         new Dictionary<string, TransportCapabilitySupport>

@@ -7,6 +7,7 @@ const versions = [
   ['PostgreSQL', '17 / 17.6 baseline', 'Transactional outbox and inbox provider.'],
   ['RabbitMQ', '4.1 / 4.1.8 baseline', 'Declared RabbitMQ transport profile.'],
   ['Azure Service Bus', 'Standard tier', 'Live cloud topology and delivery profile.'],
+  ['Amazon SQS/SNS', 'Standard queues', 'Preview profile; FIFO semantics are not supported.'],
   ['MassTransit peer', '8.5.1', 'Pinned interoperability evidence, not a promise for future releases.'],
   ['NServiceBus peer', '10.2.8', 'Separate RabbitMQ directed-send profile only.'],
 ];

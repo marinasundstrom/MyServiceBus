@@ -35,22 +35,22 @@ Unknown capability names are treated as `unsupported`. This lets newer runtimes 
 
 ### Version 1 Capability Names
 
-| Capability | RabbitMQ | In-memory | Meaning |
-| --- | --- | --- | --- |
-| `directedSend` | Native | Emulated | Deliver to a named destination |
-| `publishSubscribe` | Native | Emulated | Fan out published messages to subscribers |
-| `durability` | Native | Unsupported | Preserve broker state and messages across process restarts |
-| `competingConsumers` | Native | Unsupported | Share a destination across consumer instances |
-| `acknowledgement` | Native | Unsupported | Settle delivery explicitly after processing |
-| `requestResponse` | Emulated | Emulated | Compose requests from messages, correlation, and temporary endpoints |
-| `scheduling` | Emulated | Emulated | Schedule through the MyServiceBus job scheduler rather than a transport-native delayed-delivery primitive |
-| `retry` | Emulated | Emulated | Re-invoke the consume pipeline immediately or after an in-process delay |
-| `redelivery` | Unsupported | Unsupported | Release or defer a delivery and receive it again through the transport |
-| `errorDestinations` | Emulated | Emulated | Preserve terminal failures through MyServiceBus-managed destinations |
-| `ordering` | Native | Emulated | Retain transport ordering within its documented scope; concurrency can still affect completion order |
-| `replay` | Unsupported | Unsupported | Re-read retained history from an earlier position |
-| `temporaryEndpoints` | Native | Emulated | Create short-lived response or receive destinations |
-| `topologyProvisioning` | Native | Unsupported | Create broker entities and bindings |
+| Capability | RabbitMQ | Azure Service Bus | Amazon SQS/SNS | In-memory | Meaning |
+| --- | --- | --- | --- | --- | --- |
+| `directedSend` | Native | Native | Native | Emulated | Deliver to a named destination |
+| `publishSubscribe` | Native | Native | Native | Emulated | Fan out published messages to subscribers |
+| `durability` | Native | Native | Native | Unsupported | Preserve broker state and messages across process restarts |
+| `competingConsumers` | Native | Native | Native | Unsupported | Share a destination across consumer instances |
+| `acknowledgement` | Native | Native | Native | Unsupported | Settle delivery explicitly after processing |
+| `requestResponse` | Emulated | Emulated | Emulated | Emulated | Compose requests from messages, correlation, and temporary endpoints |
+| `scheduling` | Emulated | Emulated | Emulated | Emulated | Schedule through the MyServiceBus job scheduler rather than a transport-native delayed-delivery primitive |
+| `retry` | Emulated | Emulated | Emulated | Emulated | Re-invoke the consume pipeline immediately or after an in-process delay |
+| `redelivery` | Unsupported | Unsupported | Native | Unsupported | Release or defer a delivery and receive it again through the transport |
+| `errorDestinations` | Emulated | Emulated | Emulated | Emulated | Preserve terminal failures through MyServiceBus-managed destinations |
+| `ordering` | Native | Native | Unsupported | Emulated | Retain transport ordering within its documented scope; concurrency can still affect completion order |
+| `replay` | Unsupported | Unsupported | Unsupported | Unsupported | Re-read retained history from an earlier position |
+| `temporaryEndpoints` | Native | Native | Emulated | Emulated | Create short-lived response or receive destinations |
+| `topologyProvisioning` | Native | Native | Native | Unsupported | Create broker entities and bindings |
 
 `native` describes a transport or broker primitive. `emulated` describes behavior composed by MyServiceBus and therefore requires its documented limitations to be considered. It does not mean the capability is lower quality for ordinary use.
 
@@ -125,4 +125,4 @@ Transient application technologies such as SignalR are integrations, not impleme
 
 ## Examples
 
-The RabbitMQ transport demonstrates these requirements. See [RabbitMQ Transport](../rabbitmq-transport.md) for a concrete implementation.
+See the [RabbitMQ](../rabbitmq-transport.md), [Azure Service Bus](../azure-service-bus-transport.md), and [Amazon SQS/SNS](../amazon-sqs-transport.md) transport profiles for concrete implementations.

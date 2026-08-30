@@ -2,7 +2,7 @@
 set -eu
 
 version="${1:-0.1.0-preview.6}"
-modules="myservicebus-abstractions myservicebus-di myservicebus-logging myservicebus-tasks myservicebus myservicebus-processor myservicebus-serialization-bson myservicebus-postgresql myservicebus-inspection myservicebus-monitoring myservicebus-rabbitmq myservicebus-azure-service-bus myservicebus-testing"
+modules="myservicebus-abstractions myservicebus-di myservicebus-logging myservicebus-tasks myservicebus myservicebus-processor myservicebus-serialization-bson myservicebus-postgresql myservicebus-inspection myservicebus-monitoring myservicebus-rabbitmq myservicebus-azure-service-bus myservicebus-amazon-sqs myservicebus-testing"
 require_signatures="${REQUIRE_MAVEN_SIGNATURES:-0}"
 
 for artifact_id in $modules; do
@@ -32,7 +32,7 @@ for artifact_id in $modules; do
 done
 
 if [ "$require_signatures" = "1" ]; then
-  echo "Verified thirteen signed Maven publications with binary, source, Javadoc, module, and POM artifacts for $version."
+  echo "Verified fourteen signed Maven publications with binary, source, Javadoc, module, and POM artifacts for $version."
 else
-  echo "Verified thirteen Maven publications with binary, source, Javadoc, module, and POM artifacts for $version."
+  echo "Verified fourteen Maven publications with binary, source, Javadoc, module, and POM artifacts for $version."
 fi

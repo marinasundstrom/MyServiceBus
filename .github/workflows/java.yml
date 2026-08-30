@@ -36,6 +36,15 @@ jobs:
         run: ./eng/verify-release-versions.sh
       - name: Build with Gradle
         run: gradle test publish
+      - name: Start Amazon SQS/SNS emulator
+        run: docker compose -f test/AmazonSqsLocalStack/compose.yaml up -d --wait
+      - name: Test Amazon SQS/SNS transport
+        env:
+          RUN_AMAZON_SQS_LOCALSTACK_TESTS: '1'
+        run: gradle :myservicebus-amazon-sqs:test --rerun-tasks
+      - name: Stop Amazon SQS/SNS emulator
+        if: always()
+        run: docker compose -f test/AmazonSqsLocalStack/compose.yaml down
       - name: Verify generated dispatch with GraalVM Native Image
         run: ./eng/verify-java-aot.sh
       - name: Verify Maven packages

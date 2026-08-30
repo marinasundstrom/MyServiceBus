@@ -1,0 +1,7 @@
+dependencies {
+    api project(':myservicebus')
+    api "software.amazon.awssdk:sqs:${awsSdkVersion}"
+    api "software.amazon.awssdk:sns:${awsSdkVersion}"
+    runtimeOnly "software.amazon.awssdk:sso:${awsSdkVersion}"
+    runtimeOnly "software.amazon.awssdk:ssooidc:${awsSdkVersion}"
+}

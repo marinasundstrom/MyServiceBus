@@ -25,6 +25,7 @@ _ = typeof(IBusInspectionProvider);
 _ = typeof(MonitoringExporterOptions);
 _ = typeof(RabbitMqFactoryConfigurator);
 _ = typeof(AzureServiceBusFactoryConfigurator);
+_ = typeof(AmazonSqsFactoryConfigurator);
 _ = typeof(BsonSerializerFactory);
 _ = typeof(PostgreSqlSchema);
 Console.WriteLine("Verified the staged MyServiceBus NuGet packages from a consumer project.");

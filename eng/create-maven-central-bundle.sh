@@ -3,7 +3,7 @@ set -eu
 
 output="${1:-build/maven-central-bundle.zip}"
 version="${2:-0.1.0-preview.6}"
-modules="myservicebus-abstractions myservicebus-di myservicebus-logging myservicebus-tasks myservicebus myservicebus-processor myservicebus-serialization-bson myservicebus-postgresql myservicebus-inspection myservicebus-monitoring myservicebus-rabbitmq myservicebus-azure-service-bus myservicebus-testing"
+modules="myservicebus-abstractions myservicebus-di myservicebus-logging myservicebus-tasks myservicebus myservicebus-processor myservicebus-serialization-bson myservicebus-postgresql myservicebus-inspection myservicebus-monitoring myservicebus-rabbitmq myservicebus-azure-service-bus myservicebus-amazon-sqs myservicebus-testing"
 staging_dir="$(mktemp -d)"
 
 case "$version" in

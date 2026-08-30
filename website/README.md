@@ -66,6 +66,7 @@ The public site currently covers:
 - detailed messaging concepts covering contracts, intent, receive endpoints,
   topology, dispatch, requests, and reliability
 - RabbitMQ transport behavior
+- Amazon SQS/SNS preview behavior and its verified interoperability boundary
 - .NET NativeAOT registration modes and current support boundary
 - attributed C# consumer methods, parameter binding, and class-level discovery
 - platform parity across the .NET runtime, C# generation, and Java

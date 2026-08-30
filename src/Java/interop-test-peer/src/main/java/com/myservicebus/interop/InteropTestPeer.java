@@ -50,6 +50,10 @@ public final class InteropTestPeer {
             AzureServiceBusInteropPeer.run(args);
             return;
         }
+        if (args.length > 0 && args[0].startsWith("amazon-")) {
+            AmazonSqsInteropPeer.run(args);
+            return;
+        }
 
         if (args.length != 5) {
             throw new IllegalArgumentException(
