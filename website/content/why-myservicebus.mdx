@@ -54,19 +54,20 @@ export const chooseTransport = {
 
 <p className="docs-kicker">Why MyServiceBus?</p>
 
-# Use one focused model locally or across services.
+# Decide whether MyServiceBus fits your system.
 
-<p className="docs-summary">Replace MediatR for in-process application messaging, extend a MassTransit-based .NET estate with Java, or start a new system in C#, Java, or both.</p>
+<p className="docs-summary">Evaluate MyServiceBus against the system you need to operate: language mix, messaging scope, broker requirements, support model, and tolerance for a pre-1.0 dependency.</p>
 
 <div className="docs-feature-grid">
-  <div><span>01</span><h3>Add Java to MassTransit</h3><p>Participate through the verified common protocol subset without building a custom bridge or a second messaging model.</p></div>
-  <div><span>02</span><h3>Replace MediatR</h3><p>Use dedicated handlers and generated dispatch for local commands, queries, notifications, and responses.</p></div>
-  <div><span>03</span><h3>Start cross-platform</h3><p>Choose C# or Java per service while message intent, requests, retries, and faults retain the same meaning.</p></div>
+  <div><span>GOOD FIT</span><h3>Cross-language alignment</h3><p>You need C# and Java services to share message intent, envelopes, requests, retries, and failure semantics.</p></div>
+  <div><span>GOOD FIT</span><h3>Local mediator dispatch</h3><p>You want generated commands, queries, notifications, and handlers without adopting a broker.</p></div>
+  <div><span>REVIEW</span><h3>Preview adoption</h3><p>You can evaluate and pin a pre-1.0 dependency while APIs, operational evidence, and production gates continue to mature.</p></div>
+  <div><span>ALTERNATIVE</span><h3>Mature .NET platform</h3><p>Choose MassTransit when its broader feature set, established operations, and commercial support are requirements.</p></div>
 </div>
 
 <div className="callout callout-accent">
-  <strong>Write for the platform, design for the system</strong>
-  <p>C# and Java code stays idiomatic, while contracts, consumers, commands, events, requests, retries, and faults retain the same meaning. Teams share one mental model instead of maintaining separate messaging architectures.</p>
+  <strong>Design target</strong>
+  <p>C# and Java code remains idiomatic while contracts, consumers, commands, events, requests, retries, and faults retain corresponding meaning. The goal is shared behavior, not identical source code.</p>
 </div>
 
 <div className="callout">
@@ -74,7 +75,7 @@ export const chooseTransport = {
   <p>MyServiceBus is being developed toward enterprise production confidence, but current releases remain previews. It does not offer MassTransit&apos;s commercial support, maturity, long-term product assurances, or complete feature breadth. Evaluate those differences as operational constraints.</p>
 </div>
 
-<h2 id="commercial-fit">Match the commercial commitment to the system</h2>
+<h2 id="commercial-fit">License, support, and maturity</h2>
 
 MyServiceBus is MIT-licensed. MassTransit v9 and later require a commercial license and pair that model with a mature product, support, and a much broader capability set. Those benefits can be worth paying for when a system needs them.
 
@@ -114,7 +115,7 @@ MyServiceBus deliberately preserves MassTransit&apos;s most useful structural an
 
 Compatibility is intentional where it supports familiarity and wire-level interoperability. Complete source compatibility and feature parity are not the goal; advanced features may be absent, and each platform keeps its natural dependency-injection, type-system, and asynchronous programming style.
 
-<h2 id="framework-first">Start framework-first, not broker-first</h2>
+<h2 id="framework-first">Separate application intent from broker mechanics</h2>
 
 Early design questions are usually about communication, not infrastructure. Is the message a command or an event? Who may consume it? Does the sender need an immediate response? What happens after a duplicate, timeout, or partial failure? MyServiceBus lets teams express those decisions through contracts, consumers, endpoints, publish and send intent, requests, retries, and faults before committing the design to native broker concepts.
 
@@ -143,7 +144,7 @@ A native client is deliberately close to its broker. That is ideal when you need
   <section><span className="tag">MYSERVICEBUS</span><h2>Messaging model</h2><p>Typed consumers, send and publish intent, portable envelopes, endpoint lifecycle, and shared failure behavior.</p><strong>Your responsibility:</strong><p>Design contracts, idempotency, service boundaries, and business recovery.</p></section>
 </div>
 
-<h2 id="what-you-get">What MyServiceBus brings</h2>
+<h2 id="what-you-get">Capability snapshot</h2>
 
 <div className="docs-feature-grid">
   <div><span>01</span><h3>One mental model</h3><p>Send commands, publish events, consume messages, and request responses through aligned C# and Java concepts.</p></div>
@@ -154,9 +155,9 @@ A native client is deliberately close to its broker. That is ideal when you need
   <div><span>06</span><h3>Operational context</h3><p>Propagate OpenTelemetry context and observe topology, throughput, retries, and failures through optional monitoring.</p></div>
 </div>
 
-<h2 id="easy-to-start">Get from an idea to a running message flow quickly</h2>
+<h2 id="easy-to-start">Typical adoption path</h2>
 
-MyServiceBus is designed to make the common path easy. Define a message contract, implement a typed consumer, register it with dependency injection, and select a transport. Endpoint discovery, consumer scopes, topology conventions, serialization, and bus lifecycle are handled by the framework so application development can start with the behavior that matters.
+A basic application defines a message contract, implements a typed consumer, registers it with dependency injection, and selects a transport. MyServiceBus then owns endpoint discovery, consumer scopes, topology conventions, serialization, and bus lifecycle for the supported profile.
 
 <div className="flow-line" aria-label="Getting started with MyServiceBus">
   <span>Define contract</span><b>→</b><span>Write consumer</span><b>→</b><span>Choose transport</span><b>→</b><span>Send a message</span>
@@ -181,19 +182,19 @@ The <Link href="/docs/java-adoption">Java adoption guide</Link> shows concrete S
 
 Use the in-memory mediator for deliberately local flows and fast tests, or run RabbitMQ locally for a realistic broker-backed development loop. The same consumer model can then move into the deployed environment. The <Link href="/docs/getting-started">getting-started guide</Link> walks through the complete first flow in both C# and Java.
 
-<h2 id="cross-language">Keep concepts aligned across .NET and Java</h2>
+<h2 id="cross-language">How C# and Java align</h2>
 
 The APIs are idiomatic rather than textually identical. A consumer has the same responsibilities and wire behavior in both languages, while each client follows its platform&apos;s dependency-injection and asynchronous programming style.
 
 <LanguageTabs csharp={sameModel.csharp} java={sameModel.java} />
 
-<h2 id="community">Build on the model—and improve the boundaries we own</h2>
+<h2 id="community">Project scope and ownership</h2>
 
-MyServiceBus starts from the parts of MassTransit that have proven useful: its messaging vocabulary, envelope conventions, consumer model, and operational semantics. It then concentrates improvement on first-class C# and Java parity, generated registration and dispatch, explicit compatibility and delivery evidence, and a smaller portable core.
+MyServiceBus starts from MassTransit&apos;s messaging vocabulary, envelope conventions, consumer model, and operational semantics. Development then concentrates on C# and Java parity, generated registration and dispatch, explicit compatibility and delivery evidence, and a smaller portable core.
 
 It is intentionally not a feature-for-feature reimplementation of MassTransit. “Improve upon” means advancing those owned boundaries, not claiming universal superiority. MassTransit remains the more mature and capable choice for many .NET systems. MyServiceBus commits to keeping its core runtime permissively open source while it evolves through production evidence and community contributions.
 
-<h2 id="transport-choice">Change transport configuration, not business intent</h2>
+<h2 id="transport-choice">What transport portability preserves</h2>
 
 The transport is selected at the application boundary. A team can run RabbitMQ locally because it is lightweight and easy to host, then configure Azure Service Bus when deploying the same application to Azure. Contracts, consumers, and the code that sends, publishes, requests, and responds do not need to be rewritten.
 

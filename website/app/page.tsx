@@ -69,22 +69,22 @@ export default function Home() {
             <p className="eyebrow">Asynchronous messaging for .NET and Java</p>
             <h1>One messaging model for distributed services.</h1>
             <p className="lede">
-              Publish events and send commands across C# and Java with RabbitMQ
-              or Azure Service Bus. Integrate Java into a MassTransit estate or
-              build cross-platform from the start—with MediatR-compatible
-              in-process dispatch when you need it.
+              Model commands, events, requests, and consumers consistently across
+              C# and Java. RabbitMQ is the verified broker baseline; Azure Service
+              Bus and Amazon SQS/SNS are preview transports. A local mediator covers
+              deliberately in-process dispatch without requiring a broker.
             </p>
             <div className="hero-actions">
               <Link className="primary-button" href="/docs/getting-started">
                 Get started <span aria-hidden="true">→</span>
               </Link>
               <Link className="text-button" href="/docs/why-myservicebus">
-                Why MyServiceBus?
+                Evaluate the fit
               </Link>
             </div>
             <div className="compatibility-line">
               <span aria-hidden="true" className="pulse" />
-              RabbitMQ verified · Azure Service Bus verified preview
+              Pre-1.0 · RabbitMQ verified · Azure and AWS preview transports
             </div>
           </div>
 
@@ -152,35 +152,36 @@ export default function Home() {
 
         <section className="concept-strip" id="concepts" aria-labelledby="concept-heading">
           <div className="section-intro">
-            <p className="eyebrow">The essentials</p>
-            <h2 id="concept-heading">A small set of concepts that travel well.</h2>
+            <p className="eyebrow">Before you adopt</p>
+            <h2 id="concept-heading">Know the current boundaries.</h2>
           </div>
           <div className="concept-grid">
             <article>
               <span className="concept-number">01</span>
-              <h3>Publish events</h3>
-              <p>Fan out facts to every interested service without coupling producers to queues.</p>
+              <h3>Pre-1.0 APIs</h3>
+              <p>Preview releases can change configuration and public APIs before a stable compatibility policy is published.</p>
             </article>
             <article>
               <span className="concept-number">02</span>
-              <h3>Send commands</h3>
-              <p>Direct work to a specific endpoint when exactly one consumer should handle it.</p>
+              <h3>Focused scope</h3>
+              <p>The portable subset is smaller than MassTransit and does not replace its feature breadth, maturity, or commercial support.</p>
             </article>
             <article>
               <span className="concept-number">03</span>
-              <h3>Consume safely</h3>
-              <p>Use scoped consumers, retries, faults, and test harnesses with aligned semantics.</p>
+              <h3>Transport evidence</h3>
+              <p>Ordering, settlement, topology, quotas, and operational behavior still need validation against the broker you will run.</p>
             </article>
           </div>
         </section>
 
         <section className="explore-section" aria-labelledby="explore-heading">
           <div className="explore-heading">
-            <p className="eyebrow">Focused documentation</p>
-            <h2 id="explore-heading">From first message to production behavior.</h2>
-            <p>Learn the portable concepts first, then add transport and testing detail when you need it.</p>
+            <p className="eyebrow">Technical documentation</p>
+            <h2 id="explore-heading">Evaluate the model, then implement it.</h2>
+            <p>Start with fit and compatibility boundaries, then move into concepts, transport behavior, reliability, and testing.</p>
           </div>
           <div className="explore-grid">
+            <Link href="/docs/why-myservicebus"><span>Decision guide</span><h3>Evaluate the fit</h3><p>Compare use cases, preview maturity, support expectations, alternatives, and adoption risk.</p><b>Review the trade-offs →</b></Link>
             <Link href="/docs/getting-started"><span>4 steps</span><h3>Getting started</h3><p>Install, configure, consume, and publish in C# or Java.</p><b>Open guide →</b></Link>
             <Link href="/docs/concepts"><span>Core model</span><h3>Messaging concepts</h3><p>Choose between publish, send, consume, and request.</p><b>Learn concepts →</b></Link>
             <Link href="/docs/rabbitmq"><span>Transport</span><h3>RabbitMQ</h3><p>Understand recovery, failure queues, topology, and tuning.</p><b>Configure transport →</b></Link>
@@ -188,14 +189,13 @@ export default function Home() {
             <Link href="/docs/testing"><span>Confidence</span><h3>Testing</h3><p>Exercise message flows with the aligned in-memory harness.</p><b>Write a test →</b></Link>
             <Link href="/docs/transactional-outbox"><span>Production reliability</span><h3>Transactional outbox</h3><p>Commit PostgreSQL application state and outgoing messaging intent together in C# or Java.</p><b>Explore the outbox →</b></Link>
             <Link href="/docs/mediator"><span>In process</span><h3>Mediator pattern</h3><p>Use generated dispatch for local commands, queries, and notifications through reusable consumers and pipelines.</p><b>Use the mediator →</b></Link>
-            <Link href="/docs/native-aot"><span>Work in progress</span><h3>AOT compilation</h3><p>Generate consumer dispatch for .NET NativeAOT and GraalVM Native Image.</p><b>See the proof of concept →</b></Link>
           </div>
         </section>
       </main>
 
       <footer className="site-footer">
         <div className="brand"><span className="brand-mark" aria-hidden="true">M</span><span>MyServiceBus</span></div>
-        <p>Lightweight messaging for services that cross ecosystem boundaries.</p>
+        <p>Cross-platform messaging with explicit compatibility and maturity boundaries.</p>
         <div><Link href="/docs">Documentation</Link><Link href="/docs/interoperability">Compatibility</Link><a href="https://github.com/marinasundstrom/MyServiceBus">GitHub ↗</a></div>
       </footer>
     </div>

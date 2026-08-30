@@ -89,9 +89,9 @@ GeneratedConsumerCatalog.INSTANCE.register(configurator);`;
 
 <p className="docs-kicker">C# and Java consumer declarations · Preview</p>
 
-# Consume messages with methods, not framework base classes.
+# Declare consumers with methods or consumer types.
 
-<p className="docs-summary">A consumer can be a method: its attribute declares it, its signature binds the message and dependencies, and its body handles the message. No consumer interface, base class, or one-consumer-per-class structure is required.</p>
+<p className="docs-summary">Attributed methods are an alternative declaration style for the same consumer pipeline. Their signatures bind messages and dependencies without requiring one interface implementation or class per message.</p>
 
 <CodeViewer code={methodExample} label="C# consumer methods" language="csharp" />
 

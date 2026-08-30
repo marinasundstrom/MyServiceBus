@@ -81,9 +81,9 @@ MediatorBus bus = MediatorBus.configure(
 
 <p className="docs-kicker">Guide · Mediator</p>
 
-# A first-class mediator, not just an in-memory transport.
+# Use mediator dispatch inside one process.
 
-<p className="docs-summary">Adopt dedicated handlers and generated in-process dispatch on a path toward replacing MediatR. No broker is required, and the same model can cross a process boundary if the system evolves.</p>
+<p className="docs-summary">The mediator runs commands, queries, notifications, consumers, and pipeline filters locally without a broker. It can replace MediatR in suitable applications, while broker-backed delivery remains a separate operational boundary.</p>
 
 <div className="callout callout-accent">
   <strong>Local by design</strong>
@@ -159,15 +159,15 @@ MyServiceBus provides a C# source generator and a Java JSR 269 annotation proces
   <div><span>04</span><h3>Behaviors</h3><p>Apply validation, logging, telemetry, and opt-in retry through consumer filters.</p></div>
 </div>
 
-<h2 id="mediatr">A practical MediatR replacement</h2>
+<h2 id="mediatr">Behavior and migration differences from MediatR</h2>
 
-Replacing MediatR is an explicit MyServiceBus goal. Notification fan-out, type-routed single-handler send, cardinality validation, and result-bearing requests are supported. MyServiceBus is not source-compatible with MediatR, and MediatR remains the established dedicated .NET mediator with a broader mediator-specific ecosystem. MyServiceBus differentiates through generated handler registration and direct invocation, aligned Java support, permissive licensing, and one behavior model for local and distributed work.
+MyServiceBus supports notification fan-out, type-routed single-handler send, cardinality validation, and result-bearing requests. It is not source-compatible with MediatR: contracts, handler interfaces, registration, pipeline filters, and result access must be migrated deliberately. Generated handler registration and direct invocation are available in C# and Java, and the same consumer types can also run behind a broker transport.
 
-MyServiceBus is MIT-licensed. MediatR 13 and later moved from Apache 2.0 to a dual commercial/reciprocal license and require a license key. Review the{' '} <a href="https://github.com/LuckyPennySoftware/MediatR/blob/main/LICENSE.md">current MediatR license ↗</a>{' '} for the exact terms and available community eligibility rather than treating every production use as necessarily paid.
+MediatR remains the established dedicated .NET mediator with a broader mediator-specific ecosystem. MyServiceBus is MIT-licensed; MediatR 13 and later use a dual commercial/reciprocal license and require a license key. Review the{' '} <a href="https://github.com/LuckyPennySoftware/MediatR/blob/main/LICENSE.md">current MediatR license ↗</a>{' '} for the exact terms and community eligibility.
 
-<div className="callout callout-accent">
-  <strong>MassTransit supports this capability; it is not its product identity</strong>
-  <p>MassTransit includes mediator-style in-process dispatch, but presents itself as a{' '} <a href="https://masstransit.massient.com/">distributed application framework ↗</a>. MyServiceBus can make mediator-only adoption a primary path, with no broker required and no assumption that the application will become distributed.</p>
+<div className="callout">
+  <strong>Relationship to MassTransit mediator</strong>
+  <p>MassTransit also provides mediator-style in-process dispatch as part of its{' '} <a href="https://masstransit.massient.com/">distributed application framework ↗</a>. MyServiceBus mediator-only applications do not require a broker, but compatibility with MassTransit&apos;s distributed wire profile does not imply source compatibility with its mediator APIs.</p>
 </div>
 
 <h2 id="not-method-call">Why use a mediator instead of a method call?</h2>

@@ -22,24 +22,24 @@ public class SubmitOrderConsumer implements Consumer<SubmitOrder> {
 
 <p className="docs-kicker">Introduction</p>
 
-# Messaging across .NET and Java, without changing the mental model.
+# MyServiceBus at a glance.
 
-<p className="docs-summary">MyServiceBus is a focused asynchronous service-bus runtime with aligned C# and Java APIs. It can extend a MassTransit-based .NET estate with Java or provide one model for a new cross-platform system. It includes RabbitMQ-backed messaging, preview Azure Service Bus and Amazon SQS/SNS transports, an in-memory mediator, and familiar MassTransit-style concepts.</p>
+<p className="docs-summary">MyServiceBus is a pre-1.0 asynchronous messaging runtime with aligned C# and Java APIs. It provides RabbitMQ-backed messaging, preview Azure Service Bus and Amazon SQS/SNS transports, and an in-process mediator built around MassTransit-familiar concepts.</p>
 
 <div className="callout callout-accent">
   <strong>Current scope</strong>
   <p>RabbitMQ is the verified broker profile. Azure Service Bus and Amazon SQS/SNS are preview profiles with explicitly documented verification boundaries. MyServiceBus is not a drop-in replacement for every MassTransit feature.</p>
 </div>
 
-<h2 id="why">Why MyServiceBus?</h2>
+<h2 id="why">Decision snapshot</h2>
 
 <div className="docs-feature-grid">
-  <div><span>01</span><h3>Cross-language</h3><p>Share contracts and messaging behavior across .NET and Java services.</p></div>
-  <div><span>02</span><h3>Focused</h3><p>Send, publish, consume, request, retry, and test—without a framework-wide commitment.</p></div>
-  <div><span>03</span><h3>Familiar</h3><p>Use concepts that feel natural to developers who already know MassTransit.</p></div>
-  <div><span>04</span><h3>Explicit</h3><p>Transport capabilities and compatibility boundaries are documented rather than implied.</p></div>
-  <div><span>05</span><h3>Permissive</h3><p>Adopt an MIT-licensed core when a commercial platform&apos;s support and breadth are not required.</p></div>
-  <div><span>06</span><h3>Mediator first</h3><p>Replace MediatR with dedicated handlers and generated C# and Java dispatch, with no broker required.</p></div>
+  <div><span>01</span><h3>Primary fit</h3><p>C# and Java services that need corresponding message contracts, consumer semantics, and failure behavior.</p></div>
+  <div><span>02</span><h3>Broker baseline</h3><p>RabbitMQ is the most established profile; Azure Service Bus and Amazon SQS/SNS retain preview boundaries.</p></div>
+  <div><span>03</span><h3>Local dispatch</h3><p>The mediator supports commands, queries, notifications, handlers, and generated dispatch without a broker.</p></div>
+  <div><span>04</span><h3>Compatibility</h3><p>MassTransit interoperability is pinned to named versions, transports, and tested message flows.</p></div>
+  <div><span>05</span><h3>Maturity</h3><p>APIs can change before 1.0, and production promotion remains capability-specific rather than project-wide.</p></div>
+  <div><span>06</span><h3>License and support</h3><p>The core is MIT-licensed; there is no equivalent of MassTransit&apos;s commercial support relationship today.</p></div>
 </div>
 
 <h2 id="same-concept">The same concept, idiomatic code</h2>
@@ -59,6 +59,6 @@ The APIs do not try to look identical. They preserve the same behavior while fol
 </div>
 
 <div className="next-card">
-  <div><span>Next</span><strong>Build your first message flow</strong></div>
-  <Link href="/docs/getting-started">Getting started →</Link>
+  <div><span>Next</span><strong>Evaluate fit and trade-offs</strong></div>
+  <Link href="/docs/why-myservicebus">Why MyServiceBus? →</Link>
 </div>

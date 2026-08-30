@@ -4,6 +4,7 @@ This changelog summarizes the bigger themes in the repository history rather tha
 
 ## Unreleased
 
+- Reframed the public website for technical evaluation: the landing page now exposes pre-1.0, scope, and transport boundaries up front, while documentation pages lead with concise factual overviews and then focus on implementation, verified behavior, limitations, operational consequences, and alternatives.
 - Moved all public documentation prose into Markdown-compatible MDX sources while preserving the existing routes, interactive components, design, and copy; documentation route files are now thin presentation wrappers.
 
 ## 0.1.0-preview.7 - 2026-08-30

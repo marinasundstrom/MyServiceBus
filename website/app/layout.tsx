@@ -23,11 +23,11 @@ const siteUrl = isGitHubPages
 export const metadata: Metadata = {
   title: 'MyServiceBus — Messaging for .NET and Java',
   description:
-    'Asynchronous messaging for distributed .NET and Java services, with MassTransit interoperability and optional MediatR-compatible in-process dispatch.',
+    'A pre-1.0 messaging runtime for .NET and Java with scoped MassTransit interoperability, broker transports, and in-process mediator dispatch.',
   openGraph: {
     title: 'MyServiceBus — Messaging for .NET and Java',
     description:
-      'Publish events and send commands across .NET and Java, integrate MassTransit estates, and optionally dispatch in process with MediatR-compatible semantics.',
+      'Evaluate a pre-1.0 C# and Java messaging runtime with explicit transport, interoperability, maturity, and support boundaries.',
     type: 'website',
     url: siteUrl,
     images: [{ url: `${siteUrl}/og.png`, width: 1730, height: 909, alt: 'MyServiceBus — Messaging for .NET and Java' }],
@@ -36,7 +36,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: 'MyServiceBus — Messaging for .NET and Java',
     description:
-      'Publish events and send commands across .NET and Java, integrate MassTransit estates, and optionally dispatch in process with MediatR-compatible semantics.',
+      'Evaluate a pre-1.0 C# and Java messaging runtime with explicit transport, interoperability, maturity, and support boundaries.',
     images: [`${siteUrl}/og.png`],
   },
 };

@@ -5,8 +5,8 @@
 <p className="docs-summary">The MyServiceBus PostgreSQL outbox gives C# and Java services one durable transaction for a database change and its outgoing message. The matching inbox protects consumer-side effects when brokers redeliver.</p>
 
 <div className="callout callout-accent">
-  <strong>Why this belongs in the framework</strong>
-  <p>An application should not have to rebuild durable envelope storage, multi-replica leasing, stable message identity, retry state, and duplicate detection for every service. These are shared messaging guarantees, so MyServiceBus is making them a primary production capability.</p>
+  <strong>Current provider boundary</strong>
+  <p>The preview implements durable envelope storage, multi-replica leasing, stable message identity, retry state, and duplicate detection for PostgreSQL. Consumer Outbox middleware, cleanup, and the complete production crash matrix remain open gates.</p>
 </div>
 
 ## A familiar MassTransit model
