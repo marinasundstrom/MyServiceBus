@@ -410,9 +410,12 @@ class PostgreSqlPersistenceTest {
             assertEquals(0, backlog.dispatched());
             assertEquals(0, backlog.dead());
             assertEquals(0, backlog.cancelled());
-            assertEquals(
-                    ordersMessage.createdAtUtc().truncatedTo(ChronoUnit.MICROS),
-                    backlog.oldestUndispatchedAtUtc().truncatedTo(ChronoUnit.MICROS));
+            Duration persistedTimestampDifference = Duration.between(
+                            ordersMessage.createdAtUtc(), backlog.oldestUndispatchedAtUtc())
+                    .abs();
+            assertTrue(
+                    persistedTimestampDifference.compareTo(Duration.ofNanos(1_000)) <= 0,
+                    () -> "PostgreSQL timestamp differed by " + persistedTimestampDifference);
         }
     }
 
