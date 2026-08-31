@@ -1,0 +1,37 @@
+@page "/applications/{ApplicationName}/flow"
+@rendermode InteractiveServer
+@inherits ApplicationPageBase
+
+<PageTitle>@ApplicationName flow · MyServiceBus Monitoring</PageTitle>
+<DashboardPageHeader Eyebrow="Application flow" Title="@ApplicationName" Description="Follow the messages entering and leaving this application. The map stays application-oriented while preserving exact paths below." />
+<ApplicationNavigation ApplicationName="@ApplicationName" />
+
+@if (Application is null)
+{
+    <section class="empty-state"><h2>Application not found</h2><p>This application may not have registered yet, or its monitoring lease may have expired.</p></section>
+}
+else
+{
+    <section class="panel flow-map-panel application-flow-map">
+        <div class="section-heading"><div><p class="eyebrow">Live neighborhood</p><h2>Direct message flow</h2></div><span>Last 5 minutes · line width represents throughput</span></div>
+        <FlowMap Applications="FlowApplications" Edges="ApplicationFlow" />
+        <p class="map-help">Only this application and its directly observed neighbors are shown. Drag nodes to explore; scroll or use the controls to zoom.</p>
+    </section>
+
+    <section class="panel flow-detail-panel">
+        <div class="section-heading"><div><p class="eyebrow">Exact paths</p><h2>Observed connections</h2></div><span>Last 5 minutes</span></div>
+        @if (ApplicationFlow.Count == 0)
+        {
+            <p class="panel-empty">No correlated message paths were observed for this application in this window.</p>
+        }
+        else
+        {
+            <div class="flow-list">
+                @foreach (var edge in ApplicationFlow.OrderByDescending(edge => edge.Count))
+                {
+                    <div class="flow-edge"><strong>@edge.SourceApplication</strong><span>→</span><strong>@edge.TargetApplication</strong><small>@ShortMessageType(edge.MessageType) · @edge.Count.ToString("N0") messages</small></div>
+                }
+            </div>
+        }
+    </section>
+}

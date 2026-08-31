@@ -1,0 +1,90 @@
+@page "/applications/{ApplicationName}"
+@rendermode InteractiveServer
+@inherits ApplicationPageBase
+
+<PageTitle>@ApplicationName · MyServiceBus Monitoring</PageTitle>
+<DashboardPageHeader Eyebrow="Application" Title="@ApplicationName" Description="See how this application participates in the system, then open technical details only when they help explain its behavior." />
+<ApplicationNavigation ApplicationName="@ApplicationName" />
+
+@if (Application is null)
+{
+    <section class="empty-state"><h2>Application not found</h2><p>This application may not have registered yet, or its monitoring lease may have expired.</p></section>
+}
+else
+{
+    <section class="overview-grid application-overview-grid">
+        <MetricValue Label="Replicas online" Value="@($"{Application.OnlineInstances} / {Application.TotalInstances}")" Alert="@(Application.OnlineInstances < Application.TotalInstances)" />
+        <MetricValue Label="Receive endpoints" Value="@ApplicationEndpoints.Count.ToString("N0")" />
+        <MetricValue Label="Handled / sec" Value="@FormatRate(Rate?.Rates.ConsumedPerSecond)" />
+        <MetricValue Label="p95 handling time" Value="@FormatDuration(Rate?.P95ConsumeDurationMs)" />
+        <MetricValue Label="Failures · 60 sec" Value="@FormatCount(Failures(Rate?.Counts))" Alert="@(Failures(Rate?.Counts) > 0)" />
+    </section>
+
+    <div class="application-detail-grid">
+        <section class="panel application-summary-panel">
+            <div class="section-heading">
+                <div><p class="eyebrow">At a glance</p><h2>Messaging activity</h2></div>
+                <a class="section-link" href="@($"/applications/{Uri.EscapeDataString(ApplicationName)}/metrics")">Explore metrics →</a>
+            </div>
+            @if (ApplicationEndpoints.Count == 0)
+            {
+                <p class="panel-empty">No receive endpoints have been reported for this application.</p>
+            }
+            else
+            {
+                <div class="ranked-list">
+                    @foreach (var endpoint in ApplicationEndpoints.Take(5))
+                    {
+                        <div class="ranked-row">
+                            <div><strong>@endpoint.EndpointName</strong><small>@endpoint.ConsumerCount consumer@(endpoint.ConsumerCount == 1 ? null : "s")</small></div>
+                            <div><strong>@FormatRate(endpoint.ConsumedPerSecond)/s</strong><small>@endpoint.Consumed.ToString("N0") handled</small></div>
+                        </div>
+                    }
+                </div>
+            }
+        </section>
+
+        <section class="panel application-summary-panel">
+            <div class="section-heading">
+                <div><p class="eyebrow">Technical details</p><h2>Messaging connections</h2></div>
+                <span>@Buses.Count connection@(Buses.Count == 1 ? null : "s")</span>
+            </div>
+            @if (Buses.Count == 0)
+            {
+                <p class="panel-empty">No messaging connection metadata has been reported for this application.</p>
+            }
+            else
+            {
+                <div class="ranked-list">
+                    @foreach (var bus in Buses)
+                    {
+                        <div class="ranked-row bus-row">
+                            <div><strong>@bus.TransportName</strong><small>@bus.OnlineInstances / @bus.TotalInstances replicas online</small></div>
+                            <small class="mono">@bus.BusAddress · @bus.BusId</small>
+                        </div>
+                    }
+                </div>
+            }
+        </section>
+    </div>
+
+    <section class="panel instances application-replicas">
+        <div class="section-heading"><div><p class="eyebrow">Runtime</p><h2>Application replicas</h2></div><span>Updated @Dashboard.UpdatedAt.ToLocalTime().ToString("HH:mm:ss")</span></div>
+        <div class="table-wrap">
+            <table>
+                <thead><tr><th>Status</th><th>Replica</th><th>Messaging connection</th><th>Last seen</th></tr></thead>
+                <tbody>
+                    @foreach (var instance in ApplicationInstances)
+                    {
+                        <tr>
+                            <td><span class="status-dot @(instance.Online ? "online" : "offline")"></span>@(instance.Online ? "Online" : "Offline")</td>
+                            <td class="mono">@instance.InstanceId<small>@instance.ClientLanguage @instance.ClientVersion</small></td>
+                            <td>@instance.TransportName<small class="mono">@instance.BusAddress · @instance.BusId</small></td>
+                            <td>@instance.LastSeenAtUtc.ToLocalTime().ToString("HH:mm:ss")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </section>
+}

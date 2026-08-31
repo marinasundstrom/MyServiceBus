@@ -33,6 +33,7 @@ else
                             <MetricValue Label="Retries · 60 sec" Value="@FormatCount(rate?.Counts.RetryAttempted)" Alert="@(rate?.Counts.RetryAttempted > 0)" />
                             <MetricValue Label="Failures · 60 sec" Value="@FormatCount(Failures(rate?.Counts))" Alert="@(Failures(rate?.Counts) > 0)" />
                         </div>
+                        <a class="card-link" href="@($"/applications/{Uri.EscapeDataString(application.ApplicationName)}")">Open application <span aria-hidden="true">→</span></a>
                         @if (application.Labels is { Count: > 0 })
                         {
                             <div class="labels">
