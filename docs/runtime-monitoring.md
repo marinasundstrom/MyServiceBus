@@ -19,7 +19,7 @@ The proof of concept is suitable to ship as an **experimental MVP**, not as a pr
 The MVP includes:
 
 - automatic application and instance registration from bus metadata
-- current endpoint, consumer, message, binding, address, and transport metadata
+- first-class receive-endpoint summaries with replica availability, consumers, message types, addresses, transport, and current activity
 - instance heartbeats and online/offline leases
 - bounded client queues and interval/count-based observation batches
 - cumulative and time-window sent, published, consumed, faulted, and retry metrics
@@ -33,15 +33,36 @@ The MVP includes:
 - batch deduplication and reported dropped-observation counts
 - HTTP ingest and query APIs
 - WebSocket change invalidations
-- a standalone Blazor runtime overview with persisted light, dark, and system themes
+- a directed, responsive Blazor dashboard with persisted light, dark, and system themes
 - equivalent exporter behavior for C# and Java
 - first-class outbox dispatcher operations for embedded and standalone workers, including latest backlog, oldest-undispatched age, windowed throughput, failures, lost leases, and cycle latency
 
 The MVP does not yet include authentication, durable storage, configurable retention, alerting or scaling recommendations, broker queue depth, host saturation, or payload-byte limits. The dashboard uses WebSocket invalidations to re-query HTTP snapshots, with a 15-second polling fallback.
 
-## Dashboard Preview
+## Dashboard Experience
 
-The dashboard is usable in both dark and light environments. The selector persists an explicit light or dark preference locally; system mode follows the operating-system preference. The reconnect dialog uses the same theme tokens, so connection status remains legible while the server is unavailable.
+The dashboard is both an operations tool and a development tool for understanding a distributed application. Its landing page is deliberately an overview rather than a wall of diagnostics. It answers five questions at a glance:
+
+- how many applications and replicas are participating
+- how quickly messages are being handled now
+- whether recent failures or retries need attention
+- whether monitoring coverage is complete
+- where to go for the next level of detail
+
+The overview uses compact, reusable widgets for summary, throughput, current concerns, and drill-down links. Each widget has a stable internal identity so a future layout configuration can arrange known widgets without coupling configuration to Razor component names. User-defined JSON layouts are intentionally not exposed yet; the default information hierarchy needs to mature first.
+
+Focused views provide the engineering detail:
+
+- **Applications** explains logical applications and replicas, then compares load, latency, retries, failures, runtime, and transport.
+- **Receive endpoints** combines exported topology with current activity so configured, offline, healthy, and faulting endpoints remain distinguishable.
+- **Throughput** expands the compact landing-page chart into a five-minute streamed graph and application rate breakdown.
+- **Message flow** maps applications and observed message paths, with throughput encoded in line weight and exact rates available alongside the map.
+- **Failures** exposes bounded failure and retry metadata without capturing message bodies or arbitrary headers.
+- **Outbox** separates dispatcher backlog and delivery pressure from broker transit and consumer processing.
+
+Graphs and maps are a continuing dashboard theme. They are implemented as distinct components rather than being embedded into individual pages, which keeps compact overview variants and full drill-down variants consistent. New domains such as sagas should follow the same shape: add only a concise health signal to the overview when it is broadly actionable, and put state distribution, transitions, faults, and correlations in a focused view.
+
+The dashboard is usable in both dark and light environments. The selector persists an explicit light or dark preference locally across enhanced page navigation; system mode follows the operating-system preference. The reconnect dialog uses the same theme tokens, so connection status remains legible while the server is unavailable. On narrow screens, navigation becomes horizontally scrollable, cards collapse to one column, graphs and maps fit the viewport, and wide diagnostic tables scroll inside their panels instead of widening the page.
 
 The flow map projects the same five-minute observed-flow window as the detailed path list. Applications are nodes, directional paths are links, link width reflects relative traffic, and each link reports its observed messages per second. WebSocket invalidations update the existing D3 graph in place so node positions and the operator's zoom context remain stable while rates and health change.
 
@@ -143,6 +164,7 @@ The prototype uses `/api/monitoring/v1` for both ingest and query operations.
 | `POST` | `/heartbeat` | Renew an existing instance lease |
 | `GET` | `/applications` | Query application aggregates |
 | `GET` | `/instances?application=...` | Query application instances |
+| `GET` | `/endpoints?application=...&windowSeconds=60` | Query receive-endpoint topology, availability, and windowed activity |
 | `GET` | `/metadata/{application}/{instanceId}/{busId}` | Query current bus metadata |
 | `GET` | `/observations?application=...&limit=100` | Query recent observations |
 | `GET` | `/metrics?application=...&windowSeconds=60&byInstance=true` | Query bounded-window rates, counts, and consume latency |
