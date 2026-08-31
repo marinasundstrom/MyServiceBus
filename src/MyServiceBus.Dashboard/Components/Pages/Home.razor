@@ -177,6 +177,18 @@ else
         </div>
     </section>
 
+    <section class="panel flow-map-panel" id="flow">
+        <div class="section-heading">
+            <div>
+                <p class="eyebrow">Live system map</p>
+                <h2>Observed message flow</h2>
+            </div>
+            <span>Last 5 minutes · line width represents throughput</span>
+        </div>
+        <FlowMap Applications="_applications" Edges="_flow" />
+        <p class="map-help">Drag applications to explore the topology. Select one to focus its direct message paths; scroll or use the controls to zoom.</p>
+    </section>
+
     <div class="detail-grid">
         <section class="panel">
             <div class="section-heading">

@@ -133,6 +133,28 @@ td small { display: block; margin-top: 4px; color: var(--text-dim); font-size: .
 .event-message { grid-column: 1 / -1; }
 .empty-state { padding: 60px; text-align: center; }
 .empty-state p { color: var(--text-muted); }
+.flow-map-panel { margin-top: 30px; overflow: hidden; }
+.flow-map-shell { position: relative; min-height: 540px; overflow: hidden; background: linear-gradient(var(--border-subtle) 1px, transparent 1px), linear-gradient(90deg, var(--border-subtle) 1px, transparent 1px), var(--surface-deep); background-size: 42px 42px; }
+.flow-map-canvas { display: block; width: 100%; min-height: 540px; cursor: grab; }
+.flow-map-canvas:active { cursor: grabbing; }
+.flow-map-controls { position: absolute; right: 14px; bottom: 14px; display: flex; gap: 5px; padding: 5px; border: 1px solid var(--border); border-radius: 9px; background: color-mix(in srgb, var(--surface-solid) 92%, transparent); box-shadow: 0 8px 24px rgb(0 0 0 / 16%); }
+.flow-map-controls button { width: 34px; height: 32px; border: 0; border-radius: 6px; background: transparent; color: var(--text-muted); font-size: 1.1rem; cursor: pointer; }
+.flow-map-controls button:hover, .flow-map-controls button:focus-visible { outline: none; background: var(--surface-raised); color: var(--text); }
+.flow-map-link { fill: none; stroke: color-mix(in srgb, var(--accent) 58%, var(--border)); opacity: .82; transition: opacity 140ms ease; }
+.flow-map-arrow { fill: var(--accent); }
+.flow-map-label { transition: opacity 140ms ease; }
+.flow-map-label rect { fill: color-mix(in srgb, var(--surface-solid) 94%, transparent); stroke: var(--border); }
+.flow-map-label text { fill: var(--text-soft); font-size: 11px; font-weight: 750; pointer-events: none; }
+.flow-map-node { cursor: pointer; transition: opacity 140ms ease; }
+.flow-map-node rect { fill: var(--surface-solid); stroke: var(--border-strong); stroke-width: 1; filter: drop-shadow(0 7px 16px rgb(0 0 0 / 18%)); }
+.flow-map-node:hover rect, .flow-map-node.selected rect { stroke: var(--accent); stroke-width: 2; }
+.flow-map-node circle { stroke: var(--surface-solid); stroke-width: 3; }
+.flow-map-node circle.online { fill: var(--accent); }
+.flow-map-node circle.offline { fill: var(--danger); }
+.flow-map-name { fill: var(--text); font-size: 13px; font-weight: 750; }
+.flow-map-meta { fill: var(--text-dim); font-size: 10px; }
+.flow-map-node.dimmed, .flow-map-link.dimmed, .flow-map-label.dimmed { opacity: .16; }
+.map-help { margin: 0; padding: 12px 18px; border-top: 1px solid var(--border); color: var(--text-dim); font-size: .7rem; }
 
 @media (max-width: 760px) {
     .theme-selector span { display: none; }
@@ -144,4 +166,5 @@ td small { display: block; margin-top: 4px; color: var(--text-dim); font-size: .
     .detail-grid { grid-template-columns: 1fr; }
     .event-detail { grid-template-columns: 1fr; margin-left: 0; }
     .event-message { grid-column: auto; }
+    .flow-map-shell, .flow-map-canvas { min-height: 430px; }
 }

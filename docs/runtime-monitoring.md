@@ -27,6 +27,7 @@ The MVP includes:
 - automatic replica grouping by application name and optional resource labels
 - per-replica throughput, load share, p95 consume duration, retries, and failures
 - observed cross-application message-flow reconstruction from correlation identifiers
+- an interactive D3 message-flow map with live topology updates and throughput-weighted paths
 - expandable failed-message metadata with endpoint, retry, exception, correlation, and trace details
 - recent observations with optional W3C trace and span identifiers
 - batch deduplication and reported dropped-observation counts
@@ -41,6 +42,8 @@ The MVP does not yet include authentication, durable storage, configurable reten
 ## Dashboard Preview
 
 The dashboard is usable in both dark and light environments. The selector persists an explicit light or dark preference locally; system mode follows the operating-system preference. The reconnect dialog uses the same theme tokens, so connection status remains legible while the server is unavailable.
+
+The flow map projects the same five-minute observed-flow window as the detailed path list. Applications are nodes, directional paths are links, link width reflects relative traffic, and each link reports its observed messages per second. WebSocket invalidations update the existing D3 graph in place so node positions and the operator's zoom context remain stable while rates and health change.
 
 ![Monitoring dashboard in dark theme with fictional application and host names](images/runtime-monitoring-dashboard-dark.jpg)
 
