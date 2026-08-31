@@ -98,6 +98,8 @@ A **misfire** is a scheduled time that passed while the definition could not be 
 
 `FireOnceNow` is the proposed default because it preserves the intent to run without producing an unbounded burst after downtime. The occurrence records the original missed window and that it was coalesced.
 
+Normal timer jitter is not a misfire. A due occurrence remains an ordinary occurrence until at least one later cadence instant has also passed. Once that boundary is crossed, `Skip` advances without dispatch, `FireOnceNow` emits one coalesced dispatch, and `CatchUp` emits the oldest due occurrences up to its configured cap. Any excess is skipped and the definition advances to the first future cadence instant; the cap cannot be bypassed through an immediate materialization loop. C# and Java run these rules against the same fixtures.
+
 Overlap is independent from misfire handling:
 
 - `Allow`: materialize each due occurrence regardless of earlier execution state;

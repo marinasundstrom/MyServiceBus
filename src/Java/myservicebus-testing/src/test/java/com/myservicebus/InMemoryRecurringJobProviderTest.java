@@ -9,9 +9,13 @@ import com.myservicebus.di.ServiceCollection;
 import com.myservicebus.di.ServiceProvider;
 import com.myservicebus.mediator.MediatorTransport;
 import com.myservicebus.tasks.CancellationToken;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.io.InputStream;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -38,7 +42,12 @@ class InMemoryRecurringJobProviderTest {
     }
 
     private static final class ManualDelayScheduler implements LocalDelayScheduler {
-        private final Map<UUID, Function<CancellationToken, CompletionStage<Void>>> callbacks =
+        private record ScheduledCallback(
+                Instant scheduledTime,
+                Function<CancellationToken, CompletionStage<Void>> callback) {
+        }
+
+        private final Map<UUID, ScheduledCallback> callbacks =
                 new LinkedHashMap<>();
 
         @Override
@@ -47,7 +56,7 @@ class InMemoryRecurringJobProviderTest {
                 Function<CancellationToken, CompletionStage<Void>> callback,
                 CancellationToken cancellationToken) {
             UUID token = UUID.randomUUID();
-            callbacks.put(token, callback);
+            callbacks.put(token, new ScheduledCallback(scheduledTime, callback));
             return CompletableFuture.completedFuture(token);
         }
 
@@ -57,11 +66,51 @@ class InMemoryRecurringJobProviderTest {
         }
 
         CompletionStage<Void> runNext() {
-            Map.Entry<UUID, Function<CancellationToken, CompletionStage<Void>>> next =
+            Map.Entry<UUID, ScheduledCallback> next =
                     callbacks.entrySet().iterator().next();
             callbacks.remove(next.getKey());
-            return next.getValue().apply(CancellationToken.none());
+            return next.getValue().callback().apply(CancellationToken.none());
         }
+
+        Instant nextScheduledTime() {
+            return callbacks.values().iterator().next().scheduledTime();
+        }
+    }
+
+    private static final class MutableClock extends Clock {
+        private Instant now;
+
+        private MutableClock(Instant now) {
+            this.now = now;
+        }
+
+        void setInstant(Instant value) {
+            now = value;
+        }
+
+        @Override
+        public ZoneId getZone() {
+            return ZoneOffset.UTC;
+        }
+
+        @Override
+        public Clock withZone(ZoneId zone) {
+            return this;
+        }
+
+        @Override
+        public Instant instant() {
+            return now;
+        }
+    }
+
+    private record FixedIntervalFixture(
+            String name,
+            String policy,
+            int maxCatchUpOccurrences,
+            Instant nowUtc,
+            int expectedDispatchCount,
+            Instant expectedNextUtc) {
     }
 
     @Test
@@ -188,6 +237,51 @@ class InMemoryRecurringJobProviderTest {
         assertSame(custom, serviceProvider.getRequiredService(RecurringJobProvider.class));
         assertTrue(serviceProvider.getRequiredService(RecurringJobScheduler.class)
                 instanceof RecurringJobSchedulerImpl);
+    }
+
+    @Test
+    void fixedIntervalMisfiresMatchSharedCrossLanguageFixtures() throws Exception {
+        List<FixedIntervalFixture> fixtures;
+        try (InputStream stream = getClass().getResourceAsStream(
+                "/scheduling/v1/fixed-interval-misfires.json")) {
+            if (stream == null) {
+                throw new IllegalStateException("Scheduling fixtures were not found");
+            }
+            fixtures = new ObjectMapper().findAndRegisterModules().readValue(
+                    stream,
+                    new TypeReference<List<FixedIntervalFixture>>() { });
+        }
+
+        for (FixedIntervalFixture fixture : fixtures) {
+            RecordingPublishEndpoint publisher = new RecordingPublishEndpoint();
+            ManualDelayScheduler delays = new ManualDelayScheduler();
+            MutableClock clock = new MutableClock(Instant.parse("2026-09-01T00:00:00Z"));
+            InMemoryRecurringJobProvider provider = new InMemoryRecurringJobProvider(
+                    publisher,
+                    delays,
+                    clock);
+            provider.addOrUpdate(
+                    new RecurringJobDefinition(
+                            new RecurringJobIdentity(fixture.name()),
+                            new FixedIntervalRecurringJobCadence(
+                                    Duration.ofHours(1),
+                                    Instant.parse("2026-09-01T00:00:00Z")),
+                            null, null, null,
+                            RecurringJobMisfirePolicy.valueOf(toEnumName(fixture.policy())),
+                            fixture.maxCatchUpOccurrences(),
+                            RecurringJobOverlapPolicy.ALLOW),
+                    new TestJob(fixture.name())).toCompletableFuture().join();
+
+            clock.setInstant(fixture.nowUtc());
+            delays.runNext().toCompletableFuture().join();
+
+            assertEquals(fixture.expectedDispatchCount(), publisher.messages.size(), fixture.name());
+            assertEquals(fixture.expectedNextUtc(), delays.nextScheduledTime(), fixture.name());
+        }
+    }
+
+    private static String toEnumName(String value) {
+        return value.replaceAll("([a-z])([A-Z])", "$1_$2").toUpperCase();
     }
 
     private static InMemoryRecurringJobProvider createProvider(

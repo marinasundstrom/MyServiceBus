@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using System.Text.Json;
 
 namespace MyServiceBus.Tests;
 
@@ -33,9 +34,15 @@ public class InMemoryRecurringJobProviderTests
 
     private sealed class ManualDelayScheduler : ILocalDelayScheduler
     {
-        private readonly Dictionary<Guid, Func<CancellationToken, Task>> callbacks = [];
+        private readonly Dictionary<Guid, ScheduledCallback> callbacks = [];
+
+        private sealed record ScheduledCallback(
+            DateTime ScheduledTime,
+            Func<CancellationToken, Task> Callback);
 
         public int Count => callbacks.Count;
+
+        public DateTime? NextScheduledTime => callbacks.Values.FirstOrDefault()?.ScheduledTime;
 
         public Task<Guid> Schedule(
             DateTime scheduledTime,
@@ -43,7 +50,7 @@ public class InMemoryRecurringJobProviderTests
             CancellationToken cancellationToken = default)
         {
             var token = Guid.NewGuid();
-            callbacks[token] = callback;
+            callbacks[token] = new(scheduledTime, callback);
             return Task.FromResult(token);
         }
 
@@ -53,14 +60,24 @@ public class InMemoryRecurringJobProviderTests
         {
             var next = callbacks.First();
             callbacks.Remove(next.Key);
-            await next.Value(CancellationToken.None);
+            await next.Value.Callback(CancellationToken.None);
         }
     }
 
     private sealed class ManualTimeProvider(DateTimeOffset now) : TimeProvider
     {
         public override DateTimeOffset GetUtcNow() => now;
+
+        public void SetUtcNow(DateTimeOffset value) => now = value;
     }
+
+    private sealed record FixedIntervalFixture(
+        string Name,
+        string Policy,
+        int MaxCatchUpOccurrences,
+        DateTimeOffset NowUtc,
+        int ExpectedDispatchCount,
+        DateTimeOffset ExpectedNextUtc);
 
     private sealed class CustomProvider : IRecurringJobProvider
     {
@@ -213,6 +230,42 @@ public class InMemoryRecurringJobProviderTests
 
         Assert.Same(custom, serviceProvider.GetRequiredService<IRecurringJobProvider>());
         Assert.IsType<RecurringJobScheduler>(serviceProvider.GetRequiredService<IRecurringJobScheduler>());
+    }
+
+    [Fact]
+    public async Task Fixed_interval_misfires_match_shared_cross_language_fixtures()
+    {
+        var fixturePath = Path.Combine(
+            AppContext.BaseDirectory,
+            "scheduling-fixtures",
+            "fixed-interval-misfires.json");
+        var fixtures = JsonSerializer.Deserialize<List<FixedIntervalFixture>>(
+            await File.ReadAllTextAsync(fixturePath),
+            new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+        Assert.NotNull(fixtures);
+
+        foreach (var fixture in fixtures)
+        {
+            var publisher = new RecordingPublishEndpoint();
+            var delays = new ManualDelayScheduler();
+            var clock = new ManualTimeProvider(DateTimeOffset.Parse("2026-09-01T00:00:00Z"));
+            var provider = new InMemoryRecurringJobProvider(publisher, delays, clock);
+            await provider.AddOrUpdate(
+                new RecurringJobDefinition(
+                    new RecurringJobIdentity(fixture.Name),
+                    new FixedIntervalRecurringJobCadence(
+                        TimeSpan.FromHours(1),
+                        DateTimeOffset.Parse("2026-09-01T00:00:00Z")),
+                    misfirePolicy: Enum.Parse<RecurringJobMisfirePolicy>(fixture.Policy),
+                    maxCatchUpOccurrences: fixture.MaxCatchUpOccurrences),
+                new TestJob(fixture.Name));
+
+            clock.SetUtcNow(fixture.NowUtc);
+            await delays.RunNext();
+
+            Assert.Equal(fixture.ExpectedDispatchCount, publisher.Messages.Count);
+            Assert.Equal(fixture.ExpectedNextUtc.UtcDateTime, delays.NextScheduledTime);
+        }
     }
 
     private static InMemoryRecurringJobProvider CreateProvider(

@@ -242,7 +242,14 @@ public final class InMemoryRecurringJobProvider implements RecurringJobProvider 
             Entry entry,
             Instant afterUtc,
             CancellationToken cancellationToken) {
-        Instant next = calculateNext(entry.definition, afterUtc);
+        Instant next = calculateNext(entry, afterUtc);
+        return scheduleAt(entry, next, cancellationToken);
+    }
+
+    private CompletionStage<Void> scheduleAt(
+            Entry entry,
+            Instant next,
+            CancellationToken cancellationToken) {
         if (next == null) {
             synchronized (gate) {
                 if (isCurrent(entry)) {
@@ -281,33 +288,78 @@ public final class InMemoryRecurringJobProvider implements RecurringJobProvider 
             Instant scheduledForUtc,
             CancellationToken cancellationToken) {
         Entry entry;
+        int dispatchCount;
+        Instant next;
         synchronized (gate) {
             entry = definitions.get(identity);
             if (entry == null
                     || entry.revision != revision
                     || entry.status != RecurringJobDefinitionStatus.ACTIVE
-                    || !occurrences.add(new OccurrenceKey(entry.definitionId, revision, scheduledForUtc))) {
+                    || occurrences.contains(new OccurrenceKey(entry.definitionId, revision, scheduledForUtc))) {
                 return CompletableFuture.completedFuture(null);
             }
             entry.timerToken = null;
             entry.nextOccurrenceAtUtc = null;
+            Evaluation evaluation = evaluateDue(entry, scheduledForUtc, clock.instant());
+            dispatchCount = evaluation.dispatchCount();
+            next = evaluation.next();
+            occurrences.add(new OccurrenceKey(entry.definitionId, revision, scheduledForUtc));
+            Duration interval = ((FixedIntervalRecurringJobCadence) entry.definition.cadence()).interval();
+            for (int index = 1; index < dispatchCount; index++) {
+                occurrences.add(new OccurrenceKey(
+                        entry.definitionId,
+                        revision,
+                        scheduledForUtc.plus(interval.multipliedBy(index))));
+            }
         }
 
         Entry captured = entry;
-        return scheduleNext(entry, scheduledForUtc, cancellationToken)
-                .thenCompose(ignored -> captured.dispatch.apply(cancellationToken));
+        CompletionStage<Void> dispatches = scheduleAt(entry, next, cancellationToken);
+        for (int index = 0; index < dispatchCount; index++) {
+            dispatches = dispatches.thenCompose(ignored -> captured.dispatch.apply(cancellationToken));
+        }
+        return dispatches;
     }
 
     private boolean isCurrent(Entry entry) {
         return definitions.get(entry.definition.identity()) == entry;
     }
 
-    private static Instant calculateNext(RecurringJobDefinition definition, Instant afterUtc) {
+    private record Evaluation(int dispatchCount, Instant next) {
+    }
+
+    private static Evaluation evaluateDue(Entry entry, Instant scheduledForUtc, Instant nowUtc) {
+        Instant following = calculateNext(entry, scheduledForUtc);
+        boolean misfire = following != null && !following.isAfter(nowUtc);
+        if (!misfire) {
+            return new Evaluation(1, following);
+        }
+
+        int dispatchCount = switch (entry.definition.misfirePolicy()) {
+            case SKIP -> 0;
+            case FIRE_ONCE_NOW -> 1;
+            case CATCH_UP -> countCatchUpOccurrences(entry, scheduledForUtc, nowUtc);
+        };
+        return new Evaluation(dispatchCount, calculateNext(entry, nowUtc));
+    }
+
+    private static int countCatchUpOccurrences(Entry entry, Instant scheduledForUtc, Instant nowUtc) {
+        Duration interval = ((FixedIntervalRecurringJobCadence) entry.definition.cadence()).interval();
+        Instant lastEligible = entry.definition.endAtUtc() != null
+                && !entry.definition.endAtUtc().isAfter(nowUtc)
+                ? entry.definition.endAtUtc().minusNanos(1)
+                : nowUtc;
+        long elapsedIntervals = Duration.between(scheduledForUtc, lastEligible).dividedBy(interval);
+        return (int) Math.min(Math.addExact(elapsedIntervals, 1), entry.definition.maxCatchUpOccurrences());
+    }
+
+    private static Instant calculateNext(Entry entry, Instant afterUtc) {
+        RecurringJobDefinition definition = entry.definition;
         FixedIntervalRecurringJobCadence cadence =
                 (FixedIntervalRecurringJobCadence) definition.cadence();
         Instant anchor = cadence.anchorAtUtc() != null
                 ? cadence.anchorAtUtc()
-                : definition.startAtUtc() != null ? definition.startAtUtc() : afterUtc;
+                : definition.startAtUtc() != null ? definition.startAtUtc() : entry.acceptedAtUtc;
         Instant threshold = definition.startAtUtc() != null && definition.startAtUtc().isAfter(afterUtc)
                 ? definition.startAtUtc().minusNanos(1)
                 : afterUtc;

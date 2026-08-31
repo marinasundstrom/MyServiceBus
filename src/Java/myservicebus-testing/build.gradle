@@ -1,3 +1,12 @@
 dependencies {
     api project(':myservicebus')
+    testImplementation "com.fasterxml.jackson.core:jackson-databind:${jacksonVersion}"
+}
+
+sourceSets {
+    test {
+        resources {
+            srcDir "${rootProject.projectDir}/test/fixtures"
+        }
+    }
 }

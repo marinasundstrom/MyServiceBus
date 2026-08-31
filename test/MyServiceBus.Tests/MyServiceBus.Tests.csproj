@@ -40,6 +40,9 @@
     <None Include="../fixtures/serialization/v1/*.base64"
           Link="serialization-fixtures/%(Filename)%(Extension)"
           CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../fixtures/scheduling/v1/*.json"
+          Link="scheduling-fixtures/%(Filename)%(Extension)"
+          CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

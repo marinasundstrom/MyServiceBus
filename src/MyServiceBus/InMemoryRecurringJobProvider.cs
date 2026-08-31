@@ -197,7 +197,15 @@ public sealed class InMemoryRecurringJobProvider : IRecurringJobProvider
 
     private async Task ScheduleNext(Entry entry, DateTimeOffset afterUtc, CancellationToken cancellationToken)
     {
-        var next = CalculateNext(entry.Definition, afterUtc);
+        var next = CalculateNext(entry, afterUtc);
+        await ScheduleAt(entry, next, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task ScheduleAt(
+        Entry entry,
+        DateTimeOffset? next,
+        CancellationToken cancellationToken)
+    {
         if (next is null)
         {
             lock (gate)
@@ -243,30 +251,75 @@ public sealed class InMemoryRecurringJobProvider : IRecurringJobProvider
         CancellationToken cancellationToken)
     {
         Entry entry;
+        int dispatchCount;
+        DateTimeOffset? next;
         lock (gate)
         {
             if (!definitions.TryGetValue(identity, out entry!)
                 || entry.Revision != revision
                 || entry.Status != RecurringJobDefinitionStatus.Active
-                || !occurrences.Add((entry.DefinitionId, revision, scheduledForUtc)))
+                || occurrences.Contains((entry.DefinitionId, revision, scheduledForUtc)))
                 return;
 
             entry.TimerToken = null;
             entry.NextOccurrenceAtUtc = null;
+            (dispatchCount, next) = EvaluateDue(entry, scheduledForUtc, timeProvider.GetUtcNow());
+            occurrences.Add((entry.DefinitionId, revision, scheduledForUtc));
+            for (var index = 1; index < dispatchCount; index++)
+            {
+                var occurrenceTime = scheduledForUtc + TimeSpan.FromTicks(
+                    checked(((FixedIntervalRecurringJobCadence)entry.Definition.Cadence).Interval.Ticks * index));
+                occurrences.Add((entry.DefinitionId, revision, occurrenceTime));
+            }
         }
 
-        await ScheduleNext(entry, scheduledForUtc, cancellationToken).ConfigureAwait(false);
-        await entry.Dispatch(cancellationToken).ConfigureAwait(false);
+        await ScheduleAt(entry, next, cancellationToken).ConfigureAwait(false);
+        for (var index = 0; index < dispatchCount; index++)
+            await entry.Dispatch(cancellationToken).ConfigureAwait(false);
     }
 
     private bool IsCurrent(Entry entry) =>
         definitions.TryGetValue(entry.Definition.Identity, out var current)
         && ReferenceEquals(current, entry);
 
-    private static DateTimeOffset? CalculateNext(RecurringJobDefinition definition, DateTimeOffset afterUtc)
+    private static (int DispatchCount, DateTimeOffset? Next) EvaluateDue(
+        Entry entry,
+        DateTimeOffset scheduledForUtc,
+        DateTimeOffset nowUtc)
     {
+        var following = CalculateNext(entry, scheduledForUtc);
+        var isMisfire = following is { } nextAfterScheduled && nextAfterScheduled <= nowUtc;
+        if (!isMisfire)
+            return (1, following);
+
+        var dispatchCount = entry.Definition.MisfirePolicy switch
+        {
+            RecurringJobMisfirePolicy.Skip => 0,
+            RecurringJobMisfirePolicy.FireOnceNow => 1,
+            RecurringJobMisfirePolicy.CatchUp => CountCatchUpOccurrences(entry, scheduledForUtc, nowUtc),
+            _ => throw new NotSupportedException($"Unsupported misfire policy '{entry.Definition.MisfirePolicy}'.")
+        };
+        return (dispatchCount, CalculateNext(entry, nowUtc));
+    }
+
+    private static int CountCatchUpOccurrences(
+        Entry entry,
+        DateTimeOffset scheduledForUtc,
+        DateTimeOffset nowUtc)
+    {
+        var cadence = (FixedIntervalRecurringJobCadence)entry.Definition.Cadence;
+        var lastEligible = entry.Definition.EndAtUtc is { } end && end <= nowUtc
+            ? end.AddTicks(-1)
+            : nowUtc;
+        var elapsedIntervals = (lastEligible - scheduledForUtc).Ticks / cadence.Interval.Ticks;
+        return (int)Math.Min(checked(elapsedIntervals + 1), entry.Definition.MaxCatchUpOccurrences);
+    }
+
+    private static DateTimeOffset? CalculateNext(Entry entry, DateTimeOffset afterUtc)
+    {
+        var definition = entry.Definition;
         var cadence = (FixedIntervalRecurringJobCadence)definition.Cadence;
-        var anchor = cadence.AnchorAtUtc ?? definition.StartAtUtc ?? afterUtc;
+        var anchor = cadence.AnchorAtUtc ?? definition.StartAtUtc ?? entry.AcceptedAtUtc;
         var threshold = definition.StartAtUtc is { } start && start > afterUtc ? start.AddTicks(-1) : afterUtc;
         DateTimeOffset next;
         if (anchor > threshold)
