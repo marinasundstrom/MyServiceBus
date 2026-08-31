@@ -30,9 +30,11 @@ public sealed class PostgreSqlPersistenceTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Version_two_schema_migrates_to_scheduling_cancellation_and_recurring_jobs()
+    public async Task Version_two_schema_migrates_to_scheduling_recurring_and_tracked_jobs()
     {
         await using (var command = dataSource.CreateCommand("""
+            DROP TABLE myservicebus.job_attempt;
+            DROP TABLE myservicebus.job;
             DROP TABLE myservicebus.recurring_job_occurrence;
             DROP TABLE myservicebus.recurring_job_definition;
             UPDATE myservicebus.schema_version SET version = 2 WHERE singleton;
@@ -60,7 +62,9 @@ public sealed class PostgreSqlPersistenceTests : IAsyncLifetime
                     WHERE table_schema = 'myservicebus' AND table_name = 'outbox_message'
                       AND column_name = 'cancelled_at_utc'),
                 to_regclass('myservicebus.recurring_job_definition') IS NOT NULL,
-                to_regclass('myservicebus.recurring_job_occurrence') IS NOT NULL
+                to_regclass('myservicebus.recurring_job_occurrence') IS NOT NULL,
+                to_regclass('myservicebus.job') IS NOT NULL,
+                to_regclass('myservicebus.job_attempt') IS NOT NULL
             FROM myservicebus.schema_version WHERE singleton;
             """);
         await using var reader = await verification.ExecuteReaderAsync();
@@ -70,6 +74,8 @@ public sealed class PostgreSqlPersistenceTests : IAsyncLifetime
         Assert.True(reader.GetBoolean(2));
         Assert.True(reader.GetBoolean(3));
         Assert.True(reader.GetBoolean(4));
+        Assert.True(reader.GetBoolean(5));
+        Assert.True(reader.GetBoolean(6));
     }
 
     [Fact]

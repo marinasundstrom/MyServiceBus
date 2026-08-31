@@ -166,5 +166,69 @@ public final class PostgreSqlSchema {
                 ON myservicebus.recurring_job_occurrence (definition_id, scheduled_for_utc DESC);
 
             UPDATE myservicebus.schema_version SET version = 4 WHERE singleton AND version = 3;
+
+            CREATE TABLE IF NOT EXISTS myservicebus.job (
+                job_id uuid PRIMARY KEY,
+                service_name text NOT NULL CHECK (length(service_name) > 0),
+                job_type_name text NOT NULL CHECK (length(job_type_name) > 0),
+                message_types text[] NOT NULL CHECK (cardinality(message_types) > 0),
+                body bytea NOT NULL,
+                content_type text NOT NULL CHECK (length(content_type) > 0),
+                headers jsonb NOT NULL DEFAULT '{}'::jsonb,
+                status smallint NOT NULL CHECK (status BETWEEN 0 AND 6),
+                submitted_at_utc timestamptz NOT NULL,
+                scheduled_for_utc timestamptz NULL,
+                available_at_utc timestamptz NOT NULL,
+                started_at_utc timestamptz NULL,
+                completed_at_utc timestamptz NULL,
+                updated_at_utc timestamptz NOT NULL,
+                retry_limit integer NOT NULL CHECK (retry_limit >= 0),
+                retry_delay_milliseconds bigint NULL CHECK (retry_delay_milliseconds >= 0),
+                timeout_milliseconds bigint NOT NULL CHECK (timeout_milliseconds > 0),
+                concurrent_job_limit integer NOT NULL CHECK (concurrent_job_limit > 0),
+                attempt_count integer NOT NULL DEFAULT 0 CHECK (attempt_count >= 0),
+                progress_value bigint NULL CHECK (progress_value >= 0),
+                progress_limit bigint NULL CHECK (progress_limit > 0),
+                recurring_occurrence_id uuid NULL,
+                cancellation_requested_at_utc timestamptz NULL,
+                lease_owner text NULL,
+                lease_expires_at_utc timestamptz NULL,
+                failure_type text NULL,
+                failure_message text NULL,
+                CHECK (progress_limit IS NULL OR progress_value IS NULL OR progress_value <= progress_limit),
+                CHECK (scheduled_for_utc IS NULL OR scheduled_for_utc >= submitted_at_utc)
+            );
+
+            CREATE INDEX IF NOT EXISTS ix_job_available
+                ON myservicebus.job (service_name, available_at_utc, submitted_at_utc, job_id)
+                WHERE status IN (1, 2);
+
+            CREATE INDEX IF NOT EXISTS ix_job_expired_lease
+                ON myservicebus.job (service_name, lease_expires_at_utc, job_id)
+                WHERE status = 3;
+
+            CREATE INDEX IF NOT EXISTS ix_job_history
+                ON myservicebus.job (service_name, updated_at_utc DESC, job_id);
+
+            CREATE INDEX IF NOT EXISTS ix_job_recurring_occurrence
+                ON myservicebus.job (recurring_occurrence_id)
+                WHERE recurring_occurrence_id IS NOT NULL;
+
+            CREATE TABLE IF NOT EXISTS myservicebus.job_attempt (
+                attempt_id uuid PRIMARY KEY,
+                job_id uuid NOT NULL REFERENCES myservicebus.job (job_id) ON DELETE CASCADE,
+                retry_attempt integer NOT NULL CHECK (retry_attempt >= 0),
+                status smallint NOT NULL CHECK (status BETWEEN 0 AND 3),
+                worker_id text NOT NULL CHECK (length(worker_id) > 0),
+                started_at_utc timestamptz NOT NULL,
+                completed_at_utc timestamptz NULL,
+                fault_type text NULL,
+                fault_message text NULL,
+                UNIQUE (job_id, retry_attempt)
+            );
+
+            CREATE INDEX IF NOT EXISTS ix_job_attempt_history
+                ON myservicebus.job_attempt (job_id, retry_attempt DESC);
+
             """;
 }

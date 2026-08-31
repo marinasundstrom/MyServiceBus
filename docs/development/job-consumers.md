@@ -68,6 +68,8 @@ Tracked recurring jobs default to forbidding overlapping executions. More permis
 
 The application-facing contracts do not expose storage-engine objects. The built-in durable implementation uses PostgreSQL for job intent, attempt history, leases, cancellation, progress, and the outbox boundary needed to dispatch work safely.
 
+Until the first stable release, the PostgreSQL schema is a replaceable preview schema rather than a versioned compatibility contract. Development environments may be recreated as the job model evolves. Stable upgrade and migration guarantees begin with the first real release.
+
 Hangfire and JobRunr are future ecosystem-specific adapters. They should project their lifecycle into the portable job and attempt states instead of adding their product-specific state machines to the core API. The built-in PostgreSQL provider remains the preferred cross-language profile.
 
 ## Monitoring boundary
@@ -99,4 +101,3 @@ The feature is not complete until both runtimes demonstrate:
 - [MassTransit job consumer configuration](https://masstransit.io/documentation/configuration/job-consumer)
 - [Recurring jobs](recurring-jobs.md)
 - [Scheduler provider architecture](scheduler-provider-architecture.md)
-
