@@ -61,6 +61,7 @@ final class PostgreSqlRecurringJobProvider implements RecurringJobProvider {
     private final TransportFactory transportFactory;
     private final MessageSerializer serializer;
     private final Clock clock;
+    private final PostgreSqlRecurringJobMaterializer materializer;
 
     PostgreSqlRecurringJobProvider(
             DataSource dataSource,
@@ -68,6 +69,16 @@ final class PostgreSqlRecurringJobProvider implements RecurringJobProvider {
             TransportFactory transportFactory,
             MessageSerializer serializer,
             Clock clock) {
+        this(dataSource, serviceName, transportFactory, serializer, clock, null);
+    }
+
+    PostgreSqlRecurringJobProvider(
+            DataSource dataSource,
+            String serviceName,
+            TransportFactory transportFactory,
+            MessageSerializer serializer,
+            Clock clock,
+            PostgreSqlRecurringJobMaterializer materializer) {
         this.dataSource = Objects.requireNonNull(dataSource, "dataSource");
         if (serviceName == null || serviceName.isBlank()) {
             throw new IllegalArgumentException("serviceName must not be blank");
@@ -76,6 +87,9 @@ final class PostgreSqlRecurringJobProvider implements RecurringJobProvider {
         this.transportFactory = Objects.requireNonNull(transportFactory, "transportFactory");
         this.serializer = Objects.requireNonNull(serializer, "serializer");
         this.clock = clock == null ? Clock.systemUTC() : clock;
+        this.materializer = materializer == null
+                ? new PostgreSqlRecurringJobMaterializer(dataSource, this.serviceName, this.clock)
+                : materializer;
     }
 
     @Override
@@ -203,8 +217,7 @@ final class PostgreSqlRecurringJobProvider implements RecurringJobProvider {
     public CompletionStage<RecurringJobOccurrenceReceipt> triggerNow(
             RecurringJobIdentity identity,
             CancellationToken cancellationToken) {
-        return CompletableFuture.failedFuture(new UnsupportedOperationException(
-                "Manual durable occurrence materialization is added with the outbox materializer slice."));
+        return materializer.triggerNow(identity, cancellationToken);
     }
 
     private CompletionStage<RecurringJobControlResult> changeStatus(
@@ -411,7 +424,7 @@ final class PostgreSqlRecurringJobProvider implements RecurringJobProvider {
     }
 
     private static void ensureSupported(RecurringJobDefinition definition) {
-        if (!(definition.cadence() instanceof FixedIntervalRecurringJobCadence)) {
+        if (!(definition.cadence() instanceof FixedIntervalRecurringJobCadence cadence)) {
             throw new UnsupportedOperationException(
                     "The built-in durable provider currently supports fixed intervals only.");
         }
@@ -419,6 +432,17 @@ final class PostgreSqlRecurringJobProvider implements RecurringJobProvider {
             throw new UnsupportedOperationException(
                     "The dispatch-only durable provider supports the ALLOW overlap policy only.");
         }
+        if (cadence.interval().getNano() % 1_000 != 0
+                || hasSubMicrosecondPrecision(cadence.anchorAtUtc())
+                || hasSubMicrosecondPrecision(definition.startAtUtc())
+                || hasSubMicrosecondPrecision(definition.endAtUtc())) {
+            throw new UnsupportedOperationException(
+                    "The PostgreSQL storage profile requires cadence values with microsecond precision.");
+        }
+    }
+
+    private static boolean hasSubMicrosecondPrecision(Instant value) {
+        return value != null && value.getNano() % 1_000 != 0;
     }
 
     private static void validateExpectedRevision(

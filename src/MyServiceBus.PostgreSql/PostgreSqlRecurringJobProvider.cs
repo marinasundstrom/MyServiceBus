@@ -23,13 +23,15 @@ internal sealed class PostgreSqlRecurringJobProvider : IRecurringJobProvider
     private readonly ITransportFactory transportFactory;
     private readonly IMessageSerializer serializer;
     private readonly TimeProvider timeProvider;
+    private readonly PostgreSqlRecurringJobMaterializer materializer;
 
     public PostgreSqlRecurringJobProvider(
         NpgsqlDataSource dataSource,
         string serviceName,
         ITransportFactory transportFactory,
         IMessageSerializer serializer,
-        TimeProvider? timeProvider = null)
+        TimeProvider? timeProvider = null,
+        PostgreSqlRecurringJobMaterializer? materializer = null)
     {
         this.dataSource = dataSource ?? throw new ArgumentNullException(nameof(dataSource));
         ArgumentException.ThrowIfNullOrWhiteSpace(serviceName);
@@ -37,6 +39,8 @@ internal sealed class PostgreSqlRecurringJobProvider : IRecurringJobProvider
         this.transportFactory = transportFactory ?? throw new ArgumentNullException(nameof(transportFactory));
         this.serializer = serializer ?? throw new ArgumentNullException(nameof(serializer));
         this.timeProvider = timeProvider ?? TimeProvider.System;
+        this.materializer = materializer
+            ?? new PostgreSqlRecurringJobMaterializer(dataSource, this.serviceName, this.timeProvider);
     }
 
     public string ProviderName => "MyServiceBus.Durable";
@@ -137,7 +141,7 @@ internal sealed class PostgreSqlRecurringJobProvider : IRecurringJobProvider
     public Task<RecurringJobOccurrenceReceipt> TriggerNow(
         RecurringJobIdentity identity,
         CancellationToken cancellationToken = default) =>
-        throw new NotSupportedException("Manual durable occurrence materialization is added with the outbox materializer slice.");
+        materializer.TriggerNowAsync(identity, cancellationToken);
 
     private async Task<RecurringJobControlResult> ChangeStatus(
         RecurringJobIdentity identity,
@@ -326,11 +330,22 @@ internal sealed class PostgreSqlRecurringJobProvider : IRecurringJobProvider
 
     private static void EnsureSupported(RecurringJobDefinition definition)
     {
-        if (definition.Cadence is not FixedIntervalRecurringJobCadence)
+        if (definition.Cadence is not FixedIntervalRecurringJobCadence cadence)
             throw new NotSupportedException("The built-in durable provider currently supports fixed intervals only.");
         if (definition.OverlapPolicy != RecurringJobOverlapPolicy.Allow)
             throw new NotSupportedException("The dispatch-only durable provider supports the Allow overlap policy only.");
+        if (cadence.Interval.Ticks % TimeSpan.TicksPerMicrosecond != 0
+            || HasSubMicrosecondPrecision(cadence.AnchorAtUtc)
+            || HasSubMicrosecondPrecision(definition.StartAtUtc)
+            || HasSubMicrosecondPrecision(definition.EndAtUtc))
+        {
+            throw new NotSupportedException(
+                "The PostgreSQL storage profile requires cadence values with microsecond precision.");
+        }
     }
+
+    private static bool HasSubMicrosecondPrecision(DateTimeOffset? value) =>
+        value is { } instant && instant.Ticks % TimeSpan.TicksPerMicrosecond != 0;
 
     private static void ValidateExpectedRevision(
         RecurringJobIdentity identity,

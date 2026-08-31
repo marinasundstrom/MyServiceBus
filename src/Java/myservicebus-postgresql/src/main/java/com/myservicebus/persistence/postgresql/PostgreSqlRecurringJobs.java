@@ -24,12 +24,21 @@ public final class PostgreSqlRecurringJobs {
         }
 
         services.remove(RecurringJobProvider.class);
+        services.addSingleton(PostgreSqlRecurringJobMaterializer.class, provider -> () ->
+                new PostgreSqlRecurringJobMaterializer(
+                        dataSource,
+                        serviceName,
+                        provider.getService(Clock.class)));
+        services.addSingleton(PostgreSqlRecurringJobService.class, provider -> () ->
+                new PostgreSqlRecurringJobService(
+                        provider.getRequiredService(PostgreSqlRecurringJobMaterializer.class)));
         services.addSingleton(RecurringJobProvider.class, provider -> () ->
                 new PostgreSqlRecurringJobProvider(
                         dataSource,
                         serviceName,
                         provider.getRequiredService(TransportFactory.class),
                         provider.getRequiredService(MessageSerializer.class),
-                        provider.getService(Clock.class)));
+                        provider.getService(Clock.class),
+                        provider.getRequiredService(PostgreSqlRecurringJobMaterializer.class)));
     }
 }

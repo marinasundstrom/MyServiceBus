@@ -126,6 +126,10 @@ public sealed class PostgreSqlPersistenceTests : IAsyncLifetime
         var repeated = await recurring.AddOrUpdate(definition, new SubmitOrder(Guid.Empty));
         var paused = await recurring.Pause(identity, first.Revision);
         var resumed = await recurring.Resume(identity, paused.CurrentRevision);
+        clock.UtcNow = DateTimeOffset.Parse("2026-09-01T03:30:00Z");
+        var materialized = await serviceProvider.GetRequiredService<PostgreSqlRecurringJobMaterializer>()
+            .MaterializeDueAsync();
+        var manual = await recurring.TriggerNow(identity);
 
         Assert.Equal("MyServiceBus.Durable", first.Provider);
         Assert.Equal(SchedulingDurability.Durable, first.Durability);
@@ -134,6 +138,8 @@ public sealed class PostgreSqlPersistenceTests : IAsyncLifetime
         Assert.Equal(1, repeated.Revision);
         Assert.Equal(2, paused.CurrentRevision);
         Assert.Equal(3, resumed.CurrentRevision);
+        Assert.Equal(1, materialized);
+        Assert.Equal(RecurringJobOccurrenceStatus.Pending, manual.Status);
 
         await using var command = dataSource.CreateCommand("""
             SELECT schedule_group, schedule_id, revision, status, cadence->>'intervalNanoseconds',
@@ -151,6 +157,26 @@ public sealed class PostgreSqlPersistenceTests : IAsyncLifetime
         Assert.Equal("3600000000000", reader.GetString(4));
         Assert.Equal(Guid.Empty.ToString(), reader.GetString(5));
         Assert.False(reader.IsDBNull(6));
+        await reader.CloseAsync();
+
+        await using var materialization = dataSource.CreateCommand("""
+            SELECT
+                (SELECT count(*) FROM myservicebus.recurring_job_occurrence WHERE definition_id = @definition_id),
+                (SELECT count(*) FROM myservicebus.outbox_message message
+                    JOIN myservicebus.recurring_job_occurrence occurrence
+                        ON occurrence.outbox_record_id = message.record_id
+                    WHERE occurrence.definition_id = @definition_id),
+                (SELECT count(DISTINCT message.message_id) FROM myservicebus.outbox_message message
+                    JOIN myservicebus.recurring_job_occurrence occurrence
+                        ON occurrence.outbox_record_id = message.record_id
+                    WHERE occurrence.definition_id = @definition_id);
+            """);
+        materialization.Parameters.AddWithValue("definition_id", first.DefinitionId);
+        await using var materializationReader = await materialization.ExecuteReaderAsync();
+        Assert.True(await materializationReader.ReadAsync());
+        Assert.Equal(2, materializationReader.GetInt64(0));
+        Assert.Equal(2, materializationReader.GetInt64(1));
+        Assert.Equal(2, materializationReader.GetInt64(2));
     }
 
     [Fact]

@@ -127,6 +127,10 @@ The schema stores the cadence contract and final envelope, not a language-specif
 
 The built-in durable provider reports the stable provider identity `MyServiceBus.Durable`; PostgreSQL appears as its storage profile in configuration and diagnostics. Definition registration stores an envelope template plus portable cadence metadata. Repeating the same semantic definition is idempotent even though transient envelope fields such as message id and sent time differ during registration. Materialization must replace those transient fields for every occurrence so inbox deduplication never mistakes later occurrences for duplicates.
 
+The PostgreSQL profile accepts cadence instants and intervals at microsecond precision, matching PostgreSQL timestamp storage in both runtimes. A provider rejects finer values rather than rounding C# and Java definitions differently.
+
+Due definitions are selected with row locks and `SKIP LOCKED`. Occurrence uniqueness, creation of a fresh envelope identity, insertion into the ordinary outbox, and advancement of the definition happen in one transaction. The occurrence remains `Pending` while its command is in the outbox; broker acceptance and application completion are separate evidence. The .NET registration hosts the polling lifecycle automatically. Java exposes the equivalent `PostgreSqlRecurringJobService` with explicit `start()` and `close()` lifecycle, consistent with its existing outbox delivery service.
+
 ## Provider profiles
 
 MyServiceBus supports three deliberate deployment profiles rather than pretending that one scheduler engine is best for every application:
