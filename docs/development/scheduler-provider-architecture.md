@@ -208,7 +208,7 @@ Provider controls and dashboard management remain later slices. A read-only sche
 
 One-time scheduling remains preview until the PostgreSQL provider passes cross-language conformance and the Quartz.NET and Quartz Scheduler adapters independently pass the same behavioral suite for durable acceptance, restart recovery, stable identity, due-time/misfire behavior, cancellation races, dispatch ambiguity, monitoring freshness, and missing-history transparency. Cross-language conformance means shared MyServiceBus behavior; only the PostgreSQL provider is initially expected to share scheduled records between C# and Java.
 
-Recurring jobs remain a separate future slice. Before that feature is considered complete, its definition and occurrence contracts must be exercised by at least two materially different engines. Quartz supplies the common cross-language engine; Hangfire and JobRunr should be used as comparative adapters or executable design spikes so their richer history and control models do not become impossible to represent.
+Recurring jobs are now the next feature theme and are specified in [Recurring Jobs](recurring-jobs.md). The initial preview can prove its state model through the in-memory runtime and the shared PostgreSQL provider. Before recurring jobs are considered stable, their definition and occurrence contracts must also be exercised by materially different engines. Quartz can supply common architectural evidence, while Hangfire and JobRunr can expose richer ecosystem-specific history and control models without becoming mandatory runtimes.
 
 ## References
 
