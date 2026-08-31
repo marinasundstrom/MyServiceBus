@@ -28,6 +28,7 @@ For Java build and run instructions, including JDK 17 setup and how to run the t
   - [Health checks](#health-checks)
   - [Filters](#filters)
   - [Scheduling Messages](#scheduling-messages)
+  - [Tracked Job Consumers](#tracked-job-consumers)
   - [Transactional Outbox and Inbox](#transactional-outbox-and-inbox)
   - [Unit Testing with the In-Memory Test Harness](#unit-testing-with-the-in-memory-test-harness)
 
@@ -1441,6 +1442,73 @@ busServices.addServiceBus(cfg -> { /* ... */ });
 ```
 
 These adapter names illustrate the extension boundary; first-party Quartz adapters are not shipped yet. A durable provider must persist a serializable message command or final envelope, not a delegate, lambda, or closure. See [Message Scheduling](scheduling.md) for the current PostgreSQL outbox path and promotion requirements.
+
+---
+
+### Tracked Job Consumers
+
+Job consumers are intended for long-running application work whose execution lifecycle should not depend on holding the original broker delivery lock. The preview executor records jobs and attempts, applies per-consumer concurrency, timeout and retry settings, supports cooperative cancellation and progress, and exposes authoritative snapshots through `IJobSource` / `JobSource`.
+
+The current executor is in-memory and process-local. It is useful for API evaluation and development, but jobs do not survive restart. PostgreSQL persistence, recurring-occurrence promotion, monitoring export, and dashboard presentation remain required before the tracked-job MVP is complete.
+
+#### C#
+
+```csharp
+public sealed class RebuildSearchIndexConsumer : IJobConsumer<RebuildSearchIndex>
+{
+    public async Task Run(JobContext<RebuildSearchIndex> context)
+    {
+        for (var index = 0; index < context.Job.Partitions; index++)
+        {
+            context.CancellationToken.ThrowIfCancellationRequested();
+            await RebuildPartition(index, context.CancellationToken);
+            await context.SetProgress(index + 1, context.Job.Partitions);
+        }
+    }
+}
+
+services.AddServiceBus(configurator =>
+{
+    configurator.AddJobConsumer<RebuildSearchIndexConsumer, RebuildSearchIndex>(options => options
+        .SetConcurrentJobLimit(2)
+        .SetJobTimeout(TimeSpan.FromMinutes(30))
+        .SetRetry(retry => retry.Interval(3, TimeSpan.FromMinutes(1))));
+    configurator.UsingRabbitMq((_, rabbit) => rabbit.Host("localhost"));
+});
+
+var jobs = serviceProvider.GetRequiredService<IJobClient>();
+var receipt = await jobs.Submit(new RebuildSearchIndex(16));
+await jobs.Cancel(receipt.JobId);
+```
+
+The MassTransit-familiar discovery overload is also available as `AddJobConsumer<RebuildSearchIndexConsumer>()`. The explicit job-type overload is the current reflection-free registration path.
+
+#### Java
+
+```java
+public final class RebuildSearchIndexConsumer implements JobConsumer<RebuildSearchIndex> {
+    @Override
+    public CompletionStage<Void> run(JobContext<RebuildSearchIndex> context) {
+        // Observe context.getCancellationToken() and report progress at safe boundaries.
+        return context.setProgress(1, (long) context.getJob().partitions());
+    }
+}
+
+services.from(MessageBusServices.class).addServiceBus(configurator ->
+    configurator.addJobConsumer(
+        RebuildSearchIndexConsumer.class,
+        RebuildSearchIndex.class,
+        options -> options
+            .setConcurrentJobLimit(2)
+            .setJobTimeout(Duration.ofMinutes(30))
+            .setRetry(retry -> retry.interval(3, Duration.ofMinutes(1)))));
+
+JobClient jobs = serviceProvider.getRequiredService(JobClient.class);
+JobSubmissionReceipt receipt = jobs.submit(new RebuildSearchIndex(16)).toCompletableFuture().join();
+jobs.cancel(receipt.jobId()).toCompletableFuture().join();
+```
+
+See [Job Consumers](development/job-consumers.md) for the lifecycle, scheduling relationship, provider boundary, and remaining MVP evidence.
 
 ---
 

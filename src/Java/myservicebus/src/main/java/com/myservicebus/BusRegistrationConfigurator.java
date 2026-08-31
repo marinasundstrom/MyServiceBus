@@ -6,6 +6,19 @@ import com.myservicebus.BusFactoryConfigurator;
 import com.myservicebus.persistence.OutboxSession;
 
 public interface BusRegistrationConfigurator {
+    <TConsumer extends JobConsumer<?>> void addJobConsumer(Class<TConsumer> consumerClass);
+
+    default <TJob, TConsumer extends JobConsumer<TJob>> void addJobConsumer(
+            Class<TConsumer> consumerClass,
+            Class<TJob> jobClass) {
+        addJobConsumer(consumerClass, jobClass, null);
+    }
+
+    <TJob, TConsumer extends JobConsumer<TJob>> void addJobConsumer(
+            Class<TConsumer> consumerClass,
+            Class<TJob> jobClass,
+            java.util.function.Consumer<JobConsumerOptions> configure);
+
     <T> void addConsumer(Class<T> consumerClass);
 
     default <THandler extends MediatorHandler> void addHandler(Class<THandler> handlerClass) {

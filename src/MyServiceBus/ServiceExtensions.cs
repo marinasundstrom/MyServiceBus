@@ -21,6 +21,9 @@ public static class ServiceExtensions
         services.AddScoped(typeof(IRequestClient<>), typeof(GenericRequestClient<>));
         services.AddScoped<IRequestClientFactory, RequestClientFactory>();
         services.TryAddSingleton<ILocalDelayScheduler, DefaultLocalDelayScheduler>();
+        services.TryAddSingleton<InMemoryJobService>();
+        services.TryAddSingleton<IJobClient>(provider => provider.GetRequiredService<InMemoryJobService>());
+        services.TryAddSingleton<IJobSource>(provider => provider.GetRequiredService<InMemoryJobService>());
         services.TryAddSingleton<IRecurringJobProvider>(provider => new InMemoryRecurringJobProvider(
             provider.GetRequiredService<IMessageBus>(),
             provider.GetRequiredService<ILocalDelayScheduler>()));
