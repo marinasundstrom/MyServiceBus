@@ -10,7 +10,7 @@ import java.util.concurrent.CompletionStage;
  * delivery intent and can serialize or persist it for execution after a process restart.
  */
 public interface ScheduleMessageProvider {
-    ScheduleMessageProviderDurability getDurability();
+    SchedulingDurability getDurability();
 
     boolean supportsCancellation();
 

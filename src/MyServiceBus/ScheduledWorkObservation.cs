@@ -12,7 +12,7 @@ public enum ScheduledWorkStatus
 public sealed record ScheduledWorkState(
     Guid TokenId,
     string Provider,
-    ScheduleMessageProviderDurability Durability,
+    SchedulingDurability Durability,
     string WorkKind,
     string MessageType,
     string Intent,

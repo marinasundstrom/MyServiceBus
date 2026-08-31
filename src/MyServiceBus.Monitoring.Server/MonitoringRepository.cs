@@ -14,6 +14,7 @@ public sealed class MonitoringRepository
     private readonly Queue<MonitoringObservationRecord> recentObservations = new();
     private readonly SortedDictionary<long, Dictionary<MetricKey, MutableMetricSet>> metricBuckets = new();
     private readonly ConcurrentDictionary<InstanceKey, MonitoringScheduledWorkSnapshot> scheduledWork = new();
+    private readonly ConcurrentDictionary<InstanceKey, MonitoringRecurringJobSnapshot> recurringJobs = new();
     private readonly DateTimeOffset serviceStartedAtUtc = DateTimeOffset.UtcNow;
     private long lastIngestUtcTicks;
 
@@ -143,6 +144,53 @@ public sealed class MonitoringRepository
             .OrderBy(item => item.Work.Status is "Pending" or "Running" ? 0 : 1)
             .ThenBy(item => item.Work.Status is "Pending" or "Running" ? item.Work.DueAtUtc : DateTimeOffset.MaxValue)
             .ThenByDescending(item => item.Work.UpdatedAtUtc)
+            .ToArray();
+    }
+
+    public bool UpsertRecurringJobs(MonitoringRecurringJobSnapshot snapshot)
+    {
+        ValidateProtocol(snapshot.ProtocolVersion);
+        var key = new InstanceKey(snapshot.ApplicationName, snapshot.InstanceId, snapshot.BusId);
+        if (!instances.ContainsKey(key))
+            return false;
+        if (snapshot.Items.Count > 1_000)
+            throw new MonitoringValidationException("A recurring-job snapshot accepts at most 1000 items.");
+        foreach (var item in snapshot.Items)
+        {
+            if (string.IsNullOrWhiteSpace(item.DefinitionId)
+                || string.IsNullOrWhiteSpace(item.ScheduleId)
+                || string.IsNullOrWhiteSpace(item.Provider)
+                || string.IsNullOrWhiteSpace(item.Cadence)
+                || string.IsNullOrWhiteSpace(item.MessageType)
+                || string.IsNullOrWhiteSpace(item.Status))
+                throw new MonitoringValidationException("Recurring jobs require an identity, provider, cadence, message type, and status.");
+        }
+        recurringJobs[key] = snapshot;
+        MarkIngested();
+        return true;
+    }
+
+    public IReadOnlyList<MonitoringRecurringJobSummary> GetRecurringJobs(
+        string? applicationName,
+        string? status,
+        DateTimeOffset now)
+    {
+        var online = GetInstances(applicationName, now).ToDictionary(
+            item => new InstanceKey(item.ApplicationName, item.InstanceId, item.BusId),
+            item => item.Online);
+        return recurringJobs
+            .Where(entry => applicationName is null || string.Equals(entry.Key.ApplicationName, applicationName, StringComparison.Ordinal))
+            .SelectMany(entry => entry.Value.Items.Select(item => new MonitoringRecurringJobSummary(
+                entry.Key.ApplicationName,
+                entry.Key.InstanceId,
+                entry.Key.BusId,
+                online.GetValueOrDefault(entry.Key),
+                entry.Value.CapturedAtUtc,
+                item)))
+            .Where(item => status is null || string.Equals(item.Job.Status, status, StringComparison.OrdinalIgnoreCase))
+            .OrderBy(item => item.Job.Status == "Active" ? 0 : 1)
+            .ThenBy(item => item.Job.NextOccurrenceAtUtc ?? DateTimeOffset.MaxValue)
+            .ThenBy(item => item.Job.ScheduleId, StringComparer.Ordinal)
             .ToArray();
     }
 

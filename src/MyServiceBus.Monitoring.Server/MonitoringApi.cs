@@ -58,6 +58,24 @@ public static class MonitoringApi
                 return Results.BadRequest(new { error = exception.Message });
             }
         });
+        ingest.MapPost("/recurring-jobs", async (
+            MonitoringRecurringJobSnapshot snapshot,
+            MonitoringIngestService ingestService,
+            MonitoringChangeFeed changes,
+            CancellationToken cancellationToken) =>
+        {
+            try
+            {
+                if (!await ingestService.StoreRecurringJobsAsync(snapshot, cancellationToken))
+                    return Results.Conflict(new { error = "Metadata must be registered before recurring jobs are accepted." });
+                changes.Publish("recurring_jobs_changed");
+                return Results.Accepted();
+            }
+            catch (MonitoringValidationException exception)
+            {
+                return Results.BadRequest(new { error = exception.Message });
+            }
+        });
 
         var query = endpoints.MapGroup("/api/monitoring/v1").WithTags("Monitoring queries");
         query.MapGet("/history", (MonitoringIngestService ingestService) => ingestService.GetHistory(DateTimeOffset.UtcNow));
@@ -82,6 +100,8 @@ public static class MonitoringApi
             repository.GetOutboxDispatchers(application, windowSeconds ?? 60, DateTimeOffset.UtcNow));
         query.MapGet("/scheduled-work", (string? application, string? status, MonitoringRepository repository) =>
             repository.GetScheduledWork(application, status, DateTimeOffset.UtcNow));
+        query.MapGet("/recurring-jobs", (string? application, string? status, MonitoringRepository repository) =>
+            repository.GetRecurringJobs(application, status, DateTimeOffset.UtcNow));
         query.MapGet("/stream", (HttpContext context, MonitoringChangeFeed changes, CancellationToken cancellationToken) =>
             changes.Stream(context, cancellationToken));
 

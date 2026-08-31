@@ -16,7 +16,7 @@ import org.junit.jupiter.api.Test;
 
 import com.myservicebus.MessageOperationHookEvent;
 import com.myservicebus.OutboxDeliveryHookEvent;
-import com.myservicebus.ScheduleMessageProviderDurability;
+import com.myservicebus.SchedulingDurability;
 import com.myservicebus.ScheduledWorkSource;
 import com.myservicebus.ScheduledWorkState;
 import com.myservicebus.ScheduledWorkStatus;
@@ -170,7 +170,7 @@ class MonitoringExporterTest {
         MonitoringExporter exporter = new MonitoringExporter(options);
         try {
             exporter.observe(new ScheduledWorkState(
-                    java.util.UUID.randomUUID(), "InMemory", ScheduleMessageProviderDurability.VOLATILE,
+                    java.util.UUID.randomUUID(), "InMemory", SchedulingDurability.VOLATILE,
                     "Message", TestMessage.class.getName(), "Publish", null, Instant.now().plusSeconds(60),
                     ScheduledWorkStatus.PENDING, "Pending", 0, Instant.now(), null));
             exporter.start(() -> new BusInspectionSnapshot(
@@ -204,7 +204,7 @@ class MonitoringExporterTest {
         server.start();
 
         ScheduledWorkState state = new ScheduledWorkState(
-                java.util.UUID.randomUUID(), "PostgreSQL", ScheduleMessageProviderDurability.DURABLE,
+                java.util.UUID.randomUUID(), "PostgreSQL", SchedulingDurability.DURABLE,
                 "Message", TestMessage.class.getName(), "Publish", null, Instant.now().plusSeconds(60),
                 ScheduledWorkStatus.PENDING, "Pending", 0, Instant.now(), null);
         ScheduledWorkSource source = new ScheduledWorkSource() {

@@ -20,6 +20,7 @@ public class MonitoringHistoryPersistenceTests
         script.ShouldContain("observation_batch");
         script.ShouldContain("jsonb");
         context.Database.GetMigrations().ShouldContain("20260831120000_InitialMonitoringHistory");
+        context.Database.GetMigrations().ShouldContain("20260831170000_AddRecurringJobSnapshots");
         context.Database.HasPendingModelChanges().ShouldBeFalse();
     }
 
@@ -40,6 +41,7 @@ public class MonitoringHistoryPersistenceTests
             [batch],
             [heartbeat],
             [],
+            [],
             now));
         var repository = new MonitoringRepository();
         var restore = new MonitoringHistoryRestoreService(store, repository);
@@ -58,7 +60,7 @@ public class MonitoringHistoryPersistenceTests
     public async Task Ingest_service_writes_accepted_monitoring_records_to_the_configured_store()
     {
         var now = DateTimeOffset.UtcNow;
-        var store = new StubHistoryStore(new MonitoringHistoryRestore([], [], [], [], null));
+        var store = new StubHistoryStore(new MonitoringHistoryRestore([], [], [], [], [], null));
         var service = new MonitoringIngestService(new MonitoringRepository(), store);
         var metadata = CreateMetadata(now);
         var batch = CreateBatch(now);
@@ -152,6 +154,9 @@ public class MonitoringHistoryPersistenceTests
             => Task.CompletedTask;
 
         public Task StoreScheduledWorkAsync(MonitoringScheduledWorkSnapshot snapshot, CancellationToken cancellationToken)
+            => Task.CompletedTask;
+
+        public Task StoreRecurringJobsAsync(MonitoringRecurringJobSnapshot snapshot, CancellationToken cancellationToken)
             => Task.CompletedTask;
     }
 }

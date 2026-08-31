@@ -6,7 +6,7 @@ namespace MyServiceBus;
 
 public interface IMessageScheduler
 {
-    ScheduleMessageProviderDurability Durability { get; }
+    SchedulingDurability Durability { get; }
     bool SupportsCancellation { get; }
     Task<ScheduledMessageHandle> SchedulePublish<T>(DateTime scheduledTime, T message, CancellationToken cancellationToken = default) where T : class;
     Task<ScheduledMessageHandle> SchedulePublish<T>(T message, DateTime scheduledTime, CancellationToken cancellationToken = default) where T : class;

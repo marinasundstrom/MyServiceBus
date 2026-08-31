@@ -7,6 +7,26 @@ using Shouldly;
 public class MonitoringRepositoryTests
 {
     [Fact]
+    public void Repository_keeps_recurring_definitions_separate_from_scheduled_occurrences()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var repository = new MonitoringRepository();
+        repository.UpsertMetadata(CreateMetadata("orders", "orders-1", now, "commerce"));
+        var item = new MonitoringRecurringJobItem(
+            Guid.NewGuid().ToString(), "daily-summary", "reporting", 2,
+            "MyServiceBus.Durable", "Durable", "Embedded", "Every 01:00:00",
+            "CreateSummary", "Active", now.AddHours(1), now);
+
+        repository.UpsertRecurringJobs(new MonitoringRecurringJobSnapshot(
+            MonitoringProtocol.Version, "orders", "orders-1", "bus", now, [item])).ShouldBeTrue();
+
+        var summary = repository.GetRecurringJobs("orders", "active", now).ShouldHaveSingleItem();
+        summary.Job.ScheduleId.ShouldBe("daily-summary");
+        summary.InstanceOnline.ShouldBeTrue();
+        repository.GetScheduledWork(null, null, now).ShouldBeEmpty();
+    }
+
+    [Fact]
     public void Repository_replaces_scheduled_work_snapshots_and_reports_participant_health()
     {
         var now = DateTimeOffset.UtcNow;

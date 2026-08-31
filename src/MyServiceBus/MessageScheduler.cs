@@ -13,7 +13,7 @@ public class MessageScheduler : IMessageScheduler
         this.provider = provider;
     }
 
-    public ScheduleMessageProviderDurability Durability => provider.Durability;
+    public SchedulingDurability Durability => provider.Durability;
 
     public bool SupportsCancellation => provider.SupportsCancellation;
 

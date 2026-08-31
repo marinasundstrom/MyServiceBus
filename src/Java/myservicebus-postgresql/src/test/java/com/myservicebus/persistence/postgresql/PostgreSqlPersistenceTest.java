@@ -18,12 +18,21 @@ import com.myservicebus.persistence.OutboxMessageFactory;
 import com.myservicebus.persistence.OutboxSession;
 import com.myservicebus.persistence.OutboxTransportDispatcher;
 import com.myservicebus.ScheduleCancellationResult;
-import com.myservicebus.ScheduleMessageProviderDurability;
+import com.myservicebus.SchedulingDurability;
 import com.myservicebus.ScheduledMessageHandle;
 import com.myservicebus.ScheduledWorkSource;
 import com.myservicebus.ScheduledWorkState;
 import com.myservicebus.ScheduledWorkStatus;
 import com.myservicebus.MessageScheduler;
+import com.myservicebus.FixedIntervalRecurringJobCadence;
+import com.myservicebus.RecurringJobControlResult;
+import com.myservicebus.RecurringJobDefinition;
+import com.myservicebus.RecurringJobDefinitionReceipt;
+import com.myservicebus.RecurringJobDefinitionStatus;
+import com.myservicebus.RecurringJobIdentity;
+import com.myservicebus.RecurringJobOccurrenceReceipt;
+import com.myservicebus.RecurringJobOccurrenceStatus;
+import com.myservicebus.SchedulingPlacement;
 import com.myservicebus.MessageBus;
 import com.myservicebus.MessageBusServices;
 import com.myservicebus.PublishEndpoint;
@@ -64,13 +73,15 @@ class PostgreSqlPersistenceTest {
     private static final String SERVICE_NAME = "orders-service";
 
     @Test
-    void versionTwoSchemaMigratesToSchedulingAndCancellation() throws Exception {
+    void versionTwoSchemaMigratesToSchedulingCancellationAndRecurringJobs() throws Exception {
         try (PostgreSQLContainer container = startContainer()) {
             DataSource dataSource = dataSource(container);
             PostgreSqlSchema.ensureCreated(dataSource);
             try (Connection connection = dataSource.getConnection();
                     Statement statement = connection.createStatement()) {
                 statement.execute("""
+                        DROP TABLE myservicebus.recurring_job_occurrence;
+                        DROP TABLE myservicebus.recurring_job_definition;
                         UPDATE myservicebus.schema_version SET version = 2 WHERE singleton;
                         ALTER TABLE myservicebus.outbox_message
                             DROP COLUMN scheduled_at_utc,
@@ -94,13 +105,94 @@ class PostgreSqlPersistenceTest {
                                 EXISTS (
                                     SELECT 1 FROM information_schema.columns
                                     WHERE table_schema = 'myservicebus' AND table_name = 'outbox_message'
-                                      AND column_name = 'cancelled_at_utc')
+                                      AND column_name = 'cancelled_at_utc'),
+                                to_regclass('myservicebus.recurring_job_definition') IS NOT NULL,
+                                to_regclass('myservicebus.recurring_job_occurrence') IS NOT NULL
                             FROM myservicebus.schema_version WHERE singleton;
                             """)) {
                 assertTrue(result.next());
-                assertEquals(3, result.getInt(1));
+                assertEquals(4, result.getInt(1));
                 assertTrue(result.getBoolean(2));
                 assertTrue(result.getBoolean(3));
+                assertTrue(result.getBoolean(4));
+                assertTrue(result.getBoolean(5));
+            }
+        }
+    }
+
+    @Test
+    void builtInRecurringProviderPersistsIdempotentDefinitionsAndControls() throws Exception {
+        try (PostgreSQLContainer container = startContainer()) {
+            DataSource dataSource = dataSource(container);
+            PostgreSqlSchema.ensureCreated(dataSource);
+            MutableClock clock = new MutableClock(Instant.parse("2026-09-01T00:00:00Z"));
+            PostgreSqlRecurringJobProvider recurring = new PostgreSqlRecurringJobProvider(
+                    dataSource,
+                    SERVICE_NAME,
+                    new NoOpTransportFactory(),
+                    new EnvelopeMessageSerializer(),
+                    clock);
+            RecurringJobIdentity identity = new RecurringJobIdentity("invoice-export", "billing");
+            RecurringJobDefinition definition = new RecurringJobDefinition(
+                    identity,
+                    new FixedIntervalRecurringJobCadence(Duration.ofHours(1)));
+
+            RecurringJobDefinitionReceipt first = recurring.addOrUpdate(
+                    definition, new SubmitOrder(new UUID(0, 0))).toCompletableFuture().join();
+            RecurringJobDefinitionReceipt repeated = recurring.addOrUpdate(
+                    definition, new SubmitOrder(new UUID(0, 0))).toCompletableFuture().join();
+            RecurringJobControlResult paused = recurring.pause(identity, first.revision())
+                    .toCompletableFuture().join();
+            RecurringJobControlResult resumed = recurring.resume(identity, paused.currentRevision())
+                    .toCompletableFuture().join();
+            clock.setInstant(Instant.parse("2026-09-01T03:30:00Z"));
+            int materialized = new PostgreSqlRecurringJobMaterializer(dataSource, SERVICE_NAME, clock)
+                    .materializeDue().toCompletableFuture().join();
+            RecurringJobOccurrenceReceipt manual = recurring.triggerNow(identity)
+                    .toCompletableFuture().join();
+
+            assertEquals("MyServiceBus.Durable", first.provider());
+            assertEquals(SchedulingDurability.DURABLE, first.durability());
+            assertEquals(SchedulingPlacement.EMBEDDED, first.placement());
+            assertEquals(first.definitionId(), repeated.definitionId());
+            assertEquals(1, repeated.revision());
+            assertEquals(2, paused.currentRevision());
+            assertEquals(3, resumed.currentRevision());
+            assertEquals(1, materialized);
+            assertEquals(RecurringJobOccurrenceStatus.PENDING, manual.status());
+
+            try (Connection connection = dataSource.getConnection();
+                    var statement = connection.prepareStatement("""
+                            SELECT schedule_group, schedule_id, revision, status,
+                                cadence->>'intervalNanoseconds', command_payload->'message'->>'orderId',
+                                next_due_at_utc,
+                                (SELECT count(*) FROM myservicebus.recurring_job_occurrence occurrence
+                                    WHERE occurrence.definition_id = recurring_job_definition.definition_id),
+                                (SELECT count(*) FROM myservicebus.outbox_message message
+                                    JOIN myservicebus.recurring_job_occurrence occurrence
+                                        ON occurrence.outbox_record_id = message.record_id
+                                    WHERE occurrence.definition_id = recurring_job_definition.definition_id),
+                                (SELECT count(DISTINCT message.message_id) FROM myservicebus.outbox_message message
+                                    JOIN myservicebus.recurring_job_occurrence occurrence
+                                        ON occurrence.outbox_record_id = message.record_id
+                                    WHERE occurrence.definition_id = recurring_job_definition.definition_id)
+                            FROM myservicebus.recurring_job_definition
+                            WHERE definition_id = ?
+                            """)) {
+                statement.setObject(1, first.definitionId());
+                try (ResultSet result = statement.executeQuery()) {
+                    assertTrue(result.next());
+                    assertEquals("billing", result.getString(1));
+                    assertEquals("invoice-export", result.getString(2));
+                    assertEquals(3, result.getLong(3));
+                    assertEquals((short) RecurringJobDefinitionStatus.ACTIVE.ordinal(), result.getShort(4));
+                    assertEquals("3600000000000", result.getString(5));
+                    assertEquals(new UUID(0, 0).toString(), result.getString(6));
+                    assertTrue(result.getObject(7) != null);
+                    assertEquals(2, result.getLong(8));
+                    assertEquals(2, result.getLong(9));
+                    assertEquals(2, result.getLong(10));
+                }
             }
         }
     }
@@ -172,7 +264,7 @@ class PostgreSqlPersistenceTest {
                     connection.setAutoCommit(false);
                     ServiceProvider scoped = scope.getServiceProvider();
                     MessageScheduler scheduler = scoped.getRequiredService(MessageScheduler.class);
-                    assertEquals(ScheduleMessageProviderDurability.DURABLE, scheduler.getDurability());
+                    assertEquals(SchedulingDurability.DURABLE, scheduler.getDurability());
 
                     ScheduledMessageHandle handle;
                     try (OutboxSession.Registration ignored = PostgreSqlOutboxSession.useTransaction(
@@ -201,7 +293,7 @@ class PostgreSqlPersistenceTest {
                             .filter(item -> item.tokenId().equals(handle.getTokenId()))
                             .findFirst().orElseThrow();
                     assertEquals("PostgreSQL", cancelled.provider());
-                    assertEquals(ScheduleMessageProviderDurability.DURABLE, cancelled.durability());
+                    assertEquals(SchedulingDurability.DURABLE, cancelled.durability());
                     assertEquals(ScheduledWorkStatus.CANCELLED, cancelled.status());
                     assertEquals("Cancelled", cancelled.providerStatus());
                     assertEquals(dueAt, cancelled.dueAtUtc());

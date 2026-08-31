@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using MyServiceBus.Persistence;
@@ -29,9 +30,11 @@ public sealed class PostgreSqlPersistenceTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Version_two_schema_migrates_to_scheduling_and_cancellation()
+    public async Task Version_two_schema_migrates_to_scheduling_cancellation_and_recurring_jobs()
     {
         await using (var command = dataSource.CreateCommand("""
+            DROP TABLE myservicebus.recurring_job_occurrence;
+            DROP TABLE myservicebus.recurring_job_definition;
             UPDATE myservicebus.schema_version SET version = 2 WHERE singleton;
             ALTER TABLE myservicebus.outbox_message
                 DROP COLUMN scheduled_at_utc,
@@ -55,14 +58,18 @@ public sealed class PostgreSqlPersistenceTests : IAsyncLifetime
                 EXISTS (
                     SELECT 1 FROM information_schema.columns
                     WHERE table_schema = 'myservicebus' AND table_name = 'outbox_message'
-                      AND column_name = 'cancelled_at_utc')
+                      AND column_name = 'cancelled_at_utc'),
+                to_regclass('myservicebus.recurring_job_definition') IS NOT NULL,
+                to_regclass('myservicebus.recurring_job_occurrence') IS NOT NULL
             FROM myservicebus.schema_version WHERE singleton;
             """);
         await using var reader = await verification.ExecuteReaderAsync();
         Assert.True(await reader.ReadAsync());
-        Assert.Equal(3, reader.GetInt32(0));
+        Assert.Equal(4, reader.GetInt32(0));
         Assert.True(reader.GetBoolean(1));
         Assert.True(reader.GetBoolean(2));
+        Assert.True(reader.GetBoolean(3));
+        Assert.True(reader.GetBoolean(4));
     }
 
     [Fact]
@@ -97,6 +104,181 @@ public sealed class PostgreSqlPersistenceTests : IAsyncLifetime
         Assert.Equal(committed.ContentType, lease.Message.ContentType);
         Assert.Equal(committed.Headers, lease.Message.Headers);
         Assert.Equal(committed.CorrelationId, lease.Message.CorrelationId);
+    }
+
+    [Fact]
+    public async Task Built_in_recurring_provider_persists_idempotent_definitions_and_controls()
+    {
+        var clock = new MutableTimeProvider(DateTimeOffset.Parse("2026-09-01T00:00:00Z"));
+        var services = new ServiceCollection();
+        services.AddSingleton(dataSource);
+        services.AddSingleton<ITransportFactory, CapturingTransportFactory>();
+        services.AddSingleton<IMessageSerializer, EnvelopeMessageSerializer>();
+        services.AddSingleton<TimeProvider>(clock);
+        services.AddBuiltInRecurringJobsWithPostgreSql(ServiceName);
+        using var serviceProvider = services.BuildServiceProvider();
+        var recurring = serviceProvider.GetRequiredService<IRecurringJobProvider>();
+        var identity = new RecurringJobIdentity("invoice-export", "billing");
+        var definition = new RecurringJobDefinition(
+            identity,
+            new FixedIntervalRecurringJobCadence(TimeSpan.FromHours(1)));
+
+        var first = await recurring.AddOrUpdate(definition, new SubmitOrder(Guid.Empty));
+        var repeated = await recurring.AddOrUpdate(definition, new SubmitOrder(Guid.Empty));
+        var paused = await recurring.Pause(identity, first.Revision);
+        var resumed = await recurring.Resume(identity, paused.CurrentRevision);
+        clock.UtcNow = DateTimeOffset.Parse("2026-09-01T03:30:00Z");
+        var materialized = await serviceProvider.GetRequiredService<PostgreSqlRecurringJobMaterializer>()
+            .MaterializeDueAsync();
+        var manual = await recurring.TriggerNow(identity);
+        var inspected = Assert.Single(await serviceProvider.GetRequiredService<IRecurringJobSource>()
+            .GetSnapshotAsync(100));
+
+        Assert.Equal("MyServiceBus.Durable", first.Provider);
+        Assert.Equal(SchedulingDurability.Durable, first.Durability);
+        Assert.Equal(SchedulingPlacement.Embedded, first.Placement);
+        Assert.Equal(first.DefinitionId, repeated.DefinitionId);
+        Assert.Equal(1, repeated.Revision);
+        Assert.Equal(2, paused.CurrentRevision);
+        Assert.Equal(3, resumed.CurrentRevision);
+        Assert.Equal(1, materialized);
+        Assert.Equal(RecurringJobOccurrenceStatus.Pending, manual.Status);
+        Assert.Equal(identity, inspected.Identity);
+        Assert.Equal("Every 01:00:00", inspected.Cadence);
+        Assert.Equal(RecurringJobDefinitionStatus.Active, inspected.Status);
+
+        await using var command = dataSource.CreateCommand("""
+            SELECT schedule_group, schedule_id, revision, status, cadence->>'intervalNanoseconds',
+                command_payload->'message'->>'orderId', next_due_at_utc
+            FROM myservicebus.recurring_job_definition
+            WHERE definition_id = @definition_id;
+            """);
+        command.Parameters.AddWithValue("definition_id", first.DefinitionId);
+        await using var reader = await command.ExecuteReaderAsync();
+        Assert.True(await reader.ReadAsync());
+        Assert.Equal("billing", reader.GetString(0));
+        Assert.Equal("invoice-export", reader.GetString(1));
+        Assert.Equal(3, reader.GetInt64(2));
+        Assert.Equal((short)RecurringJobDefinitionStatus.Active, reader.GetInt16(3));
+        Assert.Equal("3600000000000", reader.GetString(4));
+        Assert.Equal(Guid.Empty.ToString(), reader.GetString(5));
+        Assert.False(reader.IsDBNull(6));
+        await reader.CloseAsync();
+
+        await using var materialization = dataSource.CreateCommand("""
+            SELECT
+                (SELECT count(*) FROM myservicebus.recurring_job_occurrence WHERE definition_id = @definition_id),
+                (SELECT count(*) FROM myservicebus.outbox_message message
+                    JOIN myservicebus.recurring_job_occurrence occurrence
+                        ON occurrence.outbox_record_id = message.record_id
+                    WHERE occurrence.definition_id = @definition_id),
+                (SELECT count(DISTINCT message.message_id) FROM myservicebus.outbox_message message
+                    JOIN myservicebus.recurring_job_occurrence occurrence
+                        ON occurrence.outbox_record_id = message.record_id
+                    WHERE occurrence.definition_id = @definition_id);
+            """);
+        materialization.Parameters.AddWithValue("definition_id", first.DefinitionId);
+        await using var materializationReader = await materialization.ExecuteReaderAsync();
+        Assert.True(await materializationReader.ReadAsync());
+        Assert.Equal(2, materializationReader.GetInt64(0));
+        Assert.Equal(2, materializationReader.GetInt64(1));
+        Assert.Equal(2, materializationReader.GetInt64(2));
+    }
+
+    [Fact]
+    public async Task Durable_recurring_materialization_recovers_after_provider_restart()
+    {
+        const string serviceName = "recurring-restart-service";
+        var acceptedAt = DateTimeOffset.Parse("2026-09-01T00:00:00Z");
+        var identity = new RecurringJobIdentity("restart-proof", "recovery");
+        using (var firstProcess = CreateRecurringServices(serviceName, acceptedAt))
+        {
+            await firstProcess.GetRequiredService<IRecurringJobProvider>().AddOrUpdate(
+                new RecurringJobDefinition(identity, new FixedIntervalRecurringJobCadence(TimeSpan.FromHours(1))),
+                new CrossLanguageRecurringJob("csharp-restart"));
+        }
+
+        using var recoveredProcess = CreateRecurringServices(
+            serviceName,
+            DateTimeOffset.Parse("2026-09-01T03:30:00Z"));
+        var definition = Assert.Single(await recoveredProcess.GetRequiredService<IRecurringJobSource>()
+            .GetSnapshotAsync(10));
+        var materialized = await recoveredProcess.GetRequiredService<PostgreSqlRecurringJobMaterializer>()
+            .MaterializeDueAsync();
+
+        Assert.Equal(identity, definition.Identity);
+        Assert.Equal(1, materialized);
+        Assert.Equal(1, await CountRecurringOutboxRecords(serviceName, identity.ScheduleId));
+    }
+
+    [Fact]
+    public async Task Concurrent_materializers_create_one_logical_occurrence()
+    {
+        const string serviceName = "recurring-concurrency-service";
+        var identity = new RecurringJobIdentity("single-occurrence", "concurrency");
+        using (var registration = CreateRecurringServices(
+            serviceName,
+            DateTimeOffset.Parse("2026-09-01T00:00:00Z")))
+        {
+            await registration.GetRequiredService<IRecurringJobProvider>().AddOrUpdate(
+                new RecurringJobDefinition(identity, new FixedIntervalRecurringJobCadence(TimeSpan.FromHours(1))),
+                new CrossLanguageRecurringJob("csharp-concurrency"));
+        }
+
+        var clock = new MutableTimeProvider(DateTimeOffset.Parse("2026-09-01T01:30:00Z"));
+        var first = new PostgreSqlRecurringJobMaterializer(dataSource, serviceName, clock);
+        var second = new PostgreSqlRecurringJobMaterializer(dataSource, serviceName, clock);
+        var results = await Task.WhenAll(first.MaterializeDueAsync(), second.MaterializeDueAsync());
+
+        Assert.Equal(1, results.Sum());
+        Assert.Equal(1, await CountRecurringOutboxRecords(serviceName, identity.ScheduleId));
+    }
+
+    [CrossLanguageFact]
+    public async Task Csharp_and_Java_create_and_materialize_each_others_recurring_definitions()
+    {
+        var acceptedAt = DateTimeOffset.Parse("2026-09-01T00:00:00Z");
+        var materializedAt = DateTimeOffset.Parse("2026-09-01T03:30:00Z");
+
+        const string csharpService = "recurring-csharp-to-java";
+        const string csharpSchedule = "created-by-csharp";
+        using (var csharp = CreateRecurringServices(csharpService, acceptedAt))
+        {
+            await csharp.GetRequiredService<IRecurringJobProvider>().AddOrUpdate(
+                new RecurringJobDefinition(
+                    new RecurringJobIdentity(csharpSchedule, "cross-language"),
+                    new FixedIntervalRecurringJobCadence(TimeSpan.FromHours(1))),
+                new CrossLanguageRecurringJob("csharp"));
+        }
+        using (var java = StartJavaRecurringPeer(
+            "postgres-recurring-materialize",
+            csharpService,
+            csharpSchedule,
+            materializedAt))
+        {
+            await WaitForJavaOutput(java, "MATERIALIZED:1", TimeSpan.FromMinutes(2));
+        }
+        Assert.Equal(1, await CountRecurringOutboxRecords(csharpService, csharpSchedule));
+
+        const string javaService = "recurring-java-to-csharp";
+        const string javaSchedule = "created-by-java";
+        using (var java = StartJavaRecurringPeer(
+            "postgres-recurring-create",
+            javaService,
+            javaSchedule,
+            acceptedAt))
+        {
+            await WaitForJavaOutput(java, "CREATED", TimeSpan.FromMinutes(2));
+        }
+        using (var csharp = CreateRecurringServices(javaService, materializedAt))
+        {
+            var inspected = Assert.Single(await csharp.GetRequiredService<IRecurringJobSource>()
+                .GetSnapshotAsync(10));
+            Assert.Equal(javaSchedule, inspected.Identity.ScheduleId);
+            Assert.Equal(1, await csharp.GetRequiredService<PostgreSqlRecurringJobMaterializer>()
+                .MaterializeDueAsync());
+        }
+        Assert.Equal(1, await CountRecurringOutboxRecords(javaService, javaSchedule));
     }
 
     [Fact]
@@ -168,7 +350,7 @@ public sealed class PostgreSqlPersistenceTests : IAsyncLifetime
         {
             await using var scope = provider.CreateAsyncScope();
             var scheduler = scope.ServiceProvider.GetRequiredService<IMessageScheduler>();
-            Assert.Equal(ScheduleMessageProviderDurability.Durable, scheduler.Durability);
+            Assert.Equal(SchedulingDurability.Durable, scheduler.Durability);
 
             ScheduledMessageHandle handle;
             await using (var connection = await dataSource.OpenConnectionAsync())
@@ -200,7 +382,7 @@ public sealed class PostgreSqlPersistenceTests : IAsyncLifetime
             var scheduledWork = await source.GetSnapshotAsync(100);
             var cancelled = Assert.Single(scheduledWork, item => item.TokenId == handle.TokenId);
             Assert.Equal("PostgreSQL", cancelled.Provider);
-            Assert.Equal(ScheduleMessageProviderDurability.Durable, cancelled.Durability);
+            Assert.Equal(SchedulingDurability.Durable, cancelled.Durability);
             Assert.Equal(ScheduledWorkStatus.Cancelled, cancelled.Status);
             Assert.Equal("Cancelled", cancelled.ProviderStatus);
             Assert.Equal(dueAt, cancelled.DueAtUtc.UtcDateTime);
@@ -460,6 +642,99 @@ public sealed class PostgreSqlPersistenceTests : IAsyncLifetime
         await transaction.CommitAsync();
     }
 
+    private ServiceProvider CreateRecurringServices(string serviceName, DateTimeOffset now)
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton(dataSource);
+        services.AddSingleton<ITransportFactory, CapturingTransportFactory>();
+        services.AddSingleton<IMessageSerializer, EnvelopeMessageSerializer>();
+        services.AddSingleton<TimeProvider>(new MutableTimeProvider(now));
+        services.AddBuiltInRecurringJobsWithPostgreSql(serviceName);
+        return services.BuildServiceProvider();
+    }
+
+    private async Task<long> CountRecurringOutboxRecords(string serviceName, string scheduleId)
+    {
+        await using var command = dataSource.CreateCommand("""
+            SELECT count(*)
+            FROM myservicebus.outbox_message message
+            JOIN myservicebus.recurring_job_occurrence occurrence
+                ON occurrence.outbox_record_id = message.record_id
+            JOIN myservicebus.recurring_job_definition definition
+                ON definition.definition_id = occurrence.definition_id
+            WHERE definition.service_name = @service_name AND definition.schedule_id = @schedule_id;
+            """);
+        command.Parameters.AddWithValue("service_name", serviceName);
+        command.Parameters.AddWithValue("schedule_id", scheduleId);
+        return (long)(await command.ExecuteScalarAsync())!;
+    }
+
+    private Process StartJavaRecurringPeer(
+        string mode,
+        string serviceName,
+        string scheduleId,
+        DateTimeOffset now)
+    {
+        var connection = new NpgsqlConnectionStringBuilder(container.GetConnectionString());
+        var repositoryRoot = FindRepositoryRoot();
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = Environment.GetEnvironmentVariable("GRADLE_COMMAND")
+                ?? Path.Combine(repositoryRoot, "gradlew"),
+            WorkingDirectory = repositoryRoot,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false
+        };
+        startInfo.ArgumentList.Add("--console=plain");
+        startInfo.ArgumentList.Add("-q");
+        startInfo.ArgumentList.Add(":interop-test-peer:run");
+        startInfo.ArgumentList.Add($"--args={mode} {serviceName} {scheduleId}");
+        startInfo.Environment["POSTGRES_HOST"] = connection.Host;
+        startInfo.Environment["POSTGRES_PORT"] = connection.Port.ToString();
+        startInfo.Environment["POSTGRES_DATABASE"] = connection.Database;
+        startInfo.Environment["POSTGRES_USERNAME"] = connection.Username;
+        startInfo.Environment["POSTGRES_PASSWORD"] = connection.Password;
+        startInfo.Environment["RECURRING_NOW"] = now.ToUniversalTime().ToString("O");
+        return Process.Start(startInfo)
+            ?? throw new InvalidOperationException("Failed to start the Java recurring-job interoperability peer.");
+    }
+
+    private static async Task WaitForJavaOutput(Process process, string expectedLine, TimeSpan timeout)
+    {
+        using var cancellation = new CancellationTokenSource(timeout);
+        try
+        {
+            while (await process.StandardOutput.ReadLineAsync(cancellation.Token) is { } line)
+            {
+                if (line == expectedLine)
+                {
+                    await process.WaitForExitAsync(cancellation.Token);
+                    Assert.Equal(0, process.ExitCode);
+                    return;
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            if (!process.HasExited)
+                process.Kill(entireProcessTree: true);
+        }
+
+        var error = await process.StandardError.ReadToEndAsync();
+        throw new InvalidOperationException(
+            $"Java recurring-job peer did not write '{expectedLine}'. {error}");
+    }
+
+    private static string FindRepositoryRoot()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "settings.gradle")))
+            directory = directory.Parent;
+        return directory?.FullName
+            ?? throw new InvalidOperationException("Could not locate the repository root.");
+    }
+
     private static OutboxLeaseRequest Request(string owner, int count) => new(
         owner,
         count,
@@ -490,6 +765,8 @@ public sealed class PostgreSqlPersistenceTests : IAsyncLifetime
     private sealed record OrderSubmitted(Guid OrderId);
 
     private sealed record SubmitOrder(Guid OrderId);
+
+    private sealed record CrossLanguageRecurringJob(string Origin);
 
     private sealed class CapturingTransportFactory : ITransportFactory
     {

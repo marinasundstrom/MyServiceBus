@@ -25,6 +25,7 @@ public sealed class MonitoringExporter : BackgroundService, IBusHook, IScheduled
     private int queuedObservations;
     private int scheduledWorkChanged = 1;
     private bool scheduledWorkSourcesAvailable = true;
+    private IReadOnlyList<MonitoringRecurringJobItem> recurringJobs = [];
 
     public MonitoringExporter(
         HttpClient httpClient,
@@ -109,6 +110,7 @@ public sealed class MonitoringExporter : BackgroundService, IBusHook, IScheduled
                 {
                     nextScheduledWorkRefresh = now + options.ExportInterval;
                     await RefreshScheduledWork(stoppingToken).ConfigureAwait(false);
+                    await RefreshRecurringJobs(stoppingToken).ConfigureAwait(false);
                     Interlocked.Exchange(ref scheduledWorkChanged, 1);
                 }
 
@@ -117,6 +119,7 @@ public sealed class MonitoringExporter : BackgroundService, IBusHook, IScheduled
                     try
                     {
                         await SendScheduledWork(stoppingToken).ConfigureAwait(false);
+                        await SendRecurringJobs(stoppingToken).ConfigureAwait(false);
                     }
                     catch
                     {
@@ -310,6 +313,37 @@ public sealed class MonitoringExporter : BackgroundService, IBusHook, IScheduled
         }
     }
 
+    private async Task RefreshRecurringJobs(CancellationToken cancellationToken)
+    {
+        var items = new List<MonitoringRecurringJobItem>();
+        foreach (var source in serviceProvider.GetServices<IRecurringJobSource>())
+        {
+            var states = await source.GetSnapshotAsync(options.MaxScheduledWorkItems, cancellationToken)
+                .ConfigureAwait(false);
+            items.AddRange(states.Select(MapRecurringJob));
+        }
+        recurringJobs = items
+            .OrderBy(item => item.NextOccurrenceAtUtc ?? DateTimeOffset.MaxValue)
+            .Take(options.MaxScheduledWorkItems)
+            .ToArray();
+    }
+
+    private async Task SendRecurringJobs(CancellationToken cancellationToken)
+    {
+        var snapshot = new MonitoringRecurringJobSnapshot(
+            MonitoringProtocol.Version,
+            options.ApplicationName,
+            options.InstanceId,
+            options.BusId,
+            DateTimeOffset.UtcNow,
+            recurringJobs);
+        using var response = await httpClient.PostAsJsonAsync(
+            "/api/monitoring/v1/recurring-jobs",
+            snapshot,
+            cancellationToken).ConfigureAwait(false);
+        response.EnsureSuccessStatusCode();
+    }
+
     private void PruneScheduledWork(DateTimeOffset now)
     {
         var cutoff = now - options.ScheduledWorkHistory;
@@ -338,6 +372,20 @@ public sealed class MonitoringExporter : BackgroundService, IBusHook, IScheduled
         state.Attempt,
         state.UpdatedAtUtc,
         state.FailureCategory);
+
+    private static MonitoringRecurringJobItem MapRecurringJob(RecurringJobState state) => new(
+        state.DefinitionId.ToString("D"),
+        state.Identity.ScheduleId,
+        state.Identity.ScheduleGroup,
+        state.Revision,
+        state.Provider,
+        state.Durability.ToString(),
+        state.Placement.ToString(),
+        state.Cadence,
+        state.MessageType,
+        state.Status.ToString(),
+        state.NextOccurrenceAtUtc,
+        state.UpdatedAtUtc);
 
     private MonitoringObservation CreateLifecycleObservation(BusLifecycleHookEvent busEvent)
         => new(

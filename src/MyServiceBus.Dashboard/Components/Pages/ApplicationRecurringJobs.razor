@@ -1,0 +1,22 @@
+@page "/applications/{ApplicationName}/recurring"
+@rendermode InteractiveServer
+@inherits ApplicationPageBase
+
+<PageTitle>@ApplicationName recurring jobs · MyServiceBus Monitoring</PageTitle>
+<DashboardPageHeader Eyebrow="Application recurring jobs" Title="@ApplicationName" Description="Repeated work owned and reported by this application." />
+<ApplicationNavigation ApplicationName="@ApplicationName" />
+
+@if (Application is null)
+{
+    <section class="empty-state"><h2>Application not found</h2><p>This application may not have registered yet, or its monitoring lease may have expired.</p></section>
+}
+else
+{
+    <RecurringJobsTable Items="RecurringItems" />
+}
+
+@code {
+    private IReadOnlyList<MonitoringRecurringJobSummary> RecurringItems => Dashboard.RecurringJobs
+        .Where(item => string.Equals(item.ApplicationName, ApplicationName, StringComparison.Ordinal))
+        .ToArray();
+}

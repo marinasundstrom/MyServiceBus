@@ -16,10 +16,15 @@ var rabbitmq = builder.AddRabbitMQ("messaging", rabbitUser, rabbitPassword)
 var postgres = builder.AddPostgres("postgres", postgresUser, postgresPassword)
     .WithImageTag("17.6-alpine");
 var outbox = postgres.AddDatabase("outbox");
+var monitoring = postgres.AddDatabase("monitoring");
 
 var monitoringService = builder.AddProject<MyServiceBus_Monitoring_Server>("monitoring-service")
     .WithHttpEndpoint(name: "http")
-    .WithExternalHttpEndpoints();
+    .WithReference(monitoring)
+    .WithEnvironment("Monitoring__Storage__Provider", "PostgreSql")
+    .WithEnvironment("Monitoring__Storage__ConnectionStringName", "monitoring")
+    .WithExternalHttpEndpoints()
+    .WaitFor(monitoring);
 
 builder.AddProject<MyServiceBus_Dashboard>("monitoring-dashboard")
     .WithHttpEndpoint(name: "http")

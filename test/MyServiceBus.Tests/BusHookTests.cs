@@ -220,7 +220,7 @@ public class BusHookTests
             NullLogger<MonitoringExporter>.Instance);
 
         exporter.Observe(new ScheduledWorkState(
-            Guid.NewGuid(), "InMemory", ScheduleMessageProviderDurability.Volatile, "Message",
+            Guid.NewGuid(), "InMemory", SchedulingDurability.Volatile, "Message",
             typeof(TestMessage).FullName!, "Publish", null, DateTimeOffset.UtcNow.AddMinutes(1),
             ScheduledWorkStatus.Pending, "Pending", 0, DateTimeOffset.UtcNow));
         await exporter.StartAsync(CancellationToken.None);
@@ -236,7 +236,7 @@ public class BusHookTests
     public async Task Monitoring_exporter_restores_scheduled_work_from_authoritative_source()
     {
         var state = new ScheduledWorkState(
-            Guid.NewGuid(), "PostgreSQL", ScheduleMessageProviderDurability.Durable, "Message",
+            Guid.NewGuid(), "PostgreSQL", SchedulingDurability.Durable, "Message",
             typeof(TestMessage).FullName!, "Publish", null, DateTimeOffset.UtcNow.AddMinutes(1),
             ScheduledWorkStatus.Pending, "Pending", 0, DateTimeOffset.UtcNow);
         var handler = new RecordingHttpHandler();

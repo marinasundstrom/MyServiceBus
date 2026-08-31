@@ -114,6 +114,36 @@ public sealed record MonitoringScheduledWorkSummary(
     bool InstanceOnline,
     MonitoringScheduledWorkItem Work);
 
+public sealed record MonitoringRecurringJobSnapshot(
+    string ProtocolVersion,
+    string ApplicationName,
+    string InstanceId,
+    string BusId,
+    DateTimeOffset CapturedAtUtc,
+    IReadOnlyList<MonitoringRecurringJobItem> Items);
+
+public sealed record MonitoringRecurringJobItem(
+    string DefinitionId,
+    string ScheduleId,
+    string? ScheduleGroup,
+    long Revision,
+    string Provider,
+    string Durability,
+    string Placement,
+    string Cadence,
+    string MessageType,
+    string Status,
+    DateTimeOffset? NextOccurrenceAtUtc,
+    DateTimeOffset UpdatedAtUtc);
+
+public sealed record MonitoringRecurringJobSummary(
+    string ApplicationName,
+    string InstanceId,
+    string BusId,
+    bool InstanceOnline,
+    DateTimeOffset CapturedAtUtc,
+    MonitoringRecurringJobItem Job);
+
 public sealed record MonitoringApplicationSummary(
     string ApplicationName,
     int OnlineInstances,

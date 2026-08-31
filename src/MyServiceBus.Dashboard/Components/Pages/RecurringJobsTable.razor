@@ -1,0 +1,44 @@
+<section class="panel instances scheduled-work-panel">
+    <div class="section-heading"><div><p class="eyebrow">Definitions</p><h2>Recurring jobs</h2></div><span>Cadence and next planned occurrence</span></div>
+    @if (Items.Count == 0)
+    {
+        <p class="panel-empty">No recurring jobs have been reported. The application may not use recurring work, may be offline, or its configured provider may not expose definitions yet.</p>
+    }
+    else
+    {
+        <div class="table-wrap"><table>
+            <thead><tr><th>Status</th><th>Application</th><th>Job</th><th>Cadence</th><th>Next run</th><th>Provider</th><th>Reported by</th></tr></thead>
+            <tbody>
+                @foreach (var item in Items)
+                {
+                    <tr>
+                        <td><span class="status-dot @StatusClass(item.Job.Status)"></span><strong>@item.Job.Status</strong><small>Revision @item.Job.Revision</small></td>
+                        <td><a href="@($"/applications/{Uri.EscapeDataString(item.ApplicationName)}/recurring")">@item.ApplicationName</a></td>
+                        <td><strong>@item.Job.ScheduleId</strong><small>@(item.Job.ScheduleGroup ?? "Default group") · @ShortMessageType(item.Job.MessageType)</small></td>
+                        <td>@item.Job.Cadence</td>
+                        <td>@FormatNext(item.Job.NextOccurrenceAtUtc)<small>Snapshot @item.CapturedAtUtc.LocalDateTime.ToString("HH:mm:ss")</small></td>
+                        <td>@item.Job.Provider<small>@item.Job.Durability · @item.Job.Placement</small></td>
+                        <td><span class="status-dot @(item.InstanceOnline ? "online" : "offline")"></span>@(item.InstanceOnline ? "Online" : "Offline")<small class="mono">@item.InstanceId</small></td>
+                    </tr>
+                }
+            </tbody>
+        </table></div>
+    }
+</section>
+
+@code {
+    [Parameter, EditorRequired]
+    public required IReadOnlyList<MonitoringRecurringJobSummary> Items { get; set; }
+
+    private static string StatusClass(string status) => status switch
+    {
+        "Active" => "online",
+        "Paused" => "degraded",
+        _ => "offline"
+    };
+
+    private static string FormatNext(DateTimeOffset? value)
+        => value is { } next ? next.LocalDateTime.ToString("MMM d, HH:mm:ss") : "Not scheduled";
+
+    private static string ShortMessageType(string value) => value.Split('.').Last();
+}

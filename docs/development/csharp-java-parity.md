@@ -20,7 +20,8 @@ Parity in this document means equivalent concepts, behavior, and wire outcomes. 
 | Transport abstraction | Implemented | Implemented | RabbitMQ and Azure Service Bus are verified preview profiles. Amazon SQS/SNS has corresponding experimental C# and Java adapters with LocalStack coverage. |
 | Retries | Implemented | Implemented | Both clients require explicit configuration to retry consumers. |
 | PostgreSQL Bus Outbox MVP | `UsePostgreSql` scoped capture, `AddPostgreSqlOutboxDelivery`, and `PostgreSqlOutboxHealth` | `PostgreSqlOutboxSession.useTransaction`, `PostgreSqlOutboxDelivery.create`, and `PostgreSqlOutboxHealth` | The normalized, service-partitioned schema and delivery semantics align across C# and Java. Consumer Outbox middleware, cleanup, SQL Server, and production promotion remain open. The schema is not a MassTransit database-compatibility contract. |
-| Message scheduling | `IMessageScheduler`, `IScheduleMessageProvider`, time-first absolute overloads, and `ScheduleCancellationResult` | `MessageScheduler`, `ScheduleMessageProvider`, `Instant`/`Duration`, `CompletionStage`, and `ScheduleCancellationResult` | Default providers are explicitly volatile. PostgreSQL providers persist delayed intent and cancellation with equivalent lease-race outcomes. Recurring schedules and provider-specific adapters remain open. |
+| Message scheduling | `IMessageScheduler`, `IScheduleMessageProvider`, time-first absolute overloads, and `ScheduleCancellationResult` | `MessageScheduler`, `ScheduleMessageProvider`, `Instant`/`Duration`, `CompletionStage`, and `ScheduleCancellationResult` | Default providers are explicitly volatile. PostgreSQL providers persist delayed intent and cancellation with equivalent lease-race outcomes. |
+| Recurring jobs MVP | `IRecurringJobScheduler`, provider/source seams, in-memory and built-in durable providers | `RecurringJobScheduler`, provider/source seams, in-memory and built-in durable providers | Fixed intervals, revisions, controls, capped misfires, transactional outbox materialization, restart recovery, monitoring, and bidirectional shared-PostgreSQL materialization are verified. Cron, occurrence-history monitoring, tracked job execution, and third-party adapters remain open. |
 | Configuration API (host, queue, message overrides, endpoint formatter) | Implemented | Implemented | Both clients support overriding names and automatic endpoint configuration with custom formatters. |
 | Logging and tracing flow | Implemented | Implemented | Both clients emit MassTransit-style lifecycle and message-flow logs and propagate OpenTelemetry context across send/publish/consume pipelines. |
 
@@ -48,6 +49,8 @@ Keep the two views synchronized by meaning, not by copying rows mechanically. Th
 ## Consumer declaration and generation
 
 Runtime capability and language tooling are tracked separately. A feature implemented by the .NET runtime is not automatically available through the C# source generator, and a Java runtime primitive does not imply that an annotation processor exists.
+
+The same rule will apply to the planned job-execution layer. Interface and method-based job handlers, their normalized descriptors, and generated registration must be implemented and verified independently in both columns; recurring-job cadence and provider selection remain separate concerns.
 
 | Capability | .NET runtime | C# source generator | Java runtime | Java build tooling |
 | --- | --- | --- | --- | --- |

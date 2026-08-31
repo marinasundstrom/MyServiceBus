@@ -59,7 +59,7 @@ public sealed class PostgreSqlScheduledWorkSource : IScheduledWorkSource
             items.Add(new ScheduledWorkState(
                 reader.GetGuid(0),
                 Provider,
-                ScheduleMessageProviderDurability.Durable,
+                SchedulingDurability.Durable,
                 "Message",
                 reader.GetString(3),
                 ((Persistence.OutboxDeliveryIntent)reader.GetInt16(1)).ToString(),
