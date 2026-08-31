@@ -381,13 +381,13 @@ public class SchedulingTests
             handle = await schedulingScope.ServiceProvider.GetRequiredService<IMessageScheduler>()
                 .SchedulePublish(new TestMessage(), TimeSpan.FromDays(1));
 
-        Assert.Single(provider.GetRequiredService<IScheduledWorkSource>().GetSnapshot());
+        Assert.Single(await provider.GetRequiredService<IScheduledWorkSource>().GetSnapshotAsync(100));
         await using (var cancellationScope = provider.CreateAsyncScope())
             await cancellationScope.ServiceProvider.GetRequiredService<IMessageScheduler>()
                 .CancelScheduledPublish(handle);
 
         Assert.Equal(ScheduledWorkStatus.Cancelled, observer.States[^1].Status);
-        Assert.Empty(provider.GetRequiredService<IScheduledWorkSource>().GetSnapshot());
+        Assert.Empty(await provider.GetRequiredService<IScheduledWorkSource>().GetSnapshotAsync(100));
     }
 
     private sealed class RecordingScheduledWorkObserver : IScheduledWorkObserver

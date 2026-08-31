@@ -232,6 +232,39 @@ public class BusHookTests
         await exporter.StopAsync(CancellationToken.None);
     }
 
+    [Fact]
+    public async Task Monitoring_exporter_restores_scheduled_work_from_authoritative_source()
+    {
+        var state = new ScheduledWorkState(
+            Guid.NewGuid(), "PostgreSQL", ScheduleMessageProviderDurability.Durable, "Message",
+            typeof(TestMessage).FullName!, "Publish", null, DateTimeOffset.UtcNow.AddMinutes(1),
+            ScheduledWorkStatus.Pending, "Pending", 0, DateTimeOffset.UtcNow);
+        var handler = new RecordingHttpHandler();
+        var services = new ServiceCollection()
+            .AddSingleton<IBusInspectionProvider>(new StubInspectionProvider())
+            .AddSingleton<IScheduledWorkSource>(new StubScheduledWorkSource(state));
+        await using var provider = services.BuildServiceProvider();
+        var options = new MonitoringExporterOptions
+        {
+            ServiceAddress = new Uri("http://monitoring.test"),
+            ApplicationName = "scheduler-source-tests",
+            ExportInterval = TimeSpan.FromMilliseconds(20),
+            HeartbeatInterval = TimeSpan.FromMinutes(1)
+        };
+        var exporter = new MonitoringExporter(
+            new HttpClient(handler) { BaseAddress = options.ServiceAddress },
+            provider,
+            options,
+            NullLogger<MonitoringExporter>.Instance);
+
+        await exporter.StartAsync(CancellationToken.None);
+        var json = await handler.ScheduledWorkReceived.Task.WaitAsync(TimeSpan.FromSeconds(2));
+
+        json.ShouldContain(state.TokenId.ToString("D"));
+        json.ShouldContain("\"provider\":\"PostgreSQL\"");
+        await exporter.StopAsync(CancellationToken.None);
+    }
+
     public sealed record TestMessage(string Value);
 
     public sealed class TestConsumer : IConsumer<TestMessage>
@@ -271,6 +304,17 @@ public class BusHookTests
             [],
             [],
             []);
+    }
+
+    private sealed class StubScheduledWorkSource(ScheduledWorkState state) : IScheduledWorkSource
+    {
+        public string Provider => "PostgreSQL";
+        public bool Authoritative => true;
+
+        public Task<IReadOnlyList<ScheduledWorkState>> GetSnapshotAsync(
+            int maximumCount,
+            CancellationToken cancellationToken = default)
+            => Task.FromResult<IReadOnlyList<ScheduledWorkState>>([state]);
     }
 
     private sealed class RecordingHttpHandler : HttpMessageHandler

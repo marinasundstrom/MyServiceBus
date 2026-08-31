@@ -18,7 +18,6 @@ import com.myservicebus.PublishEndpoint;
 import com.myservicebus.di.ServiceCollection;
 import com.myservicebus.di.ServiceProvider;
 import com.myservicebus.di.ServiceScope;
-import com.myservicebus.inspection.BusInspectionProvider;
 import com.myservicebus.inspection.InspectionServices;
 import com.myservicebus.monitoring.MonitoringExporter;
 import com.myservicebus.monitoring.MonitoringExporterOptions;
@@ -94,12 +93,11 @@ public class Main {
         LoggerFactory loggerFactory = provider.getService(LoggerFactory.class);
         final Logger logger = loggerFactory != null ? loggerFactory.create(Main.class) : null;
         MessageBus serviceBus = provider.getRequiredService(MessageBus.class);
-        BusInspectionProvider inspectionProvider = provider.getRequiredService(BusInspectionProvider.class);
         AtomicBoolean started = new AtomicBoolean();
 
         try {
             serviceBus.start();
-            monitoringExporter.start(inspectionProvider);
+            monitoringExporter.start(provider);
             started.set(true);
             logger.info("🚀 Test app started");
         } catch (Exception e) {

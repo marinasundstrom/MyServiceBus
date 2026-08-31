@@ -24,6 +24,7 @@ public sealed class MonitoringExporter : BackgroundService, IBusHook, IScheduled
     private long droppedObservations;
     private int queuedObservations;
     private int scheduledWorkChanged = 1;
+    private bool scheduledWorkSourcesAvailable = true;
 
     public MonitoringExporter(
         HttpClient httpClient,
@@ -72,20 +73,7 @@ public sealed class MonitoringExporter : BackgroundService, IBusHook, IScheduled
         lock (scheduledWorkSync)
         {
             PruneScheduledWork(DateTimeOffset.UtcNow);
-            scheduledWork[state.TokenId.ToString("D")] = new MonitoringScheduledWorkItem(
-                state.TokenId.ToString("D"),
-                state.Provider,
-                state.Durability.ToString(),
-                state.WorkKind,
-                state.MessageType,
-                state.Intent,
-                state.DestinationAddress,
-                state.DueAtUtc,
-                state.Status.ToString(),
-                state.ProviderStatus,
-                state.Attempt,
-                state.UpdatedAtUtc,
-                state.FailureCategory);
+            scheduledWork[state.TokenId.ToString("D")] = MapScheduledWork(state);
             while (scheduledWork.Count > options.MaxScheduledWorkItems)
             {
                 var oldest = scheduledWork.Values.OrderBy(item => item.UpdatedAtUtc).First();
@@ -100,6 +88,7 @@ public sealed class MonitoringExporter : BackgroundService, IBusHook, IScheduled
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         var nextHeartbeat = DateTimeOffset.UtcNow + options.HeartbeatInterval;
+        var nextScheduledWorkRefresh = DateTimeOffset.MinValue;
         List<MonitoringObservation>? pending = null;
         var metadataSent = false;
 
@@ -115,7 +104,15 @@ public sealed class MonitoringExporter : BackgroundService, IBusHook, IScheduled
                     metadataSent = true;
                 }
 
-                if (Interlocked.Exchange(ref scheduledWorkChanged, 0) == 1)
+                var now = DateTimeOffset.UtcNow;
+                if (now >= nextScheduledWorkRefresh)
+                {
+                    nextScheduledWorkRefresh = now + options.ExportInterval;
+                    await RefreshScheduledWork(stoppingToken).ConfigureAwait(false);
+                    Interlocked.Exchange(ref scheduledWorkChanged, 1);
+                }
+
+                if (scheduledWorkSourcesAvailable && Interlocked.Exchange(ref scheduledWorkChanged, 0) == 1)
                 {
                     try
                     {
@@ -278,6 +275,41 @@ public sealed class MonitoringExporter : BackgroundService, IBusHook, IScheduled
         response.EnsureSuccessStatusCode();
     }
 
+    private async Task RefreshScheduledWork(CancellationToken cancellationToken)
+    {
+        try
+        {
+            foreach (var source in serviceProvider.GetServices<IScheduledWorkSource>())
+            {
+                var states = await source.GetSnapshotAsync(options.MaxScheduledWorkItems, cancellationToken)
+                    .ConfigureAwait(false);
+                var tokenIds = states.Select(state => state.TokenId.ToString("D")).ToHashSet(StringComparer.Ordinal);
+                lock (scheduledWorkSync)
+                {
+                    if (source.Authoritative)
+                    {
+                        foreach (var tokenId in scheduledWork
+                            .Where(entry => entry.Value.Provider == source.Provider
+                                && !IsTerminal(entry.Value.Status)
+                                && !tokenIds.Contains(entry.Key))
+                            .Select(entry => entry.Key)
+                            .ToArray())
+                            scheduledWork.Remove(tokenId);
+                    }
+
+                    foreach (var state in states)
+                        scheduledWork[state.TokenId.ToString("D")] = MapScheduledWork(state);
+                }
+            }
+            scheduledWorkSourcesAvailable = true;
+        }
+        catch
+        {
+            scheduledWorkSourcesAvailable = false;
+            throw;
+        }
+    }
+
     private void PruneScheduledWork(DateTimeOffset now)
     {
         var cutoff = now - options.ScheduledWorkHistory;
@@ -288,6 +320,24 @@ public sealed class MonitoringExporter : BackgroundService, IBusHook, IScheduled
             .ToArray())
             scheduledWork.Remove(tokenId);
     }
+
+    private static bool IsTerminal(string status)
+        => status is "Completed" or "Cancelled" or "Failed";
+
+    private static MonitoringScheduledWorkItem MapScheduledWork(ScheduledWorkState state) => new(
+        state.TokenId.ToString("D"),
+        state.Provider,
+        state.Durability.ToString(),
+        state.WorkKind,
+        state.MessageType,
+        state.Intent,
+        state.DestinationAddress,
+        state.DueAtUtc,
+        state.Status.ToString(),
+        state.ProviderStatus,
+        state.Attempt,
+        state.UpdatedAtUtc,
+        state.FailureCategory);
 
     private MonitoringObservation CreateLifecycleObservation(BusLifecycleHookEvent busEvent)
         => new(

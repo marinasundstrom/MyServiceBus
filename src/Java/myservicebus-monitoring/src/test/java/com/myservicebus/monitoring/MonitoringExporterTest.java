@@ -17,6 +17,7 @@ import org.junit.jupiter.api.Test;
 import com.myservicebus.MessageOperationHookEvent;
 import com.myservicebus.OutboxDeliveryHookEvent;
 import com.myservicebus.ScheduleMessageProviderDurability;
+import com.myservicebus.ScheduledWorkSource;
 import com.myservicebus.ScheduledWorkState;
 import com.myservicebus.ScheduledWorkStatus;
 import com.myservicebus.inspection.BusInspectionSnapshot;
@@ -177,6 +178,62 @@ class MonitoringExporterTest {
             assertTrue(scheduledJson.get().contains("\"status\":\"Pending\""));
             assertTrue(scheduledJson.get().contains("\"messageType\":"));
             assertTrue(!scheduledJson.get().contains("secret-body"));
+        } finally {
+            exporter.close();
+            server.stop(0);
+        }
+    }
+
+    @Test
+    void exporterRestoresScheduledWorkFromAuthoritativeSource() throws Exception {
+        CountDownLatch scheduledReceived = new CountDownLatch(1);
+        AtomicReference<String> scheduledJson = new AtomicReference<>();
+        HttpServer server = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
+        server.createContext("/api/monitoring/v1/metadata", exchange -> {
+            readBody(exchange);
+            respond(exchange);
+        });
+        server.createContext("/api/monitoring/v1/scheduled-work", exchange -> {
+            scheduledJson.set(readBody(exchange));
+            respond(exchange);
+            scheduledReceived.countDown();
+        });
+        server.start();
+
+        ScheduledWorkState state = new ScheduledWorkState(
+                java.util.UUID.randomUUID(), "PostgreSQL", ScheduleMessageProviderDurability.DURABLE,
+                "Message", TestMessage.class.getName(), "Publish", null, Instant.now().plusSeconds(60),
+                ScheduledWorkStatus.PENDING, "Pending", 0, Instant.now(), null);
+        ScheduledWorkSource source = new ScheduledWorkSource() {
+            @Override
+            public String getProvider() {
+                return "PostgreSQL";
+            }
+
+            @Override
+            public boolean isAuthoritative() {
+                return true;
+            }
+
+            @Override
+            public java.util.concurrent.CompletionStage<List<ScheduledWorkState>> getSnapshot(int maximumCount) {
+                return java.util.concurrent.CompletableFuture.completedFuture(List.of(state));
+            }
+        };
+        MonitoringExporterOptions options = new MonitoringExporterOptions();
+        options.setServiceAddress(URI.create("http://localhost:" + server.getAddress().getPort()));
+        options.setExportInterval(Duration.ofMillis(20));
+        MonitoringExporter exporter = new MonitoringExporter(options);
+        try {
+            exporter.start(
+                    () -> new BusInspectionSnapshot(
+                            "mediator", URI.create("loopback://localhost/"), Instant.now(),
+                            List.of(), List.of(), List.of()),
+                    List.of(source));
+
+            assertTrue(scheduledReceived.await(2, TimeUnit.SECONDS));
+            assertTrue(scheduledJson.get().contains(state.tokenId().toString()));
+            assertTrue(scheduledJson.get().contains("\"provider\":\"PostgreSQL\""));
         } finally {
             exporter.close();
             server.stop(0);

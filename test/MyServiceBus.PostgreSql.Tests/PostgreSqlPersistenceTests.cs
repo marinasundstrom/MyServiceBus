@@ -183,11 +183,26 @@ public sealed class PostgreSqlPersistenceTests : IAsyncLifetime
                 await transaction.CommitAsync();
             }
 
+            var source = provider.GetRequiredService<IScheduledWorkSource>();
+            var pending = Assert.Single(
+                await source.GetSnapshotAsync(100),
+                item => item.TokenId == handle.TokenId);
+            Assert.Equal(ScheduledWorkStatus.Pending, pending.Status);
+            Assert.True(pending.UpdatedAtUtc < pending.DueAtUtc);
+
             var result = await scheduler.CancelScheduledPublish(handle);
             Assert.Equal(ScheduleCancellationResult.Cancelled, result);
             Assert.Equal(
                 ScheduleCancellationResult.AlreadyCancelled,
                 await scheduler.CancelScheduledPublish(handle));
+
+            var scheduledWork = await source.GetSnapshotAsync(100);
+            var cancelled = Assert.Single(scheduledWork, item => item.TokenId == handle.TokenId);
+            Assert.Equal("PostgreSQL", cancelled.Provider);
+            Assert.Equal(ScheduleMessageProviderDurability.Durable, cancelled.Durability);
+            Assert.Equal(ScheduledWorkStatus.Cancelled, cancelled.Status);
+            Assert.Equal("Cancelled", cancelled.ProviderStatus);
+            Assert.Equal(dueAt, cancelled.DueAtUtc.UtcDateTime);
         }
         finally
         {

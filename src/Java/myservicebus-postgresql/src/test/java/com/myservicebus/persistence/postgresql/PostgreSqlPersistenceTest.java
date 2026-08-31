@@ -20,6 +20,9 @@ import com.myservicebus.persistence.OutboxTransportDispatcher;
 import com.myservicebus.ScheduleCancellationResult;
 import com.myservicebus.ScheduleMessageProviderDurability;
 import com.myservicebus.ScheduledMessageHandle;
+import com.myservicebus.ScheduledWorkSource;
+import com.myservicebus.ScheduledWorkState;
+import com.myservicebus.ScheduledWorkStatus;
 import com.myservicebus.MessageScheduler;
 import com.myservicebus.MessageBus;
 import com.myservicebus.MessageBusServices;
@@ -180,12 +183,27 @@ class PostgreSqlPersistenceTest {
                     }
                     connection.commit();
 
+                    ScheduledWorkSource source = provider.getRequiredService(ScheduledWorkSource.class);
+                    ScheduledWorkState pending = source.getSnapshot(100).toCompletableFuture().join().stream()
+                            .filter(item -> item.tokenId().equals(handle.getTokenId()))
+                            .findFirst().orElseThrow();
+                    assertEquals(ScheduledWorkStatus.PENDING, pending.status());
+                    assertTrue(pending.updatedAtUtc().isBefore(pending.dueAtUtc()));
+
                     assertEquals(
                             ScheduleCancellationResult.CANCELLED,
                             scheduler.cancelScheduledPublish(handle).toCompletableFuture().join());
                     assertEquals(
                             ScheduleCancellationResult.ALREADY_CANCELLED,
                             scheduler.cancelScheduledPublish(handle).toCompletableFuture().join());
+                    ScheduledWorkState cancelled = source.getSnapshot(100).toCompletableFuture().join().stream()
+                            .filter(item -> item.tokenId().equals(handle.getTokenId()))
+                            .findFirst().orElseThrow();
+                    assertEquals("PostgreSQL", cancelled.provider());
+                    assertEquals(ScheduleMessageProviderDurability.DURABLE, cancelled.durability());
+                    assertEquals(ScheduledWorkStatus.CANCELLED, cancelled.status());
+                    assertEquals("Cancelled", cancelled.providerStatus());
+                    assertEquals(dueAt, cancelled.dueAtUtc());
                 }
             } finally {
                 bus.stop();

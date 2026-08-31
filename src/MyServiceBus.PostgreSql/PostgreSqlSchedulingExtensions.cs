@@ -18,6 +18,10 @@ public static class PostgreSqlSchedulingExtensions
         ArgumentException.ThrowIfNullOrWhiteSpace(serviceName);
 
         services.RemoveAll<IScheduleMessageProvider>();
+        services.RemoveAll<IScheduledWorkSource>();
+        services.AddSingleton<IScheduledWorkSource>(provider => new PostgreSqlScheduledWorkSource(
+            provider.GetRequiredService<NpgsqlDataSource>(),
+            serviceName));
         services.AddScoped<IScheduleMessageProvider>(provider => new PostgreSqlScheduleMessageProvider(
             provider.GetRequiredService<NpgsqlDataSource>(),
             serviceName,
