@@ -104,6 +104,14 @@ Monitoring is never part of message delivery. If the service is unavailable, mes
   <li>Transparent storage durability, freshness, retained-window coverage, and monitoring gaps</li>
 </ul>
 
+## Build another dashboard or exporter
+
+The supplied dashboard is only one consumer of the monitoring service. The service publishes its current OpenAPI 3.1 contract at <code>/openapi/v1.json</code>. It describes the versioned <code>/api/monitoring/v1</code> HTTP ingest and query operations, JSON schemas, filters, and response codes, with separate tags for exporters and dashboards. A team can generate a client from the exact collector version it deploys instead of depending on the Blazor application or a .NET interface.
+
+Live updates use the separately documented WebSocket endpoint <code>/api/monitoring/v1/stream</code>. Each UTF-8 JSON message contains an invalidation type such as <code>observations_changed</code> or <code>jobs_changed</code> and an <code>occurredAtUtc</code> timestamp. It is a bounded hint stream, not a durable event log: clients fetch initial state over HTTP, re-query after relevant hints, and fetch again after reconnecting. Polling is a supported fallback.
+
+The OpenAPI and WebSocket contracts are preview integration surfaces, not control-plane APIs. They expose monitoring state but do not authorize queue purges, job cancellation, retries, or broker mutation. The collector still has no built-in authentication, so alternative dashboards and exporters must remain inside a trusted deployment boundary.
+
 ## Replicas and flexible grouping
 
 Processes with the same application name are replicas of one participating service or sub-application, while each instance remains available for comparison. Optional bounded labels add a display level above that model: for example, <code>group=commerce</code>, <code>environment=production</code>, or <code>role=worker</code>. Labels organize the view; they do not replace identity.
@@ -139,7 +147,7 @@ In-memory storage remains the zero-configuration development default. The .NET m
   language="json"
 />
 
-The provider applies its migration at startup, deduplicates retried observation batches, and restores the active 15-minute read-model window after restart. Seven-day retention bounds stored batches for future history queries; the current dashboard does not imply that the full retained period is queryable yet.
+The provider applies its migration at startup, deduplicates retried observation batches, restores the active 15-minute observation window, and restores the latest scheduled-work, recurring-definition, and tracked-job snapshots after restart. Seven-day retention bounds stored observation batches for future history queries; latest-state snapshots are not time series, and the current dashboard does not imply that the full retained period is queryable yet.
 
 ## Follow one operation across services
 

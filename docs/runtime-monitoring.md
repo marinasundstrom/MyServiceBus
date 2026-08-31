@@ -189,13 +189,18 @@ The monitoring service never connects directly to application databases or mutat
 
 ## Service API
 
-The prototype uses `/api/monitoring/v1` for both ingest and query operations.
+The prototype uses `/api/monitoring/v1` for both ingest and query operations. The monitoring service publishes a generated OpenAPI 3.1 document at `/openapi/v1.json`. This is the primary machine-readable contract for teams building another dashboard, exporter, or integration. The document separates **Monitoring ingest** operations from **Monitoring queries** and includes the current JSON schemas and HTTP response codes.
+
+The contract is versioned but remains preview. The `/v1` route and each ingest body's `protocolVersion` identify the current wire generation; they do not imply stable-release compatibility guarantees before MyServiceBus 1.0. Integrators should generate clients from the document they deploy with and must preserve unknown additive response fields.
 
 | Method | Route | Purpose |
 | --- | --- | --- |
 | `POST` | `/metadata` | Register or replace an instance's bus metadata |
 | `POST` | `/observations:batch` | Submit one sequenced observation batch |
 | `POST` | `/heartbeat` | Renew an existing instance lease |
+| `POST` | `/scheduled-work` | Replace one instance's authoritative one-time scheduled-work snapshot |
+| `POST` | `/recurring-jobs` | Replace one instance's authoritative recurring-definition snapshot |
+| `POST` | `/jobs` | Replace one instance's authoritative tracked-job and attempt snapshot |
 | `GET` | `/history` | Query storage durability, history availability, freshness, gaps, and retained-window coverage |
 | `GET` | `/applications` | Query application aggregates |
 | `GET` | `/instances?application=...` | Query application instances |
@@ -206,9 +211,25 @@ The prototype uses `/api/monitoring/v1` for both ingest and query operations.
 | `GET` | `/metrics/timeseries?windowSeconds=300&bucketSeconds=5` | Query bucketed rates for real-time graphs |
 | `GET` | `/flow?application=...&windowSeconds=300` | Query observed correlated application flow |
 | `GET` | `/outbox?application=...&windowSeconds=60` | Query dispatcher state and windowed outbox throughput |
+| `GET` | `/scheduled-work?application=...&status=...` | Query current one-time scheduled work |
+| `GET` | `/recurring-jobs?application=...&status=...` | Query current recurring definitions |
+| `GET` | `/jobs?application=...&status=...` | Query current tracked jobs with bounded attempt history |
 | WebSocket | `/stream` | Receive change invalidations |
 
-WebSocket messages indicate that metadata or observations changed; clients should re-query the authoritative HTTP read model. They are not a durable event stream.
+All routes in the table are relative to `/api/monitoring/v1`. Ingest clients must register metadata before sending observations, heartbeats, or authoritative snapshots for that application-instance-bus identity. Successful writes return `202 Accepted`; invalid protocol data returns `400`, and writes for an unregistered identity return `404` or `409` as described by OpenAPI. An accepted snapshot replaces that identity's current view: omission from a successfully accepted snapshot means “not present now,” not “unknown historically.”
+
+The WebSocket route is documented here rather than in OpenAPI because it is an upgrade protocol, not an ordinary HTTP response. Connect to `/api/monitoring/v1/stream` and expect UTF-8 JSON text messages shaped as:
+
+```json
+{
+  "type": "jobs_changed",
+  "occurredAtUtc": "2026-08-31T12:34:56.789Z"
+}
+```
+
+Current invalidation types are `metadata_changed`, `observations_changed`, `scheduled_work_changed`, `recurring_jobs_changed`, and `jobs_changed`. They only mean that the corresponding HTTP read model may have changed. The stream is bounded, has no replay, cursor, sequence, or delivery guarantee, and does not carry the changed snapshot. A dashboard must fetch its initial HTTP state, re-query after relevant invalidations, and re-fetch all required state after reconnecting. Polling remains a valid fallback.
+
+Neither interface is a control plane. The query API cannot cancel jobs, purge queues, or mutate a broker, and the ingest API is not an application command endpoint. The preview service has no built-in authentication yet, so custom dashboards and exporters must only connect over a trusted deployment boundary.
 
 The active read model retains metric buckets for 15 minutes and bounds its recent observation buffer. A `Complete` flag on window summaries reports whether the exporter has declared dropped observations. The history summary also reports whether storage is volatile or durable and the oldest and latest observations available in the active window. A zero rate with incomplete or stale coverage must not be interpreted as proven inactivity.
 
