@@ -132,6 +132,20 @@ See the <Link href="/docs/transactional-outbox">transactional outbox guide</Link
   <p>Define what users see while data is catching up, how long is acceptable, and how operators detect and repair a stuck workflow.</p>
 </div>
 
+<h2 id="workflow-coordination">Choose orchestration or choreography deliberately</h2>
+
+Long-running workflows usually coordinate in one of two ways. Orchestration gives an explicit coordinator responsibility for the workflow state and next command. Sagas, state machines, durable timeouts, and compensation are common orchestration techniques. Choreography keeps that responsibility distributed: services publish facts and other services decide independently how to react.
+
+<div className="concept-comparison">
+  <section><span className="tag">ORCHESTRATION</span><h2>One explicit coordinator</h2><p>A durable process tracks progress and directs each participant.</p><strong>Watch for:</strong><p>Coordinator availability, state concurrency, compensation, and coupling to the workflow definition.</p></section>
+  <section><span className="tag">CHOREOGRAPHY</span><h2>Services react to events</h2><p>Participants remain autonomous and no service owns the complete sequence.</p><strong>Watch for:</strong><p>Hidden coupling, event cycles, duplicate reactions, unclear progress, and difficult recovery.</p></section>
+</div>
+
+<div className="callout callout-accent">
+  <strong>Future MyServiceBus areas</strong>
+  <p>Applications can build basic choreography from today&apos;s publish and consume primitives, but MyServiceBus does not yet provide a first-class choreography lifecycle model. Framework-owned orchestration—including saga persistence and state machines—is also future work. Use application-owned workflow state or a mature workflow product when those capabilities are required now.</p>
+</div>
+
 <h2 id="failure">Classify failures before retrying</h2>
 
 Retry transient failures such as brief network or dependency outages. Do not retry invalid input, missing business preconditions, or permanent authorization failures: retries only increase load and delay diagnosis. Keep the retry window bounded, use backoff for shared dependencies, and make the consumer idempotent first.
