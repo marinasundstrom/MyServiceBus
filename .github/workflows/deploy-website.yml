@@ -41,12 +41,14 @@ jobs:
       - name: Verify static website assets
         shell: bash
         run: |
-          grep -Fq 'src="/MyServiceBus/docs/runtime-monitoring-dashboard-dark.jpg"' \
+          grep -Fq 'Understand distributed applications through messaging' \
             website/out/docs/runtime-monitoring/index.html
-          grep -Fq 'src="/MyServiceBus/docs/runtime-monitoring-dashboard-light.jpg"' \
+          grep -Fq 'Applications first, infrastructure when needed' \
             website/out/docs/runtime-monitoring/index.html
-          test "$(od -An -t x1 -N2 website/out/docs/runtime-monitoring-dashboard-dark.jpg | tr -d ' ')" = 'ffd8'
-          test "$(od -An -t x1 -N2 website/out/docs/runtime-monitoring-dashboard-light.jpg | tr -d ' ')" = 'ffd8'
+          version="$(sed -n "s/^version = '\([^']*\)'/\1/p" build.gradle)"
+          test -n "$version"
+          grep -Fq "$version" \
+            website/out/docs/runtime-monitoring/index.html
 
       - name: Upload GitHub Pages artifact
         uses: actions/upload-pages-artifact@v4
