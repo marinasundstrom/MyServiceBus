@@ -310,3 +310,18 @@ public sealed record MonitoringFlowEdge(
     long Count,
     DateTimeOffset FirstSeenAtUtc,
     DateTimeOffset LastSeenAtUtc);
+
+public sealed record MonitoringReplicaFlowEdge(
+    string SourceApplication,
+    string SourceInstanceId,
+    string SourceBusId,
+    string TargetApplication,
+    string TargetInstanceId,
+    string TargetBusId,
+    string? EndpointName,
+    string? MessageType,
+    string? MessageUrn,
+    string OperationKind,
+    long Count,
+    DateTimeOffset FirstSeenAtUtc,
+    DateTimeOffset LastSeenAtUtc);

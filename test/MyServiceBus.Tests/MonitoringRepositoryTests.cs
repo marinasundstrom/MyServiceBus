@@ -348,9 +348,13 @@ public class MonitoringRepositoryTests
             now,
             new MonitoringObservation(
                 1, now.AddSeconds(-4), "published", true, "OrderSubmitted", "urn:message:OrderSubmitted",
-                null, "exchange:orders", 2, null, null, null, "conversation-1", null, null),
+                null, "exchange:orders", 2, null, null, null, "conversation-1", null, null))).ShouldBeTrue();
+        repository.RecordBatch(CreateBatch(
+            "checkout",
+            "checkout-2",
+            now,
             new MonitoringObservation(
-                2, now.AddSeconds(-3), "published", true, "OrderSubmitted", "urn:message:OrderSubmitted",
+                1, now.AddSeconds(-3), "published", true, "OrderSubmitted", "urn:message:OrderSubmitted",
                 null, "exchange:orders", 2, null, null, null, "conversation-2", null, null))).ShouldBeTrue();
         repository.RecordBatch(CreateBatch(
             "orders",
@@ -371,6 +375,19 @@ public class MonitoringRepositoryTests
         flow.SourceApplication.ShouldBe("checkout");
         flow.TargetApplication.ShouldBe("orders");
         flow.Count.ShouldBe(2);
+
+        var replicaFlow = repository.GetReplicaFlow(null, 60, now);
+        replicaFlow.Count.ShouldBe(2);
+        var firstReplicaPath = replicaFlow.Single(edge => edge.SourceInstanceId == "checkout-1");
+        firstReplicaPath.SourceBusId.ShouldBe("bus");
+        firstReplicaPath.TargetApplication.ShouldBe("orders");
+        firstReplicaPath.TargetInstanceId.ShouldBe("orders-1");
+        firstReplicaPath.TargetBusId.ShouldBe("bus");
+        firstReplicaPath.Count.ShouldBe(1);
+        var secondReplicaPath = replicaFlow.Single(edge => edge.SourceInstanceId == "checkout-2");
+        secondReplicaPath.TargetInstanceId.ShouldBe("orders-2");
+        repository.GetReplicaFlow("checkout", 60, now).Count.ShouldBe(2);
+        repository.GetReplicaFlow("unrelated", 60, now).ShouldBeEmpty();
 
         var orderRate = repository.GetRates("orders", 60, false, now).ShouldHaveSingleItem();
         orderRate.InstanceId.ShouldBeNull();

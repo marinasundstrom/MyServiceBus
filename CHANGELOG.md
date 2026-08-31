@@ -5,6 +5,7 @@ This changelog summarizes the bigger themes in the repository history rather tha
 ## Unreleased
 
 - Fixed observed message flow for the C# and Java transactional outbox by emitting the outbound operation only when a persisted envelope is actually dispatched to the broker. Application-level flow and throughput continue to aggregate cleanly across producer and consumer replicas.
+- Added a replica-preserving monitoring flow projection with explicit source and target application, instance, and bus identities, while retaining the compact application-aggregated projection for overview dashboards.
 
 ## 0.1.0-preview.8 - 2026-08-31
 

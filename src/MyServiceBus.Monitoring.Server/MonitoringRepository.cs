@@ -624,6 +624,32 @@ public sealed class MonitoringRepository
     }
 
     public IReadOnlyList<MonitoringFlowEdge> GetFlow(string? applicationName, int windowSeconds, DateTimeOffset now)
+        => GetReplicaFlow(applicationName, windowSeconds, now)
+            .GroupBy(edge => new FlowEdgeKey(
+                edge.SourceApplication,
+                edge.TargetApplication,
+                edge.EndpointName,
+                edge.MessageUrn,
+                edge.OperationKind))
+            .Select(group => new MonitoringFlowEdge(
+                group.Key.SourceApplication,
+                group.Key.TargetApplication,
+                group.Key.EndpointName,
+                group.First().MessageType,
+                group.Key.MessageUrn,
+                group.Key.OperationKind,
+                group.Sum(edge => edge.Count),
+                group.Min(edge => edge.FirstSeenAtUtc),
+                group.Max(edge => edge.LastSeenAtUtc)))
+            .OrderByDescending(edge => edge.Count)
+            .ThenBy(edge => edge.SourceApplication, StringComparer.Ordinal)
+            .ThenBy(edge => edge.TargetApplication, StringComparer.Ordinal)
+            .ToArray();
+
+    public IReadOnlyList<MonitoringReplicaFlowEdge> GetReplicaFlow(
+        string? applicationName,
+        int windowSeconds,
+        DateTimeOffset now)
     {
         var boundedWindow = Math.Clamp(windowSeconds, 10, (int)MetricRetention.TotalSeconds);
         var start = now.AddSeconds(-boundedWindow);
@@ -637,13 +663,17 @@ public sealed class MonitoringRepository
         }
 
         var sources = new Dictionary<string, FlowSource>(StringComparer.Ordinal);
-        var edges = new Dictionary<FlowEdgeKey, MutableFlowEdge>();
+        var edges = new Dictionary<ReplicaFlowEdgeKey, MutableReplicaFlowEdge>();
         foreach (var record in records)
         {
             var observation = record.Observation;
             if (observation.Kind is "sent" or "published" or "fault_published")
             {
-                var outboundSource = new FlowSource(record.ApplicationName, observation.Kind);
+                var outboundSource = new FlowSource(
+                    record.ApplicationName,
+                    record.InstanceId,
+                    record.BusId,
+                    observation.Kind);
                 foreach (var correlationKey in CorrelationKeys(observation))
                     sources[correlationKey] = outboundSource;
                 continue;
@@ -664,17 +694,25 @@ public sealed class MonitoringRepository
                 && !string.Equals(record.ApplicationName, applicationName, StringComparison.Ordinal))
                 continue;
 
-            var edgeKey = new FlowEdgeKey(
+            var edgeKey = new ReplicaFlowEdgeKey(
                 matchedSource.ApplicationName,
+                matchedSource.InstanceId,
+                matchedSource.BusId,
                 record.ApplicationName,
+                record.InstanceId,
+                record.BusId,
                 observation.EndpointName,
                 observation.MessageUrn,
                 matchedSource.OperationKind);
             if (!edges.TryGetValue(edgeKey, out var edge))
             {
-                edge = new MutableFlowEdge(
+                edge = new MutableReplicaFlowEdge(
                     matchedSource.ApplicationName,
+                    matchedSource.InstanceId,
+                    matchedSource.BusId,
                     record.ApplicationName,
+                    record.InstanceId,
+                    record.BusId,
                     observation.EndpointName,
                     observation.MessageType,
                     observation.MessageUrn,
@@ -689,7 +727,9 @@ public sealed class MonitoringRepository
             .Select(edge => edge.ToImmutable())
             .OrderByDescending(edge => edge.Count)
             .ThenBy(edge => edge.SourceApplication, StringComparer.Ordinal)
+            .ThenBy(edge => edge.SourceInstanceId, StringComparer.Ordinal)
             .ThenBy(edge => edge.TargetApplication, StringComparer.Ordinal)
+            .ThenBy(edge => edge.TargetInstanceId, StringComparer.Ordinal)
             .ToArray();
     }
 
@@ -788,7 +828,21 @@ public sealed class MonitoringRepository
         string? EndpointName,
         string? MessageUrn,
         string OperationKind);
-    private sealed record FlowSource(string ApplicationName, string OperationKind);
+    private readonly record struct ReplicaFlowEdgeKey(
+        string SourceApplication,
+        string SourceInstanceId,
+        string SourceBusId,
+        string TargetApplication,
+        string TargetInstanceId,
+        string TargetBusId,
+        string? EndpointName,
+        string? MessageUrn,
+        string OperationKind);
+    private sealed record FlowSource(
+        string ApplicationName,
+        string InstanceId,
+        string BusId,
+        string OperationKind);
 
     private static bool TryGet(
         IReadOnlyDictionary<string, string>? properties,
@@ -822,15 +876,19 @@ public sealed class MonitoringRepository
                 ? parsed
                 : null;
 
-    private sealed class MutableFlowEdge
+    private sealed class MutableReplicaFlowEdge
     {
         private long count;
         private DateTimeOffset firstSeenAtUtc;
         private DateTimeOffset lastSeenAtUtc;
 
-        public MutableFlowEdge(
+        public MutableReplicaFlowEdge(
             string sourceApplication,
+            string sourceInstanceId,
+            string sourceBusId,
             string targetApplication,
+            string targetInstanceId,
+            string targetBusId,
             string? endpointName,
             string? messageType,
             string? messageUrn,
@@ -838,7 +896,11 @@ public sealed class MonitoringRepository
             DateTimeOffset occurredAtUtc)
         {
             SourceApplication = sourceApplication;
+            SourceInstanceId = sourceInstanceId;
+            SourceBusId = sourceBusId;
             TargetApplication = targetApplication;
+            TargetInstanceId = targetInstanceId;
+            TargetBusId = targetBusId;
             EndpointName = endpointName;
             MessageType = messageType;
             MessageUrn = messageUrn;
@@ -848,7 +910,11 @@ public sealed class MonitoringRepository
         }
 
         public string SourceApplication { get; }
+        public string SourceInstanceId { get; }
+        public string SourceBusId { get; }
         public string TargetApplication { get; }
+        public string TargetInstanceId { get; }
+        public string TargetBusId { get; }
         public string? EndpointName { get; }
         public string? MessageType { get; }
         public string? MessageUrn { get; }
@@ -863,9 +929,13 @@ public sealed class MonitoringRepository
                 lastSeenAtUtc = occurredAtUtc;
         }
 
-        public MonitoringFlowEdge ToImmutable() => new(
+        public MonitoringReplicaFlowEdge ToImmutable() => new(
             SourceApplication,
+            SourceInstanceId,
+            SourceBusId,
             TargetApplication,
+            TargetInstanceId,
+            TargetBusId,
             EndpointName,
             MessageType,
             MessageUrn,

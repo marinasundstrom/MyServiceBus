@@ -210,7 +210,8 @@ The contract is versioned but remains preview. The `/v1` route and each ingest b
 | `GET` | `/observations?application=...&limit=100` | Query recent observations |
 | `GET` | `/metrics?application=...&windowSeconds=60&byInstance=true` | Query bounded-window rates, counts, and consume latency |
 | `GET` | `/metrics/timeseries?windowSeconds=300&bucketSeconds=5` | Query bucketed rates for real-time graphs |
-| `GET` | `/flow?application=...&windowSeconds=300` | Query observed correlated application flow |
+| `GET` | `/flow?application=...&windowSeconds=300` | Query observed correlated application flow aggregated across replicas |
+| `GET` | `/flow/replicas?application=...&windowSeconds=300` | Query correlated source-to-target replica paths with owning application and bus identity |
 | `GET` | `/outbox?application=...&windowSeconds=60` | Query dispatcher state and windowed outbox throughput |
 | `GET` | `/scheduled-work?application=...&status=...` | Query current one-time scheduled work |
 | `GET` | `/recurring-jobs?application=...&status=...` | Query current recurring definitions |
