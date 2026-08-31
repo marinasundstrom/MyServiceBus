@@ -1,0 +1,12 @@
+<nav class="application-navigation" aria-label="Application sections">
+    <NavLink href="@ApplicationUrl" Match="NavLinkMatch.All">Overview</NavLink>
+    <NavLink href="@($"{ApplicationUrl}/metrics")">Metrics</NavLink>
+    <NavLink href="@($"{ApplicationUrl}/flow")">Flow</NavLink>
+</nav>
+
+@code {
+    [Parameter, EditorRequired]
+    public required string ApplicationName { get; set; }
+
+    private string ApplicationUrl => $"/applications/{Uri.EscapeDataString(ApplicationName)}";
+}

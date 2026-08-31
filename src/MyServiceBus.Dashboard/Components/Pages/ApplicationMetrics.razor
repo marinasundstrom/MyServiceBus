@@ -1,0 +1,50 @@
+@page "/applications/{ApplicationName}/metrics"
+@rendermode InteractiveServer
+@inherits ApplicationPageBase
+
+<PageTitle>@ApplicationName metrics · MyServiceBus Monitoring</PageTitle>
+<DashboardPageHeader Eyebrow="Application metrics" Title="@ApplicationName" Description="See how this application is handling messages, with the busiest receiving paths first and endpoint detail available below." />
+<ApplicationNavigation ApplicationName="@ApplicationName" />
+
+@if (Application is null)
+{
+    <section class="empty-state"><h2>Application not found</h2><p>This application may not have registered yet, or its monitoring lease may have expired.</p></section>
+}
+else
+{
+    <section class="panel chart-panel">
+        <div class="section-heading"><div><p class="eyebrow">Live trend</p><h2>Messages handled per second</h2></div><span>Last 5 minutes · 5-second buckets</span></div>
+        <ThroughputChart Points="ApplicationTimeSeries" />
+    </section>
+
+    <section class="panel endpoints-panel">
+        <div class="section-heading"><div><p class="eyebrow">Busiest first</p><h2>Top receive endpoints</h2></div><span>60-second window</span></div>
+        @if (ApplicationEndpoints.Count == 0)
+        {
+            <p class="panel-empty">No receive endpoint activity is available for this application.</p>
+        }
+        else
+        {
+            <div class="table-wrap">
+                <table>
+                    <thead><tr><th>Endpoint</th><th>Handled / sec</th><th>Handled</th><th>Failures</th><th>Retries</th><th>Consumers</th><th>Message types</th><th>Status</th></tr></thead>
+                    <tbody>
+                        @foreach (var endpoint in ApplicationEndpoints)
+                        {
+                            <tr>
+                                <td><strong>@endpoint.EndpointName</strong><small class="mono">@endpoint.Address</small></td>
+                                <td>@FormatRate(endpoint.ConsumedPerSecond)</td>
+                                <td>@endpoint.Consumed.ToString("N0")</td>
+                                <td class="@(endpoint.Faulted > 0 ? "fault" : null)">@endpoint.Faulted.ToString("N0")</td>
+                                <td>@endpoint.Retried.ToString("N0")</td>
+                                <td>@endpoint.ConsumerCount.ToString("N0")</td>
+                                <td>@endpoint.MessageTypeCount.ToString("N0")</td>
+                                <td><span class="status-dot @(endpoint.OnlineInstances > 0 ? "online" : "offline")"></span>@endpoint.OnlineInstances / @endpoint.TotalInstances online</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </section>
+}
