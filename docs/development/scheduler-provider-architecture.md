@@ -36,9 +36,9 @@ Remote acceptance needs its own stable command identity and idempotency behavior
 
 ## Replace the callback seam
 
-The current `IJobScheduler` / `JobScheduler` accepts an executable callback. It is useful as a local timer and deterministic test seam, but a callback cannot be persisted, inspected, migrated, or executed by another process safely. It must not become the Quartz or Hangfire integration contract.
+The former `IJobScheduler` / `JobScheduler` callback seam accepted an executable callback. It was useful as a local timer and deterministic test seam, but a callback cannot be persisted, inspected, migrated, or executed by another process safely. It was renamed to `ILocalDelayScheduler` / `LocalDelayScheduler` so it cannot become a durable provider or application-job contract accidentally.
 
-Because the project is still in preview, the current interface should be renamed to an explicitly process-local abstraction such as `ILocalDelayScheduler` / `LocalDelayScheduler`. It may remain public for advanced composition, but its name and documentation must make volatility unavoidable.
+The process-local interface remains public for advanced composition, but its name and documentation make volatility unavoidable.
 
 A new provider-neutral scheduler SPI should accept serializable execution commands. This should evolve the existing `IScheduleMessageProvider` / `ScheduleMessageProvider` seam for messages rather than creating a second competing message-provider abstraction. The exact C# and Java APIs may be idiomatic, but they represent the same records and behavior:
 
@@ -64,7 +64,7 @@ SchedulerEventObserver
 
 `IMessageScheduler` / `MessageScheduler` remains the application-facing bus facade. It creates the final message envelope and submits a built-in message execution command. A future `IRecurringMessageScheduler` / `RecurringMessageScheduler` manages recurring message definitions using the familiar MassTransit separation. A future application `JobClient` submits immediate or scheduled registered job requests, while a `RecurringJobScheduler` manages recurring application-job definitions. These facades may share lower-level timing and execution infrastructure without exposing engine objects or collapsing their semantics.
 
-The current callback interface already uses the `IJobScheduler` / `JobScheduler` name. Renaming it to `ILocalDelayScheduler` / `LocalDelayScheduler` must happen before introducing the application-job facade, so “job” cannot mean both a volatile callback timer and durable application work.
+The rename leaves the job vocabulary available for durable application work, so “job” cannot mean both a volatile callback timer and a tracked execution.
 
 Execution location is separate from timing location. A due command may ask the provider to dispatch a message back to an application, or it may invoke a registered handler in a colocated worker. Distributed applications should prefer dispatching a portable occurrence message when work belongs to an application. Embedded Hangfire or JobRunr integrations may invoke the generic MyServiceBus runner locally, but provider-native method or lambda metadata remains private to the adapter.
 

@@ -11,7 +11,7 @@ MyServiceBus separates **volatile in-process scheduling** from **durable message
 | Custom message-aware provider | Provider-defined | Provider-defined and reported as durable or volatile | Provider-defined | Extension point available |
 | Broker-native, Quartz.NET, Quartz Scheduler, Hangfire, JobRunr, or recurring adapters | Provider-defined | Not claimed until separately implemented and tested | Provider-defined | Future adapters |
 
-Scheduling a callback and scheduling a message are different extension points. `IJobScheduler` / `JobScheduler` receives an executable callback and is therefore suitable only for process-bound timing and deterministic tests. `IScheduleMessageProvider` / `ScheduleMessageProvider` receives the message delivery intent and is the integration boundary for an implementation that serializes and persists work outside the process.
+Scheduling a callback and scheduling a message are different extension points. `ILocalDelayScheduler` / `LocalDelayScheduler` receives an executable callback and is therefore suitable only for process-bound timing and deterministic tests. `IScheduleMessageProvider` / `ScheduleMessageProvider` receives the message delivery intent and is the integration boundary for an implementation that serializes and persists work outside the process.
 
 ## Use the familiar message scheduler
 

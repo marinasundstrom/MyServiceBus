@@ -98,7 +98,7 @@ This path survives process restart and retains stable record and message identit
 
 ## Plug in a durable scheduling service
 
-`IScheduleMessageProvider` in C# and `ScheduleMessageProvider` in Java are message-aware extension points. A provider can serialize and persist intent in Quartz.NET, Quartz Scheduler, a broker-native scheduler, or an external service. The older callback-level `IJobScheduler` / `JobScheduler` seam remains useful for in-process timing and deterministic tests, but callbacks cannot honestly be restart-safe.
+`IScheduleMessageProvider` in C# and `ScheduleMessageProvider` in Java are message-aware extension points. A provider can serialize and persist intent in an embedded scheduler, a broker-native scheduler, or an external service. The callback-level `ILocalDelayScheduler` / `LocalDelayScheduler` seam remains useful for in-process timing and deterministic tests, but callbacks cannot honestly be restart-safe.
 
 <div className="callout">
   <strong>Quartz.NET is a target, not a current claim</strong>

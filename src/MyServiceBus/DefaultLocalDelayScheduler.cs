@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 
 namespace MyServiceBus;
 
-public class DefaultJobScheduler : IJobScheduler
+public class DefaultLocalDelayScheduler : ILocalDelayScheduler
 {
     private readonly ConcurrentDictionary<Guid, CancellationTokenSource> _jobs = new();
 

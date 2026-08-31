@@ -26,7 +26,7 @@ public class SchedulingTests
         }
     }
 
-    class ImmediateJobScheduler : IJobScheduler
+    class ImmediateLocalDelayScheduler : ILocalDelayScheduler
     {
         public Task<Guid> Schedule(DateTime scheduledTime, Func<CancellationToken, Task> callback, CancellationToken cancellationToken = default)
         {
@@ -43,7 +43,7 @@ public class SchedulingTests
         public Task<bool> Cancel(Guid tokenId) => Task.FromResult(false);
     }
 
-    class ManualJobScheduler : IJobScheduler
+    class ManualLocalDelayScheduler : ILocalDelayScheduler
     {
         readonly Dictionary<Guid, Func<CancellationToken, Task>> jobs = new();
 
@@ -221,7 +221,7 @@ public class SchedulingTests
     {
         var services = new ServiceCollection();
         services.AddLogging();
-        services.AddSingleton<IJobScheduler, ImmediateJobScheduler>();
+        services.AddSingleton<ILocalDelayScheduler, ImmediateLocalDelayScheduler>();
         services.AddServiceBus(cfg =>
         {
             cfg.UsingMediator();
@@ -248,10 +248,10 @@ public class SchedulingTests
     [Fact]
     public async Task Manual_scheduler_controls_publish_and_send_delivery()
     {
-        var manual = new ManualJobScheduler();
+        var manual = new ManualLocalDelayScheduler();
         var services = new ServiceCollection();
         services.AddLogging();
-        services.AddSingleton<IJobScheduler>(manual);
+        services.AddSingleton<ILocalDelayScheduler>(manual);
         services.AddServiceBus(cfg =>
         {
             cfg.UsingMediator();
@@ -307,10 +307,10 @@ public class SchedulingTests
     [Fact]
     public async Task Cancel_prevents_scheduled_publish()
     {
-        var manual = new ManualJobScheduler();
+        var manual = new ManualLocalDelayScheduler();
         var services = new ServiceCollection();
         services.AddLogging();
-        services.AddSingleton<IJobScheduler>(manual);
+        services.AddSingleton<ILocalDelayScheduler>(manual);
         services.AddServiceBus(cfg =>
         {
             cfg.UsingMediator();
@@ -335,11 +335,11 @@ public class SchedulingTests
     [Fact]
     public async Task In_memory_scheduler_reports_scheduled_work_lifecycle()
     {
-        var manual = new ManualJobScheduler();
+        var manual = new ManualLocalDelayScheduler();
         var observer = new RecordingScheduledWorkObserver();
         var services = new ServiceCollection();
         services.AddLogging();
-        services.AddSingleton<IJobScheduler>(manual);
+        services.AddSingleton<ILocalDelayScheduler>(manual);
         services.AddSingleton<IScheduledWorkObserver>(observer);
         services.AddServiceBus(cfg =>
         {
@@ -367,11 +367,11 @@ public class SchedulingTests
     [Fact]
     public async Task In_memory_scheduled_work_is_shared_across_application_scopes()
     {
-        var manual = new ManualJobScheduler();
+        var manual = new ManualLocalDelayScheduler();
         var observer = new RecordingScheduledWorkObserver();
         var services = new ServiceCollection();
         services.AddLogging();
-        services.AddSingleton<IJobScheduler>(manual);
+        services.AddSingleton<ILocalDelayScheduler>(manual);
         services.AddSingleton<IScheduledWorkObserver>(observer);
         services.AddServiceBus(cfg => cfg.UsingMediator());
 

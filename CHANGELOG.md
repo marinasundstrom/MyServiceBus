@@ -4,6 +4,7 @@ This changelog summarizes the bigger themes in the repository history rather tha
 
 ## Unreleased
 
+- Renamed the callback-only scheduling seam to `ILocalDelayScheduler` / `LocalDelayScheduler` in C# and Java, making its process-local volatility explicit and reserving job terminology for future tracked application jobs and recurring work.
 - Added optional PostgreSQL-backed monitoring history with Entity Framework Core migrations, deduplicated JSONB observation batches, bounded retention, active-window restoration, and explicit dashboard reporting for durability, freshness, and incomplete coverage.
 - Added application-specific Overview, Metrics, and D3 Flow drill-downs and documented the dashboard as an application-oriented distributed-development and operations tool that progressively reveals MyServiceBus topology and transport details.
 - Added C# and Java scheduled-work export, current-state collection, PostgreSQL monitoring history, and application-focused global and per-application dashboard views. Shared in-memory and authoritative PostgreSQL sources restore bounded schedule state across scopes and restarts while preserving the separation between observation and privileged commands.

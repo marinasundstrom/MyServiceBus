@@ -16,7 +16,7 @@ import java.util.function.Function;
 import com.myservicebus.tasks.CancellationToken;
 import com.myservicebus.tasks.CancellationTokenSource;
 
-public class DefaultJobScheduler implements JobScheduler {
+public class DefaultLocalDelayScheduler implements LocalDelayScheduler {
     private final ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
     private final ConcurrentMap<UUID, ScheduledJob> jobs = new ConcurrentHashMap<>();
 

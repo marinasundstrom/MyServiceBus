@@ -8,7 +8,11 @@ import java.util.function.Function;
 
 import com.myservicebus.tasks.CancellationToken;
 
-public interface JobScheduler {
+/**
+ * Schedules callbacks within the current process. Pending callbacks are not durable and are lost
+ * when the process stops. Durable message scheduling uses {@link ScheduleMessageProvider}.
+ */
+public interface LocalDelayScheduler {
     CompletionStage<UUID> schedule(Instant scheduledTime,
             Function<CancellationToken, CompletionStage<Void>> callback,
             CancellationToken cancellationToken);
