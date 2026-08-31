@@ -121,7 +121,7 @@ The PostgreSQL storage profile uses schema version 4 and tables separate from `o
 - a unique key on definition identity prevents duplicate ownership;
 - a unique key on definition id, revision, and scheduled time prevents duplicate scheduled occurrences.
 
-A materializer leases due definitions with database time and `SKIP LOCKED`. In one transaction it creates the occurrence, writes the final command envelope to the existing outbox, and advances the definition's next due time. A crash can repeat the transaction, but the uniqueness constraints prevent a second logical occurrence. C# and Java use the same schema and may materialize definitions created by either client.
+A materializer leases due definitions with database time and `SKIP LOCKED`. In one transaction it creates the occurrence, writes the final command envelope to the existing outbox, and advances the definition's next due time. A crash can repeat the transaction, but the uniqueness constraints prevent a second logical occurrence. Integration gates verify restart recovery, competing materializers creating one logical occurrence, Java materializing a C# definition, and C# materializing a Java definition against the same PostgreSQL database.
 
 The schema stores the cadence contract and final envelope, not a language-specific scheduler object. PostgreSQL is therefore the promoted storage-interoperable profile of the built-in provider. The in-memory implementation uses the same state machine for development but reports volatile durability and loses definitions on restart.
 
