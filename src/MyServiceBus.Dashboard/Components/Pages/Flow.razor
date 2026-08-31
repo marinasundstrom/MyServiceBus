@@ -1,0 +1,29 @@
+@page "/flow"
+@rendermode InteractiveServer
+@inherits MonitoringPageBase
+
+<PageTitle>Message Flow · MyServiceBus Monitoring</PageTitle>
+<DashboardPageHeader Eyebrow="System map" Title="Message flow" Description="Explore which applications exchange messages and the observed traffic between them. This map is reconstructed from recent correlated activity." />
+
+<section class="panel flow-map-panel">
+    <div class="section-heading"><div><p class="eyebrow">Live system map</p><h2>Observed application flow</h2></div><span>Last 5 minutes · line width represents throughput</span></div>
+    <FlowMap Applications="Dashboard.Applications" Edges="Dashboard.Flow" />
+    <p class="map-help">Drag applications to explore the topology. Select one to focus its direct message paths; scroll or use the controls to zoom.</p>
+</section>
+
+<section class="panel flow-detail-panel">
+    <div class="section-heading"><div><p class="eyebrow">Exact paths</p><h2>Observed connections</h2></div><span>Last 5 minutes</span></div>
+    @if (Dashboard.Flow.Count == 0)
+    {
+        <p class="panel-empty">No correlated message paths were observed in this window.</p>
+    }
+    else
+    {
+        <div class="flow-list">
+            @foreach (var edge in Dashboard.Flow)
+            {
+                <div class="flow-edge"><strong>@edge.SourceApplication</strong><span>→</span><strong>@edge.TargetApplication</strong><small>@ShortMessageType(edge.MessageType) · @edge.Count.ToString("N0") messages</small></div>
+            }
+        </div>
+    }
+</section>

@@ -30,9 +30,14 @@
         }
     });
 
+    document.addEventListener("DOMContentLoaded", () => {
+        window.Blazor?.addEventListener("enhancedload", () => apply(getPreference()));
+    });
+
     window.dashboardTheme = {
         get: getPreference,
-        set: setPreference
+        set: setPreference,
+        apply: () => apply(getPreference())
     };
 
     apply(getPreference());

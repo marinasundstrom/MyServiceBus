@@ -1,14 +1,41 @@
 @inherits LayoutComponentBase
 
-<header class="topbar">
-    <div class="brand-mark">MSB</div>
-    <div>
-        <strong>MyServiceBus</strong>
-        <span>Monitoring dashboard</span>
-    </div>
-    <ThemeSelector />
-</header>
+<div class="app-shell">
+    <aside class="sidebar">
+        <a class="sidebar-brand" href="/" aria-label="MyServiceBus monitoring overview">
+            <span class="brand-mark">MSB</span>
+            <span>
+                <strong>MyServiceBus</strong>
+                <small>Monitoring</small>
+            </span>
+        </a>
 
-<main>
-    @Body
-</main>
+        <nav aria-label="Dashboard sections">
+            <span class="nav-label">Operations</span>
+            <NavLink href="/" Match="NavLinkMatch.All">Overview</NavLink>
+            <span class="nav-label">Explore</span>
+            <NavLink href="/applications">Applications</NavLink>
+            <NavLink href="/throughput">Throughput</NavLink>
+            <NavLink href="/flow">Message flow</NavLink>
+            <span class="nav-label">Reliability</span>
+            <NavLink href="/failures">Failures</NavLink>
+            <NavLink href="/outbox">Outbox</NavLink>
+        </nav>
+
+        <p class="sidebar-note">Understand and operate distributed applications through live messaging topology and activity.</p>
+    </aside>
+
+    <div class="content-shell">
+        <header class="topbar">
+            <div>
+                <strong>Operations</strong>
+                <span>Build and operate distributed apps</span>
+            </div>
+            <ThemeSelector />
+        </header>
+
+        <main>
+            @Body
+        </main>
+    </div>
+</div>

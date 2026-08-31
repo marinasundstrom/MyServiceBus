@@ -1,7 +1,7 @@
 @implements IAsyncDisposable
 @inject IJSRuntime JavaScript
 
-<div class="chart" @ref="_chart"></div>
+<div class="chart @(Compact ? "compact" : null)" @ref="_chart"></div>
 
 @code {
     private ElementReference _chart;
@@ -10,15 +10,22 @@
     [Parameter, EditorRequired]
     public required IReadOnlyList<MonitoringTimeSeriesPoint> Points { get; set; }
 
+    [Parameter]
+    public bool Compact { get; set; }
+
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         _module ??= await JavaScript.InvokeAsync<IJSObjectReference>("import", "./monitoringChart.js");
-        await _module.InvokeVoidAsync("renderThroughputChart", _chart, Points.Select(point => new
-        {
-            point.ApplicationName,
-            point.TimestampUtc,
-            point.Rates.ConsumedPerSecond
-        }));
+        await _module.InvokeVoidAsync(
+            "renderThroughputChart",
+            _chart,
+            Points.Select(point => new
+            {
+                point.ApplicationName,
+                point.TimestampUtc,
+                point.Rates.ConsumedPerSecond
+            }),
+            Compact);
     }
 
     public async ValueTask DisposeAsync()

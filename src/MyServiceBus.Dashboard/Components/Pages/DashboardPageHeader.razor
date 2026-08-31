@@ -1,0 +1,16 @@
+<section class="page-heading">
+    <p class="eyebrow">@Eyebrow</p>
+    <h1>@Title</h1>
+    <p>@Description</p>
+</section>
+
+@code {
+    [Parameter, EditorRequired]
+    public required string Eyebrow { get; set; }
+
+    [Parameter, EditorRequired]
+    public required string Title { get; set; }
+
+    [Parameter, EditorRequired]
+    public required string Description { get; set; }
+}

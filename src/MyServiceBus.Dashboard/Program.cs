@@ -11,6 +11,7 @@ builder.Services.AddHttpClient<MonitoringApiClient>(client =>
 {
     client.BaseAddress = new Uri(builder.Configuration["MonitoringService"] ?? "http://localhost:5310");
 });
+builder.Services.AddScoped<MonitoringDashboardState>();
 
 var app = builder.Build();
 app.UseAntiforgery();

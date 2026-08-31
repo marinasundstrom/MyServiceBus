@@ -1,0 +1,27 @@
+@page "/outbox"
+@rendermode InteractiveServer
+@inherits MonitoringPageBase
+
+<PageTitle>Outbox · MyServiceBus Monitoring</PageTitle>
+<DashboardPageHeader Eyebrow="Reliable delivery" Title="Outbox dispatchers" Description="The transactional outbox stores outgoing messages with application data, then a dispatcher delivers them to the broker. This view shows whether those workers are keeping up." />
+
+<section class="panel instances outbox-operations">
+    <div class="section-heading"><div><p class="eyebrow">Dispatcher operations</p><h2>Delivery workers</h2></div><span>60-second delivery window · grouped by service partition</span></div>
+    @if (Dashboard.OutboxDispatchers.Count == 0)
+    {
+        <p class="panel-empty">No outbox dispatcher activity has been reported.</p>
+    }
+    else
+    {
+        <div class="table-wrap"><table>
+            <thead><tr><th>Status</th><th>Service partition</th><th>Worker</th><th>Waiting</th><th>Oldest waiting</th><th>Delivered / sec</th><th>Failed</th><th>Lost leases</th><th>Cycle time</th></tr></thead>
+            <tbody>
+                @foreach (var dispatcher in Dashboard.OutboxDispatchers)
+                {
+                    var healthy = dispatcher.Online && dispatcher.LastCycleSucceeded;
+                    <tr><td><span class="status-dot @(healthy ? "online" : "offline")"></span>@(healthy ? "Healthy" : "Attention")</td><td><strong>@dispatcher.ServiceName</strong><small>@dispatcher.ApplicationName</small></td><td class="mono">@dispatcher.OwnerId<small>@dispatcher.InstanceId</small></td><td class="@(dispatcher.Pending > 0 ? "fault" : null)">@FormatCount(dispatcher.Pending)</td><td class="@(dispatcher.OldestUndispatchedAgeMs > 30_000 ? "fault" : null)">@FormatAge(dispatcher.OldestUndispatchedAgeMs)</td><td>@FormatRate(dispatcher.DispatchedPerSecond)</td><td class="@(dispatcher.WindowFailed > 0 ? "fault" : null)">@dispatcher.WindowFailed.ToString("N0")</td><td class="@(dispatcher.WindowLostLeases > 0 ? "fault" : null)">@dispatcher.WindowLostLeases.ToString("N0")</td><td>@FormatDuration(dispatcher.LastCycleDurationMs)</td></tr>
+                }
+            </tbody>
+        </table></div>
+    }
+</section>

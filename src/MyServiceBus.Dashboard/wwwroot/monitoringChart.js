@@ -3,7 +3,7 @@ import * as d3 from "https://cdn.jsdelivr.net/npm/d3@7/+esm";
 const colors = ["#55d6a9", "#69a8ff", "#f2bd5c", "#d68cff", "#ff837a", "#66d7e8"];
 const flowMaps = new WeakMap();
 
-export function renderThroughputChart(element, rawPoints) {
+export function renderThroughputChart(element, rawPoints, compact = false) {
     const points = rawPoints.map(point => ({
         application: point.applicationName,
         timestamp: new Date(point.timestampUtc),
@@ -28,8 +28,8 @@ export function renderThroughputChart(element, rawPoints) {
     });
 
     const width = 800;
-    const height = 230;
-    const margin = { top: 18, right: 16, bottom: 34, left: 50 };
+    const height = compact ? 170 : 230;
+    const margin = { top: 12, right: 16, bottom: 32, left: 46 };
     const timestamps = points.map(point => point.timestamp);
     const x = d3.scaleUtc()
         .domain(d3.extent(timestamps))
@@ -51,15 +51,15 @@ export function renderThroughputChart(element, rawPoints) {
     svg.append("g")
         .attr("class", "chart-grid")
         .attr("transform", `translate(${margin.left},0)`)
-        .call(d3.axisLeft(y).ticks(4).tickSize(-(width - margin.left - margin.right)).tickFormat(""));
+        .call(d3.axisLeft(y).ticks(compact ? 3 : 4).tickSize(-(width - margin.left - margin.right)).tickFormat(""));
     svg.append("g")
         .attr("class", "chart-axis")
         .attr("transform", `translate(0,${height - margin.bottom})`)
-        .call(d3.axisBottom(x).ticks(5).tickFormat(d3.utcFormat("%H:%M:%S")));
+        .call(d3.axisBottom(x).ticks(compact ? 3 : 5).tickFormat(d3.utcFormat("%H:%M:%S")));
     svg.append("g")
         .attr("class", "chart-axis")
         .attr("transform", `translate(${margin.left},0)`)
-        .call(d3.axisLeft(y).ticks(4));
+        .call(d3.axisLeft(y).ticks(compact ? 3 : 4));
 
     series.forEach(([, values], index) => {
         svg.append("path")
