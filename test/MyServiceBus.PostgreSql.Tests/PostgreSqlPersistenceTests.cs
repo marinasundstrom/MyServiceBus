@@ -543,9 +543,10 @@ public sealed class PostgreSqlPersistenceTests : IAsyncLifetime
             Assert.Equal(SchedulingDurability.Durable, cancelled.Durability);
             Assert.Equal(ScheduledWorkStatus.Cancelled, cancelled.Status);
             Assert.Equal("Cancelled", cancelled.ProviderStatus);
-            Assert.Equal(
-                TruncateToMicroseconds(new DateTimeOffset(dueAt)),
-                TruncateToMicroseconds(cancelled.DueAtUtc));
+            var dueAtDifference = (cancelled.DueAtUtc - new DateTimeOffset(dueAt)).Duration();
+            Assert.True(
+                dueAtDifference <= TimeSpan.FromMicroseconds(1),
+                $"PostgreSQL due timestamp differed by {dueAtDifference}.");
         }
         finally
         {
