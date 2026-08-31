@@ -174,9 +174,24 @@ public sealed class PostgreSqlJobProcessor
     private async Task Execute(Lease lease, CancellationToken stoppingToken)
     {
         var descriptor = consumers.Get(lease.JobTypeName);
-        await descriptor.Concurrency.WaitAsync(stoppingToken);
+        var acquired = false;
         try
         {
+            while (!acquired)
+            {
+                acquired = await descriptor.Concurrency.WaitAsync(options.HeartbeatInterval, stoppingToken);
+                if (!acquired && await RenewLease(lease.JobId, stoppingToken))
+                {
+                    await Finish(
+                        lease,
+                        JobStatus.Cancelled,
+                        JobAttemptStatus.Cancelled,
+                        null,
+                        stoppingToken);
+                    return;
+                }
+            }
+
             var job = Deserialize(lease, descriptor.JobType);
             using var requestedCancellation = new CancellationTokenSource();
             using var timeout = new CancellationTokenSource(TimeSpan.FromMilliseconds(lease.TimeoutMilliseconds));
@@ -237,7 +252,8 @@ public sealed class PostgreSqlJobProcessor
         }
         finally
         {
-            descriptor.Concurrency.Release();
+            if (acquired)
+                descriptor.Concurrency.Release();
         }
     }
 

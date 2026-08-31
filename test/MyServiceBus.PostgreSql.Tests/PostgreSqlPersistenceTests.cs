@@ -356,6 +356,46 @@ public sealed class PostgreSqlPersistenceTests : IAsyncLifetime
         Assert.Equal(1, await CountRecurringOutboxRecords(javaService, javaSchedule));
     }
 
+    [CrossLanguageFact]
+    public async Task Csharp_and_Java_execute_each_others_durable_tracked_jobs()
+    {
+        const string csharpService = "tracked-job-csharp-to-java";
+        using (var csharp = CreateCrossLanguageTrackedJobServices(
+            csharpService,
+            new CrossLanguageTrackedJobRecorder()))
+        {
+            await csharp.GetRequiredService<IJobClient>()
+                .Submit(new CrossLanguageTrackedJob("csharp"));
+        }
+        using (var java = StartJavaRecurringPeer(
+            "postgres-job-process",
+            csharpService,
+            "unused",
+            DateTimeOffset.UtcNow))
+        {
+            await WaitForJavaOutput(java, "PROCESSED:1:csharp", TimeSpan.FromMinutes(2));
+        }
+
+        const string javaService = "tracked-job-java-to-csharp";
+        using (var java = StartJavaRecurringPeer(
+            "postgres-job-submit",
+            javaService,
+            "java",
+            DateTimeOffset.UtcNow))
+        {
+            await WaitForJavaOutput(java, "SUBMITTED", TimeSpan.FromMinutes(2));
+        }
+        var recorder = new CrossLanguageTrackedJobRecorder();
+        using var recovered = CreateCrossLanguageTrackedJobServices(javaService, recorder);
+        Assert.Equal(
+            1,
+            await recovered.GetRequiredService<PostgreSqlJobProcessor>().ProcessDueAsync());
+        Assert.Equal("java", recorder.Origin);
+        Assert.Equal(
+            JobStatus.Completed,
+            Assert.Single(await recovered.GetRequiredService<IJobSource>().GetSnapshotAsync(10)).Status);
+    }
+
     [Fact]
     public async Task Scoped_bus_endpoints_capture_messages_in_application_transaction()
     {
@@ -742,6 +782,23 @@ public sealed class PostgreSqlPersistenceTests : IAsyncLifetime
         return services.BuildServiceProvider();
     }
 
+    private ServiceProvider CreateCrossLanguageTrackedJobServices(
+        string serviceName,
+        CrossLanguageTrackedJobRecorder recorder)
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton(dataSource);
+        services.AddSingleton(recorder);
+        services.AddServiceBus(configurator =>
+        {
+            configurator.AddJobConsumer<CrossLanguageTrackedJobConsumer, CrossLanguageTrackedJob>(
+                options => options.SetJobTypeName("cross-language-job"));
+            configurator.UsingMediator();
+        });
+        services.AddBuiltInJobsWithPostgreSql(serviceName);
+        return services.BuildServiceProvider();
+    }
+
     private async Task<long> CountRecurringOutboxRecords(string serviceName, string scheduleId)
     {
         await using var command = dataSource.CreateCommand("""
@@ -878,6 +935,23 @@ public sealed class PostgreSqlPersistenceTests : IAsyncLifetime
         public int Attempts => Volatile.Read(ref attempts);
 
         public void IncrementAttempts() => Interlocked.Increment(ref attempts);
+    }
+
+    private sealed record CrossLanguageTrackedJob(string Origin);
+
+    private sealed class CrossLanguageTrackedJobConsumer(CrossLanguageTrackedJobRecorder recorder)
+        : IJobConsumer<CrossLanguageTrackedJob>
+    {
+        public Task Run(JobContext<CrossLanguageTrackedJob> context)
+        {
+            recorder.Origin = context.Job.Origin;
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class CrossLanguageTrackedJobRecorder
+    {
+        public string? Origin { get; set; }
     }
 
     private sealed class CapturingTransportFactory : ITransportFactory
