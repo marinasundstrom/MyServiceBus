@@ -2,7 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace MyServiceBus;
 
-internal interface IJobConsumerDescriptor
+public interface IRegisteredJobConsumer
 {
     Type JobType { get; }
 
@@ -15,7 +15,7 @@ internal interface IJobConsumerDescriptor
     Task Run(IServiceProvider serviceProvider, JobExecutionContext context);
 }
 
-internal sealed class JobConsumerDescriptor<TConsumer, TJob> : IJobConsumerDescriptor
+internal sealed class JobConsumerDescriptor<TConsumer, TJob> : IRegisteredJobConsumer
     where TConsumer : class, IJobConsumer<TJob>
     where TJob : class
 {
@@ -41,20 +41,40 @@ internal sealed class JobConsumerDescriptor<TConsumer, TJob> : IJobConsumerDescr
     }
 }
 
-internal sealed class JobConsumerRegistry
+public interface IJobConsumerRegistry
 {
-    private readonly Dictionary<Type, IJobConsumerDescriptor> descriptors = [];
+    IRegisteredJobConsumer Get(Type jobType);
+
+    IRegisteredJobConsumer Get(string jobTypeName);
+}
+
+internal sealed class JobConsumerRegistry : IJobConsumerRegistry
+{
+    private readonly Dictionary<Type, IRegisteredJobConsumer> descriptors = [];
+    private readonly Dictionary<string, IRegisteredJobConsumer> descriptorsByName =
+        new(StringComparer.Ordinal);
 
     public void Add<TConsumer, TJob>(JobConsumerOptions options)
         where TConsumer : class, IJobConsumer<TJob>
         where TJob : class
     {
-        if (!descriptors.TryAdd(typeof(TJob), new JobConsumerDescriptor<TConsumer, TJob>(options)))
+        var descriptor = new JobConsumerDescriptor<TConsumer, TJob>(options);
+        if (descriptors.ContainsKey(typeof(TJob)))
             throw new InvalidOperationException($"A job consumer is already registered for {typeof(TJob)}.");
+        if (descriptorsByName.ContainsKey(descriptor.JobTypeName))
+            throw new InvalidOperationException($"A job consumer is already registered for job type name '{descriptor.JobTypeName}'.");
+
+        descriptors.Add(typeof(TJob), descriptor);
+        descriptorsByName.Add(descriptor.JobTypeName, descriptor);
     }
 
-    public IJobConsumerDescriptor Get(Type jobType) =>
+    public IRegisteredJobConsumer Get(Type jobType) =>
         descriptors.TryGetValue(jobType, out var descriptor)
             ? descriptor
             : throw new InvalidOperationException($"No job consumer is registered for {jobType}.");
+
+    public IRegisteredJobConsumer Get(string jobTypeName) =>
+        descriptorsByName.TryGetValue(jobTypeName, out var descriptor)
+            ? descriptor
+            : throw new InvalidOperationException($"No job consumer is registered for job type name '{jobTypeName}'.");
 }

@@ -6,16 +6,6 @@ import java.util.concurrent.CompletionStage;
 
 import com.myservicebus.tasks.CancellationToken;
 
-record JobExecutionContext(
-        UUID jobId,
-        UUID attemptId,
-        int retryAttempt,
-        Object job,
-        java.time.Instant startedAtUtc,
-        CancellationToken cancellationToken,
-        java.util.function.Consumer<JobProgress> progress) {
-}
-
 final class InMemoryJobContext<TJob> implements JobContext<TJob> {
     private final JobExecutionContext context;
     private final TJob job;
@@ -63,4 +53,3 @@ final class InMemoryJobContext<TJob> implements JobContext<TJob> {
         return java.util.concurrent.CompletableFuture.completedFuture(null);
     }
 }
-

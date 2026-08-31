@@ -6,8 +6,8 @@ import java.util.concurrent.Semaphore;
 
 import com.myservicebus.di.ServiceProvider;
 
-final class JobConsumerRegistry {
-    static final class Descriptor {
+public final class JobConsumerRegistry {
+    public static final class Descriptor {
         private final Class<?> consumerType;
         private final Class<?> jobType;
         private final JobConsumerOptions options;
@@ -22,24 +22,24 @@ final class JobConsumerRegistry {
             concurrency = new Semaphore(options.getConcurrentJobLimit());
         }
 
-        Class<?> jobType() {
+        public Class<?> jobType() {
             return jobType;
         }
 
-        JobConsumerOptions options() {
+        public JobConsumerOptions options() {
             return options;
         }
 
-        String jobTypeName() {
+        public String jobTypeName() {
             return jobTypeName;
         }
 
-        Semaphore concurrency() {
+        public Semaphore concurrency() {
             return concurrency;
         }
 
         @SuppressWarnings("unchecked")
-        java.util.concurrent.CompletionStage<Void> run(ServiceProvider services, JobExecutionContext context)
+        public java.util.concurrent.CompletionStage<Void> run(ServiceProvider services, JobExecutionContext context)
                 throws Exception {
             JobConsumer<Object> consumer = (JobConsumer<Object>) services.getRequiredService(consumerType);
             return consumer.run(new InMemoryJobContext<>(context, context.job()));
@@ -47,20 +47,35 @@ final class JobConsumerRegistry {
     }
 
     private final Map<Class<?>, Descriptor> descriptors = new ConcurrentHashMap<>();
+    private final Map<String, Descriptor> descriptorsByName = new ConcurrentHashMap<>();
 
     void add(Class<?> consumerType, Class<?> jobType, JobConsumerOptions options) {
         Descriptor descriptor = new Descriptor(consumerType, jobType, options);
-        if (descriptors.putIfAbsent(jobType, descriptor) != null) {
+        if (descriptors.containsKey(jobType)) {
             throw new IllegalStateException("A job consumer is already registered for " + jobType.getName());
         }
+        if (descriptorsByName.containsKey(descriptor.jobTypeName())) {
+            throw new IllegalStateException(
+                    "A job consumer is already registered for job type name '" + descriptor.jobTypeName() + "'");
+        }
+
+        descriptors.put(jobType, descriptor);
+        descriptorsByName.put(descriptor.jobTypeName(), descriptor);
     }
 
-    Descriptor get(Class<?> jobType) {
+    public Descriptor get(Class<?> jobType) {
         Descriptor descriptor = descriptors.get(jobType);
         if (descriptor == null) {
             throw new IllegalStateException("No job consumer is registered for " + jobType.getName());
         }
         return descriptor;
     }
-}
 
+    public Descriptor get(String jobTypeName) {
+        Descriptor descriptor = descriptorsByName.get(jobTypeName);
+        if (descriptor == null) {
+            throw new IllegalStateException("No job consumer is registered for job type name '" + jobTypeName + "'");
+        }
+        return descriptor;
+    }
+}

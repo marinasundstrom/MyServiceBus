@@ -303,6 +303,7 @@ public class BusRegistrationConfigurator : IBusRegistrationConfigurator
 
         Services.AddSingleton(_topology);
         Services.AddSingleton(jobConsumers);
+        Services.AddSingleton<IJobConsumerRegistry>(provider => provider.GetRequiredService<JobConsumerRegistry>());
         Services.AddSingleton<IBusTopology>(_ => _topology);
         Services.AddSingleton<IBusHookDispatcher, BusHookDispatcher>();
         Services.AddSingleton<IRetryObserver, BusHookRetryObserver>();

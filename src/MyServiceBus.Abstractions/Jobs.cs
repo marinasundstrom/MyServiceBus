@@ -173,3 +173,15 @@ public interface IJobClient
         CancellationToken cancellationToken = default);
 }
 
+/// <summary>
+/// Provider integration boundary for tracked job storage and execution.
+/// Applications use <see cref="IJobClient"/> instead.
+/// </summary>
+public interface IJobProvider : IJobClient, IJobSource
+{
+    string ProviderName { get; }
+
+    SchedulingDurability Durability { get; }
+
+    SchedulingPlacement Placement { get; }
+}

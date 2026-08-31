@@ -22,7 +22,7 @@ import com.myservicebus.tasks.CancellationToken;
 import com.myservicebus.tasks.CancellationRegistration;
 import com.myservicebus.tasks.CancellationTokenSource;
 
-final class InMemoryJobService implements JobClient, JobSource {
+final class InMemoryJobService implements JobProvider {
     private static final class Entry {
         final UUID jobId;
         final Object job;
@@ -62,8 +62,18 @@ final class InMemoryJobService implements JobClient, JobSource {
     }
 
     @Override
-    public String getProvider() {
+    public String getProviderName() {
         return "in-memory";
+    }
+
+    @Override
+    public SchedulingDurability getDurability() {
+        return SchedulingDurability.VOLATILE;
+    }
+
+    @Override
+    public SchedulingPlacement getPlacement() {
+        return SchedulingPlacement.PROCESS_LOCAL;
     }
 
     @Override
@@ -332,9 +342,9 @@ final class InMemoryJobService implements JobClient, JobSource {
                     entry.jobId,
                     entry.descriptor.jobTypeName(),
                     entry.status,
-                    "in-memory",
-                    SchedulingDurability.VOLATILE,
-                    SchedulingPlacement.PROCESS_LOCAL,
+                    getProviderName(),
+                    getDurability(),
+                    getPlacement(),
                     entry.submittedAtUtc,
                     entry.scheduledForUtc,
                     entry.startedAtUtc,

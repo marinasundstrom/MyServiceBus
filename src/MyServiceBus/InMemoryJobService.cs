@@ -3,7 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace MyServiceBus;
 
-internal sealed class JobExecutionContext
+public sealed class JobExecutionContext
 {
     private readonly Action<JobProgress> setProgress;
     private readonly DateTimeOffset startedAtUtc;
@@ -74,13 +74,13 @@ internal sealed class InMemoryJobContext<TJob> : JobContext<TJob>
         context.SetProgress(value, limit, cancellationToken);
 }
 
-internal sealed class InMemoryJobService : IJobClient, IJobSource
+internal sealed class InMemoryJobService : IJobProvider
 {
     private sealed class Entry
     {
         public required Guid JobId { get; init; }
         public required object Job { get; init; }
-        public required IJobConsumerDescriptor Descriptor { get; init; }
+        public required IRegisteredJobConsumer Descriptor { get; init; }
         public required DateTimeOffset SubmittedAtUtc { get; init; }
         public DateTimeOffset? ScheduledForUtc { get; init; }
         public JobStatus Status { get; set; }
@@ -109,7 +109,13 @@ internal sealed class InMemoryJobService : IJobClient, IJobSource
         this.delayScheduler = delayScheduler;
     }
 
-    public string Provider => "in-memory";
+    public string ProviderName => "in-memory";
+
+    public SchedulingDurability Durability => SchedulingDurability.Volatile;
+
+    public SchedulingPlacement Placement => SchedulingPlacement.ProcessLocal;
+
+    string IJobSource.Provider => ProviderName;
 
     public bool Authoritative => true;
 
@@ -398,7 +404,7 @@ internal sealed class InMemoryJobService : IJobClient, IJobSource
     private static JobSubmissionReceipt CreateReceipt(Entry entry) =>
         new(entry.JobId, entry.Status, entry.SubmittedAtUtc, entry.ScheduledForUtc);
 
-    private static JobState CreateState(Entry entry)
+    private JobState CreateState(Entry entry)
     {
         lock (entry.Sync)
         {
@@ -406,9 +412,9 @@ internal sealed class InMemoryJobService : IJobClient, IJobSource
                 entry.JobId,
                 entry.Descriptor.JobTypeName,
                 entry.Status,
-                "in-memory",
-                SchedulingDurability.Volatile,
-                SchedulingPlacement.ProcessLocal,
+                ProviderName,
+                Durability,
+                Placement,
                 entry.SubmittedAtUtc,
                 entry.ScheduledForUtc,
                 entry.StartedAtUtc,
