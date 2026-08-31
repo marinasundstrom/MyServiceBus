@@ -543,7 +543,9 @@ public sealed class PostgreSqlPersistenceTests : IAsyncLifetime
             Assert.Equal(SchedulingDurability.Durable, cancelled.Durability);
             Assert.Equal(ScheduledWorkStatus.Cancelled, cancelled.Status);
             Assert.Equal("Cancelled", cancelled.ProviderStatus);
-            Assert.Equal(dueAt, cancelled.DueAtUtc.UtcDateTime);
+            Assert.Equal(
+                TruncateToMicroseconds(new DateTimeOffset(dueAt)),
+                TruncateToMicroseconds(cancelled.DueAtUtc));
         }
         finally
         {
