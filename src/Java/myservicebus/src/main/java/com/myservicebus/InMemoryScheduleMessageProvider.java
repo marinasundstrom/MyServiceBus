@@ -11,34 +11,34 @@ import java.util.function.Supplier;
 public final class InMemoryScheduleMessageProvider implements ScheduleMessageProvider {
     private final PublishEndpoint publishEndpoint;
     private final SendEndpointProvider sendEndpointProvider;
-    private final JobScheduler jobScheduler;
+    private final LocalDelayScheduler delayScheduler;
     private final InMemoryScheduledWorkSource source;
     private final Set<ScheduledWorkObserver> observers;
 
     public InMemoryScheduleMessageProvider(
             PublishEndpoint publishEndpoint,
             SendEndpointProvider sendEndpointProvider,
-            JobScheduler jobScheduler) {
-        this(publishEndpoint, sendEndpointProvider, jobScheduler, new InMemoryScheduledWorkSource(), Set.of());
+            LocalDelayScheduler delayScheduler) {
+        this(publishEndpoint, sendEndpointProvider, delayScheduler, new InMemoryScheduledWorkSource(), Set.of());
     }
 
     public InMemoryScheduleMessageProvider(
             PublishEndpoint publishEndpoint,
             SendEndpointProvider sendEndpointProvider,
-            JobScheduler jobScheduler,
+            LocalDelayScheduler delayScheduler,
             Set<ScheduledWorkObserver> observers) {
-        this(publishEndpoint, sendEndpointProvider, jobScheduler, new InMemoryScheduledWorkSource(), observers);
+        this(publishEndpoint, sendEndpointProvider, delayScheduler, new InMemoryScheduledWorkSource(), observers);
     }
 
     public InMemoryScheduleMessageProvider(
             PublishEndpoint publishEndpoint,
             SendEndpointProvider sendEndpointProvider,
-            JobScheduler jobScheduler,
+            LocalDelayScheduler delayScheduler,
             InMemoryScheduledWorkSource source,
             Set<ScheduledWorkObserver> observers) {
         this.publishEndpoint = publishEndpoint;
         this.sendEndpointProvider = sendEndpointProvider;
-        this.jobScheduler = jobScheduler;
+        this.delayScheduler = delayScheduler;
         this.source = source;
         this.observers = Set.copyOf(observers);
     }
@@ -59,7 +59,7 @@ public final class InMemoryScheduleMessageProvider implements ScheduleMessagePro
             T message,
             CancellationToken cancellationToken) {
         CompletableFuture<UUID> tokenReady = new CompletableFuture<>();
-        return jobScheduler.schedule(scheduledTime, token -> tokenReady.thenCompose(tokenId ->
+        return delayScheduler.schedule(scheduledTime, token -> tokenReady.thenCompose(tokenId ->
                         execute(tokenId, token, () -> publishEndpoint.publish(message, token))), cancellationToken)
                 .thenApply(tokenId -> {
                     trackPending(tokenId, scheduledTime, message.getClass(), "Publish", null);
@@ -75,7 +75,7 @@ public final class InMemoryScheduleMessageProvider implements ScheduleMessagePro
             T message,
             CancellationToken cancellationToken) {
         CompletableFuture<UUID> tokenReady = new CompletableFuture<>();
-        return jobScheduler.schedule(scheduledTime, token -> tokenReady.thenCompose(tokenId ->
+        return delayScheduler.schedule(scheduledTime, token -> tokenReady.thenCompose(tokenId ->
                         execute(tokenId, token, () -> {
                             SendEndpoint endpoint = sendEndpointProvider.getSendEndpoint(destinationAddress);
                             return endpoint.send(message, token);
@@ -89,7 +89,7 @@ public final class InMemoryScheduleMessageProvider implements ScheduleMessagePro
 
     @Override
     public CompletionStage<ScheduleCancellationResult> cancel(UUID tokenId, CancellationToken cancellationToken) {
-        return jobScheduler.cancel(tokenId).thenApply(cancelled -> {
+        return delayScheduler.cancel(tokenId).thenApply(cancelled -> {
             if (!cancelled) {
                 return ScheduleCancellationResult.NOT_FOUND;
             }

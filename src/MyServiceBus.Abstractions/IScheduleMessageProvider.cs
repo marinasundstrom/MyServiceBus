@@ -7,7 +7,7 @@ public enum ScheduleMessageProviderDurability
 }
 
 /// <summary>
-/// Provides message-aware scheduling. Unlike <see cref="IJobScheduler"/>, implementations receive
+/// Provides message-aware scheduling. Unlike <see cref="ILocalDelayScheduler"/>, implementations receive
 /// the delivery intent and can serialize or persist it for execution after a process restart.
 /// </summary>
 public interface IScheduleMessageProvider

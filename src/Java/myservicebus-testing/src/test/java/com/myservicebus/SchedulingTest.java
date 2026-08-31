@@ -60,7 +60,7 @@ public class SchedulingTest {
         }
     }
 
-    static class ManualJobScheduler implements JobScheduler {
+    static class ManualLocalDelayScheduler implements LocalDelayScheduler {
         private final Map<UUID, Function<CancellationToken, CompletionStage<Void>>> jobs = new HashMap<>();
 
         @Override
@@ -121,7 +121,7 @@ public class SchedulingTest {
                     }
                 },
                 uri -> harness.getSendEndpoint(uri),
-                new DefaultJobScheduler());
+                new DefaultLocalDelayScheduler());
         Instant start = Instant.now();
         Duration delay = Duration.ofMillis(100);
         scheduler.scheduleSend("loopback://localhost/queue", "hi", delay);
@@ -166,7 +166,7 @@ public class SchedulingTest {
         });
         harness.start().join();
 
-        JobScheduler immediate = new JobScheduler() {
+        LocalDelayScheduler immediate = new LocalDelayScheduler() {
             
             public CompletionStage<UUID> schedule(Instant time, Function<CancellationToken, CompletionStage<Void>> cb, CancellationToken token) {
                 cb.apply(token);
@@ -202,7 +202,7 @@ public class SchedulingTest {
         InMemoryTestHarness harness = new InMemoryTestHarness();
         harness.registerHandler(String.class, ctx -> CompletableFuture.completedFuture(null));
         harness.start().join();
-        ManualJobScheduler manual = new ManualJobScheduler();
+        ManualLocalDelayScheduler manual = new ManualLocalDelayScheduler();
         MessageScheduler scheduler = new MessageSchedulerImpl(
                 new PublishEndpoint() {
                     @Override
@@ -233,7 +233,7 @@ public class SchedulingTest {
         harness.registerHandler(String.class, ctx -> CompletableFuture.completedFuture(null));
         harness.start().join();
 
-        ManualJobScheduler manual = new ManualJobScheduler();
+        ManualLocalDelayScheduler manual = new ManualLocalDelayScheduler();
         MessageScheduler scheduler = new MessageSchedulerImpl(
                 new PublishEndpoint() {
                     @Override
@@ -255,7 +255,7 @@ public class SchedulingTest {
 
     @Test
     void inMemoryScheduledWorkIsSharedAcrossApplicationScopes() {
-        ManualJobScheduler manual = new ManualJobScheduler();
+        ManualLocalDelayScheduler manual = new ManualLocalDelayScheduler();
         InMemoryScheduledWorkSource source = new InMemoryScheduledWorkSource();
         List<ScheduledWorkState> observed = new java.util.concurrent.CopyOnWriteArrayList<>();
         ScheduledWorkObserver observer = observed::add;

@@ -15,8 +15,8 @@ public class MessageSchedulerImpl implements MessageScheduler {
 
     public MessageSchedulerImpl(PublishEndpoint publishEndpoint,
             SendEndpointProvider sendEndpointProvider,
-            JobScheduler jobScheduler) {
-        this(new InMemoryScheduleMessageProvider(publishEndpoint, sendEndpointProvider, jobScheduler));
+            LocalDelayScheduler delayScheduler) {
+        this(new InMemoryScheduleMessageProvider(publishEndpoint, sendEndpointProvider, delayScheduler));
     }
 
     @Override

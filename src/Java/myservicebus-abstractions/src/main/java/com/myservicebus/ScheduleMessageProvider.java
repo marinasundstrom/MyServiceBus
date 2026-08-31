@@ -6,7 +6,7 @@ import java.util.UUID;
 import java.util.concurrent.CompletionStage;
 
 /**
- * Provides message-aware scheduling. Unlike {@link JobScheduler}, implementations receive the
+ * Provides message-aware scheduling. Unlike {@link LocalDelayScheduler}, implementations receive the
  * delivery intent and can serialize or persist it for execution after a process restart.
  */
 public interface ScheduleMessageProvider {

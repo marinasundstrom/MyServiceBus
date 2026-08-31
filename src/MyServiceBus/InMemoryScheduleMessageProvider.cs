@@ -4,37 +4,37 @@ public sealed class InMemoryScheduleMessageProvider : IScheduleMessageProvider
 {
     private readonly IPublishEndpoint publishEndpoint;
     private readonly ISendEndpointProvider sendEndpointProvider;
-    private readonly IJobScheduler jobScheduler;
+    private readonly ILocalDelayScheduler delayScheduler;
     private readonly InMemoryScheduledWorkSource source;
     private readonly IReadOnlyList<IScheduledWorkObserver> observers;
 
     public InMemoryScheduleMessageProvider(
         IPublishEndpoint publishEndpoint,
         ISendEndpointProvider sendEndpointProvider,
-        IJobScheduler jobScheduler)
-        : this(publishEndpoint, sendEndpointProvider, jobScheduler, new InMemoryScheduledWorkSource(), [])
+        ILocalDelayScheduler delayScheduler)
+        : this(publishEndpoint, sendEndpointProvider, delayScheduler, new InMemoryScheduledWorkSource(), [])
     {
     }
 
     public InMemoryScheduleMessageProvider(
         IPublishEndpoint publishEndpoint,
         ISendEndpointProvider sendEndpointProvider,
-        IJobScheduler jobScheduler,
+        ILocalDelayScheduler delayScheduler,
         IEnumerable<IScheduledWorkObserver>? observers)
-        : this(publishEndpoint, sendEndpointProvider, jobScheduler, new InMemoryScheduledWorkSource(), observers ?? [])
+        : this(publishEndpoint, sendEndpointProvider, delayScheduler, new InMemoryScheduledWorkSource(), observers ?? [])
     {
     }
 
     public InMemoryScheduleMessageProvider(
         IPublishEndpoint publishEndpoint,
         ISendEndpointProvider sendEndpointProvider,
-        IJobScheduler jobScheduler,
+        ILocalDelayScheduler delayScheduler,
         InMemoryScheduledWorkSource source,
         IEnumerable<IScheduledWorkObserver> observers)
     {
         this.publishEndpoint = publishEndpoint;
         this.sendEndpointProvider = sendEndpointProvider;
-        this.jobScheduler = jobScheduler;
+        this.delayScheduler = delayScheduler;
         this.source = source;
         this.observers = observers.ToArray();
     }
@@ -50,7 +50,7 @@ public sealed class InMemoryScheduleMessageProvider : IScheduleMessageProvider
         where T : class
     {
         var tokenReady = new TaskCompletionSource<Guid>(TaskCreationOptions.RunContinuationsAsynchronously);
-        var tokenId = await jobScheduler.Schedule(
+        var tokenId = await delayScheduler.Schedule(
             scheduledTime,
             async ct =>
             {
@@ -81,7 +81,7 @@ public sealed class InMemoryScheduleMessageProvider : IScheduleMessageProvider
             }).ConfigureAwait(false);
         }
 
-        var tokenId = await jobScheduler.Schedule(scheduledTime, Callback, cancellationToken);
+        var tokenId = await delayScheduler.Schedule(scheduledTime, Callback, cancellationToken);
         TrackPending(tokenId, scheduledTime, typeof(T), "Send", destinationAddress.ToString());
         tokenReady.SetResult(tokenId);
         return new ScheduledMessageHandle(tokenId, scheduledTime);
@@ -89,7 +89,7 @@ public sealed class InMemoryScheduleMessageProvider : IScheduleMessageProvider
 
     public async Task<ScheduleCancellationResult> Cancel(Guid tokenId, CancellationToken cancellationToken = default)
     {
-        if (!await jobScheduler.Cancel(tokenId))
+        if (!await delayScheduler.Cancel(tokenId))
             return ScheduleCancellationResult.NotFound;
 
         if (source.TryRemove(tokenId, out var state))

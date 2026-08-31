@@ -1384,7 +1384,7 @@ Registration order defines wrapping order. The first filter is outermost; code b
 
 ### Scheduling Messages
 
-Delay message delivery by setting the scheduled enqueue time on the send or publish context or by using the `IMessageScheduler` service. `IMessageScheduler` returns a `ScheduledMessageHandle` that can be used to cancel a scheduled message when the selected provider supports cancellation. The default provider is volatile and process-bound. Durable integrations implement the message-aware `IScheduleMessageProvider`/`ScheduleMessageProvider`; callback-only `IJobScheduler`/`JobScheduler` implementations cannot survive restart.
+Delay message delivery by setting the scheduled enqueue time on the send or publish context or by using the `IMessageScheduler` service. `IMessageScheduler` returns a `ScheduledMessageHandle` that can be used to cancel a scheduled message when the selected provider supports cancellation. The default provider is volatile and process-bound. Durable integrations implement the message-aware `IScheduleMessageProvider`/`ScheduleMessageProvider`; callback-only `ILocalDelayScheduler`/`LocalDelayScheduler` implementations cannot survive restart.
 
 #### C#
 
@@ -1419,7 +1419,7 @@ scheduler.scheduleSend("queue:submit-order", Instant.now().plusSeconds(30), new 
 
 ##### Custom in-process timers
 
-`AddServiceBus` registers a simple timer-based `DefaultJobScheduler`. Replace `IJobScheduler`/`JobScheduler` to control process-local timing or deterministic tests. Use `IScheduleMessageProvider`/`ScheduleMessageProvider` for a durable scheduler such as a future Quartz.NET adapter because a callback cannot be persisted safely.
+`AddServiceBus` registers a simple timer-based `DefaultLocalDelayScheduler`. Replace `ILocalDelayScheduler`/`LocalDelayScheduler` to control process-local timing or deterministic tests. Use `IScheduleMessageProvider`/`ScheduleMessageProvider` for durable scheduling because a callback cannot be persisted safely.
 
 Register a message-aware provider before `AddServiceBus` so the default provider does not replace it.
 
