@@ -251,6 +251,12 @@ It does not connect to monitored applications or own the canonical monitoring st
 
 The same query API can later support a CLI, tests, other dashboards, or support tooling.
 
+The dashboard follows a directed information hierarchy. The landing page contains only compact, broadly actionable health and throughput signals; application, endpoint, flow, failure, and delivery views own their detailed breakdowns. Explanatory labels should make messaging concepts understandable without hiding exact engineering data from experienced operators. The layout must remain useful on phone-sized screens as well as desktop displays.
+
+Graphs and maps are reusable dashboard components and a primary way to explain live behavior. Overview variants stay compact, while focused views provide full scales, dimensions, labels, and tabular alternatives. Streamed updates preserve graph position, selection, and zoom context where possible.
+
+Known overview widgets have stable identities so a future versioned JSON layout can arrange an allowlisted component catalog. The first dashboard keeps one curated default and exposes no layout configuration. Future domains such as sagas should add focused views and query models first, promoting only a concise actionable signal to the landing page.
+
 ## Identity And Registration
 
 ### Resource Identity
@@ -423,6 +429,7 @@ The dashboard uses a separate read-only API:
 
 - `GET /api/monitoring/v1/applications`
 - `GET /api/monitoring/v1/applications/{application}/instances`
+- `GET /api/monitoring/v1/endpoints`
 - `GET /api/monitoring/v1/instances/{instanceId}/metadata`
 - `GET /api/monitoring/v1/metrics`
 - `GET /api/monitoring/v1/metrics/timeseries`
@@ -555,11 +562,13 @@ The sandbox prototype should show:
 
 - discovered applications and online/offline instances
 - bus, endpoint, consumer, handler, and message metadata
+- endpoint availability and current windowed activity as a focused drill-down
 - live send, publish, receive, consume, retry, and failure rates
 - bounded recent retries and failures
 - configured and observed message flows
 - monitoring gaps
 - links to traces through a configured dashboard telemetry provider
+- compact overview graphs plus full graph and map views with streamed updates
 
 It should not initially include broker actions, alerting, complete trace viewing, message bodies, automatic discovery integrations, or authentication administration.
 

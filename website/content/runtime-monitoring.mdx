@@ -1,5 +1,4 @@
 import Link from 'next/link';
-import Image from 'next/image';
 import CodeViewer from '../app/components/CodeViewer';
 import LanguageTabs from '../app/components/LanguageTabs';
 
@@ -32,8 +31,6 @@ export const exporterInstall = {
   java: `implementation 'io.github.marinasundstrom.myservicebus:myservicebus-monitoring:0.1.0-preview.7'`,
 };
 
-export const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? '';
-
 <p className="docs-kicker">Optional addon · Experimental</p>
 
 # Inspect the bus through an optional monitoring stack.
@@ -45,29 +42,25 @@ export const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? '';
   <p>The end-to-end stack is ready for local development and controlled evaluation. It is not yet a production observability backend: storage, authentication, configurable retention, broker metrics, and automated scaling advice remain future work.</p>
 </div>
 
-## Dashboard preview
+## A directed dashboard
 
-The standalone dashboard supports persisted light, dark, and system theme preferences. Its live overview keeps replica health, throughput, flow, and failures in one scaling-oriented view.
+The landing page is a concise answer to “does this system look healthy?” It shows application and replica availability, messages handled per second, recent failures, monitoring completeness, a compact live throughput graph, and current concerns. Detailed engineering data stays one click away instead of competing for the first viewport.
 
-<div className="dashboard-screenshots">
-  <figure>
-    <Image
-      src={`${basePath}/docs/runtime-monitoring-dashboard-dark.jpg`}
-      alt="MyServiceBus monitoring dashboard in dark theme with fictional Commerce applications"
-      width={1280}
-      height={720}
-    />
-    <figcaption>Dark theme</figcaption>
-  </figure>
-  <figure>
-    <Image
-      src={`${basePath}/docs/runtime-monitoring-dashboard-light.jpg`}
-      alt="MyServiceBus monitoring dashboard in light theme with fictional Commerce applications"
-      width={1280}
-      height={720}
-    />
-    <figcaption>Light theme</figcaption>
-  </figure>
+<ul className="check-list">
+  <li><strong>Applications</strong> compares replicas, load share, handling latency, retries, failures, and transports.</li>
+  <li><strong>Receive endpoints</strong> explains where messages arrive and shows availability, consumers, message types, addresses, throughput, retries, and failures.</li>
+  <li><strong>Throughput</strong> expands the overview sparkline into a streamed five-minute graph and per-application breakdown.</li>
+  <li><strong>Message flow</strong> uses an interactive D3 map to show observed application paths, with line weight and labels communicating throughput.</li>
+  <li><strong>Failures</strong> and <strong>Outbox</strong> keep diagnostic and delivery detail in focused operational views.</li>
+</ul>
+
+The same information hierarchy supports learning and operations: concepts use plain labels such as “messages handled,” while exact rates, endpoint addresses, retry counts, latency, and transport details remain available. Light, dark, and system themes persist across navigation. On phones, cards collapse, maps and graphs fit the viewport, navigation scrolls, and wide tables stay contained inside their panels.
+
+Graphs and maps are distinct reusable components, with compact overview and full drill-down forms. Future capabilities such as sagas can add their own focused views without turning the landing page into a catalog of every metric.
+
+<div className="callout">
+  <strong>Customization boundary</strong>
+  <p>Overview widgets already have stable identities for a future versioned JSON layout. The preview intentionally ships one curated default and does not expose dashboard customization yet.</p>
 </div>
 
 ## How it fits together
@@ -92,7 +85,7 @@ Monitoring is never part of message delivery. If the service is unavailable, mes
 
 <ul className="check-list">
   <li>Applications with automatically grouped replicas and optional resource labels</li>
-  <li>Bus addresses, endpoints, consumers, messages, and bindings</li>
+  <li>Receive-endpoint availability, replicas, consumers, messages, addresses, transports, and windowed activity</li>
   <li>Live throughput graphs, windowed rates, load share, and p95 consume latency</li>
   <li>Retries, failures, completeness, and observed cross-application flow</li>
   <li>Expandable failure metadata without capturing message bodies or arbitrary headers</li>
@@ -111,7 +104,7 @@ The prototype lets an operator compare per-replica consume rate, load share, p95
 
 ## Outbox dispatcher operations
 
-C# and Java delivery services treat embedded and standalone dispatchers as first-class runtime components. Per service partition and worker, the dashboard&apos;s Dispatcher operations view shows current backlog, oldest-undispatched age, dispatch throughput, failures, lost leases, cycle latency, and online state. This makes an undersized dispatcher fleet visible as a bottleneck and separates time waiting in an outbox from broker backlog and consumer processing time.
+C# and Java delivery services treat embedded and standalone dispatchers as first-class runtime components. Per service partition and worker, the dashboard&apos;s Outbox view shows current backlog, oldest-undispatched age, dispatch throughput, failures, lost leases, cycle latency, and online state. This makes an undersized dispatcher fleet visible as a bottleneck and separates time waiting in an outbox from broker backlog and consumer processing time.
 
 The collector receives bounded cycle observations from each service; it does not connect to application databases or mutate persisted records. Message bodies, arbitrary headers, record identities, connection details, and SQL remain outside the monitoring protocol. Inbox duplicate outcomes, cleanup progress, alerting, and durable monitoring history remain future work.
 

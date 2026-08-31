@@ -4,6 +4,7 @@ This changelog summarizes the bigger themes in the repository history rather tha
 
 ## Unreleased
 
+- Reorganized the monitoring dashboard around a concise responsive overview and focused application, endpoint, throughput, message-flow, failure, and outbox views; added first-class endpoint availability and activity projections, persistent theme navigation, and stable widget identities for future layout configuration.
 - Added an interactive D3 monitoring flow map with application health, throughput-weighted directional paths, stable streamed updates, neighbor highlighting, dragging, and zoom controls.
 - Reframed the public website for technical evaluation: the landing page now exposes pre-1.0, scope, and transport boundaries up front, while documentation pages lead with concise factual overviews and then focus on implementation, verified behavior, limitations, operational consequences, and alternatives.
 - Moved all public documentation prose into Markdown-compatible MDX sources while preserving the existing routes, interactive components, design, and copy; documentation route files are now thin presentation wrappers.
