@@ -59,9 +59,10 @@ body { margin: 0; min-height: 100vh; background: radial-gradient(circle at 15% 0
 .sidebar-brand strong { font-size: .96rem; }
 .sidebar-brand small { margin-top: 2px; color: var(--text-dim); font-size: .68rem; letter-spacing: .08em; text-transform: uppercase; }
 .sidebar nav { display: flex; flex-direction: column; gap: 3px; margin-top: 38px; }
-.sidebar nav a { padding: 10px 12px; border-radius: 8px; color: var(--text-muted); font-size: .82rem; font-weight: 650; text-decoration: none; }
+.sidebar nav a { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px; border-radius: 8px; color: var(--text-muted); font-size: .82rem; font-weight: 650; text-decoration: none; }
 .sidebar nav a:hover, .sidebar nav a:focus-visible, .sidebar nav a.active { outline: none; background: var(--surface-raised); color: var(--text); }
 .sidebar nav a.active { box-shadow: inset 3px 0 0 var(--accent); }
+.nav-badge { min-width: 1.55rem; padding: 2px 6px; border: 1px solid color-mix(in srgb, var(--danger) 50%, var(--border)); border-radius: 999px; background: var(--danger-surface); color: var(--danger); font-size: .65rem; font-variant-numeric: tabular-nums; line-height: 1.25; text-align: center; }
 .nav-label { margin: 22px 12px 6px; color: var(--text-dim); font-size: .65rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
 .nav-label:first-child { margin-top: 0; }
 .sidebar-note { margin: auto 8px 0; color: var(--text-dim); font-size: .7rem; line-height: 1.5; }

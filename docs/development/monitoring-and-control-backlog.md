@@ -35,10 +35,11 @@ One-time scheduled messages and recurring jobs are separate concepts.
 Alert evaluation should be shared across MyServiceBus observations, scheduler state, broker state, and other configured sources instead of being reimplemented by every provider.
 
 - Keep MyServiceBus collection focused on MyServiceBus data.
-- Evaluate cross-source thresholds and warning caps in a separate alerting service or similarly explicit boundary.
+- Treat rolling dashboard badges as navigational activity signals, not unread or acknowledged alerts.
+- Evaluate cross-source thresholds and warning caps in a separate alerting service with its own durable identity and lifecycle.
 - Expose alert state through the monitoring query plane for the dashboard.
 - Add notification providers independently; email can be exercised against a mock SMTP server.
-- Define freshness, missing-data, deduplication, suppression, recovery, and audit semantics before treating alerts as production-ready.
+- Define open, acknowledged, and resolved states together with ownership, notes, freshness, missing-data, deduplication, suppression, recovery, and audit semantics before treating alerts as production-ready.
 
 ## Privileged controls
 

@@ -202,6 +202,7 @@ The contract is versioned but remains preview. The `/v1` route and each ingest b
 | `POST` | `/recurring-jobs` | Replace one instance's authoritative recurring-definition snapshot |
 | `POST` | `/jobs` | Replace one instance's authoritative tracked-job and attempt snapshot |
 | `GET` | `/history` | Query storage durability, history availability, freshness, gaps, and retained-window coverage |
+| `GET` | `/summary?windowSeconds=60` | Query lightweight rolling navigation signals, job and outbox state, completeness, and freshness |
 | `GET` | `/applications` | Query application aggregates |
 | `GET` | `/instances?application=...` | Query application instances |
 | `GET` | `/endpoints?application=...&windowSeconds=60` | Query receive-endpoint topology, availability, and windowed activity |
@@ -218,6 +219,10 @@ The contract is versioned but remains preview. The `/v1` route and each ingest b
 
 All routes in the table are relative to `/api/monitoring/v1`. Ingest clients must register metadata before sending observations, heartbeats, or authoritative snapshots for that application-instance-bus identity. Successful writes return `202 Accepted`; invalid protocol data returns `400`, and writes for an unregistered identity return `404` or `409` as described by OpenAPI. An accepted snapshot replaces that identity's current view: omission from a successfully accepted snapshot means “not present now,” not “unknown historically.”
 
+`/summary` is the lightweight shell read model. It reports rolling failure and retry counts, affected applications, unhealthy outbox dispatchers, faulted and running tracked jobs, monitored and stale application counts, latest monitoring and observation timestamps, and whether the selected window is complete. Its response is cached for five seconds by the monitoring service so many dashboards share one projection. `CapturedAtUtc`, `WindowStartUtc`, and `WindowSeconds` make that bounded staleness explicit.
+
+The Failures navigation badge uses only the rolling failure count. It disappears as the window clears, displays `99+` rather than expanding indefinitely, and remains a link to the focused failure view. It is neither an unread count nor an alert and therefore has no acknowledgement state. Alert evaluation, thresholds, suppression, recovery, acknowledgement, and notification belong to the future alerting service rather than raw monitoring observations.
+
 The WebSocket route is documented here rather than in OpenAPI because it is an upgrade protocol, not an ordinary HTTP response. Connect to `/api/monitoring/v1/stream` and expect UTF-8 JSON text messages shaped as:
 
 ```json
@@ -231,7 +236,7 @@ Current invalidation types are `metadata_changed`, `observations_changed`, `sche
 
 Neither interface is a control plane. The query API cannot cancel jobs, purge queues, or mutate a broker, and the ingest API is not an application command endpoint. The preview service has no built-in authentication yet, so custom dashboards and exporters must only connect over a trusted deployment boundary.
 
-The active read model retains metric buckets for 15 minutes and bounds its recent observation buffer. A `Complete` flag on window summaries reports whether the exporter has declared dropped observations. The history summary also reports whether storage is volatile or durable and the oldest and latest observations available in the active window. A zero rate with incomplete or stale coverage must not be interpreted as proven inactivity.
+The active read model retains metric buckets for 15 minutes and bounds its recent observation buffer. A `Complete` flag on window summaries reports whether the exporter has declared dropped observations. The history and shell summaries also expose timestamps and stale application counts so a zero rate with incomplete or stale coverage is not interpreted as proven inactivity.
 
 ## Monitoring History Storage
 

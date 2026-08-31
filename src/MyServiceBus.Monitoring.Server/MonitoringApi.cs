@@ -123,6 +123,10 @@ public static class MonitoringApi
             .WithTags("Monitoring queries");
         query.MapGet("/history", (MonitoringIngestService ingestService) => ingestService.GetHistory(DateTimeOffset.UtcNow))
             .WithSummary("Query monitoring storage durability and retained-window coverage");
+        query.MapGet("/summary", (int? windowSeconds, MonitoringRepository repository) =>
+            repository.GetDashboardSummary(windowSeconds ?? 60, DateTimeOffset.UtcNow))
+            .WithSummary("Query a lightweight rolling operational summary for dashboard navigation")
+            .CacheOutput(policy => policy.Expire(TimeSpan.FromSeconds(5)));
         query.MapGet("/applications", (MonitoringRepository repository) => repository.GetApplications(DateTimeOffset.UtcNow))
             .WithSummary("List application-level monitoring summaries");
         query.MapGet("/instances", (string? application, MonitoringRepository repository) => repository.GetInstances(application, DateTimeOffset.UtcNow))

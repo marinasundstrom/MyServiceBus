@@ -7,6 +7,80 @@ using Shouldly;
 public class MonitoringRepositoryTests
 {
     [Fact]
+    public void Dashboard_summary_is_explicit_when_no_monitoring_data_is_available()
+    {
+        var summary = new MonitoringRepository().GetDashboardSummary(60, DateTimeOffset.UtcNow);
+
+        summary.FailureCount.ShouldBe(0);
+        summary.MonitoredApplicationCount.ShouldBe(0);
+        summary.StaleApplicationCount.ShouldBe(0);
+        summary.LatestMonitoringUpdateAtUtc.ShouldBeNull();
+        summary.LatestObservationAtUtc.ShouldBeNull();
+        summary.Complete.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Dashboard_summary_uses_a_rolling_failure_window_and_reports_coverage()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var repository = new MonitoringRepository();
+        repository.UpsertMetadata(CreateMetadata("orders", "orders-1", now, "commerce"));
+        repository.RecordBatch(CreateBatch(
+            "orders",
+            "orders-1",
+            now,
+            new MonitoringObservation(
+                1, now.AddSeconds(-5), "consume_faulted", false, "SubmitOrder", "urn:message:SubmitOrder",
+                "orders", null, 12, typeof(InvalidOperationException).FullName, "failed", null, null, null, null),
+            new MonitoringObservation(
+                2, now.AddSeconds(-4), "retry_attempted", false, "SubmitOrder", "urn:message:SubmitOrder",
+                "orders", null, 0, typeof(InvalidOperationException).FullName, "retry", null, null, null, null, 1, 3),
+            new MonitoringObservation(
+                3, now.AddSeconds(-3), "outbox_dispatch_cycle", false, null, null,
+                null, null, 5, "database", "unavailable", null, null, null, null, Properties: new Dictionary<string, string>
+                {
+                    ["service_name"] = "orders-outbox",
+                    ["owner_id"] = "orders-1"
+                })))
+            .ShouldBeTrue();
+        repository.UpsertJobs(new MonitoringJobSnapshot(
+            MonitoringProtocol.Version,
+            "orders",
+            "orders-1",
+            "bus",
+            now,
+            [
+                new MonitoringJobItem(
+                    "job-1", "ImportOrders", "Running", "in-memory", "Volatile", "ProcessLocal",
+                    now, null, now, null, null, null, null, now, []),
+                new MonitoringJobItem(
+                    "job-2", "ExportOrders", "Faulted", "in-memory", "Volatile", "ProcessLocal",
+                    now, null, now, now, null, null, null, now, [])
+            ])).ShouldBeTrue();
+
+        var active = repository.GetDashboardSummary(60, now);
+        active.WindowSeconds.ShouldBe(60);
+        active.WindowStartUtc.ShouldBe(now.AddSeconds(-60));
+        active.CapturedAtUtc.ShouldBe(now);
+        active.FailureCount.ShouldBe(1);
+        active.RetryCount.ShouldBe(1);
+        active.AffectedApplicationCount.ShouldBe(1);
+        active.UnhealthyOutboxDispatcherCount.ShouldBe(1);
+        active.FaultedTrackedJobCount.ShouldBe(1);
+        active.RunningTrackedJobCount.ShouldBe(1);
+        active.MonitoredApplicationCount.ShouldBe(1);
+        active.StaleApplicationCount.ShouldBe(0);
+        active.LatestMonitoringUpdateAtUtc.ShouldBe(now);
+        active.LatestObservationAtUtc.ShouldBe(now.AddSeconds(-3));
+        active.Complete.ShouldBeTrue();
+
+        var recovered = repository.GetDashboardSummary(60, now.AddSeconds(61));
+        recovered.FailureCount.ShouldBe(0);
+        recovered.RetryCount.ShouldBe(0);
+        recovered.AffectedApplicationCount.ShouldBe(0);
+    }
+
+    [Fact]
     public void Repository_keeps_job_freshness_and_instance_availability_explicit()
     {
         var now = DateTimeOffset.UtcNow;

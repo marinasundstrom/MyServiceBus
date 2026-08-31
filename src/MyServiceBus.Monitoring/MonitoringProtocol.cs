@@ -237,6 +237,22 @@ public sealed record MonitoringHistorySummary(
     long DroppedObservations,
     bool Complete);
 
+public sealed record MonitoringDashboardSummary(
+    int WindowSeconds,
+    DateTimeOffset WindowStartUtc,
+    DateTimeOffset CapturedAtUtc,
+    long FailureCount,
+    long RetryCount,
+    int AffectedApplicationCount,
+    int UnhealthyOutboxDispatcherCount,
+    int FaultedTrackedJobCount,
+    int RunningTrackedJobCount,
+    int MonitoredApplicationCount,
+    int StaleApplicationCount,
+    DateTimeOffset? LatestMonitoringUpdateAtUtc,
+    DateTimeOffset? LatestObservationAtUtc,
+    bool Complete);
+
 public sealed record MonitoringCounterSet(
     long Sent,
     long SendFaulted,
