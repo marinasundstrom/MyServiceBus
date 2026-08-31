@@ -238,6 +238,14 @@ The PostgreSQL schema is one normalized MyServiceBus provider contract shared by
 
 The matching inbox belongs to the consuming service boundary. It commits the consumer's protected database effects, completed message identity, and any resulting outgoing outbox records together. Delivery remains at least once across the broker/database acknowledgement gap; stable message identity and inbox deduplication make protected database effects repeat-safe.
 
+### Idempotency boundary
+
+`MessageId` identifies one messaging operation; it is not automatically a business idempotency key. MyServiceBus assigns a new identity to a normal send or publish. A transactional outbox persists that identity and reuses it for every dispatch attempt, and a broker redelivery retains the same inbound identity. The PostgreSQL inbox can therefore deduplicate a completed `(consumer scope, MessageId)` and protect database effects when its acquisition, the application changes, and completion are committed together.
+
+The current inbox is an explicit persistence primitive rather than automatic consumer middleware. Application code must continue only when acquisition returns `Acquired`, treat `Completed` as an already-applied duplicate, and leave `InProgress` eligible for retry. The inbox does not infer that two independently created messages represent the same logical command.
+
+When an application may retry or reconstruct the same logical send or publish outside one outbox transaction, it should derive and assign a stable application-specific GUID/UUID as `MessageId`, or use a separate domain idempotency key. The receiving application must retain and check that identity for the required deduplication window, preferably in the same transaction as the protected effect. Reusing an identity for unrelated operations is invalid, while allowing each retry to receive a new identity defeats inbox deduplication. The outbox solves atomic production and stable dispatch identity; the inbox or equivalent application logic solves repeat-safe consumption. Neither makes arbitrary external side effects automatically idempotent.
+
 A centralized dispatcher shared by unrelated services is possible only as an explicit deployment design. It must be configured for those service partitions and requires authorization, schema ownership, independent failure isolation, and operational accountability; it is not the default MyServiceBus model. See the [Transactional Outbox and Inbox guide](transactional-outbox.md) and its [normative specification](specs/outbox-inbox.md).
 
 ## Inspection, Monitoring, and Dashboard
