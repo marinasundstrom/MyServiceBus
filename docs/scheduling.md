@@ -9,7 +9,7 @@ MyServiceBus separates **volatile in-process scheduling** from **durable message
 | Default in-memory provider | Process memory | Pending work is lost | Supported before the callback starts | Available in C# and Java |
 | PostgreSQL outbox scheduler | Caller-owned PostgreSQL transaction | Persisted intent remains eligible after restart | Persisted, with an explicit race result | Available for evaluation in C# and Java |
 | Custom message-aware provider | Provider-defined | Provider-defined and reported as durable or volatile | Provider-defined | Extension point available |
-| Broker-native, Quartz.NET, Hangfire, or recurring adapters | Provider-defined | Not claimed until separately implemented and tested | Provider-defined | Future adapters |
+| Broker-native, Quartz.NET, Quartz Scheduler, Hangfire, JobRunr, or recurring adapters | Provider-defined | Not claimed until separately implemented and tested | Provider-defined | Future adapters |
 
 Scheduling a callback and scheduling a message are different extension points. `IJobScheduler` / `JobScheduler` receives an executable callback and is therefore suitable only for process-bound timing and deterministic tests. `IScheduleMessageProvider` / `ScheduleMessageProvider` receives the message delivery intent and is the integration boundary for an implementation that serializes and persists work outside the process.
 
@@ -137,8 +137,10 @@ busServices.addServiceBus(configurator -> {
 
 A provider that reports `Durable` / `DURABLE` must prove persisted acceptance, restart recovery, stable identity, due-time boundaries, cancellation races, and ambiguous dispatch behavior. Recurring schedules are a separate capability and are not part of the current interface.
 
+Provider support in C# and Java means compatible MyServiceBus APIs and behavior; it does not require the applications to use the same scheduler engine. Hangfire may be appropriate for a .NET application and JobRunr for a Java application. Their records are not portable between engines, but both can export normalized scheduling state to monitoring. Use the MyServiceBus PostgreSQL scheduler when C# and Java applications need to share the same persisted scheduled-message records and envelopes.
+
 ## Relationship to MassTransit
 
 MassTransit distinguishes transport-based scheduling from scheduler services such as Quartz.NET or Hangfire. MyServiceBus preserves that useful model and the familiar `IMessageScheduler` vocabulary. It deliberately adds an explicit durability capability and defines a matching Java seam. It does not currently claim MassTransit scheduler breadth, recurring scheduling, broker-native scheduling, or source-compatible provider implementations.
 
-MassTransit's current [message scheduler documentation](https://masstransit.massient.com/configuration/schedulers) is useful conceptual background. MyServiceBus documentation and tests remain authoritative for the capabilities above.
+MassTransit's current [message scheduler documentation](https://masstransit.io/documentation/configuration/scheduling) is useful conceptual background. MyServiceBus documentation and tests remain authoritative for the capabilities above.
