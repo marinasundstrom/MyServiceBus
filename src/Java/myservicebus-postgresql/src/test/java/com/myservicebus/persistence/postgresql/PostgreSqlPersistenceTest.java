@@ -183,7 +183,8 @@ class PostgreSqlPersistenceTest {
                     }
                     connection.commit();
 
-                    ScheduledWorkSource source = provider.getRequiredService(ScheduledWorkSource.class);
+                    // A newly constructed source models the state a fresh process restores after restart.
+                    ScheduledWorkSource source = new PostgreSqlScheduledWorkSource(dataSource, SERVICE_NAME);
                     ScheduledWorkState pending = source.getSnapshot(100).toCompletableFuture().join().stream()
                             .filter(item -> item.tokenId().equals(handle.getTokenId()))
                             .findFirst().orElseThrow();

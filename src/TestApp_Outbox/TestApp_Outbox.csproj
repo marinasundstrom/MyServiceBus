@@ -7,6 +7,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="../MyServiceBus.Monitoring/MyServiceBus.Monitoring.csproj" />
     <ProjectReference Include="../MyServiceBus.PostgreSql/MyServiceBus.PostgreSql.csproj" />
     <ProjectReference Include="../MyServiceBus.RabbitMq/MyServiceBus.RabbitMq.csproj" />
   </ItemGroup>

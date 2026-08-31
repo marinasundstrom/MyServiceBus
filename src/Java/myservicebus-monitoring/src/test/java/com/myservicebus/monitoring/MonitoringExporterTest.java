@@ -20,6 +20,9 @@ import com.myservicebus.ScheduleMessageProviderDurability;
 import com.myservicebus.ScheduledWorkSource;
 import com.myservicebus.ScheduledWorkState;
 import com.myservicebus.ScheduledWorkStatus;
+import com.myservicebus.di.ServiceCollection;
+import com.myservicebus.di.ServiceProvider;
+import com.myservicebus.inspection.BusInspectionProvider;
 import com.myservicebus.inspection.BusInspectionSnapshot;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
@@ -225,15 +228,18 @@ class MonitoringExporterTest {
         options.setExportInterval(Duration.ofMillis(20));
         MonitoringExporter exporter = new MonitoringExporter(options);
         try {
-            exporter.start(
-                    () -> new BusInspectionSnapshot(
-                            "mediator", URI.create("loopback://localhost/"), Instant.now(),
-                            List.of(), List.of(), List.of()),
-                    List.of(source));
+            ServiceCollection services = ServiceCollection.create();
+            services.addSingleton(BusInspectionProvider.class, ignored -> () -> () -> new BusInspectionSnapshot(
+                    "mediator", URI.create("loopback://localhost/"), Instant.now(),
+                    List.of(), List.of(), List.of()));
+            services.addSingleton(ScheduledWorkSource.class, ignored -> () -> source);
+            ServiceProvider provider = services.buildServiceProvider();
+            exporter.start(provider);
 
             assertTrue(scheduledReceived.await(2, TimeUnit.SECONDS));
             assertTrue(scheduledJson.get().contains(state.tokenId().toString()));
             assertTrue(scheduledJson.get().contains("\"provider\":\"PostgreSQL\""));
+            assertTrue(scheduledJson.get().contains("\"durability\":\"Durable\""));
         } finally {
             exporter.close();
             server.stop(0);
