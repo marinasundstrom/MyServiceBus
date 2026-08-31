@@ -497,7 +497,7 @@ class PostgreSqlPersistenceTest {
     }
 
     @Test
-    void inboxCompletionAndOutboxWriteCommitAtomically() throws Exception {
+    void inboxDeduplicatesCompletedIdentityAndCommitsOutboxAtomically() throws Exception {
         try (PostgreSQLContainer container = startContainer()) {
             DataSource dataSource = dataSource(container);
             PostgreSqlSchema.ensureCreated(dataSource);
@@ -519,6 +519,12 @@ class PostgreSqlPersistenceTest {
                 InboxTransaction duplicate = new PostgreSqlInboxStore(connection, SERVICE_NAME)
                         .acquire(key, CancellationToken.none()).join();
                 assertEquals(InboxAcquisition.COMPLETED, duplicate.getAcquisition());
+
+                InboxTransaction distinct = new PostgreSqlInboxStore(connection, SERVICE_NAME)
+                        .acquire(new InboxMessageKey(key.consumerScope(), UUID.randomUUID()), CancellationToken.none())
+                        .join();
+                assertEquals(InboxAcquisition.ACQUIRED, distinct.getAcquisition());
+                distinct.complete().join();
                 connection.commit();
             }
 

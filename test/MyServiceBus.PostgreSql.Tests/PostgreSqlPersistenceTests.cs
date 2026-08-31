@@ -420,7 +420,7 @@ public sealed class PostgreSqlPersistenceTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Inbox_completion_and_outbox_write_commit_atomically()
+    public async Task Inbox_deduplicates_completed_identity_and_commits_outbox_atomically()
     {
         var key = new InboxMessageKey("billing-charge-card", Guid.NewGuid());
         var message = CreateMessage();
@@ -440,6 +440,11 @@ public sealed class PostgreSqlPersistenceTests : IAsyncLifetime
         {
             await using var duplicate = await new PostgreSqlInboxStore(connection, transaction, ServiceName).AcquireAsync(key);
             Assert.Equal(InboxAcquisition.Completed, duplicate.Acquisition);
+
+            await using var distinct = await new PostgreSqlInboxStore(connection, transaction, ServiceName)
+                .AcquireAsync(new InboxMessageKey(key.ConsumerScope, Guid.NewGuid()));
+            Assert.Equal(InboxAcquisition.Acquired, distinct.Acquisition);
+            await distinct.CompleteAsync();
             await transaction.CommitAsync();
         }
 
