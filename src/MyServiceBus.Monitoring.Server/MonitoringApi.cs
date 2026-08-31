@@ -76,6 +76,24 @@ public static class MonitoringApi
                 return Results.BadRequest(new { error = exception.Message });
             }
         });
+        ingest.MapPost("/jobs", async (
+            MonitoringJobSnapshot snapshot,
+            MonitoringIngestService ingestService,
+            MonitoringChangeFeed changes,
+            CancellationToken cancellationToken) =>
+        {
+            try
+            {
+                if (!await ingestService.StoreJobsAsync(snapshot, cancellationToken))
+                    return Results.Conflict(new { error = "Metadata must be registered before jobs are accepted." });
+                changes.Publish("jobs_changed");
+                return Results.Accepted();
+            }
+            catch (MonitoringValidationException exception)
+            {
+                return Results.BadRequest(new { error = exception.Message });
+            }
+        });
 
         var query = endpoints.MapGroup("/api/monitoring/v1").WithTags("Monitoring queries");
         query.MapGet("/history", (MonitoringIngestService ingestService) => ingestService.GetHistory(DateTimeOffset.UtcNow));
@@ -102,6 +120,8 @@ public static class MonitoringApi
             repository.GetScheduledWork(application, status, DateTimeOffset.UtcNow));
         query.MapGet("/recurring-jobs", (string? application, string? status, MonitoringRepository repository) =>
             repository.GetRecurringJobs(application, status, DateTimeOffset.UtcNow));
+        query.MapGet("/jobs", (string? application, string? status, MonitoringRepository repository) =>
+            repository.GetJobs(application, status, DateTimeOffset.UtcNow));
         query.MapGet("/stream", (HttpContext context, MonitoringChangeFeed changes, CancellationToken cancellationToken) =>
             changes.Stream(context, cancellationToken));
 

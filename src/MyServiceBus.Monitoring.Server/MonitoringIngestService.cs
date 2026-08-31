@@ -55,6 +55,12 @@ public sealed class MonitoringIngestService
         return true;
     }
 
+    public Task<bool> StoreJobsAsync(MonitoringJobSnapshot snapshot, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult(repository.UpsertJobs(snapshot));
+    }
+
     public MonitoringHistorySummary GetHistory(DateTimeOffset now)
         => repository.GetHistory(now, store.Provider, store.Durable, store.HistoryAvailableFromUtc);
 }

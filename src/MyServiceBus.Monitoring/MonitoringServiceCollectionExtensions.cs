@@ -23,7 +23,8 @@ public static class MonitoringServiceCollectionExtensions
             throw new ArgumentOutOfRangeException(nameof(configure), "ExportInterval must be greater than zero.");
         if (options.HeartbeatInterval <= TimeSpan.Zero)
             throw new ArgumentOutOfRangeException(nameof(configure), "HeartbeatInterval must be greater than zero.");
-        if (options.MaxBatchSize <= 0 || options.MaxQueueSize <= 0 || options.MaxScheduledWorkItems <= 0)
+        if (options.MaxBatchSize <= 0 || options.MaxQueueSize <= 0 || options.MaxScheduledWorkItems <= 0
+            || options.MaxJobItems <= 0 || options.MaxJobAttempts <= 0)
             throw new ArgumentOutOfRangeException(nameof(configure), "Batch and queue sizes must be greater than zero.");
         if (options.ScheduledWorkHistory <= TimeSpan.Zero)
             throw new ArgumentOutOfRangeException(nameof(configure), "ScheduledWorkHistory must be greater than zero.");

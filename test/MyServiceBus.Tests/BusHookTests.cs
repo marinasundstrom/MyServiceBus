@@ -265,6 +265,46 @@ public class BusHookTests
         await exporter.StopAsync(CancellationToken.None);
     }
 
+    [Fact]
+    public async Task Monitoring_exporter_sends_jobs_with_bounded_attempts_without_payloads()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var occurrenceId = Guid.NewGuid();
+        var state = new JobState(
+            Guid.NewGuid(), "invoice-export", JobStatus.Faulted, "in-memory",
+            SchedulingDurability.Volatile, SchedulingPlacement.ProcessLocal,
+            now.AddSeconds(-2), null, now.AddSeconds(-1), now, new JobProgress(4, 10), occurrenceId, now);
+        var attempt = new JobAttemptState(
+            Guid.NewGuid(), state.JobId, 0, JobAttemptStatus.Faulted,
+            now.AddSeconds(-1), now, "System.InvalidOperationException", "secret-body");
+        var handler = new RecordingHttpHandler();
+        var services = new ServiceCollection()
+            .AddSingleton<IBusInspectionProvider>(new StubInspectionProvider())
+            .AddSingleton<IJobSource>(new StubJobSource(state, attempt));
+        await using var provider = services.BuildServiceProvider();
+        var options = new MonitoringExporterOptions
+        {
+            ServiceAddress = new Uri("http://monitoring.test"),
+            ApplicationName = "job-tests",
+            ExportInterval = TimeSpan.FromMilliseconds(20),
+            HeartbeatInterval = TimeSpan.FromMinutes(1)
+        };
+        var exporter = new MonitoringExporter(
+            new HttpClient(handler) { BaseAddress = options.ServiceAddress },
+            provider,
+            options,
+            NullLogger<MonitoringExporter>.Instance);
+
+        await exporter.StartAsync(CancellationToken.None);
+        var json = await handler.JobsReceived.Task.WaitAsync(TimeSpan.FromSeconds(2));
+
+        json.ShouldContain(state.JobId.ToString("D"));
+        json.ShouldContain(occurrenceId.ToString("D"));
+        json.ShouldContain("System.InvalidOperationException");
+        json.ShouldNotContain("secret-body");
+        await exporter.StopAsync(CancellationToken.None);
+    }
+
     public sealed record TestMessage(string Value);
 
     public sealed class TestConsumer : IConsumer<TestMessage>
@@ -317,10 +357,26 @@ public class BusHookTests
             => Task.FromResult<IReadOnlyList<ScheduledWorkState>>([state]);
     }
 
+    private sealed class StubJobSource(JobState state, JobAttemptState attempt) : IJobSource
+    {
+        public string Provider => "in-memory";
+        public bool Authoritative => true;
+
+        public Task<IReadOnlyList<JobState>> GetSnapshotAsync(
+            int maximumCount,
+            CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<JobState>>([state]);
+
+        public Task<IReadOnlyList<JobAttemptState>> GetAttemptsAsync(
+            Guid jobId,
+            int maximumCount,
+            CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<JobAttemptState>>([attempt]);
+    }
+
     private sealed class RecordingHttpHandler : HttpMessageHandler
     {
         public TaskCompletionSource<string> BatchReceived { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public TaskCompletionSource<string> ScheduledWorkReceived { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource<string> JobsReceived { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
@@ -331,6 +387,8 @@ public class BusHookTests
                 BatchReceived.TrySetResult(json);
             if (request.RequestUri?.AbsolutePath.EndsWith("scheduled-work", StringComparison.Ordinal) == true)
                 ScheduledWorkReceived.TrySetResult(json);
+            if (request.RequestUri?.AbsolutePath.EndsWith("/jobs", StringComparison.Ordinal) == true)
+                JobsReceived.TrySetResult(json);
 
             return new HttpResponseMessage(System.Net.HttpStatusCode.Accepted);
         }

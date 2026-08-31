@@ -17,6 +17,8 @@ public final class MonitoringExporterOptions {
     private int maxBatchSize = 256;
     private int maxQueueSize = 10_000;
     private int maxScheduledWorkItems = 1_000;
+    private int maxJobItems = 1_000;
+    private int maxJobAttempts = 10;
     private Duration scheduledWorkHistory = Duration.ofHours(24);
 
     public URI getServiceAddress() {
@@ -108,6 +110,22 @@ public final class MonitoringExporterOptions {
 
     public void setMaxScheduledWorkItems(int maxScheduledWorkItems) {
         this.maxScheduledWorkItems = maxScheduledWorkItems;
+    }
+
+    public int getMaxJobItems() {
+        return maxJobItems;
+    }
+
+    public void setMaxJobItems(int maxJobItems) {
+        this.maxJobItems = maxJobItems;
+    }
+
+    public int getMaxJobAttempts() {
+        return maxJobAttempts;
+    }
+
+    public void setMaxJobAttempts(int maxJobAttempts) {
+        this.maxJobAttempts = maxJobAttempts;
     }
 
     public Duration getScheduledWorkHistory() {

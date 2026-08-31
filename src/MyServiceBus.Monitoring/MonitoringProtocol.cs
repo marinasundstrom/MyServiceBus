@@ -144,6 +144,47 @@ public sealed record MonitoringRecurringJobSummary(
     DateTimeOffset CapturedAtUtc,
     MonitoringRecurringJobItem Job);
 
+public sealed record MonitoringJobSnapshot(
+    string ProtocolVersion,
+    string ApplicationName,
+    string InstanceId,
+    string BusId,
+    DateTimeOffset CapturedAtUtc,
+    IReadOnlyList<MonitoringJobItem> Items);
+
+public sealed record MonitoringJobItem(
+    string JobId,
+    string JobType,
+    string Status,
+    string Provider,
+    string Durability,
+    string Placement,
+    DateTimeOffset SubmittedAtUtc,
+    DateTimeOffset? ScheduledForUtc,
+    DateTimeOffset? StartedAtUtc,
+    DateTimeOffset? CompletedAtUtc,
+    long? ProgressValue,
+    long? ProgressLimit,
+    string? RecurringJobOccurrenceId,
+    DateTimeOffset UpdatedAtUtc,
+    IReadOnlyList<MonitoringJobAttemptItem> Attempts);
+
+public sealed record MonitoringJobAttemptItem(
+    string AttemptId,
+    int RetryAttempt,
+    string Status,
+    DateTimeOffset StartedAtUtc,
+    DateTimeOffset? CompletedAtUtc,
+    string? FailureCategory);
+
+public sealed record MonitoringJobSummary(
+    string ApplicationName,
+    string InstanceId,
+    string BusId,
+    bool InstanceOnline,
+    DateTimeOffset CapturedAtUtc,
+    MonitoringJobItem Job);
+
 public sealed record MonitoringApplicationSummary(
     string ApplicationName,
     int OnlineInstances,

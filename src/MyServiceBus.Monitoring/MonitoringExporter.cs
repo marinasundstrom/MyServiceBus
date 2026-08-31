@@ -26,6 +26,7 @@ public sealed class MonitoringExporter : BackgroundService, IBusHook, IScheduled
     private int scheduledWorkChanged = 1;
     private bool scheduledWorkSourcesAvailable = true;
     private IReadOnlyList<MonitoringRecurringJobItem> recurringJobs = [];
+    private IReadOnlyList<MonitoringJobItem> jobs = [];
 
     public MonitoringExporter(
         HttpClient httpClient,
@@ -111,6 +112,7 @@ public sealed class MonitoringExporter : BackgroundService, IBusHook, IScheduled
                     nextScheduledWorkRefresh = now + options.ExportInterval;
                     await RefreshScheduledWork(stoppingToken).ConfigureAwait(false);
                     await RefreshRecurringJobs(stoppingToken).ConfigureAwait(false);
+                    await RefreshJobs(stoppingToken).ConfigureAwait(false);
                     Interlocked.Exchange(ref scheduledWorkChanged, 1);
                 }
 
@@ -120,6 +122,7 @@ public sealed class MonitoringExporter : BackgroundService, IBusHook, IScheduled
                     {
                         await SendScheduledWork(stoppingToken).ConfigureAwait(false);
                         await SendRecurringJobs(stoppingToken).ConfigureAwait(false);
+                        await SendJobs(stoppingToken).ConfigureAwait(false);
                     }
                     catch
                     {
@@ -344,6 +347,40 @@ public sealed class MonitoringExporter : BackgroundService, IBusHook, IScheduled
         response.EnsureSuccessStatusCode();
     }
 
+    private async Task RefreshJobs(CancellationToken cancellationToken)
+    {
+        var items = new List<MonitoringJobItem>();
+        foreach (var source in serviceProvider.GetServices<IJobSource>())
+        {
+            var states = await source.GetSnapshotAsync(options.MaxJobItems, cancellationToken).ConfigureAwait(false);
+            foreach (var state in states)
+            {
+                var attempts = await source.GetAttemptsAsync(
+                    state.JobId,
+                    options.MaxJobAttempts,
+                    cancellationToken).ConfigureAwait(false);
+                items.Add(MapJob(state, attempts));
+            }
+        }
+        jobs = items.OrderByDescending(item => item.UpdatedAtUtc).Take(options.MaxJobItems).ToArray();
+    }
+
+    private async Task SendJobs(CancellationToken cancellationToken)
+    {
+        var snapshot = new MonitoringJobSnapshot(
+            MonitoringProtocol.Version,
+            options.ApplicationName,
+            options.InstanceId,
+            options.BusId,
+            DateTimeOffset.UtcNow,
+            jobs);
+        using var response = await httpClient.PostAsJsonAsync(
+            "/api/monitoring/v1/jobs",
+            snapshot,
+            cancellationToken).ConfigureAwait(false);
+        response.EnsureSuccessStatusCode();
+    }
+
     private void PruneScheduledWork(DateTimeOffset now)
     {
         var cutoff = now - options.ScheduledWorkHistory;
@@ -386,6 +423,29 @@ public sealed class MonitoringExporter : BackgroundService, IBusHook, IScheduled
         state.Status.ToString(),
         state.NextOccurrenceAtUtc,
         state.UpdatedAtUtc);
+
+    private static MonitoringJobItem MapJob(JobState state, IReadOnlyList<JobAttemptState> attempts) => new(
+        state.JobId.ToString("D"),
+        state.JobType,
+        state.Status.ToString(),
+        state.Provider,
+        state.Durability.ToString(),
+        state.Placement.ToString(),
+        state.SubmittedAtUtc,
+        state.ScheduledForUtc,
+        state.StartedAtUtc,
+        state.CompletedAtUtc,
+        state.Progress?.Value,
+        state.Progress?.Limit,
+        state.RecurringJobOccurrenceId?.ToString("D"),
+        state.UpdatedAtUtc,
+        attempts.Select(attempt => new MonitoringJobAttemptItem(
+            attempt.AttemptId.ToString("D"),
+            attempt.RetryAttempt,
+            attempt.Status.ToString(),
+            attempt.StartedAtUtc,
+            attempt.CompletedAtUtc,
+            attempt.FaultType)).ToArray());
 
     private MonitoringObservation CreateLifecycleObservation(BusLifecycleHookEvent busEvent)
         => new(

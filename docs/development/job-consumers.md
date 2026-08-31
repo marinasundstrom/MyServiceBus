@@ -76,7 +76,9 @@ Hangfire and JobRunr are future ecosystem-specific adapters. They should project
 
 ## Monitoring boundary
 
-The monitoring service receives authoritative job and attempt state from configured job sources. The dashboard consumes only the monitoring service and presents jobs under their owning application or service. Provider names, leases, worker identities, and raw attempt faults belong in drill-down views rather than the landing-page overview.
+The monitoring service receives bounded authoritative job and attempt snapshots from configured job sources in both runtimes. Each snapshot carries its capture time, and query results retain the reporting instance's online state, so a stale or unavailable source is not presented as an empty job list. The export includes safe job identity, status, timing, progress, recurring-occurrence correlation, attempt status, and failure category; it excludes job bodies, arbitrary headers, and failure messages. The dashboard consumes only the monitoring service and presents jobs under their owning application or service. Provider names and attempt faults belong in drill-down views rather than the landing-page overview.
+
+The monitoring server currently retains the latest job snapshot in process. PostgreSQL history persistence for job and occurrence snapshots is the next storage slice; until then, the API's capture time and instance availability are the explicit coverage boundary.
 
 The monitoring data must distinguish:
 

@@ -15,6 +15,7 @@ public sealed class MonitoringRepository
     private readonly SortedDictionary<long, Dictionary<MetricKey, MutableMetricSet>> metricBuckets = new();
     private readonly ConcurrentDictionary<InstanceKey, MonitoringScheduledWorkSnapshot> scheduledWork = new();
     private readonly ConcurrentDictionary<InstanceKey, MonitoringRecurringJobSnapshot> recurringJobs = new();
+    private readonly ConcurrentDictionary<InstanceKey, MonitoringJobSnapshot> jobs = new();
     private readonly DateTimeOffset serviceStartedAtUtc = DateTimeOffset.UtcNow;
     private long lastIngestUtcTicks;
 
@@ -191,6 +192,51 @@ public sealed class MonitoringRepository
             .OrderBy(item => item.Job.Status == "Active" ? 0 : 1)
             .ThenBy(item => item.Job.NextOccurrenceAtUtc ?? DateTimeOffset.MaxValue)
             .ThenBy(item => item.Job.ScheduleId, StringComparer.Ordinal)
+            .ToArray();
+    }
+
+    public bool UpsertJobs(MonitoringJobSnapshot snapshot)
+    {
+        ValidateProtocol(snapshot.ProtocolVersion);
+        var key = new InstanceKey(snapshot.ApplicationName, snapshot.InstanceId, snapshot.BusId);
+        if (!instances.ContainsKey(key))
+            return false;
+        if (snapshot.Items.Count > 1_000)
+            throw new MonitoringValidationException("A job snapshot accepts at most 1000 items.");
+        foreach (var item in snapshot.Items)
+        {
+            if (string.IsNullOrWhiteSpace(item.JobId)
+                || string.IsNullOrWhiteSpace(item.JobType)
+                || string.IsNullOrWhiteSpace(item.Provider)
+                || string.IsNullOrWhiteSpace(item.Status))
+                throw new MonitoringValidationException("Jobs require an identity, type, provider, and status.");
+            if (item.Attempts.Count > 100)
+                throw new MonitoringValidationException("A job accepts at most 100 attempts per snapshot.");
+        }
+        jobs[key] = snapshot;
+        MarkIngested();
+        return true;
+    }
+
+    public IReadOnlyList<MonitoringJobSummary> GetJobs(string? applicationName, string? status, DateTimeOffset now)
+    {
+        var online = GetInstances(applicationName, now).ToDictionary(
+            item => new InstanceKey(item.ApplicationName, item.InstanceId, item.BusId),
+            item => item.Online);
+        return jobs
+            .Where(entry => applicationName is null
+                || string.Equals(entry.Key.ApplicationName, applicationName, StringComparison.Ordinal))
+            .SelectMany(entry => entry.Value.Items.Select(item => new MonitoringJobSummary(
+                entry.Key.ApplicationName,
+                entry.Key.InstanceId,
+                entry.Key.BusId,
+                online.GetValueOrDefault(entry.Key),
+                entry.Value.CapturedAtUtc,
+                item)))
+            .Where(item => status is null
+                || string.Equals(item.Job.Status, status, StringComparison.OrdinalIgnoreCase))
+            .OrderBy(item => item.Job.Status is "Running" or "Waiting" or "Scheduled" ? 0 : 1)
+            .ThenByDescending(item => item.Job.UpdatedAtUtc)
             .ToArray();
     }
 

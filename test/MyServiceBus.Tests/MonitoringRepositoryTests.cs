@@ -7,6 +7,25 @@ using Shouldly;
 public class MonitoringRepositoryTests
 {
     [Fact]
+    public void Repository_keeps_job_freshness_and_instance_availability_explicit()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var repository = new MonitoringRepository();
+        repository.UpsertMetadata(CreateMetadata("orders", "replica-1", now, "commerce"));
+        var item = new MonitoringJobItem(
+            Guid.NewGuid().ToString("D"), "invoice-export", "Running", "in-memory", "Volatile",
+            "ProcessLocal", now.AddMinutes(-1), null, now.AddSeconds(-5), null, 4, 10,
+            Guid.NewGuid().ToString("D"), now, []);
+        repository.UpsertJobs(new MonitoringJobSnapshot(
+            MonitoringProtocol.Version, "orders", "replica-1", "bus", now, [item])).ShouldBeTrue();
+
+        var summary = repository.GetJobs("orders", "running", now).ShouldHaveSingleItem();
+        summary.InstanceOnline.ShouldBeTrue();
+        summary.CapturedAtUtc.ShouldBe(now);
+        summary.Job.ShouldBe(item);
+    }
+
+    [Fact]
     public void Repository_keeps_recurring_definitions_separate_from_scheduled_occurrences()
     {
         var now = DateTimeOffset.UtcNow;
