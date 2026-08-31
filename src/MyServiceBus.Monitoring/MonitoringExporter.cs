@@ -9,7 +9,7 @@ using MyServiceBus.Inspection;
 
 namespace MyServiceBus.Monitoring;
 
-public sealed class MonitoringExporter : BackgroundService, IBusHook
+public sealed class MonitoringExporter : BackgroundService, IBusHook, IScheduledWorkObserver
 {
     private readonly HttpClient httpClient;
     private readonly IServiceProvider serviceProvider;
@@ -18,9 +18,12 @@ public sealed class MonitoringExporter : BackgroundService, IBusHook
     private readonly Channel<MonitoringObservation> observations;
     private readonly SemaphoreSlim batchReady = new(0, 1);
     private readonly DateTimeOffset startedAtUtc = DateTimeOffset.UtcNow;
+    private readonly object scheduledWorkSync = new();
+    private readonly Dictionary<string, MonitoringScheduledWorkItem> scheduledWork = new(StringComparer.Ordinal);
     private long sequence;
     private long droppedObservations;
     private int queuedObservations;
+    private int scheduledWorkChanged = 1;
 
     public MonitoringExporter(
         HttpClient httpClient,
@@ -64,6 +67,36 @@ public sealed class MonitoringExporter : BackgroundService, IBusHook
             batchReady.Release();
     }
 
+    public void Observe(ScheduledWorkState state)
+    {
+        lock (scheduledWorkSync)
+        {
+            PruneScheduledWork(DateTimeOffset.UtcNow);
+            scheduledWork[state.TokenId.ToString("D")] = new MonitoringScheduledWorkItem(
+                state.TokenId.ToString("D"),
+                state.Provider,
+                state.Durability.ToString(),
+                state.WorkKind,
+                state.MessageType,
+                state.Intent,
+                state.DestinationAddress,
+                state.DueAtUtc,
+                state.Status.ToString(),
+                state.ProviderStatus,
+                state.Attempt,
+                state.UpdatedAtUtc,
+                state.FailureCategory);
+            while (scheduledWork.Count > options.MaxScheduledWorkItems)
+            {
+                var oldest = scheduledWork.Values.OrderBy(item => item.UpdatedAtUtc).First();
+                scheduledWork.Remove(oldest.TokenId);
+            }
+        }
+        Interlocked.Exchange(ref scheduledWorkChanged, 1);
+        if (batchReady.CurrentCount == 0)
+            batchReady.Release();
+    }
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         var nextHeartbeat = DateTimeOffset.UtcNow + options.HeartbeatInterval;
@@ -80,6 +113,19 @@ public sealed class MonitoringExporter : BackgroundService, IBusHook
                 {
                     await SendMetadata(stoppingToken).ConfigureAwait(false);
                     metadataSent = true;
+                }
+
+                if (Interlocked.Exchange(ref scheduledWorkChanged, 0) == 1)
+                {
+                    try
+                    {
+                        await SendScheduledWork(stoppingToken).ConfigureAwait(false);
+                    }
+                    catch
+                    {
+                        Interlocked.Exchange(ref scheduledWorkChanged, 1);
+                        throw;
+                    }
                 }
 
                 pending ??= DrainBatch();
@@ -208,6 +254,39 @@ public sealed class MonitoringExporter : BackgroundService, IBusHook
             DateTimeOffset.UtcNow);
         using var response = await httpClient.PostAsJsonAsync("/api/monitoring/v1/heartbeat", heartbeat, cancellationToken).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
+    }
+
+    private async Task SendScheduledWork(CancellationToken cancellationToken)
+    {
+        MonitoringScheduledWorkItem[] items;
+        lock (scheduledWorkSync)
+        {
+            PruneScheduledWork(DateTimeOffset.UtcNow);
+            items = scheduledWork.Values.OrderBy(item => item.DueAtUtc).ToArray();
+        }
+        var snapshot = new MonitoringScheduledWorkSnapshot(
+            MonitoringProtocol.Version,
+            options.ApplicationName,
+            options.InstanceId,
+            options.BusId,
+            DateTimeOffset.UtcNow,
+            items);
+        using var response = await httpClient.PostAsJsonAsync(
+            "/api/monitoring/v1/scheduled-work",
+            snapshot,
+            cancellationToken).ConfigureAwait(false);
+        response.EnsureSuccessStatusCode();
+    }
+
+    private void PruneScheduledWork(DateTimeOffset now)
+    {
+        var cutoff = now - options.ScheduledWorkHistory;
+        foreach (var tokenId in scheduledWork
+            .Where(entry => entry.Value.Status is "Completed" or "Cancelled" or "Failed"
+                && entry.Value.UpdatedAtUtc < cutoff)
+            .Select(entry => entry.Key)
+            .ToArray())
+            scheduledWork.Remove(tokenId);
     }
 
     private MonitoringObservation CreateLifecycleObservation(BusLifecycleHookEvent busEvent)

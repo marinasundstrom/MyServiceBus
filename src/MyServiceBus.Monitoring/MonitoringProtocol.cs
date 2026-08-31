@@ -84,6 +84,36 @@ public sealed record MonitoringHeartbeat(
     string BusId,
     DateTimeOffset SentAtUtc);
 
+public sealed record MonitoringScheduledWorkSnapshot(
+    string ProtocolVersion,
+    string ApplicationName,
+    string InstanceId,
+    string BusId,
+    DateTimeOffset CapturedAtUtc,
+    IReadOnlyList<MonitoringScheduledWorkItem> Items);
+
+public sealed record MonitoringScheduledWorkItem(
+    string TokenId,
+    string Provider,
+    string Durability,
+    string WorkKind,
+    string MessageType,
+    string Intent,
+    string? DestinationAddress,
+    DateTimeOffset DueAtUtc,
+    string Status,
+    string ProviderStatus,
+    int Attempt,
+    DateTimeOffset UpdatedAtUtc,
+    string? FailureCategory = null);
+
+public sealed record MonitoringScheduledWorkSummary(
+    string ApplicationName,
+    string InstanceId,
+    string BusId,
+    bool InstanceOnline,
+    MonitoringScheduledWorkItem Work);
+
 public sealed record MonitoringApplicationSummary(
     string ApplicationName,
     int OnlineInstances,

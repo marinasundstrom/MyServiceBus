@@ -83,11 +83,21 @@ public sealed class PostgreSqlMonitoringHistoryTests : IAsyncLifetime
             "orders-1",
             "bus",
             now);
+        var scheduledWork = new MonitoringScheduledWorkSnapshot(
+            MonitoringProtocol.Version,
+            "orders",
+            "orders-1",
+            "bus",
+            now,
+            [new MonitoringScheduledWorkItem(
+                Guid.NewGuid().ToString(), "InMemory", "Volatile", "Message", "SubmitOrder", "Publish", null,
+                now.AddMinutes(5), "Pending", "Pending", 0, now)]);
 
         await first.StoreMetadataAsync(metadata, CancellationToken.None);
         await first.StoreBatchAsync(batch, CancellationToken.None);
         await first.StoreBatchAsync(batch, CancellationToken.None);
         await first.StoreHeartbeatAsync(heartbeat, CancellationToken.None);
+        await first.StoreScheduledWorkAsync(scheduledWork, CancellationToken.None);
 
         var restarted = new PostgreSqlMonitoringHistoryStore(contextFactory, options);
         await restarted.InitializeAsync(CancellationToken.None);
@@ -99,6 +109,8 @@ public sealed class PostgreSqlMonitoringHistoryTests : IAsyncLifetime
         Assert.Single(restored.Metadata);
         Assert.Single(restored.Batches);
         Assert.Single(restored.Heartbeats);
+        Assert.Single(restored.ScheduledWork);
+        Assert.Single(restored.ScheduledWork[0].Items);
         Assert.Equal("batch-1", restored.Batches[0].BatchId);
         Assert.NotNull(restored.LastIngestAtUtc);
     }

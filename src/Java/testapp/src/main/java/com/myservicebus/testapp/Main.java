@@ -2,6 +2,7 @@ package com.myservicebus.testapp;
 
 import io.javalin.Javalin;
 import java.net.URI;
+import java.time.Duration;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -12,6 +13,7 @@ import com.myservicebus.Response;
 import com.myservicebus.SendEndpointProvider;
 import com.myservicebus.MessageBus;
 import com.myservicebus.MessageBusServices;
+import com.myservicebus.MessageScheduler;
 import com.myservicebus.PublishEndpoint;
 import com.myservicebus.di.ServiceCollection;
 import com.myservicebus.di.ServiceProvider;
@@ -181,6 +183,31 @@ public class Main {
                     logger.error("❌ Failed to send fault message", e);
                     ctx.status(500).result("Failed to send fault message");
                 }
+            }
+        });
+
+        app.post("/schedule", ctx -> {
+            int requestedDelay = ctx.queryParamAsClass("delaySeconds", Integer.class).getOrDefault(120);
+            int delaySeconds = Math.max(5, Math.min(requestedDelay, 3_600));
+            try (ServiceScope scope = provider.createScope()) {
+                var scheduler = scope.getServiceProvider().getRequiredService(MessageScheduler.class);
+                var message = new SubmitOrder(
+                        UUID.randomUUID(), DemoScenario.createSubmitMessage("java-scheduled", false));
+                var handle = scheduler.schedulePublish(message, Duration.ofSeconds(delaySeconds))
+                        .toCompletableFuture().join();
+                ctx.status(202).json(java.util.Map.of(
+                        "tokenId", handle.getTokenId().toString(),
+                        "dueAtUtc", handle.getScheduledTime().toString(),
+                        "messageType", SubmitOrder.class.getSimpleName()));
+            }
+        });
+
+        app.delete("/schedule/{tokenId}", ctx -> {
+            UUID tokenId = UUID.fromString(ctx.pathParam("tokenId"));
+            try (ServiceScope scope = provider.createScope()) {
+                var scheduler = scope.getServiceProvider().getRequiredService(MessageScheduler.class);
+                var status = scheduler.cancelScheduledPublish(tokenId).toCompletableFuture().join();
+                ctx.json(java.util.Map.of("tokenId", tokenId.toString(), "status", status.toString()));
             }
         });
 

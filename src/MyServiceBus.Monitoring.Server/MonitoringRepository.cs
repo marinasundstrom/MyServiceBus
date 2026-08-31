@@ -13,6 +13,7 @@ public sealed class MonitoringRepository
     private readonly object observationSync = new();
     private readonly Queue<MonitoringObservationRecord> recentObservations = new();
     private readonly SortedDictionary<long, Dictionary<MetricKey, MutableMetricSet>> metricBuckets = new();
+    private readonly ConcurrentDictionary<InstanceKey, MonitoringScheduledWorkSnapshot> scheduledWork = new();
     private readonly DateTimeOffset serviceStartedAtUtc = DateTimeOffset.UtcNow;
     private long lastIngestUtcTicks;
 
@@ -98,6 +99,51 @@ public sealed class MonitoringRepository
         state.MarkSeen(heartbeat.SentAtUtc);
         MarkIngested();
         return true;
+    }
+
+    public bool UpsertScheduledWork(MonitoringScheduledWorkSnapshot snapshot)
+    {
+        ValidateProtocol(snapshot.ProtocolVersion);
+        var key = new InstanceKey(snapshot.ApplicationName, snapshot.InstanceId, snapshot.BusId);
+        if (!instances.ContainsKey(key))
+            return false;
+        if (snapshot.Items.Count > 1_000)
+            throw new MonitoringValidationException("A scheduled-work snapshot accepts at most 1000 items.");
+        foreach (var item in snapshot.Items)
+        {
+            if (string.IsNullOrWhiteSpace(item.TokenId)
+                || string.IsNullOrWhiteSpace(item.Provider)
+                || string.IsNullOrWhiteSpace(item.WorkKind)
+                || string.IsNullOrWhiteSpace(item.MessageType)
+                || string.IsNullOrWhiteSpace(item.Status))
+                throw new MonitoringValidationException("Scheduled-work items require a token, provider, kind, message type, and status.");
+        }
+        scheduledWork[key] = snapshot;
+        MarkIngested();
+        return true;
+    }
+
+    public IReadOnlyList<MonitoringScheduledWorkSummary> GetScheduledWork(
+        string? applicationName,
+        string? status,
+        DateTimeOffset now)
+    {
+        var online = GetInstances(applicationName, now).ToDictionary(
+            item => new InstanceKey(item.ApplicationName, item.InstanceId, item.BusId),
+            item => item.Online);
+        return scheduledWork
+            .Where(entry => applicationName is null || string.Equals(entry.Key.ApplicationName, applicationName, StringComparison.Ordinal))
+            .SelectMany(entry => entry.Value.Items.Select(item => new MonitoringScheduledWorkSummary(
+                entry.Key.ApplicationName,
+                entry.Key.InstanceId,
+                entry.Key.BusId,
+                online.GetValueOrDefault(entry.Key),
+                item)))
+            .Where(item => status is null || string.Equals(item.Work.Status, status, StringComparison.OrdinalIgnoreCase))
+            .OrderBy(item => item.Work.Status is "Pending" or "Running" ? 0 : 1)
+            .ThenBy(item => item.Work.Status is "Pending" or "Running" ? item.Work.DueAtUtc : DateTimeOffset.MaxValue)
+            .ThenByDescending(item => item.Work.UpdatedAtUtc)
+            .ToArray();
     }
 
     public MonitoringHistorySummary GetHistory(

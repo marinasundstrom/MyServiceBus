@@ -12,4 +12,6 @@ public sealed class MonitoringExporterOptions
     public TimeSpan HeartbeatInterval { get; set; } = TimeSpan.FromSeconds(15);
     public int MaxBatchSize { get; set; } = 256;
     public int MaxQueueSize { get; set; } = 10_000;
+    public int MaxScheduledWorkItems { get; set; } = 1_000;
+    public TimeSpan ScheduledWorkHistory { get; set; } = TimeSpan.FromHours(24);
 }

@@ -26,9 +26,11 @@ import com.myservicebus.BusHookEvent;
 import com.myservicebus.BusLifecycleHookEvent;
 import com.myservicebus.MessageOperationHookEvent;
 import com.myservicebus.OutboxDeliveryHookEvent;
+import com.myservicebus.ScheduledWorkObserver;
+import com.myservicebus.ScheduledWorkState;
 import com.myservicebus.inspection.BusInspectionProvider;
 
-public final class MonitoringExporter implements BusHook, AutoCloseable {
+public final class MonitoringExporter implements BusHook, ScheduledWorkObserver, AutoCloseable {
     private final MonitoringExporterOptions options;
     private final HttpClient httpClient = HttpClient.newHttpClient();
     private final ObjectMapper objectMapper = JsonMapper.builder()
@@ -45,6 +47,8 @@ public final class MonitoringExporter implements BusHook, AutoCloseable {
     private final AtomicLong dropped = new AtomicLong();
     private final AtomicBoolean started = new AtomicBoolean();
     private final AtomicBoolean closed = new AtomicBoolean();
+    private final AtomicBoolean scheduledWorkChanged = new AtomicBoolean(true);
+    private final Map<String, MonitoringProtocol.ScheduledWorkItem> scheduledWork = new LinkedHashMap<>();
     private final Instant startedAtUtc = Instant.now();
     private volatile BusInspectionProvider inspectionProvider;
     private volatile boolean metadataRegistered;
@@ -60,6 +64,10 @@ public final class MonitoringExporter implements BusHook, AutoCloseable {
         }
         if (options.getMaxBatchSize() <= 0 || options.getMaxQueueSize() <= 0) {
             throw new IllegalArgumentException("Batch and queue sizes must be greater than zero");
+        }
+        if (options.getMaxScheduledWorkItems() <= 0 || options.getScheduledWorkHistory().isZero()
+                || options.getScheduledWorkHistory().isNegative()) {
+            throw new IllegalArgumentException("Scheduled work limits must be greater than zero");
         }
         this.observations = new ArrayBlockingQueue<>(options.getMaxQueueSize());
     }
@@ -88,9 +96,41 @@ public final class MonitoringExporter implements BusHook, AutoCloseable {
         }
     }
 
+    @Override
+    public void observe(ScheduledWorkState state) {
+        synchronized (scheduledWork) {
+            pruneScheduledWork(Instant.now());
+            scheduledWork.put(state.tokenId().toString(), new MonitoringProtocol.ScheduledWorkItem(
+                    state.tokenId().toString(), state.provider(), state.durability().toString(), state.workKind(),
+                    state.messageType(), state.intent(), state.destinationAddress(), state.dueAtUtc(),
+                    titleCase(state.status().name()), state.providerStatus(), state.attempt(), state.updatedAtUtc(),
+                    state.failureCategory()));
+            while (scheduledWork.size() > options.getMaxScheduledWorkItems()) {
+                String oldest = scheduledWork.entrySet().stream()
+                        .min(java.util.Comparator.comparing(entry -> entry.getValue().updatedAtUtc()))
+                        .orElseThrow().getKey();
+                scheduledWork.remove(oldest);
+            }
+        }
+        scheduledWorkChanged.set(true);
+        if (started.get() && !closed.get()) {
+            worker.execute(this::exportSafely);
+        }
+    }
+
     private void exportSafely() {
         try {
             ensureMetadata();
+            if (metadataRegistered && scheduledWorkChanged.getAndSet(false)) {
+                try {
+                    if (!sendScheduledWork()) {
+                        scheduledWorkChanged.set(true);
+                    }
+                } catch (Exception exception) {
+                    scheduledWorkChanged.set(true);
+                    throw exception;
+                }
+            }
             if (pendingBatch == null) {
                 pendingBatch = new ArrayList<>(options.getMaxBatchSize());
                 observations.drainTo(pendingBatch, options.getMaxBatchSize());
@@ -175,6 +215,32 @@ public final class MonitoringExporter implements BusHook, AutoCloseable {
                 .build();
         HttpResponse<Void> response = httpClient.send(request, HttpResponse.BodyHandlers.discarding());
         return response.statusCode() >= 200 && response.statusCode() < 300;
+    }
+
+    private boolean sendScheduledWork() throws Exception {
+        List<MonitoringProtocol.ScheduledWorkItem> items;
+        synchronized (scheduledWork) {
+            pruneScheduledWork(Instant.now());
+            items = List.copyOf(scheduledWork.values());
+        }
+        return post("/api/monitoring/v1/scheduled-work", new MonitoringProtocol.ScheduledWorkSnapshot(
+                MonitoringProtocol.VERSION, options.getApplicationName(), options.getInstanceId(), options.getBusId(),
+                Instant.now(), items));
+    }
+
+    private void pruneScheduledWork(Instant now) {
+        Instant cutoff = now.minus(options.getScheduledWorkHistory());
+        scheduledWork.entrySet().removeIf(entry -> isTerminal(entry.getValue().status())
+                && entry.getValue().updatedAtUtc().isBefore(cutoff));
+    }
+
+    private static boolean isTerminal(String status) {
+        return status.equals("Completed") || status.equals("Cancelled") || status.equals("Failed");
+    }
+
+    private static String titleCase(String value) {
+        String lower = value.toLowerCase(java.util.Locale.ROOT);
+        return Character.toUpperCase(lower.charAt(0)) + lower.substring(1);
     }
 
     private MonitoringProtocol.Observation map(BusHookEvent busEvent) {

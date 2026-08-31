@@ -1,0 +1,44 @@
+<section class="panel instances scheduled-work-panel">
+    <div class="section-heading"><div><p class="eyebrow">Current state</p><h2>Messages and jobs</h2></div><span>Pending work and recent outcomes</span></div>
+    @if (Items.Count == 0)
+    {
+        <p class="panel-empty">No scheduled work has been reported. The application may not use scheduling, may be offline, or may be connected through a provider that does not report scheduled state yet.</p>
+    }
+    else
+    {
+        <div class="table-wrap"><table>
+            <thead><tr><th>Status</th><th>Application</th><th>Scheduled item</th><th>Due</th><th>Operation</th><th>Provider</th><th>Participant</th><th>Attempt</th></tr></thead>
+            <tbody>
+                @foreach (var item in Items)
+                {
+                    <tr>
+                        <td><span class="status-dot @StatusClass(item.Work.Status)"></span><strong>@item.Work.Status</strong><small>@ValueOrDash(item.Work.FailureCategory)</small></td>
+                        <td><a href="@($"/applications/{Uri.EscapeDataString(item.ApplicationName)}/scheduled")">@item.ApplicationName</a></td>
+                        <td><strong>@ShortMessageType(item.Work.MessageType)</strong><small>@item.Work.WorkKind</small></td>
+                        <td>@item.Work.DueAtUtc.LocalDateTime.ToString("MMM d, HH:mm:ss")<small>Updated @item.Work.UpdatedAtUtc.LocalDateTime.ToString("HH:mm:ss")</small></td>
+                        <td>@item.Work.Intent<small class="mono">@ValueOrDash(item.Work.DestinationAddress)</small></td>
+                        <td>@item.Work.Provider<small>@item.Work.Durability</small></td>
+                        <td><span class="status-dot @(item.InstanceOnline ? "online" : "offline")"></span>@(item.InstanceOnline ? "Online" : "Offline")<small class="mono">@item.InstanceId</small></td>
+                        <td>@item.Work.Attempt</td>
+                    </tr>
+                }
+            </tbody>
+        </table></div>
+    }
+</section>
+
+@code {
+    [Parameter, EditorRequired]
+    public required IReadOnlyList<MonitoringScheduledWorkSummary> Items { get; set; }
+
+    private static string StatusClass(string status) => status switch
+    {
+        "Pending" => "degraded",
+        "Running" or "Completed" => "online",
+        _ => "offline"
+    };
+
+    private static string ValueOrDash(string? value) => string.IsNullOrWhiteSpace(value) ? "—" : value;
+
+    private static string ShortMessageType(string value) => value.Split('.').Last();
+}

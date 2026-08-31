@@ -191,6 +191,33 @@ app.MapGet("/send/fault", async (ISendEndpointProvider sendEndpointProvider, ILo
 .WithName("Test_SendFault")
 .WithTags("Test");
 
+app.MapPost("/schedule", async (int? delaySeconds, IMessageScheduler scheduler, CancellationToken cancellationToken) =>
+{
+    var delay = TimeSpan.FromSeconds(Math.Clamp(delaySeconds ?? 120, 5, 3_600));
+    var message = new SubmitOrder
+    {
+        OrderId = Guid.NewGuid(),
+        Message = DemoScenario.CreateSubmitMessage("csharp-scheduled", shouldFault: false)
+    };
+    var handle = await scheduler.SchedulePublish(message, delay, cancellationToken);
+    return Results.Accepted($"/schedule/{handle.TokenId}", new
+    {
+        handle.TokenId,
+        DueAtUtc = new DateTimeOffset(handle.ScheduledTime.ToUniversalTime()),
+        MessageType = nameof(SubmitOrder)
+    });
+})
+.WithName("Schedule_SubmitOrder")
+.WithTags("Scheduling");
+
+app.MapDelete("/schedule/{tokenId:guid}", async (Guid tokenId, IMessageScheduler scheduler, CancellationToken cancellationToken) =>
+{
+    var result = await scheduler.CancelScheduledPublish(tokenId, cancellationToken);
+    return Results.Ok(new { TokenId = tokenId, Status = result.ToString() });
+})
+.WithName("Cancel_ScheduledSubmitOrder")
+.WithTags("Scheduling");
+
 app.MapGet("/request", async Task<Results<Ok<string>, InternalServerError<string>>> (IRequestClient<TestRequest> client, ILogger<Program> logger, CancellationToken cancellationToken = default) =>
 {
     try

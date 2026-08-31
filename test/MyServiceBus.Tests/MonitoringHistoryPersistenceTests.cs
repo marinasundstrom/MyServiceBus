@@ -39,6 +39,7 @@ public class MonitoringHistoryPersistenceTests
             [metadata],
             [batch],
             [heartbeat],
+            [],
             now));
         var repository = new MonitoringRepository();
         var restore = new MonitoringHistoryRestoreService(store, repository);
@@ -57,7 +58,7 @@ public class MonitoringHistoryPersistenceTests
     public async Task Ingest_service_writes_accepted_monitoring_records_to_the_configured_store()
     {
         var now = DateTimeOffset.UtcNow;
-        var store = new StubHistoryStore(new MonitoringHistoryRestore([], [], [], null));
+        var store = new StubHistoryStore(new MonitoringHistoryRestore([], [], [], [], null));
         var service = new MonitoringIngestService(new MonitoringRepository(), store);
         var metadata = CreateMetadata(now);
         var batch = CreateBatch(now);
@@ -148,6 +149,9 @@ public class MonitoringHistoryPersistenceTests
         }
 
         public Task StoreHeartbeatAsync(MonitoringHeartbeat heartbeat, CancellationToken cancellationToken)
+            => Task.CompletedTask;
+
+        public Task StoreScheduledWorkAsync(MonitoringScheduledWorkSnapshot snapshot, CancellationToken cancellationToken)
             => Task.CompletedTask;
     }
 }
