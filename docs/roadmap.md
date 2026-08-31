@@ -140,6 +140,8 @@ The detailed assessment, work slices, and evidence rules are defined in [Enterpr
 
 **Scheduling status:** the default C# and Java message schedulers remain explicitly volatile and cancellable. Matching PostgreSQL providers persist one-time delayed intent transactionally, return its message identity as a handle, and support atomic persisted cancellation after commit. Process-level restart evidence, recurring schedules, broker-native adapters, and Quartz.NET/Quartz Scheduler adapters remain open before a general durable-scheduling promotion claim.
 
+Future monitoring, recurring-job, alerting, and privileged-control ideas are collected without delivery ranking in the [Monitoring and Control Backlog](development/monitoring-and-control-backlog.md). A later planning pass will order them by user value and architectural dependency.
+
 ## Phase 3: Inspection and Monitoring APIs
 
 **Outcome:** applications and tools can discover and observe a distributed MyServiceBus system without coupling clients to a UI or local monitoring store.
