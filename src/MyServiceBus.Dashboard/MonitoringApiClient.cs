@@ -19,6 +19,11 @@ public sealed class MonitoringApiClient
         => await httpClient.GetFromJsonAsync<MonitoringApplicationSummary[]>("/api/monitoring/v1/applications", cancellationToken).ConfigureAwait(false)
             ?? [];
 
+    public async Task<MonitoringHistorySummary?> GetHistory(CancellationToken cancellationToken)
+        => await httpClient.GetFromJsonAsync<MonitoringHistorySummary>(
+            "/api/monitoring/v1/history",
+            cancellationToken).ConfigureAwait(false);
+
     public async Task<IReadOnlyList<MonitoringInstanceSummary>> GetInstances(CancellationToken cancellationToken)
         => await httpClient.GetFromJsonAsync<MonitoringInstanceSummary[]>("/api/monitoring/v1/instances", cancellationToken).ConfigureAwait(false)
             ?? [];

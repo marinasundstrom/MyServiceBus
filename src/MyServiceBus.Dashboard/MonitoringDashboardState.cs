@@ -21,6 +21,7 @@ public sealed class MonitoringDashboardState : IAsyncDisposable
     public event Action? Changed;
 
     public IReadOnlyList<MonitoringApplicationSummary> Applications { get; private set; } = [];
+    public MonitoringHistorySummary? History { get; private set; }
     public IReadOnlyList<MonitoringInstanceSummary> Instances { get; private set; } = [];
     public IReadOnlyList<MonitoringEndpointSummary> Endpoints { get; private set; } = [];
     public IReadOnlyList<MonitoringRateSummary> ApplicationRates { get; private set; } = [];
@@ -105,6 +106,7 @@ public sealed class MonitoringDashboardState : IAsyncDisposable
         try
         {
             var applications = api.GetApplications(stopping.Token);
+            var history = api.GetHistory(stopping.Token);
             var instances = api.GetInstances(stopping.Token);
             var endpoints = api.GetEndpoints(stopping.Token);
             var applicationRates = api.GetRates(false, stopping.Token);
@@ -115,6 +117,7 @@ public sealed class MonitoringDashboardState : IAsyncDisposable
             var outboxDispatchers = api.GetOutboxDispatchers(stopping.Token);
             await Task.WhenAll(
                 applications,
+                history,
                 instances,
                 endpoints,
                 applicationRates,
@@ -124,6 +127,7 @@ public sealed class MonitoringDashboardState : IAsyncDisposable
                 observations,
                 outboxDispatchers);
             Applications = applications.Result;
+            History = history.Result;
             Instances = instances.Result;
             Endpoints = endpoints.Result;
             ApplicationRates = applicationRates.Result;
