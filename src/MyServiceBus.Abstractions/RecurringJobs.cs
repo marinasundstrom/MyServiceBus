@@ -218,8 +218,43 @@ public sealed record RecurringJobControlResult(
     RecurringJobControlOutcome Outcome,
     long? CurrentRevision = null);
 
+public sealed class RecurringJobRevisionConflictException : Exception
+{
+    public RecurringJobRevisionConflictException(
+        RecurringJobIdentity identity,
+        long expectedRevision,
+        long currentRevision)
+        : base($"Recurring job '{identity.ScheduleId}' has revision {currentRevision}, not {expectedRevision}.")
+    {
+        Identity = identity;
+        ExpectedRevision = expectedRevision;
+        CurrentRevision = currentRevision;
+    }
+
+    public RecurringJobIdentity Identity { get; }
+
+    public long ExpectedRevision { get; }
+
+    public long CurrentRevision { get; }
+}
+
+public sealed class RecurringJobNotFoundException : Exception
+{
+    public RecurringJobNotFoundException(RecurringJobIdentity identity)
+        : base($"Recurring job '{identity.ScheduleId}' was not found.")
+    {
+        Identity = identity;
+    }
+
+    public RecurringJobIdentity Identity { get; }
+}
+
 public interface IRecurringJobScheduler
 {
+    /// <exception cref="RecurringJobRevisionConflictException">
+    /// The expected revision does not match the current definition.
+    /// </exception>
+    /// <exception cref="NotSupportedException">The provider does not support the requested cadence or policy.</exception>
     Task<RecurringJobDefinitionReceipt> AddOrUpdate<TJob>(
         RecurringJobDefinition definition,
         TJob job,
@@ -245,4 +280,17 @@ public interface IRecurringJobScheduler
     Task<RecurringJobOccurrenceReceipt> TriggerNow(
         RecurringJobIdentity identity,
         CancellationToken cancellationToken = default);
+}
+
+/// <summary>
+/// Provider integration boundary for recurring definitions and occurrence materialization.
+/// Applications use <see cref="IRecurringJobScheduler"/> instead.
+/// </summary>
+public interface IRecurringJobProvider : IRecurringJobScheduler
+{
+    string ProviderName { get; }
+
+    SchedulingDurability Durability { get; }
+
+    SchedulingPlacement Placement { get; }
 }

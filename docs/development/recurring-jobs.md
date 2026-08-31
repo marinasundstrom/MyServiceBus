@@ -34,6 +34,19 @@ End-to-end `Running`, `Completed`, progress, cooperative cancellation, persisted
 
 Recurring messages remain a separate facade. They may reuse the same cadence and materialization machinery, but their outcome is message delivery rather than a tracked application job. The dashboard must label each kind accurately.
 
+## Job definition and discovery
+
+How application code implements a job is separate from how a recurring definition selects its cadence and scheduler provider. The future job-execution layer should support the same range of discovery styles as consumers:
+
+- standard job interfaces for explicit, conventional handlers;
+- method-based jobs for applications that prefer consumer-method-style registration;
+- manual registration for dynamic or framework-integrated scenarios;
+- generated registration using a C# source generator and a Java annotation processor.
+
+Annotations or attributes may describe execution concerns such as the logical job name, queue or endpoint, concurrency, timeout, retry, and cancellation support. Generated and reflective discovery must produce the same normalized job descriptor and invoke the same runtime pipeline. An attribute must not silently create a recurring schedule: recurrence remains an explicit deployment-owned definition with its own identity and revision.
+
+Generated registration is the preferred production path when definitions are static because it improves startup behavior and native/AOT compatibility. Reflection remains a supported convenience and fallback. C# and Java metadata should express equivalent portable behavior, while language-specific extensions stay outside the shared contract.
+
 ## Application API
 
 The C# and Java APIs should expose equivalent concepts using idiomatic asynchronous types:
@@ -108,6 +121,18 @@ A materializer leases due definitions with database time and `SKIP LOCKED`. In o
 
 The schema stores the cadence contract and final envelope, not a language-specific scheduler object. PostgreSQL is therefore the promoted storage-interoperable provider. The in-memory implementation uses the same state machine for development but reports volatile durability and loses definitions on restart.
 
+## Provider profiles
+
+MyServiceBus supports three deliberate deployment profiles rather than pretending that one scheduler engine is best for every application:
+
+- **.NET-native:** every participating application is .NET. The built-in providers remain available, while a Hangfire adapter can use an established .NET scheduler when its operational maturity or ecosystem integration is preferred.
+- **Java-native:** every participating application is Java. The same portable MyServiceBus contract can be backed by a Java scheduler such as JobRunr.
+- **Mixed C# and Java:** applications share the MyServiceBus PostgreSQL provider and its language-neutral schema, cadence contract, envelope format, and leasing rules.
+
+The first two profiles promise API and monitoring-model consistency, not shared scheduler storage. A Hangfire database is not a cross-language contract for JobRunr, nor vice versa. Only the PostgreSQL profile promises that either MyServiceBus runtime can create and materialize the same definitions.
+
+Applications depend on the recurring-job scheduler facade. Provider integrations implement the separate provider boundary and report their identity, durability, and placement. The built-in in-memory provider is the development baseline: it is process-local, volatile, and intentionally implements only capabilities it can guarantee. Provider-specific capabilities may be exposed in configuration and drill-down diagnostics, while the normalized definition and occurrence model remains stable for monitoring and the dashboard.
+
 ## Monitoring
 
 The monitoring service receives separate normalized records for definitions and occurrences. It remains the store and query boundary; the dashboard does not query the scheduler database.
@@ -125,8 +150,8 @@ The application overview shows only actionable counts such as active, paused, ov
 3. Add PostgreSQL schema version 4, transactional materialization into the existing outbox, restart tests, and bidirectional C#/Java storage interoperability.
 4. Export definition and occurrence monitoring with explicit dispatch-only coverage, then add a focused dashboard view and Aspire demo case.
 5. Add cron evaluation only after cross-language fixtures cover dialect, time zones, daylight-saving transitions, boundaries, and misfires. Fixed interval may ship first if cron would otherwise obscure the state model.
-6. Design the job-execution/`JobConsumer` layer for completion, progress, retry, concurrency, and cancellation.
-7. Later validate the contracts against Quartz plus Hangfire or JobRunr without making any of those engines mandatory.
+6. Design the job-execution/`JobConsumer` layer for completion, progress, retry, concurrency, cancellation, interface and method handlers, and generated C#/Java registration.
+7. Validate the provider boundary with a .NET Hangfire conformance adapter and a Java JobRunr conformance adapter without making either engine mandatory or claiming storage interoperability between them.
 
 ## References
 

@@ -49,6 +49,8 @@ Keep the two views synchronized by meaning, not by copying rows mechanically. Th
 
 Runtime capability and language tooling are tracked separately. A feature implemented by the .NET runtime is not automatically available through the C# source generator, and a Java runtime primitive does not imply that an annotation processor exists.
 
+The same rule will apply to the planned job-execution layer. Interface and method-based job handlers, their normalized descriptors, and generated registration must be implemented and verified independently in both columns; recurring-job cadence and provider selection remain separate concerns.
+
 | Capability | .NET runtime | C# source generator | Java runtime | Java build tooling |
 | --- | --- | --- | --- | --- |
 | Interface consumer | Implemented | Implemented | Implemented | Not required |
