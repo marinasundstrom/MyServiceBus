@@ -6,7 +6,7 @@ namespace MyServiceBus.Monitoring.Server;
 public sealed class MonitoringRepository
 {
     private static readonly TimeSpan LeaseTimeout = TimeSpan.FromSeconds(45);
-    private static readonly TimeSpan MetricRetention = TimeSpan.FromMinutes(15);
+    internal static readonly TimeSpan MetricRetention = TimeSpan.FromMinutes(15);
     private const int RecentObservationLimit = 5_000;
     private const int MaximumLabelCount = 16;
     private readonly ConcurrentDictionary<InstanceKey, InstanceState> instances = new();
@@ -100,12 +100,17 @@ public sealed class MonitoringRepository
         return true;
     }
 
-    public MonitoringHistorySummary GetHistory(DateTimeOffset now)
+    public MonitoringHistorySummary GetHistory(
+        DateTimeOffset now,
+        string storageProvider = "InMemory",
+        bool durable = false,
+        DateTimeOffset? storedHistoryAvailableFromUtc = null)
     {
         lock (observationSync)
         {
             var retentionStart = now - MetricRetention;
-            var availableFrom = serviceStartedAtUtc > retentionStart ? serviceStartedAtUtc : retentionStart;
+            var historyBoundary = storedHistoryAvailableFromUtc ?? serviceStartedAtUtc;
+            var availableFrom = historyBoundary > retentionStart ? historyBoundary : retentionStart;
             var retained = recentObservations
                 .Where(record => record.Observation.OccurredAtUtc >= retentionStart
                     && record.Observation.OccurredAtUtc <= now)
@@ -117,8 +122,8 @@ public sealed class MonitoringRepository
             var lastIngestTicks = Interlocked.Read(ref lastIngestUtcTicks);
 
             return new MonitoringHistorySummary(
-                "InMemory",
-                false,
+                storageProvider,
+                durable,
                 (int)MetricRetention.TotalSeconds,
                 serviceStartedAtUtc,
                 availableFrom,
@@ -523,6 +528,9 @@ public sealed class MonitoringRepository
 
     private void MarkIngested()
         => Interlocked.Exchange(ref lastIngestUtcTicks, DateTimeOffset.UtcNow.UtcTicks);
+
+    internal void SetLastIngestAtUtc(DateTimeOffset? value)
+        => Interlocked.Exchange(ref lastIngestUtcTicks, value?.UtcTicks ?? 0);
 
     private static IEnumerable<string> CorrelationKeys(MonitoringObservation observation)
     {

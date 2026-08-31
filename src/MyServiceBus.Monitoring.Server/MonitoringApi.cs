@@ -7,11 +7,15 @@ public static class MonitoringApi
     public static IEndpointRouteBuilder MapMonitoringApi(this IEndpointRouteBuilder endpoints)
     {
         var ingest = endpoints.MapGroup("/api/monitoring/v1").WithTags("Monitoring ingest");
-        ingest.MapPost("/metadata", (MonitoringMetadata metadata, MonitoringRepository repository, MonitoringChangeFeed changes) =>
+        ingest.MapPost("/metadata", async (
+            MonitoringMetadata metadata,
+            MonitoringIngestService ingestService,
+            MonitoringChangeFeed changes,
+            CancellationToken cancellationToken) =>
         {
             try
             {
-                repository.UpsertMetadata(metadata);
+                await ingestService.UpsertMetadataAsync(metadata, cancellationToken);
                 changes.Publish("metadata_changed");
                 return Results.Accepted();
             }
@@ -20,18 +24,25 @@ public static class MonitoringApi
                 return Results.BadRequest(new { error = exception.Message });
             }
         });
-        ingest.MapPost("/observations:batch", (MonitoringObservationBatch batch, MonitoringRepository repository, MonitoringChangeFeed changes) =>
+        ingest.MapPost("/observations:batch", async (
+            MonitoringObservationBatch batch,
+            MonitoringIngestService ingestService,
+            MonitoringChangeFeed changes,
+            CancellationToken cancellationToken) =>
         {
-            if (!repository.RecordBatch(batch))
+            if (!await ingestService.RecordBatchAsync(batch, cancellationToken))
                 return Results.Conflict(new { error = "Metadata must be registered before observations are accepted." });
             changes.Publish("observations_changed");
             return Results.Accepted();
         });
-        ingest.MapPost("/heartbeat", (MonitoringHeartbeat heartbeat, MonitoringRepository repository) =>
-            repository.RecordHeartbeat(heartbeat) ? Results.Accepted() : Results.NotFound());
+        ingest.MapPost("/heartbeat", async (
+            MonitoringHeartbeat heartbeat,
+            MonitoringIngestService ingestService,
+            CancellationToken cancellationToken) =>
+            await ingestService.RecordHeartbeatAsync(heartbeat, cancellationToken) ? Results.Accepted() : Results.NotFound());
 
         var query = endpoints.MapGroup("/api/monitoring/v1").WithTags("Monitoring queries");
-        query.MapGet("/history", (MonitoringRepository repository) => repository.GetHistory(DateTimeOffset.UtcNow));
+        query.MapGet("/history", (MonitoringIngestService ingestService) => ingestService.GetHistory(DateTimeOffset.UtcNow));
         query.MapGet("/applications", (MonitoringRepository repository) => repository.GetApplications(DateTimeOffset.UtcNow));
         query.MapGet("/instances", (string? application, MonitoringRepository repository) => repository.GetInstances(application, DateTimeOffset.UtcNow));
         query.MapGet("/endpoints", (string? application, int? windowSeconds, MonitoringRepository repository) =>

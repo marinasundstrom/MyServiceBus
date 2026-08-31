@@ -1,0 +1,153 @@
+using Microsoft.EntityFrameworkCore;
+using MyServiceBus.Inspection;
+using MyServiceBus.Monitoring;
+using MyServiceBus.Monitoring.Server;
+using Shouldly;
+
+public class MonitoringHistoryPersistenceTests
+{
+    [Fact]
+    public void Entity_framework_model_maps_the_dedicated_monitoring_schema()
+    {
+        var options = new DbContextOptionsBuilder<MonitoringHistoryDbContext>()
+            .UseNpgsql("Host=localhost;Database=monitoring;Username=test;Password=test")
+            .Options;
+        using var context = new MonitoringHistoryDbContext(options);
+
+        var script = context.Database.GenerateCreateScript();
+
+        script.ShouldContain("myservicebus_monitoring");
+        script.ShouldContain("observation_batch");
+        script.ShouldContain("jsonb");
+        context.Database.GetMigrations().ShouldContain("20260831120000_InitialMonitoringHistory");
+        context.Database.HasPendingModelChanges().ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task Startup_restore_rebuilds_the_live_query_model_and_durable_history_status()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var metadata = CreateMetadata(now);
+        var batch = CreateBatch(now);
+        var heartbeat = new MonitoringHeartbeat(
+            MonitoringProtocol.Version,
+            "orders",
+            "orders-1",
+            "bus",
+            now);
+        var store = new StubHistoryStore(new MonitoringHistoryRestore(
+            [metadata],
+            [batch],
+            [heartbeat],
+            now));
+        var repository = new MonitoringRepository();
+        var restore = new MonitoringHistoryRestoreService(store, repository);
+
+        await restore.StartAsync(CancellationToken.None);
+
+        repository.GetApplications(now).ShouldHaveSingleItem().Totals.Consumed.ShouldBe(1);
+        var history = new MonitoringIngestService(repository, store).GetHistory(now);
+        history.StorageProvider.ShouldBe("PostgreSql");
+        history.Durable.ShouldBeTrue();
+        history.LastIngestAtUtc.ShouldBe(now);
+        store.Initialized.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task Ingest_service_writes_accepted_monitoring_records_to_the_configured_store()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var store = new StubHistoryStore(new MonitoringHistoryRestore([], [], [], null));
+        var service = new MonitoringIngestService(new MonitoringRepository(), store);
+        var metadata = CreateMetadata(now);
+        var batch = CreateBatch(now);
+
+        await service.UpsertMetadataAsync(metadata, CancellationToken.None);
+        (await service.RecordBatchAsync(batch, CancellationToken.None)).ShouldBeTrue();
+
+        store.StoredMetadata.ShouldBe(1);
+        store.StoredBatches.ShouldBe(1);
+    }
+
+    private static MonitoringMetadata CreateMetadata(DateTimeOffset now)
+        => new(
+            MonitoringProtocol.Version,
+            "orders",
+            "orders-1",
+            "1.0.0",
+            "dotnet",
+            "1.0.0",
+            "bus",
+            now,
+            now,
+            new BusInspectionSnapshot("rabbitmq", new Uri("rabbitmq://localhost/"), now, [], [], []));
+
+    private static MonitoringObservationBatch CreateBatch(DateTimeOffset now)
+        => new(
+            MonitoringProtocol.Version,
+            "orders",
+            "orders-1",
+            "bus",
+            "batch-1",
+            1,
+            1,
+            0,
+            now,
+            [new MonitoringObservation(
+                1,
+                now,
+                "consumed",
+                true,
+                "SubmitOrder",
+                "urn:message:SubmitOrder",
+                "orders",
+                null,
+                12,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null)]);
+
+    private sealed class StubHistoryStore : IMonitoringHistoryStore
+    {
+        private readonly MonitoringHistoryRestore restore;
+
+        public StubHistoryStore(MonitoringHistoryRestore restore)
+        {
+            this.restore = restore;
+        }
+
+        public string Provider => "PostgreSql";
+        public bool Durable => true;
+        public DateTimeOffset? HistoryAvailableFromUtc => restore.LastIngestAtUtc;
+        public bool Initialized { get; private set; }
+        public int StoredMetadata { get; private set; }
+        public int StoredBatches { get; private set; }
+
+        public Task InitializeAsync(CancellationToken cancellationToken)
+        {
+            Initialized = true;
+            return Task.CompletedTask;
+        }
+
+        public Task<MonitoringHistoryRestore> RestoreAsync(DateTimeOffset observationCutoff, CancellationToken cancellationToken)
+            => Task.FromResult(restore);
+
+        public Task StoreMetadataAsync(MonitoringMetadata metadata, CancellationToken cancellationToken)
+        {
+            StoredMetadata++;
+            return Task.CompletedTask;
+        }
+
+        public Task StoreBatchAsync(MonitoringObservationBatch batch, CancellationToken cancellationToken)
+        {
+            StoredBatches++;
+            return Task.CompletedTask;
+        }
+
+        public Task StoreHeartbeatAsync(MonitoringHeartbeat heartbeat, CancellationToken cancellationToken)
+            => Task.CompletedTask;
+    }
+}

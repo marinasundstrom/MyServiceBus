@@ -16,6 +16,7 @@
 
   <ItemGroup>
     <ProjectReference Include="../../src/MyServiceBus.PostgreSql/MyServiceBus.PostgreSql.csproj" />
+    <ProjectReference Include="../../src/MyServiceBus.Monitoring.Server/MyServiceBus.Monitoring.Server.csproj" />
   </ItemGroup>
 
   <ItemGroup>
