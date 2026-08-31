@@ -1,24 +1,22 @@
 @page "/"
 @rendermode InteractiveServer
-@implements IAsyncDisposable
-@inject MonitoringApiClient Api
-@using System.Net.WebSockets
+@inherits MonitoringPageBase
 
 <PageTitle>MyServiceBus Monitoring</PageTitle>
 
 <section class="hero">
     <div>
-        <p class="eyebrow">Distributed messaging, live</p>
-        <h1>Runtime overview</h1>
-        <p class="lede">Compare replica throughput, latency, retries, and failures. The data is descriptive—the scaling decision remains yours.</p>
+        <p class="eyebrow">Distributed messaging</p>
+        <h1>Operational overview</h1>
+        <p class="lede">The current health and activity of every participating MyServiceBus application.</p>
     </div>
-    <div class="connection @(_error is null ? "online" : "offline")">
+    <div class="connection @(Dashboard.Error is null ? "online" : "offline")">
         <span></span>
-        @(_error is not null ? "Monitoring service unavailable" : _liveConnected ? "Live updates connected" : "Polling monitoring service")
+        @(Dashboard.Error is not null ? "Monitoring service unavailable" : Dashboard.LiveConnected ? "Live updates connected" : "Polling monitoring service")
     </div>
 </section>
 
-@if (_applications.Count == 0)
+@if (Dashboard.Applications.Count == 0)
 {
     <section class="empty-state">
         <h2>Waiting for applications</h2>
@@ -27,410 +25,87 @@
 }
 else
 {
-    <section class="guidance">
-        <strong>Reading the scaling view</strong>
-        <span>Applications group their replicas automatically. Compare consume rate, load share, and p95 duration between instances. Queue depth and host saturation can be supplied by transport or telemetry integrations later.</span>
+    <section class="overview-grid dashboard-widget" data-widget-id="summary" aria-label="Operational summary">
+        <MetricValue Label="Applications" Value="@Dashboard.Applications.Count.ToString("N0")" />
+        <MetricValue Label="Replicas online" Value="@($"{OnlineInstances:N0} / {TotalInstances:N0}")" Alert="@(OnlineInstances < TotalInstances)" />
+        <MetricValue Label="Messages handled / sec" Value="@FormatRate(TotalConsumedRate)" />
+        <MetricValue Label="Failures · 60 sec" Value="@WindowFailures.ToString("N0")" Alert="@(WindowFailures > 0)" />
+        <MetricValue Label="Monitoring data" Value="@(CompleteCoverage ? "Complete" : "Incomplete")" Alert="@(!CompleteCoverage)" />
     </section>
 
-    <section class="panel chart-panel">
-        <div class="section-heading">
-            <div>
-                <p class="eyebrow">Live throughput</p>
-                <h2>Consumed messages per second</h2>
-            </div>
-            <span>Last 5 minutes · 5-second buckets</span>
-        </div>
-        <ThroughputChart Points="_timeSeries" />
-    </section>
-
-    @foreach (var group in GroupedApplications)
-    {
-        <section class="application-group">
-            <div class="group-heading">
-                <div>
-                    <p class="eyebrow">Application group</p>
-                    <h2>@group.Key</h2>
-                </div>
-                <span>@group.Count() application@(group.Count() == 1 ? null : "s")</span>
-            </div>
-            <div class="summary-grid">
-                @foreach (var application in group)
-                {
-                    var rate = ApplicationRate(application.ApplicationName);
-                    <article class="summary-card">
-                        <div class="card-heading">
-                            <div>
-                                <p class="eyebrow">Application</p>
-                                <h2>@application.ApplicationName</h2>
-                            </div>
-                            <span class="pill">@application.OnlineInstances / @application.TotalInstances replicas online</span>
-                        </div>
-                        <div class="metrics">
-                            <MetricValue Label="Consume / sec" Value="@FormatRate(rate?.Rates.ConsumedPerSecond)" />
-                            <MetricValue Label="p95 consume" Value="@FormatDuration(rate?.P95ConsumeDurationMs)" />
-                            <MetricValue Label="Retries · 60 sec" Value="@FormatCount(rate?.Counts.RetryAttempted)" Alert="@(rate?.Counts.RetryAttempted > 0)" />
-                            <MetricValue Label="Failures · 60 sec" Value="@FormatCount(Failures(rate?.Counts))" Alert="@(Failures(rate?.Counts) > 0)" />
-                        </div>
-                        @if (application.Labels is { Count: > 0 })
-                        {
-                            <div class="labels">
-                                @foreach (var label in application.Labels.Where(label => label.Key != "group"))
-                                {
-                                    <span>@label.Key: @label.Value</span>
-                                }
-                            </div>
-                        }
-                    </article>
-                }
-            </div>
-        </section>
-    }
-
-    @if (_outboxDispatchers.Count > 0)
-    {
-        <section class="panel instances outbox-operations">
+    <div class="overview-detail-grid">
+        <section class="panel overview-panel dashboard-widget" data-widget-id="throughput">
             <div class="section-heading">
                 <div>
-                    <p class="eyebrow">Transactional outbox</p>
-                    <h2>Dispatcher operations</h2>
+                    <p class="eyebrow">Live throughput</p>
+                    <h2>Messages handled per second</h2>
                 </div>
-                <span>60-second delivery window · grouped by service partition</span>
+                <a class="section-link" href="/throughput">View details</a>
             </div>
-            <div class="table-wrap">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Status</th>
-                            <th>Service partition</th>
-                            <th>Worker</th>
-                            <th>Pending</th>
-                            <th>Oldest</th>
-                            <th>Dispatch / sec</th>
-                            <th>Failed</th>
-                            <th>Lost leases</th>
-                            <th>Cycle latency</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var dispatcher in _outboxDispatchers)
-                        {
-                            var healthy = dispatcher.Online && dispatcher.LastCycleSucceeded;
-                            <tr>
-                                <td><span class="status-dot @(healthy ? "online" : "offline")"></span>@(healthy ? "Healthy" : "Attention")</td>
-                                <td><strong>@dispatcher.ServiceName</strong><small>@dispatcher.ApplicationName</small></td>
-                                <td class="mono">@dispatcher.OwnerId<small>@dispatcher.InstanceId</small></td>
-                                <td class="@(dispatcher.Pending > 0 ? "fault" : null)">@FormatCount(dispatcher.Pending)</td>
-                                <td class="@(dispatcher.OldestUndispatchedAgeMs > 30_000 ? "fault" : null)">@FormatAge(dispatcher.OldestUndispatchedAgeMs)</td>
-                                <td>@FormatRate(dispatcher.DispatchedPerSecond)</td>
-                                <td class="@(dispatcher.WindowFailed > 0 ? "fault" : null)">@dispatcher.WindowFailed.ToString("N0")</td>
-                                <td class="@(dispatcher.WindowLostLeases > 0 ? "fault" : null)">@dispatcher.WindowLostLeases.ToString("N0")</td>
-                                <td>@FormatDuration(dispatcher.LastCycleDurationMs)</td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
-            </div>
-        </section>
-    }
-
-    <section class="panel instances">
-        <div class="section-heading">
-            <div>
-                <p class="eyebrow">Replica detail</p>
-                <h2>Application instances</h2>
-            </div>
-            <span>60-second window · updated @_updatedAt.ToLocalTime().ToString("HH:mm:ss")</span>
-        </div>
-        <div class="table-wrap">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Status</th>
-                        <th>Group / application</th>
-                        <th>Instance</th>
-                        <th>Consume / sec</th>
-                        <th>Load share</th>
-                        <th>p95 consume</th>
-                        <th>Retries</th>
-                        <th>Failures</th>
-                        <th>Transport</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (var instance in _instances.OrderBy(GetGroup).ThenBy(instance => instance.ApplicationName).ThenBy(instance => instance.InstanceId))
-                    {
-                        var rate = InstanceRate(instance.ApplicationName, instance.InstanceId);
-                        <tr>
-                            <td><span class="status-dot @(instance.Online ? "online" : "offline")"></span>@(instance.Online ? "Online" : "Offline")</td>
-                            <td><strong>@instance.ApplicationName</strong><small>@GetGroup(instance)</small></td>
-                            <td class="mono">@instance.InstanceId<small>@instance.ClientLanguage @instance.ClientVersion</small></td>
-                            <td>@FormatRate(rate?.Rates.ConsumedPerSecond)</td>
-                            <td>@FormatShare(rate)</td>
-                            <td>@FormatDuration(rate?.P95ConsumeDurationMs)</td>
-                            <td class="@(rate?.Counts.RetryAttempted > 0 ? "fault" : null)">@FormatCount(rate?.Counts.RetryAttempted)</td>
-                            <td class="@(Failures(rate?.Counts) > 0 ? "fault" : null)">@FormatCount(Failures(rate?.Counts))</td>
-                            <td>@instance.TransportName<small class="mono">@instance.BusAddress</small></td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
-        </div>
-    </section>
-
-    <section class="panel flow-map-panel" id="flow">
-        <div class="section-heading">
-            <div>
-                <p class="eyebrow">Live system map</p>
-                <h2>Observed message flow</h2>
-            </div>
-            <span>Last 5 minutes · line width represents throughput</span>
-        </div>
-        <FlowMap Applications="_applications" Edges="_flow" />
-        <p class="map-help">Drag applications to explore the topology. Select one to focus its direct message paths; scroll or use the controls to zoom.</p>
-    </section>
-
-    <div class="detail-grid">
-        <section class="panel">
-            <div class="section-heading">
-                <div>
-                    <p class="eyebrow">Observed paths</p>
-                    <h2>Message flow</h2>
-                </div>
-                <span>Last 5 minutes</span>
-            </div>
-            @if (_flow.Count == 0)
-            {
-                <p class="panel-empty">No correlated message paths observed in this window.</p>
-            }
-            else
-            {
-                <div class="flow-list">
-                    @foreach (var edge in _flow.Take(12))
-                    {
-                        <div class="flow-edge">
-                            <strong>@edge.SourceApplication</strong>
-                            <span>→</span>
-                            <strong>@edge.TargetApplication</strong>
-                            <small>@ShortMessageType(edge.MessageType) · @edge.Count.ToString("N0")</small>
-                        </div>
-                    }
-                </div>
-            }
+            <ThroughputChart Points="Dashboard.TimeSeries" Compact="true" />
         </section>
 
-        <section class="panel">
+        <section class="panel overview-panel dashboard-widget" data-widget-id="attention">
             <div class="section-heading">
                 <div>
                     <p class="eyebrow">Attention</p>
-                    <h2>Retries and failed messages</h2>
+                    <h2>Current concerns</h2>
                 </div>
-                <span>Most recent</span>
+                <a class="section-link" href="/failures">Open failures</a>
             </div>
-            @if (SignificantObservations.Count == 0)
+            @if (AttentionApplications.Count == 0)
             {
-                <p class="panel-empty">No retries or failures in the retained observations.</p>
+                <div class="healthy-state">
+                    <span class="status-dot online"></span>
+                    <div>
+                        <strong>No application needs attention</strong>
+                        <p>All replicas are online and no failures or retries were observed in the current window.</p>
+                    </div>
+                </div>
             }
             else
             {
-                <div class="event-list">
-                    @foreach (var record in SignificantObservations.Take(12))
+                <div class="attention-list">
+                    @foreach (var application in AttentionApplications.Take(5))
                     {
-                        <details class="event-row">
-                            <summary>
-                                <span class="event-kind">@DisplayKind(record.Observation.Kind)</span>
-                                <span class="event-summary">
-                                    <strong>@record.ApplicationName</strong>
-                                    <small>@ShortMessageType(record.Observation.MessageType) · @record.InstanceId</small>
-                                </span>
-                                <time>@record.Observation.OccurredAtUtc.ToLocalTime().ToString("HH:mm:ss")</time>
-                            </summary>
-                            <div class="event-detail">
-                                <span><small>Endpoint</small><strong>@ValueOrDash(record.Observation.EndpointName)</strong></span>
-                                <span><small>Retry</small><strong>@RetryDescription(record.Observation)</strong></span>
-                                <span><small>Exception</small><strong>@ValueOrDash(record.Observation.ExceptionType)</strong></span>
-                                <span><small>Correlation ID</small><strong class="mono">@ValueOrDash(record.Observation.CorrelationId)</strong></span>
-                                <span><small>Conversation ID</small><strong class="mono">@ValueOrDash(record.Observation.ConversationId)</strong></span>
-                                <span><small>Trace ID</small><strong class="mono">@ValueOrDash(record.Observation.TraceId)</strong></span>
-                                <span class="event-message"><small>Failure message</small><strong>@ValueOrDash(record.Observation.ExceptionMessage)</strong></span>
-                                <span class="event-message"><small>Message URN</small><strong class="mono">@ValueOrDash(record.Observation.MessageUrn)</strong></span>
-                            </div>
-                        </details>
+                        var rate = ApplicationRate(application.ApplicationName);
+                        <div class="attention-row">
+                            <span class="status-dot @(application.OnlineInstances == application.TotalInstances ? "online" : "offline")"></span>
+                            <strong>@application.ApplicationName</strong>
+                            <span>@application.OnlineInstances / @application.TotalInstances replicas</span>
+                            <span class="@(Failures(rate?.Counts) > 0 ? "fault" : null)">@Failures(rate?.Counts).ToString("N0") failures</span>
+                        </div>
                     }
                 </div>
             }
         </section>
     </div>
+
+    <nav class="drilldown-grid dashboard-widget" data-widget-id="drilldowns" aria-label="Operational detail views">
+        <a href="/applications"><strong>Applications</strong><span>Replicas, versions, labels, and transport context</span></a>
+        <a href="/flow"><strong>Message flow</strong><span>Live topology map and observed paths</span></a>
+        <a href="/failures"><strong>Failures</strong><span>Retries, terminal failures, and correlation detail</span></a>
+        <a href="/outbox"><strong>Outbox</strong><span>Dispatcher backlog, delivery, leases, and latency</span></a>
+    </nav>
 }
 
 @code {
-    private readonly CancellationTokenSource _stopping = new();
-    private readonly SemaphoreSlim _refreshLock = new(1, 1);
-    private IReadOnlyList<MonitoringApplicationSummary> _applications = [];
-    private IReadOnlyList<MonitoringInstanceSummary> _instances = [];
-    private IReadOnlyList<MonitoringRateSummary> _applicationRates = [];
-    private IReadOnlyList<MonitoringRateSummary> _instanceRates = [];
-    private IReadOnlyList<MonitoringTimeSeriesPoint> _timeSeries = [];
-    private IReadOnlyList<MonitoringFlowEdge> _flow = [];
-    private IReadOnlyList<MonitoringObservationRecord> _observations = [];
-    private IReadOnlyList<MonitoringOutboxDispatcherSummary> _outboxDispatchers = [];
-    private DateTimeOffset _updatedAt = DateTimeOffset.UtcNow;
-    private string? _error;
-    private bool _liveConnected;
-    private Task? _pollTask;
-    private Task? _watchTask;
+    private int OnlineInstances => Dashboard.Applications.Sum(application => application.OnlineInstances);
+    private int TotalInstances => Dashboard.Applications.Sum(application => application.TotalInstances);
+    private double TotalConsumedRate => Dashboard.ApplicationRates.Sum(rate => rate.Rates.ConsumedPerSecond);
+    private long WindowFailures => Dashboard.ApplicationRates.Sum(rate => Failures(rate.Counts));
+    private bool CompleteCoverage => Dashboard.ApplicationRates.Count > 0 && Dashboard.ApplicationRates.All(rate => rate.Complete);
 
-    private IEnumerable<IGrouping<string, MonitoringApplicationSummary>> GroupedApplications
-        => _applications.GroupBy(GetGroup).OrderBy(group => group.Key, StringComparer.Ordinal);
-
-    private IReadOnlyList<MonitoringObservationRecord> SignificantObservations
-        => _observations.Where(record => record.Observation.Kind.Contains("fault", StringComparison.Ordinal)
-            || record.Observation.Kind.StartsWith("retry_", StringComparison.Ordinal)).ToArray();
-
-    protected override async Task OnInitializedAsync()
-    {
-        await Refresh();
-        _pollTask = Poll();
-        _watchTask = WatchChanges();
-    }
-
-    private async Task Poll()
-    {
-        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(15));
-        try
+    private IReadOnlyList<MonitoringApplicationSummary> AttentionApplications
+        => Dashboard.Applications.Where(application =>
         {
-            while (await timer.WaitForNextTickAsync(_stopping.Token))
-                await RefreshAndRender();
-        }
-        catch (OperationCanceledException) when (_stopping.IsCancellationRequested)
-        {
-        }
-    }
-
-    private async Task WatchChanges()
-    {
-        while (!_stopping.IsCancellationRequested)
-        {
-            try
-            {
-                await foreach (var _ in Api.WatchChanges(_stopping.Token))
-                {
-                    _liveConnected = true;
-                    await RefreshAndRender();
-                }
-            }
-            catch (OperationCanceledException) when (_stopping.IsCancellationRequested)
-            {
-                return;
-            }
-            catch (Exception exception) when (exception is HttpRequestException or WebSocketException or InvalidOperationException)
-            {
-                _liveConnected = false;
-                await InvokeAsync(StateHasChanged);
-            }
-
-            await Task.Delay(TimeSpan.FromSeconds(5), _stopping.Token);
-        }
-    }
-
-    private async Task RefreshAndRender()
-    {
-        await Refresh();
-        await InvokeAsync(StateHasChanged);
-    }
-
-    private async Task Refresh()
-    {
-        if (!await _refreshLock.WaitAsync(0, _stopping.Token))
-            return;
-        try
-        {
-            var applications = Api.GetApplications(_stopping.Token);
-            var instances = Api.GetInstances(_stopping.Token);
-            var applicationRates = Api.GetRates(false, _stopping.Token);
-            var instanceRates = Api.GetRates(true, _stopping.Token);
-            var flow = Api.GetFlow(_stopping.Token);
-            var timeSeries = Api.GetTimeSeries(_stopping.Token);
-            var observations = Api.GetRecentObservations(_stopping.Token);
-            var outboxDispatchers = Api.GetOutboxDispatchers(_stopping.Token);
-            await Task.WhenAll(applications, instances, applicationRates, instanceRates, flow, timeSeries, observations, outboxDispatchers);
-            _applications = applications.Result;
-            _instances = instances.Result;
-            _applicationRates = applicationRates.Result;
-            _instanceRates = instanceRates.Result;
-            _flow = flow.Result;
-            _timeSeries = timeSeries.Result;
-            _observations = observations.Result;
-            _outboxDispatchers = outboxDispatchers.Result;
-            _updatedAt = DateTimeOffset.UtcNow;
-            _error = null;
-        }
-        catch (HttpRequestException exception)
-        {
-            _error = exception.Message;
-        }
-        finally
-        {
-            _refreshLock.Release();
-        }
-    }
+            var rate = ApplicationRate(application.ApplicationName);
+            return application.OnlineInstances < application.TotalInstances
+                || Failures(rate?.Counts) > 0
+                || rate?.Counts.RetryAttempted > 0
+                || rate is { Complete: false };
+        }).ToArray();
 
     private MonitoringRateSummary? ApplicationRate(string applicationName)
-        => _applicationRates.FirstOrDefault(rate => rate.ApplicationName == applicationName);
-
-    private MonitoringRateSummary? InstanceRate(string applicationName, string instanceId)
-        => _instanceRates.FirstOrDefault(rate => rate.ApplicationName == applicationName && rate.InstanceId == instanceId);
-
-    private string FormatShare(MonitoringRateSummary? instanceRate)
-    {
-        if (instanceRate is null)
-            return "—";
-        var total = ApplicationRate(instanceRate.ApplicationName)?.Counts.Consumed ?? 0;
-        return total == 0 ? "—" : $"{instanceRate.Counts.Consumed * 100d / total:N0}%";
-    }
-
-    private static string GetGroup(MonitoringApplicationSummary application) => GetGroup(application.Labels);
-    private static string GetGroup(MonitoringInstanceSummary instance) => GetGroup(instance.Labels);
-
-    private static string GetGroup(IReadOnlyDictionary<string, string>? labels)
-        => labels is not null && labels.TryGetValue("group", out var group) && !string.IsNullOrWhiteSpace(group)
-            ? group
-            : "Ungrouped";
-
-    private static long Failures(MonitoringCounterSet? counters)
-        => counters is null ? 0 : counters.SendFaulted + counters.PublishFaulted + counters.ConsumeFaulted + counters.RetryExhausted;
-
-    private static string FormatRate(double? value) => value.HasValue ? value.Value.ToString("N2") : "—";
-    private static string FormatDuration(double? value) => value.HasValue ? $"{value.Value:N0} ms" : "—";
-    private static string FormatAge(double? value) => value switch
-    {
-        null => "—",
-        < 1_000 => $"{value.Value:N0} ms",
-        < 60_000 => $"{value.Value / 1_000:N1} sec",
-        _ => $"{value.Value / 60_000:N1} min"
-    };
-    private static string FormatCount(long? value) => value.HasValue ? value.Value.ToString("N0") : "—";
-    private static string DisplayKind(string value) => value.Replace('_', ' ');
-    private static string ValueOrDash(string? value) => string.IsNullOrWhiteSpace(value) ? "—" : value;
-
-    private static string RetryDescription(MonitoringObservation observation)
-        => observation.RetryAttempt.HasValue
-            ? $"Attempt {observation.RetryAttempt} · limit {observation.RetryLimit ?? 0}"
-            : "—";
-
-    private static string ShortMessageType(string? value)
-        => string.IsNullOrWhiteSpace(value) ? "Unknown message" : value.Split('.').Last();
-
-    public async ValueTask DisposeAsync()
-    {
-        _stopping.Cancel();
-        try
-        {
-            await Task.WhenAll(_pollTask ?? Task.CompletedTask, _watchTask ?? Task.CompletedTask);
-        }
-        catch (OperationCanceledException)
-        {
-        }
-        _stopping.Dispose();
-        _refreshLock.Dispose();
-    }
+        => Dashboard.ApplicationRates.FirstOrDefault(rate => rate.ApplicationName == applicationName);
 }

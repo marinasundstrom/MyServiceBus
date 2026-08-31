@@ -1,0 +1,96 @@
+@page "/applications"
+@rendermode InteractiveServer
+@inherits MonitoringPageBase
+
+<PageTitle>Applications · MyServiceBus Monitoring</PageTitle>
+<DashboardPageHeader Eyebrow="Runtime" Title="Applications" Description="Applications are the services and workers participating in this messaging system. Replicas are the running copies of each application." />
+
+@if (Dashboard.Applications.Count == 0)
+{
+    <section class="empty-state"><h2>No applications</h2><p>Applications appear here after their monitoring exporter registers.</p></section>
+}
+else
+{
+    @foreach (var group in GroupedApplications)
+    {
+        <section class="application-group">
+            <div class="group-heading">
+                <div><p class="eyebrow">Application group</p><h2>@group.Key</h2></div>
+                <span>@group.Count() application@(group.Count() == 1 ? null : "s")</span>
+            </div>
+            <div class="summary-grid">
+                @foreach (var application in group)
+                {
+                    var rate = ApplicationRate(application.ApplicationName);
+                    <article class="summary-card">
+                        <div class="card-heading">
+                            <div><p class="eyebrow">Application</p><h2>@application.ApplicationName</h2></div>
+                            <span class="pill">@application.OnlineInstances / @application.TotalInstances replicas online</span>
+                        </div>
+                        <div class="metrics">
+                            <MetricValue Label="Handled / sec" Value="@FormatRate(rate?.Rates.ConsumedPerSecond)" />
+                            <MetricValue Label="p95 handling time" Value="@FormatDuration(rate?.P95ConsumeDurationMs)" />
+                            <MetricValue Label="Retries · 60 sec" Value="@FormatCount(rate?.Counts.RetryAttempted)" Alert="@(rate?.Counts.RetryAttempted > 0)" />
+                            <MetricValue Label="Failures · 60 sec" Value="@FormatCount(Failures(rate?.Counts))" Alert="@(Failures(rate?.Counts) > 0)" />
+                        </div>
+                        @if (application.Labels is { Count: > 0 })
+                        {
+                            <div class="labels">
+                                @foreach (var label in application.Labels.Where(label => label.Key != "group"))
+                                {
+                                    <span>@label.Key: @label.Value</span>
+                                }
+                            </div>
+                        }
+                    </article>
+                }
+            </div>
+        </section>
+    }
+
+    <section class="panel instances">
+        <div class="section-heading">
+            <div><p class="eyebrow">Running copies</p><h2>Application replicas</h2></div>
+            <span>60-second window · updated @Dashboard.UpdatedAt.ToLocalTime().ToString("HH:mm:ss")</span>
+        </div>
+        <div class="table-wrap">
+            <table>
+                <thead><tr><th>Status</th><th>Group / application</th><th>Replica</th><th>Handled / sec</th><th>Load share</th><th>p95 time</th><th>Retries</th><th>Failures</th><th>Transport</th></tr></thead>
+                <tbody>
+                    @foreach (var instance in Dashboard.Instances.OrderBy(GetGroup).ThenBy(instance => instance.ApplicationName).ThenBy(instance => instance.InstanceId))
+                    {
+                        var rate = InstanceRate(instance.ApplicationName, instance.InstanceId);
+                        <tr>
+                            <td><span class="status-dot @(instance.Online ? "online" : "offline")"></span>@(instance.Online ? "Online" : "Offline")</td>
+                            <td><strong>@instance.ApplicationName</strong><small>@GetGroup(instance)</small></td>
+                            <td class="mono">@instance.InstanceId<small>@instance.ClientLanguage @instance.ClientVersion</small></td>
+                            <td>@FormatRate(rate?.Rates.ConsumedPerSecond)</td><td>@FormatShare(rate)</td><td>@FormatDuration(rate?.P95ConsumeDurationMs)</td>
+                            <td class="@(rate?.Counts.RetryAttempted > 0 ? "fault" : null)">@FormatCount(rate?.Counts.RetryAttempted)</td>
+                            <td class="@(Failures(rate?.Counts) > 0 ? "fault" : null)">@FormatCount(Failures(rate?.Counts))</td>
+                            <td>@instance.TransportName<small class="mono">@instance.BusAddress</small></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </section>
+}
+
+@code {
+    private IEnumerable<IGrouping<string, MonitoringApplicationSummary>> GroupedApplications
+        => Dashboard.Applications.GroupBy(GetGroup).OrderBy(group => group.Key, StringComparer.Ordinal);
+
+    private MonitoringRateSummary? ApplicationRate(string applicationName)
+        => Dashboard.ApplicationRates.FirstOrDefault(rate => rate.ApplicationName == applicationName);
+
+    private MonitoringRateSummary? InstanceRate(string applicationName, string instanceId)
+        => Dashboard.InstanceRates.FirstOrDefault(rate => rate.ApplicationName == applicationName && rate.InstanceId == instanceId);
+
+    private string FormatShare(MonitoringRateSummary? instanceRate)
+    {
+        if (instanceRate is null)
+            return "—";
+        var total = ApplicationRate(instanceRate.ApplicationName)?.Counts.Consumed ?? 0;
+        return total == 0 ? "—" : $"{instanceRate.Counts.Consumed * 100d / total:N0}%";
+    }
+}

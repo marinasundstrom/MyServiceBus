@@ -21,6 +21,7 @@
         }
 
         theme = await JavaScript.InvokeAsync<string>("dashboardTheme.get");
+        await JavaScript.InvokeVoidAsync("dashboardTheme.apply");
         StateHasChanged();
     }
 

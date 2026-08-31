@@ -1,0 +1,24 @@
+@page "/throughput"
+@rendermode InteractiveServer
+@inherits MonitoringPageBase
+
+<PageTitle>Throughput · MyServiceBus Monitoring</PageTitle>
+<DashboardPageHeader Eyebrow="Activity" Title="Throughput" Description="See how quickly each application is handling messages. Rates are averages over bounded time windows, not broker queue depth." />
+
+<section class="panel chart-panel">
+    <div class="section-heading"><div><p class="eyebrow">Live trend</p><h2>Messages handled per second</h2></div><span>Last 5 minutes · 5-second buckets</span></div>
+    <ThroughputChart Points="Dashboard.TimeSeries" />
+</section>
+
+<section class="panel instances">
+    <div class="section-heading"><div><p class="eyebrow">Application breakdown</p><h2>Current rates and handling time</h2></div><span>60-second window</span></div>
+    <div class="table-wrap"><table>
+        <thead><tr><th>Application</th><th>Sent / sec</th><th>Published / sec</th><th>Handled / sec</th><th>Faulted / sec</th><th>Retried / sec</th><th>Average time</th><th>p95 time</th><th>Coverage</th></tr></thead>
+        <tbody>
+            @foreach (var rate in Dashboard.ApplicationRates.OrderByDescending(rate => rate.Rates.ConsumedPerSecond))
+            {
+                <tr><td><strong>@rate.ApplicationName</strong></td><td>@FormatRate(rate.Rates.SentPerSecond)</td><td>@FormatRate(rate.Rates.PublishedPerSecond)</td><td>@FormatRate(rate.Rates.ConsumedPerSecond)</td><td class="@(rate.Rates.FaultedPerSecond > 0 ? "fault" : null)">@FormatRate(rate.Rates.FaultedPerSecond)</td><td>@FormatRate(rate.Rates.RetriedPerSecond)</td><td>@FormatDuration(rate.AverageConsumeDurationMs)</td><td>@FormatDuration(rate.P95ConsumeDurationMs)</td><td>@(rate.Complete ? "Complete" : "Incomplete")</td></tr>
+            }
+        </tbody>
+    </table></div>
+</section>
