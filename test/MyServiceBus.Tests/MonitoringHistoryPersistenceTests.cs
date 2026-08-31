@@ -18,6 +18,7 @@ public class MonitoringHistoryPersistenceTests
 
         script.ShouldContain("myservicebus_monitoring");
         script.ShouldContain("observation_batch");
+        script.ShouldContain("job_snapshot");
         script.ShouldContain("jsonb");
         context.Database.GetMigrations().ShouldContain("20260831120000_InitialMonitoringHistory");
         context.Database.GetMigrations().ShouldContain("20260831170000_AddRecurringJobSnapshots");
@@ -30,6 +31,7 @@ public class MonitoringHistoryPersistenceTests
         var now = DateTimeOffset.UtcNow;
         var metadata = CreateMetadata(now);
         var batch = CreateBatch(now);
+        var jobs = CreateJobs(now);
         var heartbeat = new MonitoringHeartbeat(
             MonitoringProtocol.Version,
             "orders",
@@ -42,6 +44,7 @@ public class MonitoringHistoryPersistenceTests
             [heartbeat],
             [],
             [],
+            [jobs],
             now));
         var repository = new MonitoringRepository();
         var restore = new MonitoringHistoryRestoreService(store, repository);
@@ -49,6 +52,8 @@ public class MonitoringHistoryPersistenceTests
         await restore.StartAsync(CancellationToken.None);
 
         repository.GetApplications(now).ShouldHaveSingleItem().Totals.Consumed.ShouldBe(1);
+        repository.GetJobs("orders", "running", now).ShouldHaveSingleItem()
+            .Job.JobType.ShouldBe("invoice-export");
         var history = new MonitoringIngestService(repository, store).GetHistory(now);
         history.StorageProvider.ShouldBe("PostgreSql");
         history.Durable.ShouldBeTrue();
@@ -60,16 +65,19 @@ public class MonitoringHistoryPersistenceTests
     public async Task Ingest_service_writes_accepted_monitoring_records_to_the_configured_store()
     {
         var now = DateTimeOffset.UtcNow;
-        var store = new StubHistoryStore(new MonitoringHistoryRestore([], [], [], [], [], null));
+        var store = new StubHistoryStore(new MonitoringHistoryRestore([], [], [], [], [], [], null));
         var service = new MonitoringIngestService(new MonitoringRepository(), store);
         var metadata = CreateMetadata(now);
         var batch = CreateBatch(now);
+        var jobs = CreateJobs(now);
 
         await service.UpsertMetadataAsync(metadata, CancellationToken.None);
         (await service.RecordBatchAsync(batch, CancellationToken.None)).ShouldBeTrue();
+        (await service.StoreJobsAsync(jobs, CancellationToken.None)).ShouldBeTrue();
 
         store.StoredMetadata.ShouldBe(1);
         store.StoredBatches.ShouldBe(1);
+        store.StoredJobs.ShouldBe(1);
     }
 
     private static MonitoringMetadata CreateMetadata(DateTimeOffset now)
@@ -113,6 +121,30 @@ public class MonitoringHistoryPersistenceTests
                 null,
                 null)]);
 
+    private static MonitoringJobSnapshot CreateJobs(DateTimeOffset now)
+        => new(
+            MonitoringProtocol.Version,
+            "orders",
+            "orders-1",
+            "bus",
+            now,
+            [new MonitoringJobItem(
+                "job-1",
+                "invoice-export",
+                "Running",
+                "MyServiceBus.InMemory",
+                "Volatile",
+                "ProcessLocal",
+                now.AddMinutes(-1),
+                null,
+                now.AddSeconds(-5),
+                null,
+                4,
+                10,
+                null,
+                now,
+                [])]);
+
     private sealed class StubHistoryStore : IMonitoringHistoryStore
     {
         private readonly MonitoringHistoryRestore restore;
@@ -128,6 +160,7 @@ public class MonitoringHistoryPersistenceTests
         public bool Initialized { get; private set; }
         public int StoredMetadata { get; private set; }
         public int StoredBatches { get; private set; }
+        public int StoredJobs { get; private set; }
 
         public Task InitializeAsync(CancellationToken cancellationToken)
         {
@@ -158,5 +191,11 @@ public class MonitoringHistoryPersistenceTests
 
         public Task StoreRecurringJobsAsync(MonitoringRecurringJobSnapshot snapshot, CancellationToken cancellationToken)
             => Task.CompletedTask;
+
+        public Task StoreJobsAsync(MonitoringJobSnapshot snapshot, CancellationToken cancellationToken)
+        {
+            StoredJobs++;
+            return Task.CompletedTask;
+        }
     }
 }

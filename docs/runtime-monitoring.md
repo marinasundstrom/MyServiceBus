@@ -90,7 +90,7 @@ Scheduled work is another application-focused view. It lists bounded operational
 
 Recurring jobs have a separate view and monitoring snapshot because cadence, revision, pause state, and next occurrence belong to the durable definition rather than to one scheduled message. The current preview exports authoritative definition state from the in-memory and built-in durable providers in both runtimes. Durable occurrences execute as correlated tracked jobs, but retained occurrence history is not exported yet. The UI therefore does not infer a definition's outcome from its current state. Snapshot time and reporting-instance health remain visible so stale or unavailable data is not presented as an empty schedule.
 
-Tracked jobs are exported separately from scheduled messages and recurring definitions. The bounded snapshot contains current job and attempt state, progress, timings, and recurring-occurrence correlation without application payloads or failure messages. Query results include capture time and reporting-instance availability. The monitoring server currently keeps the latest job snapshot in memory; durable PostgreSQL history and retained occurrence projections remain a separate persistence slice.
+Tracked jobs are exported separately from scheduled messages and recurring definitions. The bounded snapshot contains current job and attempt state, progress, timings, and recurring-occurrence correlation without application payloads or failure messages. Query results include capture time and reporting-instance availability. The PostgreSQL monitoring provider persists and restores the latest snapshot per application instance and bus; this does not yet provide retained occurrence history or a job time series.
 
 The monitoring service must not query every scheduler database. Message-aware scheduling providers and job providers should export bounded snapshots or lifecycle observations from their owning application, as outbox monitoring does. The dashboard may eventually offer cancellation or retry, but those are control-plane commands and are not authorized by read-only schedule visibility.
 
@@ -233,7 +233,7 @@ The .NET monitoring service can instead use its built-in Entity Framework Core P
 }
 ```
 
-The provider applies its schema migration at startup and stores the latest metadata and heartbeat per bus identity plus deduplicated observation batches as JSONB. On restart, it rebuilds the current 15-minute query window without making restored observations appear newly ingested. The seven-day retention default bounds stored batches for future historical queries; it does not yet make seven days available through the current dashboard.
+The provider applies its schema migration at startup and stores the latest metadata, heartbeat, scheduled-work, recurring-definition, and tracked-job snapshots per bus identity plus deduplicated observation batches as JSONB. On restart, it restores those latest authoritative snapshots and rebuilds the current 15-minute observation window without making restored records appear newly ingested. The seven-day retention default bounds stored observation batches for future historical queries; it does not turn latest-state snapshots into time series or make seven days available through the current dashboard.
 
 Storage belongs entirely to the monitoring service. Exporters and the dashboard do not receive database credentials, use Entity Framework, or own retention behavior.
 
