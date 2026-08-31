@@ -18,9 +18,11 @@ An executable spike lives in [`test/Experiments/DotNet11Unions`](../../test/Expe
 - the union carrier is absent from message topology;
 - Raven's `T1 | T2` source form lowers to Raven.Core's `System.Union<T1, T2>` and follows the same path without Raven-specific MyServiceBus runtime code;
 - `Response<T1, T2>` can provide implicit case conversion, exhaustive C# matching, `TryGetValue`, and transparent STJ serialization on the `net11.0` build; and
-- independently restored C# and Raven applications can consume locally packed MyServiceBus NuGet packages and execute these behaviors.
+- independently restored C# and Raven applications can consume locally packed MyServiceBus NuGet packages and execute these behaviors;
+- the C# source generator expands a named-union input into direct per-case consumer adapters without runtime ABI discovery; and
+- the generated union path constructs and dispatches both cases in a .NET 11 Runtime Async NativeAOT executable.
 
-The prototype is intentionally narrower than this proposal. It supports reflection-discovered input unions with public case constructors, mediator dispatch, and two-case response results. It does not yet implement generated registration, NativeAOT, broker conformance, union-valued handler returns, typed `ConsumeContext<TUnion>`, provider-based ABI construction, general outbound union values, or a Java convenience API.
+The implemented experiment remains narrower than this proposal. It supports reflection-discovered C# and Raven input unions with public case constructors, generated C# named-union input, mediator dispatch, generated NativeAOT dispatch, and two-case response results. It does not yet implement broker conformance, union-valued handler returns, typed `ConsumeContext<TUnion>`, provider-based ABI construction, general outbound union values, a trimmed Raven registration path, or a Java convenience API.
 
 ### What the experiment establishes
 
@@ -42,7 +44,7 @@ Union support should normalize into the same concrete registration model used by
 
 The prototype reflection path performs metadata inspection once, caches the descriptor by carrier type, and compiles one constructor delegate per case. It does not rediscover constructors for each delivery. It still inherits the allocation and reflection costs of the existing reflection consumer path: the union struct is boxed for `MethodInfo.Invoke`, and invocation uses an argument array.
 
-The optimized path should teach the C# registration generator to emit the normalized case registrations and direct construction:
+The C# registration generator emits normalized case registrations and direct construction:
 
 ```text
 case registration: SubmitOrder
@@ -50,7 +52,7 @@ deserialize:        SubmitOrder
 invoke:             Consume(new OrderCommand(context.Message), ...)
 ```
 
-That generated path needs neither runtime ABI discovery, expression compilation, boxing, nor `MethodInfo.Invoke`. Raven source is not visible to the C# generator, so an optimized Raven/AOT path would need a Raven-generated registration manifest or equivalent compiler integration. Both optimized paths must produce the same concrete descriptors and topology as reflection discovery.
+That generated path needs neither runtime ABI discovery, expression compilation, boxing, nor `MethodInfo.Invoke`, and the .NET 11 NativeAOT smoke continuously verifies both generated case adapters. Raven source is not visible to the C# generator, so an optimized Raven/AOT path still needs a Raven-generated registration manifest or equivalent compiler integration. Both paths must produce the same concrete descriptors and topology as reflection discovery.
 
 ## Summary
 
@@ -286,7 +288,7 @@ At startup or generation time, MyServiceBus should:
 7. Build one shared invocation plan that constructs the carrier and binds the remaining parameters.
 8. Preserve the union carrier and method as inspection provenance without registering the carrier as a message.
 
-The current reflection and generated paths reject the union carrier because generated union declarations are structs while consumer messages require reference types. Expansion must occur before that reference-type validation. Each case is then validated and registered through the ordinary `TCase : class` pipeline.
+The reflection and generated C# paths now expand the union carrier before reference-type validation because generated union declarations are structs while consumer messages remain reference types. Each case is then validated and registered through the ordinary `TCase : class` pipeline.
 
 Conceptually:
 
@@ -297,7 +299,7 @@ Consume(OrderCommand)
   -> binding<CancelOrder>(value => Consume(new OrderCommand(value)))
 ```
 
-The reflection path can cache constructor/factory delegates and closed generic case descriptors. C# generated registration should emit direct construction and direct calls.
+The reflection path caches constructor delegates and closed generic case descriptors. C# generated registration emits direct construction and direct calls.
 
 The C# source generator cannot analyze Raven source. Raven consumers initially use reflection registration. A later trimmed or NativeAOT Raven path needs Raven compiler/macro integration or a language-neutral generated descriptor manifest.
 
@@ -562,9 +564,10 @@ Raven.Core compatibility-carrier recognition on .NET 10 can be an experiment. It
 
 ### Phase 2: generated C# input
 
-- Teach the C# generator to emit the same expanded descriptors and direct invokers.
-- Add diagnostics equivalent to reflection startup validation.
-- Add trimming and NativeAOT package-smoke coverage.
+- [x] Teach the C# generator to emit the same expanded descriptors and direct invokers.
+- [x] Add diagnostics for the supported public-constructor ABI and unsupported context shapes.
+- [x] Add generated NativeAOT coverage for both union cases.
+- [ ] Extend the staged package smoke if future package-consumer generation differs from project-reference generation.
 
 ### Phase 3: union-valued responses
 
