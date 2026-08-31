@@ -4,6 +4,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 
+import com.myservicebus.BusHook;
+import com.myservicebus.BusHookEvent;
+import com.myservicebus.MessageOperationHookEvent;
 import com.myservicebus.tasks.CancellationToken;
 import com.myservicebus.SendTransport;
 import com.myservicebus.TransportFactory;
@@ -99,16 +102,18 @@ class OutboxDispatcherTest {
     @Test
     void transportDispatcherSendsStoredBodyAndIdentityWithoutReserializing() {
         UUID correlationId = UUID.randomUUID();
+        UUID conversationId = UUID.randomUUID();
         URI responseAddress = URI.create("queue:responses");
         OutboxMessage message = new OutboxMessage(
                 UUID.randomUUID(), UUID.randomUUID(), OutboxDeliveryIntent.PUBLISH,
                 URI.create("exchange:orders"), List.of("urn:message:Contracts:OrderSubmitted"),
                 new byte[] { 1, 2, 3 }, "application/vnd.masstransit+json",
                 Map.of("traceparent", "00-test"), NOW,
-                null, correlationId, null, null, responseAddress, null);
+                null, correlationId, conversationId, null, responseAddress, null);
         CapturingTransportFactory factory = new CapturingTransportFactory();
+        RecordingHook hook = new RecordingHook();
 
-        new TransportOutboxDispatcher(factory).dispatch(message, CancellationToken.none()).join();
+        new TransportOutboxDispatcher(factory, List.of(hook)).dispatch(message, CancellationToken.none()).join();
 
         assertEquals(message.destinationAddress(), factory.address);
         assertArrayEquals(message.body(), factory.transport.body);
@@ -117,6 +122,14 @@ class OutboxDispatcherTest {
         assertEquals(correlationId.toString(), factory.transport.headers.get("_correlation_id"));
         assertEquals(responseAddress.toString(), factory.transport.headers.get("_reply_to"));
         assertEquals("00-test", factory.transport.headers.get("traceparent"));
+        MessageOperationHookEvent operation = (MessageOperationHookEvent) hook.events.get(0);
+        assertEquals("published", operation.kind());
+        assertEquals(true, operation.succeeded());
+        assertEquals("Contracts.OrderSubmitted", operation.messageType());
+        assertEquals(message.messageTypes().get(0), operation.messageUrn());
+        assertEquals(message.destinationAddress().toString(), operation.destinationAddress());
+        assertEquals(correlationId.toString(), operation.correlationId());
+        assertEquals(conversationId.toString(), operation.conversationId());
     }
 
     private static OutboxDispatcher createDispatcher(TestOutboxStore store, CapturingTransport transport) {
@@ -185,6 +198,15 @@ class OutboxDispatcherTest {
         @Override
         public String getSendAddress(String queue) {
             return "queue:" + queue;
+        }
+    }
+
+    private static final class RecordingHook implements BusHook {
+        private final List<BusHookEvent> events = new ArrayList<>();
+
+        @Override
+        public void handle(BusHookEvent busEvent) {
+            events.add(busEvent);
         }
     }
 

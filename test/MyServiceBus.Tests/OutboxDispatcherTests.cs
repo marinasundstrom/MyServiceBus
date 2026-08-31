@@ -79,15 +79,17 @@ public class OutboxDispatcherTests
     public async Task Transport_dispatcher_sends_stored_body_and_identity_without_reserializing()
     {
         var correlationId = Guid.NewGuid();
+        var conversationId = Guid.NewGuid();
         var responseAddress = new Uri("queue:responses");
         var message = new OutboxMessage(
             Guid.NewGuid(), Guid.NewGuid(), OutboxDeliveryIntent.Publish,
             new Uri("exchange:orders"), ["urn:message:Contracts:OrderSubmitted"], [1, 2, 3],
             "application/vnd.masstransit+json", new Dictionary<string, string> { ["traceparent"] = "00-test" },
-            Now, correlationId: correlationId, responseAddress: responseAddress);
+            Now, correlationId: correlationId, conversationId: conversationId, responseAddress: responseAddress);
         var factory = new CapturingTransportFactory();
+        var hooks = new CapturingHookDispatcher();
 
-        await new TransportOutboxDispatcher(factory).DispatchAsync(message);
+        await new TransportOutboxDispatcher(factory, hooks).DispatchAsync(message);
 
         Assert.Equal(message.DestinationAddress, factory.Address);
         Assert.Equal(message.Body.ToArray(), factory.Transport.Body);
@@ -97,6 +99,14 @@ public class OutboxDispatcherTests
         Assert.Equal(message.MessageId.ToString(), factory.Transport.Context.Headers["_message_id"]);
         Assert.Equal(responseAddress.ToString(), factory.Transport.Context.Headers["_reply_to"]);
         Assert.Equal("00-test", factory.Transport.Context.Headers["traceparent"]);
+        var operation = Assert.IsType<MessageOperationHookEvent>(Assert.Single(hooks.Events));
+        Assert.Equal("published", operation.Kind);
+        Assert.True(operation.Succeeded);
+        Assert.Equal("Contracts.OrderSubmitted", operation.MessageType);
+        Assert.Equal(message.MessageTypes[0], operation.MessageUrn);
+        Assert.Equal(message.DestinationAddress.ToString(), operation.DestinationAddress);
+        Assert.Equal(correlationId.ToString(), operation.CorrelationId);
+        Assert.Equal(conversationId.ToString(), operation.ConversationId);
     }
 
     private static OutboxDispatcher CreateDispatcher(TestOutboxStore store, CapturingTransport transport) =>
@@ -154,6 +164,14 @@ public class OutboxDispatcherTests
             Address = address;
             return Task.FromResult<ISendTransport>(Transport);
         }
+    }
+
+    private sealed class CapturingHookDispatcher : IBusHookDispatcher
+    {
+        public bool IsEnabled => true;
+        public List<BusHookEvent> Events { get; } = [];
+
+        public void Dispatch(BusHookEvent busEvent) => Events.Add(busEvent);
     }
 
     private sealed class CapturingSendTransport : ISendTransport

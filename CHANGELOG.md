@@ -4,6 +4,8 @@ This changelog summarizes the bigger themes in the repository history rather tha
 
 ## Unreleased
 
+- Fixed observed message flow for the C# and Java transactional outbox by emitting the outbound operation only when a persisted envelope is actually dispatched to the broker. Application-level flow and throughput continue to aggregate cleanly across producer and consumer replicas.
+
 ## 0.1.0-preview.8 - 2026-08-31
 
 - Stabilized PostgreSQL scheduler persistence gates in C# and Java by accepting the database's documented microsecond timestamp precision in either rounding direction.
