@@ -58,6 +58,7 @@ This dashboard is an opinionated example of what can be built from the monitorin
   <li><strong>Throughput</strong> expands the overview sparkline into a streamed five-minute graph and per-application breakdown.</li>
   <li><strong>Message flow</strong> uses an interactive D3 map to show observed application paths, with line weight and labels communicating throughput.</li>
   <li><strong>Failures</strong> and <strong>Outbox</strong> keep diagnostic and delivery detail in focused operational views.</li>
+  <li>A compact rolling Failures badge indicates recent activity, clears after recovery, and caps at <code>99+</code>; it is not an unread or acknowledged alert.</li>
 </ul>
 
 The same information hierarchy supports learning and operations: concepts use plain labels such as “messages handled,” while exact rates, endpoint addresses, retry counts, latency, and transport details remain available. Light, dark, and system themes persist across navigation. On phones, cards collapse, maps and graphs fit the viewport, navigation scrolls, and wide tables stay contained inside their panels.
@@ -107,11 +108,11 @@ Monitoring is never part of message delivery. If the service is unavailable, mes
 
 ## Build another dashboard or exporter
 
-The supplied dashboard is only one consumer of the monitoring service. The service publishes its current OpenAPI 3.1 contract at <code>/openapi/v1.json</code>. It describes the versioned <code>/api/monitoring/v1</code> HTTP ingest and query operations, JSON schemas, filters, and response codes, with separate tags for exporters and dashboards. A team can generate a client from the exact collector version it deploys instead of depending on the Blazor application or a .NET interface.
+The supplied dashboard is only one consumer of the monitoring service. The service publishes its current OpenAPI 3.1 contract at <code>/openapi/v1.json</code>. It describes the versioned <code>/api/monitoring/v1</code> HTTP ingest and query operations, JSON schemas, filters, and response codes, with separate tags for exporters and dashboards. A team can generate a client from the exact collector version it deploys instead of depending on the Blazor application or a .NET interface. A five-second cached <code>/summary</code> projection gives dashboard shells rolling failures, affected applications, outbox and tracked-job state, and explicit completeness and freshness without fetching every detailed view.
 
 Live updates use the separately documented WebSocket endpoint <code>/api/monitoring/v1/stream</code>. Each UTF-8 JSON message contains an invalidation type such as <code>observations_changed</code> or <code>jobs_changed</code> and an <code>occurredAtUtc</code> timestamp. It is a bounded hint stream, not a durable event log: clients fetch initial state over HTTP, re-query after relevant hints, and fetch again after reconnecting. Polling is a supported fallback.
 
-The OpenAPI and WebSocket contracts are preview integration surfaces, not control-plane APIs. They expose monitoring state but do not authorize queue purges, job cancellation, retries, or broker mutation. The collector still has no built-in authentication, so alternative dashboards and exporters must remain inside a trusted deployment boundary.
+The OpenAPI and WebSocket contracts are preview integration surfaces, not control-plane APIs. They expose monitoring state but do not authorize queue purges, job cancellation, retries, or broker mutation. Raw failures and dashboard badges also do not provide alert acknowledgement; a future alerting service will own cross-source policy, recovery, acknowledgement, and notifications. The collector still has no built-in authentication, so alternative dashboards and exporters must remain inside a trusted deployment boundary.
 
 ## Replicas and flexible grouping
 
