@@ -28,6 +28,9 @@ import com.myservicebus.MessageOperationHookEvent;
 import com.myservicebus.OutboxDeliveryHookEvent;
 import com.myservicebus.RecurringJobSource;
 import com.myservicebus.RecurringJobState;
+import com.myservicebus.JobAttemptState;
+import com.myservicebus.JobSource;
+import com.myservicebus.JobState;
 import com.myservicebus.ScheduledWorkObserver;
 import com.myservicebus.ScheduledWorkSource;
 import com.myservicebus.ScheduledWorkState;
@@ -58,6 +61,8 @@ public final class MonitoringExporter implements BusHook, ScheduledWorkObserver,
     private volatile List<ScheduledWorkSource> scheduledWorkSources = List.of();
     private volatile List<RecurringJobSource> recurringJobSources = List.of();
     private volatile List<MonitoringProtocol.RecurringJobItem> recurringJobs = List.of();
+    private volatile List<JobSource> jobSources = List.of();
+    private volatile List<MonitoringProtocol.JobItem> jobs = List.of();
     private volatile boolean metadataRegistered;
     private boolean scheduledWorkSourcesAvailable = true;
     private Instant nextScheduledWorkRefresh = Instant.MIN;
@@ -74,7 +79,8 @@ public final class MonitoringExporter implements BusHook, ScheduledWorkObserver,
         if (options.getMaxBatchSize() <= 0 || options.getMaxQueueSize() <= 0) {
             throw new IllegalArgumentException("Batch and queue sizes must be greater than zero");
         }
-        if (options.getMaxScheduledWorkItems() <= 0 || options.getScheduledWorkHistory().isZero()
+        if (options.getMaxScheduledWorkItems() <= 0 || options.getMaxJobItems() <= 0
+                || options.getMaxJobAttempts() <= 0 || options.getScheduledWorkHistory().isZero()
                 || options.getScheduledWorkHistory().isNegative()) {
             throw new IllegalArgumentException("Scheduled work limits must be greater than zero");
         }
@@ -97,10 +103,12 @@ public final class MonitoringExporter implements BusHook, ScheduledWorkObserver,
     public void start(ServiceProvider serviceProvider) {
         ScheduledWorkSource source = serviceProvider.getService(ScheduledWorkSource.class);
         RecurringJobSource recurringSource = serviceProvider.getService(RecurringJobSource.class);
+        JobSource jobSource = serviceProvider.getService(JobSource.class);
         start(
                 serviceProvider.getRequiredService(BusInspectionProvider.class),
                 source == null ? List.of() : List.of(source),
-                recurringSource == null ? List.of() : List.of(recurringSource));
+                recurringSource == null ? List.of() : List.of(recurringSource),
+                jobSource == null ? List.of() : List.of(jobSource));
     }
 
     public void start(BusInspectionProvider inspectionProvider, List<ScheduledWorkSource> scheduledWorkSources) {
@@ -111,8 +119,17 @@ public final class MonitoringExporter implements BusHook, ScheduledWorkObserver,
             BusInspectionProvider inspectionProvider,
             List<ScheduledWorkSource> scheduledWorkSources,
             List<RecurringJobSource> recurringJobSources) {
+        start(inspectionProvider, scheduledWorkSources, recurringJobSources, List.of());
+    }
+
+    public void start(
+            BusInspectionProvider inspectionProvider,
+            List<ScheduledWorkSource> scheduledWorkSources,
+            List<RecurringJobSource> recurringJobSources,
+            List<JobSource> jobSources) {
         this.scheduledWorkSources = List.copyOf(scheduledWorkSources);
         this.recurringJobSources = List.copyOf(recurringJobSources);
+        this.jobSources = List.copyOf(jobSources);
         start(inspectionProvider);
     }
 
@@ -153,6 +170,7 @@ public final class MonitoringExporter implements BusHook, ScheduledWorkObserver,
                 nextScheduledWorkRefresh = now.plus(options.getExportInterval());
                 refreshScheduledWork();
                 refreshRecurringJobs();
+                refreshJobs();
                 scheduledWorkChanged.set(true);
             }
             if (metadataRegistered && scheduledWorkSourcesAvailable && scheduledWorkChanged.getAndSet(false)) {
@@ -161,6 +179,9 @@ public final class MonitoringExporter implements BusHook, ScheduledWorkObserver,
                         scheduledWorkChanged.set(true);
                     }
                     if (!sendRecurringJobs()) {
+                        scheduledWorkChanged.set(true);
+                    }
+                    if (!sendJobs()) {
                         scheduledWorkChanged.set(true);
                     }
                 } catch (Exception exception) {
@@ -316,6 +337,31 @@ public final class MonitoringExporter implements BusHook, ScheduledWorkObserver,
                 recurringJobs));
     }
 
+    private void refreshJobs() {
+        List<MonitoringProtocol.JobItem> items = new ArrayList<>();
+        for (JobSource source : jobSources) {
+            for (JobState state : source.getSnapshot(options.getMaxJobItems()).toCompletableFuture().join()) {
+                List<JobAttemptState> attempts = source.getAttempts(state.jobId(), options.getMaxJobAttempts())
+                        .toCompletableFuture().join();
+                items.add(mapJob(state, attempts));
+            }
+        }
+        jobs = items.stream()
+                .sorted(java.util.Comparator.comparing(MonitoringProtocol.JobItem::updatedAtUtc).reversed())
+                .limit(options.getMaxJobItems())
+                .toList();
+    }
+
+    private boolean sendJobs() throws Exception {
+        return post("/api/monitoring/v1/jobs", new MonitoringProtocol.JobSnapshot(
+                MonitoringProtocol.VERSION,
+                options.getApplicationName(),
+                options.getInstanceId(),
+                options.getBusId(),
+                Instant.now(),
+                jobs));
+    }
+
     private void pruneScheduledWork(Instant now) {
         Instant cutoff = now.minus(options.getScheduledWorkHistory());
         scheduledWork.entrySet().removeIf(entry -> isTerminal(entry.getValue().status())
@@ -359,6 +405,31 @@ public final class MonitoringExporter implements BusHook, ScheduledWorkObserver,
                 enumTitle(state.status().name()),
                 state.nextOccurrenceAtUtc(),
                 state.updatedAtUtc());
+    }
+
+    private static MonitoringProtocol.JobItem mapJob(JobState state, List<JobAttemptState> attempts) {
+        return new MonitoringProtocol.JobItem(
+                state.jobId().toString(),
+                state.jobType(),
+                enumTitle(state.status().name()),
+                state.provider(),
+                enumTitle(state.durability().name()),
+                enumTitle(state.placement().name()),
+                state.submittedAtUtc(),
+                state.scheduledForUtc(),
+                state.startedAtUtc(),
+                state.completedAtUtc(),
+                state.progress() == null ? null : state.progress().value(),
+                state.progress() == null ? null : state.progress().limit(),
+                state.recurringJobOccurrenceId() == null ? null : state.recurringJobOccurrenceId().toString(),
+                state.updatedAtUtc(),
+                attempts.stream().map(attempt -> new MonitoringProtocol.JobAttemptItem(
+                        attempt.attemptId().toString(),
+                        attempt.retryAttempt(),
+                        enumTitle(attempt.status().name()),
+                        attempt.startedAtUtc(),
+                        attempt.completedAtUtc(),
+                        attempt.faultType())).toList());
     }
 
     private MonitoringProtocol.Observation map(BusHookEvent busEvent) {

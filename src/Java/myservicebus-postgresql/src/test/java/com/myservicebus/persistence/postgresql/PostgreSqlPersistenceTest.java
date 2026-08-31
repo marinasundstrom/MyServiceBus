@@ -32,9 +32,20 @@ import com.myservicebus.RecurringJobDefinitionStatus;
 import com.myservicebus.RecurringJobIdentity;
 import com.myservicebus.RecurringJobOccurrenceReceipt;
 import com.myservicebus.RecurringJobOccurrenceStatus;
+import com.myservicebus.RecurringJobProvider;
 import com.myservicebus.SchedulingPlacement;
 import com.myservicebus.MessageBus;
 import com.myservicebus.MessageBusServices;
+import com.myservicebus.JobAttemptStatus;
+import com.myservicebus.JobClient;
+import com.myservicebus.JobControlOutcome;
+import com.myservicebus.JobConsumer;
+import com.myservicebus.JobContext;
+import com.myservicebus.JobProgress;
+import com.myservicebus.JobSource;
+import com.myservicebus.JobState;
+import com.myservicebus.JobStatus;
+import com.myservicebus.JobSubmissionReceipt;
 import com.myservicebus.PublishEndpoint;
 import com.myservicebus.SendEndpoint;
 import com.myservicebus.SendEndpointProvider;
@@ -63,6 +74,8 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import javax.inject.Inject;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.Test;
 import org.postgresql.ds.PGSimpleDataSource;
@@ -73,14 +86,16 @@ class PostgreSqlPersistenceTest {
     private static final String SERVICE_NAME = "orders-service";
 
     @Test
-    void versionTwoSchemaMigratesToSchedulingCancellationAndRecurringJobs() throws Exception {
+    void versionTwoSchemaMigratesToSchedulingRecurringAndTrackedJobs() throws Exception {
         try (PostgreSQLContainer container = startContainer()) {
             DataSource dataSource = dataSource(container);
             PostgreSqlSchema.ensureCreated(dataSource);
             try (Connection connection = dataSource.getConnection();
                     Statement statement = connection.createStatement()) {
                 statement.execute("""
+                        DROP TABLE myservicebus.job_attempt;
                         DROP TABLE myservicebus.recurring_job_occurrence;
+                        DROP TABLE myservicebus.job;
                         DROP TABLE myservicebus.recurring_job_definition;
                         UPDATE myservicebus.schema_version SET version = 2 WHERE singleton;
                         ALTER TABLE myservicebus.outbox_message
@@ -107,7 +122,9 @@ class PostgreSqlPersistenceTest {
                                     WHERE table_schema = 'myservicebus' AND table_name = 'outbox_message'
                                       AND column_name = 'cancelled_at_utc'),
                                 to_regclass('myservicebus.recurring_job_definition') IS NOT NULL,
-                                to_regclass('myservicebus.recurring_job_occurrence') IS NOT NULL
+                                to_regclass('myservicebus.recurring_job_occurrence') IS NOT NULL,
+                                to_regclass('myservicebus.job') IS NOT NULL,
+                                to_regclass('myservicebus.job_attempt') IS NOT NULL
                             FROM myservicebus.schema_version WHERE singleton;
                             """)) {
                 assertTrue(result.next());
@@ -116,6 +133,8 @@ class PostgreSqlPersistenceTest {
                 assertTrue(result.getBoolean(3));
                 assertTrue(result.getBoolean(4));
                 assertTrue(result.getBoolean(5));
+                assertTrue(result.getBoolean(6));
+                assertTrue(result.getBoolean(7));
             }
         }
     }
@@ -126,12 +145,19 @@ class PostgreSqlPersistenceTest {
             DataSource dataSource = dataSource(container);
             PostgreSqlSchema.ensureCreated(dataSource);
             MutableClock clock = new MutableClock(Instant.parse("2026-09-01T00:00:00Z"));
-            PostgreSqlRecurringJobProvider recurring = new PostgreSqlRecurringJobProvider(
-                    dataSource,
-                    SERVICE_NAME,
-                    new NoOpTransportFactory(),
-                    new EnvelopeMessageSerializer(),
-                    clock);
+            SubmitOrderRecorder recorder = new SubmitOrderRecorder();
+            ServiceCollection registrations = ServiceCollection.create();
+            registrations.addSingleton(Clock.class, () -> clock);
+            registrations.addSingleton(SubmitOrderRecorder.class, () -> recorder);
+            registrations.addSingleton(TransportFactory.class, ignored -> () -> new NoOpTransportFactory());
+            registrations.from(MessageBusServices.class).addServiceBus(configurator -> {
+                configurator.addJobConsumer(SubmitOrderJobConsumer.class, SubmitOrder.class, null);
+                MediatorTransport.configure(configurator);
+            });
+            PostgreSqlJobs.addBuiltInProvider(registrations, dataSource, SERVICE_NAME);
+            PostgreSqlRecurringJobs.addBuiltInProvider(registrations, dataSource, SERVICE_NAME);
+            ServiceProvider services = registrations.buildServiceProvider();
+            RecurringJobProvider recurring = services.getRequiredService(RecurringJobProvider.class);
             RecurringJobIdentity identity = new RecurringJobIdentity("invoice-export", "billing");
             RecurringJobDefinition definition = new RecurringJobDefinition(
                     identity,
@@ -146,7 +172,7 @@ class PostgreSqlPersistenceTest {
             RecurringJobControlResult resumed = recurring.resume(identity, paused.currentRevision())
                     .toCompletableFuture().join();
             clock.setInstant(Instant.parse("2026-09-01T03:30:00Z"));
-            int materialized = new PostgreSqlRecurringJobMaterializer(dataSource, SERVICE_NAME, clock)
+            int materialized = services.getRequiredService(PostgreSqlRecurringJobMaterializer.class)
                     .materializeDue().toCompletableFuture().join();
             RecurringJobOccurrenceReceipt manual = recurring.triggerNow(identity)
                     .toCompletableFuture().join();
@@ -168,13 +194,13 @@ class PostgreSqlPersistenceTest {
                                 next_due_at_utc,
                                 (SELECT count(*) FROM myservicebus.recurring_job_occurrence occurrence
                                     WHERE occurrence.definition_id = recurring_job_definition.definition_id),
-                                (SELECT count(*) FROM myservicebus.outbox_message message
+                                (SELECT count(*) FROM myservicebus.job job
                                     JOIN myservicebus.recurring_job_occurrence occurrence
-                                        ON occurrence.outbox_record_id = message.record_id
+                                        ON occurrence.job_id = job.job_id
                                     WHERE occurrence.definition_id = recurring_job_definition.definition_id),
-                                (SELECT count(DISTINCT message.message_id) FROM myservicebus.outbox_message message
+                                (SELECT count(DISTINCT job.job_id) FROM myservicebus.job job
                                     JOIN myservicebus.recurring_job_occurrence occurrence
-                                        ON occurrence.outbox_record_id = message.record_id
+                                        ON occurrence.job_id = job.job_id
                                     WHERE occurrence.definition_id = recurring_job_definition.definition_id)
                             FROM myservicebus.recurring_job_definition
                             WHERE definition_id = ?
@@ -194,6 +220,150 @@ class PostgreSqlPersistenceTest {
                     assertEquals(2, result.getLong(10));
                 }
             }
+
+            UUID linkedJobId;
+            try (Connection connection = dataSource.getConnection();
+                    var statement = connection.prepareStatement("""
+                            SELECT job_id FROM myservicebus.recurring_job_occurrence
+                            WHERE definition_id = ? ORDER BY scheduled_for_utc LIMIT 1
+                            """)) {
+                statement.setObject(1, first.definitionId());
+                try (ResultSet result = statement.executeQuery()) {
+                    assertTrue(result.next());
+                    linkedJobId = result.getObject(1, UUID.class);
+                }
+            }
+            JobClient jobClient = services.getRequiredService(JobClient.class);
+            assertEquals(JobControlOutcome.APPLIED,
+                    jobClient.cancel(linkedJobId).toCompletableFuture().join().outcome());
+            assertEquals(RecurringJobOccurrenceStatus.CANCELLED,
+                    readOccurrenceStatus(dataSource, linkedJobId));
+            assertEquals(JobControlOutcome.APPLIED,
+                    jobClient.retry(linkedJobId).toCompletableFuture().join().outcome());
+            assertEquals(RecurringJobOccurrenceStatus.RETRY_SCHEDULED,
+                    readOccurrenceStatus(dataSource, linkedJobId));
+
+            assertEquals(2, services.getRequiredService(PostgreSqlJobProcessor.class)
+                    .processDue().toCompletableFuture().join());
+            assertEquals(2, recorder.executions.get());
+            try (Connection connection = dataSource.getConnection();
+                    var statement = connection.prepareStatement("""
+                            SELECT count(*) FROM myservicebus.recurring_job_occurrence
+                            WHERE definition_id = ? AND status = 5 AND job_id IS NOT NULL
+                            """)) {
+                statement.setObject(1, first.definitionId());
+                try (ResultSet result = statement.executeQuery()) {
+                    assertTrue(result.next());
+                    assertEquals(2, result.getLong(1));
+                }
+            }
+        }
+    }
+
+    @Test
+    void durableTrackedJobExecutesAndExposesProgressAndAttempts() throws Exception {
+        try (PostgreSQLContainer container = startContainer()) {
+            DataSource dataSource = dataSource(container);
+            PostgreSqlSchema.ensureCreated(dataSource);
+            DurableJobRecorder recorder = new DurableJobRecorder();
+            ServiceProvider services = createTrackedJobServices(
+                    dataSource, "java-tracked-job-service", recorder);
+            JobClient client = services.getRequiredService(JobClient.class);
+            JobSource source = services.getRequiredService(JobSource.class);
+
+            JobSubmissionReceipt receipt = client.submit(new DurableJob(7)).toCompletableFuture().join();
+            int processed = services.getRequiredService(PostgreSqlJobProcessor.class)
+                    .processDue().toCompletableFuture().join();
+            JobState state = source.getSnapshot(10).toCompletableFuture().join().get(0);
+
+            assertEquals(1, processed);
+            assertEquals(JobStatus.COMPLETED, state.status());
+            assertEquals(new JobProgress(7, 10L), state.progress());
+            assertEquals(
+                    JobAttemptStatus.COMPLETED,
+                    source.getAttempts(receipt.jobId(), 10).toCompletableFuture().join().get(0).status());
+            assertEquals(7, recorder.lastValue);
+            assertEquals("MyServiceBus.Durable", source.getProvider());
+        }
+    }
+
+    @Test
+    void durableTrackedJobSurvivesProviderRestart() throws Exception {
+        try (PostgreSQLContainer container = startContainer()) {
+            DataSource dataSource = dataSource(container);
+            PostgreSqlSchema.ensureCreated(dataSource);
+            String serviceName = "java-tracked-job-restart-service";
+            ServiceProvider first = createTrackedJobServices(dataSource, serviceName, new DurableJobRecorder());
+            UUID jobId = first.getRequiredService(JobClient.class)
+                    .submit(new DurableJob(42)).toCompletableFuture().join().jobId();
+
+            DurableJobRecorder recorder = new DurableJobRecorder();
+            ServiceProvider recovered = createTrackedJobServices(dataSource, serviceName, recorder);
+            int processed = recovered.getRequiredService(PostgreSqlJobProcessor.class)
+                    .processDue().toCompletableFuture().join();
+            JobState state = recovered.getRequiredService(JobSource.class)
+                    .getSnapshot(10).toCompletableFuture().join().get(0);
+
+            assertEquals(1, processed);
+            assertEquals(jobId, state.jobId());
+            assertEquals(JobStatus.COMPLETED, state.status());
+            assertEquals(42, recorder.lastValue);
+        }
+    }
+
+    @Test
+    void competingDurableJobProcessorsLeaseAJobOnce() throws Exception {
+        try (PostgreSQLContainer container = startContainer()) {
+            DataSource dataSource = dataSource(container);
+            PostgreSqlSchema.ensureCreated(dataSource);
+            String serviceName = "java-tracked-job-concurrency-service";
+            DurableJobRecorder recorder = new DurableJobRecorder();
+            ServiceProvider first = createTrackedJobServices(dataSource, serviceName, recorder);
+            ServiceProvider second = createTrackedJobServices(dataSource, serviceName, recorder);
+            first.getRequiredService(JobClient.class).submit(new DurableJob(5)).toCompletableFuture().join();
+
+            CompletableFuture<Integer> firstRun = CompletableFuture.supplyAsync(() ->
+                    first.getRequiredService(PostgreSqlJobProcessor.class)
+                            .processDue().toCompletableFuture().join());
+            CompletableFuture<Integer> secondRun = CompletableFuture.supplyAsync(() ->
+                    second.getRequiredService(PostgreSqlJobProcessor.class)
+                            .processDue().toCompletableFuture().join());
+
+            assertEquals(1, firstRun.join() + secondRun.join());
+            assertEquals(1, recorder.attempts.get());
+        }
+    }
+
+    @Test
+    void durableTrackedJobPersistsRetryAttempts() throws Exception {
+        try (PostgreSQLContainer container = startContainer()) {
+            DataSource dataSource = dataSource(container);
+            PostgreSqlSchema.ensureCreated(dataSource);
+            DurableJobRecorder recorder = new DurableJobRecorder();
+            ServiceCollection registrations = ServiceCollection.create();
+            registrations.addSingleton(DurableJobRecorder.class, () -> recorder);
+            registrations.from(MessageBusServices.class).addServiceBus(configurator ->
+                    configurator.addJobConsumer(
+                            DurableRetryJobConsumer.class,
+                            DurableRetryJob.class,
+                            options -> options.setRetry(retry -> retry.immediate(2))));
+            PostgreSqlJobs.addBuiltInProvider(registrations, dataSource, "java-tracked-job-retry-service");
+            ServiceProvider services = registrations.buildServiceProvider();
+            JobSubmissionReceipt receipt = services.getRequiredService(JobClient.class)
+                    .submit(new DurableRetryJob()).toCompletableFuture().join();
+            PostgreSqlJobProcessor processor = services.getRequiredService(PostgreSqlJobProcessor.class);
+
+            processor.processDue().toCompletableFuture().join();
+            processor.processDue().toCompletableFuture().join();
+            processor.processDue().toCompletableFuture().join();
+
+            JobSource source = services.getRequiredService(JobSource.class);
+            assertEquals(JobStatus.COMPLETED, source.getSnapshot(10).toCompletableFuture().join().get(0).status());
+            assertEquals(
+                    List.of(JobAttemptStatus.FAULTED, JobAttemptStatus.FAULTED, JobAttemptStatus.COMPLETED),
+                    source.getAttempts(receipt.jobId(), 10).toCompletableFuture().join().stream()
+                            .map(attempt -> attempt.status())
+                            .toList());
         }
     }
 
@@ -642,6 +812,35 @@ class PostgreSqlPersistenceTest {
         return dataSource;
     }
 
+    private static RecurringJobOccurrenceStatus readOccurrenceStatus(DataSource dataSource, UUID jobId)
+            throws Exception {
+        try (Connection connection = dataSource.getConnection();
+                var statement = connection.prepareStatement("""
+                        SELECT occurrence.status
+                        FROM myservicebus.recurring_job_occurrence occurrence
+                        JOIN myservicebus.job job ON job.recurring_occurrence_id = occurrence.occurrence_id
+                        WHERE job.job_id = ?
+                        """)) {
+            statement.setObject(1, jobId);
+            try (ResultSet result = statement.executeQuery()) {
+                assertTrue(result.next());
+                return RecurringJobOccurrenceStatus.values()[result.getShort(1)];
+            }
+        }
+    }
+
+    private static ServiceProvider createTrackedJobServices(
+            DataSource dataSource,
+            String serviceName,
+            DurableJobRecorder recorder) {
+        ServiceCollection services = ServiceCollection.create();
+        services.addSingleton(DurableJobRecorder.class, () -> recorder);
+        services.from(MessageBusServices.class).addServiceBus(configurator ->
+                configurator.addJobConsumer(DurableJobConsumer.class, DurableJob.class, null));
+        PostgreSqlJobs.addBuiltInProvider(services, dataSource, serviceName);
+        return services.buildServiceProvider();
+    }
+
     private static void insertCommitted(DataSource dataSource, OutboxMessage message) throws Exception {
         insertCommitted(dataSource, message, SERVICE_NAME);
     }
@@ -773,5 +972,68 @@ class PostgreSqlPersistenceTest {
     }
 
     private record SubmitOrder(UUID orderId) {
+    }
+
+    private static final class SubmitOrderJobConsumer implements JobConsumer<SubmitOrder> {
+        private final SubmitOrderRecorder recorder;
+
+        @Inject
+        SubmitOrderJobConsumer(SubmitOrderRecorder recorder) {
+            this.recorder = recorder;
+        }
+
+        @Override
+        public java.util.concurrent.CompletionStage<Void> run(JobContext<SubmitOrder> context) {
+            recorder.executions.incrementAndGet();
+            return CompletableFuture.completedFuture(null);
+        }
+    }
+
+    private static final class SubmitOrderRecorder {
+        private final AtomicInteger executions = new AtomicInteger();
+    }
+
+    private record DurableJob(int value) {
+    }
+
+    private static final class DurableJobConsumer implements JobConsumer<DurableJob> {
+        private final DurableJobRecorder recorder;
+
+        @Inject
+        DurableJobConsumer(DurableJobRecorder recorder) {
+            this.recorder = recorder;
+        }
+
+        @Override
+        public java.util.concurrent.CompletionStage<Void> run(JobContext<DurableJob> context) {
+            recorder.attempts.incrementAndGet();
+            recorder.lastValue = context.getJob().value();
+            return context.setProgress(context.getJob().value(), (long) Math.max(10, context.getJob().value()));
+        }
+    }
+
+    private static final class DurableJobRecorder {
+        private final AtomicInteger attempts = new AtomicInteger();
+        private volatile int lastValue;
+    }
+
+    private record DurableRetryJob() {
+    }
+
+    private static final class DurableRetryJobConsumer implements JobConsumer<DurableRetryJob> {
+        private final DurableJobRecorder recorder;
+
+        @Inject
+        DurableRetryJobConsumer(DurableJobRecorder recorder) {
+            this.recorder = recorder;
+        }
+
+        @Override
+        public java.util.concurrent.CompletionStage<Void> run(JobContext<DurableRetryJob> context) {
+            if (recorder.attempts.incrementAndGet() < 3) {
+                return CompletableFuture.failedFuture(new IllegalStateException("Try again"));
+            }
+            return CompletableFuture.completedFuture(null);
+        }
     }
 }

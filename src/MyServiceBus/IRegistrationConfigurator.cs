@@ -9,6 +9,15 @@ namespace MyServiceBus;
 public interface IRegistrationConfigurator
 //: IServiceCollection
 {
+    [RequiresDynamicCode("Runtime job consumer discovery closes generic registrations dynamically. Use the explicit job/message overload for NativeAOT.")]
+    [RequiresUnreferencedCode("Runtime job consumer discovery cannot guarantee that generic interface metadata is preserved.")]
+    void AddJobConsumer<TConsumer>(Action<JobConsumerOptions>? configure = null)
+        where TConsumer : class, IJobConsumer;
+
+    void AddJobConsumer<TConsumer, TJob>(Action<JobConsumerOptions>? configure = null)
+        where TConsumer : class, IJobConsumer<TJob>
+        where TJob : class;
+
     [RequiresDynamicCode("Runtime consumer discovery closes generic registrations dynamically. Use AddGeneratedConsumers for NativeAOT.")]
     [RequiresUnreferencedCode("Runtime consumer discovery cannot guarantee that consumer metadata is preserved. Use AddGeneratedConsumers for trimmed applications.")]
     void AddConsumer<T>() where T : class, IConsumer;

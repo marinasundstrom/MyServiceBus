@@ -21,7 +21,7 @@ Parity in this document means equivalent concepts, behavior, and wire outcomes. 
 | Retries | Implemented | Implemented | Both clients require explicit configuration to retry consumers. |
 | PostgreSQL Bus Outbox MVP | `UsePostgreSql` scoped capture, `AddPostgreSqlOutboxDelivery`, and `PostgreSqlOutboxHealth` | `PostgreSqlOutboxSession.useTransaction`, `PostgreSqlOutboxDelivery.create`, and `PostgreSqlOutboxHealth` | The normalized, service-partitioned schema and delivery semantics align across C# and Java. Consumer Outbox middleware, cleanup, SQL Server, and production promotion remain open. The schema is not a MassTransit database-compatibility contract. |
 | Message scheduling | `IMessageScheduler`, `IScheduleMessageProvider`, time-first absolute overloads, and `ScheduleCancellationResult` | `MessageScheduler`, `ScheduleMessageProvider`, `Instant`/`Duration`, `CompletionStage`, and `ScheduleCancellationResult` | Default providers are explicitly volatile. PostgreSQL providers persist delayed intent and cancellation with equivalent lease-race outcomes. |
-| Recurring jobs MVP | `IRecurringJobScheduler`, provider/source seams, in-memory and built-in durable providers | `RecurringJobScheduler`, provider/source seams, in-memory and built-in durable providers | Fixed intervals, revisions, controls, capped misfires, transactional outbox materialization, restart recovery, monitoring, and bidirectional shared-PostgreSQL materialization are verified. Cron, occurrence-history monitoring, tracked job execution, and third-party adapters remain open. |
+| Recurring jobs MVP | `IRecurringJobScheduler`, provider/source seams, in-memory and built-in durable providers | `RecurringJobScheduler`, provider/source seams, in-memory and built-in durable providers | Fixed intervals, revisions, controls, capped misfires, tracked-job promotion in both profiles, durable restart recovery, monitoring, and bidirectional shared-PostgreSQL materialization are verified. Occurrence-history monitoring, cron, and third-party adapters remain open. |
 | Configuration API (host, queue, message overrides, endpoint formatter) | Implemented | Implemented | Both clients support overriding names and automatic endpoint configuration with custom formatters. |
 | Logging and tracing flow | Implemented | Implemented | Both clients emit MassTransit-style lifecycle and message-flow logs and propagate OpenTelemetry context across send/publish/consume pipelines. |
 
@@ -40,7 +40,7 @@ API differences are also classified by intent:
 - **Aligned + interoperable** is the pinned common wire subset.
 - **Idiomatic equivalent** preserves the responsibility and observable behavior with a platform-native API shape.
 - **Deliberate divergence** or **MyServiceBus-native** is a boundary the project chooses and owns, such as the cross-platform outbox schema, Java composition model, mediator emphasis, and generated handler surfaces.
-- **Temporary gap** is unfinished parity or production work, such as recurring scheduling or restart-boundary promotion evidence; it must not be presented as an intentional design advantage.
+- **Temporary gap** is unfinished parity or production work, such as recurring occurrence monitoring or restart-boundary promotion evidence; it must not be presented as an intentional design advantage.
 
 Migration, feature, and compatibility guides should use these classifications so an adopter can distinguish a durable product choice from preview incompleteness.
 

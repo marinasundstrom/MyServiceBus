@@ -24,6 +24,7 @@ public class BusRegistrationConfigurator : IBusRegistrationConfigurator
     ];
     private string defaultContentType = InboundMessageResolver.EnvelopeContentType;
     private readonly TransportCapabilityRequirements capabilityRequirements = new();
+    private readonly JobConsumerRegistry jobConsumers = new();
 
     public IServiceCollection Services { get; }
 
@@ -33,6 +34,35 @@ public class BusRegistrationConfigurator : IBusRegistrationConfigurator
         var telemetryFilter = new OpenTelemetrySendFilter();
         sendConfigurator.UseFilter((IFilter<SendContext>)telemetryFilter);
         publishConfigurator.UseFilter((IFilter<PublishContext>)telemetryFilter);
+    }
+
+    [RequiresDynamicCode("Runtime job consumer discovery closes generic registrations dynamically. Use the explicit job/message overload for NativeAOT.")]
+    [RequiresUnreferencedCode("Runtime job consumer discovery cannot guarantee that generic interface metadata is preserved.")]
+    public void AddJobConsumer<TConsumer>(Action<JobConsumerOptions>? configure = null)
+        where TConsumer : class, IJobConsumer
+    {
+        var interfaces = typeof(TConsumer).GetInterfaces()
+            .Where(type => type.IsGenericType && type.GetGenericTypeDefinition() == typeof(IJobConsumer<>))
+            .ToArray();
+        if (interfaces.Length != 1)
+            throw new InvalidOperationException($"Job consumer type {typeof(TConsumer)} must implement exactly one IJobConsumer<TJob> interface.");
+
+        var method = GetType().GetMethods()
+            .Single(candidate => candidate.Name == nameof(AddJobConsumer)
+                && candidate.IsGenericMethodDefinition
+                && candidate.GetGenericArguments().Length == 2);
+        method.MakeGenericMethod(typeof(TConsumer), interfaces[0].GetGenericArguments()[0])
+            .Invoke(this, [configure]);
+    }
+
+    public void AddJobConsumer<TConsumer, TJob>(Action<JobConsumerOptions>? configure = null)
+        where TConsumer : class, IJobConsumer<TJob>
+        where TJob : class
+    {
+        var options = new JobConsumerOptions();
+        configure?.Invoke(options);
+        Services.AddScoped<TConsumer>();
+        jobConsumers.Add<TConsumer, TJob>(options);
     }
 
     [RequiresDynamicCode("Runtime consumer discovery closes generic registrations dynamically. Use AddGeneratedConsumers for NativeAOT.")]
@@ -272,6 +302,8 @@ public class BusRegistrationConfigurator : IBusRegistrationConfigurator
             Services.AddLogging(b => b.AddSimpleConsole());
 
         Services.AddSingleton(_topology);
+        Services.AddSingleton(jobConsumers);
+        Services.AddSingleton<IJobConsumerRegistry>(provider => provider.GetRequiredService<JobConsumerRegistry>());
         Services.AddSingleton<IBusTopology>(_ => _topology);
         Services.AddSingleton<IBusHookDispatcher, BusHookDispatcher>();
         Services.AddSingleton<IRetryObserver, BusHookRetryObserver>();

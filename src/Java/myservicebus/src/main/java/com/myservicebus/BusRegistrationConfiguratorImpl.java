@@ -39,11 +39,47 @@ public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigura
     private java.util.function.BiConsumer<BusRegistrationContext, Object> transportConfigure;
     private Class<?> factoryConfiguratorClass;
     private final TransportCapabilityRequirements capabilityRequirements = new TransportCapabilityRequirements();
+    private final JobConsumerRegistry jobConsumers = new JobConsumerRegistry();
 
     public BusRegistrationConfiguratorImpl(ServiceCollection serviceCollection) {
         this.serviceCollection = serviceCollection;
         sendConfigurator.useFilter(new OpenTelemetrySendFilter());
         publishConfigurator.useFilter(new OpenTelemetryPublishFilter());
+    }
+
+    @Override
+    public <TConsumer extends JobConsumer<?>> void addJobConsumer(Class<TConsumer> consumerClass) {
+        List<ParameterizedType> interfaces = java.util.Arrays.stream(consumerClass.getGenericInterfaces())
+                .filter(ParameterizedType.class::isInstance)
+                .map(ParameterizedType.class::cast)
+                .filter(type -> type.getRawType().equals(JobConsumer.class))
+                .toList();
+        if (interfaces.size() != 1) {
+            throw new IllegalArgumentException(
+                    "Job consumer must implement exactly one JobConsumer<TJob> interface");
+        }
+        Class<?> jobClass = getClassFromType(interfaces.get(0).getActualTypeArguments()[0]);
+        registerJobConsumer(consumerClass, jobClass, null);
+    }
+
+    @Override
+    public <TJob, TConsumer extends JobConsumer<TJob>> void addJobConsumer(
+            Class<TConsumer> consumerClass,
+            Class<TJob> jobClass,
+            Consumer<JobConsumerOptions> configure) {
+        registerJobConsumer(consumerClass, jobClass, configure);
+    }
+
+    private void registerJobConsumer(
+            Class<?> consumerClass,
+            Class<?> jobClass,
+            Consumer<JobConsumerOptions> configure) {
+        JobConsumerOptions options = new JobConsumerOptions();
+        if (configure != null) {
+            configure.accept(options);
+        }
+        serviceCollection.addScoped(consumerClass);
+        jobConsumers.add(consumerClass, jobClass, options);
     }
 
     @Override
@@ -325,6 +361,7 @@ public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigura
         serviceCollection.addScoped(PublishEndpoint.class,
                 sp -> () -> sp.getService(PublishEndpointProvider.class).getPublishEndpoint());
         serviceCollection.addSingleton(TopologyRegistry.class, sp -> () -> topology);
+        serviceCollection.addSingleton(JobConsumerRegistry.class, sp -> () -> jobConsumers);
         serviceCollection.addSingleton(TransportCapabilityRequirements.class, sp -> () -> capabilityRequirements);
         serviceCollection.addSingleton(com.myservicebus.topology.BusTopology.class, sp -> () -> topology);
         if (serviceCollection.getDescriptors().stream().anyMatch(d -> d.getServiceType().equals(BusHook.class))) {

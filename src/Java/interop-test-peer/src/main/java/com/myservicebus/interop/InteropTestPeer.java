@@ -50,6 +50,10 @@ public final class InteropTestPeer {
             com.myservicebus.persistence.postgresql.RecurringJobPostgreSqlInteropPeer.run(args);
             return;
         }
+        if (args.length > 0 && args[0].startsWith("postgres-job-")) {
+            com.myservicebus.persistence.postgresql.TrackedJobPostgreSqlInteropPeer.run(args);
+            return;
+        }
         if (args.length > 0 && args[0].startsWith("azure-")) {
             AzureServiceBusInteropPeer.run(args);
             return;

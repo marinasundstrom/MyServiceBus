@@ -13,5 +13,7 @@ public sealed class MonitoringExporterOptions
     public int MaxBatchSize { get; set; } = 256;
     public int MaxQueueSize { get; set; } = 10_000;
     public int MaxScheduledWorkItems { get; set; } = 1_000;
+    public int MaxJobItems { get; set; } = 1_000;
+    public int MaxJobAttempts { get; set; } = 10;
     public TimeSpan ScheduledWorkHistory { get; set; } = TimeSpan.FromHours(24);
 }

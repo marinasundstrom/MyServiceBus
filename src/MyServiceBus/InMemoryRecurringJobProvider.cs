@@ -7,7 +7,7 @@ public sealed class InMemoryRecurringJobProvider : IRecurringJobProvider, IRecur
         public required Guid DefinitionId { get; init; }
         public required RecurringJobDefinition Definition { get; set; }
         public required object Job { get; set; }
-        public required Func<CancellationToken, Task> Dispatch { get; set; }
+        public required Func<Guid, CancellationToken, Task> Submit { get; set; }
         public required long Revision { get; set; }
         public required DateTimeOffset AcceptedAtUtc { get; set; }
         public required RecurringJobDefinitionStatus Status { get; set; }
@@ -18,16 +18,16 @@ public sealed class InMemoryRecurringJobProvider : IRecurringJobProvider, IRecur
     private readonly object gate = new();
     private readonly Dictionary<RecurringJobIdentity, Entry> definitions = [];
     private readonly HashSet<(Guid DefinitionId, long Revision, DateTimeOffset ScheduledForUtc)> occurrences = [];
-    private readonly IPublishEndpoint publishEndpoint;
+    private readonly IJobClient jobClient;
     private readonly ILocalDelayScheduler delayScheduler;
     private readonly TimeProvider timeProvider;
 
     public InMemoryRecurringJobProvider(
-        IPublishEndpoint publishEndpoint,
+        IJobClient jobClient,
         ILocalDelayScheduler delayScheduler,
         TimeProvider? timeProvider = null)
     {
-        this.publishEndpoint = publishEndpoint;
+        this.jobClient = jobClient;
         this.delayScheduler = delayScheduler;
         this.timeProvider = timeProvider ?? TimeProvider.System;
     }
@@ -103,7 +103,10 @@ public sealed class InMemoryRecurringJobProvider : IRecurringJobProvider, IRecur
                 DefinitionId = current?.DefinitionId ?? Guid.NewGuid(),
                 Definition = definition,
                 Job = job,
-                Dispatch = token => publishEndpoint.Publish(job, cancellationToken: token),
+                Submit = (occurrenceId, token) => jobClient.Submit(
+                    job,
+                    new JobSubmissionOptions(recurringJobOccurrenceId: occurrenceId),
+                    token),
                 Revision = (current?.Revision ?? 0) + 1,
                 AcceptedAtUtc = timeProvider.GetUtcNow(),
                 Status = RecurringJobDefinitionStatus.Active
@@ -218,14 +221,14 @@ public sealed class InMemoryRecurringJobProvider : IRecurringJobProvider, IRecur
             occurrenceId = Guid.NewGuid();
         }
 
-        await entry.Dispatch(cancellationToken).ConfigureAwait(false);
+        await entry.Submit(occurrenceId, cancellationToken).ConfigureAwait(false);
         return new(
             occurrenceId,
             entry.DefinitionId,
             entry.Revision,
             scheduledFor,
             true,
-            RecurringJobOccurrenceStatus.Dispatched);
+            RecurringJobOccurrenceStatus.Pending);
     }
 
     private async Task ScheduleNext(Entry entry, DateTimeOffset afterUtc, CancellationToken cancellationToken)
@@ -308,7 +311,7 @@ public sealed class InMemoryRecurringJobProvider : IRecurringJobProvider, IRecur
 
         await ScheduleAt(entry, next, cancellationToken).ConfigureAwait(false);
         for (var index = 0; index < dispatchCount; index++)
-            await entry.Dispatch(cancellationToken).ConfigureAwait(false);
+            await entry.Submit(Guid.NewGuid(), cancellationToken).ConfigureAwait(false);
     }
 
     private bool IsCurrent(Entry entry) =>

@@ -15,8 +15,15 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 
 import com.myservicebus.MessageOperationHookEvent;
+import com.myservicebus.JobAttemptState;
+import com.myservicebus.JobAttemptStatus;
+import com.myservicebus.JobProgress;
+import com.myservicebus.JobSource;
+import com.myservicebus.JobState;
+import com.myservicebus.JobStatus;
 import com.myservicebus.OutboxDeliveryHookEvent;
 import com.myservicebus.SchedulingDurability;
+import com.myservicebus.SchedulingPlacement;
 import com.myservicebus.ScheduledWorkSource;
 import com.myservicebus.ScheduledWorkState;
 import com.myservicebus.ScheduledWorkStatus;
@@ -240,6 +247,89 @@ class MonitoringExporterTest {
             assertTrue(scheduledJson.get().contains(state.tokenId().toString()));
             assertTrue(scheduledJson.get().contains("\"provider\":\"PostgreSQL\""));
             assertTrue(scheduledJson.get().contains("\"durability\":\"Durable\""));
+        } finally {
+            exporter.close();
+            server.stop(0);
+        }
+    }
+
+    @Test
+    void exporterSendsJobsWithBoundedAttemptsWithoutPayloads() throws Exception {
+        CountDownLatch jobsReceived = new CountDownLatch(1);
+        AtomicReference<String> jobsJson = new AtomicReference<>();
+        HttpServer server = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
+        server.createContext("/api/monitoring/v1/metadata", exchange -> {
+            readBody(exchange);
+            respond(exchange);
+        });
+        server.createContext("/api/monitoring/v1/scheduled-work", exchange -> {
+            readBody(exchange);
+            respond(exchange);
+        });
+        server.createContext("/api/monitoring/v1/recurring-jobs", exchange -> {
+            readBody(exchange);
+            respond(exchange);
+        });
+        server.createContext("/api/monitoring/v1/jobs", exchange -> {
+            jobsJson.set(readBody(exchange));
+            respond(exchange);
+            jobsReceived.countDown();
+        });
+        server.start();
+
+        Instant now = Instant.now();
+        java.util.UUID occurrenceId = java.util.UUID.randomUUID();
+        JobState state = new JobState(
+                java.util.UUID.randomUUID(), "invoice-export", JobStatus.FAULTED, "in-memory",
+                SchedulingDurability.VOLATILE, SchedulingPlacement.PROCESS_LOCAL,
+                now.minusSeconds(2), null, now.minusSeconds(1), now,
+                new JobProgress(4, 10L), occurrenceId, now);
+        JobAttemptState attempt = new JobAttemptState(
+                java.util.UUID.randomUUID(), state.jobId(), 0, JobAttemptStatus.FAULTED,
+                now.minusSeconds(1), now, "java.lang.IllegalStateException", "secret-body");
+        JobSource source = new JobSource() {
+            @Override
+            public String getProvider() {
+                return "in-memory";
+            }
+
+            @Override
+            public boolean isAuthoritative() {
+                return true;
+            }
+
+            @Override
+            public java.util.concurrent.CompletionStage<List<JobState>> getSnapshot(
+                    int maximumCount,
+                    com.myservicebus.tasks.CancellationToken cancellationToken) {
+                return java.util.concurrent.CompletableFuture.completedFuture(List.of(state));
+            }
+
+            @Override
+            public java.util.concurrent.CompletionStage<List<JobAttemptState>> getAttempts(
+                    java.util.UUID jobId,
+                    int maximumCount,
+                    com.myservicebus.tasks.CancellationToken cancellationToken) {
+                return java.util.concurrent.CompletableFuture.completedFuture(List.of(attempt));
+            }
+        };
+        MonitoringExporterOptions options = new MonitoringExporterOptions();
+        options.setServiceAddress(URI.create("http://localhost:" + server.getAddress().getPort()));
+        options.setExportInterval(Duration.ofMillis(20));
+        MonitoringExporter exporter = new MonitoringExporter(options);
+        try {
+            ServiceCollection services = ServiceCollection.create();
+            services.addSingleton(BusInspectionProvider.class, ignored -> () -> () -> new BusInspectionSnapshot(
+                    "mediator", URI.create("loopback://localhost/"), Instant.now(),
+                    List.of(), List.of(), List.of()));
+            services.addSingleton(JobSource.class, ignored -> () -> source);
+            exporter.start(services.buildServiceProvider());
+
+            assertTrue(jobsReceived.await(2, TimeUnit.SECONDS));
+            assertTrue(jobsJson.get().contains(state.jobId().toString()));
+            assertTrue(jobsJson.get().contains(occurrenceId.toString()));
+            assertTrue(jobsJson.get().contains("java.lang.IllegalStateException"));
+            assertTrue(!jobsJson.get().contains("secret-body"));
         } finally {
             exporter.close();
             server.stop(0);

@@ -24,6 +24,7 @@ internal sealed class PostgreSqlRecurringJobProvider : IRecurringJobProvider, IR
     private readonly IMessageSerializer serializer;
     private readonly TimeProvider timeProvider;
     private readonly PostgreSqlRecurringJobMaterializer materializer;
+    private readonly IJobConsumerRegistry? consumers;
 
     public PostgreSqlRecurringJobProvider(
         NpgsqlDataSource dataSource,
@@ -31,7 +32,8 @@ internal sealed class PostgreSqlRecurringJobProvider : IRecurringJobProvider, IR
         ITransportFactory transportFactory,
         IMessageSerializer serializer,
         TimeProvider? timeProvider = null,
-        PostgreSqlRecurringJobMaterializer? materializer = null)
+        PostgreSqlRecurringJobMaterializer? materializer = null,
+        IJobConsumerRegistry? consumers = null)
     {
         this.dataSource = dataSource ?? throw new ArgumentNullException(nameof(dataSource));
         ArgumentException.ThrowIfNullOrWhiteSpace(serviceName);
@@ -41,6 +43,7 @@ internal sealed class PostgreSqlRecurringJobProvider : IRecurringJobProvider, IR
         this.timeProvider = timeProvider ?? TimeProvider.System;
         this.materializer = materializer
             ?? new PostgreSqlRecurringJobMaterializer(dataSource, this.serviceName, this.timeProvider);
+        this.consumers = consumers;
     }
 
     public string ProviderName => "MyServiceBus.Durable";
@@ -105,6 +108,9 @@ internal sealed class PostgreSqlRecurringJobProvider : IRecurringJobProvider, IR
             throw new NotSupportedException("The interoperable durable provider requires the MyServiceBus envelope format.");
 
         var now = timeProvider.GetUtcNow();
+        var registered = consumers?.Get(typeof(TJob));
+        var jobTypeName = registered?.JobTypeName ?? typeof(TJob).Name;
+        var jobOptions = registered?.Options ?? new JobConsumerOptions();
         var cadenceJson = CreateCadenceJson((FixedIntervalRecurringJobCadence)definition.Cadence);
         var messageTypes = MessageTypeCache.GetMessageTypes(typeof(TJob)).Select(MessageUrn.For).ToArray();
         var destination = transportFactory.GetPublishAddress(typeof(TJob));
@@ -117,7 +123,14 @@ internal sealed class PostgreSqlRecurringJobProvider : IRecurringJobProvider, IR
         using var envelopeDocument = JsonDocument.Parse(commandEnvelope);
         commandEnvelope = envelopeDocument.RootElement.GetRawText();
         var commandMessage = envelopeDocument.RootElement.GetProperty("message").GetRawText();
-        var semanticHash = CreateSemanticHash(definition, cadenceJson, destination, messageTypes, commandMessage);
+        var semanticHash = CreateSemanticHash(
+            definition,
+            cadenceJson,
+            destination,
+            messageTypes,
+            commandMessage,
+            jobTypeName,
+            jobOptions);
 
         await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
@@ -144,6 +157,8 @@ internal sealed class PostgreSqlRecurringJobProvider : IRecurringJobProvider, IR
             definition,
             cadenceJson,
             destination,
+            jobTypeName,
+            jobOptions,
             messageTypes,
             commandEnvelope,
             now,
@@ -259,6 +274,8 @@ internal sealed class PostgreSqlRecurringJobProvider : IRecurringJobProvider, IR
         RecurringJobDefinition definition,
         string cadenceJson,
         Uri destination,
+        string jobTypeName,
+        JobConsumerOptions jobOptions,
         string[] messageTypes,
         string commandEnvelope,
         DateTimeOffset now,
@@ -273,6 +290,10 @@ internal sealed class PostgreSqlRecurringJobProvider : IRecurringJobProvider, IR
                 end_at_utc = @end_at_utc, misfire_policy = @misfire_policy,
                 max_catch_up_occurrences = @max_catch_up, overlap_policy = @overlap_policy,
                 delivery_intent = 1, destination_address = @destination_address,
+                job_type_name = @job_type_name, job_retry_limit = @job_retry_limit,
+                job_retry_delay_milliseconds = @job_retry_delay_milliseconds,
+                job_timeout_milliseconds = @job_timeout_milliseconds,
+                job_concurrent_limit = @job_concurrent_limit,
                 command_message_types = @command_message_types, command_payload = @command_payload,
                 command_headers = '{}'::jsonb, content_type = @content_type,
                 accepted_at_utc = @accepted_at_utc, updated_at_utc = @accepted_at_utc,
@@ -283,12 +304,16 @@ internal sealed class PostgreSqlRecurringJobProvider : IRecurringJobProvider, IR
                 definition_id, service_name, schedule_group, schedule_id, revision, semantic_hash, status,
                 cadence_kind, cadence, description, start_at_utc, end_at_utc, misfire_policy,
                 max_catch_up_occurrences, overlap_policy, delivery_intent, destination_address,
+                job_type_name, job_retry_limit, job_retry_delay_milliseconds,
+                job_timeout_milliseconds, job_concurrent_limit,
                 command_message_types, command_payload, command_headers, content_type, accepted_at_utc,
                 updated_at_utc, next_due_at_utc)
             VALUES (
                 @definition_id, @service_name, @schedule_group, @schedule_id, @revision, @semantic_hash, 0,
                 0, @cadence, @description, @start_at_utc, @end_at_utc, @misfire_policy,
                 @max_catch_up, @overlap_policy, 1, @destination_address,
+                @job_type_name, @job_retry_limit, @job_retry_delay_milliseconds,
+                @job_timeout_milliseconds, @job_concurrent_limit,
                 @command_message_types, @command_payload, '{}'::jsonb, @content_type, @accepted_at_utc,
                 @accepted_at_utc, @next_due_at_utc);
             """;
@@ -307,6 +332,22 @@ internal sealed class PostgreSqlRecurringJobProvider : IRecurringJobProvider, IR
         command.Parameters.AddWithValue("max_catch_up", NpgsqlDbType.Integer, definition.MaxCatchUpOccurrences);
         command.Parameters.AddWithValue("overlap_policy", NpgsqlDbType.Smallint, (short)definition.OverlapPolicy);
         command.Parameters.AddWithValue("destination_address", NpgsqlDbType.Text, destination.ToString());
+        command.Parameters.AddWithValue("job_type_name", NpgsqlDbType.Text, jobTypeName);
+        command.Parameters.AddWithValue("job_retry_limit", NpgsqlDbType.Integer, jobOptions.RetryCount);
+        command.Parameters.AddWithValue(
+            "job_retry_delay_milliseconds",
+            NpgsqlDbType.Bigint,
+            jobOptions.RetryDelay is null
+                ? DBNull.Value
+                : checked((long)jobOptions.RetryDelay.Value.TotalMilliseconds));
+        command.Parameters.AddWithValue(
+            "job_timeout_milliseconds",
+            NpgsqlDbType.Bigint,
+            checked((long)jobOptions.JobTimeout.TotalMilliseconds));
+        command.Parameters.AddWithValue(
+            "job_concurrent_limit",
+            NpgsqlDbType.Integer,
+            jobOptions.ConcurrentJobLimit);
         command.Parameters.AddWithValue("command_message_types", NpgsqlDbType.Array | NpgsqlDbType.Text, messageTypes);
         command.Parameters.AddWithValue("command_payload", NpgsqlDbType.Jsonb, commandEnvelope);
         command.Parameters.AddWithValue("content_type", NpgsqlDbType.Text, serializer.ContentType);
@@ -328,7 +369,9 @@ internal sealed class PostgreSqlRecurringJobProvider : IRecurringJobProvider, IR
         string cadence,
         Uri destination,
         string[] messageTypes,
-        string commandMessage)
+        string commandMessage,
+        string jobTypeName,
+        JobConsumerOptions jobOptions)
     {
         var value = string.Join('\n',
             cadence,
@@ -339,6 +382,11 @@ internal sealed class PostgreSqlRecurringJobProvider : IRecurringJobProvider, IR
             definition.MaxCatchUpOccurrences.ToString(),
             ((int)definition.OverlapPolicy).ToString(),
             destination.ToString(),
+            jobTypeName,
+            jobOptions.RetryCount.ToString(),
+            jobOptions.RetryDelay?.TotalMilliseconds.ToString(),
+            jobOptions.JobTimeout.TotalMilliseconds.ToString(),
+            jobOptions.ConcurrentJobLimit.ToString(),
             string.Join('\u001f', messageTypes),
             commandMessage);
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value)));

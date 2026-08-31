@@ -20,6 +20,9 @@ builder.Services.AddServiceBus(configurator =>
     configurator.UseBusOutbox();
     configurator.AddConsumer<OutboxShowcaseConsumer, OutboxShowcaseMessage>(
         "outbox-showcase-csharp-consumer");
+    configurator.AddJobConsumer<OutboxHeartbeatJobConsumer, OutboxShowcaseMessage>(options => options
+        .SetJobTypeName("outbox-heartbeat")
+        .SetConcurrentJobLimit(1));
     configurator.UsingRabbitMq((context, rabbit) =>
     {
         var host = Environment.GetEnvironmentVariable("RABBITMQ_HOST") ?? "localhost";
@@ -48,15 +51,18 @@ builder.Services.AddPostgreSqlOutboxDelivery(serviceName, options =>
     options.OwnerId = $"csharp-{Environment.MachineName}-{Environment.ProcessId}";
     options.PollInterval = TimeSpan.FromMilliseconds(250);
 });
+builder.Services.AddBuiltInJobsWithPostgreSql(serviceName);
 builder.Services.AddBuiltInRecurringJobsWithPostgreSql(serviceName);
 
 var app = builder.Build();
 await PostgreSqlSchema.EnsureCreatedAsync(dataSource);
 await EnsureApplicationSchema(dataSource);
-await app.Services.GetRequiredService<IRecurringJobScheduler>().AddOrUpdate(
+var recurringJobs = app.Services.GetRequiredService<IRecurringJobScheduler>();
+var heartbeatIdentity = new RecurringJobIdentity("outbox-heartbeat", "aspire-demo");
+await recurringJobs.AddOrUpdate(
     new RecurringJobDefinition(
-        new RecurringJobIdentity("outbox-heartbeat", "aspire-demo"),
-        new FixedIntervalRecurringJobCadence(TimeSpan.FromSeconds(15)),
+        heartbeatIdentity,
+        new FixedIntervalRecurringJobCadence(TimeSpan.FromMinutes(5)),
         "Demonstrates durable recurring publication through the transactional outbox."),
     new OutboxShowcaseMessage
     {
@@ -64,6 +70,7 @@ await app.Services.GetRequiredService<IRecurringJobScheduler>().AddOrUpdate(
         Origin = "csharp-recurring",
         CreatedAtUtc = "recurring-definition"
     });
+await recurringJobs.TriggerNow(heartbeatIdentity);
 
 app.MapPost("/publish", async (
     IPublishEndpoint publishEndpoint,
@@ -181,6 +188,14 @@ namespace TestApp
         {
             Received.Enqueue(context.Message);
             return Task.CompletedTask;
+        }
+    }
+
+    public sealed class OutboxHeartbeatJobConsumer : IJobConsumer<OutboxShowcaseMessage>
+    {
+        public async Task Run(JobContext<OutboxShowcaseMessage> context)
+        {
+            await context.SetProgress(1, 1, context.CancellationToken);
         }
     }
 }

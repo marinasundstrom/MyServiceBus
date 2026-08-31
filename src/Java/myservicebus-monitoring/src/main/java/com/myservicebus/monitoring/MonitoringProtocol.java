@@ -116,4 +116,40 @@ public final class MonitoringProtocol {
             Instant nextOccurrenceAtUtc,
             Instant updatedAtUtc) {
     }
+
+    public record JobSnapshot(
+            String protocolVersion,
+            String applicationName,
+            String instanceId,
+            String busId,
+            Instant capturedAtUtc,
+            List<JobItem> items) {
+    }
+
+    public record JobItem(
+            String jobId,
+            String jobType,
+            String status,
+            String provider,
+            String durability,
+            String placement,
+            Instant submittedAtUtc,
+            Instant scheduledForUtc,
+            Instant startedAtUtc,
+            Instant completedAtUtc,
+            Long progressValue,
+            Long progressLimit,
+            String recurringJobOccurrenceId,
+            Instant updatedAtUtc,
+            List<JobAttemptItem> attempts) {
+    }
+
+    public record JobAttemptItem(
+            String attemptId,
+            int retryAttempt,
+            String status,
+            Instant startedAtUtc,
+            Instant completedAtUtc,
+            String failureCategory) {
+    }
 }

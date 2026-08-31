@@ -19,6 +19,11 @@ public sealed class PostgreSqlRecurringJobMaterializer
         RecurringJobMisfirePolicy MisfirePolicy,
         int MaxCatchUpOccurrences,
         Uri Destination,
+        string JobTypeName,
+        int RetryLimit,
+        long? RetryDelayMilliseconds,
+        long TimeoutMilliseconds,
+        int ConcurrentJobLimit,
         string[] MessageTypes,
         string Envelope,
         string ContentType,
@@ -113,6 +118,8 @@ public sealed class PostgreSqlRecurringJobMaterializer
         await using var command = new NpgsqlCommand("""
             SELECT definition_id, revision, accepted_at_utc, start_at_utc, end_at_utc, cadence::text,
                 misfire_policy, max_catch_up_occurrences, destination_address, command_message_types,
+                job_type_name, job_retry_limit, job_retry_delay_milliseconds,
+                job_timeout_milliseconds, job_concurrent_limit,
                 command_payload::text, content_type, next_due_at_utc
             FROM myservicebus.recurring_job_definition
             WHERE service_name = @service_name AND status = 0 AND next_due_at_utc <= @now
@@ -134,6 +141,8 @@ public sealed class PostgreSqlRecurringJobMaterializer
         await using var command = new NpgsqlCommand("""
             SELECT definition_id, revision, accepted_at_utc, start_at_utc, end_at_utc, cadence::text,
                 misfire_policy, max_catch_up_occurrences, destination_address, command_message_types,
+                job_type_name, job_retry_limit, job_retry_delay_milliseconds,
+                job_timeout_milliseconds, job_concurrent_limit,
                 command_payload::text, content_type, COALESCE(next_due_at_utc, CURRENT_TIMESTAMP)
             FROM myservicebus.recurring_job_definition
             WHERE service_name = @service_name AND schedule_group = @schedule_group AND schedule_id = @schedule_id
@@ -170,10 +179,15 @@ public sealed class PostgreSqlRecurringJobMaterializer
                 (RecurringJobMisfirePolicy)reader.GetInt16(6),
                 reader.GetInt32(7),
                 new Uri(reader.GetString(8)),
-                reader.GetFieldValue<string[]>(9),
                 reader.GetString(10),
-                reader.GetString(11),
-                reader.GetFieldValue<DateTimeOffset>(12)));
+                reader.GetInt32(11),
+                reader.IsDBNull(12) ? null : reader.GetInt64(12),
+                reader.GetInt64(13),
+                reader.GetInt32(14),
+                reader.GetFieldValue<string[]>(9),
+                reader.GetString(15),
+                reader.GetString(16),
+                reader.GetFieldValue<DateTimeOffset>(17)));
         }
         return result;
     }
@@ -220,7 +234,6 @@ public sealed class PostgreSqlRecurringJobMaterializer
         Guid? requestedOccurrenceId = null)
     {
         var occurrenceId = requestedOccurrenceId ?? Guid.NewGuid();
-        var outboxRecordId = Guid.NewGuid();
         await using (var occurrence = new NpgsqlCommand("""
             INSERT INTO myservicebus.recurring_job_occurrence (
                 occurrence_id, definition_id, definition_revision, scheduled_for_utc, materialized_at_utc,
@@ -240,32 +253,44 @@ public sealed class PostgreSqlRecurringJobMaterializer
                 return null;
         }
 
-        var messageId = Guid.NewGuid();
+        var jobId = Guid.NewGuid();
         var envelope = JsonNode.Parse(definition.Envelope)!.AsObject();
-        envelope["messageId"] = messageId;
+        envelope["messageId"] = jobId;
         envelope["conversationId"] = Guid.NewGuid();
         envelope["sentTime"] = now;
         var body = Encoding.UTF8.GetBytes(envelope.ToJsonString());
-        await using (var outbox = new NpgsqlCommand("""
-            INSERT INTO myservicebus.outbox_message (
-                record_id, service_name, message_id, intent, destination_address, message_types, body,
-                content_type, headers, created_at_utc, state, next_attempt_at_utc)
-            VALUES (@record_id, @service_name, @message_id, 1, @destination, @message_types, @body,
-                @content_type, '{}'::jsonb, @now, 0, @now);
+        await using (var job = new NpgsqlCommand("""
+            INSERT INTO myservicebus.job (
+                job_id, service_name, job_type_name, message_types, body, content_type, headers,
+                status, submitted_at_utc, scheduled_for_utc, available_at_utc, updated_at_utc,
+                retry_limit, retry_delay_milliseconds, timeout_milliseconds, concurrent_job_limit,
+                recurring_occurrence_id)
+            VALUES (
+                @job_id, @service_name, @job_type_name, @message_types, @body, @content_type, '{}'::jsonb,
+                2, @now, @scheduled_for, @now, @now,
+                @retry_limit, @retry_delay_milliseconds, @timeout_milliseconds, @concurrent_job_limit,
+                @occurrence_id);
             UPDATE myservicebus.recurring_job_occurrence
-            SET outbox_record_id = @record_id WHERE occurrence_id = @occurrence_id;
+            SET job_id = @job_id WHERE occurrence_id = @occurrence_id;
             """, connection, transaction))
         {
-            outbox.Parameters.AddWithValue("record_id", NpgsqlDbType.Uuid, outboxRecordId);
-            outbox.Parameters.AddWithValue("service_name", NpgsqlDbType.Text, serviceName);
-            outbox.Parameters.AddWithValue("message_id", NpgsqlDbType.Uuid, messageId);
-            outbox.Parameters.AddWithValue("destination", NpgsqlDbType.Text, definition.Destination.ToString());
-            outbox.Parameters.AddWithValue("message_types", NpgsqlDbType.Array | NpgsqlDbType.Text, definition.MessageTypes);
-            outbox.Parameters.AddWithValue("body", NpgsqlDbType.Bytea, body);
-            outbox.Parameters.AddWithValue("content_type", NpgsqlDbType.Text, definition.ContentType);
-            outbox.Parameters.AddWithValue("now", NpgsqlDbType.TimestampTz, now);
-            outbox.Parameters.AddWithValue("occurrence_id", NpgsqlDbType.Uuid, occurrenceId);
-            await outbox.ExecuteNonQueryAsync(cancellationToken);
+            job.Parameters.AddWithValue("job_id", NpgsqlDbType.Uuid, jobId);
+            job.Parameters.AddWithValue("service_name", NpgsqlDbType.Text, serviceName);
+            job.Parameters.AddWithValue("job_type_name", NpgsqlDbType.Text, definition.JobTypeName);
+            job.Parameters.AddWithValue("message_types", NpgsqlDbType.Array | NpgsqlDbType.Text, definition.MessageTypes);
+            job.Parameters.AddWithValue("body", NpgsqlDbType.Bytea, body);
+            job.Parameters.AddWithValue("content_type", NpgsqlDbType.Text, definition.ContentType);
+            job.Parameters.AddWithValue("now", NpgsqlDbType.TimestampTz, now);
+            job.Parameters.AddWithValue("scheduled_for", NpgsqlDbType.TimestampTz, scheduledFor);
+            job.Parameters.AddWithValue("retry_limit", NpgsqlDbType.Integer, definition.RetryLimit);
+            job.Parameters.AddWithValue(
+                "retry_delay_milliseconds",
+                NpgsqlDbType.Bigint,
+                definition.RetryDelayMilliseconds is null ? DBNull.Value : definition.RetryDelayMilliseconds.Value);
+            job.Parameters.AddWithValue("timeout_milliseconds", NpgsqlDbType.Bigint, definition.TimeoutMilliseconds);
+            job.Parameters.AddWithValue("concurrent_job_limit", NpgsqlDbType.Integer, definition.ConcurrentJobLimit);
+            job.Parameters.AddWithValue("occurrence_id", NpgsqlDbType.Uuid, occurrenceId);
+            await job.ExecuteNonQueryAsync(cancellationToken);
         }
         return occurrenceId;
     }

@@ -14,6 +14,7 @@ public sealed class MonitoringHistoryDbContext : DbContext
     internal DbSet<MonitoringHeartbeatEntity> Heartbeats => Set<MonitoringHeartbeatEntity>();
     internal DbSet<MonitoringScheduledWorkEntity> ScheduledWork => Set<MonitoringScheduledWorkEntity>();
     internal DbSet<MonitoringRecurringJobEntity> RecurringJobs => Set<MonitoringRecurringJobEntity>();
+    internal DbSet<MonitoringJobEntity> Jobs => Set<MonitoringJobEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -47,6 +48,12 @@ public sealed class MonitoringHistoryDbContext : DbContext
         modelBuilder.Entity<MonitoringRecurringJobEntity>(entity =>
         {
             entity.ToTable("recurring_job_snapshot");
+            entity.HasKey(value => new { value.ApplicationName, value.InstanceId, value.BusId });
+            entity.Property(value => value.Payload).HasColumnType("jsonb");
+        });
+        modelBuilder.Entity<MonitoringJobEntity>(entity =>
+        {
+            entity.ToTable("job_snapshot");
             entity.HasKey(value => new { value.ApplicationName, value.InstanceId, value.BusId });
             entity.Property(value => value.Payload).HasColumnType("jsonb");
         });
@@ -93,6 +100,16 @@ internal sealed class MonitoringScheduledWorkEntity
 }
 
 internal sealed class MonitoringRecurringJobEntity
+{
+    public string ApplicationName { get; set; } = string.Empty;
+    public string InstanceId { get; set; } = string.Empty;
+    public string BusId { get; set; } = string.Empty;
+    public DateTimeOffset CapturedAtUtc { get; set; }
+    public DateTimeOffset ReceivedAtUtc { get; set; }
+    public string Payload { get; set; } = string.Empty;
+}
+
+internal sealed class MonitoringJobEntity
 {
     public string ApplicationName { get; set; } = string.Empty;
     public string InstanceId { get; set; } = string.Empty;

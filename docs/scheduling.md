@@ -137,7 +137,7 @@ busServices.addServiceBus(configurator -> {
 
 A provider that reports `Durable` / `DURABLE` must prove persisted acceptance, restart recovery, stable identity, due-time boundaries, cancellation races, and ambiguous dispatch behavior. Recurring schedules are a separate capability and are not part of the current interface.
 
-Recurring jobs are designed separately from one-time scheduled messages. See [Recurring Jobs](development/recurring-jobs.md) for the definition-versus-occurrence model, dispatch-only first execution boundary, provider-independent cadence semantics, PostgreSQL interoperability direction, and monitoring requirements.
+Recurring jobs are designed separately from one-time scheduled messages. See [Recurring Jobs](development/recurring-jobs.md) for the definition-versus-occurrence-versus-job model, tracked durable execution boundary, provider-independent cadence semantics, PostgreSQL interoperability direction, and monitoring requirements.
 
 Provider support in C# and Java means compatible MyServiceBus APIs and behavior; it does not require the applications to use the same scheduler engine. Hangfire may be appropriate for a .NET application and JobRunr for a Java application. Their records are not portable between engines, but both can export normalized scheduling state to monitoring. Use the MyServiceBus PostgreSQL scheduler when C# and Java applications need to share the same persisted scheduled-message records and envelopes.
 

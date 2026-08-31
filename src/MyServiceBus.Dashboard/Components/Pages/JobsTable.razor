@@ -1,0 +1,77 @@
+<section class="panel instances scheduled-work-panel">
+    <div class="section-heading"><div><p class="eyebrow">Current lifecycle</p><h2>Tracked jobs</h2></div><span>Progress, outcomes, and bounded attempts</span></div>
+    @if (Items.Count == 0)
+    {
+        <p class="panel-empty">No tracked jobs have been reported. The application may not use job consumers, may be offline, or its configured provider may not expose job state yet.</p>
+    }
+    else
+    {
+        <div class="table-wrap"><table>
+            <thead><tr><th>Status</th><th>Application</th><th>Job</th><th>Progress</th><th>Timing</th><th>Attempts</th><th>Provider</th><th>Reported by</th></tr></thead>
+            <tbody>
+                @foreach (var item in Items)
+                {
+                    <tr>
+                        <td><span class="status-dot @StatusClass(item.Job.Status)"></span><strong>@item.Job.Status</strong><small>Updated @item.Job.UpdatedAtUtc.LocalDateTime.ToString("HH:mm:ss")</small></td>
+                        <td><a href="@($"/applications/{Uri.EscapeDataString(item.ApplicationName)}/jobs")">@item.ApplicationName</a></td>
+                        <td><strong>@ShortType(item.Job.JobType)</strong><small class="mono">@item.Job.JobId</small></td>
+                        <td>@FormatProgress(item.Job)<small>@ProgressDetail(item.Job)</small></td>
+                        <td>@FormatPrimaryTime(item.Job)<small>@FormatCompletion(item.Job)</small></td>
+                        <td>
+                            @if (item.Job.Attempts.Count == 0)
+                            {
+                                <span>None reported</span>
+                            }
+                            else
+                            {
+                                <details><summary>@item.Job.Attempts.Count attempt@(item.Job.Attempts.Count == 1 ? string.Empty : "s")</summary>
+                                    @foreach (var attempt in item.Job.Attempts.OrderByDescending(attempt => attempt.RetryAttempt))
+                                    {
+                                        <small><strong>#@(attempt.RetryAttempt + 1) @attempt.Status</strong> · @attempt.StartedAtUtc.LocalDateTime.ToString("HH:mm:ss") @Failure(attempt)</small>
+                                    }
+                                </details>
+                            }
+                        </td>
+                        <td>@item.Job.Provider<small>@item.Job.Durability · @item.Job.Placement</small></td>
+                        <td><span class="status-dot @(item.InstanceOnline ? "online" : "offline")"></span>@(item.InstanceOnline ? "Online" : "Offline")<small class="mono">@item.InstanceId</small><small>Snapshot @item.CapturedAtUtc.LocalDateTime.ToString("HH:mm:ss")</small></td>
+                    </tr>
+                }
+            </tbody>
+        </table></div>
+    }
+</section>
+
+@code {
+    [Parameter, EditorRequired]
+    public required IReadOnlyList<MonitoringJobSummary> Items { get; set; }
+
+    private static string StatusClass(string status) => status switch
+    {
+        "Running" or "Completed" => "online",
+        "Submitted" or "Scheduled" or "Waiting" => "degraded",
+        _ => "offline"
+    };
+
+    private static string ShortType(string value) => value.Split('.').Last();
+
+    private static string FormatProgress(MonitoringJobItem job)
+        => job.ProgressValue is { } value ? job.ProgressLimit is { } limit ? $"{value} / {limit}" : value.ToString() : "Not reported";
+
+    private static string ProgressDetail(MonitoringJobItem job)
+        => job.ProgressValue is { } value && job.ProgressLimit is { } limit
+            ? $"{Math.Round(value * 100d / limit):0}% complete"
+            : "Optional application progress";
+
+    private static string FormatPrimaryTime(MonitoringJobItem job)
+        => job.StartedAtUtc?.LocalDateTime.ToString("MMM d, HH:mm:ss")
+            ?? job.ScheduledForUtc?.LocalDateTime.ToString("MMM d, HH:mm:ss")
+            ?? job.SubmittedAtUtc.LocalDateTime.ToString("MMM d, HH:mm:ss");
+
+    private static string FormatCompletion(MonitoringJobItem job)
+        => job.CompletedAtUtc is { } completed
+            ? $"{job.Status} {completed.LocalDateTime:HH:mm:ss}"
+            : job.StartedAtUtc is not null ? "Started" : job.ScheduledForUtc is not null ? "Scheduled" : "Submitted";
+
+    private static string Failure(MonitoringJobAttemptItem attempt)
+        => string.IsNullOrWhiteSpace(attempt.FailureCategory) ? string.Empty : $"· {ShortType(attempt.FailureCategory)}";
+}

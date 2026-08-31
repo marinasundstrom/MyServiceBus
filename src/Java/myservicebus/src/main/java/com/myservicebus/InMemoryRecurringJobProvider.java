@@ -19,7 +19,7 @@ public final class InMemoryRecurringJobProvider implements RecurringJobProvider,
         private final UUID definitionId;
         private RecurringJobDefinition definition;
         private Object job;
-        private Function<CancellationToken, CompletionStage<Void>> dispatch;
+        private Submission submit;
         private long revision;
         private Instant acceptedAtUtc;
         private RecurringJobDefinitionStatus status;
@@ -30,13 +30,13 @@ public final class InMemoryRecurringJobProvider implements RecurringJobProvider,
                 UUID definitionId,
                 RecurringJobDefinition definition,
                 Object job,
-                Function<CancellationToken, CompletionStage<Void>> dispatch,
+                Submission submit,
                 long revision,
                 Instant acceptedAtUtc) {
             this.definitionId = definitionId;
             this.definition = definition;
             this.job = job;
-            this.dispatch = dispatch;
+            this.submit = submit;
             this.revision = revision;
             this.acceptedAtUtc = acceptedAtUtc;
             this.status = RecurringJobDefinitionStatus.ACTIVE;
@@ -46,24 +46,29 @@ public final class InMemoryRecurringJobProvider implements RecurringJobProvider,
     private record OccurrenceKey(UUID definitionId, long revision, Instant scheduledForUtc) {
     }
 
+    @FunctionalInterface
+    private interface Submission {
+        CompletionStage<Void> apply(UUID occurrenceId, CancellationToken cancellationToken);
+    }
+
     private final Object gate = new Object();
     private final Map<RecurringJobIdentity, Entry> definitions = new HashMap<>();
     private final Set<OccurrenceKey> occurrences = new HashSet<>();
-    private final PublishEndpoint publishEndpoint;
+    private final JobClient jobClient;
     private final LocalDelayScheduler delayScheduler;
     private final Clock clock;
 
     public InMemoryRecurringJobProvider(
-            PublishEndpoint publishEndpoint,
+            JobClient jobClient,
             LocalDelayScheduler delayScheduler) {
-        this(publishEndpoint, delayScheduler, Clock.systemUTC());
+        this(jobClient, delayScheduler, Clock.systemUTC());
     }
 
     public InMemoryRecurringJobProvider(
-            PublishEndpoint publishEndpoint,
+            JobClient jobClient,
             LocalDelayScheduler delayScheduler,
             Clock clock) {
-        this.publishEndpoint = publishEndpoint;
+        this.jobClient = jobClient;
         this.delayScheduler = delayScheduler;
         this.clock = clock;
     }
@@ -148,7 +153,11 @@ public final class InMemoryRecurringJobProvider implements RecurringJobProvider,
                     current == null ? UUID.randomUUID() : current.definitionId,
                     definition,
                     job,
-                    token -> publishEndpoint.publish(job, token),
+                    (occurrenceId, token) -> jobClient.submit(
+                            job,
+                            new JobSubmissionOptions(null, occurrenceId),
+                            token)
+                            .thenApply(ignored -> null),
                     (current == null ? 0 : current.revision) + 1,
                     clock.instant());
             definitions.put(definition.identity(), entry);
@@ -266,14 +275,14 @@ public final class InMemoryRecurringJobProvider implements RecurringJobProvider,
         }
 
         Entry captured = entry;
-        return entry.dispatch.apply(cancellationToken).thenApply(ignored ->
+        return entry.submit.apply(occurrenceId, cancellationToken).thenApply(ignored ->
                 new RecurringJobOccurrenceReceipt(
                         occurrenceId,
                         captured.definitionId,
                         captured.revision,
                         scheduledFor,
                         true,
-                        RecurringJobOccurrenceStatus.DISPATCHED));
+                        RecurringJobOccurrenceStatus.PENDING));
     }
 
     private CompletionStage<Void> scheduleNext(
@@ -354,7 +363,8 @@ public final class InMemoryRecurringJobProvider implements RecurringJobProvider,
         Entry captured = entry;
         CompletionStage<Void> dispatches = scheduleAt(entry, next, cancellationToken);
         for (int index = 0; index < dispatchCount; index++) {
-            dispatches = dispatches.thenCompose(ignored -> captured.dispatch.apply(cancellationToken));
+            dispatches = dispatches.thenCompose(ignored ->
+                    captured.submit.apply(UUID.randomUUID(), cancellationToken));
         }
         return dispatches;
     }

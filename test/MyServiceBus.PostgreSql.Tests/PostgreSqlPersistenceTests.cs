@@ -30,10 +30,12 @@ public sealed class PostgreSqlPersistenceTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Version_two_schema_migrates_to_scheduling_cancellation_and_recurring_jobs()
+    public async Task Version_two_schema_migrates_to_scheduling_recurring_and_tracked_jobs()
     {
         await using (var command = dataSource.CreateCommand("""
+            DROP TABLE myservicebus.job_attempt;
             DROP TABLE myservicebus.recurring_job_occurrence;
+            DROP TABLE myservicebus.job;
             DROP TABLE myservicebus.recurring_job_definition;
             UPDATE myservicebus.schema_version SET version = 2 WHERE singleton;
             ALTER TABLE myservicebus.outbox_message
@@ -60,7 +62,9 @@ public sealed class PostgreSqlPersistenceTests : IAsyncLifetime
                     WHERE table_schema = 'myservicebus' AND table_name = 'outbox_message'
                       AND column_name = 'cancelled_at_utc'),
                 to_regclass('myservicebus.recurring_job_definition') IS NOT NULL,
-                to_regclass('myservicebus.recurring_job_occurrence') IS NOT NULL
+                to_regclass('myservicebus.recurring_job_occurrence') IS NOT NULL,
+                to_regclass('myservicebus.job') IS NOT NULL,
+                to_regclass('myservicebus.job_attempt') IS NOT NULL
             FROM myservicebus.schema_version WHERE singleton;
             """);
         await using var reader = await verification.ExecuteReaderAsync();
@@ -70,6 +74,8 @@ public sealed class PostgreSqlPersistenceTests : IAsyncLifetime
         Assert.True(reader.GetBoolean(2));
         Assert.True(reader.GetBoolean(3));
         Assert.True(reader.GetBoolean(4));
+        Assert.True(reader.GetBoolean(5));
+        Assert.True(reader.GetBoolean(6));
     }
 
     [Fact]
@@ -115,6 +121,12 @@ public sealed class PostgreSqlPersistenceTests : IAsyncLifetime
         services.AddSingleton<ITransportFactory, CapturingTransportFactory>();
         services.AddSingleton<IMessageSerializer, EnvelopeMessageSerializer>();
         services.AddSingleton<TimeProvider>(clock);
+        services.AddServiceBus(configurator =>
+        {
+            configurator.AddJobConsumer<SubmitOrderJobConsumer, SubmitOrder>();
+            configurator.UsingMediator();
+        });
+        services.AddBuiltInJobsWithPostgreSql(ServiceName);
         services.AddBuiltInRecurringJobsWithPostgreSql(ServiceName);
         using var serviceProvider = services.BuildServiceProvider();
         var recurring = serviceProvider.GetRequiredService<IRecurringJobProvider>();
@@ -168,13 +180,13 @@ public sealed class PostgreSqlPersistenceTests : IAsyncLifetime
         await using var materialization = dataSource.CreateCommand("""
             SELECT
                 (SELECT count(*) FROM myservicebus.recurring_job_occurrence WHERE definition_id = @definition_id),
-                (SELECT count(*) FROM myservicebus.outbox_message message
+                (SELECT count(*) FROM myservicebus.job job
                     JOIN myservicebus.recurring_job_occurrence occurrence
-                        ON occurrence.outbox_record_id = message.record_id
+                        ON occurrence.job_id = job.job_id
                     WHERE occurrence.definition_id = @definition_id),
-                (SELECT count(DISTINCT message.message_id) FROM myservicebus.outbox_message message
+                (SELECT count(DISTINCT job.job_id) FROM myservicebus.job job
                     JOIN myservicebus.recurring_job_occurrence occurrence
-                        ON occurrence.outbox_record_id = message.record_id
+                        ON occurrence.job_id = job.job_id
                     WHERE occurrence.definition_id = @definition_id);
             """);
         materialization.Parameters.AddWithValue("definition_id", first.DefinitionId);
@@ -183,6 +195,112 @@ public sealed class PostgreSqlPersistenceTests : IAsyncLifetime
         Assert.Equal(2, materializationReader.GetInt64(0));
         Assert.Equal(2, materializationReader.GetInt64(1));
         Assert.Equal(2, materializationReader.GetInt64(2));
+        await materializationReader.CloseAsync();
+
+        await using var linkedJob = dataSource.CreateCommand("""
+            SELECT job_id FROM myservicebus.recurring_job_occurrence
+            WHERE definition_id = @definition_id ORDER BY scheduled_for_utc LIMIT 1;
+            """);
+        linkedJob.Parameters.AddWithValue("definition_id", first.DefinitionId);
+        var linkedJobId = (Guid)(await linkedJob.ExecuteScalarAsync())!;
+        var jobClient = serviceProvider.GetRequiredService<IJobClient>();
+        Assert.Equal(JobControlOutcome.Applied, (await jobClient.Cancel(linkedJobId)).Outcome);
+        Assert.Equal(RecurringJobOccurrenceStatus.Cancelled, await ReadOccurrenceStatus(linkedJobId));
+        Assert.Equal(JobControlOutcome.Applied, (await jobClient.Retry(linkedJobId)).Outcome);
+        Assert.Equal(RecurringJobOccurrenceStatus.RetryScheduled, await ReadOccurrenceStatus(linkedJobId));
+
+        Assert.Equal(
+            2,
+            await serviceProvider.GetRequiredService<PostgreSqlJobProcessor>().ProcessDueAsync());
+        await using var completion = dataSource.CreateCommand("""
+            SELECT count(*)
+            FROM myservicebus.recurring_job_occurrence
+            WHERE definition_id = @definition_id AND status = 5 AND job_id IS NOT NULL;
+            """);
+        completion.Parameters.AddWithValue("definition_id", first.DefinitionId);
+        Assert.Equal(2L, await completion.ExecuteScalarAsync());
+
+    }
+
+    private async Task<RecurringJobOccurrenceStatus> ReadOccurrenceStatus(Guid jobId)
+    {
+        await using var command = dataSource.CreateCommand("""
+            SELECT occurrence.status
+            FROM myservicebus.recurring_job_occurrence occurrence
+            JOIN myservicebus.job job ON job.recurring_occurrence_id = occurrence.occurrence_id
+            WHERE job.job_id = @job_id;
+            """);
+        command.Parameters.AddWithValue("job_id", jobId);
+        return (RecurringJobOccurrenceStatus)Convert.ToInt16(await command.ExecuteScalarAsync());
+    }
+
+    [Fact]
+    public async Task Durable_tracked_job_executes_and_exposes_progress_and_attempts()
+    {
+        const string serviceName = "tracked-job-service";
+        var recorder = new DurableJobRecorder();
+        using var services = CreateTrackedJobServices(serviceName, recorder);
+        var client = services.GetRequiredService<IJobClient>();
+        var source = services.GetRequiredService<IJobSource>();
+
+        var receipt = await client.Submit(new DurableJob(7));
+        var processed = await services.GetRequiredService<PostgreSqlJobProcessor>().ProcessDueAsync();
+        var state = Assert.Single(await source.GetSnapshotAsync(10));
+        var attempt = Assert.Single(await source.GetAttemptsAsync(receipt.JobId, 10));
+
+        Assert.Equal(1, processed);
+        Assert.Equal(JobStatus.Completed, state.Status);
+        Assert.Equal(new JobProgress(7, 10), state.Progress);
+        Assert.Equal(JobAttemptStatus.Completed, attempt.Status);
+        Assert.Equal(7, recorder.LastValue);
+        Assert.Equal("MyServiceBus.Durable", source.Provider);
+    }
+
+    [Fact]
+    public async Task Durable_tracked_job_survives_provider_restart()
+    {
+        const string serviceName = "tracked-job-restart-service";
+        Guid jobId;
+        using (var firstProcess = CreateTrackedJobServices(serviceName, new DurableJobRecorder()))
+        {
+            jobId = (await firstProcess.GetRequiredService<IJobClient>()
+                .Submit(new DurableJob(42))).JobId;
+        }
+
+        var recorder = new DurableJobRecorder();
+        using var recoveredProcess = CreateTrackedJobServices(serviceName, recorder);
+        var processed = await recoveredProcess.GetRequiredService<PostgreSqlJobProcessor>().ProcessDueAsync();
+        var source = recoveredProcess.GetRequiredService<IJobSource>();
+        var state = Assert.Single(await source.GetSnapshotAsync(10));
+        var attempts = await source.GetAttemptsAsync(jobId, 10);
+
+        Assert.Equal(1, processed);
+        Assert.Equal(jobId, state.JobId);
+        Assert.True(
+            state.Status == JobStatus.Completed,
+            string.Join(Environment.NewLine, attempts.Select(attempt =>
+                $"{attempt.FaultType}: {attempt.FaultMessage}")));
+        Assert.Equal(42, recorder.LastValue);
+    }
+
+    [Fact]
+    public async Task Concurrent_durable_job_processors_lease_a_job_once()
+    {
+        const string serviceName = "tracked-job-concurrency-service";
+        var recorder = new DurableJobRecorder();
+        using var first = CreateTrackedJobServices(serviceName, recorder);
+        using var second = CreateTrackedJobServices(serviceName, recorder);
+        await first.GetRequiredService<IJobClient>().Submit(new DurableJob(5));
+
+        var processed = await Task.WhenAll(
+            first.GetRequiredService<PostgreSqlJobProcessor>().ProcessDueAsync(),
+            second.GetRequiredService<PostgreSqlJobProcessor>().ProcessDueAsync());
+
+        Assert.Equal(1, processed.Sum());
+        Assert.Equal(1, recorder.Attempts);
+        Assert.Equal(
+            JobStatus.Completed,
+            Assert.Single(await first.GetRequiredService<IJobSource>().GetSnapshotAsync(10)).Status);
     }
 
     [Fact]
@@ -208,7 +326,7 @@ public sealed class PostgreSqlPersistenceTests : IAsyncLifetime
 
         Assert.Equal(identity, definition.Identity);
         Assert.Equal(1, materialized);
-        Assert.Equal(1, await CountRecurringOutboxRecords(serviceName, identity.ScheduleId));
+        Assert.Equal(1, await CountRecurringJobs(serviceName, identity.ScheduleId));
     }
 
     [Fact]
@@ -231,7 +349,7 @@ public sealed class PostgreSqlPersistenceTests : IAsyncLifetime
         var results = await Task.WhenAll(first.MaterializeDueAsync(), second.MaterializeDueAsync());
 
         Assert.Equal(1, results.Sum());
-        Assert.Equal(1, await CountRecurringOutboxRecords(serviceName, identity.ScheduleId));
+        Assert.Equal(1, await CountRecurringJobs(serviceName, identity.ScheduleId));
     }
 
     [CrossLanguageFact]
@@ -258,7 +376,7 @@ public sealed class PostgreSqlPersistenceTests : IAsyncLifetime
         {
             await WaitForJavaOutput(java, "MATERIALIZED:1", TimeSpan.FromMinutes(2));
         }
-        Assert.Equal(1, await CountRecurringOutboxRecords(csharpService, csharpSchedule));
+        Assert.Equal(1, await CountRecurringJobs(csharpService, csharpSchedule));
 
         const string javaService = "recurring-java-to-csharp";
         const string javaSchedule = "created-by-java";
@@ -278,7 +396,47 @@ public sealed class PostgreSqlPersistenceTests : IAsyncLifetime
             Assert.Equal(1, await csharp.GetRequiredService<PostgreSqlRecurringJobMaterializer>()
                 .MaterializeDueAsync());
         }
-        Assert.Equal(1, await CountRecurringOutboxRecords(javaService, javaSchedule));
+        Assert.Equal(1, await CountRecurringJobs(javaService, javaSchedule));
+    }
+
+    [CrossLanguageFact]
+    public async Task Csharp_and_Java_execute_each_others_durable_tracked_jobs()
+    {
+        const string csharpService = "tracked-job-csharp-to-java";
+        using (var csharp = CreateCrossLanguageTrackedJobServices(
+            csharpService,
+            new CrossLanguageTrackedJobRecorder()))
+        {
+            await csharp.GetRequiredService<IJobClient>()
+                .Submit(new CrossLanguageTrackedJob("csharp"));
+        }
+        using (var java = StartJavaRecurringPeer(
+            "postgres-job-process",
+            csharpService,
+            "unused",
+            DateTimeOffset.UtcNow))
+        {
+            await WaitForJavaOutput(java, "PROCESSED:1:csharp", TimeSpan.FromMinutes(2));
+        }
+
+        const string javaService = "tracked-job-java-to-csharp";
+        using (var java = StartJavaRecurringPeer(
+            "postgres-job-submit",
+            javaService,
+            "java",
+            DateTimeOffset.UtcNow))
+        {
+            await WaitForJavaOutput(java, "SUBMITTED", TimeSpan.FromMinutes(2));
+        }
+        var recorder = new CrossLanguageTrackedJobRecorder();
+        using var recovered = CreateCrossLanguageTrackedJobServices(javaService, recorder);
+        Assert.Equal(
+            1,
+            await recovered.GetRequiredService<PostgreSqlJobProcessor>().ProcessDueAsync());
+        Assert.Equal("java", recorder.Origin);
+        Assert.Equal(
+            JobStatus.Completed,
+            Assert.Single(await recovered.GetRequiredService<IJobSource>().GetSnapshotAsync(10)).Status);
     }
 
     [Fact]
@@ -649,17 +807,54 @@ public sealed class PostgreSqlPersistenceTests : IAsyncLifetime
         services.AddSingleton<ITransportFactory, CapturingTransportFactory>();
         services.AddSingleton<IMessageSerializer, EnvelopeMessageSerializer>();
         services.AddSingleton<TimeProvider>(new MutableTimeProvider(now));
+        services.AddServiceBus(configurator =>
+        {
+            configurator.AddJobConsumer<CrossLanguageRecurringJobConsumer, CrossLanguageRecurringJob>();
+            configurator.UsingMediator();
+        });
+        services.AddBuiltInJobsWithPostgreSql(serviceName);
         services.AddBuiltInRecurringJobsWithPostgreSql(serviceName);
         return services.BuildServiceProvider();
     }
 
-    private async Task<long> CountRecurringOutboxRecords(string serviceName, string scheduleId)
+    private ServiceProvider CreateTrackedJobServices(string serviceName, DurableJobRecorder recorder)
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton(dataSource);
+        services.AddSingleton(recorder);
+        services.AddServiceBus(configurator =>
+        {
+            configurator.AddJobConsumer<DurableJobConsumer, DurableJob>();
+            configurator.UsingMediator();
+        });
+        services.AddBuiltInJobsWithPostgreSql(serviceName);
+        return services.BuildServiceProvider();
+    }
+
+    private ServiceProvider CreateCrossLanguageTrackedJobServices(
+        string serviceName,
+        CrossLanguageTrackedJobRecorder recorder)
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton(dataSource);
+        services.AddSingleton(recorder);
+        services.AddServiceBus(configurator =>
+        {
+            configurator.AddJobConsumer<CrossLanguageTrackedJobConsumer, CrossLanguageTrackedJob>(
+                options => options.SetJobTypeName("cross-language-job"));
+            configurator.UsingMediator();
+        });
+        services.AddBuiltInJobsWithPostgreSql(serviceName);
+        return services.BuildServiceProvider();
+    }
+
+    private async Task<long> CountRecurringJobs(string serviceName, string scheduleId)
     {
         await using var command = dataSource.CreateCommand("""
             SELECT count(*)
-            FROM myservicebus.outbox_message message
+            FROM myservicebus.job job
             JOIN myservicebus.recurring_job_occurrence occurrence
-                ON occurrence.outbox_record_id = message.record_id
+                ON occurrence.job_id = job.job_id
             JOIN myservicebus.recurring_job_definition definition
                 ON definition.definition_id = occurrence.definition_id
             WHERE definition.service_name = @service_name AND definition.schedule_id = @schedule_id;
@@ -767,6 +962,56 @@ public sealed class PostgreSqlPersistenceTests : IAsyncLifetime
     private sealed record SubmitOrder(Guid OrderId);
 
     private sealed record CrossLanguageRecurringJob(string Origin);
+
+    private sealed class SubmitOrderJobConsumer : IJobConsumer<SubmitOrder>
+    {
+        public Task Run(JobContext<SubmitOrder> context) => Task.CompletedTask;
+    }
+
+    private sealed class CrossLanguageRecurringJobConsumer : IJobConsumer<CrossLanguageRecurringJob>
+    {
+        public Task Run(JobContext<CrossLanguageRecurringJob> context) => Task.CompletedTask;
+    }
+
+    private sealed record DurableJob(int Value);
+
+    private sealed class DurableJobConsumer(DurableJobRecorder recorder) : IJobConsumer<DurableJob>
+    {
+        public async Task Run(JobContext<DurableJob> context)
+        {
+            recorder.IncrementAttempts();
+            recorder.LastValue = context.Job.Value;
+            await context.SetProgress(context.Job.Value, Math.Max(10, context.Job.Value));
+        }
+    }
+
+    private sealed class DurableJobRecorder
+    {
+        private int attempts;
+
+        public int LastValue { get; set; }
+
+        public int Attempts => Volatile.Read(ref attempts);
+
+        public void IncrementAttempts() => Interlocked.Increment(ref attempts);
+    }
+
+    private sealed record CrossLanguageTrackedJob(string Origin);
+
+    private sealed class CrossLanguageTrackedJobConsumer(CrossLanguageTrackedJobRecorder recorder)
+        : IJobConsumer<CrossLanguageTrackedJob>
+    {
+        public Task Run(JobContext<CrossLanguageTrackedJob> context)
+        {
+            recorder.Origin = context.Job.Origin;
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class CrossLanguageTrackedJobRecorder
+    {
+        public string? Origin { get; set; }
+    }
 
     private sealed class CapturingTransportFactory : ITransportFactory
     {

@@ -34,6 +34,8 @@ public final class PostgreSqlRecurringJobMaterializer {
             UUID definitionId, long revision, Instant acceptedAtUtc, Instant startAtUtc, Instant endAtUtc,
             Duration interval, Instant anchorAtUtc, RecurringJobMisfirePolicy misfirePolicy,
             int maxCatchUpOccurrences, String destination, List<String> messageTypes, String envelope,
+            String jobTypeName, int retryLimit, Long retryDelayMilliseconds,
+            long timeoutMilliseconds, int concurrentJobLimit,
             String contentType, Instant nextDueAtUtc) {
     }
 
@@ -125,7 +127,8 @@ public final class PostgreSqlRecurringJobMaterializer {
         try (PreparedStatement statement = connection.prepareStatement("""
                 SELECT definition_id, revision, accepted_at_utc, start_at_utc, end_at_utc, cadence::text,
                     misfire_policy, max_catch_up_occurrences, destination_address, command_message_types,
-                    command_payload::text, content_type, next_due_at_utc
+                    command_payload::text, job_type_name, job_retry_limit, job_retry_delay_milliseconds,
+                    job_timeout_milliseconds, job_concurrent_limit, content_type, next_due_at_utc
                 FROM myservicebus.recurring_job_definition
                 WHERE service_name = ? AND status = 0 AND next_due_at_utc <= ?
                 ORDER BY next_due_at_utc, definition_id LIMIT ? FOR UPDATE SKIP LOCKED
@@ -141,7 +144,9 @@ public final class PostgreSqlRecurringJobMaterializer {
         try (PreparedStatement statement = connection.prepareStatement("""
                 SELECT definition_id, revision, accepted_at_utc, start_at_utc, end_at_utc, cadence::text,
                     misfire_policy, max_catch_up_occurrences, destination_address, command_message_types,
-                    command_payload::text, content_type, COALESCE(next_due_at_utc, CURRENT_TIMESTAMP)
+                    command_payload::text, job_type_name, job_retry_limit, job_retry_delay_milliseconds,
+                    job_timeout_milliseconds, job_concurrent_limit,
+                    content_type, COALESCE(next_due_at_utc, CURRENT_TIMESTAMP)
                 FROM myservicebus.recurring_job_definition
                 WHERE service_name = ? AND schedule_group = ? AND schedule_id = ? AND status NOT IN (2, 3)
                 FOR UPDATE
@@ -162,13 +167,16 @@ public final class PostgreSqlRecurringJobMaterializer {
                 BigInteger nanos = new BigInteger(cadence.get("intervalNanoseconds").asText());
                 BigInteger[] seconds = nanos.divideAndRemainder(BigInteger.valueOf(1_000_000_000L));
                 Duration interval = Duration.ofSeconds(seconds[0].longValueExact(), seconds[1].longValueExact());
+                long retryDelay = result.getLong(14);
+                Long retryDelayMilliseconds = result.wasNull() ? null : retryDelay;
                 definitions.add(new DueDefinition(
                         result.getObject(1, UUID.class), result.getLong(2), instant(result, 3),
                         instant(result, 4), instant(result, 5), interval,
                         cadence.get("anchorAtUtc").isNull() ? null : Instant.parse(cadence.get("anchorAtUtc").asText()),
                         RecurringJobMisfirePolicy.values()[result.getShort(7)], result.getInt(8),
                         result.getString(9), List.of((String[]) result.getArray(10).getArray()), result.getString(11),
-                        result.getString(12), instant(result, 13)));
+                        result.getString(12), result.getInt(13), retryDelayMilliseconds,
+                        result.getLong(15), result.getInt(16), result.getString(17), instant(result, 18)));
             }
         }
         return definitions;
@@ -234,31 +242,42 @@ public final class PostgreSqlRecurringJobMaterializer {
             }
         }
 
-        UUID recordId = UUID.randomUUID();
-        UUID messageId = UUID.randomUUID();
+        UUID jobId = UUID.randomUUID();
         ObjectNode envelope = (ObjectNode) MAPPER.readTree(definition.envelope());
-        envelope.put("messageId", messageId.toString());
+        envelope.put("messageId", jobId.toString());
         envelope.put("conversationId", UUID.randomUUID().toString());
         envelope.put("sentTime", now.toString());
-        try (PreparedStatement outbox = connection.prepareStatement("""
-                INSERT INTO myservicebus.outbox_message (
-                    record_id, service_name, message_id, intent, destination_address, message_types, body,
-                    content_type, headers, created_at_utc, state, next_attempt_at_utc)
-                VALUES (?, ?, ?, 1, ?, ?, ?, ?, '{}'::jsonb, ?, 0, ?);
-                UPDATE myservicebus.recurring_job_occurrence SET outbox_record_id = ? WHERE occurrence_id = ?
+        try (PreparedStatement job = connection.prepareStatement("""
+                INSERT INTO myservicebus.job (
+                    job_id, service_name, job_type_name, message_types, body, content_type, headers,
+                    status, submitted_at_utc, scheduled_for_utc, available_at_utc, updated_at_utc,
+                    retry_limit, retry_delay_milliseconds, timeout_milliseconds, concurrent_job_limit,
+                    recurring_occurrence_id)
+                VALUES (?, ?, ?, ?, ?, ?, '{}'::jsonb, 2, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+                UPDATE myservicebus.recurring_job_occurrence SET job_id = ? WHERE occurrence_id = ?
                 """)) {
-            outbox.setObject(1, recordId);
-            outbox.setString(2, serviceName);
-            outbox.setObject(3, messageId);
-            outbox.setString(4, definition.destination());
-            outbox.setArray(5, connection.createArrayOf("text", definition.messageTypes().toArray()));
-            outbox.setBytes(6, MAPPER.writeValueAsString(envelope).getBytes(StandardCharsets.UTF_8));
-            outbox.setString(7, definition.contentType());
-            setInstant(outbox, 8, now);
-            setInstant(outbox, 9, now);
-            outbox.setObject(10, recordId);
-            outbox.setObject(11, occurrenceId);
-            outbox.executeUpdate();
+            job.setObject(1, jobId);
+            job.setString(2, serviceName);
+            job.setString(3, definition.jobTypeName());
+            job.setArray(4, connection.createArrayOf("text", definition.messageTypes().toArray()));
+            job.setBytes(5, MAPPER.writeValueAsString(envelope).getBytes(StandardCharsets.UTF_8));
+            job.setString(6, definition.contentType());
+            setInstant(job, 7, now);
+            setInstant(job, 8, scheduledFor);
+            setInstant(job, 9, now);
+            setInstant(job, 10, now);
+            job.setInt(11, definition.retryLimit());
+            if (definition.retryDelayMilliseconds() == null) {
+                job.setNull(12, Types.BIGINT);
+            } else {
+                job.setLong(12, definition.retryDelayMilliseconds());
+            }
+            job.setLong(13, definition.timeoutMilliseconds());
+            job.setInt(14, definition.concurrentJobLimit());
+            job.setObject(15, occurrenceId);
+            job.setObject(16, jobId);
+            job.setObject(17, occurrenceId);
+            job.executeUpdate();
         }
         return occurrenceId;
     }

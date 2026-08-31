@@ -88,7 +88,9 @@ This supplied dashboard is one opinionated consumer of the monitoring APIs. A fu
 
 Scheduled work is another application-focused view. It lists bounded operational metadata for one-time scheduled messages: application, provider, safe message type, due time, destination or intent, status, attempt, and last failure category. The status vocabulary preserves provider truth while normalizing common states such as `Pending`, `Leased` or running, `Dispatched` or completed, `Cancelled`, and `Dead` or failed. Message bodies, arbitrary headers, serialized callbacks, and application payloads remain excluded.
 
-Recurring jobs have a separate view and monitoring snapshot because cadence, revision, pause state, and next occurrence belong to the durable definition rather than to one scheduled message. The current preview exports authoritative definition state from the in-memory and built-in durable providers in both runtimes. It does not yet export retained occurrence history or claim application completion; materialized commands contribute to ordinary throughput and outbox observations. Snapshot time and reporting-instance health remain visible so stale or unavailable data is not presented as an empty schedule.
+Recurring jobs have a separate view and monitoring snapshot because cadence, revision, pause state, and next occurrence belong to the durable definition rather than to one scheduled message. The current preview exports authoritative definition state from the in-memory and built-in durable providers in both runtimes. Durable occurrences execute as correlated tracked jobs, but retained occurrence history is not exported yet. The UI therefore does not infer a definition's outcome from its current state. Snapshot time and reporting-instance health remain visible so stale or unavailable data is not presented as an empty schedule.
+
+Tracked jobs are exported separately from scheduled messages and recurring definitions. The bounded snapshot contains current job and attempt state, progress, timings, and recurring-occurrence correlation without application payloads or failure messages. Query results include capture time and reporting-instance availability. The PostgreSQL monitoring provider persists and restores the latest snapshot per application instance and bus; this does not yet provide retained occurrence history or a job time series.
 
 The monitoring service must not query every scheduler database. Message-aware scheduling providers and job providers should export bounded snapshots or lifecycle observations from their owning application, as outbox monitoring does. The dashboard may eventually offer cancellation or retry, but those are control-plane commands and are not authorized by read-only schedule visibility.
 
@@ -114,7 +116,7 @@ dotnet run --project src/AspireApp --launch-profile http
 
 Open the Aspire dashboard URL printed by the command, then open the `monitoring-dashboard` resource. The AppHost starts RabbitMQ, the monitoring service, the Blazor dashboard, and the C# and Java sample applications. Both sample applications self-register after their buses start.
 
-Use the sample applications' `/publish`, `/send`, and `/request` routes to create activity. The `/request/fault` route exercises fault handling. Export intervals make dashboard updates asynchronous; allow a few seconds for a batch and UI refresh.
+Use the sample applications' `/publish`, `/send`, and `/request` routes to create message activity. The `/request/fault` route exercises message fault handling. Both C# and Java samples register a `sample-report` job consumer and create one recurring occurrence at startup. `POST /jobs` submits another job; add `delaySeconds`, `failFirstAttempt`, or `failAlways` query parameters to demonstrate scheduled, retried, and faulted states. The C# outbox sample also executes a recurring job through the durable PostgreSQL provider. Export intervals make dashboard updates asynchronous; allow a few seconds, then open **Tracked jobs** globally or under an application.
 
 ## Enable the C# Exporter
 
@@ -187,13 +189,18 @@ The monitoring service never connects directly to application databases or mutat
 
 ## Service API
 
-The prototype uses `/api/monitoring/v1` for both ingest and query operations.
+The prototype uses `/api/monitoring/v1` for both ingest and query operations. The monitoring service publishes a generated OpenAPI 3.1 document at `/openapi/v1.json`. This is the primary machine-readable contract for teams building another dashboard, exporter, or integration. The document separates **Monitoring ingest** operations from **Monitoring queries** and includes the current JSON schemas and HTTP response codes.
+
+The contract is versioned but remains preview. The `/v1` route and each ingest body's `protocolVersion` identify the current wire generation; they do not imply stable-release compatibility guarantees before MyServiceBus 1.0. Integrators should generate clients from the document they deploy with and must preserve unknown additive response fields.
 
 | Method | Route | Purpose |
 | --- | --- | --- |
 | `POST` | `/metadata` | Register or replace an instance's bus metadata |
 | `POST` | `/observations:batch` | Submit one sequenced observation batch |
 | `POST` | `/heartbeat` | Renew an existing instance lease |
+| `POST` | `/scheduled-work` | Replace one instance's authoritative one-time scheduled-work snapshot |
+| `POST` | `/recurring-jobs` | Replace one instance's authoritative recurring-definition snapshot |
+| `POST` | `/jobs` | Replace one instance's authoritative tracked-job and attempt snapshot |
 | `GET` | `/history` | Query storage durability, history availability, freshness, gaps, and retained-window coverage |
 | `GET` | `/applications` | Query application aggregates |
 | `GET` | `/instances?application=...` | Query application instances |
@@ -204,9 +211,25 @@ The prototype uses `/api/monitoring/v1` for both ingest and query operations.
 | `GET` | `/metrics/timeseries?windowSeconds=300&bucketSeconds=5` | Query bucketed rates for real-time graphs |
 | `GET` | `/flow?application=...&windowSeconds=300` | Query observed correlated application flow |
 | `GET` | `/outbox?application=...&windowSeconds=60` | Query dispatcher state and windowed outbox throughput |
+| `GET` | `/scheduled-work?application=...&status=...` | Query current one-time scheduled work |
+| `GET` | `/recurring-jobs?application=...&status=...` | Query current recurring definitions |
+| `GET` | `/jobs?application=...&status=...` | Query current tracked jobs with bounded attempt history |
 | WebSocket | `/stream` | Receive change invalidations |
 
-WebSocket messages indicate that metadata or observations changed; clients should re-query the authoritative HTTP read model. They are not a durable event stream.
+All routes in the table are relative to `/api/monitoring/v1`. Ingest clients must register metadata before sending observations, heartbeats, or authoritative snapshots for that application-instance-bus identity. Successful writes return `202 Accepted`; invalid protocol data returns `400`, and writes for an unregistered identity return `404` or `409` as described by OpenAPI. An accepted snapshot replaces that identity's current view: omission from a successfully accepted snapshot means “not present now,” not “unknown historically.”
+
+The WebSocket route is documented here rather than in OpenAPI because it is an upgrade protocol, not an ordinary HTTP response. Connect to `/api/monitoring/v1/stream` and expect UTF-8 JSON text messages shaped as:
+
+```json
+{
+  "type": "jobs_changed",
+  "occurredAtUtc": "2026-08-31T12:34:56.789Z"
+}
+```
+
+Current invalidation types are `metadata_changed`, `observations_changed`, `scheduled_work_changed`, `recurring_jobs_changed`, and `jobs_changed`. They only mean that the corresponding HTTP read model may have changed. The stream is bounded, has no replay, cursor, sequence, or delivery guarantee, and does not carry the changed snapshot. A dashboard must fetch its initial HTTP state, re-query after relevant invalidations, and re-fetch all required state after reconnecting. Polling remains a valid fallback.
+
+Neither interface is a control plane. The query API cannot cancel jobs, purge queues, or mutate a broker, and the ingest API is not an application command endpoint. The preview service has no built-in authentication yet, so custom dashboards and exporters must only connect over a trusted deployment boundary.
 
 The active read model retains metric buckets for 15 minutes and bounds its recent observation buffer. A `Complete` flag on window summaries reports whether the exporter has declared dropped observations. The history summary also reports whether storage is volatile or durable and the oldest and latest observations available in the active window. A zero rate with incomplete or stale coverage must not be interpreted as proven inactivity.
 
@@ -231,7 +254,7 @@ The .NET monitoring service can instead use its built-in Entity Framework Core P
 }
 ```
 
-The provider applies its schema migration at startup and stores the latest metadata and heartbeat per bus identity plus deduplicated observation batches as JSONB. On restart, it rebuilds the current 15-minute query window without making restored observations appear newly ingested. The seven-day retention default bounds stored batches for future historical queries; it does not yet make seven days available through the current dashboard.
+The provider applies its schema migration at startup and stores the latest metadata, heartbeat, scheduled-work, recurring-definition, and tracked-job snapshots per bus identity plus deduplicated observation batches as JSONB. On restart, it restores those latest authoritative snapshots and rebuilds the current 15-minute observation window without making restored records appear newly ingested. The seven-day retention default bounds stored observation batches for future historical queries; it does not turn latest-state snapshots into time series or make seven days available through the current dashboard.
 
 Storage belongs entirely to the monitoring service. Exporters and the dashboard do not receive database credentials, use Entity Framework, or own retention behavior.
 

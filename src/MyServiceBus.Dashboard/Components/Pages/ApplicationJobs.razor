@@ -1,0 +1,22 @@
+@page "/applications/{ApplicationName}/jobs"
+@rendermode InteractiveServer
+@inherits ApplicationPageBase
+
+<PageTitle>@ApplicationName tracked jobs · MyServiceBus Monitoring</PageTitle>
+<DashboardPageHeader Eyebrow="Application jobs" Title="@ApplicationName" Description="Tracked work owned by this application, with progress and outcomes first and provider details available when needed." />
+<ApplicationNavigation ApplicationName="@ApplicationName" />
+
+@if (Application is null)
+{
+    <section class="empty-state"><h2>Application not found</h2><p>This application may not have registered yet, or its monitoring lease may have expired.</p></section>
+}
+else
+{
+    <JobsTable Items="JobItems" />
+}
+
+@code {
+    private IReadOnlyList<MonitoringJobSummary> JobItems => Dashboard.Jobs
+        .Where(item => string.Equals(item.ApplicationName, ApplicationName, StringComparison.Ordinal))
+        .ToArray();
+}
