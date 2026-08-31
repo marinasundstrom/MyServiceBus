@@ -466,9 +466,10 @@ class PostgreSqlPersistenceTest {
                     assertEquals(SchedulingDurability.DURABLE, cancelled.durability());
                     assertEquals(ScheduledWorkStatus.CANCELLED, cancelled.status());
                     assertEquals("Cancelled", cancelled.providerStatus());
-                    assertEquals(
-                            dueAt.truncatedTo(ChronoUnit.MICROS),
-                            cancelled.dueAtUtc().truncatedTo(ChronoUnit.MICROS));
+                    Duration dueAtDifference = Duration.between(dueAt, cancelled.dueAtUtc()).abs();
+                    assertTrue(
+                            dueAtDifference.compareTo(Duration.ofNanos(1_000)) <= 0,
+                            () -> "PostgreSQL due timestamp differed by " + dueAtDifference);
                 }
             } finally {
                 bus.stop();
