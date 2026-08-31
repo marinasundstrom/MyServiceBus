@@ -69,14 +69,14 @@ Each application has its own progressive drill-down:
 
 - **Overview** shows replicas, receive endpoints, current rate, latency, failures, busiest receiving paths, and secondary messaging-connection context.
 - **Metrics** expands that application's throughput graph and ranks its receive endpoints without presenting endpoint activity as consumer-level metrics.
-- **Flow** limits the D3 map to the application and its directly observed neighbors, while preserving exact paths in a table.
+- **Flow** groups every replica of the selected application inside its application boundary, adds the directly observed neighboring replicas, and preserves exact replica paths in a table.
 
 System-wide focused views remain available when the operator needs to compare applications or inspect a domain:
 
 - **Applications** explains logical applications and replicas, then compares load, latency, retries, failures, runtime, and transport.
 - **Receive endpoints** combines exported topology with current activity so configured, offline, healthy, and faulting endpoints remain distinguishable.
 - **Throughput** expands the compact landing-page chart into a five-minute streamed graph and application rate breakdown.
-- **Message flow** maps applications and observed message paths, with throughput encoded in line weight and exact rates available alongside the map.
+- **Message flow** defaults to applications and observed message paths, with throughput encoded in line weight and exact rates available alongside the map. Its **Detailed** mode expands replicas into application groups and draws the directly correlated replica-to-replica paths.
 - **Failures** exposes bounded failure and retry metadata without capturing message bodies or arbitrary headers.
 - **Outbox** separates dispatcher backlog and delivery pressure from broker transit and consumer processing.
 
@@ -98,7 +98,7 @@ The unprioritized [Monitoring and Control Backlog](development/monitoring-and-co
 
 The dashboard is usable in both dark and light environments. The selector persists an explicit light or dark preference locally across enhanced page navigation; system mode follows the operating-system preference. The reconnect dialog uses the same theme tokens, so connection status remains legible while the server is unavailable. On narrow screens, navigation becomes horizontally scrollable, cards collapse to one column, graphs and maps fit the viewport, and wide diagnostic tables scroll inside their panels instead of widening the page.
 
-The flow map projects the same five-minute observed-flow window as the detailed path list. Applications are nodes, directional paths are links, link width reflects relative traffic, and each link reports its observed messages per second. Producer and consumer replicas contribute to their owning application's aggregate rather than appearing as duplicate application nodes. Transactional-outbox traffic enters this projection when the persisted envelope is actually dispatched to the broker, not when it is first stored. WebSocket invalidations update the existing D3 graph in place so node positions and the operator's zoom context remain stable while rates and health change.
+The flow map projects the same five-minute observed-flow window as the detailed path list. Applications are nodes, directional paths are links, link width reflects relative traffic, and each link reports its observed messages per second. Producer and consumer replicas contribute to their owning application's aggregate rather than appearing as duplicate application nodes. Detailed mode uses the replica-preserving projection to place each instance inside an application boundary and display the direct observed paths between instances. Transactional-outbox traffic enters these projections when the persisted envelope is actually dispatched to the broker, not when it is first stored. WebSocket invalidations update the existing D3 graph in place so node positions and the operator's zoom context remain stable while rates and health change.
 
 ![Monitoring dashboard in dark theme with fictional application and host names](images/runtime-monitoring-dashboard-dark.jpg)
 

@@ -2,6 +2,7 @@ import * as d3 from "https://cdn.jsdelivr.net/npm/d3@7/+esm";
 
 const colors = ["#55d6a9", "#69a8ff", "#f2bd5c", "#d68cff", "#ff837a", "#66d7e8"];
 const flowMaps = new WeakMap();
+const replicaFlowMaps = new WeakMap();
 
 export function renderThroughputChart(element, rawPoints, compact = false) {
     const points = rawPoints.map(point => ({
@@ -320,6 +321,354 @@ class FlowMap {
     }
 }
 
+export function initializeReplicaFlowMap(element) {
+    disposeReplicaFlowMap(element);
+    replicaFlowMaps.set(element, new ReplicaFlowMap(element));
+}
+
+export function updateReplicaFlowMap(element, graph) {
+    replicaFlowMaps.get(element)?.update(graph);
+}
+
+export function disposeReplicaFlowMap(element) {
+    const map = replicaFlowMaps.get(element);
+    if (map) {
+        map.dispose();
+        replicaFlowMaps.delete(element);
+    }
+}
+
+class ReplicaFlowMap {
+    constructor(element) {
+        this.element = element;
+        this.nodes = [];
+        this.anchors = [];
+        this.links = [];
+        this.groups = [];
+        this.svg = d3.select(element).select(".replica-flow-map-canvas");
+        this.stage = this.svg.append("g").attr("class", "replica-flow-map-stage");
+        this.groupLayer = this.stage.append("g").attr("class", "replica-flow-groups");
+        this.linkLayer = this.stage.append("g").attr("class", "replica-flow-links");
+        this.labelLayer = this.stage.append("g").attr("class", "replica-flow-labels");
+        this.nodeLayer = this.stage.append("g").attr("class", "replica-flow-nodes");
+
+        const definitions = this.svg.append("defs");
+        definitions.append("marker")
+            .attr("id", "replica-flow-arrow")
+            .attr("viewBox", "0 -5 10 10")
+            .attr("refX", 10)
+            .attr("refY", 0)
+            .attr("markerWidth", 7)
+            .attr("markerHeight", 7)
+            .attr("markerUnits", "userSpaceOnUse")
+            .attr("orient", "auto")
+            .append("path")
+            .attr("d", "M0,-5L10,0L0,5")
+            .attr("class", "flow-map-arrow");
+
+        this.zoom = d3.zoom()
+            .scaleExtent([0.25, 4])
+            .on("zoom", event => this.stage.attr("transform", event.transform));
+        this.svg.call(this.zoom);
+        this.linkForce = d3.forceLink()
+            .id(node => node.id)
+            .distance(link => link.internal ? 115 : 260)
+            .strength(link => link.internal ? 0.9 : 0.48);
+        this.simulation = d3.forceSimulation()
+            .force("link", this.linkForce)
+            .force("charge", d3.forceManyBody().strength(node => node.kind === "anchor" ? -1050 : -340))
+            .force("collide", d3.forceCollide(node => node.kind === "anchor" ? 145 : 105).iterations(7))
+            .force("x", d3.forceX().strength(0.035))
+            .force("y", d3.forceY().strength(0.05))
+            .on("tick", () => this.onTick());
+        this.drag = d3.drag()
+            .on("start", event => {
+                if (!event.active) this.simulation.alphaTarget(0.16).restart();
+                event.subject.fx = event.subject.x;
+                event.subject.fy = event.subject.y;
+            })
+            .on("drag", event => {
+                event.subject.fx = event.x;
+                event.subject.fy = event.y;
+            })
+            .on("end", event => {
+                if (!event.active) this.simulation.alphaTarget(0);
+                event.subject.fx = null;
+                event.subject.fy = null;
+            });
+
+        this.registerControls();
+        this.resizeObserver = new ResizeObserver(() => this.resize());
+        this.resizeObserver.observe(element);
+        this.resize();
+    }
+
+    registerControls() {
+        this.element.querySelector('[data-replica-flow-action="zoom-in"]')
+            ?.addEventListener("click", this.zoomIn = () => this.svg.transition().duration(160).call(this.zoom.scaleBy, 1.35));
+        this.element.querySelector('[data-replica-flow-action="zoom-out"]')
+            ?.addEventListener("click", this.zoomOut = () => this.svg.transition().duration(160).call(this.zoom.scaleBy, 1 / 1.35));
+        this.element.querySelector('[data-replica-flow-action="reset"]')
+            ?.addEventListener("click", this.reset = () => this.fitToContent(true));
+    }
+
+    resize() {
+        const width = Math.max(this.element.clientWidth, 320);
+        const height = Math.max(this.element.clientHeight, 520);
+        this.svg.attr("viewBox", `${-width / 2} ${-height / 2} ${width} ${height}`);
+    }
+
+    update(graph) {
+        const rawNodes = graph?.nodes || [];
+        const nodeIds = new Set(rawNodes.map(node => node.id));
+        const rawLinks = (graph?.links || [])
+            .filter(link => nodeIds.has(link.source) && nodeIds.has(link.target));
+        const groupedLinks = d3.rollups(
+            rawLinks,
+            links => ({
+                count: d3.sum(links, link => link.count),
+                messageTypes: new Set(links.map(link => link.messageType).filter(Boolean)).size,
+                endpoints: new Set(links.map(link => link.endpointName).filter(Boolean)).size
+            }),
+            link => link.source,
+            link => link.target)
+            .flatMap(([source, targets]) => targets.map(([target, summary]) => ({
+                id: `${source}->${target}`,
+                source,
+                target,
+                ...summary
+            })));
+        const applications = [...new Set(rawNodes.map(node => node.application))].sort(d3.ascending);
+        const structureChanged = this.hasStructureChanged(rawNodes, groupedLinks, applications);
+        const previousNodes = new Map(this.nodes.map(node => [node.id, node]));
+        const previousAnchors = new Map(this.anchors.map(anchor => [anchor.application, anchor]));
+        const radius = Math.max(230, applications.length * 78);
+
+        this.anchors = applications.map((application, index) => {
+            const existing = previousAnchors.get(application);
+            const angle = applications.length === 1 ? 0 : index / applications.length * Math.PI * 2 - Math.PI / 2;
+            return {
+                ...existing,
+                id: `application:${application}`,
+                application,
+                kind: "anchor",
+                x: existing?.x ?? (applications.length === 1 ? 0 : Math.cos(angle) * radius),
+                y: existing?.y ?? (applications.length === 1 ? 0 : Math.sin(angle) * radius)
+            };
+        });
+        const anchors = new Map(this.anchors.map(anchor => [anchor.application, anchor]));
+        this.nodes = rawNodes.map((node, index) => {
+            const existing = previousNodes.get(node.id);
+            const anchor = anchors.get(node.application);
+            return {
+                ...existing,
+                ...node,
+                kind: "replica",
+                x: existing?.x ?? anchor.x + ((index % 3) - 1) * 34,
+                y: existing?.y ?? anchor.y + (Math.floor(index / 3) % 3 - 1) * 34
+            };
+        });
+        this.links = groupedLinks;
+        this.windowSeconds = Math.max(1, graph?.windowSeconds || 300);
+        const membersByApplication = d3.group(this.nodes, node => node.application);
+        this.groups = applications.map(application => ({
+            id: application,
+            application,
+            anchor: anchors.get(application),
+            members: membersByApplication.get(application) || [],
+            isFocus: (membersByApplication.get(application) || []).some(node => node.isFocus)
+        }));
+        const internalLinks = this.nodes.map(node => ({
+            id: `internal:${node.id}`,
+            source: `application:${node.application}`,
+            target: node.id,
+            internal: true
+        }));
+
+        this.renderGroups();
+        this.renderLinks();
+        this.renderNodes();
+        this.simulation.nodes([...this.anchors, ...this.nodes]);
+        this.linkForce.links([...internalLinks, ...this.links]);
+        if (structureChanged) {
+            this.simulation.stop().alpha(1);
+            for (let index = 0; index < 220; index++) this.simulation.tick();
+            this.fitToContent(false);
+        }
+        this.simulation.alpha(structureChanged ? 0.55 : 0.14).restart();
+        this.updateHighlights();
+    }
+
+    hasStructureChanged(nodes, links, applications) {
+        if (nodes.length !== this.nodes.length || links.length !== this.links.length || applications.length !== this.groups.length) return true;
+        const nodeIds = new Set(this.nodes.map(node => node.id));
+        const linkIds = new Set(this.links.map(link => link.id));
+        const groupIds = new Set(this.groups.map(group => group.id));
+        return nodes.some(node => !nodeIds.has(node.id))
+            || links.some(link => !linkIds.has(link.id))
+            || applications.some(application => !groupIds.has(application));
+    }
+
+    renderGroups() {
+        this.groupElements = this.groupLayer.selectAll("g")
+            .data(this.groups, group => group.id)
+            .join(
+                enter => {
+                    const group = enter.append("g").attr("class", "replica-flow-group");
+                    group.append("rect").attr("rx", 18);
+                    group.append("text").attr("class", "replica-flow-group-name");
+                    group.append("text").attr("class", "replica-flow-group-meta");
+                    return group;
+                },
+                update => update,
+                exit => exit.remove())
+            .classed("focus", group => group.isFocus);
+        this.groupElements.select(".replica-flow-group-name").text(group => trimText(group.application, 34));
+        this.groupElements.select(".replica-flow-group-meta")
+            .text(group => `${group.members.length} replica${group.members.length === 1 ? "" : "s"}`);
+    }
+
+    renderLinks() {
+        const maximumCount = Math.max(1, d3.max(this.links, link => link.count) ?? 1);
+        const linkWidth = d3.scaleSqrt().domain([0, maximumCount]).range([1.5, 7]);
+        this.linkElements = this.linkLayer.selectAll("path")
+            .data(this.links, link => link.id)
+            .join("path")
+            .attr("class", "flow-map-link replica-flow-link")
+            .attr("marker-end", "url(#replica-flow-arrow)")
+            .style("stroke-width", link => `${linkWidth(link.count)}px`);
+        this.labelElements = this.labelLayer.selectAll("g")
+            .data(this.links, link => link.id)
+            .join(
+                enter => {
+                    const label = enter.append("g").attr("class", "flow-map-label replica-flow-label");
+                    label.append("rect").attr("x", -43).attr("y", -13).attr("width", 86).attr("height", 26).attr("rx", 13);
+                    label.append("text").attr("text-anchor", "middle").attr("dominant-baseline", "central");
+                    label.append("title");
+                    return label;
+                },
+                update => update,
+                exit => exit.remove());
+        this.labelElements.select("text").text(link => `${formatFlowRate(link.count / this.windowSeconds)}/s`);
+        this.labelElements.select("title").text(link =>
+            `${link.count.toLocaleString()} observations · ${link.messageTypes} message type${link.messageTypes === 1 ? "" : "s"} · ${link.endpoints} endpoint${link.endpoints === 1 ? "" : "s"}`);
+    }
+
+    renderNodes() {
+        this.nodeElements = this.nodeLayer.selectAll("g")
+            .data(this.nodes, node => node.id)
+            .join(
+                enter => {
+                    const node = enter.append("g")
+                        .attr("class", "flow-map-node replica-flow-node")
+                        .call(this.drag)
+                        .on("click", (_event, value) => {
+                            this.selectedNode = this.selectedNode?.id === value.id ? null : value;
+                            this.updateHighlights();
+                        })
+                        .on("mouseover", (_event, value) => {
+                            this.hoveredNode = value;
+                            this.updateHighlights();
+                        })
+                        .on("mouseout", () => {
+                            this.hoveredNode = null;
+                            this.updateHighlights();
+                        });
+                    node.append("rect").attr("x", -85).attr("y", -29).attr("width", 170).attr("height", 58).attr("rx", 11);
+                    node.append("circle").attr("cx", -63).attr("r", 5);
+                    node.append("text").attr("x", -49).attr("y", -3).attr("class", "flow-map-name");
+                    node.append("text").attr("x", -49).attr("y", 15).attr("class", "flow-map-meta");
+                    node.append("title");
+                    return node;
+                },
+                update => update,
+                exit => exit.remove());
+        this.nodeElements.select("circle").attr("class", node => node.online ? "online" : "offline");
+        this.nodeElements.select(".flow-map-name").text(node => trimText(node.instanceId, 20));
+        this.nodeElements.select(".flow-map-meta").text(node => trimText(node.busId, 24));
+        this.nodeElements.select("title").text(node => `${node.application}\nReplica ${node.instanceId}\nBus ${node.busId}\n${node.online ? "Online" : "Offline"}`);
+    }
+
+    updateHighlights() {
+        const activeNode = this.hoveredNode || this.selectedNode;
+        const neighbors = activeNode ? new Set(this.getNeighborIds(activeNode.id)) : null;
+        this.nodeElements
+            ?.classed("selected", node => this.selectedNode?.id === node.id)
+            .classed("related", node => neighbors?.has(node.id) === true)
+            .classed("dimmed", node => neighbors !== null && !neighbors.has(node.id));
+        this.linkElements?.classed("dimmed", link => activeNode && !this.isNeighborLink(activeNode.id, link));
+        this.labelElements?.classed("dimmed", link => activeNode && !this.isNeighborLink(activeNode.id, link));
+        this.groupElements?.classed("dimmed", group => activeNode && group.application !== activeNode.application
+            && !group.members.some(node => neighbors?.has(node.id)));
+    }
+
+    getNeighborIds(nodeId) {
+        const neighbors = [nodeId];
+        for (const link of this.links) {
+            const source = getNodeId(link.source);
+            const target = getNodeId(link.target);
+            if (source === nodeId) neighbors.push(target);
+            if (target === nodeId) neighbors.push(source);
+        }
+        return neighbors;
+    }
+
+    isNeighborLink(nodeId, link) {
+        return getNodeId(link.source) === nodeId || getNodeId(link.target) === nodeId;
+    }
+
+    onTick() {
+        this.nodeElements?.attr("transform", node => `translate(${node.x},${node.y})`);
+        this.linkElements?.attr("d", replicaEdgePath);
+        this.labelElements?.attr("transform", link => {
+            const midpoint = edgeMidpoint(link);
+            return `translate(${midpoint.x},${midpoint.y})`;
+        });
+        this.groupElements?.each(function (group) {
+            const points = [...group.members, group.anchor].filter(point => Number.isFinite(point.x) && Number.isFinite(point.y));
+            const minimumX = d3.min(points, point => point.x) - 112;
+            const maximumX = d3.max(points, point => point.x) + 112;
+            const minimumY = d3.min(points, point => point.y) - 62;
+            const maximumY = d3.max(points, point => point.y) + 58;
+            const element = d3.select(this);
+            element.select("rect")
+                .attr("x", minimumX)
+                .attr("y", minimumY)
+                .attr("width", maximumX - minimumX)
+                .attr("height", maximumY - minimumY);
+            element.select(".replica-flow-group-name").attr("x", minimumX + 18).attr("y", minimumY + 24);
+            element.select(".replica-flow-group-meta").attr("x", maximumX - 18).attr("y", minimumY + 24);
+        });
+    }
+
+    fitToContent(animate) {
+        const stage = this.stage.node();
+        if (!stage || this.nodes.length === 0) return;
+        const bounds = stage.getBBox();
+        if (bounds.width <= 0 || bounds.height <= 0) return;
+        const width = Math.max(this.element.clientWidth, 320);
+        const height = Math.max(this.element.clientHeight, 520);
+        const scale = Math.min(1.15, width / (bounds.width + 90), height / (bounds.height + 90));
+        const centerX = bounds.x + bounds.width / 2;
+        const centerY = bounds.y + bounds.height / 2;
+        const transform = d3.zoomIdentity
+            .translate(-centerX * scale, -centerY * scale)
+            .scale(scale);
+        const selection = animate ? this.svg.transition().duration(180) : this.svg;
+        selection.call(this.zoom.transform, transform);
+    }
+
+    dispose() {
+        this.simulation.stop();
+        this.resizeObserver?.disconnect();
+        this.element.querySelector('[data-replica-flow-action="zoom-in"]')?.removeEventListener("click", this.zoomIn);
+        this.element.querySelector('[data-replica-flow-action="zoom-out"]')?.removeEventListener("click", this.zoomOut);
+        this.element.querySelector('[data-replica-flow-action="reset"]')?.removeEventListener("click", this.reset);
+        this.svg.on(".zoom", null);
+        this.svg.selectAll("*").remove();
+    }
+}
+
 function edgePath(edge) {
     if (getNodeId(edge.source) === getNodeId(edge.target)) {
         return `M${edge.source.x + 62},${edge.source.y - 28} C${edge.source.x + 150},${edge.source.y - 130} ${edge.source.x - 150},${edge.source.y - 130} ${edge.source.x - 62},${edge.source.y - 28}`;
@@ -332,6 +681,21 @@ function edgePath(edge) {
     const endX = edge.target.x - dx / distance * 108;
     const endY = edge.target.y - dy / distance * 108;
     const bend = getNodeId(edge.source) < getNodeId(edge.target) ? 0.12 : -0.12;
+    return `M${startX},${startY} Q${(startX + endX) / 2 + dy * bend},${(startY + endY) / 2 - dx * bend} ${endX},${endY}`;
+}
+
+function replicaEdgePath(edge) {
+    if (getNodeId(edge.source) === getNodeId(edge.target)) {
+        return `M${edge.source.x + 50},${edge.source.y - 22} C${edge.source.x + 125},${edge.source.y - 105} ${edge.source.x - 125},${edge.source.y - 105} ${edge.source.x - 50},${edge.source.y - 22}`;
+    }
+    const dx = edge.target.x - edge.source.x;
+    const dy = edge.target.y - edge.source.y;
+    const distance = Math.max(1, Math.hypot(dx, dy));
+    const startX = edge.source.x + dx / distance * 87;
+    const startY = edge.source.y + dy / distance * 47;
+    const endX = edge.target.x - dx / distance * 96;
+    const endY = edge.target.y - dy / distance * 52;
+    const bend = getNodeId(edge.source) < getNodeId(edge.target) ? 0.1 : -0.1;
     return `M${startX},${startY} Q${(startX + endX) / 2 + dy * bend},${(startY + endY) / 2 - dx * bend} ${endX},${endY}`;
 }
 
