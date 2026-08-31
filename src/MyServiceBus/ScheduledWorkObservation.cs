@@ -33,7 +33,9 @@ public interface IScheduledWorkSource
 {
     string Provider { get; }
     bool Authoritative { get; }
-    IReadOnlyList<ScheduledWorkState> GetSnapshot();
+    Task<IReadOnlyList<ScheduledWorkState>> GetSnapshotAsync(
+        int maximumCount,
+        CancellationToken cancellationToken = default);
 }
 
 public sealed class InMemoryScheduledWorkSource : IScheduledWorkSource
@@ -43,8 +45,18 @@ public sealed class InMemoryScheduledWorkSource : IScheduledWorkSource
     public string Provider => "InMemory";
     public bool Authoritative => true;
 
-    public IReadOnlyList<ScheduledWorkState> GetSnapshot()
-        => items.Values.OrderBy(item => item.DueAtUtc).ToArray();
+    public Task<IReadOnlyList<ScheduledWorkState>> GetSnapshotAsync(
+        int maximumCount,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maximumCount);
+        cancellationToken.ThrowIfCancellationRequested();
+        IReadOnlyList<ScheduledWorkState> snapshot = items.Values
+            .OrderBy(item => item.DueAtUtc)
+            .Take(maximumCount)
+            .ToArray();
+        return Task.FromResult(snapshot);
+    }
 
     internal void Upsert(ScheduledWorkState state) => items[state.TokenId] = state;
 

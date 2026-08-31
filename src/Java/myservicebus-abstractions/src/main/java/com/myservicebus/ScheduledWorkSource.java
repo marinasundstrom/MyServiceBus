@@ -1,11 +1,12 @@
 package com.myservicebus;
 
 import java.util.List;
+import java.util.concurrent.CompletionStage;
 
 public interface ScheduledWorkSource {
     String getProvider();
 
     boolean isAuthoritative();
 
-    List<ScheduledWorkState> getSnapshot();
+    CompletionStage<List<ScheduledWorkState>> getSnapshot(int maximumCount);
 }

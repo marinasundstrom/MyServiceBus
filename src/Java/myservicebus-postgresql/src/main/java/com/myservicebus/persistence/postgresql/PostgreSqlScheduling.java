@@ -2,6 +2,7 @@ package com.myservicebus.persistence.postgresql;
 
 import com.myservicebus.PublishEndpoint;
 import com.myservicebus.ScheduleMessageProvider;
+import com.myservicebus.ScheduledWorkSource;
 import com.myservicebus.SendEndpointProvider;
 import com.myservicebus.di.ServiceCollection;
 import com.myservicebus.persistence.OutboxSession;
@@ -24,6 +25,9 @@ public final class PostgreSqlScheduling {
         }
 
         services.remove(ScheduleMessageProvider.class);
+        services.remove(ScheduledWorkSource.class);
+        services.addSingleton(ScheduledWorkSource.class,
+                provider -> () -> new PostgreSqlScheduledWorkSource(dataSource, serviceName));
         services.addScoped(ScheduleMessageProvider.class, provider -> () -> {
             return new PostgreSqlScheduleMessageProvider(
                     dataSource,

@@ -278,10 +278,10 @@ public class SchedulingTest {
 
         ScheduledMessageHandle handle = firstScope.schedulePublish("scheduled", Duration.ofDays(1))
                 .toCompletableFuture().join();
-        assertEquals(1, source.getSnapshot().size());
+        assertEquals(1, source.getSnapshot(100).toCompletableFuture().join().size());
         secondScope.cancelScheduledPublish(handle).toCompletableFuture().join();
 
-        assertTrue(source.getSnapshot().isEmpty());
+        assertTrue(source.getSnapshot(100).toCompletableFuture().join().isEmpty());
         assertEquals(ScheduledWorkStatus.CANCELLED, observed.get(observed.size() - 1).status());
     }
 }

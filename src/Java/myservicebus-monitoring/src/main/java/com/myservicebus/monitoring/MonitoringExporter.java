@@ -27,7 +27,9 @@ import com.myservicebus.BusLifecycleHookEvent;
 import com.myservicebus.MessageOperationHookEvent;
 import com.myservicebus.OutboxDeliveryHookEvent;
 import com.myservicebus.ScheduledWorkObserver;
+import com.myservicebus.ScheduledWorkSource;
 import com.myservicebus.ScheduledWorkState;
+import com.myservicebus.di.ServiceProvider;
 import com.myservicebus.inspection.BusInspectionProvider;
 
 public final class MonitoringExporter implements BusHook, ScheduledWorkObserver, AutoCloseable {
@@ -51,7 +53,10 @@ public final class MonitoringExporter implements BusHook, ScheduledWorkObserver,
     private final Map<String, MonitoringProtocol.ScheduledWorkItem> scheduledWork = new LinkedHashMap<>();
     private final Instant startedAtUtc = Instant.now();
     private volatile BusInspectionProvider inspectionProvider;
+    private volatile List<ScheduledWorkSource> scheduledWorkSources = List.of();
     private volatile boolean metadataRegistered;
+    private boolean scheduledWorkSourcesAvailable = true;
+    private Instant nextScheduledWorkRefresh = Instant.MIN;
     private List<MonitoringProtocol.Observation> pendingBatch;
 
     public MonitoringExporter(MonitoringExporterOptions options) {
@@ -85,6 +90,17 @@ public final class MonitoringExporter implements BusHook, ScheduledWorkObserver,
                 TimeUnit.MILLISECONDS);
     }
 
+    public void start(ServiceProvider serviceProvider) {
+        start(
+                serviceProvider.getRequiredService(BusInspectionProvider.class),
+                List.copyOf(serviceProvider.getServices(ScheduledWorkSource.class)));
+    }
+
+    public void start(BusInspectionProvider inspectionProvider, List<ScheduledWorkSource> scheduledWorkSources) {
+        this.scheduledWorkSources = List.copyOf(scheduledWorkSources);
+        start(inspectionProvider);
+    }
+
     @Override
     public void handle(BusHookEvent busEvent) {
         MonitoringProtocol.Observation observation = map(busEvent);
@@ -100,11 +116,7 @@ public final class MonitoringExporter implements BusHook, ScheduledWorkObserver,
     public void observe(ScheduledWorkState state) {
         synchronized (scheduledWork) {
             pruneScheduledWork(Instant.now());
-            scheduledWork.put(state.tokenId().toString(), new MonitoringProtocol.ScheduledWorkItem(
-                    state.tokenId().toString(), state.provider(), state.durability().toString(), state.workKind(),
-                    state.messageType(), state.intent(), state.destinationAddress(), state.dueAtUtc(),
-                    titleCase(state.status().name()), state.providerStatus(), state.attempt(), state.updatedAtUtc(),
-                    state.failureCategory()));
+            scheduledWork.put(state.tokenId().toString(), mapScheduledWork(state));
             while (scheduledWork.size() > options.getMaxScheduledWorkItems()) {
                 String oldest = scheduledWork.entrySet().stream()
                         .min(java.util.Comparator.comparing(entry -> entry.getValue().updatedAtUtc()))
@@ -121,7 +133,13 @@ public final class MonitoringExporter implements BusHook, ScheduledWorkObserver,
     private void exportSafely() {
         try {
             ensureMetadata();
-            if (metadataRegistered && scheduledWorkChanged.getAndSet(false)) {
+            Instant now = Instant.now();
+            if (!now.isBefore(nextScheduledWorkRefresh)) {
+                nextScheduledWorkRefresh = now.plus(options.getExportInterval());
+                refreshScheduledWork();
+                scheduledWorkChanged.set(true);
+            }
+            if (metadataRegistered && scheduledWorkSourcesAvailable && scheduledWorkChanged.getAndSet(false)) {
                 try {
                     if (!sendScheduledWork()) {
                         scheduledWorkChanged.set(true);
@@ -228,6 +246,32 @@ public final class MonitoringExporter implements BusHook, ScheduledWorkObserver,
                 Instant.now(), items));
     }
 
+    private void refreshScheduledWork() {
+        try {
+            for (ScheduledWorkSource source : scheduledWorkSources) {
+                List<ScheduledWorkState> states = source.getSnapshot(options.getMaxScheduledWorkItems())
+                        .toCompletableFuture().join();
+                java.util.Set<String> tokenIds = states.stream()
+                        .map(state -> state.tokenId().toString())
+                        .collect(java.util.stream.Collectors.toSet());
+                synchronized (scheduledWork) {
+                    if (source.isAuthoritative()) {
+                        scheduledWork.entrySet().removeIf(entry -> entry.getValue().provider().equals(source.getProvider())
+                                && !isTerminal(entry.getValue().status())
+                                && !tokenIds.contains(entry.getKey()));
+                    }
+                    for (ScheduledWorkState state : states) {
+                        scheduledWork.put(state.tokenId().toString(), mapScheduledWork(state));
+                    }
+                }
+            }
+            scheduledWorkSourcesAvailable = true;
+        } catch (RuntimeException failure) {
+            scheduledWorkSourcesAvailable = false;
+            throw failure;
+        }
+    }
+
     private void pruneScheduledWork(Instant now) {
         Instant cutoff = now.minus(options.getScheduledWorkHistory());
         scheduledWork.entrySet().removeIf(entry -> isTerminal(entry.getValue().status())
@@ -241,6 +285,14 @@ public final class MonitoringExporter implements BusHook, ScheduledWorkObserver,
     private static String titleCase(String value) {
         String lower = value.toLowerCase(java.util.Locale.ROOT);
         return Character.toUpperCase(lower.charAt(0)) + lower.substring(1);
+    }
+
+    private static MonitoringProtocol.ScheduledWorkItem mapScheduledWork(ScheduledWorkState state) {
+        return new MonitoringProtocol.ScheduledWorkItem(
+                state.tokenId().toString(), state.provider(), state.durability().toString(), state.workKind(),
+                state.messageType(), state.intent(), state.destinationAddress(), state.dueAtUtc(),
+                titleCase(state.status().name()), state.providerStatus(), state.attempt(), state.updatedAtUtc(),
+                state.failureCategory());
     }
 
     private MonitoringProtocol.Observation map(BusHookEvent busEvent) {

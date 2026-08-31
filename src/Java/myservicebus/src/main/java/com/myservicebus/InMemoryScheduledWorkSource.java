@@ -5,6 +5,8 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 
 public final class InMemoryScheduledWorkSource implements ScheduledWorkSource {
     private final ConcurrentMap<UUID, ScheduledWorkState> items = new ConcurrentHashMap<>();
@@ -20,10 +22,14 @@ public final class InMemoryScheduledWorkSource implements ScheduledWorkSource {
     }
 
     @Override
-    public List<ScheduledWorkState> getSnapshot() {
-        return items.values().stream()
+    public CompletionStage<List<ScheduledWorkState>> getSnapshot(int maximumCount) {
+        if (maximumCount <= 0) {
+            throw new IllegalArgumentException("maximumCount must be greater than zero");
+        }
+        return CompletableFuture.completedFuture(items.values().stream()
                 .sorted(Comparator.comparing(ScheduledWorkState::dueAtUtc))
-                .toList();
+                .limit(maximumCount)
+                .toList());
     }
 
     void upsert(ScheduledWorkState state) {
