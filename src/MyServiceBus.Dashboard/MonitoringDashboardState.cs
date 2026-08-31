@@ -32,6 +32,7 @@ public sealed class MonitoringDashboardState : IAsyncDisposable
     public IReadOnlyList<MonitoringOutboxDispatcherSummary> OutboxDispatchers { get; private set; } = [];
     public IReadOnlyList<MonitoringScheduledWorkSummary> ScheduledWork { get; private set; } = [];
     public IReadOnlyList<MonitoringRecurringJobSummary> RecurringJobs { get; private set; } = [];
+    public IReadOnlyList<MonitoringJobSummary> Jobs { get; private set; } = [];
     public DateTimeOffset UpdatedAt { get; private set; } = DateTimeOffset.UtcNow;
     public string? Error { get; private set; }
     public bool LiveConnected { get; private set; }
@@ -119,6 +120,7 @@ public sealed class MonitoringDashboardState : IAsyncDisposable
             var outboxDispatchers = api.GetOutboxDispatchers(stopping.Token);
             var scheduledWork = api.GetScheduledWork(stopping.Token);
             var recurringJobs = api.GetRecurringJobs(stopping.Token);
+            var jobs = api.GetJobs(stopping.Token);
             await Task.WhenAll(
                 applications,
                 history,
@@ -131,7 +133,8 @@ public sealed class MonitoringDashboardState : IAsyncDisposable
                 observations,
                 outboxDispatchers,
                 scheduledWork,
-                recurringJobs);
+                recurringJobs,
+                jobs);
             Applications = applications.Result;
             History = history.Result;
             Instances = instances.Result;
@@ -144,6 +147,7 @@ public sealed class MonitoringDashboardState : IAsyncDisposable
             OutboxDispatchers = outboxDispatchers.Result;
             ScheduledWork = scheduledWork.Result;
             RecurringJobs = recurringJobs.Result;
+            Jobs = jobs.Result;
             UpdatedAt = DateTimeOffset.UtcNow;
             Error = null;
         }

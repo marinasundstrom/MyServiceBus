@@ -1,0 +1,8 @@
+@page "/jobs"
+@rendermode InteractiveServer
+@inherits MonitoringPageBase
+
+<PageTitle>Tracked jobs · MyServiceBus Monitoring</PageTitle>
+<DashboardPageHeader Eyebrow="Application work" Title="Tracked jobs" Description="Follow application-owned work that continues independently from its original message delivery. Open attempt details only when an outcome needs explanation." />
+
+<JobsTable Items="Dashboard.Jobs" />
