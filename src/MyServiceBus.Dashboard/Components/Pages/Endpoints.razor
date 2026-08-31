@@ -1,0 +1,76 @@
+@page "/endpoints"
+@rendermode InteractiveServer
+@inherits MonitoringPageBase
+
+<PageTitle>Endpoints · MyServiceBus Monitoring</PageTitle>
+<DashboardPageHeader Eyebrow="Runtime topology" Title="Receive endpoints" Description="A receive endpoint is where an application accepts messages. Use this view to see what each endpoint handles, whether its replicas are online, and how it is behaving now." />
+
+@if (Dashboard.Endpoints.Count == 0)
+{
+    <section class="empty-state"><h2>No receive endpoints</h2><p>Endpoints appear here when an application exports its bus topology.</p></section>
+}
+else
+{
+    <section class="endpoint-summary-grid" aria-label="Endpoint summary">
+        <article class="summary-card"><p class="eyebrow">Configured</p><strong class="summary-number">@Dashboard.Endpoints.Count</strong><span>receive endpoints</span></article>
+        <article class="summary-card"><p class="eyebrow">Available</p><strong class="summary-number">@Dashboard.Endpoints.Count(IsAvailable)</strong><span>with an online replica</span></article>
+        <article class="summary-card"><p class="eyebrow">Attention</p><strong class="summary-number @(AttentionCount > 0 ? "fault" : null)">@AttentionCount</strong><span>offline or faulting</span></article>
+    </section>
+
+    <section class="panel endpoints-panel">
+        <div class="section-heading">
+            <div><p class="eyebrow">Current activity</p><h2>Endpoint health and load</h2></div>
+            <span>60-second window · updated @Dashboard.UpdatedAt.ToLocalTime().ToString("HH:mm:ss")</span>
+        </div>
+        <div class="table-wrap">
+            <table>
+                <thead><tr><th>Status</th><th>Endpoint</th><th>Application</th><th>Replicas</th><th>Handled / sec</th><th>Retries</th><th>Failures</th><th>Consumers</th><th>Messages</th><th>Transport</th></tr></thead>
+                <tbody>
+                    @foreach (var endpoint in Dashboard.Endpoints.OrderBy(StatusRank).ThenBy(endpoint => endpoint.ApplicationName).ThenBy(endpoint => endpoint.EndpointName))
+                    {
+                        <tr>
+                            <td><span class="status-dot @StatusClass(endpoint)"></span>@StatusLabel(endpoint)</td>
+                            <td><strong>@endpoint.EndpointName</strong><small class="mono">@endpoint.Address</small></td>
+                            <td>@endpoint.ApplicationName</td>
+                            <td>@endpoint.OnlineInstances / @endpoint.TotalInstances</td>
+                            <td>@FormatRate(endpoint.ConsumedPerSecond)</td>
+                            <td class="@(endpoint.Retried > 0 ? "fault" : null)">@FormatCount(endpoint.Retried)</td>
+                            <td class="@(endpoint.Faulted > 0 ? "fault" : null)">@FormatCount(endpoint.Faulted)</td>
+                            <td>@endpoint.ConsumerCount</td>
+                            <td>@endpoint.MessageTypeCount</td>
+                            <td>@endpoint.TransportName</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        <p class="table-note">“Handled / sec” counts successfully consumed messages. Retry and failure totals cover the same 60-second window.</p>
+    </section>
+}
+
+@code {
+    private int AttentionCount => Dashboard.Endpoints.Count(endpoint => !IsAvailable(endpoint) || endpoint.Faulted > 0);
+
+    private static bool IsAvailable(MonitoringEndpointSummary endpoint) => endpoint.OnlineInstances > 0;
+
+    private static string StatusLabel(MonitoringEndpointSummary endpoint) => endpoint switch
+    {
+        { OnlineInstances: 0 } => "Offline",
+        { Faulted: > 0 } => "Faulting",
+        _ => "Healthy"
+    };
+
+    private static string StatusClass(MonitoringEndpointSummary endpoint) => endpoint switch
+    {
+        { OnlineInstances: 0 } => "offline",
+        { Faulted: > 0 } => "degraded",
+        _ => "online"
+    };
+
+    private static int StatusRank(MonitoringEndpointSummary endpoint) => endpoint switch
+    {
+        { OnlineInstances: 0 } => 0,
+        { Faulted: > 0 } => 1,
+        _ => 2
+    };
+}

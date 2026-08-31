@@ -218,6 +218,55 @@ public class MonitoringRepositoryTests
         dispatcher.DispatchedPerSecond.ShouldBe(13d / 60d);
     }
 
+    [Fact]
+    public void Repository_combines_endpoint_topology_across_replicas_with_recent_activity()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var repository = new MonitoringRepository();
+        var endpoint = new ReceiveEndpointInspection(
+            "orders",
+            "rabbitmq://localhost/orders",
+            [new MessageBindingInspection("SubmitOrder", "urn:message:SubmitOrder", "submit-order", new Dictionary<string, object?>())],
+            ["SubmitOrderConsumer"],
+            new TransportInspectionDetails("rabbitmq", new Dictionary<string, object?>()),
+            new Dictionary<string, object?>());
+        repository.UpsertMetadata(CreateMetadata("orders", "orders-1", now, "commerce") with
+        {
+            Bus = new BusInspectionSnapshot("rabbitmq", new Uri("rabbitmq://localhost/"), now, [], [endpoint], [])
+        });
+        repository.UpsertMetadata(CreateMetadata("orders", "orders-2", now.AddMinutes(-1), "commerce") with
+        {
+            Bus = new BusInspectionSnapshot("rabbitmq", new Uri("rabbitmq://localhost/"), now, [], [endpoint], [])
+        });
+        repository.RecordBatch(CreateBatch(
+            "orders",
+            "orders-1",
+            now,
+            new MonitoringObservation(
+                1, now.AddSeconds(-5), "consumed", true, "SubmitOrder", "urn:message:SubmitOrder",
+                "orders", null, 12, null, null, null, null, null, null),
+            new MonitoringObservation(
+                2, now.AddSeconds(-4), "retry_attempted", false, "SubmitOrder", "urn:message:SubmitOrder",
+                "orders", null, 12, "TimeoutException", "retry", null, null, null, null, 1, 3),
+            new MonitoringObservation(
+                3, now.AddSeconds(-3), "consume_faulted", false, "SubmitOrder", "urn:message:SubmitOrder",
+                "orders", null, 12, "TimeoutException", "failed", null, null, null, null)));
+
+        var summary = repository.GetEndpoints(null, 60, now).ShouldHaveSingleItem();
+        summary.ApplicationName.ShouldBe("orders");
+        summary.EndpointName.ShouldBe("orders");
+        summary.TransportName.ShouldBe("rabbitmq");
+        summary.OnlineInstances.ShouldBe(1);
+        summary.TotalInstances.ShouldBe(2);
+        summary.ConsumerCount.ShouldBe(1);
+        summary.MessageTypeCount.ShouldBe(1);
+        summary.Consumed.ShouldBe(1);
+        summary.Retried.ShouldBe(1);
+        summary.Faulted.ShouldBe(1);
+        summary.ConsumedPerSecond.ShouldBe(1d / 60d);
+        summary.LastActivityAtUtc.ShouldBe(now.AddSeconds(-3));
+    }
+
     private static MonitoringMetadata CreateMetadata(
         string applicationName,
         string instanceId,

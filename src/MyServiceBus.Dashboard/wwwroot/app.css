@@ -137,6 +137,13 @@ th, td { padding: 15px 18px; border-bottom: 1px solid var(--border-subtle); whit
 tbody tr:last-child td { border-bottom: 0; }
 td small { display: block; margin-top: 4px; color: var(--text-dim); font-size: .68rem; }
 .status-dot { display: inline-block; margin-right: 9px; }
+.status-dot.degraded { background: #f1b861; box-shadow: 0 0 0 4px rgb(241 184 97 / 12%); }
+.endpoint-summary-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; margin-bottom: 18px; }
+.endpoint-summary-grid .summary-card { display: grid; gap: 5px; padding: 20px 22px; }
+.endpoint-summary-grid .summary-card span, .table-note { color: var(--text-dim); font-size: .78rem; }
+.summary-number { font-size: 2rem; line-height: 1; }
+.endpoints-panel { overflow: hidden; }
+.table-note { margin: 0; padding: 0 24px 20px; }
 .mono { max-width: 260px; overflow: hidden; text-overflow: ellipsis; font-family: "SFMono-Regular", Consolas, monospace; color: var(--text-muted); }
 .detail-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; margin-top: 18px; }
 .detail-grid .panel { overflow: hidden; }
@@ -216,6 +223,7 @@ td small { display: block; margin-top: 4px; color: var(--text-dim); font-size: .
     .summary-grid { grid-template-columns: 1fr; }
     .guidance { align-items: start; flex-direction: column; }
     .detail-grid { grid-template-columns: 1fr; }
+    .endpoint-summary-grid { grid-template-columns: 1fr; }
     .event-detail { grid-template-columns: 1fr; margin-left: 0; }
     .event-message { grid-column: auto; }
     .flow-map-shell, .flow-map-canvas { min-height: 430px; }

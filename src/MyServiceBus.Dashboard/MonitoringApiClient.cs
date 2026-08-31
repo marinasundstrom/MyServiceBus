@@ -23,6 +23,12 @@ public sealed class MonitoringApiClient
         => await httpClient.GetFromJsonAsync<MonitoringInstanceSummary[]>("/api/monitoring/v1/instances", cancellationToken).ConfigureAwait(false)
             ?? [];
 
+    public async Task<IReadOnlyList<MonitoringEndpointSummary>> GetEndpoints(CancellationToken cancellationToken)
+        => await httpClient.GetFromJsonAsync<MonitoringEndpointSummary[]>(
+            "/api/monitoring/v1/endpoints?windowSeconds=60",
+            cancellationToken).ConfigureAwait(false)
+            ?? [];
+
     public async Task<IReadOnlyList<MonitoringRateSummary>> GetRates(bool byInstance, CancellationToken cancellationToken)
         => await httpClient.GetFromJsonAsync<MonitoringRateSummary[]>(
             $"/api/monitoring/v1/metrics?windowSeconds=60&byInstance={byInstance.ToString().ToLowerInvariant()}",
