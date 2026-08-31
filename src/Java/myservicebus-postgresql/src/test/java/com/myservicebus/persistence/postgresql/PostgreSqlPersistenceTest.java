@@ -466,7 +466,9 @@ class PostgreSqlPersistenceTest {
                     assertEquals(SchedulingDurability.DURABLE, cancelled.durability());
                     assertEquals(ScheduledWorkStatus.CANCELLED, cancelled.status());
                     assertEquals("Cancelled", cancelled.providerStatus());
-                    assertEquals(dueAt, cancelled.dueAtUtc());
+                    assertEquals(
+                            dueAt.truncatedTo(ChronoUnit.MICROS),
+                            cancelled.dueAtUtc().truncatedTo(ChronoUnit.MICROS));
                 }
             } finally {
                 bus.stop();
