@@ -80,7 +80,7 @@ MyServiceBus should preserve that familiarity for message scheduling where it im
 
 MassTransit's job consumers are a separate distributed job-service concept, including job submission, attempts, concurrency limits, cancellation, retry, and progress. They confirm that a scheduled message and an application job should not be collapsed into one public abstraction. MyServiceBus should consider a comparable convenience only after the underlying scheduled-message, job-execution, and monitoring primitives are stable. It does not need to reproduce MassTransit's saga-backed implementation.
 
-The provider SPI therefore sits below the MassTransit-familiar application facade. It is a MyServiceBus integration contract, not an interop wire contract and not a promise that Hangfire and JobRunr can share jobs. The PostgreSQL provider is the recommended shared C#/Java route. Transport-native scheduling can be the preferred route when compatible applications already share a broker and its delayed-delivery semantics are sufficient.
+The provider SPI therefore sits below the MassTransit-familiar application facade. It is a MyServiceBus integration contract, not an interop wire contract and not a promise that Hangfire and JobRunr can share jobs. The built-in durable provider with PostgreSQL storage is the recommended shared C#/Java route. Transport-native scheduling can be the preferred route when compatible applications already share a broker and its delayed-delivery semantics are sufficient.
 
 ## Portable execution command
 
@@ -186,7 +186,7 @@ The test suites distinguish three claims so that “supported in both languages�
 
 1. **API parity** — C# and Java expose equivalent MyServiceBus concepts and documented outcomes.
 2. **Behavioral conformance** — different adapters pass the same lifecycle, identity, cancellation, retry, recurrence, freshness, and failure scenarios independently.
-3. **Storage interoperability** — C# and Java can create, observe, cancel, and execute the same persisted scheduled records. This is a stronger provider-specific claim, initially reserved for the MyServiceBus PostgreSQL provider.
+3. **Storage interoperability** — C# and Java can create, observe, cancel, and execute the same persisted scheduled records. This is a stronger storage-profile-specific claim, initially reserved for the built-in durable provider with PostgreSQL storage.
 
 Quartz.NET versus Quartz Scheduler, and Hangfire versus JobRunr, can satisfy the first two levels without satisfying the third. The dashboard consumes normalized monitoring records, so it can present one distributed application even when its services use different scheduling engines.
 
@@ -206,9 +206,9 @@ Provider controls and dashboard management remain later slices. A read-only sche
 
 ## Completion gates
 
-One-time scheduling remains preview until the PostgreSQL provider passes cross-language conformance and the Quartz.NET and Quartz Scheduler adapters independently pass the same behavioral suite for durable acceptance, restart recovery, stable identity, due-time/misfire behavior, cancellation races, dispatch ambiguity, monitoring freshness, and missing-history transparency. Cross-language conformance means shared MyServiceBus behavior; only the PostgreSQL provider is initially expected to share scheduled records between C# and Java.
+One-time scheduling remains preview until the built-in durable provider's PostgreSQL profile passes cross-language conformance and the Quartz.NET and Quartz Scheduler adapters independently pass the same behavioral suite for durable acceptance, restart recovery, stable identity, due-time/misfire behavior, cancellation races, dispatch ambiguity, monitoring freshness, and missing-history transparency. Cross-language conformance means shared MyServiceBus behavior; only the PostgreSQL storage profile is initially expected to share scheduled records between C# and Java.
 
-Recurring jobs are now the next feature theme and are specified in [Recurring Jobs](recurring-jobs.md). The initial preview can prove its state model through the in-memory runtime and the shared PostgreSQL provider. Before recurring jobs are considered stable, their definition and occurrence contracts must also be exercised by materially different engines. Quartz can supply common architectural evidence, while Hangfire and JobRunr can expose richer ecosystem-specific history and control models without becoming mandatory runtimes.
+Recurring jobs are now the next feature theme and are specified in [Recurring Jobs](recurring-jobs.md). The initial preview can prove its state model through the in-memory runtime and the built-in durable provider using PostgreSQL storage. Before recurring jobs are considered stable, their definition and occurrence contracts must also be exercised by materially different engines. Quartz can supply common architectural evidence, while Hangfire and JobRunr can expose richer ecosystem-specific history and control models without becoming mandatory runtimes.
 
 ## References
 

@@ -4,7 +4,7 @@ namespace MyServiceBus.Persistence.PostgreSql;
 
 public static class PostgreSqlSchema
 {
-    public const int CurrentVersion = 3;
+    public const int CurrentVersion = 4;
 
     public static async Task EnsureCreatedAsync(
         NpgsqlDataSource dataSource,
@@ -31,12 +31,12 @@ public static class PostgreSqlSchema
         );
 
         INSERT INTO myservicebus.schema_version (singleton, version)
-        VALUES (true, 3)
+        VALUES (true, 4)
         ON CONFLICT (singleton) DO NOTHING;
 
         DO $migration$
         BEGIN
-            IF (SELECT version FROM myservicebus.schema_version WHERE singleton) NOT IN (2, 3) THEN
+            IF (SELECT version FROM myservicebus.schema_version WHERE singleton) NOT IN (2, 3, 4) THEN
                 RAISE EXCEPTION 'Unsupported MyServiceBus PostgreSQL schema version';
             END IF;
         END
@@ -98,5 +98,63 @@ public static class PostgreSqlSchema
         CREATE INDEX IF NOT EXISTS ix_inbox_message_completed
             ON myservicebus.inbox_message (completed_at_utc)
             WHERE state = 1;
+
+        CREATE TABLE IF NOT EXISTS myservicebus.recurring_job_definition (
+            definition_id uuid PRIMARY KEY,
+            service_name text NOT NULL CHECK (length(service_name) > 0),
+            schedule_group text NOT NULL DEFAULT '',
+            schedule_id text NOT NULL CHECK (length(schedule_id) > 0),
+            revision bigint NOT NULL CHECK (revision > 0),
+            semantic_hash text NOT NULL CHECK (length(semantic_hash) > 0),
+            status smallint NOT NULL CHECK (status BETWEEN 0 AND 3),
+            cadence_kind smallint NOT NULL CHECK (cadence_kind BETWEEN 0 AND 1),
+            cadence jsonb NOT NULL,
+            description text NULL,
+            start_at_utc timestamptz NULL,
+            end_at_utc timestamptz NULL,
+            misfire_policy smallint NOT NULL CHECK (misfire_policy BETWEEN 0 AND 2),
+            max_catch_up_occurrences integer NOT NULL CHECK (max_catch_up_occurrences > 0),
+            overlap_policy smallint NOT NULL CHECK (overlap_policy BETWEEN 0 AND 2),
+            delivery_intent smallint NOT NULL CHECK (delivery_intent BETWEEN 0 AND 1),
+            destination_address text NOT NULL,
+            command_message_types text[] NOT NULL CHECK (cardinality(command_message_types) > 0),
+            command_payload jsonb NOT NULL,
+            command_headers jsonb NOT NULL DEFAULT '{}'::jsonb,
+            content_type text NOT NULL,
+            accepted_at_utc timestamptz NOT NULL,
+            updated_at_utc timestamptz NOT NULL,
+            next_due_at_utc timestamptz NULL,
+            lease_owner text NULL,
+            lease_expires_at_utc timestamptz NULL,
+            UNIQUE (service_name, schedule_group, schedule_id),
+            CHECK (end_at_utc IS NULL OR start_at_utc IS NULL OR end_at_utc > start_at_utc)
+        );
+
+        CREATE INDEX IF NOT EXISTS ix_recurring_job_definition_due
+            ON myservicebus.recurring_job_definition (next_due_at_utc, definition_id)
+            WHERE status = 0 AND next_due_at_utc IS NOT NULL;
+
+        CREATE TABLE IF NOT EXISTS myservicebus.recurring_job_occurrence (
+            occurrence_id uuid PRIMARY KEY,
+            definition_id uuid NOT NULL REFERENCES myservicebus.recurring_job_definition (definition_id),
+            definition_revision bigint NOT NULL CHECK (definition_revision > 0),
+            scheduled_for_utc timestamptz NOT NULL,
+            materialized_at_utc timestamptz NOT NULL,
+            materialization_reason smallint NOT NULL CHECK (materialization_reason BETWEEN 0 AND 3),
+            is_manual boolean NOT NULL DEFAULT false,
+            status smallint NOT NULL CHECK (status BETWEEN 0 AND 8),
+            outbox_record_id uuid NULL REFERENCES myservicebus.outbox_message (record_id),
+            failure_category text NULL
+        );
+
+        CREATE UNIQUE INDEX IF NOT EXISTS ux_recurring_job_occurrence_scheduled
+            ON myservicebus.recurring_job_occurrence (
+                definition_id, definition_revision, scheduled_for_utc)
+            WHERE NOT is_manual;
+
+        CREATE INDEX IF NOT EXISTS ix_recurring_job_occurrence_history
+            ON myservicebus.recurring_job_occurrence (definition_id, scheduled_for_utc DESC);
+
+        UPDATE myservicebus.schema_version SET version = 4 WHERE singleton AND version = 3;
         """;
 }

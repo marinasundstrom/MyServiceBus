@@ -64,13 +64,15 @@ class PostgreSqlPersistenceTest {
     private static final String SERVICE_NAME = "orders-service";
 
     @Test
-    void versionTwoSchemaMigratesToSchedulingAndCancellation() throws Exception {
+    void versionTwoSchemaMigratesToSchedulingCancellationAndRecurringJobs() throws Exception {
         try (PostgreSQLContainer container = startContainer()) {
             DataSource dataSource = dataSource(container);
             PostgreSqlSchema.ensureCreated(dataSource);
             try (Connection connection = dataSource.getConnection();
                     Statement statement = connection.createStatement()) {
                 statement.execute("""
+                        DROP TABLE myservicebus.recurring_job_occurrence;
+                        DROP TABLE myservicebus.recurring_job_definition;
                         UPDATE myservicebus.schema_version SET version = 2 WHERE singleton;
                         ALTER TABLE myservicebus.outbox_message
                             DROP COLUMN scheduled_at_utc,
@@ -94,13 +96,17 @@ class PostgreSqlPersistenceTest {
                                 EXISTS (
                                     SELECT 1 FROM information_schema.columns
                                     WHERE table_schema = 'myservicebus' AND table_name = 'outbox_message'
-                                      AND column_name = 'cancelled_at_utc')
+                                      AND column_name = 'cancelled_at_utc'),
+                                to_regclass('myservicebus.recurring_job_definition') IS NOT NULL,
+                                to_regclass('myservicebus.recurring_job_occurrence') IS NOT NULL
                             FROM myservicebus.schema_version WHERE singleton;
                             """)) {
                 assertTrue(result.next());
-                assertEquals(3, result.getInt(1));
+                assertEquals(4, result.getInt(1));
                 assertTrue(result.getBoolean(2));
                 assertTrue(result.getBoolean(3));
+                assertTrue(result.getBoolean(4));
+                assertTrue(result.getBoolean(5));
             }
         }
     }

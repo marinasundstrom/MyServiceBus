@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Recurring jobs are the next scheduling theme. They exercise durable identity, repeated execution, provider ownership, and monitoring more deeply than another one-time scheduling adapter would. Quartz, Hangfire, and JobRunr remain later conformance providers; the first implementation should prove the model with the in-memory development runtime and the shared MyServiceBus PostgreSQL provider.
+Recurring jobs are the next scheduling theme. They exercise durable identity, repeated execution, provider ownership, and monitoring more deeply than another one-time scheduling adapter would. Quartz, Hangfire, and JobRunr remain later conformance providers; the first implementation should prove the model with the in-memory development runtime and the built-in durable provider using its PostgreSQL storage profile.
 
 The public model should be familiar to MassTransit users without copying its saga implementation. MassTransit usefully distinguishes message scheduling from job consumers and offers add-or-update recurring jobs. MyServiceBus keeps those ideas, but makes definition state, occurrence state, provider capability, and monitoring coverage explicit.
 
@@ -110,9 +110,11 @@ The first dispatch-only slice can implement `Allow`. It cannot honestly implemen
 
 Occurrence execution retry is not recurrence. Retrying a failed occurrence preserves its occurrence identity and increments an attempt identity. The definition continues according to its own cadence unless an explicit policy pauses it after failures. The first dispatch-only slice relies on ordinary message delivery guarantees and reports dispatch failure without inventing application retry state.
 
-## PostgreSQL ownership
+## Built-in durable provider
 
-PostgreSQL uses tables separate from `outbox_message`:
+The provider is a MyServiceBus facility; PostgreSQL is its first durable persistence and coordination substrate, not its product-level identity. This distinction leaves room for other storage profiles without changing the application facade or normalized monitoring model.
+
+The PostgreSQL storage profile uses schema version 4 and tables separate from `outbox_message`:
 
 - `recurring_job_definition` stores identity, revision, cadence, window, policy, safe job type, serialized command reference, current status, next due time, and audit timestamps;
 - `recurring_job_occurrence` stores occurrence identity, definition revision, scheduled time, materialization reason, lifecycle, and the resulting outbox record identity;
@@ -129,9 +131,9 @@ MyServiceBus supports three deliberate deployment profiles rather than pretendin
 
 - **.NET-native:** every participating application is .NET. The built-in providers remain available, while a Hangfire adapter can use an established .NET scheduler when its operational maturity or ecosystem integration is preferred.
 - **Java-native:** every participating application is Java. The same portable MyServiceBus contract can be backed by a Java scheduler such as JobRunr.
-- **Mixed C# and Java:** applications share the MyServiceBus PostgreSQL provider and its language-neutral schema, cadence contract, envelope format, and leasing rules.
+- **Mixed C# and Java:** applications share the built-in durable provider with PostgreSQL storage and its language-neutral schema, cadence contract, envelope format, and leasing rules.
 
-The first two profiles promise API and monitoring-model consistency, not shared scheduler storage. A Hangfire database is not a cross-language contract for JobRunr, nor vice versa. Only the PostgreSQL profile promises that either MyServiceBus runtime can create and materialize the same definitions.
+The first two profiles promise API and monitoring-model consistency, not shared scheduler storage. A Hangfire database is not a cross-language contract for JobRunr, nor vice versa. Only the built-in provider's PostgreSQL storage profile promises that either MyServiceBus runtime can create and materialize the same definitions.
 
 Applications depend on the recurring-job scheduler facade. Provider integrations implement the separate provider boundary and report their identity, durability, and placement. The built-in in-memory provider is the development baseline: it is process-local, volatile, and intentionally implements only capabilities it can guarantee. Provider-specific capabilities may be exposed in configuration and drill-down diagnostics, while the normalized definition and occurrence model remains stable for monitoring and the dashboard.
 
