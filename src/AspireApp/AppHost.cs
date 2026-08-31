@@ -18,7 +18,7 @@ var monitoringService = builder.AddProject<MyServiceBus_Monitoring_Server>("moni
 
 builder.AddProject<MyServiceBus_Dashboard>("monitoring-dashboard")
     .WithHttpEndpoint(name: "http")
-    .WithEnvironment("MonitoringService", monitoringService.GetEndpoint("http"))
+    .WithEnvironment("Dashboard__MonitoringServiceAddress", monitoringService.GetEndpoint("http"))
     .WithExternalHttpEndpoints()
     .WaitFor(monitoringService);
 
