@@ -45,6 +45,16 @@ public sealed class MonitoringIngestService
         return true;
     }
 
+    public async Task<bool> StoreRecurringJobsAsync(
+        MonitoringRecurringJobSnapshot snapshot,
+        CancellationToken cancellationToken)
+    {
+        if (!repository.UpsertRecurringJobs(snapshot))
+            return false;
+        await store.StoreRecurringJobsAsync(snapshot, cancellationToken);
+        return true;
+    }
+
     public MonitoringHistorySummary GetHistory(DateTimeOffset now)
         => repository.GetHistory(now, store.Provider, store.Durable, store.HistoryAvailableFromUtc);
 }

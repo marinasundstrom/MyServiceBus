@@ -1,0 +1,7 @@
+@page "/recurring"
+@rendermode InteractiveServer
+@inherits MonitoringPageBase
+
+<PageTitle>Recurring jobs · MyServiceBus Monitoring</PageTitle>
+<DashboardPageHeader Eyebrow="Planned activity" Title="Recurring jobs" Description="See repeated work defined by applications, its cadence, state, and next planned occurrence. Executions contribute to the normal message throughput after materialization." />
+<RecurringJobsTable Items="Dashboard.RecurringJobs" />

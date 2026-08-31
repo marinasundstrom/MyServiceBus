@@ -214,6 +214,34 @@ public sealed record RecurringJobOccurrenceReceipt(
     bool IsManual,
     RecurringJobOccurrenceStatus Status);
 
+/// <summary>
+/// Provider-neutral recurring definition state intended for inspection and monitoring.
+/// The scheduled command body is deliberately excluded.
+/// </summary>
+public sealed record RecurringJobState(
+    Guid DefinitionId,
+    RecurringJobIdentity Identity,
+    long Revision,
+    string Provider,
+    SchedulingDurability Durability,
+    SchedulingPlacement Placement,
+    string Cadence,
+    string MessageType,
+    RecurringJobDefinitionStatus Status,
+    DateTimeOffset? NextOccurrenceAtUtc,
+    DateTimeOffset UpdatedAtUtc);
+
+public interface IRecurringJobSource
+{
+    string Provider { get; }
+
+    bool Authoritative { get; }
+
+    Task<IReadOnlyList<RecurringJobState>> GetSnapshotAsync(
+        int maximumCount,
+        CancellationToken cancellationToken = default);
+}
+
 public sealed record RecurringJobControlResult(
     RecurringJobControlOutcome Outcome,
     long? CurrentRevision = null);

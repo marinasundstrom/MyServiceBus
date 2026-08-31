@@ -8,7 +8,7 @@ using NpgsqlTypes;
 
 namespace MyServiceBus.Persistence.PostgreSql;
 
-internal sealed class PostgreSqlRecurringJobProvider : IRecurringJobProvider
+internal sealed class PostgreSqlRecurringJobProvider : IRecurringJobProvider, IRecurringJobSource
 {
     private sealed record CurrentDefinition(
         Guid DefinitionId,
@@ -48,6 +48,48 @@ internal sealed class PostgreSqlRecurringJobProvider : IRecurringJobProvider
     public SchedulingDurability Durability => SchedulingDurability.Durable;
 
     public SchedulingPlacement Placement => SchedulingPlacement.Embedded;
+
+    string IRecurringJobSource.Provider => ProviderName;
+
+    bool IRecurringJobSource.Authoritative => true;
+
+    public async Task<IReadOnlyList<RecurringJobState>> GetSnapshotAsync(
+        int maximumCount,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maximumCount);
+        await using var command = dataSource.CreateCommand("""
+            SELECT definition_id, schedule_group, schedule_id, revision, cadence::text,
+                command_message_types[1], status, next_due_at_utc, updated_at_utc
+            FROM myservicebus.recurring_job_definition
+            WHERE service_name = @service_name AND status <> 3
+            ORDER BY next_due_at_utc ASC NULLS LAST, schedule_group, schedule_id
+            LIMIT @maximum_count;
+            """);
+        command.Parameters.AddWithValue("service_name", NpgsqlDbType.Text, serviceName);
+        command.Parameters.AddWithValue("maximum_count", NpgsqlDbType.Integer, maximumCount);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        var result = new List<RecurringJobState>();
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            using var cadence = JsonDocument.Parse(reader.GetString(4));
+            var intervalNanoseconds = BigInteger.Parse(
+                cadence.RootElement.GetProperty("intervalNanoseconds").GetString()!);
+            result.Add(new RecurringJobState(
+                reader.GetGuid(0),
+                new RecurringJobIdentity(reader.GetString(2), NullIfEmpty(reader.GetString(1))),
+                reader.GetInt64(3),
+                ProviderName,
+                Durability,
+                Placement,
+                $"Every {TimeSpan.FromTicks(checked((long)(intervalNanoseconds / 100)))}",
+                reader.GetString(5),
+                (RecurringJobDefinitionStatus)reader.GetInt16(6),
+                reader.IsDBNull(7) ? null : reader.GetFieldValue<DateTimeOffset>(7),
+                reader.GetFieldValue<DateTimeOffset>(8)));
+        }
+        return result;
+    }
 
     public async Task<RecurringJobDefinitionReceipt> AddOrUpdate<TJob>(
         RecurringJobDefinition definition,
@@ -346,6 +388,8 @@ internal sealed class PostgreSqlRecurringJobProvider : IRecurringJobProvider
 
     private static bool HasSubMicrosecondPrecision(DateTimeOffset? value) =>
         value is { } instant && instant.Ticks % TimeSpan.TicksPerMicrosecond != 0;
+
+    private static string? NullIfEmpty(string value) => value.Length == 0 ? null : value;
 
     private static void ValidateExpectedRevision(
         RecurringJobIdentity identity,

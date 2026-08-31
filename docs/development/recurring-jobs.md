@@ -145,20 +145,20 @@ Applications depend on the recurring-job scheduler facade. Provider integrations
 
 ## Monitoring
 
-The monitoring service receives separate normalized records for definitions and occurrences. It remains the store and query boundary; the dashboard does not query the scheduler database.
+The monitoring service is the store and query boundary; the dashboard does not query the scheduler database. The first monitoring slice exports bounded, command-body-free definition snapshots from each application in C# and Java. The snapshots are stored by the configured monitoring history provider and appear in separate system and application Recurring Jobs views.
 
-A definition projection includes application, human-readable id and description, provider, durability, status, cadence summary, time zone, next occurrence, last materialization, revision, and snapshot freshness. An occurrence includes its stable identity, definition identity and revision, scheduled time, actual materialization/dispatch times, reason, normalized and provider-native status, attempt metadata when available, and a safe failure category.
+A definition projection includes application, human-readable id and description, provider, durability, status, cadence summary, time zone, next occurrence, last materialization, revision, and snapshot freshness. A later occurrence projection will include its stable identity, definition identity and revision, scheduled time, actual materialization/dispatch times, reason, normalized and provider-native status, attempt metadata when available, and a safe failure category. Until that projection exists, the UI does not infer occurrence completion from definition state; materialized commands appear only in ordinary throughput and outbox evidence.
 
 Coverage is explicit: authoritative current definitions, occurrence-history retention start, last successful query, snapshot time, and gaps. If the scheduler reports dispatch only, the dashboard says `Dispatched`; it does not show `Completed`. Missing data for a period is displayed as unknown coverage rather than zero executions.
 
-The application overview shows only actionable counts such as active, paused, overdue, dispatch-failed, and next due. A focused Recurring Jobs view shows definitions and occurrence history. Provider details remain a drill-down.
+The focused Recurring Jobs view currently shows definitions, cadence, next occurrence, provider profile, revision, snapshot freshness, and reporting-instance health. Occurrence history and actionable overview counts such as overdue or dispatch-failed remain follow-up slices that require stronger execution evidence.
 
 ## First implementation slices
 
 1. Add shared definition, cadence, receipt, control-result, and occurrence contracts in C# and Java, with conformance fixtures but no provider persistence.
 2. Add a volatile in-memory definition store and deterministic materializer tests for add-or-update, revisions, pause/resume/remove, trigger-now, and occurrence uniqueness.
 3. Add PostgreSQL schema version 4, transactional materialization into the existing outbox, restart tests, and bidirectional C#/Java storage interoperability.
-4. Export definition and occurrence monitoring with explicit dispatch-only coverage, then add a focused dashboard view and Aspire demo case.
+4. Export definition monitoring with explicit snapshot freshness, then add a focused dashboard view and Aspire demo case. Add retained occurrence monitoring only when dispatch lifecycle evidence is available.
 5. Add cron evaluation only after cross-language fixtures cover dialect, time zones, daylight-saving transitions, boundaries, and misfires. Fixed interval may ship first if cron would otherwise obscure the state model.
 6. Design the job-execution/`JobConsumer` layer for completion, progress, retry, concurrency, cancellation, interface and method handlers, and generated C#/Java registration.
 7. Validate the provider boundary with a .NET Hangfire conformance adapter and a Java JobRunr conformance adapter without making either engine mandatory or claiming storage interoperability between them.

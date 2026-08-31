@@ -92,4 +92,28 @@ public final class MonitoringProtocol {
             Instant updatedAtUtc,
             String failureCategory) {
     }
+
+    public record RecurringJobSnapshot(
+            String protocolVersion,
+            String applicationName,
+            String instanceId,
+            String busId,
+            Instant capturedAtUtc,
+            List<RecurringJobItem> items) {
+    }
+
+    public record RecurringJobItem(
+            String definitionId,
+            String scheduleId,
+            String scheduleGroup,
+            long revision,
+            String provider,
+            String durability,
+            String placement,
+            String cadence,
+            String messageType,
+            String status,
+            Instant nextOccurrenceAtUtc,
+            Instant updatedAtUtc) {
+    }
 }

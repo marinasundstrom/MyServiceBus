@@ -16,6 +16,8 @@ import com.myservicebus.RecurringJobOccurrenceReceipt;
 import com.myservicebus.RecurringJobOverlapPolicy;
 import com.myservicebus.RecurringJobProvider;
 import com.myservicebus.RecurringJobRevisionConflictException;
+import com.myservicebus.RecurringJobSource;
+import com.myservicebus.RecurringJobState;
 import com.myservicebus.SchedulingDurability;
 import com.myservicebus.SchedulingPlacement;
 import com.myservicebus.TransportFactory;
@@ -45,7 +47,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import javax.sql.DataSource;
 
-final class PostgreSqlRecurringJobProvider implements RecurringJobProvider {
+final class PostgreSqlRecurringJobProvider implements RecurringJobProvider, RecurringJobSource {
     private record CurrentDefinition(
             UUID definitionId,
             long revision,
@@ -105,6 +107,59 @@ final class PostgreSqlRecurringJobProvider implements RecurringJobProvider {
     @Override
     public SchedulingPlacement getPlacement() {
         return SchedulingPlacement.EMBEDDED;
+    }
+
+    @Override
+    public String getProvider() {
+        return getProviderName();
+    }
+
+    @Override
+    public boolean isAuthoritative() {
+        return true;
+    }
+
+    @Override
+    public CompletionStage<List<RecurringJobState>> getSnapshot(int maximumCount) {
+        if (maximumCount <= 0) {
+            throw new IllegalArgumentException("maximumCount must be greater than zero");
+        }
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement command = connection.prepareStatement("""
+                        SELECT definition_id, schedule_group, schedule_id, revision, cadence::text,
+                            command_message_types[1], status, next_due_at_utc, updated_at_utc
+                        FROM myservicebus.recurring_job_definition
+                        WHERE service_name = ? AND status <> 3
+                        ORDER BY next_due_at_utc ASC NULLS LAST, schedule_group, schedule_id
+                        LIMIT ?
+                        """)) {
+            command.setString(1, serviceName);
+            command.setInt(2, maximumCount);
+            try (ResultSet reader = command.executeQuery()) {
+                java.util.ArrayList<RecurringJobState> result = new java.util.ArrayList<>();
+                while (reader.next()) {
+                    JsonNode cadence = MAPPER.readTree(reader.getString(5));
+                    Duration interval = Duration.ofNanos(
+                            new BigInteger(cadence.get("intervalNanoseconds").asText()).longValueExact());
+                    OffsetDateTime next = reader.getObject(8, OffsetDateTime.class);
+                    result.add(new RecurringJobState(
+                            reader.getObject(1, UUID.class),
+                            new RecurringJobIdentity(reader.getString(3), nullIfEmpty(reader.getString(2))),
+                            reader.getLong(4),
+                            getProviderName(),
+                            getDurability(),
+                            getPlacement(),
+                            "Every " + interval,
+                            reader.getString(6),
+                            RecurringJobDefinitionStatus.values()[reader.getShort(7)],
+                            next == null ? null : next.toInstant(),
+                            reader.getObject(9, OffsetDateTime.class).toInstant()));
+                }
+                return CompletableFuture.completedFuture(List.copyOf(result));
+            }
+        } catch (Exception exception) {
+            return CompletableFuture.failedFuture(exception);
+        }
     }
 
     @Override
@@ -443,6 +498,10 @@ final class PostgreSqlRecurringJobProvider implements RecurringJobProvider {
 
     private static boolean hasSubMicrosecondPrecision(Instant value) {
         return value != null && value.getNano() % 1_000 != 0;
+    }
+
+    private static String nullIfEmpty(String value) {
+        return value == null || value.isEmpty() ? null : value;
     }
 
     private static void validateExpectedRevision(

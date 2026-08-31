@@ -1,6 +1,7 @@
 package com.myservicebus.persistence.postgresql;
 
 import com.myservicebus.RecurringJobProvider;
+import com.myservicebus.RecurringJobSource;
 import com.myservicebus.TransportFactory;
 import com.myservicebus.di.ServiceCollection;
 import com.myservicebus.serialization.MessageSerializer;
@@ -24,6 +25,7 @@ public final class PostgreSqlRecurringJobs {
         }
 
         services.remove(RecurringJobProvider.class);
+        services.remove(RecurringJobSource.class);
         services.addSingleton(PostgreSqlRecurringJobMaterializer.class, provider -> () ->
                 new PostgreSqlRecurringJobMaterializer(
                         dataSource,
@@ -40,5 +42,7 @@ public final class PostgreSqlRecurringJobs {
                         provider.getRequiredService(MessageSerializer.class),
                         provider.getService(Clock.class),
                         provider.getRequiredService(PostgreSqlRecurringJobMaterializer.class)));
+        services.addSingleton(RecurringJobSource.class, provider -> () ->
+                (RecurringJobSource) provider.getRequiredService(RecurringJobProvider.class));
     }
 }

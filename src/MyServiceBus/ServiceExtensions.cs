@@ -24,6 +24,8 @@ public static class ServiceExtensions
         services.TryAddSingleton<IRecurringJobProvider>(provider => new InMemoryRecurringJobProvider(
             provider.GetRequiredService<IMessageBus>(),
             provider.GetRequiredService<ILocalDelayScheduler>()));
+        services.TryAddSingleton<IRecurringJobSource>(provider =>
+            (IRecurringJobSource)provider.GetRequiredService<IRecurringJobProvider>());
         services.TryAddSingleton<IRecurringJobScheduler, RecurringJobScheduler>();
         services.TryAddSingleton<InMemoryScheduledWorkSource>();
         services.TryAddSingleton<IScheduledWorkSource>(provider => provider.GetRequiredService<InMemoryScheduledWorkSource>());

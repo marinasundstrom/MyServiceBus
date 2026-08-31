@@ -14,7 +14,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.function.Function;
 
-public final class InMemoryRecurringJobProvider implements RecurringJobProvider {
+public final class InMemoryRecurringJobProvider implements RecurringJobProvider, RecurringJobSource {
     private static final class Entry {
         private final UUID definitionId;
         private RecurringJobDefinition definition;
@@ -81,6 +81,44 @@ public final class InMemoryRecurringJobProvider implements RecurringJobProvider 
     @Override
     public SchedulingPlacement getPlacement() {
         return SchedulingPlacement.PROCESS_LOCAL;
+    }
+
+    @Override
+    public String getProvider() {
+        return getProviderName();
+    }
+
+    @Override
+    public boolean isAuthoritative() {
+        return true;
+    }
+
+    @Override
+    public CompletionStage<java.util.List<RecurringJobState>> getSnapshot(int maximumCount) {
+        if (maximumCount <= 0) {
+            throw new IllegalArgumentException("maximumCount must be greater than zero");
+        }
+        synchronized (gate) {
+            return CompletableFuture.completedFuture(definitions.values().stream()
+                    .filter(entry -> entry.status != RecurringJobDefinitionStatus.REMOVED)
+                    .sorted(java.util.Comparator.comparing(
+                            entry -> entry.nextOccurrenceAtUtc,
+                            java.util.Comparator.nullsLast(java.util.Comparator.naturalOrder())))
+                    .limit(maximumCount)
+                    .map(entry -> new RecurringJobState(
+                            entry.definitionId,
+                            entry.definition.identity(),
+                            entry.revision,
+                            getProviderName(),
+                            getDurability(),
+                            getPlacement(),
+                            formatCadence(entry.definition.cadence()),
+                            entry.job.getClass().getName(),
+                            entry.status,
+                            entry.nextOccurrenceAtUtc,
+                            entry.acceptedAtUtc))
+                    .toList());
+        }
     }
 
     @Override
@@ -383,6 +421,16 @@ public final class InMemoryRecurringJobProvider implements RecurringJobProvider 
             throw new UnsupportedOperationException(
                     "The dispatch-only recurring scheduler supports the ALLOW overlap policy only.");
         }
+    }
+
+    private static String formatCadence(RecurringJobCadence cadence) {
+        if (cadence instanceof FixedIntervalRecurringJobCadence fixedInterval) {
+            return "Every " + fixedInterval.interval();
+        }
+        if (cadence instanceof CronRecurringJobCadence cron) {
+            return cron.dialect() + ": " + cron.expression() + " (" + cron.timeZoneId() + ")";
+        }
+        return cadence.getClass().getSimpleName();
     }
 
     private static void validateExpectedRevision(

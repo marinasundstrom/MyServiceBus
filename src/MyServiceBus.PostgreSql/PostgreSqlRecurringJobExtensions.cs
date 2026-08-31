@@ -19,6 +19,7 @@ public static class PostgreSqlRecurringJobExtensions
         ArgumentException.ThrowIfNullOrWhiteSpace(serviceName);
 
         services.RemoveAll<IRecurringJobProvider>();
+        services.RemoveAll<IRecurringJobSource>();
         services.AddSingleton(provider => new PostgreSqlRecurringJobMaterializer(
             provider.GetRequiredService<NpgsqlDataSource>(),
             serviceName,
@@ -33,6 +34,8 @@ public static class PostgreSqlRecurringJobExtensions
             provider.GetRequiredService<IMessageSerializer>(),
             provider.GetService<TimeProvider>(),
             provider.GetRequiredService<PostgreSqlRecurringJobMaterializer>()));
+        services.AddSingleton<IRecurringJobSource>(provider =>
+            (IRecurringJobSource)provider.GetRequiredService<IRecurringJobProvider>());
         return services;
     }
 }

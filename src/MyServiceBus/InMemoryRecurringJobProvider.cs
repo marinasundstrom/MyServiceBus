@@ -1,6 +1,6 @@
 namespace MyServiceBus;
 
-public sealed class InMemoryRecurringJobProvider : IRecurringJobProvider
+public sealed class InMemoryRecurringJobProvider : IRecurringJobProvider, IRecurringJobSource
 {
     private sealed class Entry
     {
@@ -37,6 +37,39 @@ public sealed class InMemoryRecurringJobProvider : IRecurringJobProvider
     public SchedulingDurability Durability => SchedulingDurability.Volatile;
 
     public SchedulingPlacement Placement => SchedulingPlacement.ProcessLocal;
+
+    string IRecurringJobSource.Provider => ProviderName;
+
+    bool IRecurringJobSource.Authoritative => true;
+
+    public Task<IReadOnlyList<RecurringJobState>> GetSnapshotAsync(
+        int maximumCount,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maximumCount);
+        cancellationToken.ThrowIfCancellationRequested();
+        lock (gate)
+        {
+            IReadOnlyList<RecurringJobState> snapshot = definitions.Values
+                .Where(entry => entry.Status != RecurringJobDefinitionStatus.Removed)
+                .OrderBy(entry => entry.NextOccurrenceAtUtc ?? DateTimeOffset.MaxValue)
+                .Take(maximumCount)
+                .Select(entry => new RecurringJobState(
+                    entry.DefinitionId,
+                    entry.Definition.Identity,
+                    entry.Revision,
+                    ProviderName,
+                    Durability,
+                    Placement,
+                    FormatCadence(entry.Definition.Cadence),
+                    entry.Job.GetType().FullName ?? entry.Job.GetType().Name,
+                    entry.Status,
+                    entry.NextOccurrenceAtUtc,
+                    entry.AcceptedAtUtc))
+                .ToArray();
+            return Task.FromResult(snapshot);
+        }
+    }
 
     public async Task<RecurringJobDefinitionReceipt> AddOrUpdate<TJob>(
         RecurringJobDefinition definition,
@@ -343,6 +376,13 @@ public sealed class InMemoryRecurringJobProvider : IRecurringJobProvider
         if (definition.OverlapPolicy != RecurringJobOverlapPolicy.Allow)
             throw new NotSupportedException("The dispatch-only recurring scheduler supports the Allow overlap policy only.");
     }
+
+    private static string FormatCadence(RecurringJobCadence cadence) => cadence switch
+    {
+        FixedIntervalRecurringJobCadence fixedInterval => $"Every {fixedInterval.Interval}",
+        CronRecurringJobCadence cron => $"{cron.Dialect}: {cron.Expression} ({cron.TimeZoneId})",
+        _ => cadence.GetType().Name
+    };
 
     private static void ValidateExpectedRevision(
         RecurringJobIdentity identity,

@@ -130,6 +130,8 @@ public sealed class PostgreSqlPersistenceTests : IAsyncLifetime
         var materialized = await serviceProvider.GetRequiredService<PostgreSqlRecurringJobMaterializer>()
             .MaterializeDueAsync();
         var manual = await recurring.TriggerNow(identity);
+        var inspected = Assert.Single(await serviceProvider.GetRequiredService<IRecurringJobSource>()
+            .GetSnapshotAsync(100));
 
         Assert.Equal("MyServiceBus.Durable", first.Provider);
         Assert.Equal(SchedulingDurability.Durable, first.Durability);
@@ -140,6 +142,9 @@ public sealed class PostgreSqlPersistenceTests : IAsyncLifetime
         Assert.Equal(3, resumed.CurrentRevision);
         Assert.Equal(1, materialized);
         Assert.Equal(RecurringJobOccurrenceStatus.Pending, manual.Status);
+        Assert.Equal(identity, inspected.Identity);
+        Assert.Equal("Every 01:00:00", inspected.Cadence);
+        Assert.Equal(RecurringJobDefinitionStatus.Active, inspected.Status);
 
         await using var command = dataSource.CreateCommand("""
             SELECT schedule_group, schedule_id, revision, status, cadence->>'intervalNanoseconds',

@@ -26,6 +26,8 @@ import com.myservicebus.BusHookEvent;
 import com.myservicebus.BusLifecycleHookEvent;
 import com.myservicebus.MessageOperationHookEvent;
 import com.myservicebus.OutboxDeliveryHookEvent;
+import com.myservicebus.RecurringJobSource;
+import com.myservicebus.RecurringJobState;
 import com.myservicebus.ScheduledWorkObserver;
 import com.myservicebus.ScheduledWorkSource;
 import com.myservicebus.ScheduledWorkState;
@@ -54,6 +56,8 @@ public final class MonitoringExporter implements BusHook, ScheduledWorkObserver,
     private final Instant startedAtUtc = Instant.now();
     private volatile BusInspectionProvider inspectionProvider;
     private volatile List<ScheduledWorkSource> scheduledWorkSources = List.of();
+    private volatile List<RecurringJobSource> recurringJobSources = List.of();
+    private volatile List<MonitoringProtocol.RecurringJobItem> recurringJobs = List.of();
     private volatile boolean metadataRegistered;
     private boolean scheduledWorkSourcesAvailable = true;
     private Instant nextScheduledWorkRefresh = Instant.MIN;
@@ -92,13 +96,23 @@ public final class MonitoringExporter implements BusHook, ScheduledWorkObserver,
 
     public void start(ServiceProvider serviceProvider) {
         ScheduledWorkSource source = serviceProvider.getService(ScheduledWorkSource.class);
+        RecurringJobSource recurringSource = serviceProvider.getService(RecurringJobSource.class);
         start(
                 serviceProvider.getRequiredService(BusInspectionProvider.class),
-                source == null ? List.of() : List.of(source));
+                source == null ? List.of() : List.of(source),
+                recurringSource == null ? List.of() : List.of(recurringSource));
     }
 
     public void start(BusInspectionProvider inspectionProvider, List<ScheduledWorkSource> scheduledWorkSources) {
+        start(inspectionProvider, scheduledWorkSources, List.of());
+    }
+
+    public void start(
+            BusInspectionProvider inspectionProvider,
+            List<ScheduledWorkSource> scheduledWorkSources,
+            List<RecurringJobSource> recurringJobSources) {
         this.scheduledWorkSources = List.copyOf(scheduledWorkSources);
+        this.recurringJobSources = List.copyOf(recurringJobSources);
         start(inspectionProvider);
     }
 
@@ -138,11 +152,15 @@ public final class MonitoringExporter implements BusHook, ScheduledWorkObserver,
             if (!now.isBefore(nextScheduledWorkRefresh)) {
                 nextScheduledWorkRefresh = now.plus(options.getExportInterval());
                 refreshScheduledWork();
+                refreshRecurringJobs();
                 scheduledWorkChanged.set(true);
             }
             if (metadataRegistered && scheduledWorkSourcesAvailable && scheduledWorkChanged.getAndSet(false)) {
                 try {
                     if (!sendScheduledWork()) {
+                        scheduledWorkChanged.set(true);
+                    }
+                    if (!sendRecurringJobs()) {
                         scheduledWorkChanged.set(true);
                     }
                 } catch (Exception exception) {
@@ -273,6 +291,31 @@ public final class MonitoringExporter implements BusHook, ScheduledWorkObserver,
         }
     }
 
+    private void refreshRecurringJobs() {
+        List<MonitoringProtocol.RecurringJobItem> items = new ArrayList<>();
+        for (RecurringJobSource source : recurringJobSources) {
+            source.getSnapshot(options.getMaxScheduledWorkItems()).toCompletableFuture().join().stream()
+                    .map(MonitoringExporter::mapRecurringJob)
+                    .forEach(items::add);
+        }
+        recurringJobs = items.stream()
+                .sorted(java.util.Comparator.comparing(
+                        MonitoringProtocol.RecurringJobItem::nextOccurrenceAtUtc,
+                        java.util.Comparator.nullsLast(java.util.Comparator.naturalOrder())))
+                .limit(options.getMaxScheduledWorkItems())
+                .toList();
+    }
+
+    private boolean sendRecurringJobs() throws Exception {
+        return post("/api/monitoring/v1/recurring-jobs", new MonitoringProtocol.RecurringJobSnapshot(
+                MonitoringProtocol.VERSION,
+                options.getApplicationName(),
+                options.getInstanceId(),
+                options.getBusId(),
+                Instant.now(),
+                recurringJobs));
+    }
+
     private void pruneScheduledWork(Instant now) {
         Instant cutoff = now.minus(options.getScheduledWorkHistory());
         scheduledWork.entrySet().removeIf(entry -> isTerminal(entry.getValue().status())
@@ -288,12 +331,34 @@ public final class MonitoringExporter implements BusHook, ScheduledWorkObserver,
         return Character.toUpperCase(lower.charAt(0)) + lower.substring(1);
     }
 
+    private static String enumTitle(String value) {
+        return java.util.Arrays.stream(value.split("_"))
+                .map(MonitoringExporter::titleCase)
+                .collect(java.util.stream.Collectors.joining());
+    }
+
     private static MonitoringProtocol.ScheduledWorkItem mapScheduledWork(ScheduledWorkState state) {
         return new MonitoringProtocol.ScheduledWorkItem(
                 state.tokenId().toString(), state.provider(), titleCase(state.durability().name()), state.workKind(),
                 state.messageType(), state.intent(), state.destinationAddress(), state.dueAtUtc(),
                 titleCase(state.status().name()), state.providerStatus(), state.attempt(), state.updatedAtUtc(),
                 state.failureCategory());
+    }
+
+    private static MonitoringProtocol.RecurringJobItem mapRecurringJob(RecurringJobState state) {
+        return new MonitoringProtocol.RecurringJobItem(
+                state.definitionId().toString(),
+                state.identity().scheduleId(),
+                state.identity().scheduleGroup(),
+                state.revision(),
+                state.provider(),
+                enumTitle(state.durability().name()),
+                enumTitle(state.placement().name()),
+                state.cadence(),
+                state.messageType(),
+                enumTitle(state.status().name()),
+                state.nextOccurrenceAtUtc(),
+                state.updatedAtUtc());
     }
 
     private MonitoringProtocol.Observation map(BusHookEvent busEvent) {

@@ -25,6 +25,8 @@ public sealed class MonitoringHistoryRestoreService : IHostedService
             repository.RecordHeartbeat(heartbeat);
         foreach (var snapshot in restored.ScheduledWork)
             repository.UpsertScheduledWork(snapshot);
+        foreach (var snapshot in restored.RecurringJobs)
+            repository.UpsertRecurringJobs(snapshot);
         repository.SetLastIngestAtUtc(restored.LastIngestAtUtc);
     }
 
