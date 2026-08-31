@@ -6,22 +6,20 @@ import java.util.UUID;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
 import java.util.function.Supplier;
 
 public final class InMemoryScheduleMessageProvider implements ScheduleMessageProvider {
     private final PublishEndpoint publishEndpoint;
     private final SendEndpointProvider sendEndpointProvider;
     private final JobScheduler jobScheduler;
+    private final InMemoryScheduledWorkSource source;
     private final Set<ScheduledWorkObserver> observers;
-    private final ConcurrentMap<UUID, ScheduledWorkState> scheduledWork = new ConcurrentHashMap<>();
 
     public InMemoryScheduleMessageProvider(
             PublishEndpoint publishEndpoint,
             SendEndpointProvider sendEndpointProvider,
             JobScheduler jobScheduler) {
-        this(publishEndpoint, sendEndpointProvider, jobScheduler, Set.of());
+        this(publishEndpoint, sendEndpointProvider, jobScheduler, new InMemoryScheduledWorkSource(), Set.of());
     }
 
     public InMemoryScheduleMessageProvider(
@@ -29,9 +27,19 @@ public final class InMemoryScheduleMessageProvider implements ScheduleMessagePro
             SendEndpointProvider sendEndpointProvider,
             JobScheduler jobScheduler,
             Set<ScheduledWorkObserver> observers) {
+        this(publishEndpoint, sendEndpointProvider, jobScheduler, new InMemoryScheduledWorkSource(), observers);
+    }
+
+    public InMemoryScheduleMessageProvider(
+            PublishEndpoint publishEndpoint,
+            SendEndpointProvider sendEndpointProvider,
+            JobScheduler jobScheduler,
+            InMemoryScheduledWorkSource source,
+            Set<ScheduledWorkObserver> observers) {
         this.publishEndpoint = publishEndpoint;
         this.sendEndpointProvider = sendEndpointProvider;
         this.jobScheduler = jobScheduler;
+        this.source = source;
         this.observers = Set.copyOf(observers);
     }
 
@@ -85,7 +93,7 @@ public final class InMemoryScheduleMessageProvider implements ScheduleMessagePro
             if (!cancelled) {
                 return ScheduleCancellationResult.NOT_FOUND;
             }
-            ScheduledWorkState state = scheduledWork.remove(tokenId);
+            ScheduledWorkState state = source.remove(tokenId);
             if (state != null) {
                 publish(new ScheduledWorkState(
                         state.tokenId(), state.provider(), state.durability(), state.workKind(), state.messageType(),
@@ -101,13 +109,13 @@ public final class InMemoryScheduleMessageProvider implements ScheduleMessagePro
         ScheduledWorkState state = new ScheduledWorkState(
                 tokenId, "InMemory", getDurability(), "Message", messageType.getName(), intent,
                 destinationAddress, scheduledTime, ScheduledWorkStatus.PENDING, "Pending", 0, Instant.now(), null);
-        scheduledWork.put(tokenId, state);
+        source.upsert(state);
         publish(state);
     }
 
     private CompletionStage<Void> execute(UUID tokenId, CancellationToken token,
             Supplier<CompletionStage<Void>> callback) {
-        ScheduledWorkState state = scheduledWork.get(tokenId);
+        ScheduledWorkState state = source.get(tokenId);
         if (state == null) {
             return CompletableFuture.completedFuture(null);
         }
@@ -115,7 +123,7 @@ public final class InMemoryScheduleMessageProvider implements ScheduleMessagePro
                 state.tokenId(), state.provider(), state.durability(), state.workKind(), state.messageType(),
                 state.intent(), state.destinationAddress(), state.dueAtUtc(), ScheduledWorkStatus.RUNNING,
                 "Running", state.attempt() + 1, Instant.now(), null);
-        scheduledWork.put(tokenId, running);
+        source.upsert(running);
         publish(running);
         try {
             return callback.get().whenComplete((ignored, failure) -> {
@@ -126,7 +134,7 @@ public final class InMemoryScheduleMessageProvider implements ScheduleMessagePro
                         running.messageType(), running.intent(), running.destinationAddress(), running.dueAtUtc(),
                         status, failure == null ? "Completed" : "Failed", running.attempt(), Instant.now(),
                         failureCategory));
-                scheduledWork.remove(tokenId);
+                source.remove(tokenId);
             });
         } catch (RuntimeException exception) {
             publish(new ScheduledWorkState(
@@ -134,7 +142,7 @@ public final class InMemoryScheduleMessageProvider implements ScheduleMessagePro
                     running.messageType(), running.intent(), running.destinationAddress(), running.dueAtUtc(),
                     ScheduledWorkStatus.FAILED, "Failed", running.attempt(), Instant.now(),
                     exception.getClass().getSimpleName()));
-            scheduledWork.remove(tokenId);
+            source.remove(tokenId);
             return CompletableFuture.failedFuture(exception);
         }
     }
