@@ -26,8 +26,8 @@ public class SchedulingTest {
         private Object message;
 
         @Override
-        public ScheduleMessageProviderDurability getDurability() {
-            return ScheduleMessageProviderDurability.DURABLE;
+        public SchedulingDurability getDurability() {
+            return SchedulingDurability.DURABLE;
         }
 
         @Override
@@ -96,7 +96,7 @@ public class SchedulingTest {
         ScheduledMessageHandle handle = scheduler.schedulePublish(scheduledTime, message)
                 .toCompletableFuture().join();
 
-        assertEquals(ScheduleMessageProviderDurability.DURABLE, scheduler.getDurability());
+        assertEquals(SchedulingDurability.DURABLE, scheduler.getDurability());
         assertTrue(scheduler.supportsCancellation());
         assertEquals(scheduledTime, provider.scheduledTime);
         assertSame(message, provider.message);

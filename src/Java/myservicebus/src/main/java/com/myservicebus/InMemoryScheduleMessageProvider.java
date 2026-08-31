@@ -44,8 +44,8 @@ public final class InMemoryScheduleMessageProvider implements ScheduleMessagePro
     }
 
     @Override
-    public ScheduleMessageProviderDurability getDurability() {
-        return ScheduleMessageProviderDurability.VOLATILE;
+    public SchedulingDurability getDurability() {
+        return SchedulingDurability.VOLATILE;
     }
 
     @Override

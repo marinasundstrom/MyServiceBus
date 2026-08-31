@@ -1,6 +1,6 @@
 package com.myservicebus;
 
-public enum ScheduleMessageProviderDurability {
+public enum SchedulingDurability {
     VOLATILE,
     DURABLE
 }

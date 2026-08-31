@@ -18,7 +18,7 @@ import com.myservicebus.persistence.OutboxMessageFactory;
 import com.myservicebus.persistence.OutboxSession;
 import com.myservicebus.persistence.OutboxTransportDispatcher;
 import com.myservicebus.ScheduleCancellationResult;
-import com.myservicebus.ScheduleMessageProviderDurability;
+import com.myservicebus.SchedulingDurability;
 import com.myservicebus.ScheduledMessageHandle;
 import com.myservicebus.ScheduledWorkSource;
 import com.myservicebus.ScheduledWorkState;
@@ -172,7 +172,7 @@ class PostgreSqlPersistenceTest {
                     connection.setAutoCommit(false);
                     ServiceProvider scoped = scope.getServiceProvider();
                     MessageScheduler scheduler = scoped.getRequiredService(MessageScheduler.class);
-                    assertEquals(ScheduleMessageProviderDurability.DURABLE, scheduler.getDurability());
+                    assertEquals(SchedulingDurability.DURABLE, scheduler.getDurability());
 
                     ScheduledMessageHandle handle;
                     try (OutboxSession.Registration ignored = PostgreSqlOutboxSession.useTransaction(
@@ -201,7 +201,7 @@ class PostgreSqlPersistenceTest {
                             .filter(item -> item.tokenId().equals(handle.getTokenId()))
                             .findFirst().orElseThrow();
                     assertEquals("PostgreSQL", cancelled.provider());
-                    assertEquals(ScheduleMessageProviderDurability.DURABLE, cancelled.durability());
+                    assertEquals(SchedulingDurability.DURABLE, cancelled.durability());
                     assertEquals(ScheduledWorkStatus.CANCELLED, cancelled.status());
                     assertEquals("Cancelled", cancelled.providerStatus());
                     assertEquals(dueAt, cancelled.dueAtUtc());

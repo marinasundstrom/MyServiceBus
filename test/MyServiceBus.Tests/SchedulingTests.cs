@@ -73,7 +73,7 @@ public class SchedulingTests
 
     class RecordingScheduleMessageProvider : IScheduleMessageProvider
     {
-        public ScheduleMessageProviderDurability Durability => ScheduleMessageProviderDurability.Durable;
+        public SchedulingDurability Durability => SchedulingDurability.Durable;
         public bool SupportsCancellation => true;
         public DateTime? ScheduledTime { get; private set; }
         public object? Message { get; private set; }
@@ -150,7 +150,7 @@ public class SchedulingTests
 
         var handle = await scheduler.SchedulePublish(scheduledTime, message);
 
-        Assert.Equal(ScheduleMessageProviderDurability.Durable, scheduler.Durability);
+        Assert.Equal(SchedulingDurability.Durable, scheduler.Durability);
         Assert.True(scheduler.SupportsCancellation);
         Assert.Equal(scheduledTime, provider.ScheduledTime);
         Assert.Same(message, provider.Message);

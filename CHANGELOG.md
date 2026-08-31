@@ -4,7 +4,7 @@ This changelog summarizes the bigger themes in the repository history rather tha
 
 ## Unreleased
 
-- Defined recurring jobs as durable, revisioned definitions that create independently tracked occurrences, with explicit cadence dialects, misfire and overlap policies, dispatch-only initial status, PostgreSQL materialization, monitoring coverage, and a later JobConsumer execution boundary.
+- Defined recurring jobs as durable, revisioned definitions that create independently tracked occurrences, added matching validated C#/Java contracts, and generalized scheduling durability across message and recurring providers. The model includes explicit cadence dialects, misfire and overlap policies, dispatch-only initial status, PostgreSQL materialization, monitoring coverage, and a later JobConsumer execution boundary.
 - Renamed the callback-only scheduling seam to `ILocalDelayScheduler` / `LocalDelayScheduler` in C# and Java, making its process-local volatility explicit and reserving job terminology for future tracked application jobs and recurring work.
 - Added optional PostgreSQL-backed monitoring history with Entity Framework Core migrations, deduplicated JSONB observation batches, bounded retention, active-window restoration, and explicit dashboard reporting for durability, freshness, and incomplete coverage.
 - Added application-specific Overview, Metrics, and D3 Flow drill-downs and documented the dashboard as an application-oriented distributed-development and operations tool that progressively reveals MyServiceBus topology and transport details.

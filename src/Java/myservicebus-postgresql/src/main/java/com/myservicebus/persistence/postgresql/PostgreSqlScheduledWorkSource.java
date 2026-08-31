@@ -1,6 +1,6 @@
 package com.myservicebus.persistence.postgresql;
 
-import com.myservicebus.ScheduleMessageProviderDurability;
+import com.myservicebus.SchedulingDurability;
 import com.myservicebus.ScheduledWorkSource;
 import com.myservicebus.ScheduledWorkState;
 import com.myservicebus.ScheduledWorkStatus;
@@ -82,7 +82,7 @@ public final class PostgreSqlScheduledWorkSource implements ScheduledWorkSource 
                     items.add(new ScheduledWorkState(
                             result.getObject(1, java.util.UUID.class),
                             getProvider(),
-                            ScheduleMessageProviderDurability.DURABLE,
+                            SchedulingDurability.DURABLE,
                             "Message",
                             result.getString(4),
                             titleCase(OutboxDeliveryIntent.values()[result.getShort(2)].name()),

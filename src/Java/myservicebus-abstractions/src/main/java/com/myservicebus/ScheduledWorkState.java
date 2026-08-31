@@ -6,7 +6,7 @@ import java.util.UUID;
 public record ScheduledWorkState(
         UUID tokenId,
         String provider,
-        ScheduleMessageProviderDurability durability,
+        SchedulingDurability durability,
         String workKind,
         String messageType,
         String intent,

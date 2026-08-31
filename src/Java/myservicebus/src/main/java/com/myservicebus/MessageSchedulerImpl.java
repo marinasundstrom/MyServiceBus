@@ -20,7 +20,7 @@ public class MessageSchedulerImpl implements MessageScheduler {
     }
 
     @Override
-    public ScheduleMessageProviderDurability getDurability() {
+    public SchedulingDurability getDurability() {
         return provider.getDurability();
     }
 

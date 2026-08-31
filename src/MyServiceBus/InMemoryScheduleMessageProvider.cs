@@ -39,7 +39,7 @@ public sealed class InMemoryScheduleMessageProvider : IScheduleMessageProvider
         this.observers = observers.ToArray();
     }
 
-    public ScheduleMessageProviderDurability Durability => ScheduleMessageProviderDurability.Volatile;
+    public SchedulingDurability Durability => SchedulingDurability.Volatile;
 
     public bool SupportsCancellation => true;
 

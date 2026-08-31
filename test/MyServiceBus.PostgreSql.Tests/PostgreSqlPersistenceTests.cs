@@ -168,7 +168,7 @@ public sealed class PostgreSqlPersistenceTests : IAsyncLifetime
         {
             await using var scope = provider.CreateAsyncScope();
             var scheduler = scope.ServiceProvider.GetRequiredService<IMessageScheduler>();
-            Assert.Equal(ScheduleMessageProviderDurability.Durable, scheduler.Durability);
+            Assert.Equal(SchedulingDurability.Durable, scheduler.Durability);
 
             ScheduledMessageHandle handle;
             await using (var connection = await dataSource.OpenConnectionAsync())
@@ -200,7 +200,7 @@ public sealed class PostgreSqlPersistenceTests : IAsyncLifetime
             var scheduledWork = await source.GetSnapshotAsync(100);
             var cancelled = Assert.Single(scheduledWork, item => item.TokenId == handle.TokenId);
             Assert.Equal("PostgreSQL", cancelled.Provider);
-            Assert.Equal(ScheduleMessageProviderDurability.Durable, cancelled.Durability);
+            Assert.Equal(SchedulingDurability.Durable, cancelled.Durability);
             Assert.Equal(ScheduledWorkStatus.Cancelled, cancelled.Status);
             Assert.Equal("Cancelled", cancelled.ProviderStatus);
             Assert.Equal(dueAt, cancelled.DueAtUtc.UtcDateTime);

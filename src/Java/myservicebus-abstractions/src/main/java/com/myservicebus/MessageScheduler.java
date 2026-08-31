@@ -8,7 +8,7 @@ import java.util.concurrent.CompletionStage;
 import com.myservicebus.tasks.CancellationToken;
 
 public interface MessageScheduler {
-    ScheduleMessageProviderDurability getDurability();
+    SchedulingDurability getDurability();
 
     boolean supportsCancellation();
 

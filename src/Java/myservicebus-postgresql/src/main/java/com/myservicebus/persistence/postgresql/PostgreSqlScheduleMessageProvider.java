@@ -3,7 +3,7 @@ package com.myservicebus.persistence.postgresql;
 import com.myservicebus.PublishEndpoint;
 import com.myservicebus.ScheduleCancellationResult;
 import com.myservicebus.ScheduleMessageProvider;
-import com.myservicebus.ScheduleMessageProviderDurability;
+import com.myservicebus.SchedulingDurability;
 import com.myservicebus.ScheduledMessageHandle;
 import com.myservicebus.SendEndpoint;
 import com.myservicebus.SendEndpointProvider;
@@ -49,8 +49,8 @@ public final class PostgreSqlScheduleMessageProvider implements ScheduleMessageP
     }
 
     @Override
-    public ScheduleMessageProviderDurability getDurability() {
-        return ScheduleMessageProviderDurability.DURABLE;
+    public SchedulingDurability getDurability() {
+        return SchedulingDurability.DURABLE;
     }
 
     @Override

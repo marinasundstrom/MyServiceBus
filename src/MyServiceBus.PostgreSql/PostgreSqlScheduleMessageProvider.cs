@@ -31,7 +31,7 @@ public sealed class PostgreSqlScheduleMessageProvider : IScheduleMessageProvider
         this.timeProvider = timeProvider ?? TimeProvider.System;
     }
 
-    public ScheduleMessageProviderDurability Durability => ScheduleMessageProviderDurability.Durable;
+    public SchedulingDurability Durability => SchedulingDurability.Durable;
 
     public bool SupportsCancellation => true;
 

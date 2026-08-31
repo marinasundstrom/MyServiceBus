@@ -1,18 +1,12 @@
 namespace MyServiceBus;
 
-public enum ScheduleMessageProviderDurability
-{
-    Volatile,
-    Durable
-}
-
 /// <summary>
 /// Provides message-aware scheduling. Unlike <see cref="ILocalDelayScheduler"/>, implementations receive
 /// the delivery intent and can serialize or persist it for execution after a process restart.
 /// </summary>
 public interface IScheduleMessageProvider
 {
-    ScheduleMessageProviderDurability Durability { get; }
+    SchedulingDurability Durability { get; }
 
     bool SupportsCancellation { get; }
 
