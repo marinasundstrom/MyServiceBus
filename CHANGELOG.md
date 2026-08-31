@@ -4,6 +4,9 @@ This changelog summarizes the bigger themes in the repository history rather tha
 
 ## Unreleased
 
+- Added optional PostgreSQL-backed monitoring history with Entity Framework Core migrations, deduplicated JSONB observation batches, bounded retention, active-window restoration, and explicit dashboard reporting for durability, freshness, and incomplete coverage.
+- Added application-specific Overview, Metrics, and D3 Flow drill-downs and documented the dashboard as an application-oriented distributed-development and operations tool that progressively reveals MyServiceBus topology and transport details.
+- Defined future scheduled-work visibility for messages and jobs, including due time, bounded identity, attempts, normalized and provider-native status, safe failure categories, and a strict separation between observation and privileged cancellation or retry commands.
 - Reorganized the monitoring dashboard around a concise responsive overview and focused application, endpoint, throughput, message-flow, failure, and outbox views; added first-class endpoint availability and activity projections, persistent theme navigation, and stable widget identities for future layout configuration.
 - Added an interactive D3 monitoring flow map with application health, throughput-weighted directional paths, stable streamed updates, neighbor highlighting, dragging, and zoom controls.
 - Reframed the public website for technical evaluation: the landing page now exposes pre-1.0, scope, and transport boundaries up front, while documentation pages lead with concise factual overviews and then focus on implementation, verified behavior, limitations, operational consequences, and alternatives.
