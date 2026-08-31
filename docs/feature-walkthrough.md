@@ -1449,7 +1449,7 @@ These adapter names illustrate the extension boundary; first-party Quartz adapte
 
 Job consumers are intended for long-running application work whose execution lifecycle should not depend on holding the original broker delivery lock. The preview executor records jobs and attempts, applies per-consumer concurrency, timeout and retry settings, supports cooperative cancellation and progress, and exposes authoritative snapshots through `IJobSource` / `JobSource`.
 
-The current executor is in-memory and process-local. It is useful for API evaluation and development, but jobs do not survive restart. PostgreSQL persistence, recurring-occurrence promotion, monitoring export, and dashboard presentation remain required before the tracked-job MVP is complete.
+The default executor is in-memory and process-local. The C# runtime can opt into the built-in PostgreSQL provider for durable intent, execution leases, restart recovery, attempt history, cancellation, and progress. Java PostgreSQL execution, recurring-occurrence promotion, monitoring export, and dashboard presentation remain required before the tracked-job MVP is complete.
 
 #### C#
 
@@ -1475,6 +1475,10 @@ services.AddServiceBus(configurator =>
         .SetRetry(retry => retry.Interval(3, TimeSpan.FromMinutes(1))));
     configurator.UsingRabbitMq((_, rabbit) => rabbit.Host("localhost"));
 });
+
+// Optional: replace the development executor with the embedded durable worker.
+services.AddSingleton(dataSource);
+services.AddBuiltInJobsWithPostgreSql("orders-service");
 
 var jobs = serviceProvider.GetRequiredService<IJobClient>();
 var receipt = await jobs.Submit(new RebuildSearchIndex(16));

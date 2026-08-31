@@ -66,7 +66,9 @@ Tracked recurring jobs default to forbidding overlapping executions. More permis
 
 ## Persistence and providers
 
-The application-facing contracts do not expose storage-engine objects. The built-in durable implementation uses PostgreSQL for job intent, attempt history, leases, cancellation, progress, and the outbox boundary needed to dispatch work safely.
+The application-facing contracts do not expose storage-engine objects. The built-in durable implementation uses PostgreSQL for job intent, attempt history, leases, cancellation, and progress. Recurring definitions will submit tracked occurrences through a separate transactional promotion boundary.
+
+The first C# implementation is selected with `AddBuiltInJobsWithPostgreSql(serviceName)`. It keeps the dashboard-facing `IJobSource` contract provider-neutral while an embedded hosted worker uses fenced PostgreSQL leases and heartbeats. A stopped process leaves running work recoverable after its lease expires. The matching Java provider is the next parity step and the feature remains incomplete until both runtimes share the storage contract.
 
 Until the first stable release, the PostgreSQL schema is a replaceable preview schema rather than a versioned compatibility contract. Development environments may be recreated as the job model evolves. Stable upgrade and migration guarantees begin with the first real release.
 
