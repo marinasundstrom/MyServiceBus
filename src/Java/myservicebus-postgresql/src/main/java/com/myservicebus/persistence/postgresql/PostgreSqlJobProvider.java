@@ -325,8 +325,9 @@ final class PostgreSqlJobProvider implements JobProvider, JobSource {
                             INSERT INTO myservicebus.job (
                                 job_id, service_name, job_type_name, message_types, body, content_type, headers,
                                 status, submitted_at_utc, scheduled_for_utc, available_at_utc, updated_at_utc,
-                                retry_limit, retry_delay_milliseconds, timeout_milliseconds, concurrent_job_limit)
-                            VALUES (?, ?, ?, ?, ?, ?, '{}'::jsonb, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                retry_limit, retry_delay_milliseconds, timeout_milliseconds, concurrent_job_limit,
+                                recurring_occurrence_id)
+                            VALUES (?, ?, ?, ?, ?, ?, '{}'::jsonb, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                             """)) {
                 command.setObject(1, jobId);
                 command.setString(2, serviceName);
@@ -347,6 +348,11 @@ final class PostgreSqlJobProvider implements JobProvider, JobSource {
                 }
                 command.setLong(14, descriptor.options().getJobTimeout().toMillis());
                 command.setInt(15, descriptor.options().getConcurrentJobLimit());
+                if (options == null || options.recurringJobOccurrenceId() == null) {
+                    command.setNull(16, Types.OTHER);
+                } else {
+                    command.setObject(16, options.recurringJobOccurrenceId());
+                }
                 command.executeUpdate();
             } catch (SQLException exception) {
                 if ("23505".equals(exception.getSQLState())) {

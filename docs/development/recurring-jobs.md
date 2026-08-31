@@ -30,7 +30,7 @@ The outbox polling loop is not a recurring job. It is runtime infrastructure eve
 
 The built-in durable provider creates a tracked job for every occurrence. It can therefore report `Running`, `RetryScheduled`, `Completed`, `Cancelled`, and `Failed` from authoritative job execution state rather than treating broker acceptance as application completion. Job attempts preserve the occurrence identity across execution retries.
 
-The volatile in-memory recurring provider remains a development baseline with a dispatch-only boundary. It may report creation and dispatch, but it cannot call an occurrence completed merely because a consumer command was accepted. Aligning that provider with in-memory tracked jobs is a remaining MVP slice.
+The volatile in-memory recurring provider uses the same tracked-job boundary without durable occurrence storage. It correlates the occurrence with the process-local job source and can report execution while the process remains alive, but it loses definitions, jobs, attempts, and history on restart.
 
 The minimal tracked execution contract and its promotion path for recurring occurrences are specified in [Job Consumers](job-consumers.md). While the API is still in preview, `IRecurringJobScheduler` should become the facade for recurring tracked application jobs. If recurring publication to ordinary consumers remains desirable, it should be introduced separately as an `IRecurringMessageScheduler` instead of making one facade report two different meanings of completion.
 

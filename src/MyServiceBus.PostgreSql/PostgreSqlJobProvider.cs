@@ -254,11 +254,13 @@ internal sealed class PostgreSqlJobProvider : IJobProvider
             INSERT INTO myservicebus.job (
                 job_id, service_name, job_type_name, message_types, body, content_type, headers,
                 status, submitted_at_utc, scheduled_for_utc, available_at_utc, updated_at_utc,
-                retry_limit, retry_delay_milliseconds, timeout_milliseconds, concurrent_job_limit)
+                retry_limit, retry_delay_milliseconds, timeout_milliseconds, concurrent_job_limit,
+                recurring_occurrence_id)
             VALUES (
                 @job_id, @service_name, @job_type_name, @message_types, @body, @content_type, '{}'::jsonb,
                 @status, @now, @scheduled_for_utc, @available_at_utc, @now,
-                @retry_limit, @retry_delay_milliseconds, @timeout_milliseconds, @concurrent_job_limit);
+                @retry_limit, @retry_delay_milliseconds, @timeout_milliseconds, @concurrent_job_limit,
+                @recurring_occurrence_id);
             """);
         command.Parameters.AddWithValue("job_id", NpgsqlDbType.Uuid, jobId);
         command.Parameters.AddWithValue("service_name", NpgsqlDbType.Text, serviceName);
@@ -288,6 +290,10 @@ internal sealed class PostgreSqlJobProvider : IJobProvider
             "concurrent_job_limit",
             NpgsqlDbType.Integer,
             descriptor.Options.ConcurrentJobLimit);
+        command.Parameters.AddWithValue(
+            "recurring_occurrence_id",
+            NpgsqlDbType.Uuid,
+            options?.RecurringJobOccurrenceId ?? (object)DBNull.Value);
         try
         {
             await command.ExecuteNonQueryAsync(cancellationToken);

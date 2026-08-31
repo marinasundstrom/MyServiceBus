@@ -7,29 +7,49 @@ public class InMemoryRecurringJobProviderTests
 {
     private sealed record TestJob(string Value);
 
-    private sealed class RecordingPublishEndpoint : IPublishEndpoint
+    private sealed class JobRecorder
+    {
+        public TaskCompletionSource<string> Completion { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    }
+
+    private sealed class TestJobConsumer(JobRecorder recorder) : IJobConsumer<TestJob>
+    {
+        public Task Run(JobContext<TestJob> context)
+        {
+            recorder.Completion.TrySetResult(context.Job.Value);
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class RecordingJobClient : IJobClient
     {
         public List<object> Messages { get; } = [];
 
-        public Task Publish<T>(
-            object message,
-            Action<IPublishContext>? contextCallback = null,
+        public Task<JobSubmissionReceipt> Submit<TJob>(
+            TJob job,
+            JobSubmissionOptions? options = null,
             CancellationToken cancellationToken = default)
-            where T : class
+            where TJob : class
         {
-            Messages.Add(message);
-            return Task.CompletedTask;
+            Messages.Add(job);
+            return Task.FromResult(new JobSubmissionReceipt(
+                options?.JobId ?? Guid.NewGuid(),
+                JobStatus.Waiting,
+                DateTimeOffset.UtcNow));
         }
 
-        public Task Publish<T>(
-            T message,
-            Action<IPublishContext>? contextCallback = null,
+        public Task<JobSubmissionReceipt> Schedule<TJob>(
+            DateTimeOffset startAtUtc,
+            TJob job,
+            JobSubmissionOptions? options = null,
             CancellationToken cancellationToken = default)
-            where T : class
-        {
-            Messages.Add(message);
-            return Task.CompletedTask;
-        }
+            where TJob : class => throw new NotSupportedException();
+
+        public Task<JobControlResult> Cancel(Guid jobId, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<JobControlResult> Retry(Guid jobId, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
     }
 
     private sealed class ManualDelayScheduler : ILocalDelayScheduler
@@ -117,7 +137,7 @@ public class InMemoryRecurringJobProviderTests
     [Fact]
     public async Task Add_or_update_is_idempotent_and_revisions_changed_content()
     {
-        var publisher = new RecordingPublishEndpoint();
+        var publisher = new RecordingJobClient();
         var delays = new ManualDelayScheduler();
         var provider = CreateProvider(publisher, delays);
         var identity = new RecurringJobIdentity("daily-export", "billing");
@@ -150,7 +170,7 @@ public class InMemoryRecurringJobProviderTests
     public async Task Revision_conflicts_and_controls_are_explicit()
     {
         var delays = new ManualDelayScheduler();
-        var provider = CreateProvider(new RecordingPublishEndpoint(), delays);
+        var provider = CreateProvider(new RecordingJobClient(), delays);
         var identity = new RecurringJobIdentity("daily-export");
         var definition = new RecurringJobDefinition(
             identity,
@@ -177,9 +197,9 @@ public class InMemoryRecurringJobProviderTests
     }
 
     [Fact]
-    public async Task Due_and_manual_occurrences_dispatch_the_job_command()
+    public async Task Due_and_manual_occurrences_submit_tracked_jobs()
     {
-        var publisher = new RecordingPublishEndpoint();
+        var publisher = new RecordingJobClient();
         var delays = new ManualDelayScheduler();
         var provider = CreateProvider(publisher, delays);
         var identity = new RecurringJobIdentity("daily-export");
@@ -195,15 +215,43 @@ public class InMemoryRecurringJobProviderTests
 
         var manual = await provider.TriggerNow(identity);
         Assert.True(manual.IsManual);
-        Assert.Equal(RecurringJobOccurrenceStatus.Dispatched, manual.Status);
+        Assert.Equal(RecurringJobOccurrenceStatus.Pending, manual.Status);
         Assert.Equal(2, publisher.Messages.Count);
         Assert.Equal(1, delays.Count);
     }
 
     [Fact]
+    public async Task Default_registration_executes_manual_occurrence_as_tracked_job()
+    {
+        var recorder = new JobRecorder();
+        var services = new ServiceCollection();
+        services.AddSingleton(recorder);
+        services.AddServiceBus(configurator =>
+        {
+            configurator.AddJobConsumer<TestJobConsumer, TestJob>();
+            configurator.UsingMediator();
+        });
+        using var serviceProvider = services.BuildServiceProvider();
+        var recurring = serviceProvider.GetRequiredService<IRecurringJobProvider>();
+        var identity = new RecurringJobIdentity("tracked-manual");
+        await recurring.AddOrUpdate(
+            new RecurringJobDefinition(
+                identity,
+                new FixedIntervalRecurringJobCadence(TimeSpan.FromHours(1))),
+            new TestJob("executed"));
+
+        var occurrence = await recurring.TriggerNow(identity);
+        Assert.Equal("executed", await recorder.Completion.Task.WaitAsync(TimeSpan.FromSeconds(5)));
+        var job = Assert.Single(await serviceProvider.GetRequiredService<IJobSource>().GetSnapshotAsync(10));
+
+        Assert.Equal(occurrence.OccurrenceId, job.RecurringJobOccurrenceId);
+        Assert.Equal(JobStatus.Completed, job.Status);
+    }
+
+    [Fact]
     public async Task Unsupported_cadence_and_overlap_are_rejected()
     {
-        var provider = CreateProvider(new RecordingPublishEndpoint(), new ManualDelayScheduler());
+        var provider = CreateProvider(new RecordingJobClient(), new ManualDelayScheduler());
 
         await Assert.ThrowsAsync<NotSupportedException>(() => provider.AddOrUpdate(
             new RecurringJobDefinition(
@@ -246,7 +294,7 @@ public class InMemoryRecurringJobProviderTests
 
         foreach (var fixture in fixtures)
         {
-            var publisher = new RecordingPublishEndpoint();
+            var publisher = new RecordingJobClient();
             var delays = new ManualDelayScheduler();
             var clock = new ManualTimeProvider(DateTimeOffset.Parse("2026-09-01T00:00:00Z"));
             var provider = new InMemoryRecurringJobProvider(publisher, delays, clock);
@@ -269,7 +317,7 @@ public class InMemoryRecurringJobProviderTests
     }
 
     private static InMemoryRecurringJobProvider CreateProvider(
-        RecordingPublishEndpoint publisher,
+        RecordingJobClient publisher,
         ManualDelayScheduler delays) =>
         new(
             publisher,

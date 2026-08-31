@@ -12,6 +12,8 @@ class JobContractTest {
     void submissionOptionsRejectEmptyIdentifier() {
         assertThrows(IllegalArgumentException.class,
                 () -> new JobSubmissionOptions(new UUID(0, 0)));
+        assertThrows(IllegalArgumentException.class,
+                () -> new JobSubmissionOptions(null, new UUID(0, 0)));
     }
 
     @Test
@@ -22,4 +24,3 @@ class JobContractTest {
         assertThrows(IllegalArgumentException.class, () -> new JobProgress(11, 10L));
     }
 }
-

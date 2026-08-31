@@ -15,6 +15,7 @@ public class JobContractTests
     public void Submission_options_reject_an_empty_identifier()
     {
         Should.Throw<ArgumentException>(() => new JobSubmissionOptions(Guid.Empty));
+        Should.Throw<ArgumentException>(() => new JobSubmissionOptions(recurringJobOccurrenceId: Guid.Empty));
     }
 
     [Fact]
@@ -33,4 +34,3 @@ public class JobContractTests
         public Task Run(JobContext<TestJob> context) => Task.CompletedTask;
     }
 }
-

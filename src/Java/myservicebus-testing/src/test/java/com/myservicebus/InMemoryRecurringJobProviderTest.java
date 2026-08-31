@@ -24,20 +24,70 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
+import javax.inject.Inject;
 import org.junit.jupiter.api.Test;
 
 class InMemoryRecurringJobProviderTest {
     private record TestJob(String value) {
     }
 
-    private static final class RecordingPublishEndpoint implements PublishEndpoint {
+    private static final class JobRecorder {
+        private final CountDownLatch completion = new CountDownLatch(1);
+        private volatile String value;
+    }
+
+    private static final class TestJobConsumer implements JobConsumer<TestJob> {
+        private final JobRecorder recorder;
+
+        @Inject
+        TestJobConsumer(JobRecorder recorder) {
+            this.recorder = recorder;
+        }
+
+        @Override
+        public CompletionStage<Void> run(JobContext<TestJob> context) {
+            recorder.value = context.getJob().value();
+            recorder.completion.countDown();
+            return CompletableFuture.completedFuture(null);
+        }
+    }
+
+    private static final class RecordingJobClient implements JobClient {
         private final List<Object> messages = new ArrayList<>();
 
         @Override
-        public <T> CompletableFuture<Void> publish(T message, CancellationToken cancellationToken) {
-            messages.add(message);
-            return CompletableFuture.completedFuture(null);
+        public <TJob> CompletionStage<JobSubmissionReceipt> submit(
+                TJob job,
+                JobSubmissionOptions options,
+                CancellationToken cancellationToken) {
+            messages.add(job);
+            return CompletableFuture.completedFuture(new JobSubmissionReceipt(
+                    options.jobId() == null ? UUID.randomUUID() : options.jobId(),
+                    JobStatus.WAITING,
+                    Instant.now(),
+                    null));
+        }
+
+        @Override
+        public <TJob> CompletionStage<JobSubmissionReceipt> schedule(
+                Instant startAtUtc,
+                TJob job,
+                JobSubmissionOptions options,
+                CancellationToken cancellationToken) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public CompletionStage<JobControlResult> cancel(UUID jobId, CancellationToken cancellationToken) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public CompletionStage<JobControlResult> retry(UUID jobId, CancellationToken cancellationToken) {
+            throw new UnsupportedOperationException();
         }
     }
 
@@ -115,7 +165,7 @@ class InMemoryRecurringJobProviderTest {
 
     @Test
     void addOrUpdateIsIdempotentAndRevisionsChangedContent() {
-        RecordingPublishEndpoint publisher = new RecordingPublishEndpoint();
+        RecordingJobClient publisher = new RecordingJobClient();
         ManualDelayScheduler delays = new ManualDelayScheduler();
         InMemoryRecurringJobProvider provider = createProvider(publisher, delays);
         RecurringJobIdentity identity = new RecurringJobIdentity("daily-export", "billing");
@@ -149,7 +199,7 @@ class InMemoryRecurringJobProviderTest {
     @Test
     void revisionConflictsAndControlsAreExplicit() {
         ManualDelayScheduler delays = new ManualDelayScheduler();
-        InMemoryRecurringJobProvider provider = createProvider(new RecordingPublishEndpoint(), delays);
+        InMemoryRecurringJobProvider provider = createProvider(new RecordingJobClient(), delays);
         RecurringJobIdentity identity = new RecurringJobIdentity("daily-export");
         RecurringJobDefinition definition = new RecurringJobDefinition(
                 identity,
@@ -178,8 +228,8 @@ class InMemoryRecurringJobProviderTest {
     }
 
     @Test
-    void dueAndManualOccurrencesDispatchTheJobCommand() {
-        RecordingPublishEndpoint publisher = new RecordingPublishEndpoint();
+    void dueAndManualOccurrencesSubmitTrackedJobs() {
+        RecordingJobClient publisher = new RecordingJobClient();
         ManualDelayScheduler delays = new ManualDelayScheduler();
         InMemoryRecurringJobProvider provider = createProvider(publisher, delays);
         RecurringJobIdentity identity = new RecurringJobIdentity("daily-export");
@@ -196,15 +246,44 @@ class InMemoryRecurringJobProviderTest {
         RecurringJobOccurrenceReceipt manual = provider.triggerNow(identity)
                 .toCompletableFuture().join();
         assertTrue(manual.manual());
-        assertEquals(RecurringJobOccurrenceStatus.DISPATCHED, manual.status());
+        assertEquals(RecurringJobOccurrenceStatus.PENDING, manual.status());
         assertEquals(2, publisher.messages.size());
         assertEquals(1, delays.callbacks.size());
     }
 
     @Test
+    void defaultRegistrationExecutesManualOccurrenceAsTrackedJob() throws Exception {
+        JobRecorder recorder = new JobRecorder();
+        ServiceCollection registrations = ServiceCollection.create();
+        registrations.addSingleton(JobRecorder.class, () -> recorder);
+        registrations.from(MessageBusServices.class).addServiceBus(configurator -> {
+            configurator.addJobConsumer(TestJobConsumer.class, TestJob.class, null);
+            MediatorTransport.configure(configurator);
+        });
+        ServiceProvider services = registrations.buildServiceProvider();
+        RecurringJobProvider recurring = services.getRequiredService(RecurringJobProvider.class);
+        RecurringJobIdentity identity = new RecurringJobIdentity("tracked-manual");
+        recurring.addOrUpdate(
+                new RecurringJobDefinition(
+                        identity,
+                        new FixedIntervalRecurringJobCadence(Duration.ofHours(1))),
+                new TestJob("executed")).toCompletableFuture().join();
+
+        RecurringJobOccurrenceReceipt occurrence = recurring.triggerNow(identity)
+                .toCompletableFuture().join();
+        assertTrue(recorder.completion.await(5, TimeUnit.SECONDS));
+        JobState job = services.getRequiredService(JobSource.class)
+                .getSnapshot(10).toCompletableFuture().join().get(0);
+
+        assertEquals("executed", recorder.value);
+        assertEquals(occurrence.occurrenceId(), job.recurringJobOccurrenceId());
+        assertEquals(JobStatus.COMPLETED, job.status());
+    }
+
+    @Test
     void unsupportedCadenceAndOverlapAreRejected() {
         InMemoryRecurringJobProvider provider = createProvider(
-                new RecordingPublishEndpoint(),
+                new RecordingJobClient(),
                 new ManualDelayScheduler());
 
         assertThrows(UnsupportedOperationException.class, () -> provider.addOrUpdate(
@@ -226,7 +305,7 @@ class InMemoryRecurringJobProviderTest {
     @Test
     void addServiceBusPreservesAnExplicitProviderRegistration() {
         InMemoryRecurringJobProvider custom = createProvider(
-                new RecordingPublishEndpoint(),
+                new RecordingJobClient(),
                 new ManualDelayScheduler());
         ServiceCollection services = ServiceCollection.create();
         services.addSingleton(RecurringJobProvider.class, () -> custom);
@@ -253,7 +332,7 @@ class InMemoryRecurringJobProviderTest {
         }
 
         for (FixedIntervalFixture fixture : fixtures) {
-            RecordingPublishEndpoint publisher = new RecordingPublishEndpoint();
+            RecordingJobClient publisher = new RecordingJobClient();
             ManualDelayScheduler delays = new ManualDelayScheduler();
             MutableClock clock = new MutableClock(Instant.parse("2026-09-01T00:00:00Z"));
             InMemoryRecurringJobProvider provider = new InMemoryRecurringJobProvider(
@@ -285,7 +364,7 @@ class InMemoryRecurringJobProviderTest {
     }
 
     private static InMemoryRecurringJobProvider createProvider(
-            RecordingPublishEndpoint publisher,
+            RecordingJobClient publisher,
             ManualDelayScheduler delays) {
         return new InMemoryRecurringJobProvider(
                 publisher,

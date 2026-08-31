@@ -82,6 +82,7 @@ internal sealed class InMemoryJobService : IJobProvider
         public required object Job { get; init; }
         public required IRegisteredJobConsumer Descriptor { get; init; }
         public required DateTimeOffset SubmittedAtUtc { get; init; }
+        public Guid? RecurringJobOccurrenceId { get; init; }
         public DateTimeOffset? ScheduledForUtc { get; init; }
         public JobStatus Status { get; set; }
         public DateTimeOffset? StartedAtUtc { get; set; }
@@ -248,6 +249,7 @@ internal sealed class InMemoryJobService : IJobProvider
             Job = job,
             Descriptor = registry.Get(typeof(TJob)),
             SubmittedAtUtc = submittedAtUtc,
+            RecurringJobOccurrenceId = options?.RecurringJobOccurrenceId,
             ScheduledForUtc = scheduledForUtc,
             Status = status,
             UpdatedAtUtc = submittedAtUtc
@@ -420,7 +422,7 @@ internal sealed class InMemoryJobService : IJobProvider
                 entry.StartedAtUtc,
                 entry.CompletedAtUtc,
                 entry.Progress,
-                null,
+                entry.RecurringJobOccurrenceId,
                 entry.UpdatedAtUtc);
         }
     }

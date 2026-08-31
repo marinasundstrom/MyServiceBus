@@ -70,7 +70,7 @@ public class MessageBusServices extends ServiceCollectionDecorator {
                 sp -> () -> sp.getRequiredService(JobProvider.class));
         inner.tryAddSingleton(RecurringJobProvider.class,
                 sp -> () -> new InMemoryRecurringJobProvider(
-                        (PublishEndpoint) sp.getService(MessageBus.class),
+                        sp.getRequiredService(JobClient.class),
                         (LocalDelayScheduler) sp.getService(LocalDelayScheduler.class)));
         inner.tryAddSingleton(RecurringJobSource.class,
                 sp -> () -> (RecurringJobSource) sp.getRequiredService(RecurringJobProvider.class));

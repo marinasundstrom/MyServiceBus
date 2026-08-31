@@ -60,7 +60,7 @@ A scheduled tracked job creates a job record immediately with a future eligibili
 
 `definition -> occurrence -> job -> attempts`
 
-The built-in durable recurring provider now promotes every materialized occurrence into a distinct tracked job in the same PostgreSQL transaction. Registered application jobs therefore enter the ordinary job executor and the occurrence follows its running, retry, cancellation, and terminal outcome. The volatile in-memory recurring provider still has a dispatch-only development boundary and must not claim application completion. If recurring message publication remains useful, it should receive a separately named facade rather than sharing `IRecurringJobScheduler` semantics.
+Both built-in recurring providers promote every materialized occurrence into a distinct tracked job. The durable provider performs occurrence and job creation in one PostgreSQL transaction; the volatile provider submits directly to its process-local executor. Registered application jobs therefore enter the ordinary job pipeline in both profiles. If recurring message publication remains useful, it should receive a separately named facade rather than sharing `IRecurringJobScheduler` semantics.
 
 Tracked recurring jobs default to forbidding overlapping executions. More permissive overlap policies remain explicit provider capabilities.
 

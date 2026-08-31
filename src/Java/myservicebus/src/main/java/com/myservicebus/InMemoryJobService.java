@@ -29,6 +29,7 @@ final class InMemoryJobService implements JobProvider {
         final JobConsumerRegistry.Descriptor descriptor;
         final Instant submittedAtUtc;
         final Instant scheduledForUtc;
+        final UUID recurringJobOccurrenceId;
         final List<JobAttemptState> attempts = new ArrayList<>();
         JobStatus status;
         Instant startedAtUtc;
@@ -39,12 +40,13 @@ final class InMemoryJobService implements JobProvider {
         UUID scheduleToken;
 
         Entry(UUID jobId, Object job, JobConsumerRegistry.Descriptor descriptor,
-                Instant submittedAtUtc, Instant scheduledForUtc, JobStatus status) {
+                Instant submittedAtUtc, Instant scheduledForUtc, UUID recurringJobOccurrenceId, JobStatus status) {
             this.jobId = jobId;
             this.job = job;
             this.descriptor = descriptor;
             this.submittedAtUtc = submittedAtUtc;
             this.scheduledForUtc = scheduledForUtc;
+            this.recurringJobOccurrenceId = recurringJobOccurrenceId;
             this.status = status;
             this.updatedAtUtc = submittedAtUtc;
         }
@@ -200,7 +202,14 @@ final class InMemoryJobService implements JobProvider {
             Instant scheduledForUtc, JobStatus status) {
         JobSubmissionOptions effectiveOptions = options == null ? new JobSubmissionOptions() : options;
         UUID jobId = effectiveOptions.jobId() == null ? UUID.randomUUID() : effectiveOptions.jobId();
-        Entry entry = new Entry(jobId, job, registry.get(job.getClass()), submittedAtUtc, scheduledForUtc, status);
+        Entry entry = new Entry(
+                jobId,
+                job,
+                registry.get(job.getClass()),
+                submittedAtUtc,
+                scheduledForUtc,
+                effectiveOptions.recurringJobOccurrenceId(),
+                status);
         if (jobs.putIfAbsent(jobId, entry) != null) {
             throw new IllegalStateException("Job '" + jobId + "' already exists");
         }
@@ -350,7 +359,7 @@ final class InMemoryJobService implements JobProvider {
                     entry.startedAtUtc,
                     entry.completedAtUtc,
                     entry.progress,
-                    null,
+                    entry.recurringJobOccurrenceId,
                     entry.updatedAtUtc);
         }
     }

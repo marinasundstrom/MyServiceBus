@@ -64,15 +64,22 @@ public enum JobControlOutcome
 
 public sealed record JobSubmissionOptions
 {
-    public JobSubmissionOptions(Guid? jobId = null)
+    public JobSubmissionOptions(Guid? jobId = null, Guid? recurringJobOccurrenceId = null)
     {
         if (jobId == Guid.Empty)
             throw new ArgumentException("The job identifier cannot be empty.", nameof(jobId));
+        if (recurringJobOccurrenceId == Guid.Empty)
+            throw new ArgumentException(
+                "The recurring job occurrence identifier cannot be empty.",
+                nameof(recurringJobOccurrenceId));
 
         JobId = jobId;
+        RecurringJobOccurrenceId = recurringJobOccurrenceId;
     }
 
     public Guid? JobId { get; }
+
+    public Guid? RecurringJobOccurrenceId { get; }
 }
 
 public sealed record JobSubmissionReceipt(
