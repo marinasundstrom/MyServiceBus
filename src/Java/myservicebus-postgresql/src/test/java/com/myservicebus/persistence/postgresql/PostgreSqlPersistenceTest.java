@@ -24,6 +24,13 @@ import com.myservicebus.ScheduledWorkSource;
 import com.myservicebus.ScheduledWorkState;
 import com.myservicebus.ScheduledWorkStatus;
 import com.myservicebus.MessageScheduler;
+import com.myservicebus.FixedIntervalRecurringJobCadence;
+import com.myservicebus.RecurringJobControlResult;
+import com.myservicebus.RecurringJobDefinition;
+import com.myservicebus.RecurringJobDefinitionReceipt;
+import com.myservicebus.RecurringJobDefinitionStatus;
+import com.myservicebus.RecurringJobIdentity;
+import com.myservicebus.SchedulingPlacement;
 import com.myservicebus.MessageBus;
 import com.myservicebus.MessageBusServices;
 import com.myservicebus.PublishEndpoint;
@@ -107,6 +114,63 @@ class PostgreSqlPersistenceTest {
                 assertTrue(result.getBoolean(3));
                 assertTrue(result.getBoolean(4));
                 assertTrue(result.getBoolean(5));
+            }
+        }
+    }
+
+    @Test
+    void builtInRecurringProviderPersistsIdempotentDefinitionsAndControls() throws Exception {
+        try (PostgreSQLContainer container = startContainer()) {
+            DataSource dataSource = dataSource(container);
+            PostgreSqlSchema.ensureCreated(dataSource);
+            MutableClock clock = new MutableClock(Instant.parse("2026-09-01T00:00:00Z"));
+            PostgreSqlRecurringJobProvider recurring = new PostgreSqlRecurringJobProvider(
+                    dataSource,
+                    SERVICE_NAME,
+                    new NoOpTransportFactory(),
+                    new EnvelopeMessageSerializer(),
+                    clock);
+            RecurringJobIdentity identity = new RecurringJobIdentity("invoice-export", "billing");
+            RecurringJobDefinition definition = new RecurringJobDefinition(
+                    identity,
+                    new FixedIntervalRecurringJobCadence(Duration.ofHours(1)));
+
+            RecurringJobDefinitionReceipt first = recurring.addOrUpdate(
+                    definition, new SubmitOrder(new UUID(0, 0))).toCompletableFuture().join();
+            RecurringJobDefinitionReceipt repeated = recurring.addOrUpdate(
+                    definition, new SubmitOrder(new UUID(0, 0))).toCompletableFuture().join();
+            RecurringJobControlResult paused = recurring.pause(identity, first.revision())
+                    .toCompletableFuture().join();
+            RecurringJobControlResult resumed = recurring.resume(identity, paused.currentRevision())
+                    .toCompletableFuture().join();
+
+            assertEquals("MyServiceBus.Durable", first.provider());
+            assertEquals(SchedulingDurability.DURABLE, first.durability());
+            assertEquals(SchedulingPlacement.EMBEDDED, first.placement());
+            assertEquals(first.definitionId(), repeated.definitionId());
+            assertEquals(1, repeated.revision());
+            assertEquals(2, paused.currentRevision());
+            assertEquals(3, resumed.currentRevision());
+
+            try (Connection connection = dataSource.getConnection();
+                    var statement = connection.prepareStatement("""
+                            SELECT schedule_group, schedule_id, revision, status,
+                                cadence->>'intervalNanoseconds', command_payload->'message'->>'orderId',
+                                next_due_at_utc
+                            FROM myservicebus.recurring_job_definition
+                            WHERE definition_id = ?
+                            """)) {
+                statement.setObject(1, first.definitionId());
+                try (ResultSet result = statement.executeQuery()) {
+                    assertTrue(result.next());
+                    assertEquals("billing", result.getString(1));
+                    assertEquals("invoice-export", result.getString(2));
+                    assertEquals(3, result.getLong(3));
+                    assertEquals((short) RecurringJobDefinitionStatus.ACTIVE.ordinal(), result.getShort(4));
+                    assertEquals("3600000000000", result.getString(5));
+                    assertEquals(new UUID(0, 0).toString(), result.getString(6));
+                    assertTrue(result.getObject(7) != null);
+                }
             }
         }
     }

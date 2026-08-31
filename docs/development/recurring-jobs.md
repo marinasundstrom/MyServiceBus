@@ -123,7 +123,9 @@ The PostgreSQL storage profile uses schema version 4 and tables separate from `o
 
 A materializer leases due definitions with database time and `SKIP LOCKED`. In one transaction it creates the occurrence, writes the final command envelope to the existing outbox, and advances the definition's next due time. A crash can repeat the transaction, but the uniqueness constraints prevent a second logical occurrence. C# and Java use the same schema and may materialize definitions created by either client.
 
-The schema stores the cadence contract and final envelope, not a language-specific scheduler object. PostgreSQL is therefore the promoted storage-interoperable provider. The in-memory implementation uses the same state machine for development but reports volatile durability and loses definitions on restart.
+The schema stores the cadence contract and final envelope, not a language-specific scheduler object. PostgreSQL is therefore the promoted storage-interoperable profile of the built-in provider. The in-memory implementation uses the same state machine for development but reports volatile durability and loses definitions on restart.
+
+The built-in durable provider reports the stable provider identity `MyServiceBus.Durable`; PostgreSQL appears as its storage profile in configuration and diagnostics. Definition registration stores an envelope template plus portable cadence metadata. Repeating the same semantic definition is idempotent even though transient envelope fields such as message id and sent time differ during registration. Materialization must replace those transient fields for every occurrence so inbox deduplication never mistakes later occurrences for duplicates.
 
 ## Provider profiles
 

@@ -106,6 +106,54 @@ public sealed class PostgreSqlPersistenceTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Built_in_recurring_provider_persists_idempotent_definitions_and_controls()
+    {
+        var clock = new MutableTimeProvider(DateTimeOffset.Parse("2026-09-01T00:00:00Z"));
+        var services = new ServiceCollection();
+        services.AddSingleton(dataSource);
+        services.AddSingleton<ITransportFactory, CapturingTransportFactory>();
+        services.AddSingleton<IMessageSerializer, EnvelopeMessageSerializer>();
+        services.AddSingleton<TimeProvider>(clock);
+        services.AddBuiltInRecurringJobsWithPostgreSql(ServiceName);
+        using var serviceProvider = services.BuildServiceProvider();
+        var recurring = serviceProvider.GetRequiredService<IRecurringJobProvider>();
+        var identity = new RecurringJobIdentity("invoice-export", "billing");
+        var definition = new RecurringJobDefinition(
+            identity,
+            new FixedIntervalRecurringJobCadence(TimeSpan.FromHours(1)));
+
+        var first = await recurring.AddOrUpdate(definition, new SubmitOrder(Guid.Empty));
+        var repeated = await recurring.AddOrUpdate(definition, new SubmitOrder(Guid.Empty));
+        var paused = await recurring.Pause(identity, first.Revision);
+        var resumed = await recurring.Resume(identity, paused.CurrentRevision);
+
+        Assert.Equal("MyServiceBus.Durable", first.Provider);
+        Assert.Equal(SchedulingDurability.Durable, first.Durability);
+        Assert.Equal(SchedulingPlacement.Embedded, first.Placement);
+        Assert.Equal(first.DefinitionId, repeated.DefinitionId);
+        Assert.Equal(1, repeated.Revision);
+        Assert.Equal(2, paused.CurrentRevision);
+        Assert.Equal(3, resumed.CurrentRevision);
+
+        await using var command = dataSource.CreateCommand("""
+            SELECT schedule_group, schedule_id, revision, status, cadence->>'intervalNanoseconds',
+                command_payload->'message'->>'orderId', next_due_at_utc
+            FROM myservicebus.recurring_job_definition
+            WHERE definition_id = @definition_id;
+            """);
+        command.Parameters.AddWithValue("definition_id", first.DefinitionId);
+        await using var reader = await command.ExecuteReaderAsync();
+        Assert.True(await reader.ReadAsync());
+        Assert.Equal("billing", reader.GetString(0));
+        Assert.Equal("invoice-export", reader.GetString(1));
+        Assert.Equal(3, reader.GetInt64(2));
+        Assert.Equal((short)RecurringJobDefinitionStatus.Active, reader.GetInt16(3));
+        Assert.Equal("3600000000000", reader.GetString(4));
+        Assert.Equal(Guid.Empty.ToString(), reader.GetString(5));
+        Assert.False(reader.IsDBNull(6));
+    }
+
+    [Fact]
     public async Task Scoped_bus_endpoints_capture_messages_in_application_transaction()
     {
         var services = new ServiceCollection();
