@@ -69,7 +69,7 @@
 
     private static string FormatCompletion(MonitoringJobItem job)
         => job.CompletedAtUtc is { } completed
-            ? $"Completed {completed.LocalDateTime:HH:mm:ss}"
+            ? $"{job.Status} {completed.LocalDateTime:HH:mm:ss}"
             : job.StartedAtUtc is not null ? "Started" : job.ScheduledForUtc is not null ? "Scheduled" : "Submitted";
 
     private static string Failure(MonitoringJobAttemptItem attempt)
