@@ -332,6 +332,56 @@ public class MonitoringRepositoryTests
     }
 
     [Fact]
+    public void Repository_aggregates_flow_and_throughput_across_source_and_target_replicas()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var repository = new MonitoringRepository();
+        repository.UpsertMetadata(CreateMetadata("checkout", "checkout-1", now, "commerce"));
+        repository.UpsertMetadata(CreateMetadata("checkout", "checkout-2", now, "commerce"));
+        repository.UpsertMetadata(CreateMetadata("orders", "orders-1", now, "commerce"));
+        repository.UpsertMetadata(CreateMetadata("orders", "orders-2", now, "commerce"));
+        repository.UpsertMetadata(CreateMetadata("orders", "orders-3", now, "commerce"));
+
+        repository.RecordBatch(CreateBatch(
+            "checkout",
+            "checkout-1",
+            now,
+            new MonitoringObservation(
+                1, now.AddSeconds(-4), "published", true, "OrderSubmitted", "urn:message:OrderSubmitted",
+                null, "exchange:orders", 2, null, null, null, "conversation-1", null, null),
+            new MonitoringObservation(
+                2, now.AddSeconds(-3), "published", true, "OrderSubmitted", "urn:message:OrderSubmitted",
+                null, "exchange:orders", 2, null, null, null, "conversation-2", null, null))).ShouldBeTrue();
+        repository.RecordBatch(CreateBatch(
+            "orders",
+            "orders-1",
+            now,
+            new MonitoringObservation(
+                1, now.AddSeconds(-2), "consumed", true, "OrderSubmitted", "urn:message:OrderSubmitted",
+                "orders", null, 10, null, null, null, "conversation-1", null, null))).ShouldBeTrue();
+        repository.RecordBatch(CreateBatch(
+            "orders",
+            "orders-2",
+            now,
+            new MonitoringObservation(
+                1, now.AddSeconds(-1), "consumed", true, "OrderSubmitted", "urn:message:OrderSubmitted",
+                "orders", null, 12, null, null, null, "conversation-2", null, null))).ShouldBeTrue();
+
+        var flow = repository.GetFlow(null, 60, now).ShouldHaveSingleItem();
+        flow.SourceApplication.ShouldBe("checkout");
+        flow.TargetApplication.ShouldBe("orders");
+        flow.Count.ShouldBe(2);
+
+        var orderRate = repository.GetRates("orders", 60, false, now).ShouldHaveSingleItem();
+        orderRate.InstanceId.ShouldBeNull();
+        orderRate.Counts.Consumed.ShouldBe(2);
+        repository.GetRates("orders", 60, true, now).Sum(rate => rate.Counts.Consumed).ShouldBe(2);
+        repository.GetTimeSeries("orders", 60, 5, false, now)
+            .Sum(point => point.Counts.Consumed)
+            .ShouldBe(2);
+    }
+
+    [Fact]
     public void Repository_summarizes_outbox_dispatcher_state_and_windowed_throughput()
     {
         var now = DateTimeOffset.UtcNow;

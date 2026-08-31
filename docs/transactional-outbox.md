@@ -171,6 +171,8 @@ OutboxDeliveryService delivery = PostgreSqlOutboxDelivery.create(
 
 Every polling cycle emits one bounded `outbox_dispatch_cycle` observation. The monitoring service aggregates the latest backlog state and a configurable throughput window per application instance, bus, logical service partition, and dispatcher owner. The dashboard's **Dispatcher operations** view shows online state, pending work, oldest undispatched age, dispatch rate, failed records, lost leases, and cycle latency. This works for an embedded dispatcher and for a standalone dispatcher service because both use the same delivery lifecycle and service-partition identity.
 
+Capturing a message in the outbox is not reported as broker traffic. When the dispatcher actually sends the persisted envelope, it emits the corresponding `sent`, `published`, or `fault_published` message observation, including correlation and conversation identity. That broker-bound observation lets monitoring reconstruct application flow when the receiving replica later reports consumption, without double-counting the earlier database enqueue.
+
 The application database remains authoritative. The monitoring service does not connect to it, lease records, or mutate outbox state. Observations exclude persisted row identities, message bodies, arbitrary headers, SQL, and connection details. Export failures are isolated from dispatch outcomes.
 
 ## Use the outbox with EF Core

@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using MyServiceBus.Serialization;
 
 namespace MyServiceBus.Persistence;
@@ -5,10 +6,17 @@ namespace MyServiceBus.Persistence;
 public sealed class TransportOutboxDispatcher : IOutboxTransportDispatcher
 {
     private readonly ITransportFactory transportFactory;
+    private readonly IBusHookDispatcher? hooks;
 
     public TransportOutboxDispatcher(ITransportFactory transportFactory)
+        : this(transportFactory, null)
+    {
+    }
+
+    public TransportOutboxDispatcher(ITransportFactory transportFactory, IBusHookDispatcher? hooks)
     {
         this.transportFactory = transportFactory ?? throw new ArgumentNullException(nameof(transportFactory));
+        this.hooks = hooks;
     }
 
     public async Task DispatchAsync(OutboxMessage message, CancellationToken cancellationToken = default)
@@ -38,7 +46,50 @@ public sealed class TransportOutboxDispatcher : IOutboxTransportDispatcher
         if (message.ResponseAddress is { } responseAddress)
             context.Headers["_reply_to"] = responseAddress.ToString();
 
-        await transport.Send(PersistedEnvelope.Instance, context, cancellationToken);
+        var startedAt = Stopwatch.GetTimestamp();
+        try
+        {
+            await transport.Send(PersistedEnvelope.Instance, context, cancellationToken);
+            DispatchObservation(message, Stopwatch.GetElapsedTime(startedAt));
+        }
+        catch (Exception exception)
+        {
+            DispatchObservation(message, Stopwatch.GetElapsedTime(startedAt), exception);
+            throw;
+        }
+    }
+
+    private void DispatchObservation(OutboxMessage message, TimeSpan duration, Exception? exception = null)
+    {
+        if (hooks?.IsEnabled != true)
+            return;
+
+        var (successKind, failureKind) = message.Intent switch
+        {
+            OutboxDeliveryIntent.Publish => ("published", "publish_faulted"),
+            OutboxDeliveryIntent.Fault => ("fault_published", "fault_publish_faulted"),
+            _ => ("sent", "send_faulted")
+        };
+        var messageUrn = message.MessageTypes[0];
+        hooks.Dispatch(MessageOperationHookEvent.Create(
+            exception is null ? successKind : failureKind,
+            exception is null,
+            DisplayMessageType(messageUrn),
+            messageUrn,
+            null,
+            message.DestinationAddress.ToString(),
+            duration,
+            exception,
+            message.CorrelationId?.ToString(),
+            message.ConversationId?.ToString()));
+    }
+
+    private static string DisplayMessageType(string messageUrn)
+    {
+        const string prefix = "urn:message:";
+        return messageUrn.StartsWith(prefix, StringComparison.Ordinal)
+            ? messageUrn[prefix.Length..].Replace(':', '.')
+            : messageUrn;
     }
 
     private static MessageIntent MapIntent(OutboxDeliveryIntent intent) => intent switch

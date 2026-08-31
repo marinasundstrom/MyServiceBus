@@ -8,8 +8,9 @@ import com.myservicebus.persistence.OutboxDeliveryService;
 import com.myservicebus.persistence.OutboxDispatcher;
 import com.myservicebus.persistence.TransportOutboxDispatcher;
 import java.time.Duration;
-import java.util.Objects;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.function.Consumer;
 import javax.sql.DataSource;
 
@@ -47,15 +48,17 @@ public final class PostgreSqlOutboxDelivery {
         if (configure != null) {
             configure.accept(options);
         }
+        List<BusHook> hookList = new ArrayList<>();
+        hooks.forEach(hookList::add);
         OutboxDispatcher dispatcher = new OutboxDispatcher(
                 new PostgreSqlOutboxStore(dataSource, serviceName),
-                new TransportOutboxDispatcher(transportFactory),
+                new TransportOutboxDispatcher(transportFactory, hookList),
                 new ExponentialOutboxRetryPolicy(Duration.ofSeconds(1), Duration.ofMinutes(1)));
         return new OutboxDeliveryService(
                 dispatcher,
                 options,
                 new PostgreSqlOutboxHealth(dataSource, serviceName),
-                hooks);
+                hookList);
     }
 
     public static OutboxDeliveryService create(
