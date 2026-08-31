@@ -136,6 +136,19 @@ final class PostgreSqlJobProvider implements JobProvider, JobSource {
                     command.setObject(7, jobId);
                     command.executeUpdate();
                 }
+                if (next == JobStatus.CANCELLED) {
+                    try (PreparedStatement occurrence = connection.prepareStatement("""
+                            UPDATE myservicebus.recurring_job_occurrence occurrence
+                            SET status = 6
+                            FROM myservicebus.job job
+                            WHERE job.recurring_occurrence_id = occurrence.occurrence_id
+                              AND job.service_name = ? AND job.job_id = ?
+                            """)) {
+                        occurrence.setString(1, serviceName);
+                        occurrence.setObject(2, jobId);
+                        occurrence.executeUpdate();
+                    }
+                }
                 connection.commit();
                 return CompletableFuture.completedFuture(new JobControlResult(JobControlOutcome.APPLIED, next));
             }
@@ -149,8 +162,9 @@ final class PostgreSqlJobProvider implements JobProvider, JobSource {
         try {
             cancellationToken.throwIfCancelled();
             Instant now = clock.instant();
-            try (Connection connection = dataSource.getConnection();
-                    PreparedStatement command = connection.prepareStatement("""
+            try (Connection connection = dataSource.getConnection()) {
+                connection.setAutoCommit(false);
+                try (PreparedStatement command = connection.prepareStatement("""
                             UPDATE myservicebus.job
                             SET status = 2, available_at_utc = ?, completed_at_utc = NULL,
                                 cancellation_requested_at_utc = NULL, lease_owner = NULL,
@@ -158,14 +172,28 @@ final class PostgreSqlJobProvider implements JobProvider, JobSource {
                                 failure_message = NULL, updated_at_utc = ?
                             WHERE service_name = ? AND job_id = ? AND status IN (5, 6)
                             """)) {
-                setInstant(command, 1, now);
-                setInstant(command, 2, now);
-                command.setString(3, serviceName);
-                command.setObject(4, jobId);
-                if (command.executeUpdate() == 1) {
-                    return CompletableFuture.completedFuture(
-                            new JobControlResult(JobControlOutcome.APPLIED, JobStatus.WAITING));
+                    setInstant(command, 1, now);
+                    setInstant(command, 2, now);
+                    command.setString(3, serviceName);
+                    command.setObject(4, jobId);
+                    if (command.executeUpdate() == 1) {
+                        try (PreparedStatement occurrence = connection.prepareStatement("""
+                                UPDATE myservicebus.recurring_job_occurrence occurrence
+                                SET status = 4, failure_category = NULL
+                                FROM myservicebus.job job
+                                WHERE job.recurring_occurrence_id = occurrence.occurrence_id
+                                  AND job.service_name = ? AND job.job_id = ?
+                                """)) {
+                            occurrence.setString(1, serviceName);
+                            occurrence.setObject(2, jobId);
+                            occurrence.executeUpdate();
+                        }
+                        connection.commit();
+                        return CompletableFuture.completedFuture(
+                                new JobControlResult(JobControlOutcome.APPLIED, JobStatus.WAITING));
+                    }
                 }
+                connection.rollback();
             }
 
             JobStatus current = readStatus(jobId);

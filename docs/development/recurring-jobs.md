@@ -26,11 +26,11 @@ Definitions and occurrences have different lifecycles:
 
 The outbox polling loop is not a recurring job. It is runtime infrastructure even if it uses similar timer and lease mechanics internally.
 
-## Honest first execution boundary
+## Execution boundary
 
-The first recurring slice dispatches a job command through MyServiceBus to an ordinary application consumer. The scheduler can authoritatively report that an occurrence was created and dispatched. It cannot call that occurrence completed merely because the broker accepted the message.
+The built-in durable provider creates a tracked job for every occurrence. It can therefore report `Running`, `RetryScheduled`, `Completed`, `Cancelled`, and `Failed` from authoritative job execution state rather than treating broker acceptance as application completion. Job attempts preserve the occurrence identity across execution retries.
 
-End-to-end `Running`, `Completed`, progress, cooperative cancellation, persisted job state, long-running lock avoidance, and execution retry belong to a later `JobConsumer`-style layer. That layer can correlate its execution records with the existing definition and occurrence identities. This keeps the first recurring feature useful without pretending that message delivery and application work completion are the same event.
+The volatile in-memory recurring provider remains a development baseline with a dispatch-only boundary. It may report creation and dispatch, but it cannot call an occurrence completed merely because a consumer command was accepted. Aligning that provider with in-memory tracked jobs is a remaining MVP slice.
 
 The minimal tracked execution contract and its promotion path for recurring occurrences are specified in [Job Consumers](job-consumers.md). While the API is still in preview, `IRecurringJobScheduler` should become the facade for recurring tracked application jobs. If recurring publication to ordinary consumers remains desirable, it should be introduced separately as an `IRecurringMessageScheduler` instead of making one facade report two different meanings of completion.
 
@@ -108,9 +108,9 @@ Overlap is independent from misfire handling:
 - `Forbid`: do not dispatch a new occurrence while an earlier tracked execution is active;
 - `Queue`: materialize the occurrence but hold dispatch until the previous one reaches a terminal state.
 
-The first dispatch-only slice can implement `Allow`. It cannot honestly implement `Forbid` or `Queue` across application execution because it does not yet observe completion. Those policies require the job-execution layer. A provider must reject unsupported overlap requirements at registration or definition acceptance.
+The current preview implements `Allow`. The durable provider now observes tracked completion, but `Forbid` and `Queue` still require explicit materializer policy and concurrency tests before they can be advertised. A provider must reject unsupported overlap requirements at registration or definition acceptance.
 
-Occurrence execution retry is not recurrence. Retrying a failed occurrence preserves its occurrence identity and increments an attempt identity. The definition continues according to its own cadence unless an explicit policy pauses it after failures. The first dispatch-only slice relies on ordinary message delivery guarantees and reports dispatch failure without inventing application retry state.
+Occurrence execution retry is not recurrence. Retrying a failed occurrence preserves its occurrence identity and creates another attempt under the same tracked job. The definition continues according to its own cadence unless an explicit policy pauses it after failures. The durable provider projects automatic and manual retry, cancellation, completion, and final failure back to the occurrence.
 
 ## Built-in durable provider
 
@@ -119,11 +119,11 @@ The provider is a MyServiceBus facility; PostgreSQL is its first durable persist
 The PostgreSQL storage profile uses schema version 4 and tables separate from `outbox_message`:
 
 - `recurring_job_definition` stores identity, revision, cadence, window, policy, safe job type, serialized command reference, current status, next due time, and audit timestamps;
-- `recurring_job_occurrence` stores occurrence identity, definition revision, scheduled time, materialization reason, lifecycle, and the resulting outbox record identity;
+- `recurring_job_occurrence` stores occurrence identity, definition revision, scheduled time, materialization reason, lifecycle, and the resulting tracked job identity;
 - a unique key on definition identity prevents duplicate ownership;
 - a unique key on definition id, revision, and scheduled time prevents duplicate scheduled occurrences.
 
-A materializer leases due definitions with database time and `SKIP LOCKED`. In one transaction it creates the occurrence, writes the final command envelope to the existing outbox, and advances the definition's next due time. A crash can repeat the transaction, but the uniqueness constraints prevent a second logical occurrence. Integration gates verify restart recovery, competing materializers creating one logical occurrence, Java materializing a C# definition, and C# materializing a Java definition against the same PostgreSQL database.
+A materializer leases due definitions with database time and `SKIP LOCKED`. In one transaction it creates the occurrence, writes a waiting tracked job with the final command envelope and registered execution policy, links both records, and advances the definition's next due time. A crash can repeat the transaction, but the uniqueness constraints prevent a second logical occurrence. Integration gates verify restart recovery, competing materializers creating one logical occurrence, Java materializing a C# definition, and C# materializing a Java definition against the same PostgreSQL database.
 
 The schema stores the cadence contract and final envelope, not a language-specific scheduler object. PostgreSQL is therefore the promoted storage-interoperable profile of the built-in provider. The in-memory implementation uses the same state machine for development but reports volatile durability and loses definitions on restart.
 
@@ -131,7 +131,7 @@ The built-in durable provider reports the stable provider identity `MyServiceBus
 
 The PostgreSQL profile accepts cadence instants and intervals at microsecond precision, matching PostgreSQL timestamp storage in both runtimes. A provider rejects finer values rather than rounding C# and Java definitions differently.
 
-Due definitions are selected with row locks and `SKIP LOCKED`. Occurrence uniqueness, creation of a fresh envelope identity, insertion into the ordinary outbox, and advancement of the definition happen in one transaction. The occurrence remains `Pending` while its command is in the outbox; broker acceptance and application completion are separate evidence. The .NET registration hosts the polling lifecycle automatically. Java exposes the equivalent `PostgreSqlRecurringJobService` with explicit `start()` and `close()` lifecycle, consistent with its existing outbox delivery service.
+Due definitions are selected with row locks and `SKIP LOCKED`. Occurrence uniqueness, creation of a fresh envelope and job identity, tracked-job insertion, occurrence linkage, and advancement of the definition happen in one transaction. The occurrence begins `Pending`, becomes `Running` when a worker leases its job, and follows the job into retry or a terminal state. The .NET registration hosts the polling lifecycle automatically. Java exposes the equivalent `PostgreSqlRecurringJobService` with explicit `start()` and `close()` lifecycle.
 
 ## Provider profiles
 
@@ -159,10 +159,10 @@ The focused Recurring Jobs view currently shows definitions, cadence, next occur
 
 1. Add shared definition, cadence, receipt, control-result, and occurrence contracts in C# and Java, with conformance fixtures but no provider persistence.
 2. Add a volatile in-memory definition store and deterministic materializer tests for add-or-update, revisions, pause/resume/remove, trigger-now, and occurrence uniqueness.
-3. Add PostgreSQL schema version 4, transactional materialization into the existing outbox, restart tests, and bidirectional C#/Java storage interoperability.
+3. Add PostgreSQL schema version 4, transactional occurrence materialization, restart tests, and bidirectional C#/Java storage interoperability.
 4. Export definition monitoring with explicit snapshot freshness, then add a focused dashboard view and Aspire demo case. Add retained occurrence monitoring only when dispatch lifecycle evidence is available.
 5. Add cron evaluation only after cross-language fixtures cover dialect, time zones, daylight-saving transitions, boundaries, and misfires. Fixed interval may ship first if cron would otherwise obscure the state model.
-6. Implement the job-execution/`JobConsumer` layer described in [Job Consumers](job-consumers.md), beginning with interface handlers and explicit registration, then add method handlers and generated C#/Java registration.
+6. Implement the job-execution/`JobConsumer` layer described in [Job Consumers](job-consumers.md), beginning with interface handlers and explicit registration, and promote durable recurring occurrences into tracked jobs. Method handlers and generated C#/Java registration remain later conveniences.
 7. Validate the provider boundary with a .NET Hangfire conformance adapter and a Java JobRunr conformance adapter without making either engine mandatory or claiming storage interoperability between them.
 
 ## References

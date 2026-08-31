@@ -42,7 +42,7 @@ The MVP is the first coherent Bus Outbox evaluation path, not production promoti
 - minimal health and monitoring signals for dispatcher progress, failure, pending count, oldest pending age, throughput, cycle latency, and lost leases — implemented; and
 - an end-to-end Aspire showcase that commits application state plus outbox intent and consumes the result in C# and Java — implemented and live-verified.
 
-Transparent Consumer Outbox middleware, automatic retention cleanup, inbox monitoring, alerting, historical monitoring storage, and SQL Server follow the MVP. One-time durable PostgreSQL scheduling and persisted cancellation are available for evaluation; recurring schedules and external scheduler adapters remain later work.
+Transparent Consumer Outbox middleware, automatic retention cleanup, inbox monitoring, alerting, historical monitoring storage, and SQL Server follow the MVP. One-time durable PostgreSQL scheduling and persisted cancellation are available for evaluation. Recurring jobs use their own definition, occurrence, and tracked-job records rather than masquerading as repeatedly rescheduled outbox messages; external scheduler adapters remain later work.
 
 ## Why the boundary matters
 

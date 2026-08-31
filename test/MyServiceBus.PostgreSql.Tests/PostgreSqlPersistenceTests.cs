@@ -34,8 +34,8 @@ public sealed class PostgreSqlPersistenceTests : IAsyncLifetime
     {
         await using (var command = dataSource.CreateCommand("""
             DROP TABLE myservicebus.job_attempt;
-            DROP TABLE myservicebus.job;
             DROP TABLE myservicebus.recurring_job_occurrence;
+            DROP TABLE myservicebus.job;
             DROP TABLE myservicebus.recurring_job_definition;
             UPDATE myservicebus.schema_version SET version = 2 WHERE singleton;
             ALTER TABLE myservicebus.outbox_message
@@ -121,6 +121,12 @@ public sealed class PostgreSqlPersistenceTests : IAsyncLifetime
         services.AddSingleton<ITransportFactory, CapturingTransportFactory>();
         services.AddSingleton<IMessageSerializer, EnvelopeMessageSerializer>();
         services.AddSingleton<TimeProvider>(clock);
+        services.AddServiceBus(configurator =>
+        {
+            configurator.AddJobConsumer<SubmitOrderJobConsumer, SubmitOrder>();
+            configurator.UsingMediator();
+        });
+        services.AddBuiltInJobsWithPostgreSql(ServiceName);
         services.AddBuiltInRecurringJobsWithPostgreSql(ServiceName);
         using var serviceProvider = services.BuildServiceProvider();
         var recurring = serviceProvider.GetRequiredService<IRecurringJobProvider>();
@@ -174,13 +180,13 @@ public sealed class PostgreSqlPersistenceTests : IAsyncLifetime
         await using var materialization = dataSource.CreateCommand("""
             SELECT
                 (SELECT count(*) FROM myservicebus.recurring_job_occurrence WHERE definition_id = @definition_id),
-                (SELECT count(*) FROM myservicebus.outbox_message message
+                (SELECT count(*) FROM myservicebus.job job
                     JOIN myservicebus.recurring_job_occurrence occurrence
-                        ON occurrence.outbox_record_id = message.record_id
+                        ON occurrence.job_id = job.job_id
                     WHERE occurrence.definition_id = @definition_id),
-                (SELECT count(DISTINCT message.message_id) FROM myservicebus.outbox_message message
+                (SELECT count(DISTINCT job.job_id) FROM myservicebus.job job
                     JOIN myservicebus.recurring_job_occurrence occurrence
-                        ON occurrence.outbox_record_id = message.record_id
+                        ON occurrence.job_id = job.job_id
                     WHERE occurrence.definition_id = @definition_id);
             """);
         materialization.Parameters.AddWithValue("definition_id", first.DefinitionId);
@@ -189,6 +195,43 @@ public sealed class PostgreSqlPersistenceTests : IAsyncLifetime
         Assert.Equal(2, materializationReader.GetInt64(0));
         Assert.Equal(2, materializationReader.GetInt64(1));
         Assert.Equal(2, materializationReader.GetInt64(2));
+        await materializationReader.CloseAsync();
+
+        await using var linkedJob = dataSource.CreateCommand("""
+            SELECT job_id FROM myservicebus.recurring_job_occurrence
+            WHERE definition_id = @definition_id ORDER BY scheduled_for_utc LIMIT 1;
+            """);
+        linkedJob.Parameters.AddWithValue("definition_id", first.DefinitionId);
+        var linkedJobId = (Guid)(await linkedJob.ExecuteScalarAsync())!;
+        var jobClient = serviceProvider.GetRequiredService<IJobClient>();
+        Assert.Equal(JobControlOutcome.Applied, (await jobClient.Cancel(linkedJobId)).Outcome);
+        Assert.Equal(RecurringJobOccurrenceStatus.Cancelled, await ReadOccurrenceStatus(linkedJobId));
+        Assert.Equal(JobControlOutcome.Applied, (await jobClient.Retry(linkedJobId)).Outcome);
+        Assert.Equal(RecurringJobOccurrenceStatus.RetryScheduled, await ReadOccurrenceStatus(linkedJobId));
+
+        Assert.Equal(
+            2,
+            await serviceProvider.GetRequiredService<PostgreSqlJobProcessor>().ProcessDueAsync());
+        await using var completion = dataSource.CreateCommand("""
+            SELECT count(*)
+            FROM myservicebus.recurring_job_occurrence
+            WHERE definition_id = @definition_id AND status = 5 AND job_id IS NOT NULL;
+            """);
+        completion.Parameters.AddWithValue("definition_id", first.DefinitionId);
+        Assert.Equal(2L, await completion.ExecuteScalarAsync());
+
+    }
+
+    private async Task<RecurringJobOccurrenceStatus> ReadOccurrenceStatus(Guid jobId)
+    {
+        await using var command = dataSource.CreateCommand("""
+            SELECT occurrence.status
+            FROM myservicebus.recurring_job_occurrence occurrence
+            JOIN myservicebus.job job ON job.recurring_occurrence_id = occurrence.occurrence_id
+            WHERE job.job_id = @job_id;
+            """);
+        command.Parameters.AddWithValue("job_id", jobId);
+        return (RecurringJobOccurrenceStatus)Convert.ToInt16(await command.ExecuteScalarAsync());
     }
 
     [Fact]
@@ -283,7 +326,7 @@ public sealed class PostgreSqlPersistenceTests : IAsyncLifetime
 
         Assert.Equal(identity, definition.Identity);
         Assert.Equal(1, materialized);
-        Assert.Equal(1, await CountRecurringOutboxRecords(serviceName, identity.ScheduleId));
+        Assert.Equal(1, await CountRecurringJobs(serviceName, identity.ScheduleId));
     }
 
     [Fact]
@@ -306,7 +349,7 @@ public sealed class PostgreSqlPersistenceTests : IAsyncLifetime
         var results = await Task.WhenAll(first.MaterializeDueAsync(), second.MaterializeDueAsync());
 
         Assert.Equal(1, results.Sum());
-        Assert.Equal(1, await CountRecurringOutboxRecords(serviceName, identity.ScheduleId));
+        Assert.Equal(1, await CountRecurringJobs(serviceName, identity.ScheduleId));
     }
 
     [CrossLanguageFact]
@@ -333,7 +376,7 @@ public sealed class PostgreSqlPersistenceTests : IAsyncLifetime
         {
             await WaitForJavaOutput(java, "MATERIALIZED:1", TimeSpan.FromMinutes(2));
         }
-        Assert.Equal(1, await CountRecurringOutboxRecords(csharpService, csharpSchedule));
+        Assert.Equal(1, await CountRecurringJobs(csharpService, csharpSchedule));
 
         const string javaService = "recurring-java-to-csharp";
         const string javaSchedule = "created-by-java";
@@ -353,7 +396,7 @@ public sealed class PostgreSqlPersistenceTests : IAsyncLifetime
             Assert.Equal(1, await csharp.GetRequiredService<PostgreSqlRecurringJobMaterializer>()
                 .MaterializeDueAsync());
         }
-        Assert.Equal(1, await CountRecurringOutboxRecords(javaService, javaSchedule));
+        Assert.Equal(1, await CountRecurringJobs(javaService, javaSchedule));
     }
 
     [CrossLanguageFact]
@@ -764,6 +807,12 @@ public sealed class PostgreSqlPersistenceTests : IAsyncLifetime
         services.AddSingleton<ITransportFactory, CapturingTransportFactory>();
         services.AddSingleton<IMessageSerializer, EnvelopeMessageSerializer>();
         services.AddSingleton<TimeProvider>(new MutableTimeProvider(now));
+        services.AddServiceBus(configurator =>
+        {
+            configurator.AddJobConsumer<CrossLanguageRecurringJobConsumer, CrossLanguageRecurringJob>();
+            configurator.UsingMediator();
+        });
+        services.AddBuiltInJobsWithPostgreSql(serviceName);
         services.AddBuiltInRecurringJobsWithPostgreSql(serviceName);
         return services.BuildServiceProvider();
     }
@@ -799,13 +848,13 @@ public sealed class PostgreSqlPersistenceTests : IAsyncLifetime
         return services.BuildServiceProvider();
     }
 
-    private async Task<long> CountRecurringOutboxRecords(string serviceName, string scheduleId)
+    private async Task<long> CountRecurringJobs(string serviceName, string scheduleId)
     {
         await using var command = dataSource.CreateCommand("""
             SELECT count(*)
-            FROM myservicebus.outbox_message message
+            FROM myservicebus.job job
             JOIN myservicebus.recurring_job_occurrence occurrence
-                ON occurrence.outbox_record_id = message.record_id
+                ON occurrence.job_id = job.job_id
             JOIN myservicebus.recurring_job_definition definition
                 ON definition.definition_id = occurrence.definition_id
             WHERE definition.service_name = @service_name AND definition.schedule_id = @schedule_id;
@@ -913,6 +962,16 @@ public sealed class PostgreSqlPersistenceTests : IAsyncLifetime
     private sealed record SubmitOrder(Guid OrderId);
 
     private sealed record CrossLanguageRecurringJob(string Origin);
+
+    private sealed class SubmitOrderJobConsumer : IJobConsumer<SubmitOrder>
+    {
+        public Task Run(JobContext<SubmitOrder> context) => Task.CompletedTask;
+    }
+
+    private sealed class CrossLanguageRecurringJobConsumer : IJobConsumer<CrossLanguageRecurringJob>
+    {
+        public Task Run(JobContext<CrossLanguageRecurringJob> context) => Task.CompletedTask;
+    }
 
     private sealed record DurableJob(int Value);
 

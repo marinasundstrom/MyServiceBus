@@ -33,7 +33,8 @@ public static class PostgreSqlRecurringJobExtensions
             provider.GetRequiredService<ITransportFactory>(),
             provider.GetRequiredService<IMessageSerializer>(),
             provider.GetService<TimeProvider>(),
-            provider.GetRequiredService<PostgreSqlRecurringJobMaterializer>()));
+            provider.GetRequiredService<PostgreSqlRecurringJobMaterializer>(),
+            provider.GetRequiredService<IJobConsumerRegistry>()));
         services.AddSingleton<IRecurringJobSource>(provider =>
             (IRecurringJobSource)provider.GetRequiredService<IRecurringJobProvider>());
         return services;

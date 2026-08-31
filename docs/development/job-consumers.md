@@ -60,13 +60,13 @@ A scheduled tracked job creates a job record immediately with a future eligibili
 
 `definition -> occurrence -> job -> attempts`
 
-The current preview recurring implementation dispatches an ordinary command and can authoritatively report only `Dispatched`. During the tracked-job slice it should be promoted so that registered application jobs enter the job executor and their occurrence can reach a terminal application outcome. If recurring message publication remains useful, it should receive a separately named facade rather than sharing `IRecurringJobScheduler` semantics.
+The built-in durable recurring provider now promotes every materialized occurrence into a distinct tracked job in the same PostgreSQL transaction. Registered application jobs therefore enter the ordinary job executor and the occurrence follows its running, retry, cancellation, and terminal outcome. The volatile in-memory recurring provider still has a dispatch-only development boundary and must not claim application completion. If recurring message publication remains useful, it should receive a separately named facade rather than sharing `IRecurringJobScheduler` semantics.
 
 Tracked recurring jobs default to forbidding overlapping executions. More permissive overlap policies remain explicit provider capabilities.
 
 ## Persistence and providers
 
-The application-facing contracts do not expose storage-engine objects. The built-in durable implementation uses PostgreSQL for job intent, attempt history, leases, cancellation, and progress. Recurring definitions will submit tracked occurrences through a separate transactional promotion boundary.
+The application-facing contracts do not expose storage-engine objects. The built-in durable implementation uses PostgreSQL for job intent, attempt history, leases, cancellation, and progress. Recurring definitions submit tracked occurrences through a transactional promotion boundary that stores `definition -> occurrence -> job` correlation without routing the work through the outbox first.
 
 The durable implementation is selected with `AddBuiltInJobsWithPostgreSql(serviceName)` in C# or `PostgreSqlJobs.addBuiltInProvider(...)` in Java. It keeps the dashboard-facing job-source contract provider-neutral while embedded workers use fenced PostgreSQL leases and heartbeats. A stopped process leaves running work recoverable after its lease expires. Both runtimes use the same storage model and interoperability tests execute each other's stored envelopes when the logical job type name and message contract agree.
 

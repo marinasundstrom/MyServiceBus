@@ -117,6 +117,11 @@ public static class PostgreSqlSchema
             overlap_policy smallint NOT NULL CHECK (overlap_policy BETWEEN 0 AND 2),
             delivery_intent smallint NOT NULL CHECK (delivery_intent BETWEEN 0 AND 1),
             destination_address text NOT NULL,
+            job_type_name text NOT NULL CHECK (length(job_type_name) > 0),
+            job_retry_limit integer NOT NULL CHECK (job_retry_limit >= 0),
+            job_retry_delay_milliseconds bigint NULL CHECK (job_retry_delay_milliseconds >= 0),
+            job_timeout_milliseconds bigint NOT NULL CHECK (job_timeout_milliseconds > 0),
+            job_concurrent_limit integer NOT NULL CHECK (job_concurrent_limit > 0),
             command_message_types text[] NOT NULL CHECK (cardinality(command_message_types) > 0),
             command_payload jsonb NOT NULL,
             command_headers jsonb NOT NULL DEFAULT '{}'::jsonb,
@@ -143,7 +148,7 @@ public static class PostgreSqlSchema
             materialization_reason smallint NOT NULL CHECK (materialization_reason BETWEEN 0 AND 3),
             is_manual boolean NOT NULL DEFAULT false,
             status smallint NOT NULL CHECK (status BETWEEN 0 AND 8),
-            outbox_record_id uuid NULL REFERENCES myservicebus.outbox_message (record_id),
+            job_id uuid NULL,
             failure_category text NULL
         );
 
@@ -185,8 +190,7 @@ public static class PostgreSqlSchema
             lease_expires_at_utc timestamptz NULL,
             failure_type text NULL,
             failure_message text NULL,
-            CHECK (progress_limit IS NULL OR progress_value IS NULL OR progress_value <= progress_limit),
-            CHECK (scheduled_for_utc IS NULL OR scheduled_for_utc >= submitted_at_utc)
+            CHECK (progress_limit IS NULL OR progress_value IS NULL OR progress_value <= progress_limit)
         );
 
         CREATE INDEX IF NOT EXISTS ix_job_available
@@ -203,6 +207,19 @@ public static class PostgreSqlSchema
         CREATE INDEX IF NOT EXISTS ix_job_recurring_occurrence
             ON myservicebus.job (recurring_occurrence_id)
             WHERE recurring_occurrence_id IS NOT NULL;
+
+        DO $constraint$
+        BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM pg_constraint
+                WHERE conname = 'recurring_job_occurrence_job_id_fkey'
+                  AND conrelid = 'myservicebus.recurring_job_occurrence'::regclass) THEN
+                ALTER TABLE myservicebus.recurring_job_occurrence
+                    ADD CONSTRAINT recurring_job_occurrence_job_id_fkey
+                    FOREIGN KEY (job_id) REFERENCES myservicebus.job (job_id);
+            END IF;
+        END
+        $constraint$;
 
         CREATE TABLE IF NOT EXISTS myservicebus.job_attempt (
             attempt_id uuid PRIMARY KEY,

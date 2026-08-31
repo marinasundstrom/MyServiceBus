@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.myservicebus.FixedIntervalRecurringJobCadence;
+import com.myservicebus.JobConsumerOptions;
+import com.myservicebus.JobConsumerRegistry;
 import com.myservicebus.MessageUrn;
 import com.myservicebus.PublishContext;
 import com.myservicebus.RecurringJobControlOutcome;
@@ -64,6 +66,7 @@ final class PostgreSqlRecurringJobProvider implements RecurringJobProvider, Recu
     private final MessageSerializer serializer;
     private final Clock clock;
     private final PostgreSqlRecurringJobMaterializer materializer;
+    private final JobConsumerRegistry consumers;
 
     PostgreSqlRecurringJobProvider(
             DataSource dataSource,
@@ -71,7 +74,7 @@ final class PostgreSqlRecurringJobProvider implements RecurringJobProvider, Recu
             TransportFactory transportFactory,
             MessageSerializer serializer,
             Clock clock) {
-        this(dataSource, serviceName, transportFactory, serializer, clock, null);
+        this(dataSource, serviceName, transportFactory, serializer, clock, null, null);
     }
 
     PostgreSqlRecurringJobProvider(
@@ -81,6 +84,17 @@ final class PostgreSqlRecurringJobProvider implements RecurringJobProvider, Recu
             MessageSerializer serializer,
             Clock clock,
             PostgreSqlRecurringJobMaterializer materializer) {
+        this(dataSource, serviceName, transportFactory, serializer, clock, materializer, null);
+    }
+
+    PostgreSqlRecurringJobProvider(
+            DataSource dataSource,
+            String serviceName,
+            TransportFactory transportFactory,
+            MessageSerializer serializer,
+            Clock clock,
+            PostgreSqlRecurringJobMaterializer materializer,
+            JobConsumerRegistry consumers) {
         this.dataSource = Objects.requireNonNull(dataSource, "dataSource");
         if (serviceName == null || serviceName.isBlank()) {
             throw new IllegalArgumentException("serviceName must not be blank");
@@ -92,6 +106,7 @@ final class PostgreSqlRecurringJobProvider implements RecurringJobProvider, Recu
         this.materializer = materializer == null
                 ? new PostgreSqlRecurringJobMaterializer(dataSource, this.serviceName, this.clock)
                 : materializer;
+        this.consumers = consumers;
     }
 
     @Override
@@ -179,6 +194,9 @@ final class PostgreSqlRecurringJobProvider implements RecurringJobProvider, Recu
                         "The interoperable durable provider requires the MyServiceBus envelope format.");
             }
             Instant now = clock.instant();
+            JobConsumerRegistry.Descriptor registered = consumers == null ? null : consumers.get(job.getClass());
+            String jobTypeName = registered == null ? job.getClass().getSimpleName() : registered.jobTypeName();
+            JobConsumerOptions jobOptions = registered == null ? new JobConsumerOptions() : registered.options();
             String cadenceJson = createCadenceJson((FixedIntervalRecurringJobCadence) definition.cadence());
             List<String> messageTypes = MessageUrn.forMessageTypes(job.getClass());
             String destination = transportFactory.getPublishAddress(job.getClass());
@@ -193,7 +211,9 @@ final class PostgreSqlRecurringJobProvider implements RecurringJobProvider, Recu
                     cadenceJson,
                     destination,
                     messageTypes,
-                    MAPPER.writeValueAsString(envelope.get("message")));
+                    MAPPER.writeValueAsString(envelope.get("message")),
+                    jobTypeName,
+                    jobOptions);
 
             try (Connection connection = dataSource.getConnection()) {
                 connection.setAutoCommit(false);
@@ -219,6 +239,8 @@ final class PostgreSqlRecurringJobProvider implements RecurringJobProvider, Recu
                             definition,
                             cadenceJson,
                             destination,
+                            jobTypeName,
+                            jobOptions,
                             messageTypes,
                             commandEnvelope,
                             now,
@@ -361,6 +383,8 @@ final class PostgreSqlRecurringJobProvider implements RecurringJobProvider, Recu
             RecurringJobDefinition definition,
             String cadenceJson,
             String destination,
+            String jobTypeName,
+            JobConsumerOptions jobOptions,
             List<String> messageTypes,
             String commandEnvelope,
             Instant now,
@@ -371,7 +395,9 @@ final class PostgreSqlRecurringJobProvider implements RecurringJobProvider, Recu
                     revision = ?, semantic_hash = ?, status = 0, cadence_kind = 0, cadence = ?::jsonb,
                     description = ?, start_at_utc = ?, end_at_utc = ?, misfire_policy = ?,
                     max_catch_up_occurrences = ?, overlap_policy = ?, delivery_intent = 1,
-                    destination_address = ?, command_message_types = ?, command_payload = ?::jsonb,
+                    destination_address = ?, job_type_name = ?, job_retry_limit = ?,
+                    job_retry_delay_milliseconds = ?, job_timeout_milliseconds = ?, job_concurrent_limit = ?,
+                    command_message_types = ?, command_payload = ?::jsonb,
                     command_headers = '{}'::jsonb, content_type = ?, accepted_at_utc = ?, updated_at_utc = ?,
                     next_due_at_utc = ?, lease_owner = NULL, lease_expires_at_utc = NULL
                 WHERE definition_id = ?
@@ -379,10 +405,13 @@ final class PostgreSqlRecurringJobProvider implements RecurringJobProvider, Recu
                 INSERT INTO myservicebus.recurring_job_definition (
                     revision, semantic_hash, status, cadence_kind, cadence, description, start_at_utc, end_at_utc,
                     misfire_policy, max_catch_up_occurrences, overlap_policy, delivery_intent,
-                    destination_address, command_message_types, command_payload, command_headers, content_type,
+                    destination_address, job_type_name, job_retry_limit, job_retry_delay_milliseconds,
+                    job_timeout_milliseconds, job_concurrent_limit,
+                    command_message_types, command_payload, command_headers, content_type,
                     accepted_at_utc, updated_at_utc, next_due_at_utc, definition_id,
                     service_name, schedule_group, schedule_id)
-                VALUES (?, ?, 0, 0, ?::jsonb, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?::jsonb, '{}'::jsonb, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, 0, 0, ?::jsonb, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?,
+                    ?, ?::jsonb, '{}'::jsonb, ?, ?, ?, ?, ?, ?, ?, ?)
                 """;
         try (PreparedStatement statement = connection.prepareStatement(sql)) {
             int index = 1;
@@ -396,6 +425,15 @@ final class PostgreSqlRecurringJobProvider implements RecurringJobProvider, Recu
             statement.setInt(index++, definition.maxCatchUpOccurrences());
             statement.setShort(index++, (short) definition.overlapPolicy().ordinal());
             statement.setString(index++, destination);
+            statement.setString(index++, jobTypeName);
+            statement.setInt(index++, jobOptions.getRetryCount());
+            if (jobOptions.getRetryDelay() == null) {
+                statement.setNull(index++, Types.BIGINT);
+            } else {
+                statement.setLong(index++, jobOptions.getRetryDelay().toMillis());
+            }
+            statement.setLong(index++, jobOptions.getJobTimeout().toMillis());
+            statement.setInt(index++, jobOptions.getConcurrentJobLimit());
             statement.setArray(index++, connection.createArrayOf("text", messageTypes.toArray()));
             statement.setString(index++, commandEnvelope);
             statement.setString(index++, serializer.getContentType());
@@ -433,7 +471,9 @@ final class PostgreSqlRecurringJobProvider implements RecurringJobProvider, Recu
             String cadence,
             String destination,
             List<String> messageTypes,
-            String commandMessage) throws Exception {
+            String commandMessage,
+            String jobTypeName,
+            JobConsumerOptions jobOptions) throws Exception {
         String value = String.join("\n",
                 cadence,
                 Objects.toString(definition.description(), ""),
@@ -443,6 +483,11 @@ final class PostgreSqlRecurringJobProvider implements RecurringJobProvider, Recu
                 Integer.toString(definition.maxCatchUpOccurrences()),
                 Integer.toString(definition.overlapPolicy().ordinal()),
                 destination,
+                jobTypeName,
+                Integer.toString(jobOptions.getRetryCount()),
+                Objects.toString(jobOptions.getRetryDelay(), ""),
+                jobOptions.getJobTimeout().toString(),
+                Integer.toString(jobOptions.getConcurrentJobLimit()),
                 String.join("\u001f", messageTypes),
                 commandMessage);
         return HexFormat.of().withUpperCase().formatHex(

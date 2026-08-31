@@ -47,7 +47,8 @@ public final class PostgreSqlJobProcessor {
             int retryLimit,
             Long retryDelayMilliseconds,
             long timeoutMilliseconds,
-            Instant startedAtUtc) {
+            Instant startedAtUtc,
+            UUID recurringOccurrenceId) {
     }
 
     private final DataSource dataSource;
@@ -131,7 +132,7 @@ public final class PostgreSqlJobProcessor {
                     FROM candidate WHERE job.job_id = candidate.job_id
                     RETURNING job.job_id, job.attempt_count - 1, job.job_type_name, job.body,
                         job.content_type, job.retry_limit, job.retry_delay_milliseconds,
-                        job.timeout_milliseconds
+                        job.timeout_milliseconds, job.recurring_occurrence_id
                     """)) {
                 command.setString(1, serviceName);
                 PostgreSqlJobProvider.setInstant(command, 2, now);
@@ -157,7 +158,18 @@ public final class PostgreSqlJobProcessor {
                             rows.getInt(6),
                             retryDelayMilliseconds,
                             rows.getLong(8),
-                            now);
+                            now,
+                            rows.getObject(9, UUID.class));
+                }
+            }
+
+            if (lease.recurringOccurrenceId() != null) {
+                try (PreparedStatement occurrence = connection.prepareStatement("""
+                        UPDATE myservicebus.recurring_job_occurrence
+                        SET status = 3 WHERE occurrence_id = ?
+                        """)) {
+                    occurrence.setObject(1, lease.recurringOccurrenceId());
+                    occurrence.executeUpdate();
                 }
             }
 
@@ -392,6 +404,28 @@ public final class PostgreSqlJobProcessor {
                 attempt.setObject(5, lease.attemptId());
                 attempt.executeUpdate();
             }
+            if (lease.recurringOccurrenceId() != null) {
+                short occurrenceStatus = switch (jobStatus) {
+                    case WAITING -> 4;
+                    case COMPLETED -> 5;
+                    case CANCELLED -> 6;
+                    case FAULTED -> 8;
+                    default -> 3;
+                };
+                try (PreparedStatement occurrence = connection.prepareStatement("""
+                        UPDATE myservicebus.recurring_job_occurrence
+                        SET status = ?, failure_category = ? WHERE occurrence_id = ?
+                        """)) {
+                    occurrence.setShort(1, occurrenceStatus);
+                    if (failure == null) {
+                        occurrence.setNull(2, Types.VARCHAR);
+                    } else {
+                        occurrence.setString(2, failure.getClass().getName());
+                    }
+                    occurrence.setObject(3, lease.recurringOccurrenceId());
+                    occurrence.executeUpdate();
+                }
+            }
             connection.commit();
         }
     }
@@ -414,6 +448,18 @@ public final class PostgreSqlJobProcessor {
                 attempts.setString(2, serviceName);
                 PostgreSqlJobProvider.setInstant(attempts, 3, now);
                 attempts.executeUpdate();
+            }
+            try (PreparedStatement occurrences = connection.prepareStatement("""
+                    UPDATE myservicebus.recurring_job_occurrence occurrence
+                    SET status = 8, failure_category = 'MyServiceBus.JobLeaseExpired'
+                    FROM myservicebus.job job
+                    WHERE job.recurring_occurrence_id = occurrence.occurrence_id
+                      AND job.service_name = ? AND job.status = 3
+                      AND job.lease_expires_at_utc <= ? AND job.attempt_count > job.retry_limit
+                    """)) {
+                occurrences.setString(1, serviceName);
+                PostgreSqlJobProvider.setInstant(occurrences, 2, now);
+                occurrences.executeUpdate();
             }
             try (PreparedStatement jobs = connection.prepareStatement("""
                     UPDATE myservicebus.job

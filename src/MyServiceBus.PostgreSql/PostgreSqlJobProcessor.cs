@@ -19,7 +19,8 @@ public sealed class PostgreSqlJobProcessor
         int RetryLimit,
         long? RetryDelayMilliseconds,
         long TimeoutMilliseconds,
-        DateTimeOffset StartedAtUtc);
+        DateTimeOffset StartedAtUtc,
+        Guid? RecurringOccurrenceId);
 
     private sealed record StoredTransportMessage(
         IDictionary<string, object> Headers,
@@ -111,7 +112,7 @@ public sealed class PostgreSqlJobProcessor
             WHERE job.job_id = candidate.job_id
             RETURNING job.job_id, job.attempt_count - 1, job.job_type_name, job.body,
                 job.content_type, job.retry_limit, job.retry_delay_milliseconds,
-                job.timeout_milliseconds, @now;
+                job.timeout_milliseconds, @now, job.recurring_occurrence_id;
             """, connection, transaction);
         command.Parameters.AddWithValue("service_name", NpgsqlDbType.Text, serviceName);
         command.Parameters.AddWithValue("now", NpgsqlDbType.TimestampTz, now);
@@ -137,8 +138,19 @@ public sealed class PostgreSqlJobProcessor
             reader.GetInt32(5),
             reader.IsDBNull(6) ? null : reader.GetInt64(6),
             reader.GetInt64(7),
-            reader.GetFieldValue<DateTimeOffset>(8));
+            reader.GetFieldValue<DateTimeOffset>(8),
+            reader.IsDBNull(9) ? null : reader.GetGuid(9));
         await reader.CloseAsync();
+
+        if (lease.RecurringOccurrenceId is { } occurrenceId)
+        {
+            await using var occurrence = new NpgsqlCommand("""
+                UPDATE myservicebus.recurring_job_occurrence
+                SET status = 3 WHERE occurrence_id = @occurrence_id;
+                """, connection, transaction);
+            occurrence.Parameters.AddWithValue("occurrence_id", NpgsqlDbType.Uuid, occurrenceId);
+            await occurrence.ExecuteNonQueryAsync(cancellationToken);
+        }
 
         await using (var staleAttempt = new NpgsqlCommand("""
             UPDATE myservicebus.job_attempt
@@ -410,6 +422,29 @@ public sealed class PostgreSqlJobProcessor
             attempt.Parameters.AddWithValue("attempt_id", NpgsqlDbType.Uuid, lease.AttemptId);
             await attempt.ExecuteNonQueryAsync(cancellationToken);
         }
+        if (lease.RecurringOccurrenceId is { } occurrenceId)
+        {
+            var occurrenceStatus = jobStatus switch
+            {
+                JobStatus.Waiting => RecurringJobOccurrenceStatus.RetryScheduled,
+                JobStatus.Completed => RecurringJobOccurrenceStatus.Completed,
+                JobStatus.Cancelled => RecurringJobOccurrenceStatus.Cancelled,
+                JobStatus.Faulted => RecurringJobOccurrenceStatus.Failed,
+                _ => RecurringJobOccurrenceStatus.Running
+            };
+            await using var occurrence = new NpgsqlCommand("""
+                UPDATE myservicebus.recurring_job_occurrence
+                SET status = @status, failure_category = @failure_category
+                WHERE occurrence_id = @occurrence_id;
+                """, connection, transaction);
+            occurrence.Parameters.AddWithValue("status", NpgsqlDbType.Smallint, (short)occurrenceStatus);
+            occurrence.Parameters.AddWithValue(
+                "failure_category",
+                NpgsqlDbType.Text,
+                exception?.GetType().FullName ?? (object)DBNull.Value);
+            occurrence.Parameters.AddWithValue("occurrence_id", NpgsqlDbType.Uuid, occurrenceId);
+            await occurrence.ExecuteNonQueryAsync(cancellationToken);
+        }
         await transaction.CommitAsync(cancellationToken);
     }
 
@@ -433,6 +468,20 @@ public sealed class PostgreSqlJobProcessor
             attempts.Parameters.AddWithValue("now", NpgsqlDbType.TimestampTz, now);
             attempts.Parameters.AddWithValue("service_name", NpgsqlDbType.Text, serviceName);
             await attempts.ExecuteNonQueryAsync(cancellationToken);
+        }
+        await using (var occurrences = new NpgsqlCommand("""
+            UPDATE myservicebus.recurring_job_occurrence occurrence
+            SET status = 8,
+                failure_category = 'MyServiceBus.JobLeaseExpired'
+            FROM myservicebus.job job
+            WHERE job.recurring_occurrence_id = occurrence.occurrence_id
+              AND job.service_name = @service_name AND job.status = 3
+              AND job.lease_expires_at_utc <= @now AND job.attempt_count > job.retry_limit;
+            """, connection, transaction))
+        {
+            occurrences.Parameters.AddWithValue("now", NpgsqlDbType.TimestampTz, now);
+            occurrences.Parameters.AddWithValue("service_name", NpgsqlDbType.Text, serviceName);
+            await occurrences.ExecuteNonQueryAsync(cancellationToken);
         }
         await using (var jobs = new NpgsqlCommand("""
             UPDATE myservicebus.job

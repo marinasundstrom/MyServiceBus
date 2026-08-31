@@ -82,6 +82,19 @@ internal sealed class PostgreSqlJobProvider : IJobProvider
         command.Parameters.AddWithValue("service_name", NpgsqlDbType.Text, serviceName);
         command.Parameters.AddWithValue("job_id", NpgsqlDbType.Uuid, jobId);
         await command.ExecuteNonQueryAsync(cancellationToken);
+        if (nextStatus is JobStatus.Cancelled)
+        {
+            await using var occurrence = new NpgsqlCommand("""
+                UPDATE myservicebus.recurring_job_occurrence occurrence
+                SET status = 6
+                FROM myservicebus.job job
+                WHERE job.recurring_occurrence_id = occurrence.occurrence_id
+                  AND job.service_name = @service_name AND job.job_id = @job_id;
+                """, connection, transaction);
+            occurrence.Parameters.AddWithValue("service_name", NpgsqlDbType.Text, serviceName);
+            occurrence.Parameters.AddWithValue("job_id", NpgsqlDbType.Uuid, jobId);
+            await occurrence.ExecuteNonQueryAsync(cancellationToken);
+        }
         await transaction.CommitAsync(cancellationToken);
         return new JobControlResult(JobControlOutcome.Applied, nextStatus);
     }
@@ -91,7 +104,9 @@ internal sealed class PostgreSqlJobProvider : IJobProvider
         CancellationToken cancellationToken = default)
     {
         var now = timeProvider.GetUtcNow();
-        await using var command = dataSource.CreateCommand("""
+        await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        await using var command = new NpgsqlCommand("""
             UPDATE myservicebus.job
             SET status = 2,
                 available_at_utc = @now,
@@ -103,14 +118,29 @@ internal sealed class PostgreSqlJobProvider : IJobProvider
                 failure_message = NULL,
                 updated_at_utc = @now
             WHERE service_name = @service_name AND job_id = @job_id AND status IN (5, 6)
-            RETURNING status;
-            """);
+            RETURNING job_id;
+            """, connection, transaction);
         command.Parameters.AddWithValue("now", NpgsqlDbType.TimestampTz, now);
         command.Parameters.AddWithValue("service_name", NpgsqlDbType.Text, serviceName);
         command.Parameters.AddWithValue("job_id", NpgsqlDbType.Uuid, jobId);
         var updated = await command.ExecuteScalarAsync(cancellationToken);
         if (updated is not null)
+        {
+            await using var occurrence = new NpgsqlCommand("""
+                UPDATE myservicebus.recurring_job_occurrence occurrence
+                SET status = 4, failure_category = NULL
+                FROM myservicebus.job job
+                WHERE job.recurring_occurrence_id = occurrence.occurrence_id
+                  AND job.service_name = @service_name AND job.job_id = @job_id;
+                """, connection, transaction);
+            occurrence.Parameters.AddWithValue("service_name", NpgsqlDbType.Text, serviceName);
+            occurrence.Parameters.AddWithValue("job_id", NpgsqlDbType.Uuid, jobId);
+            await occurrence.ExecuteNonQueryAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
             return new JobControlResult(JobControlOutcome.Applied, JobStatus.Waiting);
+        }
+
+        await transaction.RollbackAsync(cancellationToken);
 
         var current = await ReadStatus(jobId, cancellationToken);
         return current is null
