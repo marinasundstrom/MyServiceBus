@@ -1,0 +1,65 @@
+@implements IAsyncDisposable
+@inject IJSRuntime JavaScript
+
+<div class="flow-map-shell" @ref="_map">
+    <svg class="flow-map-canvas" role="img" aria-label="Observed application message flow and throughput"></svg>
+    <div class="flow-map-controls" aria-label="Flow map controls">
+        <button type="button" data-flow-map-action="zoom-in" title="Zoom in" aria-label="Zoom in">+</button>
+        <button type="button" data-flow-map-action="zoom-out" title="Zoom out" aria-label="Zoom out">−</button>
+        <button type="button" data-flow-map-action="reset" title="Reset view" aria-label="Reset view">↺</button>
+    </div>
+</div>
+
+@code {
+    private ElementReference _map;
+    private IJSObjectReference? _module;
+
+    [Parameter, EditorRequired]
+    public required IReadOnlyList<MonitoringApplicationSummary> Applications { get; set; }
+
+    [Parameter, EditorRequired]
+    public required IReadOnlyList<MonitoringFlowEdge> Edges { get; set; }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        _module ??= await JavaScript.InvokeAsync<IJSObjectReference>("import", "./monitoringChart.js");
+        if (firstRender)
+            await _module.InvokeVoidAsync("initializeFlowMap", _map);
+        await _module.InvokeVoidAsync(
+            "updateFlowMap",
+            _map,
+            new
+            {
+                Nodes = Applications.Select(application => new
+                {
+                    Id = application.ApplicationName,
+                    Label = application.ApplicationName,
+                    application.OnlineInstances,
+                    application.TotalInstances
+                }),
+                Links = Edges.Select(edge => new
+                {
+                    Source = edge.SourceApplication,
+                    Target = edge.TargetApplication,
+                    edge.MessageType,
+                    edge.Count
+                }),
+                WindowSeconds = 300
+            });
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            if (_module is not null)
+            {
+                await _module.InvokeVoidAsync("disposeFlowMap", _map);
+                await _module.DisposeAsync();
+            }
+        }
+        catch (Exception exception) when (exception is JSException or JSDisconnectedException or ObjectDisposedException)
+        {
+        }
+    }
+}
