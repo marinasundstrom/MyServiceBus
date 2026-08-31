@@ -18,6 +18,10 @@ builder.Services.AddScoped<GeneratedConsumerAudit>();
 builder.Services.AddServiceBus(x =>
 {
     x.AddGeneratedConsumers();
+    x.AddJobConsumer<DemoTrackedJobConsumer, DemoTrackedJob>(options => options
+        .SetJobTypeName("sample-report")
+        .SetConcurrentJobLimit(2)
+        .SetRetry(retry => retry.Interval(1, TimeSpan.FromSeconds(1))));
 
     x.UsingRabbitMq((context, cfg) =>
     {
@@ -62,6 +66,16 @@ builder.Services.AddHealthChecks()
 builder.Services.AddOpenApi();
 
 var app = builder.Build();
+
+var recurringJobs = app.Services.GetRequiredService<IRecurringJobScheduler>();
+var sampleReportIdentity = new RecurringJobIdentity("sample-report", "aspire-demo");
+await recurringJobs.AddOrUpdate(
+    new RecurringJobDefinition(
+        sampleReportIdentity,
+        new FixedIntervalRecurringJobCadence(TimeSpan.FromMinutes(5)),
+        "Creates a small tracked report job so recurring definitions and their executions can be observed together."),
+    new DemoTrackedJob("recurring-sample", false, false));
+await recurringJobs.TriggerNow(sampleReportIdentity);
 
 var logger = app.Logger;
 logger.LogInformation("🚀 Starting TestApp");
@@ -217,6 +231,26 @@ app.MapDelete("/schedule/{tokenId:guid}", async (Guid tokenId, IMessageScheduler
 })
 .WithName("Cancel_ScheduledSubmitOrder")
 .WithTags("Scheduling");
+
+app.MapPost("/jobs", async (
+    int? delaySeconds,
+    bool? failFirstAttempt,
+    bool? failAlways,
+    IJobClient jobs,
+    CancellationToken cancellationToken) =>
+{
+    var job = new DemoTrackedJob(
+        $"report-{DateTimeOffset.UtcNow:HHmmss}",
+        failFirstAttempt ?? false,
+        failAlways ?? false);
+    var delay = Math.Clamp(delaySeconds ?? 0, 0, 3_600);
+    var receipt = delay == 0
+        ? await jobs.Submit(job, cancellationToken: cancellationToken)
+        : await jobs.Schedule(DateTimeOffset.UtcNow.AddSeconds(delay), job, cancellationToken: cancellationToken);
+    return Results.Accepted($"/jobs/{receipt.JobId}", receipt);
+})
+.WithName("Submit_DemoTrackedJob")
+.WithTags("Jobs");
 
 app.MapGet("/request", async Task<Results<Ok<string>, InternalServerError<string>>> (IRequestClient<TestRequest> client, ILogger<Program> logger, CancellationToken cancellationToken = default) =>
 {

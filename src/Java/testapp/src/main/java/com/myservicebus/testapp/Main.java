@@ -14,6 +14,11 @@ import com.myservicebus.SendEndpointProvider;
 import com.myservicebus.MessageBus;
 import com.myservicebus.MessageBusServices;
 import com.myservicebus.MessageScheduler;
+import com.myservicebus.JobClient;
+import com.myservicebus.RecurringJobDefinition;
+import com.myservicebus.RecurringJobIdentity;
+import com.myservicebus.RecurringJobScheduler;
+import com.myservicebus.FixedIntervalRecurringJobCadence;
 import com.myservicebus.PublishEndpoint;
 import com.myservicebus.di.ServiceCollection;
 import com.myservicebus.di.ServiceProvider;
@@ -59,6 +64,10 @@ public class Main {
         services.from(MessageBusServices.class)
                 .addServiceBus(c -> {
                     GeneratedConsumerCatalog.INSTANCE.register(c);
+                    c.addJobConsumer(DemoTrackedJobConsumer.class, DemoTrackedJob.class, options -> options
+                            .setJobTypeName("sample-report")
+                            .setConcurrentJobLimit(2)
+                            .setRetry(retry -> retry.interval(1, Duration.ofSeconds(1))));
 
                     c.using(RabbitMqFactoryConfigurator.class, (context, cfg) -> {
                         cfg.host(rabbitMqHost, rabbitMqPort, h -> {
@@ -98,6 +107,20 @@ public class Main {
         try {
             serviceBus.start();
             monitoringExporter.start(provider);
+            RecurringJobScheduler recurringJobs = provider.getRequiredService(RecurringJobScheduler.class);
+            RecurringJobIdentity sampleReportIdentity = new RecurringJobIdentity("sample-report", "aspire-demo");
+            recurringJobs.addOrUpdate(
+                    new RecurringJobDefinition(
+                            sampleReportIdentity,
+                            new FixedIntervalRecurringJobCadence(Duration.ofMinutes(5)),
+                            "Creates a small tracked report job so recurring definitions and their executions can be observed together.",
+                            null,
+                            null,
+                            com.myservicebus.RecurringJobMisfirePolicy.FIRE_ONCE_NOW,
+                            1,
+                            com.myservicebus.RecurringJobOverlapPolicy.ALLOW),
+                    new DemoTrackedJob("recurring-sample", false, false)).toCompletableFuture().join();
+            recurringJobs.triggerNow(sampleReportIdentity).toCompletableFuture().join();
             started.set(true);
             logger.info("🚀 Test app started");
         } catch (Exception e) {
@@ -207,6 +230,22 @@ public class Main {
                 var status = scheduler.cancelScheduledPublish(tokenId).toCompletableFuture().join();
                 ctx.json(java.util.Map.of("tokenId", tokenId.toString(), "status", status.toString()));
             }
+        });
+
+        app.post("/jobs", ctx -> {
+            int requestedDelay = ctx.queryParamAsClass("delaySeconds", Integer.class).getOrDefault(0);
+            int delaySeconds = Math.max(0, Math.min(requestedDelay, 3_600));
+            boolean failFirstAttempt = ctx.queryParamAsClass("failFirstAttempt", Boolean.class).getOrDefault(false);
+            boolean failAlways = ctx.queryParamAsClass("failAlways", Boolean.class).getOrDefault(false);
+            JobClient jobs = provider.getRequiredService(JobClient.class);
+            var job = new DemoTrackedJob(
+                    "report-" + java.time.Instant.now().toString(),
+                    failFirstAttempt,
+                    failAlways);
+            var receipt = delaySeconds == 0
+                    ? jobs.submit(job).toCompletableFuture().join()
+                    : jobs.schedule(java.time.Instant.now().plusSeconds(delaySeconds), job).toCompletableFuture().join();
+            ctx.status(202).json(receipt);
         });
 
         app.get("/request", ctx -> {
