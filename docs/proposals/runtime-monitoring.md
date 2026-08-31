@@ -2,7 +2,7 @@
 
 ## Status
 
-Experimental MVP implemented and validated end to end through the Aspire stack. The proof of concept covers general-purpose hooks, C# and Java exporters, retry observations, bounded time-window and time-series metrics, observed flow reconstruction, in-memory query APIs, WebSocket invalidations, and a standalone grouped Blazor overview with light and dark themes. Authentication, payload-byte limits, persistence, broker and host metrics, automated scaling advice, and external telemetry links remain future work. See [Runtime Monitoring](../runtime-monitoring.md) for setup and the current operational boundary.
+Experimental MVP implemented and validated end to end through the Aspire stack. The proof of concept covers general-purpose hooks, C# and Java exporters, retry observations, bounded time-window and time-series metrics, observed flow reconstruction, volatile and PostgreSQL-backed collection, history-coverage reporting, WebSocket invalidations, and a standalone application-oriented Blazor dashboard with light and dark themes. Authentication, payload-byte limits, long-range history queries, broker and host metrics, alerting, administration, automated scaling advice, and external telemetry links remain future work. See [Runtime Monitoring](../runtime-monitoring.md) for setup and the current operational boundary.
 
 ## Recommendation
 
@@ -16,7 +16,7 @@ MyServiceBus client
   -> standalone Blazor dashboard
 ```
 
-The monitored applications instrument bus activity and export it asynchronously. They do not own monitoring history and do not serve query APIs. The monitoring service collects data from every application, maintains the distributed runtime model, and owns all aggregation and future persistence. The dashboard only queries and subscribes to the monitoring service.
+The monitored applications instrument bus activity and export it asynchronously. They do not own monitoring history and do not serve query APIs. The monitoring service collects data from every application, maintains the distributed runtime model, and owns aggregation and persistence. The dashboard only queries and subscribes to configured data sources; for MyServiceBus data, the monitoring service is authoritative.
 
 This should be a fully optional addon. A MyServiceBus application works normally without the exporter, collector, dashboard, or a database.
 
@@ -39,17 +39,17 @@ Reuse:
 - host authentication and authorization
 - existing OpenTelemetry instrumentation and external telemetry backends
 - existing transport management tools
-- established database providers when persistence is added
+- Entity Framework Core and PostgreSQL for the built-in durable provider
 
-Do not build:
+Do not build inside the monitoring service:
 
 - a generic telemetry collector
 - a trace, log, or infrastructure-metrics backend
-- broker administration APIs
+- broker inspection or administration APIs
 - a custom authentication system
 - a custom database engine
 
-The monitoring service is a domain-specific read-model service, not a new observability platform.
+The monitoring service is a domain-specific read-model service, not a new observability platform. Broker inspection, shared alert evaluation, and privileged administration have different data, credential, and safety boundaries and should remain separate capabilities.
 
 ## Naming And MassTransit Alignment
 
@@ -237,7 +237,7 @@ Its internal boundaries are:
 - `MetricsAggregator`: bounded time-window aggregation
 - `MessageFlowBuilder`: configured and observed graph construction
 - `MonitoringQueryService`: stable programmatic query API
-- `MonitoringStore`: optional persistence abstraction
+- `MonitoringStore`: pluggable volatile or durable persistence abstraction
 
 The first implementation hosts these backend components in one ASP.NET Core monitoring-service process. The dashboard remains a separate application and communicates only through the query API.
 
@@ -251,11 +251,23 @@ It does not connect to monitored applications or own the canonical monitoring st
 
 The same query API can later support a CLI, tests, other dashboards, or support tooling.
 
-The dashboard follows a directed information hierarchy. The landing page contains only compact, broadly actionable health and throughput signals; application, endpoint, flow, failure, and delivery views own their detailed breakdowns. Explanatory labels should make messaging concepts understandable without hiding exact engineering data from experienced operators. The layout must remain useful on phone-sized screens as well as desktop displays.
+The dashboard is a development and operations tool for one distributed application composed of participating services or sub-applications; it is not primarily a bus-instance console. The monitoring service may keep exact infrastructure terminology, while the UI starts with the distributed application and its participants and progressively reveals messaging behavior, topology, bus identity, and transport detail as diagnostic evidence.
+
+The dashboard follows a directed information hierarchy. The landing page contains only compact, broadly actionable health and throughput signals. Each application owns Overview, Metrics, and Flow drill-downs before the user moves into system-wide endpoint, failure, delivery, or topology detail. Explanatory labels should make messaging concepts understandable without hiding exact engineering data from experienced operators. The layout must remain useful on phone-sized screens as well as desktop displays.
 
 Graphs and maps are reusable dashboard components and a primary way to explain live behavior. Overview variants stay compact, while focused views provide full scales, dimensions, labels, and tabular alternatives. Streamed updates preserve graph position, selection, and zoom context where possible.
 
 Known overview widgets have stable identities so a future versioned JSON layout can arrange an allowlisted component catalog. The first dashboard keeps one curated default and exposes no layout configuration. Future domains such as sagas should add focused views and query models first, promoting only a concise actionable signal to the landing page.
+
+The supplied dashboard is an opinionated consumer, not the only valid projection of the monitoring APIs. A later engineering-specific dashboard may lead with buses, endpoints, raw topology, and broker objects, closer to MassTransit's infrastructure perspective, while this dashboard retains its application-developer information architecture.
+
+### 6. Broker, Alerting, And Control Boundaries
+
+Broker state is not MyServiceBus monitoring data. A future read-only dashboard provider may query a broker management API using separately configured credentials and present queue depth, dead-letter state, connection health, or broker capacity alongside application data. The monitoring service must not acquire those credentials or pretend exported client observations are broker truth.
+
+Alert evaluation should be shared across data sources rather than reimplemented in each provider. A separate alerting service can query MyServiceBus monitoring, broker providers, and later external metrics; own rule configuration, evaluation state, suppression, and notification delivery; and expose alert results to the dashboard. It must not write alert state into the MyServiceBus monitoring store.
+
+Queue management, purge, replay, reset, and similar commands form a privileged control plane. Read-only dashboard access must never imply permission to execute them. A future control API needs scoped authorization, explicit confirmation, audit records, bounded targets, idempotency where possible, and clear recovery semantics. Its user experience may be exposed through the dashboard without placing mutation logic in the dashboard host.
 
 ## Identity And Registration
 
@@ -270,7 +282,7 @@ Use a small MyServiceBus resource identity:
 - stable `busId` within the process
 - optional bounded resource `labels`
 
-Applications configure these values through the monitoring addon. `applicationName` is the logical identity that groups worker replicas, `instanceId` identifies each running replica, and `busId` distinguishes a bus within that process. Transport addresses are descriptive metadata rather than unique application identity. For convenience, platform adapters may use common host or telemetry resource values as defaults, but the monitoring contract does not depend on an OpenTelemetry SDK.
+Participants configure these values through the monitoring addon. `applicationName` is the logical service or sub-application identity that groups replicas within the monitored distributed application, `instanceId` identifies each running replica, and `busId` distinguishes a bus within that process. Transport addresses are descriptive metadata rather than unique application identity. For convenience, platform adapters may use common host or telemetry resource values as defaults, but the monitoring contract does not depend on an OpenTelemetry SDK.
 
 ### Self-Registration
 
@@ -389,6 +401,25 @@ Counts and ages may be grouped by application, provider, and bounded service par
 
 The dashboard should distinguish three delays: time waiting in the service-owned outbox, broker transit/backlog, and consumer processing. This prevents an old pending record from being misdiagnosed as broker queue depth. The monitoring path must never lease, retry, mark dispatched, clean up, or otherwise mutate outbox/inbox state.
 
+### Scheduled Messages And Jobs
+
+Scheduled work should be queryable by application without requiring the monitoring service to understand or connect to every scheduler store. Message-aware scheduling providers and provider-defined job schedulers export bounded snapshots or lifecycle observations from the application that owns them.
+
+The query model should include:
+
+- application, provider, and bounded schedule partition;
+- schedule token or opaque operational identity;
+- safe message type or job type, without payload data;
+- send, publish, or provider-defined job intent;
+- due time, created time, last transition time, and optional completion time;
+- normalized status plus the provider's original status;
+- delivery or execution attempt; and
+- bounded failure category without an unbounded exception message.
+
+Common status semantics should distinguish `Pending`, `Leased` or running, `Dispatched` or completed, `Cancelled`, and `Dead` or failed. A volatile callback scheduler cannot export a serializable callback and must not claim durable history. Durable providers may retain terminal status according to their own bounded retention and export it as operational history.
+
+The dashboard exposes scheduled work as a focused application view, with only an actionable summary promoted to the system overview when overdue or failed work exists. Cancellation, retry, trigger-now, and deletion are privileged control-plane commands and must remain separate from the read-only monitoring contract.
+
 ### Message Flow
 
 The monitoring service builds two graphs:
@@ -475,7 +506,7 @@ The first prototype should implement only configurable trace-link templates. Ric
 
 ## Storage
 
-### Initial In-Memory Store
+### In-Memory Store
 
 The monitoring service initially keeps:
 
@@ -485,22 +516,21 @@ The monitoring service initially keeps:
 - bounded recent significant observations
 - bounded configured and observed flow graphs
 
-Restarting the monitoring service resets this data in the first prototype.
+Restarting the monitoring service resets this data. This remains the default development provider.
 
-### Future Persistence
+### Built-In PostgreSQL Provider
 
-A monitoring-service `MonitoringStore` may later persist:
+The .NET monitoring service includes an Entity Framework Core PostgreSQL provider. It applies a dedicated schema migration at startup and persists:
 
-- application and operator annotations
-- instance sessions and lease history
-- metadata revisions
-- time-bucketed metrics
-- selected significant observations
-- flow aggregates
+- the latest metadata snapshot per application, instance, and bus identity
+- the latest heartbeat per identity
+- deduplicated observation batches as JSONB
 
-Persist aggregates for throughput and significant observations for diagnosis. Do not persist every successful message operation by default.
+The provider restores only the active 15-minute read-model window after restart and preserves original ingest freshness. Stored observation batches default to seven-day retention, but long-range historical query models are not yet implemented. The dashboard must report that distinction instead of implying the full retained period is currently queryable.
 
-Storage batching, retention, privacy, migrations, and database selection all belong to the monitoring service. Clients remain free of monitoring persistence.
+Future history slices may add time-bucketed aggregates, significant-observation queries, metadata revision history, and operator annotations. Persist aggregates where they answer a defined query; do not default to indefinite storage of every successful message operation.
+
+Storage batching, retention, privacy, migrations, and database selection all belong to the monitoring service. Clients and the dashboard remain free of monitoring persistence.
 
 ## Reliability Semantics
 
@@ -548,7 +578,7 @@ The monitoring service must validate client-supplied identities rather than allo
 ### Server
 
 - `MyServiceBus.Monitoring.Server`: ASP.NET Core collector and query API
-- `MyServiceBus.Monitoring.Persistence.*`: future server-side stores
+- built-in in-memory and PostgreSQL history providers
 - `MyServiceBus.Dashboard`: standalone Blazor sandbox
 - `MyServiceBus.Dashboard.Telemetry.*`: optional external telemetry providers
 
@@ -561,16 +591,18 @@ The existing inspection modules should be folded into the client monitoring pack
 The sandbox prototype should show:
 
 - discovered applications and online/offline instances
+- application-oriented Overview, Metrics, and Flow drill-downs
+- scheduled messages and jobs with due time and status once providers export the bounded query model
 - bus, endpoint, consumer, handler, and message metadata
 - endpoint availability and current windowed activity as a focused drill-down
 - live send, publish, receive, consume, retry, and failure rates
 - bounded recent retries and failures
 - configured and observed message flows
-- monitoring gaps
+- monitoring gaps, freshness, and storage durability
 - links to traces through a configured dashboard telemetry provider
 - compact overview graphs plus full graph and map views with streamed updates
 
-It should not initially include broker actions, alerting, complete trace viewing, message bodies, automatic discovery integrations, or authentication administration.
+It should not initially include broker actions, alert evaluation, complete trace viewing, message bodies, automatic discovery integrations, or authentication administration. Broker read models and guarded commands may later appear in the same user interface while remaining separate services or providers.
 
 ## Rollout
 
@@ -603,9 +635,9 @@ It should not initially include broker actions, alerting, complete trace viewing
 
 ### Phase 5: Persistence
 
-- derive historical queries from the working dashboard
-- add one server-side store
-- define batching, retention, privacy, and migration behavior
+- add one server-side store — PostgreSQL implemented
+- define batching, retention, privacy, and migration behavior — first bounded slice implemented
+- add long-range aggregate and significant-observation queries only when a dashboard use case requires them
 
 ## Decisions
 
@@ -616,6 +648,7 @@ It should not initially include broker actions, alerting, complete trace viewing
 - Keep clients free of queryable monitoring history and databases.
 - Put aggregation, flow reconstruction, querying, and persistence in the monitoring service.
 - Keep the Blazor dashboard separate and read-only against the query API.
+- Make applications the dashboard's primary navigation and explanation model; progressively disclose bus and topology concepts.
 - Ship the monitoring service and dashboard as separate applications, orchestrated together in the sandbox.
 - Keep OpenTelemetry collection and storage separate from the monitoring service.
 - Add optional external telemetry providers to the dashboard.
@@ -623,7 +656,9 @@ It should not initially include broker actions, alerting, complete trace viewing
 - Expose HTTP queries plus a portable WebSocket subscription API from the monitoring service.
 - Keep SignalR optional as a Blazor-specific adapter.
 - Align MassTransit terminology, not its APIs or embedded-dashboard architecture.
-- Keep broker administration out of the initial scope.
+- Keep broker inspection outside the MyServiceBus monitoring service.
+- Put cross-source alert evaluation and notification delivery in a separate alerting service.
+- Keep broker administration out of the initial scope and behind a future privileged control plane.
 
 ## Open Questions
 
