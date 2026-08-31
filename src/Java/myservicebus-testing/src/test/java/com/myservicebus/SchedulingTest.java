@@ -10,6 +10,8 @@ import java.time.Instant;
 import java.util.UUID;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.List;
+import java.util.Set;
 import java.util.concurrent.CompletionStage;
 import java.util.function.Function;
 import java.util.concurrent.CompletableFuture;
@@ -249,5 +251,37 @@ public class SchedulingTest {
         assertFalse(manual.contains(handle.getTokenId()));
         assertFalse(harness.wasConsumed(String.class));
         harness.stop().join();
+    }
+
+    @Test
+    void inMemoryScheduledWorkIsSharedAcrossApplicationScopes() {
+        ManualJobScheduler manual = new ManualJobScheduler();
+        InMemoryScheduledWorkSource source = new InMemoryScheduledWorkSource();
+        List<ScheduledWorkState> observed = new java.util.concurrent.CopyOnWriteArrayList<>();
+        ScheduledWorkObserver observer = observed::add;
+        PublishEndpoint publisher = new PublishEndpoint() {
+            @Override
+            public <T> CompletableFuture<Void> publish(T message, CancellationToken token) {
+                return CompletableFuture.completedFuture(null);
+            }
+        };
+        SendEndpointProvider endpoints = ignored -> new SendEndpoint() {
+            @Override
+            public <T> CompletableFuture<Void> send(T message, CancellationToken token) {
+                return CompletableFuture.completedFuture(null);
+            }
+        };
+        MessageScheduler firstScope = new MessageSchedulerImpl(new InMemoryScheduleMessageProvider(
+                publisher, endpoints, manual, source, Set.of(observer)));
+        MessageScheduler secondScope = new MessageSchedulerImpl(new InMemoryScheduleMessageProvider(
+                publisher, endpoints, manual, source, Set.of(observer)));
+
+        ScheduledMessageHandle handle = firstScope.schedulePublish("scheduled", Duration.ofDays(1))
+                .toCompletableFuture().join();
+        assertEquals(1, source.getSnapshot().size());
+        secondScope.cancelScheduledPublish(handle).toCompletableFuture().join();
+
+        assertTrue(source.getSnapshot().isEmpty());
+        assertEquals(ScheduledWorkStatus.CANCELLED, observed.get(observed.size() - 1).status());
     }
 }

@@ -5,19 +5,38 @@ public sealed class InMemoryScheduleMessageProvider : IScheduleMessageProvider
     private readonly IPublishEndpoint publishEndpoint;
     private readonly ISendEndpointProvider sendEndpointProvider;
     private readonly IJobScheduler jobScheduler;
+    private readonly InMemoryScheduledWorkSource source;
     private readonly IReadOnlyList<IScheduledWorkObserver> observers;
-    private readonly System.Collections.Concurrent.ConcurrentDictionary<Guid, ScheduledWorkState> scheduledWork = new();
+
+    public InMemoryScheduleMessageProvider(
+        IPublishEndpoint publishEndpoint,
+        ISendEndpointProvider sendEndpointProvider,
+        IJobScheduler jobScheduler)
+        : this(publishEndpoint, sendEndpointProvider, jobScheduler, new InMemoryScheduledWorkSource(), [])
+    {
+    }
 
     public InMemoryScheduleMessageProvider(
         IPublishEndpoint publishEndpoint,
         ISendEndpointProvider sendEndpointProvider,
         IJobScheduler jobScheduler,
-        IEnumerable<IScheduledWorkObserver>? observers = null)
+        IEnumerable<IScheduledWorkObserver>? observers)
+        : this(publishEndpoint, sendEndpointProvider, jobScheduler, new InMemoryScheduledWorkSource(), observers ?? [])
+    {
+    }
+
+    public InMemoryScheduleMessageProvider(
+        IPublishEndpoint publishEndpoint,
+        ISendEndpointProvider sendEndpointProvider,
+        IJobScheduler jobScheduler,
+        InMemoryScheduledWorkSource source,
+        IEnumerable<IScheduledWorkObserver> observers)
     {
         this.publishEndpoint = publishEndpoint;
         this.sendEndpointProvider = sendEndpointProvider;
         this.jobScheduler = jobScheduler;
-        this.observers = observers?.ToArray() ?? [];
+        this.source = source;
+        this.observers = observers.ToArray();
     }
 
     public ScheduleMessageProviderDurability Durability => ScheduleMessageProviderDurability.Volatile;
@@ -73,7 +92,7 @@ public sealed class InMemoryScheduleMessageProvider : IScheduleMessageProvider
         if (!await jobScheduler.Cancel(tokenId))
             return ScheduleCancellationResult.NotFound;
 
-        if (scheduledWork.TryRemove(tokenId, out var state))
+        if (source.TryRemove(tokenId, out var state))
             Publish(state with
             {
                 Status = ScheduledWorkStatus.Cancelled,
@@ -98,13 +117,13 @@ public sealed class InMemoryScheduleMessageProvider : IScheduleMessageProvider
             "Pending",
             0,
             DateTimeOffset.UtcNow);
-        scheduledWork[tokenId] = state;
+        source.Upsert(state);
         Publish(state);
     }
 
     private async Task ExecuteAsync(Guid tokenId, CancellationToken cancellationToken, Func<Task> callback)
     {
-        if (!scheduledWork.TryGetValue(tokenId, out var state))
+        if (!source.TryGet(tokenId, out var state))
             return;
 
         var running = state with
@@ -114,7 +133,7 @@ public sealed class InMemoryScheduleMessageProvider : IScheduleMessageProvider
             Attempt = state.Attempt + 1,
             UpdatedAtUtc = DateTimeOffset.UtcNow
         };
-        scheduledWork[tokenId] = running;
+        source.Upsert(running);
         Publish(running);
         try
         {
@@ -139,7 +158,7 @@ public sealed class InMemoryScheduleMessageProvider : IScheduleMessageProvider
         }
         finally
         {
-            scheduledWork.TryRemove(tokenId, out _);
+            source.TryRemove(tokenId, out _);
         }
     }
 

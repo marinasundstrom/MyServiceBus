@@ -364,6 +364,32 @@ public class SchedulingTests
         await hosted.StopAsync(CancellationToken.None);
     }
 
+    [Fact]
+    public async Task In_memory_scheduled_work_is_shared_across_application_scopes()
+    {
+        var manual = new ManualJobScheduler();
+        var observer = new RecordingScheduledWorkObserver();
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddSingleton<IJobScheduler>(manual);
+        services.AddSingleton<IScheduledWorkObserver>(observer);
+        services.AddServiceBus(cfg => cfg.UsingMediator());
+
+        await using var provider = services.BuildServiceProvider();
+        ScheduledMessageHandle handle;
+        await using (var schedulingScope = provider.CreateAsyncScope())
+            handle = await schedulingScope.ServiceProvider.GetRequiredService<IMessageScheduler>()
+                .SchedulePublish(new TestMessage(), TimeSpan.FromDays(1));
+
+        Assert.Single(provider.GetRequiredService<IScheduledWorkSource>().GetSnapshot());
+        await using (var cancellationScope = provider.CreateAsyncScope())
+            await cancellationScope.ServiceProvider.GetRequiredService<IMessageScheduler>()
+                .CancelScheduledPublish(handle);
+
+        Assert.Equal(ScheduledWorkStatus.Cancelled, observer.States[^1].Status);
+        Assert.Empty(provider.GetRequiredService<IScheduledWorkSource>().GetSnapshot());
+    }
+
     private sealed class RecordingScheduledWorkObserver : IScheduledWorkObserver
     {
         public List<ScheduledWorkState> States { get; } = [];
