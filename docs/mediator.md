@@ -130,7 +130,7 @@ MyServiceBus provides a C# source generator and a Java JSR 269 annotation proces
 ### C# generated catalog
 
 ```bash
-dotnet add package Sundstrom.MyServiceBus.Generators --version 0.1.0-preview.7
+dotnet add package Sundstrom.MyServiceBus.Generators --version 0.1.0-preview.8
 ```
 
 ```csharp
@@ -145,8 +145,8 @@ builder.Services.AddServiceBus(x =>
 
 ```groovy
 dependencies {
-    implementation "io.github.marinasundstrom.myservicebus:myservicebus:0.1.0-preview.7"
-    annotationProcessor "io.github.marinasundstrom.myservicebus:myservicebus-processor:0.1.0-preview.7"
+    implementation "io.github.marinasundstrom.myservicebus:myservicebus:0.1.0-preview.8"
+    annotationProcessor "io.github.marinasundstrom.myservicebus:myservicebus-processor:0.1.0-preview.8"
 }
 ```
 

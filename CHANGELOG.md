@@ -4,6 +4,9 @@ This changelog summarizes the bigger themes in the repository history rather tha
 
 ## Unreleased
 
+## 0.1.0-preview.8 - 2026-08-31
+
+- Stabilized PostgreSQL scheduler persistence gates in C# and Java by accepting the database's documented microsecond timestamp precision in either rounding direction.
 - Clarified orchestration—including sagas and state machines—and choreography as distinct future product areas. The architecture, roadmap, and public website now distinguish application-composed event choreography from a future first-class lifecycle model and state explicitly that no saga runtime or workflow engine is currently included.
 - Extended the experimental .NET 11 union path into the C# registration generator, which now expands named-union inputs into direct per-case adapters with ordinary concrete topology. The preview-pinned Runtime Async NativeAOT smoke executes both generated union cases without runtime ABI discovery, while Raven continues to use the shared reflection ABI until it has a language-owned generated manifest.
 - Added a five-second cached monitoring shell summary for rolling failures and affected applications, unhealthy outbox dispatchers, faulted and running tracked jobs, and explicit completeness and freshness. The responsive dashboard now shows a capped rolling Failures badge that naturally clears after recovery while remaining distinct from the future alert-service lifecycle.

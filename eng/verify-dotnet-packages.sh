@@ -2,7 +2,7 @@
 set -eu
 
 package_dir="${1:-artifacts/packages}"
-version="${2:-0.1.0-preview.7}"
+version="${2:-0.1.0-preview.8}"
 packages="Sundstrom.MyServiceBus.Abstractions Sundstrom.MyServiceBus Sundstrom.MyServiceBus.Serialization.Bson Sundstrom.MyServiceBus.PostgreSql Sundstrom.MyServiceBus.Inspection Sundstrom.MyServiceBus.Monitoring Sundstrom.MyServiceBus.RabbitMq Sundstrom.MyServiceBus.AzureServiceBus Sundstrom.MyServiceBus.AmazonSqs Sundstrom.MyServiceBus.Testing"
 
 for package_id in $packages; do
