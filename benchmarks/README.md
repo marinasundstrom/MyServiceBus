@@ -12,7 +12,7 @@ Build and run the Java JMH suite:
 
 ```bash
 gradle :myservicebus-benchmarks:jar
-java -jar src/Java/myservicebus-benchmarks/build/libs/myservicebus-benchmarks-0.1.0-preview.7.jar
+java -jar src/Java/myservicebus-benchmarks/build/libs/myservicebus-benchmarks-0.1.0-preview.8.jar
 ```
 
 The Java native smoke application accepts `--benchmark` for the identical generated-catalog mediator workload used to compare GraalVM JIT and Native Image execution. The supported end-to-end native compilation check is:

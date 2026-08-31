@@ -22,7 +22,7 @@ await bus.Publish(new SubmitOrder(Guid.NewGuid()));`,
   java: {
     label: 'Java',
     install:
-      "implementation 'io.github.marinasundstrom.myservicebus:myservicebus-rabbitmq:0.1.0-preview.7'",
+      "implementation 'io.github.marinasundstrom.myservicebus:myservicebus-rabbitmq:0.1.0-preview.8'",
     code: `ServiceCollection services = ServiceCollection.create();
 
 services.from(MessageBusServices.class)

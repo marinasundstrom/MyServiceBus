@@ -25,7 +25,7 @@ Create a trusted publishing policy for the NuGet.org account that owns the MySer
 
 Enter only the workflow filename, not the `.github/workflows/` path. The workflow supplies the public NuGet.org profile username directly to `NuGet/login`; no NuGet API-key secret is required. GitHub OIDC is exchanged for a short-lived key immediately before publication.
 
-The trusted policy owner must own all nine package IDs:
+The trusted policy owner must own all ten package IDs:
 
 - `Sundstrom.MyServiceBus.Abstractions`
 - `Sundstrom.MyServiceBus`
@@ -35,6 +35,7 @@ The trusted policy owner must own all nine package IDs:
 - `Sundstrom.MyServiceBus.Monitoring`
 - `Sundstrom.MyServiceBus.RabbitMq`
 - `Sundstrom.MyServiceBus.AzureServiceBus`
+- `Sundstrom.MyServiceBus.AmazonSqs`
 - `Sundstrom.MyServiceBus.Testing`
 
 ## One-time Maven Central setup
@@ -67,9 +68,9 @@ Using one immutable tag for both workflows prevents a branch update from causing
 ## Publishing both ecosystems
 
 1. In GitHub Actions, run **Publish Maven Central preview** and select the release tag.
-2. Wait for the workflow to reach Maven Central state `PUBLISHING` or `PUBLISHED`. It tests all Java modules, creates signed publications, verifies a clean consumer, uploads one bundle containing all thirteen artifacts, and waits for Central to validate and accept it. Publication then continues asynchronously in Central.
+2. Wait for the workflow to reach Maven Central state `PUBLISHING` or `PUBLISHED`. It tests all Java modules, creates signed publications, verifies a clean consumer, uploads one bundle containing all fourteen artifacts, and waits for Central to validate and accept it. Publication then continues asynchronously in Central.
 3. Run **Publish NuGet preview** and select the same release tag.
-4. Confirm that all nine NuGet packages and symbol packages were accepted.
+4. Confirm that all ten NuGet packages and symbol packages were accepted.
 5. Run **Publish monitoring images** from the same tag and confirm that the separately deployable collector and dashboard images were accepted by GitHub Container Registry for AMD64 and ARM64.
 6. Verify the version on Maven Central, NuGet.org, and GitHub Container Registry after registry indexing completes.
 7. Create the GitHub prerelease and use the same version in its title and release notes.
@@ -82,7 +83,7 @@ Maven Central accepted the original eight-artifact `0.1.0-preview.3` deployment 
 
 ## Failure and retry behavior
 
-NuGet and Maven Central package versions are immutable. The NuGet workflow uses `--skip-duplicate`, allowing an interrupted multi-package push to resume without replacing accepted packages. Maven Central uploads all thirteen Java artifacts as one deployment bundle; validation failure leaves the deployment failed rather than partially publishing individual modules. The collector and dashboard are applications rather than client libraries, so they are distributed as separate OCI images named `ghcr.io/marinasundstrom/myservicebus-monitoring-collector` and `ghcr.io/marinasundstrom/myservicebus-monitoring-dashboard`.
+NuGet and Maven Central package versions are immutable. The NuGet workflow uses `--skip-duplicate`, allowing an interrupted multi-package push to resume without replacing accepted packages. Maven Central uploads all fourteen Java artifacts as one deployment bundle; validation failure leaves the deployment failed rather than partially publishing individual modules. The collector and dashboard are applications rather than client libraries, so they are distributed as separate OCI images named `ghcr.io/marinasundstrom/myservicebus-monitoring-collector` and `ghcr.io/marinasundstrom/myservicebus-monitoring-dashboard`.
 
 If the Maven workflow is interrupted before Central accepts the deployment, do
 not upload the version again. Dispatch a ref containing the workflow's
