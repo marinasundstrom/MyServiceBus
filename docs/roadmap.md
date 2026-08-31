@@ -227,6 +227,19 @@ Start with the portable core, canonical fixtures, and one transport profile. Map
 
 **Exit criteria:** integrations preserve their native semantics, and every mutating operational action has an explicit security and audit model.
 
+## Future Area: Orchestration and Choreography
+
+**Outcome:** applications can model and observe long-running distributed workflows without confusing message delivery with business-process ownership.
+
+This is a directional area, not a committed release phase. It contains two related but different models:
+
+- **Orchestration**, including sagas and state machines, introduces an explicit coordinator with durable workflow state, correlation, concurrency control, timeouts, compensation, and recovery.
+- **Choreography** keeps services autonomous and coordinates through events. The existing publish/consume primitives can be used this way today, but first-class support would add clearer relationship modeling, monitoring, diagnostics, and guidance for detecting stalled, cyclic, or unexpectedly amplified flows.
+
+Before either area is promoted, the project must define portable C#↔Java semantics, persistence and provider boundaries, idempotency and concurrency rules, scheduling and outbox integration, topology projection, versioning, and application-centric monitoring. A saga implementation must not be copied merely for MassTransit API parity, and choreography tooling must not turn decentralized event reactions into a hidden central workflow engine.
+
+**Current status:** future area. MyServiceBus has supporting messaging and monitoring primitives but no supported saga repository, saga state-machine runtime, compensation engine, workflow definition API, or choreography-specific lifecycle model.
+
 ## Candidate Backlog
 
 The following work remains demand-driven and is not automatically part of the portable core:
@@ -240,6 +253,8 @@ The following work remains demand-driven and is not automatically part of the po
 - additional monitoring persistence providers
 - schema registry integrations and contract-evolution tooling
 - controlled replay and topology-management APIs
+- orchestration, including sagas and state machines
+- choreography modeling, diagnostics, and flow monitoring
 
 ## Near-Term Recommended Sequence
 

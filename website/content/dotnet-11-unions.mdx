@@ -99,11 +99,13 @@ The union carrier never becomes the interoperable contract. Java and other clien
 ## Understand today&apos;s experimental boundary
 
 <ul>
-  <li>Consumer discovery currently recognizes the standard union ABI through cached reflection.</li>
-  <li>Generated registration can describe the same expanded cases later for trimming, AOT, and faster startup.</li>
+  <li>Reflection discovery recognizes the standard union ABI through a cached descriptor and constructor delegates.</li>
+  <li>The C# source generator expands named-union inputs into direct per-case adapters. CI executes both cases in a .NET 11 Runtime Async NativeAOT application and verifies that topology contains only the concrete contracts.</li>
+  <li>Raven source is not visible to the C# generator, so Raven union consumers still use reflection unless a future Raven-owned manifest supplies generated registrations.</li>
+  <li>Broker-backed union delivery and union-valued handler responses remain future verification slices.</li>
   <li>A typed <code>ConsumeContext&lt;TUnion&gt;</code> parameter is not supported yet; consume the union value directly.</li>
   <li>JSON writes the active case shape. Reading an object-shaped union requires an explicit classifier or discriminator policy.</li>
   <li>The concrete case types—not the union carrier—control topology names and wire compatibility.</li>
 </ul>
 
-For the current registration model, see <Link href="/docs/consumer-methods">consumer methods</Link>. For the longer-term optimization path, see <Link href="/docs/native-aot">AOT compilation</Link>.
+For the current registration model, see <Link href="/docs/consumer-methods">consumer methods</Link>. For the generated native path and its remaining application-level constraints, see <Link href="/docs/native-aot">AOT compilation</Link>.

@@ -36,6 +36,17 @@ MassTransit supports multiple bus instances in one host through separately regis
 
 Applications that require isolated buses should use separate application hosts or processes. Multiple in-process buses may be reconsidered only in response to a concrete use case and a design that remains idiomatic in both C# and Java; MassTransit compatibility alone is insufficient justification.
 
+### Workflow coordination boundary
+
+Distributed workflow coordination is a future product area with two distinct styles:
+
+- **Orchestration** uses an explicit coordinator to own workflow state and direct the next step. Sagas, state machines, durable timeouts, compensation, and coordinator persistence belong to this area.
+- **Choreography** lets independently owned services react to events without one central coordinator. Applications can already compose basic choreography from publish and consume primitives, but MyServiceBus does not yet provide a first-class workflow model, lifecycle monitoring, cycle detection, or choreography-specific operational guidance.
+
+The current runtime supplies the messaging, correlation, scheduling, outbox, retry, fault, and monitoring primitives from which applications can build workflows. It does not yet supply a saga repository, saga state-machine runtime, compensation engine, or a framework-owned choreography model. Documentation and dashboards must not imply those capabilities merely because endpoint naming and topology models reserve room for future saga nodes.
+
+Future work must define portable workflow semantics before choosing C# or Java APIs. Orchestration state, concurrency, idempotency, timeouts, compensation, persistence providers, cross-language contracts, topology, and monitoring must form one coherent model. Choreography support must remain decentralized rather than introducing an implicit coordinator, and it should focus on making event relationships and unhealthy or incomplete flows observable without pretending that the framework owns application business state.
+
 ## Architectural Principles
 
 - **Wire compatibility is the strongest compatibility promise.** Compatible clients preserve the MassTransit envelope, message identity, headers, addressing, correlation, request/response, and fault conventions defined by the selected transport profile.
