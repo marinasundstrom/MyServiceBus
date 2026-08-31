@@ -3,7 +3,10 @@ package com.myservicebus.testapp.outbox;
 import TestApp.OutboxShowcaseMessage;
 import com.myservicebus.MessageBus;
 import com.myservicebus.MessageBusServices;
+import com.myservicebus.MessageScheduler;
 import com.myservicebus.PublishEndpoint;
+import com.myservicebus.ScheduleCancellationResult;
+import com.myservicebus.ScheduledMessageHandle;
 import com.myservicebus.TransportFactory;
 import com.myservicebus.di.ServiceCollection;
 import com.myservicebus.di.ServiceProvider;
@@ -14,13 +17,19 @@ import com.myservicebus.persistence.postgresql.PostgreSqlOutboxBacklog;
 import com.myservicebus.persistence.postgresql.PostgreSqlOutboxDelivery;
 import com.myservicebus.persistence.postgresql.PostgreSqlOutboxHealth;
 import com.myservicebus.persistence.postgresql.PostgreSqlOutboxSession;
+import com.myservicebus.persistence.postgresql.PostgreSqlScheduling;
 import com.myservicebus.persistence.postgresql.PostgreSqlSchema;
+import com.myservicebus.inspection.InspectionServices;
+import com.myservicebus.monitoring.MonitoringExporter;
+import com.myservicebus.monitoring.MonitoringExporterOptions;
+import com.myservicebus.monitoring.MonitoringServices;
 import com.myservicebus.rabbitmq.RabbitMqFactoryConfigurator;
 import io.javalin.Javalin;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.Statement;
 import java.time.Instant;
+import java.time.Duration;
 import java.util.UUID;
 import org.postgresql.ds.PGSimpleDataSource;
 
@@ -38,6 +47,14 @@ public final class Main {
         String rabbitHost = env("RABBITMQ_HOST", "localhost");
         int rabbitPort = Integer.parseInt(env("RABBITMQ_PORT", "5672"));
         ServiceCollection services = ServiceCollection.create();
+        services.from(InspectionServices.class).addInspection();
+        MonitoringExporterOptions monitoringOptions = new MonitoringExporterOptions();
+        monitoringOptions.setServiceAddress(java.net.URI.create(env("MONITORING_SERVICE_URL", "http://localhost:5310")));
+        monitoringOptions.setApplicationName("OutboxDemo.Java");
+        monitoringOptions.getLabels().put("group", "sample-system");
+        monitoringOptions.getLabels().put("role", "outbox-producer");
+        MonitoringExporter monitoringExporter = MonitoringServices.addMonitoring(services, monitoringOptions);
+        PostgreSqlScheduling.addMessageScheduler(services, dataSource, SERVICE_NAME);
         services.from(MessageBusServices.class).addServiceBus(configurator -> {
             configurator.useBusOutbox();
             configurator.addConsumer(
@@ -68,6 +85,7 @@ public final class Main {
         PostgreSqlOutboxHealth health = new PostgreSqlOutboxHealth(dataSource, SERVICE_NAME);
 
         bus.start();
+        monitoringExporter.start(provider);
         delivery.start();
 
         int httpPort = Integer.parseInt(env("HTTP_PORT", "5402"));
@@ -100,6 +118,40 @@ public final class Main {
             }
             context.status(202).json(message);
         });
+        app.post("/schedule", context -> {
+            long delaySeconds = Math.max(5, Math.min(3_600, context.queryParamAsClass("delaySeconds", Long.class)
+                    .getOrDefault(120L)));
+            OutboxShowcaseMessage message = new OutboxShowcaseMessage(
+                    UUID.randomUUID().toString(),
+                    "java-scheduled",
+                    Instant.now().toString());
+            ScheduledMessageHandle handle;
+            try (Connection connection = dataSource.getConnection()) {
+                connection.setAutoCommit(false);
+                try (ServiceScope scope = provider.createScope();
+                        OutboxSession.Registration ignored = PostgreSqlOutboxSession.useTransaction(
+                                scope.getServiceProvider().getRequiredService(OutboxSession.class),
+                                connection,
+                                SERVICE_NAME)) {
+                    handle = scope.getServiceProvider().getRequiredService(MessageScheduler.class)
+                            .schedulePublish(message, Duration.ofSeconds(delaySeconds))
+                            .toCompletableFuture().join();
+                }
+                connection.commit();
+            }
+            context.status(202).json(new ScheduledView(
+                    handle.getTokenId(), handle.getScheduledTime().toString(), "PostgreSQL",
+                    OutboxShowcaseMessage.class.getName()));
+        });
+        app.delete("/schedule/{tokenId}", context -> {
+            UUID tokenId = UUID.fromString(context.pathParam("tokenId"));
+            ScheduleCancellationResult result;
+            try (ServiceScope scope = provider.createScope()) {
+                result = scope.getServiceProvider().getRequiredService(MessageScheduler.class)
+                        .cancelScheduledPublish(tokenId).toCompletableFuture().join();
+            }
+            context.json(new CancellationView(tokenId, result.toString()));
+        });
         app.get("/received", context -> context.json(OutboxShowcaseConsumer.received()));
         app.get("/health/outbox", context -> {
             PostgreSqlOutboxBacklog backlog = health.getBacklog().join();
@@ -110,6 +162,7 @@ public final class Main {
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             app.stop();
             delivery.close();
+            monitoringExporter.close();
             try {
                 bus.stop();
             } catch (Exception exception) {
@@ -147,5 +200,15 @@ public final class Main {
     private record OutboxHealthView(
             com.myservicebus.persistence.OutboxDeliveryStatus delivery,
             PostgreSqlOutboxBacklog backlog) {
+    }
+
+    private record ScheduledView(
+            UUID tokenId,
+            String dueAtUtc,
+            String provider,
+            String messageType) {
+    }
+
+    private record CancellationView(UUID tokenId, String status) {
     }
 }

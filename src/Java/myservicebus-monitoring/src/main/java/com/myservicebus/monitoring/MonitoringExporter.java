@@ -91,9 +91,10 @@ public final class MonitoringExporter implements BusHook, ScheduledWorkObserver,
     }
 
     public void start(ServiceProvider serviceProvider) {
+        ScheduledWorkSource source = serviceProvider.getService(ScheduledWorkSource.class);
         start(
                 serviceProvider.getRequiredService(BusInspectionProvider.class),
-                List.copyOf(serviceProvider.getServices(ScheduledWorkSource.class)));
+                source == null ? List.of() : List.of(source));
     }
 
     public void start(BusInspectionProvider inspectionProvider, List<ScheduledWorkSource> scheduledWorkSources) {
@@ -289,7 +290,7 @@ public final class MonitoringExporter implements BusHook, ScheduledWorkObserver,
 
     private static MonitoringProtocol.ScheduledWorkItem mapScheduledWork(ScheduledWorkState state) {
         return new MonitoringProtocol.ScheduledWorkItem(
-                state.tokenId().toString(), state.provider(), state.durability().toString(), state.workKind(),
+                state.tokenId().toString(), state.provider(), titleCase(state.durability().name()), state.workKind(),
                 state.messageType(), state.intent(), state.destinationAddress(), state.dueAtUtc(),
                 titleCase(state.status().name()), state.providerStatus(), state.attempt(), state.updatedAtUtc(),
                 state.failureCategory());

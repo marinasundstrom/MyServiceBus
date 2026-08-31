@@ -183,7 +183,8 @@ public sealed class PostgreSqlPersistenceTests : IAsyncLifetime
                 await transaction.CommitAsync();
             }
 
-            var source = provider.GetRequiredService<IScheduledWorkSource>();
+            // A newly constructed source models the state a fresh process restores after restart.
+            var source = new PostgreSqlScheduledWorkSource(dataSource, ServiceName);
             var pending = Assert.Single(
                 await source.GetSnapshotAsync(100),
                 item => item.TokenId == handle.TokenId);

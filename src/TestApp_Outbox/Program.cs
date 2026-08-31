@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using MyServiceBus;
+using MyServiceBus.Monitoring;
 using MyServiceBus.Persistence;
 using MyServiceBus.Persistence.PostgreSql;
 using Npgsql;
@@ -13,6 +14,7 @@ var connectionString = builder.Configuration.GetConnectionString("outbox")
 var dataSource = NpgsqlDataSource.Create(connectionString);
 
 builder.Services.AddSingleton(dataSource);
+builder.Services.AddPostgreSqlMessageScheduler(serviceName);
 builder.Services.AddServiceBus(configurator =>
 {
     configurator.UseBusOutbox();
@@ -31,6 +33,15 @@ builder.Services.AddServiceBus(configurator =>
         });
         rabbit.ConfigureEndpoints(context);
     });
+});
+builder.Services.AddServiceBusMonitoring(options =>
+{
+    options.ServiceAddress = new Uri(
+        Environment.GetEnvironmentVariable("MONITORING_SERVICE_URL") ?? "http://localhost:5310");
+    options.ApplicationName = "OutboxDemo.CSharp";
+    options.InstanceId = Environment.GetEnvironmentVariable("HOSTNAME") ?? Environment.MachineName;
+    options.Labels["group"] = "sample-system";
+    options.Labels["role"] = "outbox-producer";
 });
 builder.Services.AddPostgreSqlOutboxDelivery(serviceName, options =>
 {
@@ -72,6 +83,45 @@ app.MapPost("/publish", async (
 
     await transaction.CommitAsync(cancellationToken);
     return Results.Accepted(value: message);
+});
+
+app.MapPost("/schedule", async (
+    int? delaySeconds,
+    IMessageScheduler scheduler,
+    OutboxSession outboxSession,
+    CancellationToken cancellationToken) =>
+{
+    var delay = TimeSpan.FromSeconds(Math.Clamp(delaySeconds ?? 120, 5, 3_600));
+    var message = new OutboxShowcaseMessage
+    {
+        EventId = Guid.NewGuid().ToString(),
+        Origin = "csharp-scheduled",
+        CreatedAtUtc = DateTimeOffset.UtcNow.ToString("O")
+    };
+
+    await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
+    await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+    ScheduledMessageHandle handle;
+    using (outboxSession.UsePostgreSql(connection, transaction, serviceName))
+        handle = await scheduler.SchedulePublish(message, delay, cancellationToken);
+    await transaction.CommitAsync(cancellationToken);
+
+    return Results.Accepted($"/schedule/{handle.TokenId}", new
+    {
+        handle.TokenId,
+        DueAtUtc = new DateTimeOffset(handle.ScheduledTime.ToUniversalTime()),
+        Provider = "PostgreSQL",
+        MessageType = nameof(OutboxShowcaseMessage)
+    });
+});
+
+app.MapDelete("/schedule/{tokenId:guid}", async (
+    Guid tokenId,
+    IMessageScheduler scheduler,
+    CancellationToken cancellationToken) =>
+{
+    var result = await scheduler.CancelScheduledPublish(tokenId, cancellationToken);
+    return Results.Ok(new { TokenId = tokenId, Status = result.ToString() });
 });
 
 app.MapGet("/received", () => OutboxShowcaseConsumer.Received.ToArray());

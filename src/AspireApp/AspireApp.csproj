@@ -12,6 +12,7 @@
 
   <ItemGroup>
     <PackageReference Include="Aspire.Hosting.AppHost" />
+    <PackageReference Include="Aspire.Hosting.PostgreSQL" />
     <PackageReference Include="CommunityToolkit.Aspire.Hosting.Java" />
     <PackageReference Include="Aspire.Hosting.RabbitMQ" />
   </ItemGroup>
@@ -20,6 +21,7 @@
     <ProjectReference Include="../MyServiceBus.Dashboard/MyServiceBus.Dashboard.csproj" />
     <ProjectReference Include="../MyServiceBus.Monitoring.Server/MyServiceBus.Monitoring.Server.csproj" />
     <ProjectReference Include="../TestApp/TestApp.csproj" />
+    <ProjectReference Include="../TestApp_Outbox/TestApp_Outbox.csproj" />
     <ProjectReference Include="../TestApp_MassTransit/TestApp_MassTransit.csproj" />
   </ItemGroup>
 
