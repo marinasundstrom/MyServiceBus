@@ -40,6 +40,24 @@ public static class MonitoringApi
             MonitoringIngestService ingestService,
             CancellationToken cancellationToken) =>
             await ingestService.RecordHeartbeatAsync(heartbeat, cancellationToken) ? Results.Accepted() : Results.NotFound());
+        ingest.MapPost("/scheduled-work", async (
+            MonitoringScheduledWorkSnapshot snapshot,
+            MonitoringIngestService ingestService,
+            MonitoringChangeFeed changes,
+            CancellationToken cancellationToken) =>
+        {
+            try
+            {
+                if (!await ingestService.StoreScheduledWorkAsync(snapshot, cancellationToken))
+                    return Results.Conflict(new { error = "Metadata must be registered before scheduled work is accepted." });
+                changes.Publish("scheduled_work_changed");
+                return Results.Accepted();
+            }
+            catch (MonitoringValidationException exception)
+            {
+                return Results.BadRequest(new { error = exception.Message });
+            }
+        });
 
         var query = endpoints.MapGroup("/api/monitoring/v1").WithTags("Monitoring queries");
         query.MapGet("/history", (MonitoringIngestService ingestService) => ingestService.GetHistory(DateTimeOffset.UtcNow));
@@ -62,6 +80,8 @@ public static class MonitoringApi
             repository.GetFlow(application, windowSeconds ?? 300, DateTimeOffset.UtcNow));
         query.MapGet("/outbox", (string? application, int? windowSeconds, MonitoringRepository repository) =>
             repository.GetOutboxDispatchers(application, windowSeconds ?? 60, DateTimeOffset.UtcNow));
+        query.MapGet("/scheduled-work", (string? application, string? status, MonitoringRepository repository) =>
+            repository.GetScheduledWork(application, status, DateTimeOffset.UtcNow));
         query.MapGet("/stream", (HttpContext context, MonitoringChangeFeed changes, CancellationToken cancellationToken) =>
             changes.Stream(context, cancellationToken));
 

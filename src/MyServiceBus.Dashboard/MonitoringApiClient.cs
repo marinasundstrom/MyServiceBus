@@ -65,6 +65,12 @@ public sealed class MonitoringApiClient
             cancellationToken).ConfigureAwait(false)
             ?? [];
 
+    public async Task<IReadOnlyList<MonitoringScheduledWorkSummary>> GetScheduledWork(CancellationToken cancellationToken)
+        => await httpClient.GetFromJsonAsync<MonitoringScheduledWorkSummary[]>(
+            "/api/monitoring/v1/scheduled-work",
+            cancellationToken).ConfigureAwait(false)
+            ?? [];
+
     public async IAsyncEnumerable<string> WatchChanges(
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {

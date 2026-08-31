@@ -16,6 +16,8 @@ public final class MonitoringExporterOptions {
     private Duration heartbeatInterval = Duration.ofSeconds(15);
     private int maxBatchSize = 256;
     private int maxQueueSize = 10_000;
+    private int maxScheduledWorkItems = 1_000;
+    private Duration scheduledWorkHistory = Duration.ofHours(24);
 
     public URI getServiceAddress() {
         return serviceAddress;
@@ -98,5 +100,21 @@ public final class MonitoringExporterOptions {
 
     public void setMaxQueueSize(int maxQueueSize) {
         this.maxQueueSize = maxQueueSize;
+    }
+
+    public int getMaxScheduledWorkItems() {
+        return maxScheduledWorkItems;
+    }
+
+    public void setMaxScheduledWorkItems(int maxScheduledWorkItems) {
+        this.maxScheduledWorkItems = maxScheduledWorkItems;
+    }
+
+    public Duration getScheduledWorkHistory() {
+        return scheduledWorkHistory;
+    }
+
+    public void setScheduledWorkHistory(Duration scheduledWorkHistory) {
+        this.scheduledWorkHistory = scheduledWorkHistory;
     }
 }

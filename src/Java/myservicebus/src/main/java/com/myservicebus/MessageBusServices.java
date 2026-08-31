@@ -61,7 +61,8 @@ public class MessageBusServices extends ServiceCollectionDecorator {
                 sp -> () -> new InMemoryScheduleMessageProvider(
                         (PublishEndpoint) sp.getService(MessageBus.class),
                         (SendEndpointProvider) sp.getService(MessageBus.class),
-                        (JobScheduler) sp.getService(JobScheduler.class)));
+                        (JobScheduler) sp.getService(JobScheduler.class),
+                        sp.getServices(ScheduledWorkObserver.class)));
         inner.addScoped(MessageScheduler.class,
                 sp -> () -> new MessageSchedulerImpl(
                         (ScheduleMessageProvider) sp.getService(ScheduleMessageProvider.class)));

@@ -12,6 +12,7 @@ public sealed class MonitoringHistoryDbContext : DbContext
     internal DbSet<MonitoringMetadataEntity> Metadata => Set<MonitoringMetadataEntity>();
     internal DbSet<MonitoringObservationBatchEntity> ObservationBatches => Set<MonitoringObservationBatchEntity>();
     internal DbSet<MonitoringHeartbeatEntity> Heartbeats => Set<MonitoringHeartbeatEntity>();
+    internal DbSet<MonitoringScheduledWorkEntity> ScheduledWork => Set<MonitoringScheduledWorkEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -33,6 +34,12 @@ public sealed class MonitoringHistoryDbContext : DbContext
         modelBuilder.Entity<MonitoringHeartbeatEntity>(entity =>
         {
             entity.ToTable("heartbeat");
+            entity.HasKey(value => new { value.ApplicationName, value.InstanceId, value.BusId });
+            entity.Property(value => value.Payload).HasColumnType("jsonb");
+        });
+        modelBuilder.Entity<MonitoringScheduledWorkEntity>(entity =>
+        {
+            entity.ToTable("scheduled_work_snapshot");
             entity.HasKey(value => new { value.ApplicationName, value.InstanceId, value.BusId });
             entity.Property(value => value.Payload).HasColumnType("jsonb");
         });
@@ -64,6 +71,16 @@ internal sealed class MonitoringHeartbeatEntity
     public string ApplicationName { get; set; } = string.Empty;
     public string InstanceId { get; set; } = string.Empty;
     public string BusId { get; set; } = string.Empty;
+    public DateTimeOffset ReceivedAtUtc { get; set; }
+    public string Payload { get; set; } = string.Empty;
+}
+
+internal sealed class MonitoringScheduledWorkEntity
+{
+    public string ApplicationName { get; set; } = string.Empty;
+    public string InstanceId { get; set; } = string.Empty;
+    public string BusId { get; set; } = string.Empty;
+    public DateTimeOffset CapturedAtUtc { get; set; }
     public DateTimeOffset ReceivedAtUtc { get; set; }
     public string Payload { get; set; } = string.Empty;
 }

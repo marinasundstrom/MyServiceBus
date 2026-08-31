@@ -16,6 +16,14 @@ GET {{JavaTestApp_HostAddress}}/send/fault
 
 ###
 
+POST {{JavaTestApp_HostAddress}}/schedule?delaySeconds=120
+
+###
+
+DELETE {{JavaTestApp_HostAddress}}/schedule/00000000-0000-0000-0000-000000000000
+
+###
+
 GET {{JavaTestApp_HostAddress}}/request
 
 ###

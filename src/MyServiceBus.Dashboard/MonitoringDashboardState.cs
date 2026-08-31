@@ -30,6 +30,7 @@ public sealed class MonitoringDashboardState : IAsyncDisposable
     public IReadOnlyList<MonitoringFlowEdge> Flow { get; private set; } = [];
     public IReadOnlyList<MonitoringObservationRecord> Observations { get; private set; } = [];
     public IReadOnlyList<MonitoringOutboxDispatcherSummary> OutboxDispatchers { get; private set; } = [];
+    public IReadOnlyList<MonitoringScheduledWorkSummary> ScheduledWork { get; private set; } = [];
     public DateTimeOffset UpdatedAt { get; private set; } = DateTimeOffset.UtcNow;
     public string? Error { get; private set; }
     public bool LiveConnected { get; private set; }
@@ -115,6 +116,7 @@ public sealed class MonitoringDashboardState : IAsyncDisposable
             var timeSeries = api.GetTimeSeries(stopping.Token);
             var observations = api.GetRecentObservations(stopping.Token);
             var outboxDispatchers = api.GetOutboxDispatchers(stopping.Token);
+            var scheduledWork = api.GetScheduledWork(stopping.Token);
             await Task.WhenAll(
                 applications,
                 history,
@@ -125,7 +127,8 @@ public sealed class MonitoringDashboardState : IAsyncDisposable
                 flow,
                 timeSeries,
                 observations,
-                outboxDispatchers);
+                outboxDispatchers,
+                scheduledWork);
             Applications = applications.Result;
             History = history.Result;
             Instances = instances.Result;
@@ -136,6 +139,7 @@ public sealed class MonitoringDashboardState : IAsyncDisposable
             TimeSeries = timeSeries.Result;
             Observations = observations.Result;
             OutboxDispatchers = outboxDispatchers.Result;
+            ScheduledWork = scheduledWork.Result;
             UpdatedAt = DateTimeOffset.UtcNow;
             Error = null;
         }

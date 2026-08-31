@@ -23,8 +23,10 @@ public static class MonitoringServiceCollectionExtensions
             throw new ArgumentOutOfRangeException(nameof(configure), "ExportInterval must be greater than zero.");
         if (options.HeartbeatInterval <= TimeSpan.Zero)
             throw new ArgumentOutOfRangeException(nameof(configure), "HeartbeatInterval must be greater than zero.");
-        if (options.MaxBatchSize <= 0 || options.MaxQueueSize <= 0)
+        if (options.MaxBatchSize <= 0 || options.MaxQueueSize <= 0 || options.MaxScheduledWorkItems <= 0)
             throw new ArgumentOutOfRangeException(nameof(configure), "Batch and queue sizes must be greater than zero.");
+        if (options.ScheduledWorkHistory <= TimeSpan.Zero)
+            throw new ArgumentOutOfRangeException(nameof(configure), "ScheduledWorkHistory must be greater than zero.");
 
         services.TryAddSingleton<IBusInspectionProvider, BusInspectionProvider>();
         services.AddSingleton(options);
@@ -35,6 +37,7 @@ public static class MonitoringServiceCollectionExtensions
             options,
             sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<MonitoringExporter>>()));
         services.AddSingleton<IBusHook>(sp => sp.GetRequiredService<MonitoringExporter>());
+        services.AddSingleton<IScheduledWorkObserver>(sp => sp.GetRequiredService<MonitoringExporter>());
         services.AddHostedService(sp => sp.GetRequiredService<MonitoringExporter>());
         return services;
     }

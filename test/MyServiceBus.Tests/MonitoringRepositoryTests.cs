@@ -7,6 +7,29 @@ using Shouldly;
 public class MonitoringRepositoryTests
 {
     [Fact]
+    public void Repository_replaces_scheduled_work_snapshots_and_reports_participant_health()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var repository = new MonitoringRepository();
+        repository.UpsertMetadata(CreateMetadata("orders", "orders-1", now, "commerce"));
+        var item = new MonitoringScheduledWorkItem(
+            Guid.NewGuid().ToString(), "InMemory", "Volatile", "Message", "SubmitOrder", "Publish", null,
+            now.AddMinutes(2), "Pending", "Pending", 0, now);
+
+        repository.UpsertScheduledWork(new MonitoringScheduledWorkSnapshot(
+            MonitoringProtocol.Version, "orders", "orders-1", "bus", now, [item])).ShouldBeTrue();
+
+        var summary = repository.GetScheduledWork("orders", "pending", now).ShouldHaveSingleItem();
+        summary.ApplicationName.ShouldBe("orders");
+        summary.InstanceOnline.ShouldBeTrue();
+        summary.Work.MessageType.ShouldBe("SubmitOrder");
+
+        repository.UpsertScheduledWork(new MonitoringScheduledWorkSnapshot(
+            MonitoringProtocol.Version, "orders", "orders-1", "bus", now.AddSeconds(1), [])).ShouldBeTrue();
+        repository.GetScheduledWork(null, null, now).ShouldBeEmpty();
+    }
+
+    [Fact]
     public void Repository_registers_instances_and_deduplicates_observation_batches()
     {
         var now = DateTimeOffset.UtcNow;

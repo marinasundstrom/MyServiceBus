@@ -16,6 +16,9 @@ import org.junit.jupiter.api.Test;
 
 import com.myservicebus.MessageOperationHookEvent;
 import com.myservicebus.OutboxDeliveryHookEvent;
+import com.myservicebus.ScheduleMessageProviderDurability;
+import com.myservicebus.ScheduledWorkState;
+import com.myservicebus.ScheduledWorkStatus;
 import com.myservicebus.inspection.BusInspectionSnapshot;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
@@ -39,6 +42,10 @@ class MonitoringExporterTest {
             batchReceived.countDown();
         });
         server.createContext("/api/monitoring/v1/heartbeat", exchange -> {
+            readBody(exchange);
+            respond(exchange);
+        });
+        server.createContext("/api/monitoring/v1/scheduled-work", exchange -> {
             readBody(exchange);
             respond(exchange);
         });
@@ -103,6 +110,10 @@ class MonitoringExporterTest {
             readBody(exchange);
             respond(exchange);
         });
+        server.createContext("/api/monitoring/v1/scheduled-work", exchange -> {
+            readBody(exchange);
+            respond(exchange);
+        });
         server.start();
 
         MonitoringExporterOptions options = new MonitoringExporterOptions();
@@ -127,6 +138,45 @@ class MonitoringExporterTest {
             assertTrue(batchJson.get().contains("\"batch_dispatched\":\"7\""));
             assertTrue(batchJson.get().contains("\"pending\":\"11\""));
             assertTrue(!batchJson.get().contains("message_id"));
+        } finally {
+            exporter.close();
+            server.stop(0);
+        }
+    }
+
+    @Test
+    void exporterSendsScheduledWorkSnapshotsWithoutMessageBodies() throws Exception {
+        CountDownLatch scheduledReceived = new CountDownLatch(1);
+        AtomicReference<String> scheduledJson = new AtomicReference<>();
+        HttpServer server = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
+        server.createContext("/api/monitoring/v1/metadata", exchange -> {
+            readBody(exchange);
+            respond(exchange);
+        });
+        server.createContext("/api/monitoring/v1/scheduled-work", exchange -> {
+            scheduledJson.set(readBody(exchange));
+            respond(exchange);
+            scheduledReceived.countDown();
+        });
+        server.start();
+
+        MonitoringExporterOptions options = new MonitoringExporterOptions();
+        options.setServiceAddress(URI.create("http://localhost:" + server.getAddress().getPort()));
+        options.setExportInterval(Duration.ofMillis(20));
+        MonitoringExporter exporter = new MonitoringExporter(options);
+        try {
+            exporter.observe(new ScheduledWorkState(
+                    java.util.UUID.randomUUID(), "InMemory", ScheduleMessageProviderDurability.VOLATILE,
+                    "Message", TestMessage.class.getName(), "Publish", null, Instant.now().plusSeconds(60),
+                    ScheduledWorkStatus.PENDING, "Pending", 0, Instant.now(), null));
+            exporter.start(() -> new BusInspectionSnapshot(
+                    "mediator", URI.create("loopback://localhost/"), Instant.now(),
+                    List.of(), List.of(), List.of()));
+
+            assertTrue(scheduledReceived.await(2, TimeUnit.SECONDS));
+            assertTrue(scheduledJson.get().contains("\"status\":\"Pending\""));
+            assertTrue(scheduledJson.get().contains("\"messageType\":"));
+            assertTrue(!scheduledJson.get().contains("secret-body"));
         } finally {
             exporter.close();
             server.stop(0);

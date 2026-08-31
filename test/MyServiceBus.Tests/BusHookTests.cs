@@ -111,6 +111,7 @@ public class BusHookTests
         var hookExporter = provider.GetServices<IBusHook>().OfType<MonitoringExporter>().ShouldHaveSingleItem();
         var hostedExporter = provider.GetServices<IHostedService>().OfType<MonitoringExporter>().ShouldHaveSingleItem();
         hookExporter.ShouldBeSameAs(hostedExporter);
+        provider.GetServices<IScheduledWorkObserver>().ShouldContain(hookExporter);
     }
 
     [Fact]
@@ -198,6 +199,39 @@ public class BusHookTests
         await exporter.StopAsync(CancellationToken.None);
     }
 
+    [Fact]
+    public async Task Monitoring_exporter_sends_scheduled_work_without_message_bodies()
+    {
+        var handler = new RecordingHttpHandler();
+        var services = new ServiceCollection()
+            .AddSingleton<IBusInspectionProvider>(new StubInspectionProvider());
+        await using var provider = services.BuildServiceProvider();
+        var options = new MonitoringExporterOptions
+        {
+            ServiceAddress = new Uri("http://monitoring.test"),
+            ApplicationName = "scheduler-tests",
+            ExportInterval = TimeSpan.FromMilliseconds(20),
+            HeartbeatInterval = TimeSpan.FromMinutes(1)
+        };
+        var exporter = new MonitoringExporter(
+            new HttpClient(handler) { BaseAddress = options.ServiceAddress },
+            provider,
+            options,
+            NullLogger<MonitoringExporter>.Instance);
+
+        exporter.Observe(new ScheduledWorkState(
+            Guid.NewGuid(), "InMemory", ScheduleMessageProviderDurability.Volatile, "Message",
+            typeof(TestMessage).FullName!, "Publish", null, DateTimeOffset.UtcNow.AddMinutes(1),
+            ScheduledWorkStatus.Pending, "Pending", 0, DateTimeOffset.UtcNow));
+        await exporter.StartAsync(CancellationToken.None);
+
+        var json = await handler.ScheduledWorkReceived.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        json.ShouldContain("\"status\":\"Pending\"");
+        json.ShouldContain("\"messageType\":");
+        json.ShouldNotContain("secret-body");
+        await exporter.StopAsync(CancellationToken.None);
+    }
+
     public sealed record TestMessage(string Value);
 
     public sealed class TestConsumer : IConsumer<TestMessage>
@@ -242,6 +276,7 @@ public class BusHookTests
     private sealed class RecordingHttpHandler : HttpMessageHandler
     {
         public TaskCompletionSource<string> BatchReceived { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource<string> ScheduledWorkReceived { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
@@ -250,6 +285,8 @@ public class BusHookTests
                 : await request.Content.ReadAsStringAsync(cancellationToken);
             if (request.RequestUri?.AbsolutePath.EndsWith("observations:batch", StringComparison.Ordinal) == true)
                 BatchReceived.TrySetResult(json);
+            if (request.RequestUri?.AbsolutePath.EndsWith("scheduled-work", StringComparison.Ordinal) == true)
+                ScheduledWorkReceived.TrySetResult(json);
 
             return new HttpResponseMessage(System.Net.HttpStatusCode.Accepted);
         }

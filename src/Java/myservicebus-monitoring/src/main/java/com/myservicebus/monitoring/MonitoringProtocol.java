@@ -67,4 +67,29 @@ public final class MonitoringProtocol {
             String busId,
             Instant sentAtUtc) {
     }
+
+    public record ScheduledWorkSnapshot(
+            String protocolVersion,
+            String applicationName,
+            String instanceId,
+            String busId,
+            Instant capturedAtUtc,
+            List<ScheduledWorkItem> items) {
+    }
+
+    public record ScheduledWorkItem(
+            String tokenId,
+            String provider,
+            String durability,
+            String workKind,
+            String messageType,
+            String intent,
+            String destinationAddress,
+            Instant dueAtUtc,
+            String status,
+            String providerStatus,
+            int attempt,
+            Instant updatedAtUtc,
+            String failureCategory) {
+    }
 }

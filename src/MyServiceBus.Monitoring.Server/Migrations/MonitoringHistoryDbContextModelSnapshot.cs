@@ -50,5 +50,17 @@ public sealed class MonitoringHistoryDbContextModelSnapshot : ModelSnapshot
             entity.HasIndex("ExportedAtUtc");
             entity.ToTable("observation_batch", "myservicebus_monitoring");
         });
+
+        modelBuilder.Entity("MyServiceBus.Monitoring.Server.MonitoringScheduledWorkEntity", entity =>
+        {
+            entity.Property<string>("ApplicationName").HasColumnType("text");
+            entity.Property<string>("InstanceId").HasColumnType("text");
+            entity.Property<string>("BusId").HasColumnType("text");
+            entity.Property<DateTimeOffset>("CapturedAtUtc").HasColumnType("timestamp with time zone");
+            entity.Property<string>("Payload").IsRequired().HasColumnType("jsonb");
+            entity.Property<DateTimeOffset>("ReceivedAtUtc").HasColumnType("timestamp with time zone");
+            entity.HasKey("ApplicationName", "InstanceId", "BusId");
+            entity.ToTable("scheduled_work_snapshot", "myservicebus_monitoring");
+        });
     }
 }

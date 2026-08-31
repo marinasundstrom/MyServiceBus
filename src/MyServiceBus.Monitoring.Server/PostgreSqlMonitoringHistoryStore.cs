@@ -54,16 +54,21 @@ public sealed class PostgreSqlMonitoringHistoryStore : IMonitoringHistoryStore
         var heartbeatRows = await context.Heartbeats.AsNoTracking()
             .OrderBy(value => value.ReceivedAtUtc)
             .ToArrayAsync(cancellationToken);
+        var scheduledWorkRows = await context.ScheduledWork.AsNoTracking()
+            .OrderBy(value => value.ReceivedAtUtc)
+            .ToArrayAsync(cancellationToken);
 
         var lastIngest = metadataRows.Select(value => (DateTimeOffset?)value.ReceivedAtUtc)
             .Concat(batchRows.Select(value => (DateTimeOffset?)value.ReceivedAtUtc))
             .Concat(heartbeatRows.Select(value => (DateTimeOffset?)value.ReceivedAtUtc))
+            .Concat(scheduledWorkRows.Select(value => (DateTimeOffset?)value.ReceivedAtUtc))
             .Max();
 
         return new MonitoringHistoryRestore(
             metadataRows.Select(value => Deserialize<MonitoringMetadata>(value.Payload)).ToArray(),
             batchRows.Select(value => Deserialize<MonitoringObservationBatch>(value.Payload)).ToArray(),
             heartbeatRows.Select(value => Deserialize<MonitoringHeartbeat>(value.Payload)).ToArray(),
+            scheduledWorkRows.Select(value => Deserialize<MonitoringScheduledWorkSnapshot>(value.Payload)).ToArray(),
             lastIngest);
     }
 
@@ -160,6 +165,37 @@ public sealed class PostgreSqlMonitoringHistoryStore : IMonitoringHistoryStore
         SetEarlierHistoryBoundary(receivedAt);
     }
 
+    public async Task StoreScheduledWorkAsync(
+        MonitoringScheduledWorkSnapshot snapshot,
+        CancellationToken cancellationToken)
+    {
+        var receivedAt = DateTimeOffset.UtcNow;
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var entity = await context.ScheduledWork.FindAsync(
+            [snapshot.ApplicationName, snapshot.InstanceId, snapshot.BusId],
+            cancellationToken);
+        if (entity is null)
+        {
+            context.ScheduledWork.Add(new MonitoringScheduledWorkEntity
+            {
+                ApplicationName = snapshot.ApplicationName,
+                InstanceId = snapshot.InstanceId,
+                BusId = snapshot.BusId,
+                CapturedAtUtc = snapshot.CapturedAtUtc,
+                ReceivedAtUtc = receivedAt,
+                Payload = JsonSerializer.Serialize(snapshot, JsonOptions)
+            });
+        }
+        else
+        {
+            entity.CapturedAtUtc = snapshot.CapturedAtUtc;
+            entity.ReceivedAtUtc = receivedAt;
+            entity.Payload = JsonSerializer.Serialize(snapshot, JsonOptions);
+        }
+        await context.SaveChangesAsync(cancellationToken);
+        SetEarlierHistoryBoundary(receivedAt);
+    }
+
     private async Task RefreshHistoryBoundaryAsync(
         MonitoringHistoryDbContext context,
         CancellationToken cancellationToken)
@@ -167,7 +203,8 @@ public sealed class PostgreSqlMonitoringHistoryStore : IMonitoringHistoryStore
         var metadata = await context.Metadata.Select(value => (DateTimeOffset?)value.ReceivedAtUtc).MinAsync(cancellationToken);
         var batches = await context.ObservationBatches.Select(value => (DateTimeOffset?)value.ExportedAtUtc).MinAsync(cancellationToken);
         var heartbeat = await context.Heartbeats.Select(value => (DateTimeOffset?)value.ReceivedAtUtc).MinAsync(cancellationToken);
-        var earliest = new[] { metadata, batches, heartbeat }.Where(value => value.HasValue).Min();
+        var scheduledWork = await context.ScheduledWork.Select(value => (DateTimeOffset?)value.ReceivedAtUtc).MinAsync(cancellationToken);
+        var earliest = new[] { metadata, batches, heartbeat, scheduledWork }.Where(value => value.HasValue).Min();
         if (earliest.HasValue)
             Interlocked.Exchange(ref historyAvailableFromUtcTicks, earliest.Value.UtcTicks);
     }

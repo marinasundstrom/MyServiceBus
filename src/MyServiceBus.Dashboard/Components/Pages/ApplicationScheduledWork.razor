@@ -1,0 +1,22 @@
+@page "/applications/{ApplicationName}/scheduled"
+@rendermode InteractiveServer
+@inherits ApplicationPageBase
+
+<PageTitle>@ApplicationName scheduled work · MyServiceBus Monitoring</PageTitle>
+<DashboardPageHeader Eyebrow="Application scheduled work" Title="@ApplicationName" Description="Messages this application has scheduled and their latest reported status." />
+<ApplicationNavigation ApplicationName="@ApplicationName" />
+
+@if (Application is null)
+{
+    <section class="empty-state"><h2>Application not found</h2><p>This application may not have registered yet, or its monitoring lease may have expired.</p></section>
+}
+else
+{
+    <ScheduledWorkTable Items="ScheduledItems" />
+}
+
+@code {
+    private IReadOnlyList<MonitoringScheduledWorkSummary> ScheduledItems => Dashboard.ScheduledWork
+        .Where(item => string.Equals(item.ApplicationName, ApplicationName, StringComparison.Ordinal))
+        .ToArray();
+}

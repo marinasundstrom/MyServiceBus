@@ -331,4 +331,43 @@ public class SchedulingTests
 
         await hosted.StopAsync(CancellationToken.None);
     }
+
+    [Fact]
+    public async Task In_memory_scheduler_reports_scheduled_work_lifecycle()
+    {
+        var manual = new ManualJobScheduler();
+        var observer = new RecordingScheduledWorkObserver();
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddSingleton<IJobScheduler>(manual);
+        services.AddSingleton<IScheduledWorkObserver>(observer);
+        services.AddServiceBus(cfg =>
+        {
+            cfg.UsingMediator();
+            cfg.AddConsumer<TestConsumer>();
+        });
+
+        await using var provider = services.BuildServiceProvider();
+        var hosted = provider.GetRequiredService<IHostedService>();
+        await hosted.StartAsync(CancellationToken.None);
+        var scheduler = provider.GetRequiredService<IMessageScheduler>();
+        var handle = await scheduler.SchedulePublish(new TestMessage(), TimeSpan.FromDays(1));
+
+        Assert.Single(observer.States);
+        Assert.Equal(ScheduledWorkStatus.Pending, observer.States[0].Status);
+        await manual.Run(handle.TokenId);
+        Assert.Equal([
+            ScheduledWorkStatus.Pending,
+            ScheduledWorkStatus.Running,
+            ScheduledWorkStatus.Completed], observer.States.Select(state => state.Status));
+
+        await hosted.StopAsync(CancellationToken.None);
+    }
+
+    private sealed class RecordingScheduledWorkObserver : IScheduledWorkObserver
+    {
+        public List<ScheduledWorkState> States { get; } = [];
+
+        public void Observe(ScheduledWorkState state) => States.Add(state);
+    }
 }

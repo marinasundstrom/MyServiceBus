@@ -1,0 +1,8 @@
+@page "/scheduled"
+@rendermode InteractiveServer
+@inherits MonitoringPageBase
+
+<PageTitle>Scheduled work · MyServiceBus Monitoring</PageTitle>
+<DashboardPageHeader Eyebrow="Planned activity" Title="Scheduled work" Description="See messages that applications plan to publish or send, including their current status. Message contents are intentionally not collected." />
+
+<ScheduledWorkTable Items="Dashboard.ScheduledWork" />
