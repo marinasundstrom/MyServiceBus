@@ -48,10 +48,22 @@ builder.Services.AddPostgreSqlOutboxDelivery(serviceName, options =>
     options.OwnerId = $"csharp-{Environment.MachineName}-{Environment.ProcessId}";
     options.PollInterval = TimeSpan.FromMilliseconds(250);
 });
+builder.Services.AddBuiltInRecurringJobsWithPostgreSql(serviceName);
 
 var app = builder.Build();
 await PostgreSqlSchema.EnsureCreatedAsync(dataSource);
 await EnsureApplicationSchema(dataSource);
+await app.Services.GetRequiredService<IRecurringJobScheduler>().AddOrUpdate(
+    new RecurringJobDefinition(
+        new RecurringJobIdentity("outbox-heartbeat", "aspire-demo"),
+        new FixedIntervalRecurringJobCadence(TimeSpan.FromSeconds(15)),
+        "Demonstrates durable recurring publication through the transactional outbox."),
+    new OutboxShowcaseMessage
+    {
+        EventId = "recurring-outbox-heartbeat",
+        Origin = "csharp-recurring",
+        CreatedAtUtc = "recurring-definition"
+    });
 
 app.MapPost("/publish", async (
     IPublishEndpoint publishEndpoint,
@@ -123,6 +135,9 @@ app.MapDelete("/schedule/{tokenId:guid}", async (
     var result = await scheduler.CancelScheduledPublish(tokenId, cancellationToken);
     return Results.Ok(new { TokenId = tokenId, Status = result.ToString() });
 });
+
+app.MapGet("/recurring", async (IRecurringJobSource source, CancellationToken cancellationToken) =>
+    await source.GetSnapshotAsync(100, cancellationToken));
 
 app.MapGet("/received", () => OutboxShowcaseConsumer.Received.ToArray());
 app.MapGet("/health/outbox", async (
