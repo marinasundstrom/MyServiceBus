@@ -123,7 +123,7 @@ This classification prevents a .NET runtime optimization from becoming an artifi
 The repository currently has these relevant characteristics:
 
 - Production C# projects target `net10.0` through the .NET SDK pinned in `global.json`.
-- The abstractions and core runtime packages publish an experimental `net11.0` asset alongside `net10.0`. A .NET 11 NativeAOT smoke rebuilds those projects with `runtime-async=on` and verifies generated mediator dispatch.
+- The abstractions and core runtime packages publish an experimental `net11.0` asset alongside `net10.0`. A .NET 11 NativeAOT smoke rebuilds those projects with `runtime-async=on` and verifies generated mediator dispatch for both an interface consumer and a C# named-union method consumer.
 - Java publishes Java 17-compatible APIs and bytecode. The build uses a Java 17 toolchain even when Gradle itself runs on a newer JDK.
 - C# exposes `Response<T>` and `Response<T1, T2>`. Multiple results are inspected with `Is(out Response<T>)`.
 - Java returns `T` for one expected response, exposes `Response2<T1, T2>` for the request client, and also contains unused or not-yet-integrated `Response3` through `Response8` wrappers. These wrappers repeat the same object-and-runtime-type implementation.
@@ -184,7 +184,7 @@ Keep the implementation in the existing MyServiceBus C# response classes. A `net
 
 This enables transparent exhaustive matching from C# and ordinary `match` from Raven without introducing a Raven-specific response wrapper or changing the wire protocol. Continue to expose baseline-neutral `Match` on `net10.0` and Java 17.
 
-The direct-constructor and typed-access shape was compiled and run locally with .NET SDK `11.0.100-preview.7`. Package-level Raven, allocation, NativeAOT, overlap, nullability, and API-compatibility proofs remain required, and preview evidence must be repeated against the release SDK.
+The direct-constructor and typed-access shape is continuously compiled with .NET SDK `11.0.100-preview.7`. Staged C# and Raven package consumers verify the public package ABI, while a generated C# input-union consumer runs under NativeAOT. Allocation, overlapping-case, nullability, response-union NativeAOT, broker, and broader API-compatibility proofs remain required, and all preview evidence must be repeated against the release SDK.
 
 The normative ABI shape and validation plan are maintained in the [Union-Typed Consumers Proposal](../proposals/union-typed-consumers.md#companion-request-client-response-results).
 
@@ -279,7 +279,7 @@ The same rule applies to request overloads and transport adapters: support an ar
 
 ### Runtime Async experiment
 
-The existing NativeAOT smoke proves that a suspended consumer can complete with Runtime Async enabled. Promotion needs comparative evidence rather than a single success case.
+The existing NativeAOT smoke proves that suspended interface and generated named-union consumers can complete with Runtime Async enabled. Promotion still needs comparative evidence rather than successful execution alone.
 
 Measure the same commit with Runtime Async on and off for:
 
@@ -347,8 +347,8 @@ Structured concurrency could make mediator fan-out and coordinated shutdown easi
 1. Specify case identity, overlap, and null semantics for multiple responses.
 2. Add discriminator-backed `Match` APIs to C# `Response<T1, T2>` and Java `Response2<T1, T2>`.
 3. Add equivalent unit tests in both languages, including fault and overlapping-type cases.
-4. Specify and prototype metadata-only recognition of Raven.Core `System.Union<T1, ...>` in reflection consumer discovery, expanding it before applying reference-type message constraints.
-5. Add Raven consumer fixtures for a union-valued message parameter and a union-valued async response. Verify variant registration, single invocation, response unwrapping, and unchanged wire identities.
+4. Keep the implemented metadata-only recognition of Raven.Core `System.Union<T1, ...>` aligned with generated C# named-union registration.
+5. Extend the existing Raven input-union fixture with a union-valued async response. Verify response unwrapping and unchanged wire identities.
 6. Update the feature walkthrough to prefer `Match` while retaining `Is`/`as` migration examples as needed. Keep Raven syntax in development compatibility samples until Raven support is released.
 7. Decide whether unintegrated Java `Response3` through `Response8` should be generated, completed end to end, or removed before the next preview release.
 8. Audit C# task-completion continuation behavior and Java common-pool continuation use in request and shutdown paths.
@@ -358,7 +358,7 @@ Structured concurrency could make mediator fan-out and coordinated shutdown easi
 1. Add newer-JDK runtime-compatibility CI, initially Java 21 and Java 25, while continuing to compile and verify with `--release 17`.
 2. Run all cross-language, package-smoke, broker, serialization, and GraalVM reachability gates on the newer runtime.
 3. Repeat the C# custom-union proof against the .NET 11 release candidate and GA SDK, using the direct constructors and `TryGetValue` shape intended for `Response<T1, T2>`.
-4. Compile a Raven package-smoke application against the staged `net11.0` abstractions package and verify exhaustive `match` over the C#-implemented response types.
+4. Keep the implemented staged Raven package smoke running against every .NET 11 preview, release-candidate, and GA SDK update.
 5. Verify Raven ad-hoc consumer unions through mediator and one broker transport, including a handler that returns one of two response contracts.
 6. Complete the Runtime Async and virtual-thread comparison matrices.
 7. Audit dependency support, build images, Gradle plugins, analyzers, source generators/processors, NativeAOT/GraalVM tooling, and self-hosted CPU requirements.
@@ -412,7 +412,8 @@ This stage gives applications the correctness property without waiting for a run
 
 - Add a `net11.0` NuGet asset that marks the same C# response classes as custom unions and exposes their standard construction and typed-access members.
 - Validate that a Raven application can consume those classes with ordinary `match`; do not add a Raven-specific response wrapper.
-- Allow reflection consumer discovery to expand Raven's standard `System.Union<T1, ...>` carrier into message-case registrations and to unwrap union-valued async consumer responses.
+- Allow reflection consumer discovery to expand Raven's standard `System.Union<T1, ...>` carrier into message-case registrations; union-valued async consumer responses remain the next response slice.
+- Generate direct per-case adapters for C# named-union input consumers and continuously verify them under NativeAOT.
 - Keep `Match` as the portable and down-level API.
 - Keep Java publication and consumer tests on Java 17. Test newer JVM implementations behind that stable surface and do not publish preview APIs.
 
@@ -433,7 +434,7 @@ Platform convenience must not change which messages are accepted or how a case i
 
 ### Feature maturity rules
 
-- Preview or incubating features may appear in benchmarks, smoke projects, or experimental branches, but not in published runtime artifacts.
+- Preview or incubating features may appear in benchmarks, smoke projects, or explicitly experimental target-specific assets. They must not silently alter the stable baseline asset or be presented as supported behavior.
 - Stable language features can be used internally once the published target supports them.
 - A public API should use a new platform type only when that type materially improves the contract and the baseline policy accepts the resulting consumer requirement.
 - Runtime-only optimizations should remain switchable during evaluation and should have rollback criteria.

@@ -58,5 +58,5 @@ jobs:
         run: ./eng/verify-dotnet-package-consumer.sh
       - name: Verify .NET 11 union package consumers
         run: ./eng/verify-dotnet11-union-package-consumers.sh
-      - name: Verify .NET 11 Runtime Async NativeAOT application
+      - name: Verify .NET 11 generated union and Runtime Async NativeAOT application
         run: ./eng/verify-dotnet11-runtime-async-aot.sh

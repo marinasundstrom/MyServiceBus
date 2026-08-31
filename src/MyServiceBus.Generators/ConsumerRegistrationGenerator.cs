@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Reflection;
 using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -31,9 +32,9 @@ public sealed class ConsumerRegistrationGenerator : IIncrementalGenerator
         var methodRegistrations = context.SyntaxProvider
             .CreateSyntaxProvider(
                 static (node, _) => node is MethodDeclarationSyntax,
-                static (generatorContext, cancellationToken) => GetMethodRegistration(generatorContext, cancellationToken))
-            .Where(static registration => registration is not null)
-            .Select(static (registration, _) => registration!);
+                static (generatorContext, cancellationToken) => GetMethodRegistrations(generatorContext, cancellationToken))
+            .Where(static registrations => !registrations.IsDefaultOrEmpty)
+            .SelectMany(static (registrations, _) => registrations);
 
         var diagnostics = context.SyntaxProvider
             .CreateSyntaxProvider(
@@ -90,14 +91,24 @@ public sealed class ConsumerRegistrationGenerator : IIncrementalGenerator
                 }
             }
 
-            if (messageType is null || !messageType.IsReferenceType)
-                reason = "a reference-type message parameter is required";
+            var unionCases = ImmutableArray<INamedTypeSymbol>.Empty;
+            string? unionError = null;
+            var isUnion = messageType is not null
+                && TryGetUnionCases(messageType, out unionCases, out unionError);
+            if (unionError is not null)
+                reason = unionError;
+            else if (messageType is null || !messageType.IsReferenceType && !isUnion)
+                reason = "a reference-type message parameter or supported union carrier is required";
+            else if (isUnion && unionCases.Any(static caseType => !caseType.IsReferenceType))
+                reason = "every union message case must be a reference type";
             else if (method.Parameters.Any(parameter =>
                 parameter.Type is INamedTypeSymbol named
                 && IsGenericConsumeContext(named)
-                && !SymbolEqualityComparer.Default.Equals(named.TypeArguments[0], messageType)))
+                && (isUnion || !SymbolEqualityComparer.Default.Equals(named.TypeArguments[0], messageType))))
             {
-                reason = $"the generic consume context must use message type {messageType.ToDisplayString()}";
+                reason = isUnion
+                    ? "union consumers currently support only non-generic ConsumeContext"
+                    : $"the generic consume context must use message type {messageType!.ToDisplayString()}";
             }
         }
 
@@ -143,7 +154,7 @@ public sealed class ConsumerRegistrationGenerator : IIncrementalGenerator
         return registrations.ToImmutable();
     }
 
-    private static MethodRegistration? GetMethodRegistration(
+    private static ImmutableArray<MethodRegistration> GetMethodRegistrations(
         GeneratorSyntaxContext context,
         CancellationToken cancellationToken)
     {
@@ -156,7 +167,7 @@ public sealed class ConsumerRegistrationGenerator : IIncrementalGenerator
             || method.ContainingType is null
             || !IsAccessibleFromGeneratedCode(method.ContainingType))
         {
-            return null;
+            return ImmutableArray<MethodRegistration>.Empty;
         }
 
         var methodAttribute = FindConsumerAttribute(method);
@@ -164,17 +175,17 @@ public sealed class ConsumerRegistrationGenerator : IIncrementalGenerator
         if (methodAttribute is null && ImplementsGenericConsumer(method.ContainingType))
             typeAttribute = null;
         if (methodAttribute is null && typeAttribute is null)
-            return null;
+            return ImmutableArray<MethodRegistration>.Empty;
 
         if (!TryGetReturnKind(method.ReturnType, out var returnKind))
-            return null;
+            return ImmutableArray<MethodRegistration>.Empty;
 
         var parameters = ImmutableArray.CreateBuilder<MethodParameter>();
         ITypeSymbol? messageType = null;
         foreach (var parameter in method.Parameters)
         {
             if (parameter.RefKind != RefKind.None)
-                return null;
+                return ImmutableArray<MethodRegistration>.Empty;
 
             var binding = GetFrameworkBinding(parameter.Type);
             if (binding == ParameterBinding.None)
@@ -195,16 +206,24 @@ public sealed class ConsumerRegistrationGenerator : IIncrementalGenerator
                 binding));
         }
 
-        if (messageType is null || !messageType.IsReferenceType)
-            return null;
+        if (messageType is null)
+            return ImmutableArray<MethodRegistration>.Empty;
+
+        var isUnion = TryGetUnionCases(messageType, out var unionCases, out var unionError);
+        if (unionError is not null
+            || !messageType.IsReferenceType && !isUnion
+            || isUnion && unionCases.Any(static caseType => !caseType.IsReferenceType))
+        {
+            return ImmutableArray<MethodRegistration>.Empty;
+        }
 
         foreach (var parameter in method.Parameters)
         {
             if (parameter.Type is INamedTypeSymbol named
                 && IsGenericConsumeContext(named)
-                && !SymbolEqualityComparer.Default.Equals(named.TypeArguments[0], messageType))
+                && (isUnion || !SymbolEqualityComparer.Default.Equals(named.TypeArguments[0], messageType)))
             {
-                return null;
+                return ImmutableArray<MethodRegistration>.Empty;
             }
         }
 
@@ -218,16 +237,102 @@ public sealed class ConsumerRegistrationGenerator : IIncrementalGenerator
             ? null
             : method.ContainingType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
 
-        return new MethodRegistration(
-            method.ContainingType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
-            method.Name,
-            messageType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
-            endpointName,
-            endpointNameIsExplicit,
-            endpointNameFormatterType,
-            method.IsStatic,
-            returnKind,
-            parameters.ToImmutable());
+        var concreteMessageTypes = isUnion
+            ? unionCases.Cast<ITypeSymbol>().ToImmutableArray()
+            : ImmutableArray.Create(messageType);
+        var messageCarrierType = isUnion
+            ? messageType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
+            : null;
+        return concreteMessageTypes
+            .Select(concreteMessageType => new MethodRegistration(
+                method.ContainingType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
+                method.Name,
+                concreteMessageType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
+                messageCarrierType,
+                endpointName,
+                endpointNameIsExplicit,
+                endpointNameFormatterType,
+                method.IsStatic,
+                returnKind,
+                parameters.ToImmutable()))
+            .ToImmutableArray();
+    }
+
+    private static bool TryGetUnionCases(
+        ITypeSymbol type,
+        out ImmutableArray<INamedTypeSymbol> caseTypes,
+        out string? error)
+    {
+        caseTypes = ImmutableArray<INamedTypeSymbol>.Empty;
+        error = null;
+        if (type is not INamedTypeSymbol namedType
+            || !IsUnionType(namedType))
+        {
+            return false;
+        }
+
+        var displayName = type.ToDisplayString();
+        if (!namedType.AllInterfaces.Any(static implementedInterface =>
+                implementedInterface.ToDisplayString() == "System.Runtime.CompilerServices.IUnion"))
+        {
+            error = $"union carrier {displayName} must implement System.Runtime.CompilerServices.IUnion";
+            return true;
+        }
+
+        if (namedType.IsUnboundGenericType || namedType.TypeArguments.Any(static argument => argument.TypeKind == TypeKind.TypeParameter))
+        {
+            error = $"union carrier {displayName} must be closed";
+            return true;
+        }
+
+        var constructors = namedType.InstanceConstructors
+            .Where(static constructor =>
+                constructor.DeclaredAccessibility == Accessibility.Public
+                && constructor.Parameters.Length == 1)
+            .OrderBy(static constructor => constructor.Locations.FirstOrDefault()?.SourceSpan.Start ?? int.MaxValue)
+            .ToArray();
+        if (constructors.Length == 0)
+        {
+            error = $"union carrier {displayName} must expose one public single-argument constructor per case";
+            return true;
+        }
+
+        var cases = ImmutableArray.CreateBuilder<INamedTypeSymbol>(constructors.Length);
+        foreach (var constructor in constructors)
+        {
+            if (constructor.Parameters[0].Type is not INamedTypeSymbol caseType)
+            {
+                error = $"every case of union carrier {displayName} must be a named type";
+                return true;
+            }
+
+            if (cases.Any(existing => SymbolEqualityComparer.Default.Equals(existing, caseType)))
+            {
+                error = $"union carrier {displayName} contains duplicate case types";
+                return true;
+            }
+
+            cases.Add(caseType);
+        }
+
+        caseTypes = cases.ToImmutable();
+        return true;
+    }
+
+    private static bool IsUnionType(INamedTypeSymbol type)
+    {
+        if (type.GetAttributes().Any(static attribute =>
+            attribute.AttributeClass?.ToDisplayString() == "System.Runtime.CompilerServices.UnionAttribute"))
+        {
+            return true;
+        }
+
+        // The generator targets the stable Roslyn API used by the net10.0 build,
+        // while the .NET 11 compiler adds ITypeSymbol.IsUnion. Querying the loaded
+        // compiler contract keeps the analyzer usable by both compiler generations.
+        var property = typeof(ITypeSymbol).GetProperty("IsUnion", BindingFlags.Public | BindingFlags.Instance);
+        return property?.PropertyType == typeof(bool)
+            && property.GetValue(type) is true;
     }
 
     private static AttributeData? FindConsumerAttribute(ISymbol symbol)
@@ -485,7 +590,9 @@ public sealed class ConsumerRegistrationGenerator : IIncrementalGenerator
         source.Append(string.Join(", ", method.Parameters.Select((parameter, parameterIndex) =>
             parameter.Binding switch
             {
-                ParameterBinding.Message => "context.Message",
+                ParameterBinding.Message => method.MessageCarrierType is null
+                    ? "context.Message"
+                    : "new " + method.MessageCarrierType + "(context.Message)",
                 ParameterBinding.ConsumeContext => "context",
                 ParameterBinding.CancellationToken => "context.CancellationToken",
                 ParameterBinding.Service => "_service" + parameterIndex,
@@ -528,6 +635,7 @@ public sealed class ConsumerRegistrationGenerator : IIncrementalGenerator
             string declaringType,
             string methodName,
             string messageType,
+            string? messageCarrierType,
             string endpointName,
             bool endpointNameIsExplicit,
             string? endpointNameFormatterType,
@@ -538,6 +646,7 @@ public sealed class ConsumerRegistrationGenerator : IIncrementalGenerator
             DeclaringType = declaringType;
             MethodName = methodName;
             MessageType = messageType;
+            MessageCarrierType = messageCarrierType;
             EndpointName = endpointName;
             EndpointNameIsExplicit = endpointNameIsExplicit;
             EndpointNameFormatterType = endpointNameFormatterType;
@@ -549,6 +658,7 @@ public sealed class ConsumerRegistrationGenerator : IIncrementalGenerator
         public string DeclaringType { get; }
         public string MethodName { get; }
         public string MessageType { get; }
+        public string? MessageCarrierType { get; }
         public string EndpointName { get; }
         public bool EndpointNameIsExplicit { get; }
         public string? EndpointNameFormatterType { get; }
