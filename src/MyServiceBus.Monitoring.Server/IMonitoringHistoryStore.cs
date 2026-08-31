@@ -1,0 +1,38 @@
+using MyServiceBus.Monitoring;
+
+namespace MyServiceBus.Monitoring.Server;
+
+public interface IMonitoringHistoryStore
+{
+    string Provider { get; }
+    bool Durable { get; }
+    DateTimeOffset? HistoryAvailableFromUtc { get; }
+
+    Task InitializeAsync(CancellationToken cancellationToken);
+    Task<MonitoringHistoryRestore> RestoreAsync(DateTimeOffset observationCutoff, CancellationToken cancellationToken);
+    Task StoreMetadataAsync(MonitoringMetadata metadata, CancellationToken cancellationToken);
+    Task StoreBatchAsync(MonitoringObservationBatch batch, CancellationToken cancellationToken);
+    Task StoreHeartbeatAsync(MonitoringHeartbeat heartbeat, CancellationToken cancellationToken);
+}
+
+public sealed record MonitoringHistoryRestore(
+    IReadOnlyList<MonitoringMetadata> Metadata,
+    IReadOnlyList<MonitoringObservationBatch> Batches,
+    IReadOnlyList<MonitoringHeartbeat> Heartbeats,
+    DateTimeOffset? LastIngestAtUtc);
+
+public sealed class InMemoryMonitoringHistoryStore : IMonitoringHistoryStore
+{
+    public string Provider => "InMemory";
+    public bool Durable => false;
+    public DateTimeOffset? HistoryAvailableFromUtc => null;
+
+    public Task InitializeAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+    public Task<MonitoringHistoryRestore> RestoreAsync(DateTimeOffset observationCutoff, CancellationToken cancellationToken)
+        => Task.FromResult(new MonitoringHistoryRestore([], [], [], null));
+
+    public Task StoreMetadataAsync(MonitoringMetadata metadata, CancellationToken cancellationToken) => Task.CompletedTask;
+    public Task StoreBatchAsync(MonitoringObservationBatch batch, CancellationToken cancellationToken) => Task.CompletedTask;
+    public Task StoreHeartbeatAsync(MonitoringHeartbeat heartbeat, CancellationToken cancellationToken) => Task.CompletedTask;
+}
