@@ -32,6 +32,8 @@ The first recurring slice dispatches a job command through MyServiceBus to an or
 
 End-to-end `Running`, `Completed`, progress, cooperative cancellation, persisted job state, long-running lock avoidance, and execution retry belong to a later `JobConsumer`-style layer. That layer can correlate its execution records with the existing definition and occurrence identities. This keeps the first recurring feature useful without pretending that message delivery and application work completion are the same event.
 
+The minimal tracked execution contract and its promotion path for recurring occurrences are specified in [Job Consumers](job-consumers.md). While the API is still in preview, `IRecurringJobScheduler` should become the facade for recurring tracked application jobs. If recurring publication to ordinary consumers remains desirable, it should be introduced separately as an `IRecurringMessageScheduler` instead of making one facade report two different meanings of completion.
+
 Recurring messages remain a separate facade. They may reuse the same cadence and materialization machinery, but their outcome is message delivery rather than a tracked application job. The dashboard must label each kind accurately.
 
 ## Job definition and discovery
@@ -160,7 +162,7 @@ The focused Recurring Jobs view currently shows definitions, cadence, next occur
 3. Add PostgreSQL schema version 4, transactional materialization into the existing outbox, restart tests, and bidirectional C#/Java storage interoperability.
 4. Export definition monitoring with explicit snapshot freshness, then add a focused dashboard view and Aspire demo case. Add retained occurrence monitoring only when dispatch lifecycle evidence is available.
 5. Add cron evaluation only after cross-language fixtures cover dialect, time zones, daylight-saving transitions, boundaries, and misfires. Fixed interval may ship first if cron would otherwise obscure the state model.
-6. Design the job-execution/`JobConsumer` layer for completion, progress, retry, concurrency, cancellation, interface and method handlers, and generated C#/Java registration.
+6. Implement the job-execution/`JobConsumer` layer described in [Job Consumers](job-consumers.md), beginning with interface handlers and explicit registration, then add method handlers and generated C#/Java registration.
 7. Validate the provider boundary with a .NET Hangfire conformance adapter and a Java JobRunr conformance adapter without making either engine mandatory or claiming storage interoperability between them.
 
 ## References

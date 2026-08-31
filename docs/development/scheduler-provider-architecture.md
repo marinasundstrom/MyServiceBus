@@ -80,6 +80,8 @@ MyServiceBus should preserve that familiarity for message scheduling where it im
 
 MassTransit's job consumers are a separate distributed job-service concept, including job submission, attempts, concurrency limits, cancellation, retry, and progress. They confirm that a scheduled message and an application job should not be collapsed into one public abstraction. MyServiceBus should consider a comparable convenience only after the underlying scheduled-message, job-execution, and monitoring primitives are stable. It does not need to reproduce MassTransit's saga-backed implementation.
 
+The minimal compatible public surface and execution lifecycle are now specified in [Job Consumers](job-consumers.md). The implementation should preserve MassTransit-familiar names such as `IJobConsumer<TJob>`, `JobContext<TJob>`, job timeout, concurrent job limit, and retry while using a provider-neutral `JobClient` as the primary cross-language submission facade.
+
 The provider SPI therefore sits below the MassTransit-familiar application facade. It is a MyServiceBus integration contract, not an interop wire contract and not a promise that Hangfire and JobRunr can share jobs. The built-in durable provider with PostgreSQL storage is the recommended shared C#/Java route. Transport-native scheduling can be the preferred route when compatible applications already share a broker and its delayed-delivery semantics are sufficient.
 
 ## Portable execution command
