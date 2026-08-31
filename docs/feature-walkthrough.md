@@ -1449,7 +1449,7 @@ These adapter names illustrate the extension boundary; first-party Quartz adapte
 
 Job consumers are intended for long-running application work whose execution lifecycle should not depend on holding the original broker delivery lock. The preview executor records jobs and attempts, applies per-consumer concurrency, timeout and retry settings, supports cooperative cancellation and progress, and exposes authoritative snapshots through `IJobSource` / `JobSource`.
 
-The default executor is in-memory and process-local. Both runtimes can opt into the built-in PostgreSQL provider for durable intent, execution leases, restart recovery, attempt history, cancellation, and progress. Recurring providers promote each occurrence into the selected executor and retain its correlation; PostgreSQL performs the durable promotion transactionally. Monitoring export and dashboard presentation remain required before the tracked-job MVP is complete.
+The default executor is in-memory and process-local. Both runtimes can opt into the built-in PostgreSQL provider for durable intent, execution leases, restart recovery, attempt history, cancellation, and progress. Recurring providers promote each occurrence into the selected executor and retain its correlation; PostgreSQL performs the durable promotion transactionally. Both runtimes export bounded payload-free snapshots to the monitoring service, and the supplied dashboard presents current jobs under their owning application with progress, freshness, provider, and expandable attempt outcomes.
 
 #### C#
 
@@ -1515,7 +1515,7 @@ JobSubmissionReceipt receipt = jobs.submit(new RebuildSearchIndex(16)).toComplet
 jobs.cancel(receipt.jobId()).toCompletableFuture().join();
 ```
 
-See [Job Consumers](development/job-consumers.md) for the lifecycle, scheduling relationship, provider boundary, and remaining MVP evidence.
+See [Job Consumers](development/job-consumers.md) for the lifecycle, scheduling relationship, provider boundary, monitoring contract, and MVP evidence.
 
 ---
 

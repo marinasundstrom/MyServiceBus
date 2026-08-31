@@ -64,7 +64,7 @@ The same information hierarchy supports learning and operations: concepts use pl
 
 Graphs and maps are distinct reusable components, with compact overview and full drill-down forms. Future capabilities such as sagas can add their own focused views without turning the landing page into a catalog of every metric.
 
-A future <strong>Scheduled work</strong> view will list scheduled messages and provider-defined jobs by application, due time, safe type, intent, attempt, and status. Common states will distinguish pending, running or leased, dispatched or completed, cancelled, and dead or failed work. Providers will export bounded operational metadata; the collector will not connect to every scheduler database, and message bodies or serialized callbacks will not appear in monitoring. Cancellation and retry belong to a later privileged control plane.
+<strong>Scheduled work</strong>, <strong>Recurring jobs</strong>, and <strong>Tracked jobs</strong> are separate application-focused views. Scheduled work shows one-time message intent and due state; recurring jobs show definitions, cadence, revision, and next occurrence; tracked jobs show execution progress, timing, outcomes, and expandable attempts. Providers export bounded operational metadata, while message bodies, serialized callbacks, arbitrary headers, and failure messages remain outside monitoring. Cancellation and retry belong to a later privileged control plane.
 
 <div className="callout">
   <strong>Customization boundary</strong>
@@ -100,6 +100,7 @@ Monitoring is never part of message delivery. If the service is unavailable, mes
   <li>Expandable failure metadata without capturing message bodies or arbitrary headers</li>
   <li>Recent observations and optional W3C trace correlation identifiers</li>
   <li>Outbox dispatcher backlog, oldest-undispatched age, throughput, failures, lost leases, and cycle latency</li>
+  <li>One-time schedules, recurring definitions, and tracked C# or Java job executions in separate application-oriented views</li>
   <li>HTTP queries plus WebSocket change invalidations</li>
   <li>Transparent storage durability, freshness, retained-window coverage, and monitoring gaps</li>
 </ul>
@@ -166,7 +167,7 @@ Run the Aspire AppHost from the repository root:
 
 <CodeViewer code="dotnet run --project src/AspireApp --launch-profile http" label="Run the Aspire AppHost" language="shell" />
 
-Open the <code>monitoring-dashboard</code> resource, then call the sample applications&apos; <code>/publish</code>, <code>/send</code>, or <code>/request/fault</code> routes. Both clients self-register with the same collector and appear as separate applications.
+Open the <code>monitoring-dashboard</code> resource, then call the sample applications&apos; <code>/publish</code>, <code>/send</code>, <code>/request/fault</code>, or <code>POST /jobs</code> routes. The C# and Java samples self-register, create one recurring tracked occurrence at startup, and support <code>delaySeconds</code>, <code>failFirstAttempt</code>, and <code>failAlways</code> job-query options. The C# outbox sample contributes a durable PostgreSQL-backed recurring execution.
 
 ## Deploy the components separately
 

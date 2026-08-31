@@ -1,6 +1,6 @@
 # Job consumers
 
-Status: preview design for the tracked job-execution MVP.
+Status: experimental MVP implemented for C# and Java.
 
 ## Purpose
 
@@ -89,7 +89,7 @@ The monitoring data must distinguish:
 
 ## MVP evidence
 
-The feature is not complete until both runtimes demonstrate:
+The focused C# and Java suites plus the Aspire sample demonstrate:
 
 1. immediate, delayed, and recurring job submission;
 2. completion, fault, automatic retry, manual retry, timeout, and cancellation;
