@@ -3,7 +3,7 @@
 @inherits ApplicationPageBase
 
 <PageTitle>@ApplicationName flow · MyServiceBus Monitoring</PageTitle>
-<DashboardPageHeader Eyebrow="Application flow" Title="@ApplicationName" Description="Follow the messages entering and leaving this application. The map stays application-oriented while preserving exact paths below." />
+<DashboardPageHeader Eyebrow="Application flow" Title="@ApplicationName" Description="Follow the messages entering and leaving this application, including the exact replicas that reported each observed path." />
 <ApplicationNavigation ApplicationName="@ApplicationName" />
 
 @if (Application is null)
@@ -13,23 +13,28 @@
 else
 {
     <section class="panel flow-map-panel application-flow-map">
-        <div class="section-heading"><div><p class="eyebrow">Live neighborhood</p><h2>Direct message flow</h2></div><span>Last 5 minutes · line width represents throughput</span></div>
-        <FlowMap Applications="FlowApplications" Edges="ApplicationFlow" />
-        <p class="map-help">Only this application and its directly observed neighbors are shown. Drag nodes to explore; scroll or use the controls to zoom.</p>
+        <div class="section-heading"><div><p class="eyebrow">Live neighborhood</p><h2>Direct replica flow</h2></div><span>Last 5 minutes · line width represents throughput</span></div>
+        <ReplicaFlowMap Instances="ReplicaFlowInstances" Edges="ApplicationReplicaFlow" FocusApplication="@ApplicationName" />
+        <p class="map-help">All replicas of this application are grouped together, with the directly observed replicas of neighboring applications. Drag a replica to explore; scroll or use the controls to zoom.</p>
     </section>
 
     <section class="panel flow-detail-panel">
         <div class="section-heading"><div><p class="eyebrow">Exact paths</p><h2>Observed connections</h2></div><span>Last 5 minutes</span></div>
-        @if (ApplicationFlow.Count == 0)
+        @if (ApplicationReplicaFlow.Count == 0)
         {
             <p class="panel-empty">No correlated message paths were observed for this application in this window.</p>
         }
         else
         {
             <div class="flow-list">
-                @foreach (var edge in ApplicationFlow.OrderByDescending(edge => edge.Count))
+                @foreach (var edge in ApplicationReplicaFlow.OrderByDescending(edge => edge.Count))
                 {
-                    <div class="flow-edge"><strong>@edge.SourceApplication</strong><span>→</span><strong>@edge.TargetApplication</strong><small>@ShortMessageType(edge.MessageType) · @edge.Count.ToString("N0") messages</small></div>
+                    <div class="flow-edge replica-flow-edge">
+                        <strong>@edge.SourceApplication <small>@edge.SourceInstanceId</small></strong>
+                        <span>→</span>
+                        <strong>@edge.TargetApplication <small>@edge.TargetInstanceId</small></strong>
+                        <small>@ShortMessageType(edge.MessageType) · @edge.Count.ToString("N0") @(edge.Count == 1 ? "message" : "messages")</small>
+                    </div>
                 }
             </div>
         }

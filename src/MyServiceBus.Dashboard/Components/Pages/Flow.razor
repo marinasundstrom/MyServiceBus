@@ -6,24 +6,68 @@
 <DashboardPageHeader Eyebrow="System map" Title="Message flow" Description="Explore which applications exchange messages and the observed traffic between them. This map is reconstructed from recent correlated activity." />
 
 <section class="panel flow-map-panel">
-    <div class="section-heading"><div><p class="eyebrow">Live system map</p><h2>Observed application flow</h2></div><span>Last 5 minutes · line width represents throughput</span></div>
-    <FlowMap Applications="Dashboard.Applications" Edges="Dashboard.Flow" />
-    <p class="map-help">Drag applications to explore the topology. Select one to focus its direct message paths; scroll or use the controls to zoom.</p>
+    <div class="section-heading flow-map-heading">
+        <div><p class="eyebrow">Live system map</p><h2>@(_view == FlowView.Applications ? "Observed application flow" : "Replica flow by application")</h2></div>
+        <div class="flow-view-options">
+            <span>Last 5 minutes · line width represents throughput</span>
+            <div class="flow-view-toggle" role="group" aria-label="Message flow detail level">
+                <button type="button" class="@ViewClass(FlowView.Applications)" aria-pressed="@(_view == FlowView.Applications)" @onclick="() => _view = FlowView.Applications">Applications</button>
+                <button type="button" class="@ViewClass(FlowView.Replicas)" aria-pressed="@(_view == FlowView.Replicas)" @onclick="() => _view = FlowView.Replicas">Detailed</button>
+            </div>
+        </div>
+    </div>
+    @if (_view == FlowView.Applications)
+    {
+        <FlowMap Applications="Dashboard.Applications" Edges="Dashboard.Flow" />
+        <p class="map-help">Drag applications to explore the topology. Select one to focus its direct message paths; scroll or use the controls to zoom.</p>
+    }
+    else
+    {
+        <ReplicaFlowMap Instances="Dashboard.Instances" Edges="Dashboard.ReplicaFlow" />
+        <p class="map-help">Each boundary is an application and each node is a running or recently observed replica. Paths show which exact producer and consumer replicas reported the correlated message flow.</p>
+    }
 </section>
 
 <section class="panel flow-detail-panel">
-    <div class="section-heading"><div><p class="eyebrow">Exact paths</p><h2>Observed connections</h2></div><span>Last 5 minutes</span></div>
-    @if (Dashboard.Flow.Count == 0)
+    <div class="section-heading"><div><p class="eyebrow">Exact paths</p><h2>@(_view == FlowView.Applications ? "Observed connections" : "Observed replica connections")</h2></div><span>Last 5 minutes</span></div>
+    @if ((_view == FlowView.Applications && Dashboard.Flow.Count == 0)
+        || (_view == FlowView.Replicas && Dashboard.ReplicaFlow.Count == 0))
     {
         <p class="panel-empty">No correlated message paths were observed in this window.</p>
     }
-    else
+    else if (_view == FlowView.Applications)
     {
         <div class="flow-list">
             @foreach (var edge in Dashboard.Flow)
             {
-                <div class="flow-edge"><strong>@edge.SourceApplication</strong><span>→</span><strong>@edge.TargetApplication</strong><small>@ShortMessageType(edge.MessageType) · @edge.Count.ToString("N0") messages</small></div>
+                <div class="flow-edge"><strong>@edge.SourceApplication</strong><span>→</span><strong>@edge.TargetApplication</strong><small>@ShortMessageType(edge.MessageType) · @edge.Count.ToString("N0") @(edge.Count == 1 ? "message" : "messages")</small></div>
+            }
+        </div>
+    }
+    else
+    {
+        <div class="flow-list">
+            @foreach (var edge in Dashboard.ReplicaFlow)
+            {
+                <div class="flow-edge replica-flow-edge">
+                    <strong>@edge.SourceApplication <small>@edge.SourceInstanceId</small></strong>
+                    <span>→</span>
+                    <strong>@edge.TargetApplication <small>@edge.TargetInstanceId</small></strong>
+                    <small>@ShortMessageType(edge.MessageType) · @edge.Count.ToString("N0") @(edge.Count == 1 ? "message" : "messages")</small>
+                </div>
             }
         </div>
     }
 </section>
+
+@code {
+    private FlowView _view = FlowView.Applications;
+
+    private string ViewClass(FlowView view) => _view == view ? "active" : string.Empty;
+
+    private enum FlowView
+    {
+        Applications,
+        Replicas
+    }
+}

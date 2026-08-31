@@ -51,6 +51,12 @@ public sealed class MonitoringApiClient
             cancellationToken).ConfigureAwait(false)
             ?? [];
 
+    public async Task<IReadOnlyList<MonitoringReplicaFlowEdge>> GetReplicaFlow(CancellationToken cancellationToken)
+        => await httpClient.GetFromJsonAsync<MonitoringReplicaFlowEdge[]>(
+            "/api/monitoring/v1/flow/replicas?windowSeconds=300",
+            cancellationToken).ConfigureAwait(false)
+            ?? [];
+
     public async Task<IReadOnlyList<MonitoringTimeSeriesPoint>> GetTimeSeries(CancellationToken cancellationToken)
         => await httpClient.GetFromJsonAsync<MonitoringTimeSeriesPoint[]>(
             "/api/monitoring/v1/metrics/timeseries?windowSeconds=300&bucketSeconds=5",

@@ -45,6 +45,30 @@ public abstract class ApplicationPageBase : MonitoringPageBase
                 || string.Equals(edge.TargetApplication, ApplicationName, StringComparison.Ordinal))
             .ToArray();
 
+    protected IReadOnlyList<MonitoringReplicaFlowEdge> ApplicationReplicaFlow
+        => Dashboard.ReplicaFlow
+            .Where(edge => string.Equals(edge.SourceApplication, ApplicationName, StringComparison.Ordinal)
+                || string.Equals(edge.TargetApplication, ApplicationName, StringComparison.Ordinal))
+            .ToArray();
+
+    protected IReadOnlyList<MonitoringInstanceSummary> ReplicaFlowInstances
+    {
+        get
+        {
+            var identities = ApplicationReplicaFlow
+                .SelectMany(edge => new[]
+                {
+                    (edge.SourceApplication, edge.SourceInstanceId, edge.SourceBusId),
+                    (edge.TargetApplication, edge.TargetInstanceId, edge.TargetBusId)
+                })
+                .ToHashSet();
+            return Dashboard.Instances
+                .Where(instance => string.Equals(instance.ApplicationName, ApplicationName, StringComparison.Ordinal)
+                    || identities.Contains((instance.ApplicationName, instance.InstanceId, instance.BusId)))
+                .ToArray();
+        }
+    }
+
     protected IReadOnlyList<MonitoringApplicationSummary> FlowApplications
     {
         get
