@@ -7,6 +7,7 @@ builder.Services.AddOpenApi("v1", options =>
 {
     options.ShouldInclude = description => description.GroupName == "v1";
 });
+builder.Services.AddOutputCache();
 builder.Services.AddOptions<MonitoringStorageOptions>()
     .BindConfiguration(MonitoringStorageOptions.SectionName)
     .Validate(options => options.Retention >= TimeSpan.FromMinutes(15), "Monitoring storage retention must be at least fifteen minutes.")
@@ -35,6 +36,7 @@ builder.Services.AddHostedService<MonitoringHistoryRestoreService>();
 
 var app = builder.Build();
 app.UseWebSockets();
+app.UseOutputCache();
 app.MapOpenApi();
 app.MapMonitoringApi();
 app.MapDefaultEndpoints();

@@ -275,6 +275,40 @@ public sealed class MonitoringRepository
         }
     }
 
+    public MonitoringDashboardSummary GetDashboardSummary(int windowSeconds, DateTimeOffset now)
+    {
+        var rates = GetRates(null, windowSeconds, false, now);
+        var applications = GetApplications(now);
+        var outboxDispatchers = GetOutboxDispatchers(null, windowSeconds, now);
+        var trackedJobs = GetJobs(null, null, now);
+        var boundedWindow = rates.FirstOrDefault()?.WindowSeconds
+            ?? Math.Clamp(windowSeconds, 10, (int)MetricRetention.TotalSeconds);
+        DateTimeOffset? latestObservationAtUtc;
+        lock (observationSync)
+        {
+            latestObservationAtUtc = recentObservations
+                .Where(record => record.Observation.OccurredAtUtc <= now)
+                .Select(record => (DateTimeOffset?)record.Observation.OccurredAtUtc)
+                .Max();
+        }
+
+        return new MonitoringDashboardSummary(
+            boundedWindow,
+            now.AddSeconds(-boundedWindow),
+            now,
+            rates.Sum(rate => CountFailures(rate.Counts)),
+            rates.Sum(rate => rate.Counts.RetryAttempted),
+            rates.Count(rate => CountFailures(rate.Counts) > 0),
+            outboxDispatchers.Count(dispatcher => !dispatcher.Online || !dispatcher.LastCycleSucceeded),
+            trackedJobs.Count(job => string.Equals(job.Job.Status, "Faulted", StringComparison.OrdinalIgnoreCase)),
+            trackedJobs.Count(job => string.Equals(job.Job.Status, "Running", StringComparison.OrdinalIgnoreCase)),
+            applications.Count,
+            applications.Count(application => application.OnlineInstances == 0),
+            applications.Count == 0 ? null : applications.Max(application => application.LastSeenAtUtc),
+            latestObservationAtUtc,
+            rates.All(rate => rate.Complete));
+    }
+
     public IReadOnlyList<MonitoringApplicationSummary> GetApplications(DateTimeOffset now)
         => instances.Values
             .Select(state => state.CreateSummary(now, LeaseTimeout))
@@ -710,6 +744,9 @@ public sealed class MonitoringRepository
             result.Add(counter);
         return result.ToImmutable();
     }
+
+    private static long CountFailures(MonitoringCounterSet counters)
+        => counters.SendFaulted + counters.PublishFaulted + counters.ConsumeFaulted;
 
     private static void ValidateProtocol(string protocolVersion)
     {

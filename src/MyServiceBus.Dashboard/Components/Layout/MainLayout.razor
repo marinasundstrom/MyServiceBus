@@ -1,4 +1,6 @@
 @inherits LayoutComponentBase
+@implements IDisposable
+@inject MonitoringDashboardState Dashboard
 
 <div class="app-shell">
     <aside class="sidebar">
@@ -19,7 +21,13 @@
             <NavLink href="/throughput">Throughput</NavLink>
             <NavLink href="/flow">Message flow</NavLink>
             <span class="nav-label">Reliability</span>
-            <NavLink href="/failures">Failures</NavLink>
+            <NavLink href="/failures">
+                <span>Failures</span>
+                @if (FailureCount > 0)
+                {
+                    <span class="nav-badge" title="@FailureBadgeTitle" aria-label="@FailureBadgeTitle">@FailureBadgeText</span>
+                }
+            </NavLink>
             <NavLink href="/outbox">Outbox</NavLink>
             <NavLink href="/scheduled">Scheduled work</NavLink>
             <NavLink href="/recurring">Recurring jobs</NavLink>
@@ -43,3 +51,27 @@
         </main>
     </div>
 </div>
+
+@code {
+    private long FailureCount => Dashboard.Summary?.FailureCount ?? 0;
+    private string FailureBadgeText => FailureCount > 99 ? "99+" : FailureCount.ToString();
+
+    private string FailureBadgeTitle
+    {
+        get
+        {
+            var summary = Dashboard.Summary;
+            if (summary is null)
+                return "Failure summary unavailable";
+
+            var coverage = summary.Complete ? string.Empty : " Monitoring coverage is incomplete.";
+            return $"{summary.FailureCount:N0} failures across {summary.AffectedApplicationCount:N0} applications in the last {summary.WindowSeconds} seconds.{coverage}";
+        }
+    }
+
+    protected override void OnInitialized() => Dashboard.Changed += OnDashboardChanged;
+
+    private void OnDashboardChanged() => _ = InvokeAsync(StateHasChanged);
+
+    public void Dispose() => Dashboard.Changed -= OnDashboardChanged;
+}
