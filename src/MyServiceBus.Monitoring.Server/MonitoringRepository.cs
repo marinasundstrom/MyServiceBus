@@ -13,6 +13,8 @@ public sealed class MonitoringRepository
     private readonly object observationSync = new();
     private readonly Queue<MonitoringObservationRecord> recentObservations = new();
     private readonly SortedDictionary<long, Dictionary<MetricKey, MutableMetricSet>> metricBuckets = new();
+    private readonly DateTimeOffset serviceStartedAtUtc = DateTimeOffset.UtcNow;
+    private long lastIngestUtcTicks;
 
     public void UpsertMetadata(MonitoringMetadata metadata)
     {
@@ -27,6 +29,7 @@ public sealed class MonitoringRepository
                 state.UpdateMetadata(metadata);
                 return state;
             });
+        MarkIngested();
     }
 
     public bool RecordBatch(MonitoringObservationBatch batch)
@@ -82,6 +85,7 @@ public sealed class MonitoringRepository
             }
             PruneMetrics(batch.ExportedAtUtc - MetricRetention);
         }
+        MarkIngested();
         return true;
     }
 
@@ -92,7 +96,38 @@ public sealed class MonitoringRepository
         if (!instances.TryGetValue(key, out var state))
             return false;
         state.MarkSeen(heartbeat.SentAtUtc);
+        MarkIngested();
         return true;
+    }
+
+    public MonitoringHistorySummary GetHistory(DateTimeOffset now)
+    {
+        lock (observationSync)
+        {
+            var retentionStart = now - MetricRetention;
+            var availableFrom = serviceStartedAtUtc > retentionStart ? serviceStartedAtUtc : retentionStart;
+            var retained = recentObservations
+                .Where(record => record.Observation.OccurredAtUtc >= retentionStart
+                    && record.Observation.OccurredAtUtc <= now)
+                .ToArray();
+            var dropped = metricBuckets
+                .Where(bucket => DateTimeOffset.FromUnixTimeSeconds(bucket.Key) >= retentionStart)
+                .SelectMany(bucket => bucket.Value.Values)
+                .Sum(metric => metric.DroppedObservations);
+            var lastIngestTicks = Interlocked.Read(ref lastIngestUtcTicks);
+
+            return new MonitoringHistorySummary(
+                "InMemory",
+                false,
+                (int)MetricRetention.TotalSeconds,
+                serviceStartedAtUtc,
+                availableFrom,
+                lastIngestTicks == 0 ? null : new DateTimeOffset(lastIngestTicks, TimeSpan.Zero),
+                retained.Length == 0 ? null : retained.Min(record => record.Observation.OccurredAtUtc),
+                retained.Length == 0 ? null : retained.Max(record => record.Observation.OccurredAtUtc),
+                dropped,
+                dropped == 0);
+        }
     }
 
     public IReadOnlyList<MonitoringApplicationSummary> GetApplications(DateTimeOffset now)
@@ -485,6 +520,9 @@ public sealed class MonitoringRepository
         while (metricBuckets.Count > 0 && metricBuckets.First().Key < cutoffKey)
             metricBuckets.Remove(metricBuckets.First().Key);
     }
+
+    private void MarkIngested()
+        => Interlocked.Exchange(ref lastIngestUtcTicks, DateTimeOffset.UtcNow.UtcTicks);
 
     private static IEnumerable<string> CorrelationKeys(MonitoringObservation observation)
     {

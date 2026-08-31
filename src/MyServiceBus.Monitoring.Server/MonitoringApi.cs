@@ -31,6 +31,7 @@ public static class MonitoringApi
             repository.RecordHeartbeat(heartbeat) ? Results.Accepted() : Results.NotFound());
 
         var query = endpoints.MapGroup("/api/monitoring/v1").WithTags("Monitoring queries");
+        query.MapGet("/history", (MonitoringRepository repository) => repository.GetHistory(DateTimeOffset.UtcNow));
         query.MapGet("/applications", (MonitoringRepository repository) => repository.GetApplications(DateTimeOffset.UtcNow));
         query.MapGet("/instances", (string? application, MonitoringRepository repository) => repository.GetInstances(application, DateTimeOffset.UtcNow));
         query.MapGet("/endpoints", (string? application, int? windowSeconds, MonitoringRepository repository) =>

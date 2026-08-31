@@ -124,6 +124,18 @@ public sealed record MonitoringEndpointSummary(
     DateTimeOffset? LastActivityAtUtc,
     int WindowSeconds);
 
+public sealed record MonitoringHistorySummary(
+    string StorageProvider,
+    bool Durable,
+    int MetricRetentionSeconds,
+    DateTimeOffset ServiceStartedAtUtc,
+    DateTimeOffset HistoryAvailableFromUtc,
+    DateTimeOffset? LastIngestAtUtc,
+    DateTimeOffset? OldestObservationAtUtc,
+    DateTimeOffset? LatestObservationAtUtc,
+    long DroppedObservations,
+    bool Complete);
+
 public sealed record MonitoringCounterSet(
     long Sent,
     long SendFaulted,

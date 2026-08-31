@@ -67,6 +67,15 @@ public class MonitoringRepositoryTests
         application.Totals.Published.ShouldBe(1);
         application.Labels!["group"].ShouldBe("commerce");
         repository.GetRecentObservations("orders", 10).ShouldHaveSingleItem();
+
+        var history = repository.GetHistory(now.AddSeconds(1));
+        history.StorageProvider.ShouldBe("InMemory");
+        history.Durable.ShouldBeFalse();
+        history.MetricRetentionSeconds.ShouldBe(900);
+        history.LastIngestAtUtc.ShouldNotBeNull();
+        history.OldestObservationAtUtc.ShouldBe(now);
+        history.LatestObservationAtUtc.ShouldBe(now);
+        history.Complete.ShouldBeTrue();
     }
 
     [Fact]

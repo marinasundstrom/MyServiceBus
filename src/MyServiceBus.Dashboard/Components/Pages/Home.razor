@@ -16,6 +16,17 @@
     </div>
 </section>
 
+@if (Dashboard.History is { } history)
+{
+    <section class="history-status @HistoryStatusClass(history)" aria-label="Monitoring history availability">
+        <span class="status-dot @HistoryDotClass(history)"></span>
+        <div>
+            <strong>@HistoryStatusTitle(history)</strong>
+            <p>@HistoryStatusDescription(history)</p>
+        </div>
+    </section>
+}
+
 @if (Dashboard.Applications.Count == 0)
 {
     <section class="empty-state">
@@ -94,7 +105,46 @@ else
     private int TotalInstances => Dashboard.Applications.Sum(application => application.TotalInstances);
     private double TotalConsumedRate => Dashboard.ApplicationRates.Sum(rate => rate.Rates.ConsumedPerSecond);
     private long WindowFailures => Dashboard.ApplicationRates.Sum(rate => Failures(rate.Counts));
-    private bool CompleteCoverage => Dashboard.ApplicationRates.Count > 0 && Dashboard.ApplicationRates.All(rate => rate.Complete);
+    private bool CompleteCoverage => Dashboard.History is { } history
+        && IsFresh(history)
+        && history.Complete
+        && Dashboard.ApplicationRates.Count > 0
+        && Dashboard.ApplicationRates.All(rate => rate.Complete);
+
+    private bool IsFresh(MonitoringHistorySummary history)
+        => history.LastIngestAtUtc is { } lastIngest && Dashboard.UpdatedAt - lastIngest <= TimeSpan.FromSeconds(45);
+
+    private string HistoryStatusClass(MonitoringHistorySummary history)
+        => !IsFresh(history) || !history.Complete ? "history-warning" : history.Durable ? "history-durable" : "history-volatile";
+
+    private string HistoryDotClass(MonitoringHistorySummary history)
+        => IsFresh(history) && history.Complete ? "online" : "offline";
+
+    private string HistoryStatusTitle(MonitoringHistorySummary history) => history switch
+    {
+        { LastIngestAtUtc: null } => "No monitoring data received yet",
+        _ when !IsFresh(history) => "Monitoring data may have a gap",
+        { Complete: false } => "Monitoring data is incomplete",
+        { Durable: true } => "Durable monitoring history available",
+        _ => "Volatile monitoring history"
+    };
+
+    private string HistoryStatusDescription(MonitoringHistorySummary history)
+    {
+        var boundary = history.HistoryAvailableFromUtc.ToLocalTime().ToString("MMM d, HH:mm:ss");
+        if (history.LastIngestAtUtc is null)
+            return $"The {StorageLabel(history)} store has no earlier data. This history window began {boundary}.";
+        if (!IsFresh(history))
+            return $"No exporter contact since {history.LastIngestAtUtc.Value.ToLocalTime():MMM d, HH:mm:ss}. Data after that time is not known to be complete.";
+        if (!history.Complete)
+            return $"Exporters reported {history.DroppedObservations:N0} dropped observations in the retained window.";
+        if (!history.Durable)
+            return $"Available since {boundary}. In-memory history is lost when the monitoring service restarts.";
+        return $"Retained history is available since {boundary}.";
+    }
+
+    private static string StorageLabel(MonitoringHistorySummary history)
+        => history.StorageProvider == "InMemory" ? "in-memory" : history.StorageProvider;
 
     private IReadOnlyList<MonitoringApplicationSummary> AttentionApplications
         => Dashboard.Applications.Where(application =>
