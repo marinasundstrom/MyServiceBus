@@ -108,6 +108,22 @@ public sealed record MonitoringInstanceSummary(
     long DroppedObservations,
     IReadOnlyDictionary<string, string>? Labels = null);
 
+public sealed record MonitoringEndpointSummary(
+    string ApplicationName,
+    string EndpointName,
+    string Address,
+    string TransportName,
+    int OnlineInstances,
+    int TotalInstances,
+    int ConsumerCount,
+    int MessageTypeCount,
+    long Consumed,
+    long Faulted,
+    long Retried,
+    double ConsumedPerSecond,
+    DateTimeOffset? LastActivityAtUtc,
+    int WindowSeconds);
+
 public sealed record MonitoringCounterSet(
     long Sent,
     long SendFaulted,

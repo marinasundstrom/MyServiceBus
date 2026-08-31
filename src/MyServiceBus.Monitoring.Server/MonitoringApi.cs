@@ -33,6 +33,8 @@ public static class MonitoringApi
         var query = endpoints.MapGroup("/api/monitoring/v1").WithTags("Monitoring queries");
         query.MapGet("/applications", (MonitoringRepository repository) => repository.GetApplications(DateTimeOffset.UtcNow));
         query.MapGet("/instances", (string? application, MonitoringRepository repository) => repository.GetInstances(application, DateTimeOffset.UtcNow));
+        query.MapGet("/endpoints", (string? application, int? windowSeconds, MonitoringRepository repository) =>
+            repository.GetEndpoints(application, windowSeconds ?? 60, DateTimeOffset.UtcNow));
         query.MapGet("/metadata/{application}/{instanceId}/{busId}", (string application, string instanceId, string busId, MonitoringRepository repository) =>
         {
             var metadata = repository.GetMetadata(application, instanceId, busId);

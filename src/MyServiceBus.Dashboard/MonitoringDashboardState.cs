@@ -22,6 +22,7 @@ public sealed class MonitoringDashboardState : IAsyncDisposable
 
     public IReadOnlyList<MonitoringApplicationSummary> Applications { get; private set; } = [];
     public IReadOnlyList<MonitoringInstanceSummary> Instances { get; private set; } = [];
+    public IReadOnlyList<MonitoringEndpointSummary> Endpoints { get; private set; } = [];
     public IReadOnlyList<MonitoringRateSummary> ApplicationRates { get; private set; } = [];
     public IReadOnlyList<MonitoringRateSummary> InstanceRates { get; private set; } = [];
     public IReadOnlyList<MonitoringTimeSeriesPoint> TimeSeries { get; private set; } = [];
@@ -105,6 +106,7 @@ public sealed class MonitoringDashboardState : IAsyncDisposable
         {
             var applications = api.GetApplications(stopping.Token);
             var instances = api.GetInstances(stopping.Token);
+            var endpoints = api.GetEndpoints(stopping.Token);
             var applicationRates = api.GetRates(false, stopping.Token);
             var instanceRates = api.GetRates(true, stopping.Token);
             var flow = api.GetFlow(stopping.Token);
@@ -114,6 +116,7 @@ public sealed class MonitoringDashboardState : IAsyncDisposable
             await Task.WhenAll(
                 applications,
                 instances,
+                endpoints,
                 applicationRates,
                 instanceRates,
                 flow,
@@ -122,6 +125,7 @@ public sealed class MonitoringDashboardState : IAsyncDisposable
                 outboxDispatchers);
             Applications = applications.Result;
             Instances = instances.Result;
+            Endpoints = endpoints.Result;
             ApplicationRates = applicationRates.Result;
             InstanceRates = instanceRates.Result;
             Flow = flow.Result;

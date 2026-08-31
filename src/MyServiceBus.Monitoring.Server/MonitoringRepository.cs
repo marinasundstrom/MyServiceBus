@@ -118,6 +118,78 @@ public sealed class MonitoringRepository
             .ThenBy(instance => instance.InstanceId, StringComparer.Ordinal)
             .ToArray();
 
+    public IReadOnlyList<MonitoringEndpointSummary> GetEndpoints(
+        string? applicationName,
+        int windowSeconds,
+        DateTimeOffset now)
+    {
+        var boundedWindow = Math.Clamp(windowSeconds, 10, (int)MetricRetention.TotalSeconds);
+        var windowStart = now.AddSeconds(-boundedWindow);
+        var endpointInstances = instances.Values
+            .Select(state => (Metadata: state.Metadata, Summary: state.CreateSummary(now, LeaseTimeout)))
+            .Where(instance => applicationName is null || string.Equals(
+                instance.Metadata.ApplicationName,
+                applicationName,
+                StringComparison.Ordinal))
+            .SelectMany(instance => instance.Metadata.Bus.ReceiveEndpoints.Select(endpoint => new
+            {
+                instance.Metadata.ApplicationName,
+                instance.Metadata.BusId,
+                instance.Summary.Online,
+                Endpoint = endpoint,
+                TransportName = endpoint.Transport?.TransportName ?? instance.Metadata.Bus.TransportName
+            }))
+            .ToArray();
+
+        MonitoringObservationRecord[] observations;
+        lock (observationSync)
+        {
+            observations = recentObservations
+                .Where(record => record.Observation.OccurredAtUtc >= windowStart
+                    && record.Observation.OccurredAtUtc <= now
+                    && !string.IsNullOrWhiteSpace(record.Observation.EndpointName))
+                .ToArray();
+        }
+
+        return endpointInstances
+            .GroupBy(instance => new EndpointKey(
+                instance.ApplicationName,
+                instance.Endpoint.EndpointName,
+                instance.Endpoint.Address,
+                instance.TransportName))
+            .Select(group =>
+            {
+                var busIds = group.Select(instance => instance.BusId).ToHashSet(StringComparer.Ordinal);
+                var activity = observations.Where(record =>
+                    string.Equals(record.ApplicationName, group.Key.ApplicationName, StringComparison.Ordinal)
+                    && busIds.Contains(record.BusId)
+                    && string.Equals(record.Observation.EndpointName, group.Key.EndpointName, StringComparison.Ordinal))
+                    .ToArray();
+                var consumed = activity.LongCount(record => record.Observation.Kind == "consumed");
+                var faulted = activity.LongCount(record => record.Observation.Kind is "consume_faulted" or "retry_exhausted");
+                var retried = activity.LongCount(record => record.Observation.Kind == "retry_attempted");
+
+                return new MonitoringEndpointSummary(
+                    group.Key.ApplicationName,
+                    group.Key.EndpointName,
+                    group.Key.Address,
+                    group.Key.TransportName,
+                    group.Count(instance => instance.Online),
+                    group.Count(),
+                    group.SelectMany(instance => instance.Endpoint.ConsumerTypes).Distinct(StringComparer.Ordinal).Count(),
+                    group.SelectMany(instance => instance.Endpoint.Bindings).Select(binding => binding.MessageUrn).Distinct(StringComparer.Ordinal).Count(),
+                    consumed,
+                    faulted,
+                    retried,
+                    consumed / (double)boundedWindow,
+                    activity.Length == 0 ? null : activity.Max(record => record.Observation.OccurredAtUtc),
+                    boundedWindow);
+            })
+            .OrderBy(endpoint => endpoint.ApplicationName, StringComparer.Ordinal)
+            .ThenBy(endpoint => endpoint.EndpointName, StringComparer.Ordinal)
+            .ToArray();
+    }
+
     public MonitoringMetadata? GetMetadata(string applicationName, string instanceId, string busId)
         => instances.TryGetValue(new InstanceKey(applicationName, instanceId, busId), out var state)
             ? state.Metadata
@@ -482,6 +554,11 @@ public sealed class MonitoringRepository
         string BusId,
         string ServiceName,
         string OwnerId);
+    private readonly record struct EndpointKey(
+        string ApplicationName,
+        string EndpointName,
+        string Address,
+        string TransportName);
     private readonly record struct FlowEdgeKey(
         string SourceApplication,
         string TargetApplication,
