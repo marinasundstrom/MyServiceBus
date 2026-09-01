@@ -22,6 +22,7 @@ public sealed class MonitoringRepository
     private readonly ConcurrentDictionary<InstanceKey, MonitoringRecurringJobSnapshot> recurringJobs = new();
     private readonly ConcurrentDictionary<InstanceKey, MonitoringJobSnapshot> jobs = new();
     private readonly ConcurrentDictionary<string, MonitoringChoreographyRun> workflowRuns = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<SagaInstanceKey, MonitoringSagaInstance> sagaInstances = new();
     private readonly TimeSpan workflowRunRetention;
     private readonly DateTimeOffset serviceStartedAtUtc = DateTimeOffset.UtcNow;
     private long lastIngestUtcTicks;
@@ -552,6 +553,38 @@ public sealed class MonitoringRepository
     }
 
     public IReadOnlyList<MonitoringSagaInstance> GetSagaInstances(string? stateMachineId, string? status)
+        => CaptureSagaInstances(DateTimeOffset.UtcNow)
+            .Where(instance => string.IsNullOrWhiteSpace(stateMachineId)
+                || string.Equals(instance.StateMachineId, stateMachineId, StringComparison.OrdinalIgnoreCase))
+            .Where(instance => string.IsNullOrWhiteSpace(status)
+                || string.Equals(instance.Status, status, StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(instance => instance.LastActivityAtUtc)
+            .ThenBy(instance => instance.StateMachineId, StringComparer.Ordinal)
+            .ThenBy(instance => instance.CorrelationId, StringComparer.Ordinal)
+            .ToArray();
+
+    public IReadOnlyList<MonitoringSagaInstance> CaptureSagaInstances(DateTimeOffset now)
+    {
+        foreach (var instance in ProjectRecentSagaInstances())
+        {
+            var key = new SagaInstanceKey(instance.StateMachineId, instance.ApplicationName, instance.CorrelationId);
+            sagaInstances.AddOrUpdate(key, instance, (_, current) => MergeSagaInstance(current, instance));
+        }
+        PruneSagaInstances(now - workflowRunRetention);
+        return sagaInstances.Values.ToArray();
+    }
+
+    public void RestoreSagaInstances(IEnumerable<MonitoringSagaInstance> instances, DateTimeOffset now)
+    {
+        foreach (var instance in instances.Where(instance => instance.LastActivityAtUtc >= now - workflowRunRetention))
+        {
+            var key = new SagaInstanceKey(instance.StateMachineId, instance.ApplicationName, instance.CorrelationId);
+            sagaInstances.AddOrUpdate(key, instance, (_, current) => MergeSagaInstance(current, instance));
+        }
+        PruneSagaInstances(now - workflowRunRetention);
+    }
+
+    private IReadOnlyList<MonitoringSagaInstance> ProjectRecentSagaInstances()
     {
         MonitoringObservationRecord[] sagaObservations;
         lock (observationSync)
@@ -606,13 +639,6 @@ public sealed class MonitoringRepository
                     completed ? lastSuccessful!.Observation.OccurredAtUtc : null,
                     transitions);
             })
-            .Where(instance => string.IsNullOrWhiteSpace(stateMachineId)
-                || string.Equals(instance.StateMachineId, stateMachineId, StringComparison.OrdinalIgnoreCase))
-            .Where(instance => string.IsNullOrWhiteSpace(status)
-                || string.Equals(instance.Status, status, StringComparison.OrdinalIgnoreCase))
-            .OrderByDescending(instance => instance.LastActivityAtUtc)
-            .ThenBy(instance => instance.StateMachineId, StringComparer.Ordinal)
-            .ThenBy(instance => instance.CorrelationId, StringComparer.Ordinal)
             .ToArray();
     }
 
@@ -639,6 +665,35 @@ public sealed class MonitoringRepository
             && record.Observation.Properties.TryGetValue(name, out var value)
             && bool.TryParse(value, out var parsed)
             && parsed;
+
+    private static MonitoringSagaInstance MergeSagaInstance(
+        MonitoringSagaInstance current,
+        MonitoringSagaInstance candidate)
+    {
+        var latest = candidate.LastActivityAtUtc >= current.LastActivityAtUtc ? candidate : current;
+        var transitions = current.Transitions
+            .Concat(candidate.Transitions)
+            .Distinct()
+            .OrderBy(transition => transition.OccurredAtUtc)
+            .ThenBy(transition => transition.EventId, StringComparer.Ordinal)
+            .ToArray();
+        return latest with
+        {
+            StartedAtUtc = current.StartedAtUtc < candidate.StartedAtUtc
+                ? current.StartedAtUtc
+                : candidate.StartedAtUtc,
+            LastActivityAtUtc = current.LastActivityAtUtc > candidate.LastActivityAtUtc
+                ? current.LastActivityAtUtc
+                : candidate.LastActivityAtUtc,
+            Transitions = transitions
+        };
+    }
+
+    private void PruneSagaInstances(DateTimeOffset cutoff)
+    {
+        foreach (var item in sagaInstances.Where(item => item.Value.LastActivityAtUtc < cutoff))
+            sagaInstances.TryRemove(item.Key, out _);
+    }
 
     public IReadOnlyList<MonitoringWorkflowCatalogItem> GetWorkflowCatalog(DateTimeOffset now)
     {
@@ -1985,6 +2040,7 @@ public sealed class MonitoringRepository
     }
 
     private readonly record struct InstanceKey(string ApplicationName, string InstanceId, string BusId);
+    private readonly record struct SagaInstanceKey(string StateMachineId, string ApplicationName, string CorrelationId);
     private readonly record struct MetricKey(string ApplicationName, string? InstanceId);
     private readonly record struct OutboxDispatcherKey(
         string ApplicationName,

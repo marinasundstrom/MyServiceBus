@@ -80,6 +80,38 @@ public class MonitoringRepositoryTests
     }
 
     [Fact]
+    public void Repository_merges_restored_and_new_saga_transitions()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var firstRepository = new MonitoringRepository();
+        firstRepository.UpsertMetadata(CreateMetadata("orders", "orders-1", now, "commerce"));
+        firstRepository.RecordBatch(CreateBatch(
+            "orders",
+            "orders-1",
+            now,
+            CreateSagaObservation(1, now.AddMinutes(-1), "OrderSubmitted", "consumed", "Initial", "AwaitingPayment", true, false)))
+            .ShouldBeTrue();
+        var retained = firstRepository.CaptureSagaInstances(now).ShouldHaveSingleItem();
+
+        var restoredRepository = new MonitoringRepository();
+        restoredRepository.RestoreSagaInstances([retained], now);
+        restoredRepository.UpsertMetadata(CreateMetadata("orders", "orders-1", now, "commerce"));
+        restoredRepository.RecordBatch(CreateBatch(
+            "orders",
+            "orders-1",
+            now,
+            CreateSagaObservation(2, now, "PaymentReceived", "consumed", "AwaitingPayment", "Final", false, true)))
+            .ShouldBeTrue();
+
+        var merged = restoredRepository.GetSagaInstances("order-state-machine", "completed").ShouldHaveSingleItem();
+        merged.StartedAtUtc.ShouldBe(now.AddMinutes(-1));
+        merged.LastActivityAtUtc.ShouldBe(now);
+        merged.Transitions.Select(transition => transition.EventId)
+            .ShouldBe(["OrderSubmitted", "PaymentReceived"]);
+        merged.CurrentState.ShouldBe("Final");
+    }
+
+    [Fact]
     public void Dashboard_summary_is_explicit_when_no_monitoring_data_is_available()
     {
         var summary = new MonitoringRepository().GetDashboardSummary(60, DateTimeOffset.UtcNow);

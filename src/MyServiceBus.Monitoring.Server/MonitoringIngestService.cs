@@ -17,7 +17,7 @@ public sealed class MonitoringIngestService
     {
         repository.UpsertMetadata(metadata);
         await store.StoreMetadataAsync(metadata, cancellationToken);
-        await StoreWorkflowRunsAsync(cancellationToken);
+        await StoreWorkflowProjectionsAsync(cancellationToken);
     }
 
     public async Task<bool> RecordBatchAsync(MonitoringObservationBatch batch, CancellationToken cancellationToken)
@@ -25,7 +25,7 @@ public sealed class MonitoringIngestService
         if (!repository.RecordBatch(batch))
             return false;
         await store.StoreBatchAsync(batch, cancellationToken);
-        await StoreWorkflowRunsAsync(cancellationToken);
+        await StoreWorkflowProjectionsAsync(cancellationToken);
         return true;
     }
 
@@ -68,8 +68,10 @@ public sealed class MonitoringIngestService
     public MonitoringHistorySummary GetHistory(DateTimeOffset now)
         => repository.GetHistory(now, store.Provider, store.Durable, store.HistoryAvailableFromUtc);
 
-    private Task StoreWorkflowRunsAsync(CancellationToken cancellationToken)
-        => store.StoreWorkflowRunsAsync(
-            repository.CaptureWorkflowRuns(DateTimeOffset.UtcNow),
-            cancellationToken);
+    private async Task StoreWorkflowProjectionsAsync(CancellationToken cancellationToken)
+    {
+        var now = DateTimeOffset.UtcNow;
+        await store.StoreWorkflowRunsAsync(repository.CaptureWorkflowRuns(now), cancellationToken);
+        await store.StoreSagaInstancesAsync(repository.CaptureSagaInstances(now), cancellationToken);
+    }
 }
