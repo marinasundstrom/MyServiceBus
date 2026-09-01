@@ -4,6 +4,7 @@ This changelog summarizes the bigger themes in the repository history rather tha
 
 ## Unreleased
 
+- Improved the Dashboard shell at phone widths with concise live-status text, fully readable theme and density choices, and a visual continuation cue for the horizontally scrollable section navigation. Workflow guidance now describes saga transition retention as monitoring-service policy instead of the obsolete live-window-only limitation.
 - Preserved authoritative committed saga state when retained monitoring history is merged with later failed and recovered delivery attempts. Saga run detail now labels the sequence as delivery-attempt history so visible failures are not described as committed transitions.
 - Added matching C# and Java PostgreSQL saga recovery gates over the real state-machine runtime. They verify rollback of state and transactionally staged outgoing envelopes after a failed attempt, restart recovery through newly constructed runtimes, pessimistic serialization of competing same-correlation deliveries, durable final-instance deletion, and retention of only committed outbox records.
 - Added durable monitoring retention for authoritative saga-instance projections. The collector now merges newly committed transition evidence with retained history, PostgreSQL stores one bounded snapshot per state-machine/application/correlation identity, and startup restoration preserves saga detail and workflow-index visibility across collector restarts.

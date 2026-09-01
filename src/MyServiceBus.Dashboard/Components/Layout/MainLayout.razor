@@ -57,8 +57,9 @@
         <header class="topbar">
             <div class="topbar-status">
                 <span class="status-dot @ConnectionClass"></span>
-                <div>
-                    <strong role="status" aria-live="polite">@ConnectionTitle</strong>
+                <div role="status" aria-live="polite">
+                    <strong class="topbar-status-title-full">@ConnectionTitle</strong>
+                    <strong class="topbar-status-title-short">@ConnectionShortTitle</strong>
                     <span>@ConnectionDetail</span>
                 </div>
             </div>
@@ -83,6 +84,9 @@
     private string ConnectionTitle => Dashboard.Error is not null
         ? "Monitoring unavailable"
         : Dashboard.LiveConnected ? "Live monitoring" : "Monitoring by polling";
+    private string ConnectionShortTitle => Dashboard.Error is not null
+        ? "Unavailable"
+        : Dashboard.LiveConnected ? "Live" : "Polling";
     private string ConnectionDetail => Dashboard.Error is not null
         ? $"Last data {Dashboard.UpdatedAt.ToLocalTime():HH:mm:ss}"
         : Dashboard.LiveConnected

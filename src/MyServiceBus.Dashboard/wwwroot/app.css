@@ -74,6 +74,7 @@ body { margin: 0; min-height: 100vh; background: radial-gradient(circle at 15% 0
 .topbar-status > div { display: flex; min-width: 0; flex-direction: column; }
 .topbar-status .status-dot { flex: 0 0 auto; }
 .topbar-status strong { font-size: .82rem; }
+.topbar-status-title-short { display: none; }
 .topbar span { color: var(--text-dim); font-size: .78rem; letter-spacing: .05em; text-transform: uppercase; }
 .topbar-status > div span { overflow: hidden; font-size: .67rem; letter-spacing: .035em; text-overflow: ellipsis; white-space: nowrap; }
 .brand-mark { width: 38px; height: 38px; display: grid; place-items: center; border-radius: 11px; background: var(--accent); color: var(--accent-ink); font-weight: 900; font-size: .78rem; }
@@ -690,7 +691,7 @@ td small { display: block; margin-top: 4px; color: var(--text-dim); font-size: .
 @media (max-width: 900px) {
     .app-shell { display: block; }
     .sidebar { position: static; width: 100%; height: auto; padding: 14px 4vw; border-right: 0; border-bottom: 1px solid var(--border); }
-    .sidebar nav { flex-direction: row; gap: 4px; margin-top: 14px; padding-bottom: 5px; overflow-x: auto; scroll-snap-type: x proximity; }
+    .sidebar nav { flex-direction: row; gap: 4px; margin-top: 14px; padding: 0 30px 5px 0; overflow-x: auto; scroll-snap-type: x proximity; -webkit-mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 34px), transparent 100%); mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 34px), transparent 100%); }
     .sidebar nav a { white-space: nowrap; }
     .sidebar nav a { scroll-snap-align: start; }
     .nav-label, .sidebar-note { display: none; }
@@ -698,10 +699,13 @@ td small { display: block; margin-top: 4px; color: var(--text-dim); font-size: .
 }
 
 @media (max-width: 520px) {
-    .topbar { gap: 8px; }
+    .topbar { gap: 7px; padding-inline: 10px; }
     .topbar-status > div span { display: none; }
-    .topbar-status strong { max-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .theme-selector select, .density-selector select { max-width: 92px; padding-right: 24px; }
+    .topbar-status-title-full { display: none; }
+    .topbar-status-title-short { display: block; }
+    .topbar-status strong { white-space: nowrap; }
+    .theme-selector select { width: 96px; padding-right: 24px; }
+    .density-selector select { width: 136px; padding-right: 24px; }
     .overview-grid, .drilldown-grid { grid-template-columns: 1fr; }
     .overview-grid .metric { min-height: 92px; }
     .section-heading { align-items: start; flex-direction: column; }
