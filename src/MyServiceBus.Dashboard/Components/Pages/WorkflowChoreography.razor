@@ -36,6 +36,16 @@ else
             <span>@choreography.Fragments.Count @(choreography.Fragments.Count == 1 ? "participant" : "participants") · captured @choreography.LastCapturedAtUtc.ToLocalTime().ToString("MMM d, HH:mm:ss")</span>
         </div>
 
+        <div class="workflow-run-section-heading">
+            <div><span class="eyebrow">Coordination map</span><h3>Declared reactions and handoffs</h3></div>
+            <p>Applications remain autonomous; the map connects their declared reactions and overlays bounded observations.</p>
+        </div>
+        <WorkflowChoreographyMap Choreography="choreography" Runtime="Dashboard.ChoreographyRuntime" />
+
+        <div class="workflow-run-section-heading">
+            <div><span class="eyebrow">Definition detail</span><h3>Participant reactions and output constraints</h3></div>
+            <p>Each participant owns these local reactions. Output requirements describe intent, not centralized workflow state.</p>
+        </div>
         <div class="workflow-map" aria-label="Declared reactions grouped by application">
             @foreach (var fragment in choreography.Fragments)
             {

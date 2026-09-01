@@ -375,12 +375,14 @@ td small { display: block; margin-top: 4px; color: var(--text-dim); font-size: .
 .workflow-run-map-arrow { fill: var(--accent); }
 .workflow-run-map-link-label { fill: var(--text-dim); font-size: 9px; text-anchor: middle; paint-order: stroke; stroke: var(--surface-deep); stroke-width: 5px; stroke-linejoin: round; }
 .workflow-run-map-node rect { fill: color-mix(in srgb, var(--surface-raised) 92%, var(--accent) 8%); stroke: color-mix(in srgb, var(--accent) 52%, var(--border-strong)); stroke-width: 1.4; }
+.workflow-run-map-node.observed rect { fill: color-mix(in srgb, var(--surface-raised) 82%, var(--accent) 18%); stroke: var(--accent); stroke-width: 1.8; }
 .workflow-run-map-node.faulted rect { fill: color-mix(in srgb, var(--surface-raised) 91%, var(--danger) 9%); stroke: var(--danger); }
 .workflow-run-map-application { fill: var(--accent); font-size: 9px; font-weight: 800; text-transform: uppercase; }
 .workflow-run-map-structure { fill: var(--accent); font-size: 8px; font-weight: 850; text-anchor: end; }
 .workflow-run-map-step { fill: var(--text); font-size: 13px; font-weight: 800; }
 .workflow-run-map-contract { fill: var(--text-dim); font-size: 9px; }
 .workflow-run-map-duration { fill: var(--text-soft); font-size: 9px; font-weight: 750; text-anchor: end; }
+.declared-choreography-map { border-top: 1px solid var(--border); }
 .workflow-map-legend { position: absolute; left: 14px; bottom: 12px; display: flex; flex-wrap: wrap; gap: 8px 13px; padding: 7px 9px; border: 1px solid var(--border-subtle); border-radius: 8px; background: color-mix(in srgb, var(--surface-solid) 88%, transparent); color: var(--text-dim); font-size: .58rem; font-weight: 700; backdrop-filter: blur(8px); }
 .workflow-map-legend span { display: inline-flex; gap: 5px; align-items: center; }
 .workflow-map-legend i { width: 8px; height: 8px; border: 1px solid var(--border-strong); border-radius: 50%; background: var(--surface-raised); }

@@ -1,0 +1,191 @@
+@implements IAsyncDisposable
+@inject IJSRuntime JavaScript
+
+<div class="workflow-run-map-shell declared-choreography-map" @ref="map">
+    <svg class="workflow-run-map-canvas" role="img" aria-label="Declared choreography reactions and message handoffs"></svg>
+    <div class="workflow-map-legend" aria-hidden="true">
+        <span><i class="observed"></i>Observed in current window</span>
+        <span><i class="declared"></i>Declared only</span>
+    </div>
+    <div class="flow-map-controls" aria-label="Declared choreography map controls">
+        <button type="button" title="Zoom in" aria-label="Zoom in" @onclick="() => ZoomAsync(1.3)">+</button>
+        <button type="button" title="Zoom out" aria-label="Zoom out" @onclick="() => ZoomAsync(1 / 1.3)">−</button>
+        <button type="button" title="Reset view" aria-label="Reset view" @onclick="ResetAsync">↺</button>
+    </div>
+</div>
+
+@code {
+    private ElementReference map;
+    private IJSObjectReference? module;
+
+    [Parameter, EditorRequired]
+    public required MonitoringDeclaredChoreography Choreography { get; set; }
+
+    [Parameter]
+    public MonitoringChoreographyRuntimeSnapshot? Runtime { get; set; }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        module ??= await JavaScript.InvokeAsync<IJSObjectReference>("import", "./monitoringChart.js");
+        if (firstRender)
+            await module.InvokeVoidAsync("initializeWorkflowRunMap", map);
+
+        var steps = Choreography.Fragments
+            .SelectMany(fragment => fragment.Steps.Select(step => new DeclaredStep(fragment, step)))
+            .ToArray();
+        var incoming = Choreography.Connections
+            .GroupBy(connection => StepKey(
+                connection.DefinitionVersion,
+                connection.TargetApplication,
+                connection.TargetOwner,
+                connection.TargetStepId),
+                StringComparer.Ordinal)
+            .ToDictionary(
+                group => group.Key,
+                group => group.Select(connection => StepKey(
+                    connection.DefinitionVersion,
+                    connection.SourceApplication,
+                    connection.SourceOwner,
+                    connection.SourceStepId)).Distinct(StringComparer.Ordinal).Count(),
+                StringComparer.Ordinal);
+        var rootFanOut = steps
+            .Where(step => !incoming.ContainsKey(StepKey(step.Fragment, step.Step)))
+            .GroupBy(step => step.Step.TriggerMessageUrn, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.Count(), StringComparer.Ordinal);
+
+        await module.InvokeVoidAsync(
+            "updateWorkflowRunMap",
+            map,
+            new
+            {
+                Nodes = steps.Select((declared, sequence) =>
+                {
+                    var key = StepKey(declared.Fragment, declared.Step);
+                    var observedCount = ObservedCount(declared.Fragment, declared.Step);
+                    return new
+                    {
+                        Id = key,
+                        Application = declared.Fragment.ApplicationName,
+                        Label = declared.Step.Id,
+                        Contract = ContractLabel(declared.Step.TriggerMessageUrn),
+                        Metric = observedCount > 0 ? $"Observed {observedCount:N0}×" : "Declared",
+                        Status = observedCount > 0 ? "observed" : "declared",
+                        Sequence = sequence,
+                        BranchCount = Choreography.Connections
+                            .Where(connection => SourceMatches(connection, declared.Fragment, declared.Step))
+                            .Select(connection => StepKey(connection.DefinitionVersion, connection.TargetApplication, connection.TargetOwner, connection.TargetStepId))
+                            .Distinct(StringComparer.Ordinal)
+                            .Count(),
+                        MergeCount = incoming.GetValueOrDefault(key),
+                        RootFanOutCount = incoming.ContainsKey(key) ? 0 : rootFanOut.GetValueOrDefault(declared.Step.TriggerMessageUrn),
+                        Terminal = declared.Step.Outputs.Any(output => output.Kind == MyServiceBus.Choreography.ChoreographyOperationKind.Terminal)
+                    };
+                }),
+                Links = Choreography.Connections.Select(connection =>
+                {
+                    var observedCount = ObservedCount(connection);
+                    return new
+                    {
+                        Source = StepKey(connection.DefinitionVersion, connection.SourceApplication, connection.SourceOwner, connection.SourceStepId),
+                        Target = StepKey(connection.DefinitionVersion, connection.TargetApplication, connection.TargetOwner, connection.TargetStepId),
+                        Operation = connection.OperationKind.ToString(),
+                        Message = ContractLabel(connection.MessageUrn),
+                        Metric = observedCount > 0 ? $"Observed {observedCount:N0}×" : "Declared",
+                        Succeeded = true
+                    };
+                })
+            });
+    }
+
+    private long ObservedCount(MonitoringDeclaredChoreographyFragment fragment, MyServiceBus.Choreography.ChoreographyStep step)
+        => Runtime?.Reactions
+            .Where(reaction => string.Equals(reaction.ChoreographyId, Choreography.ChoreographyId, StringComparison.Ordinal)
+                && string.Equals(reaction.DefinitionVersion, fragment.DefinitionVersion, StringComparison.Ordinal)
+                && string.Equals(reaction.ApplicationName, fragment.ApplicationName, StringComparison.Ordinal)
+                && string.Equals(reaction.Owner, fragment.Owner, StringComparison.Ordinal)
+                && string.Equals(reaction.StepId, step.Id, StringComparison.Ordinal))
+            .Select(reaction => reaction.ObservedCount)
+            .DefaultIfEmpty()
+            .Max() ?? 0;
+
+    private long ObservedCount(MonitoringDeclaredChoreographyConnection connection)
+    {
+        var fragment = Choreography.Fragments.FirstOrDefault(candidate =>
+            string.Equals(candidate.DefinitionVersion, connection.DefinitionVersion, StringComparison.Ordinal)
+            && string.Equals(candidate.ApplicationName, connection.SourceApplication, StringComparison.Ordinal)
+            && string.Equals(candidate.Owner, connection.SourceOwner, StringComparison.Ordinal));
+        var step = fragment?.Steps.FirstOrDefault(candidate => string.Equals(candidate.Id, connection.SourceStepId, StringComparison.Ordinal));
+        if (step is null)
+            return 0;
+        int? outputIndex = null;
+        for (var index = 0; index < step.Outputs.Count; index++)
+        {
+            var output = step.Outputs[index];
+            if (output.Kind == connection.OperationKind
+                && string.Equals(output.MessageUrn, connection.MessageUrn, StringComparison.Ordinal)
+                && string.Equals(output.Destination, connection.Destination, StringComparison.Ordinal))
+            {
+                outputIndex = index;
+                break;
+            }
+        }
+        if (!outputIndex.HasValue)
+            return 0;
+        return Runtime?.Reactions
+            .Where(reaction => string.Equals(reaction.ChoreographyId, Choreography.ChoreographyId, StringComparison.Ordinal)
+                && string.Equals(reaction.DefinitionVersion, connection.DefinitionVersion, StringComparison.Ordinal)
+                && string.Equals(reaction.ApplicationName, connection.SourceApplication, StringComparison.Ordinal)
+                && string.Equals(reaction.Owner, connection.SourceOwner, StringComparison.Ordinal)
+                && string.Equals(reaction.StepId, connection.SourceStepId, StringComparison.Ordinal)
+                && reaction.OutputIndex == outputIndex.Value)
+            .Sum(reaction => reaction.ObservedCount) ?? 0;
+    }
+
+    private static bool SourceMatches(
+        MonitoringDeclaredChoreographyConnection connection,
+        MonitoringDeclaredChoreographyFragment fragment,
+        MyServiceBus.Choreography.ChoreographyStep step)
+        => string.Equals(connection.DefinitionVersion, fragment.DefinitionVersion, StringComparison.Ordinal)
+           && string.Equals(connection.SourceApplication, fragment.ApplicationName, StringComparison.Ordinal)
+           && string.Equals(connection.SourceOwner, fragment.Owner, StringComparison.Ordinal)
+           && string.Equals(connection.SourceStepId, step.Id, StringComparison.Ordinal);
+
+    private static string StepKey(MonitoringDeclaredChoreographyFragment fragment, MyServiceBus.Choreography.ChoreographyStep step)
+        => StepKey(fragment.DefinitionVersion, fragment.ApplicationName, fragment.Owner, step.Id);
+
+    private static string StepKey(string version, string application, string owner, string step)
+        => $"{version}\u001f{application}\u001f{owner}\u001f{step}";
+
+    private static string ContractLabel(string value) => value.Split('.', ':').Last();
+
+    private async Task ZoomAsync(double factor)
+    {
+        if (module is not null)
+            await module.InvokeVoidAsync("zoomWorkflowRunMap", map, factor);
+    }
+
+    private async Task ResetAsync()
+    {
+        if (module is not null)
+            await module.InvokeVoidAsync("resetWorkflowRunMap", map);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            if (module is not null)
+            {
+                await module.InvokeVoidAsync("disposeWorkflowRunMap", map);
+                await module.DisposeAsync();
+            }
+        }
+        catch (Exception exception) when (exception is JSException or JSDisconnectedException or ObjectDisposedException)
+        {
+        }
+    }
+
+    private sealed record DeclaredStep(
+        MonitoringDeclaredChoreographyFragment Fragment,
+        MyServiceBus.Choreography.ChoreographyStep Step);
+}

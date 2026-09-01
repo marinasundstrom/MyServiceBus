@@ -1040,7 +1040,7 @@ class WorkflowRunMap {
             .attr("class", "workflow-run-map-link-label")
             .attr("x", link => (link.sourceNode.x + link.targetNode.x) / 2)
             .attr("y", link => (link.sourceNode.y + link.targetNode.y) / 2 - 8)
-            .text(link => `${link.operation} ${trimText(link.message, 14)} · ${formatMilliseconds(link.handoffDurationMs)}`);
+            .text(link => `${link.operation} ${trimText(link.message, 14)} · ${link.metric || formatMilliseconds(link.handoffDurationMs)}`);
     }
 
     renderNodes(nodes) {
@@ -1065,11 +1065,12 @@ class WorkflowRunMap {
             if (node.rootFanOutCount > 1) labels.push(`ROOT ×${node.rootFanOutCount}`);
             if (node.branchCount > 1) labels.push(`FORK ×${node.branchCount}`);
             if (node.mergeCount > 1) labels.push(`MERGE ×${node.mergeCount}`);
+            if (node.terminal) labels.push("TERMINAL");
             return labels.join(" · ");
         });
         selection.select(".workflow-run-map-step").text(node => trimText(node.label, 28));
         selection.select(".workflow-run-map-contract").text(node => `Consumes ${trimText(node.contract, 16)}`);
-        selection.select(".workflow-run-map-duration").text(node => formatMilliseconds(node.durationMs));
+        selection.select(".workflow-run-map-duration").text(node => node.metric || formatMilliseconds(node.durationMs));
     }
 
     fitToContent(animate) {
