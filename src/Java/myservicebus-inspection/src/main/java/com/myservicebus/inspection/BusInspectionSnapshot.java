@@ -35,6 +35,17 @@ public record BusInspectionSnapshot(
         this(transportName, address, capturedAt, messages, receiveEndpoints, consumers, List.of(), List.of());
     }
 
+    public BusInspectionSnapshot(
+            String transportName,
+            URI address,
+            Instant capturedAt,
+            List<MessageInspection> messages,
+            List<ReceiveEndpointInspection> receiveEndpoints,
+            List<ConsumerInspection> consumers,
+            List<ChoreographyFragment> choreographies) {
+        this(transportName, address, capturedAt, messages, receiveEndpoints, consumers, choreographies, List.of());
+    }
+
     public record MessageInspection(
             String messageType,
             String messageUrn,

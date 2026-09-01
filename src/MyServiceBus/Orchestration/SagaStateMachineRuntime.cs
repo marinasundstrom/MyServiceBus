@@ -18,6 +18,8 @@ public sealed class SagaStateMachineRuntime<TSaga>
     private readonly IReadOnlyDictionary<Type, SagaEventRuntimeBinding<TSaga>> events;
     private readonly IReadOnlyDictionary<SagaActivityAddress, SagaActivityRuntimeBinding<TSaga>> activities;
 
+    internal SagaStateMachineDefinition Definition => definition;
+
     internal SagaStateMachineRuntime(
         SagaStateMachineDefinition definition,
         InMemorySagaRepository<TSaga> repository,

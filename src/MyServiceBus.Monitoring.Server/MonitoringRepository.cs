@@ -3,6 +3,7 @@ using System.Text.Json;
 using Microsoft.Extensions.Options;
 using MyServiceBus.Choreography;
 using MyServiceBus.Monitoring;
+using MyServiceBus.Orchestration;
 using MyServiceBus.Topology;
 
 namespace MyServiceBus.Monitoring.Server;
@@ -549,6 +550,91 @@ public sealed class MonitoringRepository
             .OrderBy(stateMachine => stateMachine.StateMachineId, StringComparer.Ordinal)
             .ToArray();
     }
+
+    public IReadOnlyList<MonitoringSagaInstance> GetSagaInstances(string? stateMachineId, string? status)
+    {
+        MonitoringObservationRecord[] sagaObservations;
+        lock (observationSync)
+        {
+            sagaObservations = recentObservations
+                .Where(record => record.Observation.Kind == "saga_delivery"
+                    && !string.IsNullOrWhiteSpace(record.Observation.CorrelationId)
+                    && record.Observation.Properties is not null
+                    && record.Observation.Properties.ContainsKey("state_machine_id"))
+                .ToArray();
+        }
+
+        return sagaObservations
+            .GroupBy(record => new
+            {
+                record.ApplicationName,
+                StateMachineId = record.Observation.Properties!["state_machine_id"],
+                CorrelationId = record.Observation.CorrelationId!
+            })
+            .Select(group =>
+            {
+                var ordered = group.OrderBy(record => record.Observation.OccurredAtUtc).ToArray();
+                var last = ordered[^1];
+                var lastSuccessful = ordered.LastOrDefault(record => record.Observation.Succeeded == true);
+                var transitions = ordered.Select(record => new MonitoringSagaTransition(
+                    record.Observation.OccurredAtUtc,
+                    SagaProperty(record, "event_id"),
+                    SagaProperty(record, "status"),
+                    SagaOptionalProperty(record, "begin_state"),
+                    SagaOptionalProperty(record, "end_state"),
+                    record.Observation.Succeeded == true,
+                    SagaBooleanProperty(record, "created"),
+                    SagaBooleanProperty(record, "completed"),
+                    SagaBooleanProperty(record, "instance_present"),
+                    record.Observation.DurationMs,
+                    record.Observation.ExceptionType,
+                    record.Observation.ExceptionMessage,
+                    record.Observation.MessageId)).ToArray();
+                var completed = lastSuccessful is not null && SagaBooleanProperty(lastSuccessful, "completed");
+                var instancePresent = lastSuccessful is not null && SagaBooleanProperty(lastSuccessful, "instance_present");
+                return new MonitoringSagaInstance(
+                    group.Key.StateMachineId,
+                    SagaProperty(last, "definition_version"),
+                    group.Key.ApplicationName,
+                    group.Key.CorrelationId,
+                    completed ? "completed" : instancePresent ? "active" : "not-present",
+                    SagaOptionalProperty(lastSuccessful, "end_state") ?? SagaStateMachineDefinition.InitialState,
+                    instancePresent,
+                    last.Observation.Succeeded == true,
+                    ordered[0].Observation.OccurredAtUtc,
+                    last.Observation.OccurredAtUtc,
+                    completed ? lastSuccessful!.Observation.OccurredAtUtc : null,
+                    transitions);
+            })
+            .Where(instance => string.IsNullOrWhiteSpace(stateMachineId)
+                || string.Equals(instance.StateMachineId, stateMachineId, StringComparison.OrdinalIgnoreCase))
+            .Where(instance => string.IsNullOrWhiteSpace(status)
+                || string.Equals(instance.Status, status, StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(instance => instance.LastActivityAtUtc)
+            .ThenBy(instance => instance.StateMachineId, StringComparer.Ordinal)
+            .ThenBy(instance => instance.CorrelationId, StringComparer.Ordinal)
+            .ToArray();
+    }
+
+    private static string SagaProperty(MonitoringObservationRecord record, string name)
+        => record.Observation.Properties![name];
+
+    private static string? SagaOptionalProperty(MonitoringObservationRecord? record, string name)
+    {
+        if (record?.Observation.Properties is null
+            || !record.Observation.Properties.TryGetValue(name, out var value)
+            || string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+        return value;
+    }
+
+    private static bool SagaBooleanProperty(MonitoringObservationRecord record, string name)
+        => record.Observation.Properties is not null
+            && record.Observation.Properties.TryGetValue(name, out var value)
+            && bool.TryParse(value, out var parsed)
+            && parsed;
 
     public MonitoringChoreographyRuntimeSnapshot GetChoreographyRuntime(int windowSeconds, DateTimeOffset now)
     {

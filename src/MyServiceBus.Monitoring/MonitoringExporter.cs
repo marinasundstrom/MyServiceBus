@@ -53,6 +53,7 @@ public sealed class MonitoringExporter : BackgroundService, IBusHook, IScheduled
             BusLifecycleHookEvent lifecycle => CreateLifecycleObservation(lifecycle),
             MessageOperationHookEvent operation => CreateMessageObservation(operation),
             OutboxDeliveryHookEvent outbox => CreateOutboxObservation(outbox),
+            SagaStateMachineHookEvent saga => CreateSagaObservation(saga),
             _ => null
         };
 
@@ -486,6 +487,38 @@ public sealed class MonitoringExporter : BackgroundService, IBusHook, IScheduled
             busEvent.RetryLimit,
             MessageId: busEvent.MessageId,
             CausationMessageId: busEvent.CausationMessageId);
+
+    private MonitoringObservation CreateSagaObservation(SagaStateMachineHookEvent busEvent)
+        => new(
+            Interlocked.Increment(ref sequence),
+            busEvent.OccurredAtUtc,
+            "saga_delivery",
+            busEvent.Succeeded,
+            null,
+            null,
+            null,
+            null,
+            busEvent.DurationMs,
+            busEvent.ExceptionType,
+            busEvent.ExceptionMessage,
+            busEvent.SagaCorrelationId?.ToString("D"),
+            null,
+            null,
+            null,
+            Properties: new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["state_machine_id"] = busEvent.StateMachineId,
+                ["definition_version"] = busEvent.DefinitionVersion,
+                ["owner"] = busEvent.Owner,
+                ["event_id"] = busEvent.EventId,
+                ["status"] = busEvent.Status,
+                ["begin_state"] = busEvent.BeginState ?? string.Empty,
+                ["end_state"] = busEvent.EndState ?? string.Empty,
+                ["created"] = busEvent.Created.ToString(CultureInfo.InvariantCulture),
+                ["completed"] = busEvent.Completed.ToString(CultureInfo.InvariantCulture),
+                ["instance_present"] = busEvent.InstancePresent.ToString(CultureInfo.InvariantCulture)
+            },
+            MessageId: busEvent.MessageId);
 
     private MonitoringObservation CreateOutboxObservation(OutboxDeliveryHookEvent busEvent)
         => new(

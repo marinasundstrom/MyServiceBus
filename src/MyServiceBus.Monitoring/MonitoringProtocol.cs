@@ -266,6 +266,35 @@ public sealed record MonitoringDeclaredSagaStateMachineDeployment(
     int OnlineInstanceCount,
     DateTimeOffset LastCapturedAtUtc);
 
+public sealed record MonitoringSagaInstance(
+    string StateMachineId,
+    string DefinitionVersion,
+    string ApplicationName,
+    string CorrelationId,
+    string Status,
+    string CurrentState,
+    bool InstancePresent,
+    bool LastDeliverySucceeded,
+    DateTimeOffset StartedAtUtc,
+    DateTimeOffset LastActivityAtUtc,
+    DateTimeOffset? CompletedAtUtc,
+    IReadOnlyList<MonitoringSagaTransition> Transitions);
+
+public sealed record MonitoringSagaTransition(
+    DateTimeOffset OccurredAtUtc,
+    string EventId,
+    string DeliveryStatus,
+    string? BeginState,
+    string? EndState,
+    bool Succeeded,
+    bool Created,
+    bool Completed,
+    bool InstancePresent,
+    double? DurationMs,
+    string? ExceptionType,
+    string? ExceptionMessage,
+    string? MessageId);
+
 public sealed record MonitoringChoreographyRuntimeSnapshot(
     int WindowSeconds,
     DateTimeOffset WindowStartUtc,

@@ -40,6 +40,32 @@ public class MonitoringRepositoryTests
     }
 
     [Fact]
+    public void Repository_projects_committed_saga_transitions_without_claiming_choreography()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var repository = new MonitoringRepository();
+        repository.UpsertMetadata(CreateMetadata("orders", "orders-1", now, "commerce"));
+        repository.RecordBatch(CreateBatch(
+            "orders",
+            "orders-1",
+            now,
+            CreateSagaObservation(1, now.AddSeconds(-2), "OrderSubmitted", "consumed", "Initial", "AwaitingPayment", true, false),
+            CreateSagaObservation(2, now.AddSeconds(-1), "PaymentReceived", "consumed", "AwaitingPayment", "Final", false, true)))
+            .ShouldBeTrue();
+
+        var instance = repository.GetSagaInstances("order-state-machine", "completed").ShouldHaveSingleItem();
+
+        instance.Status.ShouldBe("completed");
+        instance.CurrentState.ShouldBe("Final");
+        instance.InstancePresent.ShouldBeFalse();
+        instance.LastDeliverySucceeded.ShouldBeTrue();
+        instance.Transitions.Count.ShouldBe(2);
+        instance.Transitions[0].Created.ShouldBeTrue();
+        instance.Transitions[1].Completed.ShouldBeTrue();
+        repository.GetDeclaredChoreographies(now).ShouldBeEmpty();
+    }
+
+    [Fact]
     public void Dashboard_summary_is_explicit_when_no_monitoring_data_is_available()
     {
         var summary = new MonitoringRepository().GetDashboardSummary(60, DateTimeOffset.UtcNow);
@@ -1098,6 +1124,46 @@ public class MonitoringRepositoryTests
             0,
             now,
             observations);
+
+    private static MonitoringObservation CreateSagaObservation(
+        long sequence,
+        DateTimeOffset occurredAtUtc,
+        string eventId,
+        string deliveryStatus,
+        string beginState,
+        string endState,
+        bool created,
+        bool completed)
+        => new(
+            sequence,
+            occurredAtUtc,
+            "saga_delivery",
+            true,
+            null,
+            null,
+            null,
+            null,
+            5,
+            null,
+            null,
+            "00000000-0000-0000-0000-000000000123",
+            null,
+            null,
+            null,
+            Properties: new Dictionary<string, string>
+            {
+                ["state_machine_id"] = "order-state-machine",
+                ["definition_version"] = "1",
+                ["owner"] = "orders",
+                ["event_id"] = eventId,
+                ["status"] = deliveryStatus,
+                ["begin_state"] = beginState,
+                ["end_state"] = endState,
+                ["created"] = created.ToString(),
+                ["completed"] = completed.ToString(),
+                ["instance_present"] = (!completed).ToString()
+            },
+            MessageId: $"message-{sequence}");
 
     private static MonitoringObservation CreateOutboxObservation(
         long sequence,

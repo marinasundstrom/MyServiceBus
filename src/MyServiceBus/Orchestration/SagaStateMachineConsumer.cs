@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Reflection;
 
 namespace MyServiceBus.Orchestration;
@@ -9,20 +10,94 @@ internal sealed class SagaStateMachineConsumer<TStateMachine, TSaga, TMessage> :
     where TMessage : class
 {
     private readonly SagaStateMachineRuntime<TSaga> runtime;
+    private readonly SagaStateMachineDefinition definition;
+    private readonly string eventId;
+    private readonly Func<TMessage, Guid> correlate;
+    private readonly IBusHookDispatcher hooks;
 
-    public SagaStateMachineConsumer(SagaStateMachineRuntime<TSaga> runtime)
+    public SagaStateMachineConsumer(
+        SagaStateMachineRuntime<TSaga> runtime,
+        SagaStateMachineDefinition definition,
+        string eventId,
+        Func<TMessage, Guid> correlate,
+        IEnumerable<IBusHook> hooks)
     {
         this.runtime = runtime;
+        this.definition = definition;
+        this.eventId = eventId;
+        this.correlate = correlate;
+        this.hooks = new BusHookDispatcher(hooks);
     }
 
-    public Task Consume(ConsumeContext<TMessage> context)
-        => runtime.Deliver(
-            context.Message,
-            (operation, cancellationToken) => SagaBusOutgoingDispatcher.Dispatch(
+    public async Task Consume(ConsumeContext<TMessage> context)
+    {
+        var startedAt = Stopwatch.GetTimestamp();
+        try
+        {
+            var result = await runtime.Deliver(
+                context.Message,
+                (operation, cancellationToken) => SagaBusOutgoingDispatcher.Dispatch(
+                    context,
+                    operation,
+                    cancellationToken),
+                context.CancellationToken).ConfigureAwait(false);
+            hooks.Dispatch(CreateHookEvent(result, context, Stopwatch.GetElapsedTime(startedAt), null));
+        }
+        catch (Exception exception)
+        {
+            hooks.Dispatch(CreateHookEvent(
+                null,
                 context,
-                operation,
-                cancellationToken),
-            context.CancellationToken).AsTask();
+                Stopwatch.GetElapsedTime(startedAt),
+                exception,
+                TryCorrelate(context.Message)));
+            throw;
+        }
+    }
+
+    private SagaStateMachineHookEvent CreateHookEvent(
+        SagaDeliveryResult? result,
+        ConsumeContext context,
+        TimeSpan duration,
+        Exception? exception,
+        Guid? failedCorrelationId = null)
+        => new(
+            DateTimeOffset.UtcNow,
+            exception is null,
+            duration.TotalMilliseconds,
+            definition.StateMachineId,
+            definition.DefinitionVersion,
+            definition.Owner,
+            eventId,
+            result?.Status switch
+            {
+                SagaDeliveryStatus.Consumed => "consumed",
+                SagaDeliveryStatus.Ignored => "ignored",
+                SagaDeliveryStatus.MissingDiscarded => "missing-discarded",
+                _ => "faulted"
+            },
+            result?.CorrelationId ?? failedCorrelationId,
+            result?.BeginState,
+            result?.EndState,
+            result?.Created ?? false,
+            result?.Completed ?? false,
+            result?.InstancePresent ?? false,
+            exception?.GetType().FullName,
+            exception?.Message,
+            context.MessageId?.ToString());
+
+    private Guid? TryCorrelate(TMessage message)
+    {
+        try
+        {
+            var correlationId = correlate(message);
+            return correlationId == Guid.Empty ? null : correlationId;
+        }
+        catch
+        {
+            return null;
+        }
+    }
 }
 
 internal static class SagaBusOutgoingDispatcher

@@ -3,6 +3,8 @@ package com.myservicebus.orchestration;
 import com.myservicebus.MessageUrn;
 import com.myservicebus.BusRegistrationConfigurator;
 import com.myservicebus.ConsumeContext;
+import com.myservicebus.BusHook;
+import com.myservicebus.SagaStateMachineHookEvent;
 import com.myservicebus.orchestration.SagaStateMachineRuntime.ActivityContext;
 
 import java.util.ArrayList;
@@ -11,6 +13,7 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.CompletionException;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -411,11 +414,73 @@ public abstract class SagaStateMachine<TSaga> {
                     endpointName,
                     true,
                     null,
-                    (serviceProvider, context) -> runtime.deliver(
-                            context.getMessage(),
-                            operation -> dispatchOutgoing(context, operation))
-                            .thenApply(result -> (Void) null)
-                            .toCompletableFuture());
+                    (serviceProvider, context) -> {
+                        long startedAt = System.nanoTime();
+                        return runtime.deliver(
+                                context.getMessage(),
+                                operation -> dispatchOutgoing(context, operation))
+                                .handle((result, failure) -> {
+                                    Throwable exception = unwrap(failure);
+                                    UUID failedCorrelationId = result == null
+                                            ? tryCorrelate(correlation.correlate, context.getMessage())
+                                            : null;
+                                    SagaStateMachineHookEvent hookEvent = new SagaStateMachineHookEvent(
+                                            java.time.Instant.now(),
+                                            exception == null,
+                                            (System.nanoTime() - startedAt) / 1_000_000d,
+                                            definition().stateMachineId(),
+                                            definition().definitionVersion(),
+                                            definition().owner(),
+                                            event.id(),
+                                            result == null ? "faulted" : result.status().value(),
+                                            result == null ? failedCorrelationId : result.correlationId(),
+                                            result == null ? null : result.beginState(),
+                                            result == null ? null : result.endState(),
+                                            result != null && result.created(),
+                                            result != null && result.completed(),
+                                            result != null && result.instancePresent(),
+                                            exception == null ? null : exception.getClass().getName(),
+                                            exception == null ? null : exception.getMessage(),
+                                            context.getMessageId() == null ? null : context.getMessageId().toString());
+                                    dispatchHooks(serviceProvider.getServices(BusHook.class), hookEvent);
+                                    if (exception != null) {
+                                        throw new CompletionException(exception);
+                                    }
+                                    return (Void) null;
+                                })
+                                .toCompletableFuture();
+                    });
+        }
+    }
+
+    private static Throwable unwrap(Throwable failure) {
+        if (failure instanceof java.util.concurrent.CompletionException completion
+                && completion.getCause() != null) {
+            return completion.getCause();
+        }
+        return failure;
+    }
+
+    private static <TMessage> UUID tryCorrelate(
+            Function<TMessage, UUID> correlate,
+            TMessage message) {
+        try {
+            UUID correlationId = correlate.apply(message);
+            return correlationId == null || correlationId.equals(new UUID(0, 0)) ? null : correlationId;
+        } catch (RuntimeException ignored) {
+            return null;
+        }
+    }
+
+    private static void dispatchHooks(
+            Iterable<BusHook> hooks,
+            SagaStateMachineHookEvent event) {
+        for (BusHook hook : hooks) {
+            try {
+                hook.handle(event);
+            } catch (RuntimeException ignored) {
+                // Monitoring hooks cannot alter saga delivery outcomes.
+            }
         }
     }
 

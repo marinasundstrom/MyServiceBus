@@ -15,8 +15,12 @@ class SagaStateMachineBusRegistrationTest {
     @Test
     void registersEventsAndDispatchesOutgoingWorkThroughTheConsumeContext() {
         ServiceCollection services = ServiceCollection.create();
+        RecordingHook.events.clear();
         TestingServiceExtensions.addServiceBusTestHarness(services, configurator ->
-                configurator.addSagaStateMachine(OrderStateMachine.class));
+        {
+            configurator.addHook(RecordingHook.class);
+            configurator.addSagaStateMachine(OrderStateMachine.class);
+        });
         ServiceProvider provider = services.buildServiceProvider();
         InMemoryTestHarness harness = provider.getService(InMemoryTestHarness.class);
         CopyOnWriteArrayList<ReserveInventory> reserveInventory = new CopyOnWriteArrayList<>();
@@ -46,6 +50,13 @@ class SagaStateMachineBusRegistrationTest {
         assertEquals("order-state-machine", sagaTopology.definition().stateMachineId());
         assertEquals("orders", sagaTopology.definition().owner());
         assertEquals("order-state-machine", sagaTopology.endpointName());
+        var lifecycle = RecordingHook.events;
+        assertEquals(2, lifecycle.size());
+        assertEquals(true, lifecycle.get(0).created());
+        assertEquals("Initial", lifecycle.get(0).beginState());
+        assertEquals("AwaitingPayment", lifecycle.get(0).endState());
+        assertEquals(true, lifecycle.get(1).completed());
+        assertEquals(false, lifecycle.get(1).instancePresent());
         harness.stop().join();
     }
 
@@ -118,5 +129,16 @@ class SagaStateMachineBusRegistrationTest {
     }
 
     record OrderCompleted(UUID orderId) {
+    }
+
+    public static final class RecordingHook implements BusHook {
+        private static final CopyOnWriteArrayList<SagaStateMachineHookEvent> events = new CopyOnWriteArrayList<>();
+
+        @Override
+        public void handle(BusHookEvent busEvent) {
+            if (busEvent instanceof SagaStateMachineHookEvent saga) {
+                events.add(saga);
+            }
+        }
     }
 }

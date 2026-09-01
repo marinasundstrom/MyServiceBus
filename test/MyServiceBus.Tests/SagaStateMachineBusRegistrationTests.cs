@@ -9,6 +9,8 @@ public class SagaStateMachineBusRegistrationTests
     public async Task Registers_events_and_dispatches_outgoing_work_through_the_consume_context()
     {
         var services = new ServiceCollection();
+        var sagaObservations = new RecordingHook();
+        services.AddSingleton<IBusHook>(sagaObservations);
         services.AddServiceBusTestHarness(configurator =>
             configurator.AddSagaStateMachine<OrderStateMachine, OrderState>());
         await using var provider = services.BuildServiceProvider();
@@ -48,6 +50,13 @@ public class SagaStateMachineBusRegistrationTests
         Assert.Equal("order-state-machine", sagaTopology.Definition.StateMachineId);
         Assert.Equal("orders", sagaTopology.Definition.Owner);
         Assert.Equal("order-state-machine", sagaTopology.EndpointName);
+        var lifecycle = sagaObservations.Events.OfType<SagaStateMachineHookEvent>().ToArray();
+        Assert.Equal(2, lifecycle.Length);
+        Assert.True(lifecycle[0].Created);
+        Assert.Equal("Initial", lifecycle[0].BeginState);
+        Assert.Equal("AwaitingPayment", lifecycle[0].EndState);
+        Assert.True(lifecycle[1].Completed);
+        Assert.False(lifecycle[1].InstancePresent);
         await harness.Stop();
     }
 
@@ -98,4 +107,11 @@ public class SagaStateMachineBusRegistrationTests
     public sealed record PaymentReceived(Guid OrderId);
     public sealed record ReserveInventory(Guid OrderId);
     public sealed record OrderCompleted(Guid OrderId);
+
+    private sealed class RecordingHook : IBusHook
+    {
+        public List<BusHookEvent> Events { get; } = new();
+
+        public void Handle(BusHookEvent busEvent) => Events.Add(busEvent);
+    }
 }

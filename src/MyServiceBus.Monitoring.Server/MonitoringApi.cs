@@ -150,6 +150,9 @@ public static class MonitoringApi
             repository.GetDeclaredSagaStateMachines(DateTimeOffset.UtcNow))
             .WithSummary("List registered saga state-machine definitions and deployment conflicts")
             .CacheOutput(policy => policy.Expire(TimeSpan.FromSeconds(5)));
+        query.MapGet("/sagas/instances", (string? stateMachine, string? status, MonitoringRepository repository) =>
+            repository.GetSagaInstances(stateMachine, status))
+            .WithSummary("List recently observed saga instances and authoritative committed transitions");
         query.MapGet("/choreographies/runtime", (int? windowSeconds, MonitoringRepository repository) =>
             repository.GetChoreographyRuntime(windowSeconds ?? 300, DateTimeOffset.UtcNow))
             .WithSummary("Compare declared choreography reactions with exact causal observations");

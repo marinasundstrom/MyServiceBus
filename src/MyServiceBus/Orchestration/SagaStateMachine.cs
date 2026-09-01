@@ -1,3 +1,5 @@
+using Microsoft.Extensions.DependencyInjection;
+
 namespace MyServiceBus.Orchestration;
 
 /// <summary>
@@ -443,7 +445,12 @@ internal sealed class EventRegistration<TSaga, TMessage> : IEventRegistration<TS
     {
         configurator.AddConsumer<SagaStateMachineConsumer<TStateMachine, TSaga, TMessage>, TMessage>(
             endpointName,
-            _ => new SagaStateMachineConsumer<TStateMachine, TSaga, TMessage>(runtime));
+            serviceProvider => new SagaStateMachineConsumer<TStateMachine, TSaga, TMessage>(
+                runtime,
+                runtime.Definition,
+                @event.Id,
+                correlate,
+                serviceProvider.GetServices<IBusHook>()));
     }
 }
 
