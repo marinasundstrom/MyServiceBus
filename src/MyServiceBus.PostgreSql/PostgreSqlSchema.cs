@@ -4,7 +4,7 @@ namespace MyServiceBus.Persistence.PostgreSql;
 
 public static class PostgreSqlSchema
 {
-    public const int CurrentVersion = 5;
+    public const int CurrentVersion = 6;
 
     public static async Task EnsureCreatedAsync(
         NpgsqlDataSource dataSource,
@@ -31,12 +31,12 @@ public static class PostgreSqlSchema
         );
 
         INSERT INTO myservicebus.schema_version (singleton, version)
-        VALUES (true, 5)
+        VALUES (true, 6)
         ON CONFLICT (singleton) DO NOTHING;
 
         DO $migration$
         BEGIN
-            IF (SELECT version FROM myservicebus.schema_version WHERE singleton) NOT IN (2, 3, 4, 5) THEN
+            IF (SELECT version FROM myservicebus.schema_version WHERE singleton) NOT IN (2, 3, 4, 5, 6) THEN
                 RAISE EXCEPTION 'Unsupported MyServiceBus PostgreSQL schema version';
             END IF;
         END
@@ -240,6 +240,21 @@ public static class PostgreSqlSchema
             ON myservicebus.job_attempt (job_id, retry_attempt DESC);
 
         UPDATE myservicebus.schema_version SET version = 5 WHERE singleton AND version = 4;
+
+        CREATE TABLE IF NOT EXISTS myservicebus.saga_instance (
+            saga_type text NOT NULL CHECK (length(saga_type) > 0),
+            correlation_id uuid NOT NULL,
+            instance jsonb NOT NULL,
+            revision bigint NOT NULL CHECK (revision > 0),
+            created_at_utc timestamptz NOT NULL,
+            updated_at_utc timestamptz NOT NULL,
+            PRIMARY KEY (saga_type, correlation_id)
+        );
+
+        CREATE INDEX IF NOT EXISTS ix_saga_instance_updated
+            ON myservicebus.saga_instance (saga_type, updated_at_utc DESC, correlation_id);
+
+        UPDATE myservicebus.schema_version SET version = 6 WHERE singleton AND version = 5;
 
         """;
 }
