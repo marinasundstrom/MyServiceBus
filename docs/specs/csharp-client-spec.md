@@ -1,7 +1,9 @@
-# ServiceBus C# Client Specification
+# C# Implementation Notes
 
 ## Overview
-The ServiceBus C# client provides a lightweight messaging abstraction for building distributed applications. It exposes asynchronous APIs for producing and consuming messages while delegating transport concerns to pluggable factories.
+This document records how the C# reference implementation realizes the concepts and behavior in the language-neutral [MyServiceBus Specification](myservicebus-spec.md). Its interfaces and .NET-specific types are implementation choices, not requirements for other MyServiceBus clients.
+
+The client provides asynchronous APIs for producing and consuming messages while delegating transport concerns to pluggable factories.
 
 ## Features
 

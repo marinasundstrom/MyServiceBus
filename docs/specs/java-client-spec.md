@@ -1,7 +1,9 @@
-# ServiceBus Java Client Specification
+# Java Implementation Notes
 
 ## Overview
-The ServiceBus Java client mirrors the C# design by providing an asynchronous message bus abstraction backed by pluggable transports.
+This document records how the Java reference implementation realizes the concepts and behavior in the language-neutral [MyServiceBus Specification](myservicebus-spec.md). Its interfaces and Java-specific types are implementation choices, not requirements for other MyServiceBus clients or translations of the C# API.
+
+The client provides an asynchronous message bus implementation backed by pluggable transports.
 
 ## Features
 

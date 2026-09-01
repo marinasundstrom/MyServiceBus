@@ -1,6 +1,6 @@
 # MyServiceBus Architecture
 
-MyServiceBus is a cross-language, broker-backed service-bus runtime with a MassTransit-compatible protocol profile. C# and Java are the reference implementations. Future clients should implement the same language-neutral specification using APIs that are idiomatic for their platforms.
+MyServiceBus is a language-neutral specification for local and broker-backed messaging, with a MassTransit-compatible protocol profile. C# and Java are reference implementations used to evolve and verify its concepts and behavior. Future clients should implement the same observable model using APIs that are idiomatic for their platforms; their interfaces do not need to mirror either reference client.
 
 The architecture deliberately separates compatibility, portable messaging behavior, broker integration, and optional operational tooling. This allows the project to interoperate with MassTransit without treating every MassTransit feature or historical API as a requirement.
 

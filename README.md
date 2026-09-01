@@ -119,7 +119,7 @@ See the [runtime monitoring guide](docs/runtime-monitoring.md) for configuration
 
 ## What is MyServiceBus?
 
-MyServiceBus defines a stable messaging runtime with concepts such as:
+MyServiceBus is evolving into a language-neutral messaging specification, with C# and Java as reference implementations. It focuses first on concepts and observable behavior such as:
 
 - publish vs send
 - consumers
@@ -129,7 +129,7 @@ MyServiceBus defines a stable messaging runtime with concepts such as:
 - scheduling
 - in-memory testing
 
-These portable concepts remain consistent across supported transport profiles, while broker-specific capabilities and guarantees remain explicit.
+These portable concepts remain consistent across supported transport profiles, while broker-specific capabilities and guarantees remain explicit. Each implementation may expose idiomatic interfaces; API shape is not the specification.
 
 Unlike most Java messaging solutions, MyServiceBus does **not require a framework-wide commitment** (such as Spring). It can be used as a self-contained runtime, integrated into an existing application, or composed via factories and decorators—depending on project needs.
 
@@ -170,6 +170,8 @@ Unlike most Java messaging solutions, MyServiceBus does **not require a framewor
 
 - [MyServiceBus Specification](docs/specs/myservicebus-spec.md)
 - [ServiceBus Transport Specification](docs/specs/transport-spec.md)
+- [C# implementation notes](docs/specs/csharp-client-spec.md)
+- [Java implementation notes](docs/specs/java-client-spec.md)
 - [Differences from MassTransit](docs/masstransit-differences.md)
 - [NServiceBus interoperability](docs/nservicebus-interoperability.md)
 

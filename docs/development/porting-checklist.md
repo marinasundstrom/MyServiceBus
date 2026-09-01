@@ -1,14 +1,14 @@
 # Porting Checklist for MyServiceBus
 
 - **Confirm prerequisites**: Ensure build tools, package managers, and a compatible runtime exist for the target platform.
-- **Understand repository architecture**: Study the existing C# and Java clients to learn message flows and core abstractions.
-- **Review design and architecture docs**: Consult the specifications, transport design, and design guidelines to understand the API surface and align with existing expectations.
+- **Start with concepts and behavior**: Derive message flow, identities, operations, and outcomes from the language-neutral specification and its profiles. Use the C# and Java clients as implementation evidence, not source code to translate.
+- **Design an idiomatic API**: Choose native interfaces, types, asynchronous primitives, configuration, and lifecycle patterns for the target platform after the behavioral model is understood.
 - **Assess feature parity**: Catalog current features (serialization, routing, retries, telemetry) and determine how to provide them on the new platform.
 - **Implement required transports**: Provide a RabbitMQ transport and an in-memory mediator equivalent to the C# and Java implementations.
 - **Set up test harness**: Adapt the shared test harness so transport behavior can be verified consistently.
 - **Provision infrastructure**: Configure a RabbitMQ broker and in-memory mediator for the platform and its tests.
-- **Port core messaging features**: Implement publish/subscribe and request/response patterns, retries, and metrics in a way that fits platform conventions.
-- **Handle errors**: Replicate or adapt error-handling semantics as needed, using public API docs and tests to keep behavior aligned across runtimes.
+- **Implement core behavior**: Implement publish/subscribe and request/response behavior, retries, and telemetry in a way that fits platform conventions.
+- **Handle errors**: Preserve specified failure categories and outcomes using idiomatic native exceptions; do not copy exception class hierarchies solely for API parity.
 - **Integrate logging**: Use the platform's standard logging abstraction and ensure consumer failures are logged instead of crashing the process.
 - **Establish CI**: Set up a continuous integration pipeline to build the new client, run its tests, and enforce formatting.
-- **Document and validate**: Update the quick start guide and feature walkthrough and add tests mirroring existing ones to verify feature parity.
+- **Document and validate**: Declare supported profiles, update the quick start guide, and pass shared fixtures and behavioral scenarios. Add API-specific tests for the implementation without making them portable requirements.
