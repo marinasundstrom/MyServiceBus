@@ -8,7 +8,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "lint": "eslint . --ignore-pattern dist --ignore-pattern .next"
+    "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
+    "test:raven-grammar": "node --test tests/raven-grammar.test.mjs"
   },
   "dependencies": {
     "@mdx-js/loader": "^3.1.1",
@@ -19,7 +20,9 @@
     "next": "^16.3.3",
     "react": "19.2.6",
     "react-dom": "19.2.6",
-    "remark-gfm": "^4.0.1"
+    "remark-gfm": "^4.0.1",
+    "vscode-oniguruma": "^2.0.1",
+    "vscode-textmate": "^9.3.2"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "4.2.1",
