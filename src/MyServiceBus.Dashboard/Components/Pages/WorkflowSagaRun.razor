@@ -21,7 +21,7 @@ else if (instance is null)
 }
 else
 {
-    <div class="workflow-run-breadcrumb"><a href="/workflows">Workflow runs</a><span>→</span><strong>@instance.StateMachineId</strong></div>
+    <div class="workflow-run-breadcrumb"><a href="/workflows">Workflow runs</a><span>→</span><a href="@($"/workflows/sagas/{Uri.EscapeDataString(instance.StateMachineId)}")">@instance.StateMachineId</a></div>
     <section class="panel workflow-run-detail">
         <div class="workflow-run-outcome @OutcomeClass(instance)" role="status">
             <span class="run-status @OutcomeClass(instance)"></span>
