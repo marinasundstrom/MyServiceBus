@@ -73,6 +73,47 @@ public sealed class MonitoringApiClient
             "/api/monitoring/v1/choreographies/runs?windowSeconds=300&limit=100",
             cancellationToken).ConfigureAwait(false);
 
+    public async Task<MonitoringWorkflowRunPage?> GetWorkflowRuns(
+        string? workflow,
+        string? coordinationType,
+        string? status,
+        string? search,
+        DateTimeOffset? startedAfterUtc,
+        DateTimeOffset? startedBeforeUtc,
+        int offset,
+        int limit,
+        CancellationToken cancellationToken)
+    {
+        var parameters = new List<string>
+        {
+            $"offset={Math.Max(0, offset)}",
+            $"limit={Math.Clamp(limit, 1, 100)}"
+        };
+        AddQuery(parameters, "workflow", workflow);
+        AddQuery(parameters, "coordinationType", coordinationType);
+        AddQuery(parameters, "status", status);
+        AddQuery(parameters, "search", search);
+        AddQuery(parameters, "startedAfterUtc", startedAfterUtc?.ToString("O"));
+        AddQuery(parameters, "startedBeforeUtc", startedBeforeUtc?.ToString("O"));
+        return await httpClient.GetFromJsonAsync<MonitoringWorkflowRunPage>(
+            $"/api/monitoring/v1/workflow-runs?{string.Join('&', parameters)}",
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task<MonitoringChoreographyRun?> GetWorkflowRun(
+        string runId,
+        CancellationToken cancellationToken)
+    {
+        using var response = await httpClient.GetAsync(
+            $"/api/monitoring/v1/workflow-runs/{Uri.EscapeDataString(runId)}",
+            cancellationToken).ConfigureAwait(false);
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            return null;
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<MonitoringChoreographyRun>(cancellationToken)
+            .ConfigureAwait(false);
+    }
+
     public async Task<IReadOnlyList<MonitoringTimeSeriesPoint>> GetTimeSeries(CancellationToken cancellationToken)
         => await httpClient.GetFromJsonAsync<MonitoringTimeSeriesPoint[]>(
             "/api/monitoring/v1/metrics/timeseries?windowSeconds=300&bucketSeconds=5",
@@ -140,5 +181,11 @@ public sealed class MonitoringApiClient
 
             yield return message.ToString();
         }
+    }
+
+    private static void AddQuery(ICollection<string> parameters, string name, string? value)
+    {
+        if (!string.IsNullOrWhiteSpace(value))
+            parameters.Add($"{name}={Uri.EscapeDataString(value)}");
     }
 }

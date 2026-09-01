@@ -1,0 +1,32 @@
+@inject IJSRuntime JavaScript
+@rendermode InteractiveServer
+
+<label class="density-selector">
+    <span>Density</span>
+    <select value="@density" @onchange="ChangeDensityAsync" aria-label="Dashboard density">
+        <option value="comfortable">Comfortable</option>
+        <option value="compact">Compact</option>
+    </select>
+</label>
+
+@code {
+    private string density = "comfortable";
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        density = await JavaScript.InvokeAsync<string>("dashboardDensity.get");
+        await JavaScript.InvokeVoidAsync("dashboardDensity.apply");
+        StateHasChanged();
+    }
+
+    private async Task ChangeDensityAsync(ChangeEventArgs args)
+    {
+        density = args.Value?.ToString() ?? "comfortable";
+        await JavaScript.InvokeVoidAsync("dashboardDensity.set", density);
+    }
+}

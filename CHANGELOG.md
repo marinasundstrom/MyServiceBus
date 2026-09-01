@@ -4,6 +4,8 @@ This changelog summarizes the bigger themes in the repository history rather tha
 
 ## Unreleased
 
+- Added a monitoring-owned retained workflow-run projection with PostgreSQL restart durability, stable direct lookup, server-side type/status/identity filters, pagination, explicit reconstructed-evidence authority, and completeness metadata.
+- Added a persisted Dashboard density setting. Comfortable remains the default, while Compact tightens the application shell, navigation, cards, tables, filters, and workflow detail for higher-information and small-screen views.
 - Split the Dashboard's Workflows domain into a default filterable run index and a separate declared-workflow catalog. Run rows expose coordination type, status, timing, and step count and open a dedicated failure-aware D3 activity detail whose pan, zoom, and reset state survives live data refreshes.
 - Expanded the Aspire sample with simple, fan-out, and cross-language linear choreography declarations, including a runnable C# → Java → C# fulfillment handoff.
 

@@ -32,7 +32,7 @@ public sealed class MonitoringDashboardState : IAsyncDisposable
     public IReadOnlyList<MonitoringReplicaFlowEdge> ReplicaFlow { get; private set; } = [];
     public IReadOnlyList<MonitoringDeclaredChoreography> Choreographies { get; private set; } = [];
     public MonitoringChoreographyRuntimeSnapshot? ChoreographyRuntime { get; private set; }
-    public MonitoringChoreographyRunSnapshot? ChoreographyRuns { get; private set; }
+    public MonitoringWorkflowRunPage? WorkflowRuns { get; private set; }
     public IReadOnlyList<MonitoringObservationRecord> Observations { get; private set; } = [];
     public IReadOnlyList<MonitoringOutboxDispatcherSummary> OutboxDispatchers { get; private set; } = [];
     public IReadOnlyList<MonitoringScheduledWorkSummary> ScheduledWork { get; private set; } = [];
@@ -125,7 +125,7 @@ public sealed class MonitoringDashboardState : IAsyncDisposable
             var replicaFlow = api.GetReplicaFlow(stopping.Token);
             var choreographies = api.GetChoreographies(stopping.Token);
             var choreographyRuntime = api.GetChoreographyRuntime(stopping.Token);
-            var choreographyRuns = api.GetChoreographyRuns(stopping.Token);
+            var workflowRuns = api.GetWorkflowRuns(null, null, null, null, null, null, 0, 100, stopping.Token);
             var timeSeries = api.GetTimeSeries(stopping.Token);
             var observations = api.GetRecentObservations(stopping.Token);
             var outboxDispatchers = api.GetOutboxDispatchers(stopping.Token);
@@ -144,7 +144,7 @@ public sealed class MonitoringDashboardState : IAsyncDisposable
                 replicaFlow,
                 choreographies,
                 choreographyRuntime,
-                choreographyRuns,
+                workflowRuns,
                 timeSeries,
                 observations,
                 outboxDispatchers,
@@ -162,7 +162,7 @@ public sealed class MonitoringDashboardState : IAsyncDisposable
             ReplicaFlow = replicaFlow.Result;
             Choreographies = choreographies.Result;
             ChoreographyRuntime = choreographyRuntime.Result;
-            ChoreographyRuns = choreographyRuns.Result;
+            WorkflowRuns = workflowRuns.Result;
             TimeSeries = timeSeries.Result;
             Observations = observations.Result;
             OutboxDispatchers = outboxDispatchers.Result;

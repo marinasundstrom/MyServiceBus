@@ -43,14 +43,14 @@ The MVP includes:
 - batch deduplication and reported dropped-observation counts
 - HTTP ingest and query APIs
 - WebSocket change invalidations
-- a directed, responsive Blazor dashboard with persisted light, dark, and system themes
+- a directed, responsive Blazor dashboard with persisted light, dark, and system themes plus a comfortable or compact density preference
 - application Overview, Metrics, and Flow drill-downs that progressively reveal messaging detail
 - equivalent exporter behavior for C# and Java
 - first-class outbox dispatcher operations for embedded and standalone workers, including latest backlog, oldest-undispatched age, windowed throughput, failures, lost leases, and cycle latency
 - transparent history freshness, coverage, and durability status
 - an optional Entity Framework Core PostgreSQL history provider with automatic migrations, deduplicated batches, bounded retention, and active-window restoration after restart
 
-The MVP does not yet include authentication, long-range historical query views, alerting or scaling recommendations, broker queue depth, host saturation, broker administration, or payload-byte limits. PostgreSQL adds durable collection and restart recovery, but the current metric queries and dashboard still expose only the active 15-minute read-model window. The dashboard uses WebSocket invalidations to re-query HTTP snapshots, with a 15-second polling fallback.
+The MVP does not yet include authentication, general long-range historical metric queries, alerting or scaling recommendations, broker queue depth, host saturation, broker administration, or payload-byte limits. PostgreSQL adds durable collection, restart recovery, and retained workflow-run drill-down; other metric queries still expose only the active 15-minute read-model window. The dashboard uses WebSocket invalidations to re-query HTTP snapshots, with a 15-second polling fallback.
 
 ## Dashboard Experience
 
@@ -92,7 +92,9 @@ System-wide focused views remain available when the operator needs to compare ap
 
 Graphs and maps are a continuing dashboard theme. They are implemented as distinct components rather than being embedded into individual pages, which keeps compact overview variants and full drill-down variants consistent. New domains such as sagas should follow the same shape: add only a concise health signal to the overview when it is broadly actionable, and put state distribution, transitions, faults, and correlations in a focused view.
 
-Workflows are a focused dashboard domain with separate **Workflow runs** and **Declared workflows** tabs. The runs tab is the operational entry point: it lists recent runs with coordination type, status, timing, step count, and filters, then links to a dedicated run detail with the D3 activity diagram and ordered evidence. The declared tab is the stable catalog: its definition map groups reactions by participating application, connects consumed triggers to declared outputs and matching downstream participants, and keeps versions, definition conflicts, replica availability, capture freshness, and aggregate exact-causation evidence visible. Silence is labeled as no exact evidence, never as a missed reaction, failed workflow, or authoritative state. An orchestration view can additionally use persisted saga identity and transition evidence to show authoritative current state, transition history, pending timeouts or requests, faults, and completion. Both reuse maps, timelines, contract nodes, causal edges, and application drill-downs while preserving the distinction between reconstructed and persisted truth.
+Workflows are a focused dashboard domain with separate **Workflow runs** and **Declared workflows** tabs. The runs tab is the operational entry point: it queries the monitoring-owned retained projection with server-side type, status, and identity filters plus pagination, then links directly to a stable run detail with the D3 activity diagram and ordered evidence. The declared tab is the stable catalog: its definition map groups reactions by participating application, connects consumed triggers to declared outputs and matching downstream participants, and keeps versions, definition conflicts, replica availability, capture freshness, and aggregate exact-causation evidence visible. Silence is labeled as no exact evidence, never as a missed reaction, failed workflow, or authoritative state. An orchestration view can additionally use persisted saga identity and transition evidence to show authoritative current state, transition history, pending timeouts or requests, faults, and completion. Both reuse maps, timelines, contract nodes, causal edges, and application drill-downs while preserving the distinction between reconstructed and persisted truth.
+
+Dashboard density is a local presentation preference. **Comfortable** remains the default; **Compact** tightens navigation, headings, cards, tables, filters, and workflow detail for operators who prefer more information at once or use smaller screens. It does not change query windows, retention, aggregation, or monitoring semantics.
 
 The same domain can eventually include a **Discovered patterns** view for systems that have no formal workflow definition. Repeated causal paths may be grouped into workflow-shaped candidates and shown with their time window, sample count, participating applications and contracts, confidence, and coverage. The dashboard must label these as recurring observed patterns rather than declared choreography. It may help an owner draft a declaration, but it must not create or register one automatically.
 
@@ -263,6 +265,8 @@ The contract is versioned but remains preview. The `/v1` route and each ingest b
 | `GET` | `/choreographies` | Query merged declarations, version-scoped step connections, replica freshness, and definition conflicts |
 | `GET` | `/choreographies/runtime?windowSeconds=300` | Compare declared reactions with bounded exact causal evidence and coverage |
 | `GET` | `/choreographies/runs?choreography=...&windowSeconds=300&limit=20` | Reconstruct recent exact causal runs with step timing, handoffs, retries, outputs, and faults |
+| `GET` | `/workflow-runs?coordinationType=...&status=...&search=...&offset=0&limit=25` | Query the retained workflow-run projection with server-side filters and pagination |
+| `GET` | `/workflow-runs/{runId}` | Query one retained workflow run directly by its stable monitoring identity |
 | `GET` | `/observations?application=...&limit=100` | Query recent observations |
 | `GET` | `/metrics?application=...&windowSeconds=60&byInstance=true` | Query bounded-window rates, counts, and consume latency |
 | `GET` | `/metrics/timeseries?windowSeconds=300&bucketSeconds=5` | Query bucketed rates for real-time graphs |
@@ -317,7 +321,7 @@ The .NET monitoring service can instead use its built-in Entity Framework Core P
 }
 ```
 
-The provider applies its schema migration at startup and stores the latest metadata, heartbeat, scheduled-work, recurring-definition, and tracked-job snapshots per bus identity plus deduplicated observation batches as JSONB. On restart, it restores those latest authoritative snapshots and rebuilds the current 15-minute observation window without making restored records appear newly ingested. The seven-day retention default bounds stored observation batches for future historical queries; it does not turn latest-state snapshots into time series or make seven days available through the current dashboard.
+The provider applies its schema migration at startup and stores the latest metadata, heartbeat, scheduled-work, recurring-definition, and tracked-job snapshots per bus identity plus deduplicated observation batches and reconstructed workflow runs as JSONB. On restart, it restores those latest authoritative snapshots, rebuilds the current 15-minute observation window without making restored records appear newly ingested, and restores workflow runs retained within the configured storage period. The seven-day default bounds both observation batches and workflow-run drill-down. It does not turn the other latest-state snapshots or metric buckets into historical time series.
 
 Storage belongs entirely to the monitoring service. Exporters and the dashboard do not receive database credentials, use Entity Framework, or own retention behavior.
 

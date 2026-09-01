@@ -1,16 +1,21 @@
 @page "/workflows/runs/{RunId}"
 @rendermode InteractiveServer
 @inherits MonitoringPageBase
+@inject MonitoringApiClient Api
 
 <PageTitle>Workflow Run · MyServiceBus Monitoring</PageTitle>
 <DashboardPageHeader Eyebrow="Coordination" Title="Workflow run" Description="Inspect one reconstructed coordination run, its causal message path, handler timing, and localized failures." />
 <WorkflowTabs Active="runs" />
 
-@if (SelectedRun is not { } run)
+@if (loadingRun)
+{
+    <section class="empty-state"><h2>Loading workflow run</h2></section>
+}
+else if (SelectedRun is not { } run)
 {
     <section class="empty-state">
         <h2>Workflow run not available</h2>
-        <p>This run is outside the monitoring service's bounded observation window, or its identity is no longer present.</p>
+        <p>This run is outside the monitoring service's configured retention window, or its identity is no longer present.</p>
         <a class="section-link" href="/workflows">← Back to workflow runs</a>
     </section>
 }
@@ -42,6 +47,13 @@ else
             </div>
             <span>Started @run.StartedAtUtc.ToLocalTime().ToString("MMM d, HH:mm:ss.fff") · last activity @run.LastActivityAtUtc.ToLocalTime().ToString("HH:mm:ss.fff")</span>
         </div>
+
+        @if (!run.EvidenceComplete)
+        {
+            <div class="workflow-run-coverage-warning">
+                Evidence is incomplete: @run.DroppedObservations observations were dropped or one or more declared participants were offline when this run was captured.
+            </div>
+        }
 
         <WorkflowRunMap @key="run.RunId" Run="run" />
 
@@ -103,13 +115,29 @@ else
     [Parameter]
     public string RunId { get; set; } = string.Empty;
 
+    private MonitoringChoreographyRun? loadedRun;
+    private bool loadingRun = true;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        loadingRun = true;
+        try
+        {
+            loadedRun = await Api.GetWorkflowRun(Uri.UnescapeDataString(RunId), CancellationToken.None);
+        }
+        finally
+        {
+            loadingRun = false;
+        }
+    }
+
     private MonitoringChoreographyRun? SelectedRun
     {
         get
         {
             var decoded = Uri.UnescapeDataString(RunId);
-            return Dashboard.ChoreographyRuns?.Runs.FirstOrDefault(run =>
-                string.Equals(run.RunId, decoded, StringComparison.Ordinal));
+            return Dashboard.WorkflowRuns?.Runs.FirstOrDefault(run =>
+                string.Equals(run.RunId, decoded, StringComparison.Ordinal)) ?? loadedRun;
         }
     }
 
