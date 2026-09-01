@@ -74,29 +74,35 @@ else
                 </tbody>
             </table>
         </div>
-        <ListPagination Offset="EffectiveInstanceOffset" PageSize="PageSize" ItemCount="PageInstances.Count" Total="Dashboard.Instances.Count" PageChanged="ChangeInstancePageAsync" />
+        <ListPagination Offset="instancePagination.Offset(OrderedInstances)" PageSize="PageSize" ItemCount="PageInstances.Count" Total="instancePagination.Total(OrderedInstances)" Live="true" UpdatesAvailable="instancePagination.UpdatesAvailable(OrderedInstances)" ShowLatest="ShowLatestInstancesAsync" PageChanged="ChangeInstancePageAsync" />
     </section>
 }
 
 @code {
     private const int PageSize = 25;
-    private int instanceOffset;
+    private readonly LivePaginationState<MonitoringInstanceSummary> instancePagination = new(
+        PageSize,
+        instance => $"{instance.ApplicationName}\u001f{instance.InstanceId}\u001f{instance.Online}\u001f{instance.LastSeenAtUtc:O}");
 
     private IEnumerable<IGrouping<string, MonitoringApplicationSummary>> GroupedApplications
         => Dashboard.Applications.GroupBy(GetGroup).OrderBy(group => group.Key, StringComparer.Ordinal);
 
-    private int EffectiveInstanceOffset => Dashboard.Instances.Count == 0 ? 0 : Math.Min(instanceOffset, (Dashboard.Instances.Count - 1) / PageSize * PageSize);
-    private IReadOnlyList<MonitoringInstanceSummary> PageInstances => Dashboard.Instances
+    private IReadOnlyList<MonitoringInstanceSummary> OrderedInstances => Dashboard.Instances
         .OrderBy(GetGroup)
         .ThenBy(instance => instance.ApplicationName)
         .ThenBy(instance => instance.InstanceId)
-        .Skip(EffectiveInstanceOffset)
-        .Take(PageSize)
         .ToArray();
+    private IReadOnlyList<MonitoringInstanceSummary> PageInstances => instancePagination.Page(OrderedInstances);
 
     private Task ChangeInstancePageAsync(int value)
     {
-        instanceOffset = value;
+        instancePagination.MoveTo(value, OrderedInstances);
+        return Task.CompletedTask;
+    }
+
+    private Task ShowLatestInstancesAsync()
+    {
+        instancePagination.ShowLatest();
         return Task.CompletedTask;
     }
 

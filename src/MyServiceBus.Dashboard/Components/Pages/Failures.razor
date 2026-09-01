@@ -27,6 +27,9 @@
                         ItemCount="page.Observations.Count"
                         Total="page.Total"
                         Disabled="loading"
+                        Live="true"
+                        UpdatesAvailable="updatesAvailable"
+                        ShowLatest="ShowLatestAsync"
                         PageChanged="LoadPageAsync" />
     }
 </section>
@@ -35,19 +38,46 @@
     private const int PageSize = 25;
     private MonitoringObservationIndexPage? queriedPage;
     private bool loading;
+    private bool updatesAvailable;
+    private string? historicalHeadSignature;
 
     private MonitoringObservationIndexPage? CurrentPage => queriedPage ?? Dashboard.FailureObservationIndex;
 
     private async Task LoadPageAsync(int offset)
     {
+        if (offset == 0)
+        {
+            queriedPage = null;
+            updatesAvailable = false;
+            historicalHeadSignature = null;
+            return;
+        }
+
         loading = true;
         try
         {
             queriedPage = await Api.GetRecentObservations(null, true, offset, PageSize, CancellationToken.None);
+            updatesAvailable = false;
+            historicalHeadSignature = DashboardHeadSignature();
         }
         finally
         {
             loading = false;
         }
+    }
+
+    protected override void OnDashboardStateChanged()
+    {
+        if (CurrentPage?.Offset > 0)
+            updatesAvailable |= !string.Equals(historicalHeadSignature, DashboardHeadSignature(), StringComparison.Ordinal);
+    }
+
+    private Task ShowLatestAsync() => LoadPageAsync(0);
+
+    private string DashboardHeadSignature()
+    {
+        var page = Dashboard.FailureObservationIndex;
+        var first = page?.Observations.FirstOrDefault();
+        return $"{page?.Total ?? 0}\u001f{first?.ApplicationName}\u001f{first?.InstanceId}\u001f{first?.Observation.Sequence}\u001f{first?.Observation.OccurredAtUtc:O}\u001f{first?.Observation.Kind}";
     }
 }

@@ -53,6 +53,9 @@ else
                         ItemCount="page.Messages.Count"
                         Total="page.Total"
                         Disabled="loading"
+                        Live="true"
+                        UpdatesAvailable="updatesAvailable"
+                        ShowLatest="ShowLatestAsync"
                         PageChanged="LoadPageAsync" />
     }
 </section>
@@ -72,7 +75,9 @@ else
     private string status = "all";
     private MonitoringMessageIndexPage? queriedPage;
     private bool loading;
+    private bool updatesAvailable;
     private string? appliedQueryKey;
+    private string? historicalHeadSignature;
 
     private MonitoringMessageIndexPage? CurrentPage => queriedPage ?? Dashboard.MessageIndex;
     private bool FiltersApplied => status != "all" || !string.IsNullOrWhiteSpace(search);
@@ -131,6 +136,14 @@ else
 
     private async Task LoadPageAsync(int offset)
     {
+        if (offset == 0 && !FiltersApplied)
+        {
+            queriedPage = null;
+            updatesAvailable = false;
+            historicalHeadSignature = null;
+            return;
+        }
+
         loading = true;
         try
         {
@@ -141,11 +154,34 @@ else
                 offset,
                 PageSize,
                 CancellationToken.None);
+            updatesAvailable = false;
+            historicalHeadSignature = offset > 0 ? DashboardHeadSignature() : null;
         }
         finally
         {
             loading = false;
         }
+    }
+
+    protected override void OnDashboardStateChanged()
+    {
+        if (CurrentPage?.Offset > 0)
+        {
+            updatesAvailable |= !string.Equals(historicalHeadSignature, DashboardHeadSignature(), StringComparison.Ordinal);
+            return;
+        }
+
+        if (FiltersApplied && !loading)
+            _ = InvokeAsync(() => LoadPageAsync(0));
+    }
+
+    private Task ShowLatestAsync() => LoadPageAsync(0);
+
+    private string DashboardHeadSignature()
+    {
+        var page = Dashboard.MessageIndex;
+        var first = page?.Messages.FirstOrDefault();
+        return $"{page?.Total ?? 0}\u001f{first?.MessageId}\u001f{first?.LastObservedAtUtc:O}\u001f{first?.ObservationCount}\u001f{first?.Status}";
     }
 
     private static string StatusLabel(string value) => value switch

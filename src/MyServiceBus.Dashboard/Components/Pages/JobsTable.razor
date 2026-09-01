@@ -38,7 +38,7 @@
                 }
             </tbody>
         </table></div>
-        <ListPagination Offset="EffectiveOffset" PageSize="PageSize" ItemCount="PageItems.Count" Total="Items.Count" PageChanged="ChangePageAsync" />
+        <ListPagination Offset="pagination.Offset(Items)" PageSize="PageSize" ItemCount="PageItems.Count" Total="pagination.Total(Items)" Live="true" UpdatesAvailable="pagination.UpdatesAvailable(Items)" ShowLatest="ShowLatestAsync" PageChanged="ChangePageAsync" />
     }
 </section>
 
@@ -48,13 +48,20 @@
     [Parameter, EditorRequired]
     public required IReadOnlyList<MonitoringJobSummary> Items { get; set; }
 
-    private int offset;
-    private int EffectiveOffset => Items.Count == 0 ? 0 : Math.Min(offset, (Items.Count - 1) / PageSize * PageSize);
-    private IReadOnlyList<MonitoringJobSummary> PageItems => Items.Skip(EffectiveOffset).Take(PageSize).ToArray();
+    private readonly LivePaginationState<MonitoringJobSummary> pagination = new(
+        PageSize,
+        item => $"{item.ApplicationName}\u001f{item.Job.JobId}\u001f{item.Job.Status}\u001f{item.Job.UpdatedAtUtc:O}");
+    private IReadOnlyList<MonitoringJobSummary> PageItems => pagination.Page(Items);
 
     private Task ChangePageAsync(int value)
     {
-        offset = value;
+        pagination.MoveTo(value, Items);
+        return Task.CompletedTask;
+    }
+
+    private Task ShowLatestAsync()
+    {
+        pagination.ShowLatest();
         return Task.CompletedTask;
     }
 

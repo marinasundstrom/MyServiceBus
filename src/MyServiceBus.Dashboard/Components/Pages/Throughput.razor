@@ -21,24 +21,30 @@
             }
         </tbody>
     </table></div>
-    <ListPagination Offset="EffectiveOffset" PageSize="PageSize" ItemCount="PageRates.Count" Total="Dashboard.ApplicationRates.Count" PageChanged="ChangePageAsync" />
+    <ListPagination Offset="pagination.Offset(OrderedRates)" PageSize="PageSize" ItemCount="PageRates.Count" Total="pagination.Total(OrderedRates)" Live="true" UpdatesAvailable="pagination.UpdatesAvailable(OrderedRates)" ShowLatest="ShowLatestAsync" PageChanged="ChangePageAsync" />
 </section>
 
 @code {
     private const int PageSize = 25;
-    private int offset;
+    private readonly LivePaginationState<MonitoringRateSummary> pagination = new(
+        PageSize,
+        rate => $"{rate.ApplicationName}\u001f{rate.Counts.Consumed}\u001f{rate.Counts.ConsumeFaulted}\u001f{rate.AverageConsumeDurationMs}\u001f{rate.P95ConsumeDurationMs}");
 
-    private int EffectiveOffset => Dashboard.ApplicationRates.Count == 0 ? 0 : Math.Min(offset, (Dashboard.ApplicationRates.Count - 1) / PageSize * PageSize);
-    private IReadOnlyList<MonitoringRateSummary> PageRates => Dashboard.ApplicationRates
+    private IReadOnlyList<MonitoringRateSummary> OrderedRates => Dashboard.ApplicationRates
         .OrderByDescending(rate => rate.Rates.ConsumedPerSecond)
         .ThenBy(rate => rate.ApplicationName, StringComparer.Ordinal)
-        .Skip(EffectiveOffset)
-        .Take(PageSize)
         .ToArray();
+    private IReadOnlyList<MonitoringRateSummary> PageRates => pagination.Page(OrderedRates);
 
     private Task ChangePageAsync(int value)
     {
-        offset = value;
+        pagination.MoveTo(value, OrderedRates);
+        return Task.CompletedTask;
+    }
+
+    private Task ShowLatestAsync()
+    {
+        pagination.ShowLatest();
         return Task.CompletedTask;
     }
 }

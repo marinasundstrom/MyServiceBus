@@ -47,7 +47,18 @@ public abstract class MonitoringPageBase : ComponentBase, IAsyncDisposable
     protected static string ShortMessageType(string? value)
         => string.IsNullOrWhiteSpace(value) ? "Unknown message" : value.Split('.').Last();
 
-    private void OnDashboardChanged() => _ = InvokeAsync(StateHasChanged);
+    protected virtual void OnDashboardStateChanged()
+    {
+    }
+
+    private void OnDashboardChanged()
+    {
+        _ = InvokeAsync(() =>
+        {
+            OnDashboardStateChanged();
+            StateHasChanged();
+        });
+    }
 
     public ValueTask DisposeAsync()
     {

@@ -86,6 +86,9 @@
                         ItemCount="page.Runs.Count"
                         Total="page.Total"
                         Disabled="loading"
+                        Live="true"
+                        UpdatesAvailable="updatesAvailable"
+                        ShowLatest="ShowLatestAsync"
                         PageChanged="LoadPageAsync" />
     }
 </section>
@@ -116,7 +119,9 @@
     private string statusFilter = "all";
     private MonitoringWorkflowRunIndexPage? queriedPage;
     private bool loading;
+    private bool updatesAvailable;
     private string? appliedQueryKey;
+    private string? historicalHeadSignature;
 
     private MonitoringWorkflowRunIndexPage? CurrentPage => queriedPage ?? Dashboard.WorkflowRunIndex;
     private bool FiltersApplied => typeFilter != "all" || statusFilter != "all" || !string.IsNullOrWhiteSpace(search);
@@ -180,6 +185,14 @@
 
     private async Task LoadPageAsync(int offset)
     {
+        if (offset == 0 && !FiltersApplied)
+        {
+            queriedPage = null;
+            updatesAvailable = false;
+            historicalHeadSignature = null;
+            return;
+        }
+
         loading = true;
         try
         {
@@ -191,11 +204,34 @@
                 offset,
                 PageSize,
                 CancellationToken.None);
+            updatesAvailable = false;
+            historicalHeadSignature = offset > 0 ? DashboardHeadSignature() : null;
         }
         finally
         {
             loading = false;
         }
+    }
+
+    protected override void OnDashboardStateChanged()
+    {
+        if (CurrentPage?.Offset > 0)
+        {
+            updatesAvailable |= !string.Equals(historicalHeadSignature, DashboardHeadSignature(), StringComparison.Ordinal);
+            return;
+        }
+
+        if (FiltersApplied && !loading)
+            _ = InvokeAsync(() => LoadPageAsync(0));
+    }
+
+    private Task ShowLatestAsync() => LoadPageAsync(0);
+
+    private string DashboardHeadSignature()
+    {
+        var page = Dashboard.WorkflowRunIndex;
+        var first = page?.Runs.FirstOrDefault();
+        return $"{page?.Total ?? 0}\u001f{first?.WorkflowId}\u001f{first?.RunId}\u001f{first?.LastActivityAtUtc:O}\u001f{first?.Status}\u001f{first?.EvidenceCount}";
     }
 
     private static string RunHref(MonitoringWorkflowRunSummary run)

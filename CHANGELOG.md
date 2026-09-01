@@ -4,6 +4,7 @@ This changelog summarizes the bigger themes in the repository history rather tha
 
 ## Unreleased
 
+- Made paginated Dashboard views safe under live updates. The newest page continues to refresh automatically, while later pages hold a stable snapshot to prevent row drift and surface an explicit “Show latest” action when monitoring data changes.
 - Added server-side pagination and retained-result counts to the Dashboard message and failure indexes, with URL-backed message search and status filters that remain applied while paging. Workflow runs, declared workflows, and potentially large current-state tables for throughput, endpoints, replicas, scheduled work, recurring jobs, and tracked jobs now share the same reusable list pager.
 - Improved the Dashboard shell at phone widths with concise live-status text, fully readable theme and density choices, a visual continuation cue for the horizontally scrollable section navigation, and route-aware scrolling that keeps the active section visible. Workflow guidance now describes saga transition retention as monitoring-service policy instead of the obsolete live-window-only limitation.
 - Preserved authoritative committed saga state when retained monitoring history is merged with later failed and recovered delivery attempts. Saga run detail now labels the sequence as delivery-attempt history so visible failures are not described as committed transitions.

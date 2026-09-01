@@ -68,7 +68,7 @@
                 </a>
             }
         </div>
-        <ListPagination Offset="EffectiveOffset" PageSize="PageSize" ItemCount="PageWorkflows.Count" Total="FilteredWorkflows.Count" PageChanged="ChangePageAsync" />
+        <ListPagination Offset="pagination.Offset(FilteredWorkflows)" PageSize="PageSize" ItemCount="PageWorkflows.Count" Total="pagination.Total(FilteredWorkflows)" Live="true" UpdatesAvailable="pagination.UpdatesAvailable(FilteredWorkflows)" ShowLatest="ShowLatestAsync" PageChanged="ChangePageAsync" />
     }
 </section>
 
@@ -81,7 +81,9 @@
     private const int PageSize = 25;
     private string search = string.Empty;
     private string kindFilter = "all";
-    private int offset;
+    private readonly LivePaginationState<MonitoringWorkflowCatalogItem> pagination = new(
+        PageSize,
+        workflow => $"{workflow.WorkflowId}\u001f{workflow.Kind}\u001f{workflow.LastCapturedAtUtc:O}\u001f{workflow.OnlineInstanceCount}\u001f{workflow.ObservedRunCount}");
 
     private IReadOnlyList<MonitoringWorkflowCatalogItem> FilteredWorkflows
         => Dashboard.WorkflowCatalog
@@ -92,8 +94,7 @@
             .OrderBy(workflow => workflow.WorkflowId, StringComparer.Ordinal)
             .ToArray();
 
-    private int EffectiveOffset => FilteredWorkflows.Count == 0 ? 0 : Math.Min(offset, (FilteredWorkflows.Count - 1) / PageSize * PageSize);
-    private IReadOnlyList<MonitoringWorkflowCatalogItem> PageWorkflows => FilteredWorkflows.Skip(EffectiveOffset).Take(PageSize).ToArray();
+    private IReadOnlyList<MonitoringWorkflowCatalogItem> PageWorkflows => pagination.Page(FilteredWorkflows);
 
     private bool FiltersApplied => kindFilter != "all" || !string.IsNullOrWhiteSpace(search);
 
@@ -101,14 +102,20 @@
     {
         search = string.Empty;
         kindFilter = "all";
-        offset = 0;
+        pagination.ShowLatest();
     }
 
-    private void ResetPage() => offset = 0;
+    private void ResetPage() => pagination.ShowLatest();
 
     private Task ChangePageAsync(int value)
     {
-        offset = value;
+        pagination.MoveTo(value, FilteredWorkflows);
+        return Task.CompletedTask;
+    }
+
+    private Task ShowLatestAsync()
+    {
+        pagination.ShowLatest();
         return Task.CompletedTask;
     }
 

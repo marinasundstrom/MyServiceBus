@@ -44,28 +44,34 @@ else
                 </tbody>
             </table>
         </div>
-        <ListPagination Offset="EffectiveOffset" PageSize="PageSize" ItemCount="PageEndpoints.Count" Total="Dashboard.Endpoints.Count" PageChanged="ChangePageAsync" />
+        <ListPagination Offset="pagination.Offset(OrderedEndpoints)" PageSize="PageSize" ItemCount="PageEndpoints.Count" Total="pagination.Total(OrderedEndpoints)" Live="true" UpdatesAvailable="pagination.UpdatesAvailable(OrderedEndpoints)" ShowLatest="ShowLatestAsync" PageChanged="ChangePageAsync" />
         <p class="table-note">“Handled / sec” counts successfully consumed messages. Retry and failure totals cover the same 60-second window.</p>
     </section>
 }
 
 @code {
     private const int PageSize = 25;
-    private int offset;
+    private readonly LivePaginationState<MonitoringEndpointSummary> pagination = new(
+        PageSize,
+        endpoint => $"{endpoint.ApplicationName}\u001f{endpoint.EndpointName}\u001f{endpoint.OnlineInstances}\u001f{endpoint.TotalInstances}\u001f{endpoint.ConsumedPerSecond}\u001f{endpoint.Retried}\u001f{endpoint.Faulted}");
 
     private int AttentionCount => Dashboard.Endpoints.Count(endpoint => !IsAvailable(endpoint) || endpoint.Faulted > 0);
-    private int EffectiveOffset => Dashboard.Endpoints.Count == 0 ? 0 : Math.Min(offset, (Dashboard.Endpoints.Count - 1) / PageSize * PageSize);
-    private IReadOnlyList<MonitoringEndpointSummary> PageEndpoints => Dashboard.Endpoints
+    private IReadOnlyList<MonitoringEndpointSummary> OrderedEndpoints => Dashboard.Endpoints
         .OrderBy(StatusRank)
         .ThenBy(endpoint => endpoint.ApplicationName)
         .ThenBy(endpoint => endpoint.EndpointName)
-        .Skip(EffectiveOffset)
-        .Take(PageSize)
         .ToArray();
+    private IReadOnlyList<MonitoringEndpointSummary> PageEndpoints => pagination.Page(OrderedEndpoints);
 
     private Task ChangePageAsync(int value)
     {
-        offset = value;
+        pagination.MoveTo(value, OrderedEndpoints);
+        return Task.CompletedTask;
+    }
+
+    private Task ShowLatestAsync()
+    {
+        pagination.ShowLatest();
         return Task.CompletedTask;
     }
 
