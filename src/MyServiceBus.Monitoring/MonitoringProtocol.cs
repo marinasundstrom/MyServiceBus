@@ -575,6 +575,23 @@ public sealed record MonitoringObservationRecord(
     string BusId,
     MonitoringObservation Observation);
 
+public sealed record MonitoringMessageSummary(
+    string MessageId,
+    string? MessageType,
+    string? MessageUrn,
+    string Status,
+    IReadOnlyList<string> ProducerApplications,
+    IReadOnlyList<string> ConsumerApplications,
+    IReadOnlyList<string> ParticipantApplications,
+    int ObservationCount,
+    DateTimeOffset FirstObservedAtUtc,
+    DateTimeOffset LastObservedAtUtc,
+    string? CorrelationId,
+    string? ConversationId,
+    string? RequestId,
+    string? CausationMessageId,
+    string? MessageBodyStatus);
+
 public sealed record MonitoringFlowEdge(
     string SourceApplication,
     string TargetApplication,

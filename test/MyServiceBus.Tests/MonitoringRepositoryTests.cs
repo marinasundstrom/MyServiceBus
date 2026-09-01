@@ -1082,6 +1082,50 @@ public class MonitoringRepositoryTests
         summary.LastActivityAtUtc.ShouldBe(now.AddSeconds(-3));
     }
 
+    [Fact]
+    public void Message_projection_merges_producer_consumer_and_request_evidence()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var repository = new MonitoringRepository();
+        repository.UpsertMetadata(CreateMetadata("orders", "orders-1", now, "commerce"));
+        repository.UpsertMetadata(CreateMetadata("payments", "payments-1", now, "commerce"));
+        repository.RecordBatch(CreateBatch(
+            "orders",
+            "orders-1",
+            now,
+            new MonitoringObservation(
+                1, now, "sent", true, "SubmitOrder", "urn:message:SubmitOrder", null, "loopback://orders",
+                2, null, null, "correlation-1", "conversation-1", null, null,
+                MessageId: "message-1", RequestId: "request-1", MessageBody: "{}",
+                MessageBodyContentType: "application/json", MessageBodyStatus: "captured", MessageBodyOriginalBytes: 2)))
+            .ShouldBeTrue();
+        repository.RecordBatch(CreateBatch(
+            "payments",
+            "payments-1",
+            now.AddMilliseconds(5),
+            new MonitoringObservation(
+                2, now.AddMilliseconds(4), "consumed", true, "SubmitOrder", "urn:message:SubmitOrder", "orders", null,
+                4, null, null, "correlation-1", "conversation-1", null, null,
+                MessageId: "message-1", RequestId: "request-1"),
+            new MonitoringObservation(
+                3, now.AddMilliseconds(5), "published", true, "OrderAccepted", "urn:message:OrderAccepted", null, null,
+                1, null, null, "correlation-1", "conversation-1", null, null,
+                MessageId: "message-2", CausationMessageId: "message-1", RequestId: "request-1")))
+            .ShouldBeTrue();
+
+        var message = repository.GetMessages(null, null, null, 100)
+            .Single(item => item.MessageId == "message-1");
+        message.Status.ShouldBe("handled");
+        message.ProducerApplications.ShouldBe(["orders"]);
+        message.ConsumerApplications.ShouldBe(["payments"]);
+        message.ParticipantApplications.ShouldBe(["orders", "payments"]);
+        message.ObservationCount.ShouldBe(2);
+        message.MessageBodyStatus.ShouldBe("captured");
+
+        var timeline = repository.GetMessageObservations("message-1");
+        timeline.Select(record => record.Observation.MessageId).ShouldBe(["message-1", "message-1", "message-2"]);
+    }
+
     private static MonitoringMetadata CreateMetadata(
         string applicationName,
         string instanceId,

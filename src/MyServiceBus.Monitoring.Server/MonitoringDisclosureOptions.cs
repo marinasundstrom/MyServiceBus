@@ -31,6 +31,17 @@ public sealed class MonitoringDisclosurePolicy
             ? records
             : records.Select(Apply).ToArray();
 
+    public MonitoringMessageSummary Apply(MonitoringMessageSummary message)
+        => options.MessageBodies switch
+        {
+            MonitoringMessageBodyDisclosure.Full => message,
+            MonitoringMessageBodyDisclosure.Redact when message.MessageBodyStatus is "captured" or "truncated"
+                => message with { MessageBodyStatus = "redacted" },
+            MonitoringMessageBodyDisclosure.Omit when message.MessageBodyStatus is "captured" or "truncated"
+                => message with { MessageBodyStatus = "withheld" },
+            _ => message
+        };
+
     private MonitoringObservationRecord Apply(MonitoringObservationRecord record)
     {
         var observation = record.Observation;

@@ -2,13 +2,17 @@
     <NavLink href="@ApplicationUrl" Match="NavLinkMatch.All">Overview</NavLink>
     <NavLink href="@($"{ApplicationUrl}/metrics")">Metrics</NavLink>
     <NavLink href="@($"{ApplicationUrl}/flow")">Flow</NavLink>
-    <NavLink href="@($"{ApplicationUrl}/workflows")">Workflows</NavLink>
+    @if (Options.Value.Features.Workflows)
+    {
+        <NavLink href="@($"{ApplicationUrl}/workflows")">Workflows</NavLink>
+    }
     <NavLink href="@($"{ApplicationUrl}/scheduled")">Scheduled</NavLink>
     <NavLink href="@($"{ApplicationUrl}/recurring")">Recurring</NavLink>
     <NavLink href="@($"{ApplicationUrl}/jobs")">Jobs</NavLink>
 </nav>
 
 @code {
+    [Inject] private Microsoft.Extensions.Options.IOptions<DashboardOptions> Options { get; set; } = null!;
     [Parameter, EditorRequired]
     public required string ApplicationName { get; set; }
 

@@ -1,6 +1,7 @@
 @inherits LayoutComponentBase
 @implements IDisposable
 @inject MonitoringDashboardState Dashboard
+@inject Microsoft.Extensions.Options.IOptions<DashboardOptions> Options
 
 <div class="app-shell">
     <a class="skip-link" href="#main-content">Skip to dashboard content</a>
@@ -21,13 +22,20 @@
             <NavLink href="/endpoints">Endpoints</NavLink>
             <NavLink href="/throughput">Throughput</NavLink>
             <NavLink href="/flow">Message flow</NavLink>
-            <NavLink href="@WorkflowsHref" Match="NavLinkMatch.Prefix">
-                <span>Workflows</span>
-                @if (WorkflowFailureCount > 0)
-                {
-                    <span class="nav-badge" title="@WorkflowFailureBadgeTitle" aria-label="@WorkflowFailureBadgeTitle">@WorkflowFailureBadgeText</span>
-                }
-            </NavLink>
+            @if (Options.Value.Features.Messages)
+            {
+                <NavLink href="/messages">Messages</NavLink>
+            }
+            @if (Options.Value.Features.Workflows)
+            {
+                <NavLink href="@WorkflowsHref" Match="NavLinkMatch.Prefix">
+                    <span>Workflows</span>
+                    @if (WorkflowFailureCount > 0)
+                    {
+                        <span class="nav-badge" title="@WorkflowFailureBadgeTitle" aria-label="@WorkflowFailureBadgeTitle">@WorkflowFailureBadgeText</span>
+                    }
+                </NavLink>
+            }
             <span class="nav-label">Reliability</span>
             <NavLink href="/failures">
                 <span>Failures</span>

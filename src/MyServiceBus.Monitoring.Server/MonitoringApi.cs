@@ -225,6 +225,21 @@ public static class MonitoringApi
             MonitoringDisclosurePolicy disclosure) =>
             disclosure.Apply(repository.GetRecentObservations(application, limit ?? 100)))
             .WithSummary("List recent bounded monitoring observations under the configured disclosure policy");
+        query.MapGet("/messages/{messageId}/observations", (
+            string messageId,
+            MonitoringRepository repository,
+            MonitoringDisclosurePolicy disclosure) =>
+            disclosure.Apply(repository.GetMessageObservations(messageId)))
+            .WithSummary("Get the exact message, caused operations, and request-response observations under the configured disclosure policy");
+        query.MapGet("/messages", (
+            string? application,
+            string? status,
+            string? search,
+            int? limit,
+            MonitoringRepository repository,
+            MonitoringDisclosurePolicy disclosure) =>
+            repository.GetMessages(application, status, search, limit ?? 100).Select(disclosure.Apply).ToArray())
+            .WithSummary("Query monitoring-owned message summaries merged across producer and consumer observations");
         query.MapGet("/metrics", (string? application, int? windowSeconds, bool? byInstance, MonitoringRepository repository) =>
             repository.GetRates(application, windowSeconds ?? 60, byInstance ?? false, DateTimeOffset.UtcNow))
             .WithSummary("Query rates, counts, latency, retries, and failures for a time window");

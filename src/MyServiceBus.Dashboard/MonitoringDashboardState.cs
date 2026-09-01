@@ -1,4 +1,5 @@
 using System.Net.WebSockets;
+using Microsoft.Extensions.Options;
 using MyServiceBus.Monitoring;
 
 namespace MyServiceBus.Dashboard;
@@ -6,6 +7,7 @@ namespace MyServiceBus.Dashboard;
 public sealed class MonitoringDashboardState : IAsyncDisposable
 {
     private readonly MonitoringApiClient api;
+    private readonly DashboardOptions options;
     private readonly CancellationTokenSource stopping = new();
     private readonly SemaphoreSlim refreshLock = new(1, 1);
     private readonly SemaphoreSlim startLock = new(1, 1);
@@ -13,9 +15,10 @@ public sealed class MonitoringDashboardState : IAsyncDisposable
     private Task? watchTask;
     private bool started;
 
-    public MonitoringDashboardState(MonitoringApiClient api)
+    public MonitoringDashboardState(MonitoringApiClient api, IOptions<DashboardOptions> options)
     {
         this.api = api;
+        this.options = options.Value;
     }
 
     public event Action? Changed;
@@ -38,6 +41,7 @@ public sealed class MonitoringDashboardState : IAsyncDisposable
     public MonitoringWorkflowRunPage? WorkflowRuns { get; private set; }
     public MonitoringWorkflowRunIndexPage? WorkflowRunIndex { get; private set; }
     public IReadOnlyList<MonitoringObservationRecord> Observations { get; private set; } = [];
+    public IReadOnlyList<MonitoringMessageSummary> Messages { get; private set; } = [];
     public IReadOnlyList<MonitoringOutboxDispatcherSummary> OutboxDispatchers { get; private set; } = [];
     public IReadOnlyList<MonitoringScheduledWorkSummary> ScheduledWork { get; private set; } = [];
     public IReadOnlyList<MonitoringRecurringJobSummary> RecurringJobs { get; private set; } = [];
@@ -128,14 +132,29 @@ public sealed class MonitoringDashboardState : IAsyncDisposable
             var flow = api.GetFlow(stopping.Token);
             var requestResponseExchanges = api.GetRequestResponseExchanges(stopping.Token);
             var replicaFlow = api.GetReplicaFlow(stopping.Token);
-            var choreographies = api.GetChoreographies(stopping.Token);
-            var sagas = api.GetSagas(stopping.Token);
-            var workflowCatalog = api.GetWorkflowCatalog(stopping.Token);
-            var choreographyRuntime = api.GetChoreographyRuntime(stopping.Token);
-            var workflowRuns = api.GetWorkflowRuns(null, null, null, null, null, null, 0, 100, stopping.Token);
-            var workflowRunIndex = api.GetWorkflowRunIndex(null, null, null, null, 0, 100, stopping.Token);
+            var choreographies = options.Features.Workflows
+                ? api.GetChoreographies(stopping.Token)
+                : Task.FromResult<IReadOnlyList<MonitoringDeclaredChoreography>>([]);
+            var sagas = options.Features.Workflows
+                ? api.GetSagas(stopping.Token)
+                : Task.FromResult<IReadOnlyList<MonitoringDeclaredSagaStateMachine>>([]);
+            var workflowCatalog = options.Features.Workflows
+                ? api.GetWorkflowCatalog(stopping.Token)
+                : Task.FromResult<IReadOnlyList<MonitoringWorkflowCatalogItem>>([]);
+            var choreographyRuntime = options.Features.Workflows
+                ? api.GetChoreographyRuntime(stopping.Token)
+                : Task.FromResult<MonitoringChoreographyRuntimeSnapshot?>(null);
+            var workflowRuns = options.Features.Workflows
+                ? api.GetWorkflowRuns(null, null, null, null, null, null, 0, 100, stopping.Token)
+                : Task.FromResult<MonitoringWorkflowRunPage?>(null);
+            var workflowRunIndex = options.Features.Workflows
+                ? api.GetWorkflowRunIndex(null, null, null, null, 0, 100, stopping.Token)
+                : Task.FromResult<MonitoringWorkflowRunIndexPage?>(null);
             var timeSeries = api.GetTimeSeries(stopping.Token);
             var observations = api.GetRecentObservations(stopping.Token);
+            var messages = options.Features.Messages
+                ? api.GetMessages(stopping.Token)
+                : Task.FromResult<IReadOnlyList<MonitoringMessageSummary>>([]);
             var outboxDispatchers = api.GetOutboxDispatchers(stopping.Token);
             var scheduledWork = api.GetScheduledWork(stopping.Token);
             var recurringJobs = api.GetRecurringJobs(stopping.Token);
@@ -159,6 +178,7 @@ public sealed class MonitoringDashboardState : IAsyncDisposable
                 workflowRunIndex,
                 timeSeries,
                 observations,
+                messages,
                 outboxDispatchers,
                 scheduledWork,
                 recurringJobs,
@@ -181,6 +201,7 @@ public sealed class MonitoringDashboardState : IAsyncDisposable
             WorkflowRunIndex = workflowRunIndex.Result;
             TimeSeries = timeSeries.Result;
             Observations = observations.Result;
+            Messages = messages.Result;
             OutboxDispatchers = outboxDispatchers.Result;
             ScheduledWork = scheduledWork.Result;
             RecurringJobs = recurringJobs.Result;

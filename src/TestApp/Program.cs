@@ -115,6 +115,9 @@ builder.Services.AddServiceBusMonitoring(options =>
     options.Labels["group"] = "sample-system";
     options.Labels["environment"] = builder.Environment.EnvironmentName;
     options.Labels["role"] = "api";
+    options.CaptureMessageBodies = true;
+    options.MaxMessageBodyBytes = 8 * 1024;
+    options.MessageBodyTypeFilter = messageType => messageType.StartsWith("TestApp.", StringComparison.Ordinal);
 });
 
 builder.Services.AddHealthChecks()

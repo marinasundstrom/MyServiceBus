@@ -183,6 +183,20 @@ public sealed class MonitoringApiClient
             cancellationToken).ConfigureAwait(false)
             ?? [];
 
+    public async Task<IReadOnlyList<MonitoringMessageSummary>> GetMessages(CancellationToken cancellationToken)
+        => await httpClient.GetFromJsonAsync<MonitoringMessageSummary[]>(
+            "/api/monitoring/v1/messages?limit=100",
+            cancellationToken).ConfigureAwait(false)
+            ?? [];
+
+    public async Task<IReadOnlyList<MonitoringObservationRecord>> GetMessageObservations(
+        string messageId,
+        CancellationToken cancellationToken)
+        => await httpClient.GetFromJsonAsync<MonitoringObservationRecord[]>(
+            $"/api/monitoring/v1/messages/{Uri.EscapeDataString(messageId)}/observations",
+            cancellationToken).ConfigureAwait(false)
+            ?? [];
+
     public async Task<IReadOnlyList<MonitoringOutboxDispatcherSummary>> GetOutboxDispatchers(
         CancellationToken cancellationToken)
         => await httpClient.GetFromJsonAsync<MonitoringOutboxDispatcherSummary[]>(

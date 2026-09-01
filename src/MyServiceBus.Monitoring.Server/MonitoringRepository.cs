@@ -1188,6 +1188,101 @@ public sealed class MonitoringRepository
         }
     }
 
+    public IReadOnlyList<MonitoringObservationRecord> GetMessageObservations(string messageId)
+    {
+        if (string.IsNullOrWhiteSpace(messageId))
+            return [];
+
+        lock (observationSync)
+        {
+            var exact = recentObservations
+                .Where(record => string.Equals(record.Observation.MessageId, messageId, StringComparison.Ordinal)
+                    || string.Equals(record.Observation.CausationMessageId, messageId, StringComparison.Ordinal))
+                .ToArray();
+            var requestIds = exact
+                .Select(record => record.Observation.RequestId)
+                .Where(requestId => !string.IsNullOrWhiteSpace(requestId))
+                .ToHashSet(StringComparer.Ordinal);
+
+            return recentObservations
+                .Where(record => string.Equals(record.Observation.MessageId, messageId, StringComparison.Ordinal)
+                    || string.Equals(record.Observation.CausationMessageId, messageId, StringComparison.Ordinal)
+                    || record.Observation.RequestId is { } requestId && requestIds.Contains(requestId))
+                .OrderBy(record => record.Observation.OccurredAtUtc)
+                .ToArray();
+        }
+    }
+
+    public IReadOnlyList<MonitoringMessageSummary> GetMessages(
+        string? applicationName,
+        string? status,
+        string? search,
+        int limit)
+    {
+        lock (observationSync)
+        {
+            return recentObservations
+                .Where(record => !string.IsNullOrWhiteSpace(record.Observation.MessageId))
+                .GroupBy(record => record.Observation.MessageId!, StringComparer.Ordinal)
+                .Select(CreateMessageSummary)
+                .Where(message => string.IsNullOrWhiteSpace(applicationName)
+                    || message.ParticipantApplications.Contains(applicationName, StringComparer.Ordinal))
+                .Where(message => string.IsNullOrWhiteSpace(status)
+                    || string.Equals(message.Status, status, StringComparison.OrdinalIgnoreCase))
+                .Where(message => string.IsNullOrWhiteSpace(search)
+                    || message.MessageId.Contains(search, StringComparison.OrdinalIgnoreCase)
+                    || (message.MessageType?.Contains(search, StringComparison.OrdinalIgnoreCase) ?? false)
+                    || message.ParticipantApplications.Any(application =>
+                        application.Contains(search, StringComparison.OrdinalIgnoreCase)))
+                .OrderByDescending(message => message.LastObservedAtUtc)
+                .Take(Math.Clamp(limit, 1, 500))
+                .ToArray();
+        }
+    }
+
+    private static MonitoringMessageSummary CreateMessageSummary(
+        IGrouping<string, MonitoringObservationRecord> group)
+    {
+        var records = group.ToArray();
+        var failed = records.Any(record => record.Observation.Kind.Contains("fault", StringComparison.Ordinal)
+            || record.Observation.Kind == "retry_exhausted");
+        var handled = records.Any(record => record.Observation.Kind == "consumed" && record.Observation.Succeeded == true);
+        var producers = records
+            .Where(record => record.Observation.Kind is "sent" or "published" or "fault_published")
+            .Select(record => record.ApplicationName)
+            .Distinct(StringComparer.Ordinal)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+        var consumers = records
+            .Where(record => record.Observation.Kind is "consumed" or "consume_faulted" or "saga_delivery")
+            .Select(record => record.ApplicationName)
+            .Distinct(StringComparer.Ordinal)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+        var participants = producers.Concat(consumers)
+            .Concat(records.Select(record => record.ApplicationName))
+            .Distinct(StringComparer.Ordinal)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+
+        return new MonitoringMessageSummary(
+            group.Key,
+            records.Select(record => record.Observation.MessageType).FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)),
+            records.Select(record => record.Observation.MessageUrn).FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)),
+            failed ? "failed" : handled ? "handled" : "observed",
+            producers,
+            consumers,
+            participants,
+            records.Length,
+            records.Min(record => record.Observation.OccurredAtUtc),
+            records.Max(record => record.Observation.OccurredAtUtc),
+            records.Select(record => record.Observation.CorrelationId).FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)),
+            records.Select(record => record.Observation.ConversationId).FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)),
+            records.Select(record => record.Observation.RequestId).FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)),
+            records.Select(record => record.Observation.CausationMessageId).FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)),
+            records.Select(record => record.Observation.MessageBodyStatus).FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)));
+    }
+
     private static string[] GetChoreographyConflictKinds(
         IReadOnlyList<MonitoringDeclaredChoreographyFragment> fragments,
         IReadOnlyList<string> definitionVersions)

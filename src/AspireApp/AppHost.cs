@@ -23,12 +23,14 @@ var monitoringService = builder.AddProject<MyServiceBus_Monitoring_Server>("moni
     .WithReference(monitoring)
     .WithEnvironment("Monitoring__Storage__Provider", "PostgreSql")
     .WithEnvironment("Monitoring__Storage__ConnectionStringName", "monitoring")
+    .WithEnvironment("Monitoring__Disclosure__MessageBodies", "Full")
     .WithExternalHttpEndpoints()
     .WaitFor(monitoring);
 
 builder.AddProject<MyServiceBus_Dashboard>("monitoring-dashboard")
     .WithHttpEndpoint(name: "http")
     .WithEnvironment("Dashboard__MonitoringServiceAddress", monitoringService.GetEndpoint("http"))
+    .WithEnvironment("Dashboard__Features__Messages", "true")
     .WithExternalHttpEndpoints()
     .WaitFor(monitoringService);
 
