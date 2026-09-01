@@ -180,7 +180,7 @@ td small { display: block; margin-top: 4px; color: var(--text-dim); font-size: .
 .table-note { margin: 0; padding: 0 24px 20px; }
 .mono { max-width: 260px; overflow: hidden; text-overflow: ellipsis; font-family: "SFMono-Regular", Consolas, monospace; color: var(--text-muted); }
 .message-index { overflow: hidden; }
-.message-filters { display: grid; grid-template-columns: minmax(240px, 1fr) minmax(150px, .3fr); gap: 12px; padding: 16px 20px; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); background: var(--surface-deep); }
+.message-filters { display: grid; grid-template-columns: minmax(240px, 1fr) minmax(150px, .3fr) auto auto; gap: 12px; align-items: end; padding: 16px 20px; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); background: var(--surface-deep); }
 .message-filters label { display: grid; gap: 6px; }
 .message-filters label > span { color: var(--text-dim); font-size: .62rem; font-weight: 750; letter-spacing: .06em; text-transform: uppercase; }
 .message-filters input, .message-filters select { min-width: 0; padding: 9px 11px; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--surface-solid); color: var(--text); font: inherit; font-size: .75rem; }
@@ -374,13 +374,15 @@ td small { display: block; margin-top: 4px; color: var(--text-dim); font-size: .
 .workflow-run-filters label > span { color: var(--text-dim); font-size: .65rem; font-weight: 750; letter-spacing: .06em; text-transform: uppercase; }
 .workflow-run-filters input, .workflow-run-filters select { min-width: 0; padding: 10px 11px; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--surface-solid); color: var(--text); font: inherit; font-size: .76rem; }
 .workflow-run-filters input:focus, .workflow-run-filters select:focus { outline: 2px solid color-mix(in srgb, var(--accent) 40%, transparent); border-color: var(--accent); }
-.workflow-filter-action, .workflow-run-pagination button { padding: 10px 13px; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--surface-raised); color: var(--text); font: inherit; font-size: .72rem; font-weight: 750; cursor: pointer; }
-.workflow-filter-action:hover, .workflow-run-pagination button:hover { border-color: var(--accent); }
-.workflow-filter-action:disabled, .workflow-run-pagination button:disabled { opacity: .45; cursor: default; }
+.workflow-filter-action, .workflow-run-pagination button, .list-pagination button { padding: 10px 13px; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--surface-raised); color: var(--text); font: inherit; font-size: .72rem; font-weight: 750; cursor: pointer; }
+.workflow-filter-action:hover, .workflow-run-pagination button:hover, .list-pagination button:hover { border-color: var(--accent); }
+.workflow-filter-action:disabled, .workflow-run-pagination button:disabled, .list-pagination button:disabled { opacity: .45; cursor: default; }
 .workflow-filter-reset { padding: 10px 11px; border: 1px solid var(--border); border-radius: 8px; background: transparent; color: var(--text-dim); font: inherit; font-size: .68rem; font-weight: 750; cursor: pointer; }
 .workflow-filter-reset:hover, .workflow-filter-reset:focus-visible { border-color: var(--border-strong); color: var(--text); }
 .workflow-run-pagination { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 14px 20px; border-top: 1px solid var(--border); color: var(--text-dim); font-size: .7rem; }
 .workflow-run-pagination > div { display: flex; gap: 8px; }
+.list-pagination { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 14px 20px; border-top: 1px solid var(--border); color: var(--text-dim); font-size: .7rem; }
+.list-pagination > div { display: flex; gap: 8px; }
 .workflow-run-list { display: grid; }
 .workflow-run-list-item { display: grid; grid-template-columns: minmax(130px, .72fr) minmax(210px, 1.35fr) minmax(120px, .72fr) minmax(125px, .72fr) minmax(190px, 1fr) auto; gap: 14px; align-items: center; min-width: 0; padding: 14px 18px; border-top: 1px solid var(--border-subtle); color: inherit; text-decoration: none; transition: background 120ms ease; }
 .workflow-run-list-item:first-child { border-top: 0; }
@@ -604,8 +606,8 @@ td small { display: block; margin-top: 4px; color: var(--text-dim); font-size: .
 :root[data-density="compact"] .workflow-run-filters input,
 :root[data-density="compact"] .workflow-run-filters select,
 :root[data-density="compact"] .workflow-filter-action,
-:root[data-density="compact"] .workflow-run-pagination button { padding-block: 7px; }
-:root[data-density="compact"] .workflow-run-pagination { padding: 9px 14px; }
+:root[data-density="compact"] .workflow-run-pagination button, :root[data-density="compact"] .list-pagination button { padding-block: 7px; }
+:root[data-density="compact"] .workflow-run-pagination, :root[data-density="compact"] .list-pagination { padding: 9px 14px; }
 :root[data-density="compact"] .workflow-run-list-item { gap: 11px; padding: 10px 14px; }
 :root[data-density="compact"] .workflow-catalog-filters { gap: 8px; padding: 10px 14px; }
 :root[data-density="compact"] .workflow-declaration-list-item { gap: 11px; padding: 10px 14px; }

@@ -1283,10 +1283,18 @@ public sealed class MonitoringRepository
         string? status,
         string? search,
         int limit)
+        => GetMessageIndex(applicationName, status, search, 0, limit).Messages;
+
+    public MonitoringMessageIndexPage GetMessageIndex(
+        string? applicationName,
+        string? status,
+        string? search,
+        int offset,
+        int limit)
     {
         lock (observationSync)
         {
-            return recentObservations
+            var messages = recentObservations
                 .Where(record => !string.IsNullOrWhiteSpace(record.Observation.MessageId))
                 .GroupBy(record => record.Observation.MessageId!, StringComparer.Ordinal)
                 .Select(CreateMessageSummary)
@@ -1300,8 +1308,15 @@ public sealed class MonitoringRepository
                     || message.ParticipantApplications.Any(application =>
                         application.Contains(search, StringComparison.OrdinalIgnoreCase)))
                 .OrderByDescending(message => message.LastObservedAtUtc)
-                .Take(Math.Clamp(limit, 1, 500))
                 .ToArray();
+
+            var normalizedOffset = Math.Max(0, offset);
+            var normalizedLimit = Math.Clamp(limit, 1, 100);
+            return new MonitoringMessageIndexPage(
+                normalizedOffset,
+                normalizedLimit,
+                messages.Length,
+                messages.Skip(normalizedOffset).Take(normalizedLimit).ToArray());
         }
     }
 

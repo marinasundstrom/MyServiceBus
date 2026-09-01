@@ -235,11 +235,15 @@ public static class MonitoringApi
             string? application,
             string? status,
             string? search,
+            int? offset,
             int? limit,
             MonitoringRepository repository,
             MonitoringDisclosurePolicy disclosure) =>
-            repository.GetMessages(application, status, search, limit ?? 100).Select(disclosure.Apply).ToArray())
-            .WithSummary("Query monitoring-owned message summaries merged across producer and consumer observations");
+        {
+            var page = repository.GetMessageIndex(application, status, search, offset ?? 0, limit ?? 50);
+            return page with { Messages = page.Messages.Select(disclosure.Apply).ToArray() };
+        })
+            .WithSummary("Query a filtered page of monitoring-owned message summaries merged across producer and consumer observations");
         query.MapGet("/metrics", (string? application, int? windowSeconds, bool? byInstance, MonitoringRepository repository) =>
             repository.GetRates(application, windowSeconds ?? 60, byInstance ?? false, DateTimeOffset.UtcNow))
             .WithSummary("Query rates, counts, latency, retries, and failures for a time window");

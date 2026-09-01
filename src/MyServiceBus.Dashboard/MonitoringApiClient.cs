@@ -198,11 +198,26 @@ public sealed class MonitoringApiClient
             cancellationToken).ConfigureAwait(false)
             ?? [];
 
-    public async Task<IReadOnlyList<MonitoringMessageSummary>> GetMessages(CancellationToken cancellationToken)
-        => await httpClient.GetFromJsonAsync<MonitoringMessageSummary[]>(
-            "/api/monitoring/v1/messages?limit=100",
-            cancellationToken).ConfigureAwait(false)
-            ?? [];
+    public async Task<MonitoringMessageIndexPage?> GetMessages(
+        string? application,
+        string? status,
+        string? search,
+        int offset,
+        int limit,
+        CancellationToken cancellationToken)
+    {
+        var parameters = new List<string>
+        {
+            $"offset={Math.Max(0, offset)}",
+            $"limit={Math.Clamp(limit, 1, 100)}"
+        };
+        AddQuery(parameters, "application", application);
+        AddQuery(parameters, "status", status);
+        AddQuery(parameters, "search", search);
+        return await httpClient.GetFromJsonAsync<MonitoringMessageIndexPage>(
+            $"/api/monitoring/v1/messages?{string.Join('&', parameters)}",
+            cancellationToken).ConfigureAwait(false);
+    }
 
     public async Task<IReadOnlyList<MonitoringObservationRecord>> GetMessageObservations(
         string messageId,

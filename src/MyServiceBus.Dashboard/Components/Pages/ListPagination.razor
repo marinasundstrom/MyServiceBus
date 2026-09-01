@@ -1,0 +1,36 @@
+@if (Total > 0)
+{
+    <nav class="list-pagination" aria-label="List pages">
+        <span>Showing @(Offset + 1)–@Math.Min(Offset + ItemCount, Total) of @Total</span>
+        <div>
+            <button type="button" @onclick="PreviousPageAsync" disabled="@(Disabled || Offset == 0)">← Previous</button>
+            <button type="button" @onclick="NextPageAsync" disabled="@(Disabled || Offset + ItemCount >= Total)">Next →</button>
+        </div>
+    </nav>
+}
+
+@code {
+    [Parameter]
+    public int Offset { get; set; }
+
+    [Parameter]
+    public int PageSize { get; set; }
+
+    [Parameter]
+    public int ItemCount { get; set; }
+
+    [Parameter]
+    public int Total { get; set; }
+
+    [Parameter]
+    public bool Disabled { get; set; }
+
+    [Parameter]
+    public EventCallback<int> PageChanged { get; set; }
+
+    private Task PreviousPageAsync()
+        => PageChanged.InvokeAsync(Math.Max(0, Offset - PageSize));
+
+    private Task NextPageAsync()
+        => PageChanged.InvokeAsync(Offset + PageSize);
+}

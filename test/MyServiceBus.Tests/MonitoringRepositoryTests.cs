@@ -1222,6 +1222,16 @@ public class MonitoringRepositoryTests
         message.ObservationCount.ShouldBe(2);
         message.MessageBodyStatus.ShouldBe("captured");
 
+        var secondPage = repository.GetMessageIndex(null, null, null, 1, 1);
+        secondPage.Offset.ShouldBe(1);
+        secondPage.Limit.ShouldBe(1);
+        secondPage.Total.ShouldBe(2);
+        secondPage.Messages.Select(item => item.MessageId).ShouldBe(["message-1"]);
+
+        var filteredPage = repository.GetMessageIndex("payments", "handled", "SubmitOrder", 0, 25);
+        filteredPage.Total.ShouldBe(1);
+        filteredPage.Messages.Single().MessageId.ShouldBe("message-1");
+
         var timeline = repository.GetMessageObservations("message-1");
         timeline.Select(record => record.Observation.MessageId).ShouldBe(["message-1", "message-1", "message-2"]);
     }

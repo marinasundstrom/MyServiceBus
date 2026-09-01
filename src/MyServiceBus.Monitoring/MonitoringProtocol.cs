@@ -592,6 +592,12 @@ public sealed record MonitoringMessageSummary(
     string? CausationMessageId,
     string? MessageBodyStatus);
 
+public sealed record MonitoringMessageIndexPage(
+    int Offset,
+    int Limit,
+    int Total,
+    IReadOnlyList<MonitoringMessageSummary> Messages);
+
 public sealed record MonitoringFlowEdge(
     string SourceApplication,
     string TargetApplication,

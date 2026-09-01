@@ -81,13 +81,12 @@
                 </a>
             }
         </div>
-        <div class="workflow-run-pagination">
-            <span>Showing @(page.Offset + 1)–@Math.Min(page.Offset + page.Runs.Count, page.Total) of @(page.Total)</span>
-            <div>
-                <button type="button" @onclick="PreviousPageAsync" disabled="@(loading || page.Offset == 0)">← Previous</button>
-                <button type="button" @onclick="NextPageAsync" disabled="@(loading || page.Offset + page.Runs.Count >= page.Total)">Next →</button>
-            </div>
-        </div>
+        <ListPagination Offset="page.Offset"
+                        PageSize="page.Limit"
+                        ItemCount="page.Runs.Count"
+                        Total="page.Total"
+                        Disabled="loading"
+                        PageChanged="LoadPageAsync" />
     }
 </section>
 
@@ -178,12 +177,6 @@
             parameters.Add($"search={Uri.EscapeDataString(search.Trim())}");
         Navigation.NavigateTo(parameters.Count == 0 ? "/workflows" : $"/workflows?{string.Join("&", parameters)}", replace: true);
     }
-
-    private Task PreviousPageAsync()
-        => LoadPageAsync(Math.Max(0, (CurrentPage?.Offset ?? 0) - PageSize));
-
-    private Task NextPageAsync()
-        => LoadPageAsync((CurrentPage?.Offset ?? 0) + PageSize);
 
     private async Task LoadPageAsync(int offset)
     {

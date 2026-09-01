@@ -2,6 +2,8 @@
 @rendermode InteractiveServer
 @inherits MonitoringPageBase
 @inject Microsoft.Extensions.Options.IOptions<DashboardOptions> Options
+@inject MonitoringApiClient Api
+@inject NavigationManager Navigation
 
 <PageTitle>Messages · MyServiceBus Monitoring</PageTitle>
 <DashboardPageHeader Eyebrow="Development diagnostics" Title="Messages" Description="Inspect individual messages and exact lifecycle evidence. Identities and bodies appear only when the exporting service and collector disclosure policy permit them." />
@@ -15,25 +17,26 @@ else
 <section class="panel message-index">
     <div class="section-heading">
         <div><p class="eyebrow">Retained observations</p><h2>Individual messages</h2></div>
-        <span>@FilteredMessages.Count of @MessageSummaries.Count messages</span>
+        <span>@(CurrentPage?.Total ?? 0) retained messages</span>
     </div>
-    <div class="message-filters">
-        <label><span>Search</span><input type="search" placeholder="Message type, ID, or application" @bind="search" @bind:event="oninput" /></label>
-        <label><span>Status</span><select @bind="status"><option value="">All statuses</option><option value="failed">Failed</option><option value="handled">Handled</option><option value="observed">Observed</option></select></label>
-    </div>
+    <form class="message-filters" aria-label="Filter messages" @onsubmit="ApplyFiltersAsync" @onsubmit:preventDefault>
+        <label><span>Search</span><input type="search" placeholder="Message type, ID, or application" @bind="search" /></label>
+        <label><span>Status</span><select @bind="status" @bind:after="FilterChangedAsync"><option value="all">All statuses</option><option value="failed">Failed</option><option value="handled">Handled</option><option value="observed">Observed</option></select></label>
+        <button type="submit" class="workflow-filter-action" disabled="@loading">Search</button>
+        @if (FiltersApplied)
+        {
+            <button type="button" class="workflow-filter-reset" @onclick="ClearFiltersAsync" disabled="@loading">Clear</button>
+        }
+    </form>
 
-    @if (MessageSummaries.Count == 0)
+    @if (CurrentPage is not { } page || page.Messages.Count == 0)
     {
-        <p class="panel-empty">No retained observations contain a message identity. Enable message-identity capture in the exporting application to inspect individual messages.</p>
-    }
-    else if (FilteredMessages.Count == 0)
-    {
-        <p class="panel-empty">No messages match the current filters.</p>
+        <p class="panel-empty">@(FiltersApplied ? "No messages match the current filters." : "No retained observations contain a message identity. Enable message-identity capture in the exporting application to inspect individual messages.")</p>
     }
     else
     {
         <div class="message-list">
-            @foreach (var message in FilteredMessages)
+            @foreach (var message in page.Messages)
             {
                 <a class="message-list-item @message.Status" href="@($"/messages/{Uri.EscapeDataString(message.MessageId)}")">
                     <span class="run-status @(message.Status == "failed" ? "faulted" : message.Status == "handled" ? "terminal_observed" : null)"></span>
@@ -45,24 +48,105 @@ else
                 </a>
             }
         </div>
+        <ListPagination Offset="page.Offset"
+                        PageSize="page.Limit"
+                        ItemCount="page.Messages.Count"
+                        Total="page.Total"
+                        Disabled="loading"
+                        PageChanged="LoadPageAsync" />
     }
 </section>
 }
 
 @code {
+    private const int PageSize = 25;
+    private static readonly HashSet<string> SupportedStatuses = ["failed", "handled", "observed"];
+
+    [SupplyParameterFromQuery(Name = "status")]
+    public string? StatusQuery { get; set; }
+
+    [SupplyParameterFromQuery(Name = "search")]
+    public string? SearchQuery { get; set; }
+
     private string search = string.Empty;
-    private string status = string.Empty;
+    private string status = "all";
+    private MonitoringMessageIndexPage? queriedPage;
+    private bool loading;
+    private string? appliedQueryKey;
 
-    private IReadOnlyList<MonitoringMessageSummary> MessageSummaries => Dashboard.Messages;
+    private MonitoringMessageIndexPage? CurrentPage => queriedPage ?? Dashboard.MessageIndex;
+    private bool FiltersApplied => status != "all" || !string.IsNullOrWhiteSpace(search);
 
-    private IReadOnlyList<MonitoringMessageSummary> FilteredMessages
-        => MessageSummaries.Where(message =>
-                (string.IsNullOrWhiteSpace(status) || message.Status == status)
-                && (string.IsNullOrWhiteSpace(search)
-                    || message.MessageId.Contains(search, StringComparison.OrdinalIgnoreCase)
-                    || (message.MessageType?.Contains(search, StringComparison.OrdinalIgnoreCase) ?? false)
-                    || message.ParticipantApplications.Any(application => application.Contains(search, StringComparison.OrdinalIgnoreCase))))
-            .ToArray();
+    protected override async Task OnParametersSetAsync()
+    {
+        var requestedStatus = StatusQuery is not null && SupportedStatuses.Contains(StatusQuery)
+            ? StatusQuery
+            : "all";
+        var requestedSearch = SearchQuery?.Trim() ?? string.Empty;
+        var queryKey = $"{requestedStatus}\u001f{requestedSearch}";
+        if (string.Equals(queryKey, appliedQueryKey, StringComparison.Ordinal))
+            return;
+
+        appliedQueryKey = queryKey;
+        status = requestedStatus;
+        search = requestedSearch;
+        if (!FiltersApplied)
+        {
+            queriedPage = null;
+            return;
+        }
+
+        await LoadPageAsync(0);
+    }
+
+    private Task ApplyFiltersAsync()
+    {
+        NavigateToFilters();
+        return Task.CompletedTask;
+    }
+
+    private Task FilterChangedAsync()
+    {
+        NavigateToFilters();
+        return Task.CompletedTask;
+    }
+
+    private Task ClearFiltersAsync()
+    {
+        search = string.Empty;
+        status = "all";
+        Navigation.NavigateTo("/messages", replace: true);
+        return Task.CompletedTask;
+    }
+
+    private void NavigateToFilters()
+    {
+        var parameters = new List<string>();
+        if (status != "all")
+            parameters.Add($"status={Uri.EscapeDataString(status)}");
+        if (!string.IsNullOrWhiteSpace(search))
+            parameters.Add($"search={Uri.EscapeDataString(search.Trim())}");
+        Navigation.NavigateTo(parameters.Count == 0 ? "/messages" : $"/messages?{string.Join("&", parameters)}", replace: true);
+    }
+
+    private async Task LoadPageAsync(int offset)
+    {
+        loading = true;
+        try
+        {
+            queriedPage = await Api.GetMessages(
+                null,
+                status == "all" ? null : status,
+                search,
+                offset,
+                PageSize,
+                CancellationToken.None);
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
 
     private static string StatusLabel(string value) => value switch
     {

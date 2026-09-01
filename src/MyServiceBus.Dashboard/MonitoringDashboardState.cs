@@ -41,7 +41,7 @@ public sealed class MonitoringDashboardState : IAsyncDisposable
     public MonitoringWorkflowRunPage? WorkflowRuns { get; private set; }
     public MonitoringWorkflowRunIndexPage? WorkflowRunIndex { get; private set; }
     public IReadOnlyList<MonitoringObservationRecord> Observations { get; private set; } = [];
-    public IReadOnlyList<MonitoringMessageSummary> Messages { get; private set; } = [];
+    public MonitoringMessageIndexPage? MessageIndex { get; private set; }
     public IReadOnlyList<MonitoringOutboxDispatcherSummary> OutboxDispatchers { get; private set; } = [];
     public IReadOnlyList<MonitoringScheduledWorkSummary> ScheduledWork { get; private set; } = [];
     public IReadOnlyList<MonitoringRecurringJobSummary> RecurringJobs { get; private set; } = [];
@@ -153,8 +153,8 @@ public sealed class MonitoringDashboardState : IAsyncDisposable
             var timeSeries = api.GetTimeSeries(stopping.Token);
             var observations = api.GetRecentObservations(stopping.Token);
             var messages = options.Features.Messages
-                ? api.GetMessages(stopping.Token)
-                : Task.FromResult<IReadOnlyList<MonitoringMessageSummary>>([]);
+                ? api.GetMessages(null, null, null, 0, 25, stopping.Token)
+                : Task.FromResult<MonitoringMessageIndexPage?>(null);
             var outboxDispatchers = api.GetOutboxDispatchers(stopping.Token);
             var scheduledWork = api.GetScheduledWork(stopping.Token);
             var recurringJobs = api.GetRecurringJobs(stopping.Token);
@@ -201,7 +201,7 @@ public sealed class MonitoringDashboardState : IAsyncDisposable
             WorkflowRunIndex = workflowRunIndex.Result;
             TimeSeries = timeSeries.Result;
             Observations = observations.Result;
-            Messages = messages.Result;
+            MessageIndex = messages.Result;
             OutboxDispatchers = outboxDispatchers.Result;
             ScheduledWork = scheduledWork.Result;
             RecurringJobs = recurringJobs.Result;
