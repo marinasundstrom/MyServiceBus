@@ -292,7 +292,7 @@ Canonical fixtures should prove that C# and Java serialize equivalent fragments 
 - conflicting definition versions; and
 - canonical ordering and stable identities.
 
-The executable choreography sample should first reuse the mixed C# and Java monitoring environment and demonstrate both a healthy path and deliberately unhealthy paths for missing routing, a bounded timeout expectation, and unexpected amplification. A dedicated Aspire workflow application becomes more valuable with the orchestration runtime, when it can demonstrate persisted saga state, timeouts, recovery, and Dashboard state-machine views. That later environment should also include an event leaving the orchestrator boundary for a choreographed reaction, proving that both coordination relationships can coexist.
+The first executable choreography sample reuses the mixed C# and Java monitoring environment. Both applications register separately owned reactions under one `sample-order-submission` definition, matching their real `SubmitOrder` to `OrderSubmitted` publication and terminal observation behavior. The initial sample proves cross-language declaration merging and the Dashboard definition map. Later diagnostic slices should extend it with deliberately unhealthy paths for missing routing, a bounded timeout expectation, and unexpected amplification. A dedicated Aspire workflow application becomes more valuable with the orchestration runtime, when it can demonstrate persisted saga state, timeouts, recovery, and Dashboard state-machine views. That later environment should also include an event leaving the orchestrator boundary for a choreographed reaction, proving that both coordination relationships can coexist.
 
 ## Recommended Delivery Sequence
 

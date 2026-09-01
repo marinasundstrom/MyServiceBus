@@ -916,6 +916,8 @@ Use `sends`, `publishes`, `responds`, `schedules`, or `terminates` to describe a
 
 When runtime monitoring is enabled, `GET /api/monitoring/v1/choreographies` merges the fragments reported by participating applications. Identical declarations from replicas collapse into one fragment view with reporting and online instance counts. The Dashboard's **Workflows** page renders those declarations by application, consumed trigger, output, and matching downstream participant. Definition-version, owner, and step-ownership disagreement remains visible as configuration evidence; neither the query nor the map executes the choreography or claims that a business workflow has run or failed.
 
+The repository's mixed Aspire sample registers the same `sample-order-submission` choreography from its C# and Java applications. Each application owns two distinct reaction steps matching its real consumers: `SubmitOrder` publishes `OrderSubmitted`, and `OrderSubmitted` is a terminal observation. This deliberately demonstrates decentralized fan-out rather than inventing a coordinator. Run the Aspire stack, open the MyServiceBus monitoring dashboard, and select **Workflows** to see both application-owned fragments merged under one definition. Use either sample application's `/publish` route to produce the corresponding observed message activity; the definition map itself remains stable whether or not traffic is currently flowing.
+
 ---
 
 ### Configuration

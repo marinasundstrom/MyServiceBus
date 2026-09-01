@@ -6,6 +6,7 @@ using System.Linq;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Logging;
+using MyServiceBus.Choreography;
 using MyServiceBus.Monitoring;
 using MyServiceBus.Generated;
 using OpenTelemetry.Trace;
@@ -18,6 +19,14 @@ builder.Services.AddScoped<GeneratedConsumerAudit>();
 builder.Services.AddServiceBus(x =>
 {
     x.AddGeneratedConsumers();
+    x.AddChoreography(new ChoreographyBuilder("sample-order-submission", "1", "TestApp.CSharp")
+        .Step<SubmitOrder>("csharp-submit-order", step => step
+            .OwnedBy<SubmitOrderConsumer>()
+            .Publishes<OrderSubmitted>())
+        .Step<OrderSubmitted>("csharp-order-submitted", step => step
+            .OwnedBy<OrderSubmittedConsumer>()
+            .Terminates())
+        .Build());
     x.AddJobConsumer<DemoTrackedJobConsumer, DemoTrackedJob>(options => options
         .SetJobTypeName("sample-report")
         .SetConcurrentJobLimit(2)

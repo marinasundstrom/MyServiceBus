@@ -4,6 +4,7 @@ This changelog summarizes the bigger themes in the repository history rather tha
 
 ## Unreleased
 
+- Added an executable cross-language choreography sample to the existing Aspire environment. The C# and Java applications declare separately owned `SubmitOrder` to `OrderSubmitted` reactions under one definition, allowing the monitoring service and Workflows page to demonstrate merged decentralized intent over real sample consumers.
 - Added the first declared-workflow Dashboard view. It groups choreography reactions by application, connects triggers to outputs and matching downstream participants, and exposes definition versions, conflicts, replica availability, and freshness without presenting declarations as observed execution or authoritative workflow state.
 - Documented future workflow-pattern discovery for monitoring: recurring causal paths may be presented as explicitly inferred coordination candidates, while new branches, participants, contracts, cycles, or fan-out can be visualized as baseline deviations without claiming a formal workflow or automatic failure.
 - Added a read-only declared-choreography monitoring query that merges registered fragments across applications, collapses identical replica declarations, retains freshness and availability, and reports definition-version, owner, and step-ownership conflicts without changing message delivery or inferring workflow failure.
