@@ -114,13 +114,41 @@
 
 @code {
     private const int PageSize = 25;
+    private static readonly HashSet<string> SupportedStatuses =
+    [
+        "live", "terminal_observed", "faulted", "no_recent_activity", "active", "completed", "not-present"
+    ];
+
+    [SupplyParameterFromQuery(Name = "status")]
+    public string? StatusQuery { get; set; }
+
     private string search = string.Empty;
     private string typeFilter = "all";
     private string statusFilter = "all";
     private MonitoringWorkflowRunIndexPage? queriedPage;
     private bool loading;
+    private string? appliedQueryStatus;
 
     private MonitoringWorkflowRunIndexPage? CurrentPage => queriedPage ?? Dashboard.WorkflowRunIndex;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var requestedStatus = StatusQuery is not null && SupportedStatuses.Contains(StatusQuery)
+            ? StatusQuery
+            : "all";
+        if (string.Equals(requestedStatus, appliedQueryStatus, StringComparison.Ordinal))
+            return;
+
+        appliedQueryStatus = requestedStatus;
+        statusFilter = requestedStatus;
+        if (requestedStatus == "all")
+        {
+            queriedPage = null;
+            return;
+        }
+
+        await LoadPageAsync(0);
+    }
 
     private Task ApplyFiltersAsync() => LoadPageAsync(0);
 
