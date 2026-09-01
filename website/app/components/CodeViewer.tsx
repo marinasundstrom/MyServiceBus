@@ -20,7 +20,7 @@ export default function CodeViewer({ code, language, label, height }: CodeViewer
   return (
     <div className="monaco-viewer" style={{ height: editorHeight }}>
       <MonacoEditor
-        defaultLanguage={language}
+        language={language}
         height="100%"
         options={{
           accessibilitySupport: 'auto',
