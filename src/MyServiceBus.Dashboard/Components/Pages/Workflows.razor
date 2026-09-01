@@ -12,32 +12,61 @@
             <p class="eyebrow">Shared catalog</p>
             <h2>Declared workflows</h2>
         </div>
-        <span>@Dashboard.WorkflowCatalog.Count definitions · choreography and saga records remain separate</span>
+        <span>@FilteredWorkflows.Count of @Dashboard.WorkflowCatalog.Count definitions</span>
+    </div>
+    <div class="workflow-catalog-filters" aria-label="Filter declared workflows">
+        <label>
+            <span>Search</span>
+            <input type="search" placeholder="Workflow or owner" @bind="search" @bind:event="oninput" />
+        </label>
+        <label>
+            <span>Type</span>
+            <select @bind="kindFilter">
+                <option value="all">All types</option>
+                <option value="choreography">Choreography</option>
+                <option value="saga">Saga / orchestration</option>
+            </select>
+        </label>
+        @if (FiltersApplied)
+        {
+            <button type="button" class="workflow-filter-reset" @onclick="ClearFilters">Clear</button>
+        }
     </div>
     @if (Dashboard.WorkflowCatalog.Count == 0)
     {
         <div class="panel-empty">Applications appear here after they export choreography fragments or saga state-machine definitions.</div>
     }
+    else if (FilteredWorkflows.Count == 0)
+    {
+        <div class="panel-empty">No declared workflows match the current filters.</div>
+    }
     else
     {
-        <div class="table-wrap">
-            <table>
-                <thead><tr><th>Workflow</th><th>Kind</th><th>Versions</th><th>Ownership</th><th>Availability</th><th>Observed runs</th><th></th></tr></thead>
-                <tbody>
-                @foreach (var workflow in Dashboard.WorkflowCatalog)
-                {
-                    <tr>
-                        <td><strong>@workflow.WorkflowId</strong><small>@AuthorityLabel(workflow.LifecycleAuthority)</small></td>
-                        <td>@KindLabel(workflow.Kind)</td>
-                        <td>@string.Join(", ", workflow.DefinitionVersions)</td>
-                        <td>@string.Join(", ", workflow.Owners)</td>
-                        <td>@workflow.OnlineInstanceCount/@workflow.ReportingInstanceCount online</td>
-                        <td>@workflow.ObservedRunCount</td>
-                        <td><a class="section-link" href="@DefinitionHref(workflow)">View definition →</a></td>
-                    </tr>
-                }
-                </tbody>
-            </table>
+        <div class="workflow-declaration-list" role="list">
+            @foreach (var workflow in FilteredWorkflows)
+            {
+                <a class="workflow-declaration-list-item" href="@DefinitionHref(workflow)" role="listitem">
+                    <div class="workflow-declaration-identity">
+                        <strong>@workflow.WorkflowId</strong>
+                        <small>@AuthorityLabel(workflow.LifecycleAuthority)</small>
+                    </div>
+                    <span class="workflow-kind @workflow.Kind">@KindLabel(workflow.Kind)</span>
+                    <div>
+                        <strong>@string.Join(", ", workflow.Owners)</strong>
+                        <small>@ParticipationLabel(workflow) · version @string.Join(", ", workflow.DefinitionVersions)</small>
+                    </div>
+                    <div class="workflow-declaration-availability">
+                        <span class="status-dot @(workflow.OnlineInstanceCount > 0 ? "online" : "offline")"></span>
+                        <strong>@workflow.OnlineInstanceCount/@workflow.ReportingInstanceCount online</strong>
+                        <small>@workflow.ObservedRunCount observed @(workflow.ObservedRunCount == 1 ? "run" : "runs")</small>
+                    </div>
+                    @if (workflow.ConflictKinds.Count > 0)
+                    {
+                        <span class="workflow-conflict">@workflow.ConflictKinds.Count @(workflow.ConflictKinds.Count == 1 ? "conflict" : "conflicts")</span>
+                    }
+                    <span class="workflow-run-list-arrow" aria-hidden="true">→</span>
+                </a>
+            }
         </div>
     }
 </section>
@@ -48,7 +77,32 @@
 </div>
 
 @code {
+    private string search = string.Empty;
+    private string kindFilter = "all";
+
+    private IReadOnlyList<MonitoringWorkflowCatalogItem> FilteredWorkflows
+        => Dashboard.WorkflowCatalog
+            .Where(workflow => kindFilter == "all" || string.Equals(workflow.Kind, kindFilter, StringComparison.Ordinal))
+            .Where(workflow => string.IsNullOrWhiteSpace(search)
+                || workflow.WorkflowId.Contains(search, StringComparison.OrdinalIgnoreCase)
+                || workflow.Owners.Any(owner => owner.Contains(search, StringComparison.OrdinalIgnoreCase)))
+            .OrderBy(workflow => workflow.WorkflowId, StringComparer.Ordinal)
+            .ToArray();
+
+    private bool FiltersApplied => kindFilter != "all" || !string.IsNullOrWhiteSpace(search);
+
+    private void ClearFilters()
+    {
+        search = string.Empty;
+        kindFilter = "all";
+    }
+
     private static string KindLabel(string kind) => kind == "saga" ? "Saga / orchestration" : "Choreography";
+
+    private static string ParticipationLabel(MonitoringWorkflowCatalogItem workflow)
+        => workflow.Kind == "saga"
+            ? "Orchestrator"
+            : $"{workflow.ParticipantCount} {(workflow.ParticipantCount == 1 ? "participant" : "participants")}";
 
     private static string AuthorityLabel(string authority)
         => authority == "committed_transition_evidence" ? "Committed transition evidence" : "Reconstructed evidence";
