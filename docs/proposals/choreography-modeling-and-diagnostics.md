@@ -37,6 +37,10 @@ The normalized fragment is the common semantic and operations model, not a requi
 
 The authoring layers may improve upon the current builder without changing the portable model. MyServiceBus can draw from established event-driven, workflow, statechart, and language-native API designs without inheriting another library's historical overloads, inheritance constraints, or source-compatibility burden. C# may use fluent expressions, attributes, generated declarations, or consumer-attached configuration where those fit naturally; Java may use builders, annotations, processors, or other JVM conventions. Equivalent semantics and normalized output matter more than textual symmetry.
 
+The current portable domain model calls one locally owned reaction a `Step`. A step identifies its triggering message, owning application or consumer component, and declared outgoing operations plus expectations. It is descriptive context around ordinary consumer execution; it is not an executable workflow node and has no framework-owned instance or state.
+
+That differs deliberately from the saga model's `Activity`. A state-machine activity is an ordered executable behavior with access to the triggering message and saga instance—for example mutate, send, publish, transition, or finalize. MassTransit's routing-slip activity is another distinct concept with arguments, execution results, and compensation. A future choreography authoring API may use an activity-like vocabulary to describe the consumer operation and its local context, but it must lower to the same declarative step/output model unless an explicitly separate execution feature is designed. Naming alone must not turn choreography into a hidden coordinator or routing-slip engine.
+
 The first feature should include:
 
 - portable declarations of trigger-to-output relationships;

@@ -1,0 +1,141 @@
+@page "/workflows/sagas/{StateMachineId}/{CorrelationId}"
+@rendermode InteractiveServer
+@inherits MonitoringPageBase
+@inject MonitoringApiClient Api
+
+<PageTitle>Saga Run · MyServiceBus Monitoring</PageTitle>
+<DashboardPageHeader Eyebrow="Coordination" Title="Saga run" Description="Inspect one saga instance using its committed repository state and payload-free delivery history." />
+<WorkflowTabs Active="runs" />
+
+@if (loading)
+{
+    <section class="empty-state"><h2>Loading saga instance</h2></section>
+}
+else if (instance is null)
+{
+    <section class="empty-state">
+        <h2>Saga instance not available</h2>
+        <p>This instance is outside the bounded monitoring observation window, or its identity is no longer present.</p>
+        <a class="section-link" href="/workflows">← Back to workflow runs</a>
+    </section>
+}
+else
+{
+    <div class="workflow-run-breadcrumb"><a href="/workflows">Workflow runs</a><span>→</span><strong>@instance.StateMachineId</strong></div>
+    <section class="panel workflow-run-detail">
+        <div class="workflow-run-outcome @OutcomeClass(instance)" role="status">
+            <span class="run-status @OutcomeClass(instance)"></span>
+            <div>
+                <p class="eyebrow">Saga / orchestration · committed transition evidence</p>
+                <h2>@OutcomeTitle(instance)</h2>
+                <p>The current state comes from committed saga deliveries. Failed deliveries remain visible but do not create transitions.</p>
+            </div>
+            <dl>
+                <div><dt>State machine</dt><dd>@instance.StateMachineId</dd></div>
+                <div><dt>Instance</dt><dd>@Abbreviate(instance.CorrelationId)</dd></div>
+                <div><dt>Current state</dt><dd>@instance.CurrentState</dd></div>
+                <div><dt>Status</dt><dd>@DisplayKind(instance.Status)</dd></div>
+                <div><dt>Deliveries</dt><dd>@instance.Transitions.Count</dd></div>
+                <div><dt>Application</dt><dd>@instance.ApplicationName</dd></div>
+            </dl>
+        </div>
+
+        @if (Definition is { } definition)
+        {
+            <div class="workflow-run-structure-note">Definition @definition.DefinitionVersion · owner @definition.Owner · endpoint @DefinitionDeployment?.EndpointName</div>
+            <div class="workflow-run-flow" aria-label="Declared saga state machine">
+                @foreach (var state in DeclaredStates(definition))
+                {
+                    <article class="workflow-run-step @(state == instance.CurrentState ? "live" : null)">
+                        <header><span>State</span><strong>@state</strong></header>
+                        <div class="workflow-run-step-body">
+                            <p>@(state == instance.CurrentState ? "Current committed state" : "Declared state")</p>
+                        </div>
+                    </article>
+                }
+            </div>
+        }
+
+        <div class="workflow-run-flow" aria-label="Committed saga delivery history">
+            @for (var index = 0; index < instance.Transitions.Count; index++)
+            {
+                var transition = instance.Transitions[index];
+                @if (index > 0) { <div class="workflow-run-connector" aria-hidden="true">→</div> }
+                <article class="workflow-run-step @(transition.Succeeded ? null : "faulted")">
+                    <header>
+                        <span>Delivery @(index + 1)</span>
+                        <strong>@transition.EventId</strong>
+                        <small>@transition.OccurredAtUtc.ToLocalTime().ToString("HH:mm:ss.fff")</small>
+                    </header>
+                    <div class="workflow-run-step-body">
+                        <span class="workflow-run-contract">@StateLabel(transition.BeginState) → <strong>@StateLabel(transition.EndState)</strong></span>
+                        <h4>@DisplayKind(transition.DeliveryStatus)</h4>
+                        <dl>
+                            <div><dt>Duration</dt><dd>@FormatDuration(transition.DurationMs)</dd></div>
+                            <div><dt>Commit</dt><dd>@(transition.Succeeded ? "Committed" : "No transition committed")</dd></div>
+                            @if (transition.Created) { <div><dt>Instance</dt><dd>Created</dd></div> }
+                            @if (transition.Completed) { <div><dt>Completion</dt><dd>Finalized</dd></div> }
+                        </dl>
+                        @if (!string.IsNullOrWhiteSpace(transition.ExceptionType))
+                        {
+                            <div class="workflow-run-failure">@transition.ExceptionType@if (!string.IsNullOrWhiteSpace(transition.ExceptionMessage)) {<text>: @transition.ExceptionMessage</text>}</div>
+                        }
+                    </div>
+                </article>
+            }
+        </div>
+        <footer>Instance identity @instance.CorrelationId · payload fields are not exported · transition history is currently bounded monitoring data.</footer>
+    </section>
+}
+
+@code {
+    [Parameter] public string StateMachineId { get; set; } = string.Empty;
+    [Parameter] public string CorrelationId { get; set; } = string.Empty;
+
+    private MonitoringSagaInstance? instance;
+    private bool loading = true;
+
+    private MonitoringDeclaredSagaStateMachineDeployment? DefinitionDeployment
+        => Dashboard.Sagas.SelectMany(saga => saga.Deployments)
+            .FirstOrDefault(deployment => string.Equals(
+                deployment.Definition.StateMachineId,
+                StateMachineId,
+                StringComparison.Ordinal));
+
+    private MyServiceBus.Orchestration.SagaStateMachineDefinition? Definition => DefinitionDeployment?.Definition;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        loading = true;
+        try
+        {
+            instance = await Api.GetSagaInstance(
+                Uri.UnescapeDataString(StateMachineId),
+                Uri.UnescapeDataString(CorrelationId),
+                CancellationToken.None);
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private static IEnumerable<string> DeclaredStates(MyServiceBus.Orchestration.SagaStateMachineDefinition definition)
+        => new[] { MyServiceBus.Orchestration.SagaStateMachineDefinition.InitialState }
+            .Concat(definition.States.Select(state => state.Id))
+            .Append(MyServiceBus.Orchestration.SagaStateMachineDefinition.FinalState);
+
+    private static string OutcomeClass(MonitoringSagaInstance value)
+        => !value.LastDeliverySucceeded ? "faulted" : value.Status;
+
+    private static string OutcomeTitle(MonitoringSagaInstance value)
+        => !value.LastDeliverySucceeded ? "The latest delivery failed" : value.Status switch
+        {
+            "completed" => "Saga completed",
+            "active" => "Saga is active",
+            _ => "Saga instance is not present"
+        };
+
+    private static string StateLabel(string? state) => string.IsNullOrWhiteSpace(state) ? "No committed state" : state;
+    private static string Abbreviate(string value) => value.Length <= 16 ? value : $"{value[..8]}…{value[^4..]}";
+}

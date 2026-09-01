@@ -616,6 +616,10 @@ public sealed class MonitoringRepository
             .ToArray();
     }
 
+    public MonitoringSagaInstance? GetSagaInstance(string stateMachineId, string correlationId)
+        => GetSagaInstances(stateMachineId, null).FirstOrDefault(instance =>
+            string.Equals(instance.CorrelationId, correlationId, StringComparison.OrdinalIgnoreCase));
+
     private static string SagaProperty(MonitoringObservationRecord record, string name)
         => record.Observation.Properties![name];
 
@@ -635,6 +639,118 @@ public sealed class MonitoringRepository
             && record.Observation.Properties.TryGetValue(name, out var value)
             && bool.TryParse(value, out var parsed)
             && parsed;
+
+    public IReadOnlyList<MonitoringWorkflowCatalogItem> GetWorkflowCatalog(DateTimeOffset now)
+    {
+        var choreographyItems = GetDeclaredChoreographies(now).Select(choreography =>
+        {
+            var reportingInstances = choreography.Fragments.Sum(fragment => fragment.ReportingInstances);
+            var onlineInstances = choreography.Fragments.Sum(fragment => fragment.OnlineInstances);
+            return new MonitoringWorkflowCatalogItem(
+                choreography.ChoreographyId,
+                "choreography",
+                "reconstructed_evidence",
+                choreography.DefinitionVersions,
+                choreography.Fragments.Select(fragment => fragment.Owner)
+                    .Distinct(StringComparer.Ordinal).OrderBy(owner => owner, StringComparer.Ordinal).ToArray(),
+                choreography.ConflictKinds,
+                choreography.Fragments.Count,
+                reportingInstances,
+                onlineInstances,
+                workflowRuns.Values.Count(run => string.Equals(
+                    run.ChoreographyId,
+                    choreography.ChoreographyId,
+                    StringComparison.Ordinal)),
+                choreography.LastCapturedAtUtc);
+        });
+        var sagaItems = GetDeclaredSagaStateMachines(now).Select(stateMachine =>
+        {
+            var instances = GetSagaInstances(stateMachine.StateMachineId, null);
+            return new MonitoringWorkflowCatalogItem(
+                stateMachine.StateMachineId,
+                "saga",
+                "committed_transition_evidence",
+                stateMachine.DefinitionVersions,
+                stateMachine.Deployments.Select(deployment => deployment.Owner)
+                    .Distinct(StringComparer.Ordinal).OrderBy(owner => owner, StringComparer.Ordinal).ToArray(),
+                stateMachine.ConflictKinds,
+                stateMachine.Deployments.Select(deployment => deployment.ApplicationName)
+                    .Distinct(StringComparer.Ordinal).Count(),
+                stateMachine.Deployments.Sum(deployment => deployment.InstanceCount),
+                stateMachine.Deployments.Sum(deployment => deployment.OnlineInstanceCount),
+                instances.Count,
+                stateMachine.LastCapturedAtUtc);
+        });
+        return choreographyItems.Concat(sagaItems)
+            .OrderBy(item => item.WorkflowId, StringComparer.Ordinal)
+            .ThenBy(item => item.Kind, StringComparer.Ordinal)
+            .ToArray();
+    }
+
+    public MonitoringWorkflowRunIndexPage GetWorkflowRunIndex(
+        string? workflowId,
+        string? kind,
+        string? status,
+        string? search,
+        int offset,
+        int limit,
+        DateTimeOffset now)
+    {
+        PruneWorkflowRuns(now - workflowRunRetention);
+        var choreographyRuns = workflowRuns.Values
+            .Select(run => WithCurrentStatus(run, now))
+            .Select(run => new MonitoringWorkflowRunSummary(
+                run.ChoreographyId,
+                run.RunId,
+                "choreography",
+                run.LifecycleAuthority,
+                run.Status,
+                run.StartedAtUtc,
+                run.LastActivityAtUtc,
+                run.ObservedDurationMs,
+                run.Steps.Count,
+                null,
+                run.EvidenceComplete,
+                run.Status == "faulted",
+                run.RunId));
+        var sagaRuns = GetSagaInstances(null, null)
+            .Select(instance => new MonitoringWorkflowRunSummary(
+                instance.StateMachineId,
+                $"saga:{instance.StateMachineId}:{instance.CorrelationId}",
+                "saga",
+                "committed_transition_evidence",
+                instance.LastDeliverySucceeded ? instance.Status : "faulted",
+                instance.StartedAtUtc,
+                instance.LastActivityAtUtc,
+                Math.Max(0, (instance.LastActivityAtUtc - instance.StartedAtUtc).TotalMilliseconds),
+                instance.Transitions.Count,
+                instance.CurrentState,
+                null,
+                instance.Transitions.Any(transition => !transition.Succeeded),
+                instance.CorrelationId));
+        var query = choreographyRuns.Concat(sagaRuns)
+            .Where(run => string.IsNullOrWhiteSpace(workflowId)
+                || string.Equals(run.WorkflowId, workflowId, StringComparison.Ordinal))
+            .Where(run => string.IsNullOrWhiteSpace(kind)
+                || string.Equals(run.Kind, kind, StringComparison.OrdinalIgnoreCase))
+            .Where(run => string.IsNullOrWhiteSpace(status)
+                || string.Equals(run.Status, status, StringComparison.OrdinalIgnoreCase))
+            .Where(run => string.IsNullOrWhiteSpace(search)
+                || run.WorkflowId.Contains(search, StringComparison.OrdinalIgnoreCase)
+                || run.RunId.Contains(search, StringComparison.OrdinalIgnoreCase)
+                || run.DetailIdentity.Contains(search, StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(run => run.LastActivityAtUtc)
+            .ThenBy(run => run.RunId, StringComparer.Ordinal)
+            .ToArray();
+        var boundedOffset = Math.Max(0, offset);
+        var boundedLimit = Math.Clamp(limit, 1, 100);
+        return new MonitoringWorkflowRunIndexPage(
+            boundedOffset,
+            boundedLimit,
+            query.Length,
+            now,
+            query.Skip(boundedOffset).Take(boundedLimit).ToArray());
+    }
 
     public MonitoringChoreographyRuntimeSnapshot GetChoreographyRuntime(int windowSeconds, DateTimeOffset now)
     {

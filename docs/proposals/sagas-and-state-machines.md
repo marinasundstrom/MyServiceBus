@@ -2,7 +2,7 @@
 
 ## Status
 
-Active implementation proposal. The portable version 1 behavior is defined in the [Saga State-Machine Behavior specification](../specs/saga-state-machine-behavior.md), and matching low-level runtimes plus native C# and Java DSL foundations lower to the same canonical definition and execution sequence. Experimental registration now attaches declared events to one bus endpoint, dispatches outgoing work through the active consume context, exports the normalized definition through topology and inspection, and emits payload-free lifecycle observations after repository commit. The collector exposes dedicated definition and bounded instance-transition saga queries. Focused tests and a mixed C#/Java Aspire order workflow demonstrate the vertical slice. Durable lifecycle retention, the Dashboard orchestration view, and durable persistence remain before this is a complete saga feature.
+Active implementation proposal. The portable version 1 behavior is defined in the [Saga State-Machine Behavior specification](../specs/saga-state-machine-behavior.md), and matching low-level runtimes plus native C# and Java DSL foundations lower to the same canonical definition and execution sequence. Experimental registration now attaches declared events to one bus endpoint, dispatches outgoing work through the active consume context, exports the normalized definition through topology and inspection, and emits payload-free lifecycle observations after repository commit. The collector exposes dedicated definition and bounded instance-transition saga queries plus shared workflow catalog and run-index projections. The Dashboard renders saga definitions and an initial committed-transition instance view. Focused tests and a mixed C#/Java Aspire order workflow demonstrate the vertical slice. Durable lifecycle retention, rich state-machine visualization, and durable persistence remain before this is a complete saga feature.
 
 ## Summary
 
@@ -233,7 +233,7 @@ Broker tests should prove that C# and Java services exchange every saga input an
 3. Define the normalized declaration, repository capabilities, topology, and monitoring contracts.
 4. Implement the smallest in-memory C# and Java runtimes with their native library DSLs. **Completed for the fundamental non-bus-integrated profile.**
 5. Complete the usable MVP vertical slice with bus registration and dispatch, ordinary retry/fault behavior, a focused sample, and one Aspire order-orchestration sample. **Completed for the experimental volatile profile.**
-6. Project declarations and instance transitions into topology, monitoring, and an initial Dashboard orchestration view. **Definition topology plus separate bounded definition and instance-transition monitoring queries are implemented; durable retention and Dashboard presentation remain.**
+6. Project declarations and instance transitions into topology, monitoring, and an initial Dashboard orchestration view. **Completed for the bounded monitoring profile: separate saga queries remain authoritative, while shared workflow projections provide navigation without flattening the models. Durable retention and richer graph presentation remain.**
 7. Integrate transactional outbox and durable scheduling.
 8. Add one durable repository provider in each ecosystem and run restart and concurrency gates.
 9. Add requests, scheduled events, composite events, and richer activities through shared fixtures.

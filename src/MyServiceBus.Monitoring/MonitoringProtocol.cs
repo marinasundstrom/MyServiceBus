@@ -295,6 +295,41 @@ public sealed record MonitoringSagaTransition(
     string? ExceptionMessage,
     string? MessageId);
 
+public sealed record MonitoringWorkflowCatalogItem(
+    string WorkflowId,
+    string Kind,
+    string LifecycleAuthority,
+    IReadOnlyList<string> DefinitionVersions,
+    IReadOnlyList<string> Owners,
+    IReadOnlyList<string> ConflictKinds,
+    int ParticipantCount,
+    int ReportingInstanceCount,
+    int OnlineInstanceCount,
+    int ObservedRunCount,
+    DateTimeOffset LastCapturedAtUtc);
+
+public sealed record MonitoringWorkflowRunIndexPage(
+    int Offset,
+    int Limit,
+    int Total,
+    DateTimeOffset CapturedAtUtc,
+    IReadOnlyList<MonitoringWorkflowRunSummary> Runs);
+
+public sealed record MonitoringWorkflowRunSummary(
+    string WorkflowId,
+    string RunId,
+    string Kind,
+    string LifecycleAuthority,
+    string Status,
+    DateTimeOffset StartedAtUtc,
+    DateTimeOffset LastActivityAtUtc,
+    double DurationMs,
+    int EvidenceCount,
+    string? CurrentState,
+    bool? EvidenceComplete,
+    bool HasFailures,
+    string DetailIdentity);
+
 public sealed record MonitoringChoreographyRuntimeSnapshot(
     int WindowSeconds,
     DateTimeOffset WindowStartUtc,

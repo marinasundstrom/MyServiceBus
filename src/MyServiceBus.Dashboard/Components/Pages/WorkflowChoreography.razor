@@ -1,0 +1,192 @@
+@page "/workflows/choreographies/{ChoreographyId}"
+@rendermode InteractiveServer
+@inherits MonitoringPageBase
+
+<PageTitle>Declared Choreography · MyServiceBus Monitoring</PageTitle>
+<DashboardPageHeader Eyebrow="Coordination" Title="Declared choreography" Description="Inspect the participant-owned reactions, declared outputs, connections, and bounded runtime evidence for one choreography." />
+<WorkflowTabs Active="declared" />
+
+@if (Choreography is not { } choreography)
+{
+    <section class="empty-state">
+        <h2>Choreography not available</h2>
+        <p>No exported choreography declaration matches this identity.</p>
+        <a class="section-link" href="/workflows/declared">← Back to declared workflows</a>
+    </section>
+}
+else
+{
+    <div class="workflow-run-breadcrumb"><a href="/workflows/declared">Declared workflows</a><span>→</span><strong>@choreography.ChoreographyId</strong></div>
+    <section class="panel workflow-panel">
+        <div class="section-heading workflow-heading">
+            <div>
+                <p class="eyebrow">Decentralized coordination relationship</p>
+                <h2>@choreography.ChoreographyId</h2>
+                <div class="workflow-badges">
+                    @foreach (var version in choreography.DefinitionVersions)
+                    {
+                        <span class="pill">Version @version</span>
+                    }
+                    @foreach (var conflict in choreography.ConflictKinds)
+                    {
+                        <span class="workflow-conflict">@ConflictLabel(conflict)</span>
+                    }
+                </div>
+            </div>
+            <span>@choreography.Fragments.Count @(choreography.Fragments.Count == 1 ? "participant" : "participants") · captured @choreography.LastCapturedAtUtc.ToLocalTime().ToString("MMM d, HH:mm:ss")</span>
+        </div>
+
+        <div class="workflow-map" aria-label="Declared reactions grouped by application">
+            @foreach (var fragment in choreography.Fragments)
+            {
+                <article class="workflow-participant">
+                    <header>
+                        <div>
+                            <span class="status-dot @(fragment.OnlineInstances > 0 ? "online" : "offline")"></span>
+                            <strong>@fragment.ApplicationName</strong>
+                            @if (!string.Equals(fragment.ApplicationName, fragment.Owner, StringComparison.Ordinal))
+                            {
+                                <small>Owner @fragment.Owner</small>
+                            }
+                        </div>
+                        <span>@fragment.OnlineInstances/@fragment.ReportingInstances online</span>
+                    </header>
+
+                    <div class="workflow-reactions">
+                        @foreach (var step in fragment.Steps)
+                        {
+                            <section class="workflow-reaction">
+                                <div class="workflow-step-label">@step.Id</div>
+                                <div class="workflow-trigger">
+                                    <small>Consumes</small>
+                                    <strong>@ContractLabel(step.TriggerMessageUrn)</strong>
+                                    @if (!string.IsNullOrWhiteSpace(step.OwnerComponent))
+                                    {
+                                        <span>@step.OwnerComponent</span>
+                                    }
+                                </div>
+                                <div class="workflow-arrow" aria-hidden="true">→</div>
+                                <div class="workflow-outputs">
+                                    @for (var outputIndex = 0; outputIndex < step.Outputs.Count; outputIndex++)
+                                    {
+                                        var output = step.Outputs[outputIndex];
+                                        <div class="workflow-output">
+                                            <small>@output.Kind.ToString()</small>
+                                            <strong>@OutputLabel(output.MessageUrn)</strong>
+                                            <span>@OutputDetail(choreography, fragment, step, output)</span>
+                                            @if (RuntimeFor(choreography, fragment, step, outputIndex) is { } runtime)
+                                            {
+                                                <span class="workflow-evidence @(runtime.EvidenceStatus == "exact_causation" ? "observed" : null)">
+                                                    @(runtime.EvidenceStatus == "exact_causation"
+                                                        ? $"Observed {runtime.ObservedCount:N0} times · exact causation"
+                                                        : EvidenceLabel(runtime.EvidenceStatus))
+                                                </span>
+                                            }
+                                        </div>
+                                    }
+                                </div>
+                            </section>
+                        }
+                    </div>
+
+                    <footer>Definition @fragment.DefinitionVersion · last reported @fragment.LastCapturedAtUtc.ToLocalTime().ToString("HH:mm:ss")</footer>
+                </article>
+            }
+        </div>
+    </section>
+
+    <div class="guidance workflow-guidance">
+        <strong>Declared intent with bounded evidence</strong>
+        <span>
+            This definition overlays exact causal send and publish counts from the last @(Dashboard.ChoreographyRuntime?.WindowSeconds / 60 ?? 5) minutes. No evidence is not a failure or authoritative workflow state.
+            @if (Dashboard.ChoreographyRuntime is { Complete: false } coverage)
+            {
+                <text> Coverage is incomplete: @coverage.DroppedObservations observations were dropped or one or more participants are offline.</text>
+            }
+        </span>
+    </div>
+}
+
+@code {
+    [Parameter] public string ChoreographyId { get; set; } = string.Empty;
+
+    private MonitoringDeclaredChoreography? Choreography
+        => Dashboard.Choreographies.FirstOrDefault(choreography => string.Equals(
+            choreography.ChoreographyId,
+            Uri.UnescapeDataString(ChoreographyId),
+            StringComparison.Ordinal));
+
+    private static string ConflictLabel(string conflict) => conflict switch
+    {
+        "definition_version" => "Version conflict",
+        "step_ownership" => "Step ownership conflict",
+        "owner" => "Owner conflict",
+        _ => DisplayKind(conflict)
+    };
+
+    private static string OutputLabel(string? messageUrn)
+        => string.IsNullOrWhiteSpace(messageUrn) ? "Terminal" : ContractLabel(messageUrn);
+
+    private static string ContractLabel(string value) => value.Split('.', ':').Last();
+
+    private static string OutputDetail(
+        MonitoringDeclaredChoreography choreography,
+        MonitoringDeclaredChoreographyFragment sourceFragment,
+        MyServiceBus.Choreography.ChoreographyStep sourceStep,
+        MyServiceBus.Choreography.ChoreographyOutput output)
+    {
+        var details = new List<string>();
+        if (!string.IsNullOrWhiteSpace(output.Destination))
+            details.Add(output.Destination);
+
+        var targets = choreography.Connections
+            .Where(connection => string.Equals(connection.DefinitionVersion, sourceFragment.DefinitionVersion, StringComparison.Ordinal)
+                && string.Equals(connection.SourceApplication, sourceFragment.ApplicationName, StringComparison.Ordinal)
+                && string.Equals(connection.SourceOwner, sourceFragment.Owner, StringComparison.Ordinal)
+                && string.Equals(connection.SourceStepId, sourceStep.Id, StringComparison.Ordinal)
+                && connection.OperationKind == output.Kind
+                && string.Equals(connection.MessageUrn, output.MessageUrn, StringComparison.Ordinal)
+                && string.Equals(connection.Destination, output.Destination, StringComparison.Ordinal))
+            .Select(connection => connection.TargetApplication)
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(application => application, StringComparer.Ordinal)
+            .ToArray();
+        if (targets.Length > 0)
+            details.Add($"declared next: {string.Join(", ", targets)}");
+
+        details.Add(output.Requirement.ToString().ToLowerInvariant());
+        if (output.MinCount == output.MaxCount && output.MinCount.HasValue)
+            details.Add($"exactly {output.MinCount}");
+        else
+        {
+            if (output.MinCount.HasValue)
+                details.Add($"at least {output.MinCount}");
+            if (output.MaxCount.HasValue)
+                details.Add($"at most {output.MaxCount}");
+        }
+        if (output.WithinMilliseconds.HasValue)
+            details.Add($"within {TimeSpan.FromMilliseconds(output.WithinMilliseconds.Value):g}");
+        return string.Join(" · ", details);
+    }
+
+    private MonitoringChoreographyReactionRuntime? RuntimeFor(
+        MonitoringDeclaredChoreography choreography,
+        MonitoringDeclaredChoreographyFragment fragment,
+        MyServiceBus.Choreography.ChoreographyStep step,
+        int outputIndex)
+        => Dashboard.ChoreographyRuntime?.Reactions.FirstOrDefault(reaction =>
+            string.Equals(reaction.ChoreographyId, choreography.ChoreographyId, StringComparison.Ordinal)
+            && string.Equals(reaction.DefinitionVersion, fragment.DefinitionVersion, StringComparison.Ordinal)
+            && string.Equals(reaction.ApplicationName, fragment.ApplicationName, StringComparison.Ordinal)
+            && string.Equals(reaction.Owner, fragment.Owner, StringComparison.Ordinal)
+            && string.Equals(reaction.StepId, step.Id, StringComparison.Ordinal)
+            && reaction.OutputIndex == outputIndex);
+
+    private static string EvidenceLabel(string status) => status switch
+    {
+        "no_exact_evidence" => "No exact evidence in this window",
+        "ambiguous_declaration" => "Declaration match is ambiguous",
+        "unsupported_operation" => "Runtime evidence not supported yet",
+        _ => DisplayKind(status)
+    };
+}

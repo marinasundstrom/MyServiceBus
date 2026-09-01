@@ -2,7 +2,7 @@
 
 ## Status
 
-Design and acceptance contract for the first C# and Java authoring DSLs. The fundamental APIs illustrated here now lower to the shared normalized definition and in-memory execution runtime in both clients. Experimental registration attaches every declared event to one receive endpoint and dispatches outgoing work through the active consume context. Matching focused tests and a mixed C#/Java Aspire order workflow demonstrate the vertical slice. Topology and monitoring remain before the usable MVP is complete.
+Design and acceptance contract for the first C# and Java authoring DSLs. The fundamental APIs illustrated here now lower to the shared normalized definition and in-memory execution runtime in both clients. Experimental registration attaches every declared event to one receive endpoint and dispatches outgoing work through the active consume context. Matching focused tests and a mixed C#/Java Aspire order workflow demonstrate the vertical slice. Definition topology, bounded committed-transition monitoring, and an initial Dashboard instance view are implemented; durable persistence and lifecycle retention remain before the feature is production-capable.
 
 ## Design Goal
 
@@ -245,4 +245,4 @@ Before the fundamental DSL is complete, C# and Java tests must prove that:
 8. outgoing dispatch failure prevents the volatile instance from committing in both clients; and
 9. the DSL uses the existing low-level runtime rather than a parallel executor.
 
-Bus registration, consume-context dispatch, focused tests, and the mixed Aspire order sample now satisfy the first runtime vertical slice. Both clients also publish the normalized saga definition and endpoint attachment through topology and inspection and emit payload-free lifecycle observations after repository commit. The monitoring service exposes separate replica-aware definition and bounded instance-transition queries. Durable lifecycle retention and the initial Dashboard orchestration view should follow so the sample becomes fully operationally legible. Durable repositories and richer Dashboard analysis remain later gates over the same machine definition.
+Bus registration, consume-context dispatch, focused tests, and the mixed Aspire order sample now satisfy the first runtime vertical slice. Both clients also publish the normalized saga definition and endpoint attachment through topology and inspection and emit payload-free lifecycle observations after repository commit. The monitoring service exposes separate replica-aware definition and bounded instance-transition queries plus shared workflow catalog and run-index projections. The Dashboard renders saga definitions and a selected instance's current state and committed transition timeline without flattening that evidence into choreography. Durable lifecycle retention, durable repositories, and richer graph analysis remain later gates over the same machine definition.

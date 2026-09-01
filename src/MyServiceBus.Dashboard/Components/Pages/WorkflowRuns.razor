@@ -4,7 +4,7 @@
 @inject MonitoringApiClient Api
 
 <PageTitle>Workflow Runs · MyServiceBus Monitoring</PageTitle>
-<DashboardPageHeader Eyebrow="Coordination" Title="Workflows" Description="Follow individual coordination runs reconstructed from exact message causation, including live activity, timing, and failures." />
+<DashboardPageHeader Eyebrow="Coordination" Title="Workflows" Description="Follow reconstructed choreography runs and committed saga transitions, including live activity, timing, and failures." />
 <WorkflowTabs Active="runs" />
 
 <section class="panel workflow-run-index">
@@ -26,7 +26,7 @@
             <select @bind="typeFilter">
                 <option value="all">All types</option>
                 <option value="choreography">Choreography</option>
-                <option value="orchestration">Orchestration / Saga</option>
+                <option value="saga">Saga / orchestration</option>
             </select>
         </label>
         <label>
@@ -37,6 +37,9 @@
                 <option value="terminal_observed">Terminal observed</option>
                 <option value="faulted">Failed</option>
                 <option value="no_recent_activity">No recent activity</option>
+                <option value="active">Active saga</option>
+                <option value="completed">Completed saga</option>
+                <option value="not-present">Saga not present</option>
             </select>
         </label>
         <button type="button" class="workflow-filter-action" @onclick="ApplyFiltersAsync" disabled="@loading">Apply filters</button>
@@ -66,29 +69,26 @@
                     {
                         <tr class="workflow-run-row @run.Status">
                             <td><span class="run-status @run.Status"></span><strong>@RunStatus(run.Status)</strong></td>
-                            <td><strong>@run.ChoreographyId</strong><small>Run @Abbreviate(run.RootMessageId)</small></td>
-                            <td>@CoordinationType(run.CoordinationType)</td>
+                            <td><strong>@run.WorkflowId</strong><small>Run @Abbreviate(run.DetailIdentity)</small></td>
+                            <td>@CoordinationType(run.Kind)</td>
                             <td>
                                 <strong>@run.StartedAtUtc.ToLocalTime().ToString("MMM d, HH:mm:ss")</strong>
                                 <small>Last @run.LastActivityAtUtc.ToLocalTime().ToString("HH:mm:ss.fff")</small>
                             </td>
                             <td>
-                                <strong>@FormatDuration(run.ObservedDurationMs)</strong>
-                                <small>@run.Steps.Count observed @(run.Steps.Count == 1 ? "step" : "steps") · @ShapeLabel(run)</small>
+                                <strong>@FormatDuration(run.DurationMs)</strong>
+                                <small>@run.EvidenceCount @(run.Kind == "saga" ? "deliveries" : "observed steps")@if (!string.IsNullOrWhiteSpace(run.CurrentState)) {<text> · @run.CurrentState</text>}</small>
                             </td>
                             <td>
-                                <strong>@(run.EvidenceComplete ? "Complete" : "Incomplete")</strong>
-                                @if (run.DiagnosticIssueCount > 0)
+                                @if (run.Kind == "saga")
                                 {
-                                    <small>@run.DiagnosticIssueCount declared/observed @(run.DiagnosticIssueCount == 1 ? "finding" : "findings")</small>
+                                    <strong>Committed transitions</strong>
+                                    <small>@(run.HasFailures ? "Includes failed delivery" : "Bounded observation window")</small>
                                 }
-                                else if (run.IndeterminateExpectationCount > 0)
+                                else
                                 {
-                                    <small>@run.IndeterminateExpectationCount pending or unsupported</small>
-                                }
-                                else if (!run.EvidenceComplete)
-                                {
-                                    <small>@run.DroppedObservations dropped · @(run.AllParticipantsOnline ? "participants online" : "participant offline")</small>
+                                    <strong>@(run.EvidenceComplete == true ? "Complete" : "Incomplete")</strong>
+                                    <small>Reconstructed evidence</small>
                                 }
                             </td>
                             <td><a class="section-link" href="@RunHref(run)">View run →</a></td>
@@ -108,8 +108,8 @@
 </section>
 
 <div class="guidance workflow-guidance">
-    <strong>Evidence, not authority</strong>
-    <span>Runs are retained monitoring projections reconstructed from bounded exact-causation observations. A terminal observation means the declared terminal activity was seen; it does not make choreography a centralized state machine.</span>
+    <strong>One index, two kinds of truth</strong>
+    <span>Choreography runs are reconstructed from bounded causal evidence. Saga runs reflect committed repository transitions, although this first transition history is still retained only in the bounded monitoring window. Open a run to see its kind-specific detail.</span>
 </div>
 
 @code {
@@ -117,10 +117,10 @@
     private string search = string.Empty;
     private string typeFilter = "all";
     private string statusFilter = "all";
-    private MonitoringWorkflowRunPage? queriedPage;
+    private MonitoringWorkflowRunIndexPage? queriedPage;
     private bool loading;
 
-    private MonitoringWorkflowRunPage? CurrentPage => queriedPage ?? Dashboard.WorkflowRuns;
+    private MonitoringWorkflowRunIndexPage? CurrentPage => queriedPage ?? Dashboard.WorkflowRunIndex;
 
     private Task ApplyFiltersAsync() => LoadPageAsync(0);
 
@@ -135,13 +135,11 @@
         loading = true;
         try
         {
-            queriedPage = await Api.GetWorkflowRuns(
+            queriedPage = await Api.GetWorkflowRunIndex(
                 null,
                 typeFilter == "all" ? null : typeFilter,
                 statusFilter == "all" ? null : statusFilter,
                 search,
-                null,
-                null,
                 offset,
                 PageSize,
                 CancellationToken.None);
@@ -152,13 +150,15 @@
         }
     }
 
-    private static string RunHref(MonitoringChoreographyRun run)
-        => $"/workflows/runs/{Uri.EscapeDataString(run.RunId)}";
+    private static string RunHref(MonitoringWorkflowRunSummary run)
+        => run.Kind == "saga"
+            ? $"/workflows/sagas/{Uri.EscapeDataString(run.WorkflowId)}/{Uri.EscapeDataString(run.DetailIdentity)}"
+            : $"/workflows/runs/{Uri.EscapeDataString(run.DetailIdentity)}";
 
     private static string CoordinationType(string type) => type switch
     {
         "choreography" => "Choreography",
-        "orchestration" => "Orchestration / Saga",
+        "saga" => "Saga / orchestration",
         _ => DisplayKind(type)
     };
 
@@ -168,19 +168,14 @@
         "terminal_observed" => "Terminal observed",
         "faulted" => "Failed",
         "no_recent_activity" => "No recent activity",
+        "active" => "Active",
+        "completed" => "Completed",
+        "not-present" => "Not present",
         _ => DisplayKind(status)
     };
 
     private static string FormatDuration(double milliseconds)
         => milliseconds >= 1_000 ? $"{milliseconds / 1_000:0.##} s" : $"{milliseconds:0.##} ms";
-
-    private static string ShapeLabel(MonitoringChoreographyRun run) => run.ObservedShape switch
-    {
-        "branching" => $"{run.BranchPointCount} observed fork{(run.BranchPointCount == 1 ? string.Empty : "s")}",
-        "converging" => $"{run.MergePointCount} observed convergence{(run.MergePointCount == 1 ? string.Empty : "s")}",
-        "branching_and_converging" => $"{run.BranchPointCount} forks · {run.MergePointCount} convergences",
-        _ => "linear path"
-    };
 
     private static string Abbreviate(string value)
         => value.Length <= 12 ? value : $"{value[..8]}…{value[^4..]}";

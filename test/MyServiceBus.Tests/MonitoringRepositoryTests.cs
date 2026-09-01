@@ -37,6 +37,10 @@ public class MonitoringRepositoryTests
         saga.Deployments.Count.ShouldBe(2);
         saga.Deployments.Single(item => item.Definition.DefinitionVersion == "1").InstanceCount.ShouldBe(2);
         repository.GetDeclaredChoreographies(now).ShouldBeEmpty();
+        var catalog = repository.GetWorkflowCatalog(now).ShouldHaveSingleItem();
+        catalog.Kind.ShouldBe("saga");
+        catalog.LifecycleAuthority.ShouldBe("committed_transition_evidence");
+        catalog.ReportingInstanceCount.ShouldBe(3);
     }
 
     [Fact]
@@ -63,6 +67,16 @@ public class MonitoringRepositoryTests
         instance.Transitions[0].Created.ShouldBeTrue();
         instance.Transitions[1].Completed.ShouldBeTrue();
         repository.GetDeclaredChoreographies(now).ShouldBeEmpty();
+        var selected = repository.GetSagaInstance("order-state-machine", instance.CorrelationId).ShouldNotBeNull();
+        selected.CorrelationId.ShouldBe(instance.CorrelationId);
+        selected.CurrentState.ShouldBe(instance.CurrentState);
+        var index = repository.GetWorkflowRunIndex(
+            "order-state-machine", "saga", "completed", null, 0, 10, now);
+        var indexed = index.Runs.ShouldHaveSingleItem();
+        indexed.Kind.ShouldBe("saga");
+        indexed.LifecycleAuthority.ShouldBe("committed_transition_evidence");
+        indexed.CurrentState.ShouldBe("Final");
+        indexed.DetailIdentity.ShouldBe(instance.CorrelationId);
     }
 
     [Fact]
