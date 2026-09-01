@@ -43,7 +43,8 @@ public sealed record MessageOperationHookEvent(
     string? CausationMessageId = null,
     string? RequestId = null,
     string? ResponseAddress = null,
-    string? MessageIntent = null) : BusHookEvent(OccurredAtUtc)
+    string? MessageIntent = null,
+    object? Message = null) : BusHookEvent(OccurredAtUtc)
 {
     public static MessageOperationHookEvent Create(
         string kind,
@@ -62,7 +63,8 @@ public sealed record MessageOperationHookEvent(
         string? causationMessageId = null,
         string? requestId = null,
         string? responseAddress = null,
-        string? messageIntent = null)
+        string? messageIntent = null,
+        object? message = null)
     {
         var activity = Activity.Current;
         return new MessageOperationHookEvent(
@@ -86,7 +88,8 @@ public sealed record MessageOperationHookEvent(
             causationMessageId,
             requestId,
             responseAddress,
-            messageIntent);
+            messageIntent,
+            message);
     }
 }
 
@@ -161,7 +164,8 @@ internal sealed class BusHookRetryObserver : IRetryObserver
             retryEvent.Attempt,
             retryEvent.RetryLimit,
             context.MessageId?.ToString(),
-            requestId: context.RequestId?.ToString()));
+            requestId: context.RequestId?.ToString(),
+            message: message));
     }
 }
 
@@ -240,7 +244,8 @@ internal sealed class BusHookConsumeFilter<TMessage> : IFilter<ConsumeContext<TM
                 context.CorrelationId?.ToString(),
                 context.ConversationId?.ToString(),
                 messageId: context.MessageId?.ToString(),
-                requestId: context.RequestId?.ToString()));
+                requestId: context.RequestId?.ToString(),
+                message: context.Message));
         }
     }
 }

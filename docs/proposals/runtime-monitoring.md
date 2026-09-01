@@ -2,7 +2,7 @@
 
 ## Status
 
-Experimental MVP implemented and validated end to end through the Aspire stack. The proof of concept covers general-purpose hooks, C# and Java exporters, retry observations, bounded time-window and time-series metrics, observed flow reconstruction, volatile and PostgreSQL-backed collection, history-coverage reporting, WebSocket invalidations, and a standalone application-oriented Blazor dashboard with light and dark themes. Authentication, payload-byte limits, long-range history queries, broker and host metrics, alerting, administration, automated scaling advice, and external telemetry links remain future work. See [Runtime Monitoring](../runtime-monitoring.md) for setup and the current operational boundary.
+Experimental MVP implemented and validated end to end through the Aspire stack. The proof of concept covers general-purpose hooks, C# and Java exporters, retry observations, bounded time-window and time-series metrics, observed flow reconstruction, explicit bounded message-body export, volatile and PostgreSQL-backed collection, history-coverage reporting, WebSocket invalidations, and a standalone application-oriented Blazor dashboard with light and dark themes. Authentication, caller-specific payload disclosure, long-range history queries, broker and host metrics, alerting, administration, automated scaling advice, and external telemetry links remain future work. See [Runtime Monitoring](../runtime-monitoring.md) for setup and the current operational boundary.
 
 ## Recommendation
 
@@ -109,7 +109,7 @@ MassTransit compatibility is not a requirement. Alignment means recognizable mes
 - MassTransit API, protocol, dashboard, or wire compatibility for monitoring.
 - Broker administration, queue browsing, requeue, purge, or dead-letter operations.
 - Guaranteed audit delivery.
-- Implicit or unbounded message-body and arbitrary-header capture. A future explicit, bounded debugging profile may carry selected payload content.
+- Implicit or unbounded message-body and arbitrary-header capture. Selected message bodies may be exported only through the separate bounded, filterable, and redactable option; arbitrary headers remain excluded.
 - Receiving, storing, proxying, or querying OpenTelemetry data in the monitoring service.
 - Alerting in the first version.
 - Multiple coordinated monitoring-service replicas in the first version.
@@ -174,7 +174,7 @@ Initial typed events should include:
 - `MessageMovedToError`
 - `MessageSkipped`
 
-The model-change hook carries a stable revision and reason. The exporter then serializes the corresponding immutable metadata snapshot. Runtime hooks carry identity, timing, result, and trace correlation but not message bodies.
+The model-change hook carries a stable revision and reason. The exporter then serializes the corresponding immutable metadata snapshot. Runtime message-operation hooks carry identity, timing, result, trace correlation, and an in-process message reference. The exporter ignores that reference by default; explicit message-body capture serializes, filters, redacts, and bounds selected JSON before creating the wire observation.
 
 Telemetry instrumentation and the monitoring exporter may use the same hook events independently. Neither integration depends on the other. Other addons and tests may implement hooks without coupling core to a collector protocol.
 
@@ -341,6 +341,8 @@ Each observation contains:
 - retry attempt when applicable
 - exception type and truncated message when applicable
 - message, correlation, conversation, trace, and span identifiers when available
+- request identity, response address, and message intent when enabled
+- selected JSON message body, content type, capture status, and original byte count only when separately enabled
 - additive properties
 
 Initial observation kinds:
@@ -575,7 +577,7 @@ The design should support:
 - redaction of credentials and secrets in addresses and properties
 - exception-message truncation
 - bounded payload, batch, and query sizes
-- no message bodies or arbitrary headers by default
+- no message bodies or arbitrary headers by default; body export requires a separate explicit option
 
 The monitoring service must validate client-supplied identities rather than allowing one credential to impersonate any application unintentionally.
 

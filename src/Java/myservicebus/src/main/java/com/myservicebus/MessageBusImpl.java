@@ -585,7 +585,8 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
                             null,
                             context.getRequestId() == null ? null : context.getRequestId().toString(),
                             context.getResponseAddress() == null ? null : context.getResponseAddress().toString(),
-                            context.getIntent().name()));
+                            context.getIntent().name(),
+                            context.getMessage()));
                 });
     }
 

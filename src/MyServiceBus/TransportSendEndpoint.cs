@@ -64,15 +64,15 @@ internal class TransportSendEndpoint : ISendEndpoint
             await _sendPipe.Send(context);
             var typed = message is T t ? t : (T)MessageProxy.Create(typeof(T), message);
             await transport.Send(typed, context, cancellationToken);
-            Dispatch("sent", true, context, Stopwatch.GetElapsedTime(startedAt));
+            Dispatch("sent", true, typed, context, Stopwatch.GetElapsedTime(startedAt));
         }
         catch (Exception exception)
         {
-            Dispatch("send_faulted", false, context, Stopwatch.GetElapsedTime(startedAt), exception);
+            Dispatch("send_faulted", false, message, context, Stopwatch.GetElapsedTime(startedAt), exception);
             throw;
         }
 
-        void Dispatch(string kind, bool succeeded, SendContext sendContext, TimeSpan duration, Exception? exception = null)
+        void Dispatch(string kind, bool succeeded, object body, SendContext sendContext, TimeSpan duration, Exception? exception = null)
         {
             if (_hooks?.IsEnabled != true)
                 return;
@@ -92,7 +92,8 @@ internal class TransportSendEndpoint : ISendEndpoint
                 causationMessageId: sendContext.CausationMessageId?.ToString(),
                 requestId: sendContext.RequestId?.ToString(),
                 responseAddress: sendContext.ResponseAddress?.ToString(),
-                messageIntent: sendContext.Intent.ToString()));
+                messageIntent: sendContext.Intent.ToString(),
+                message: body));
         }
     }
 }

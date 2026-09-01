@@ -91,11 +91,11 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector, IConsumerMetho
             await _publishPipe.Send(context);
             await _sendPipe.Send(context);
             await transport.Send(message, context, cancellationToken);
-            DispatchMessageOperation("published", true, typeof(T), context, Stopwatch.GetElapsedTime(startedAt));
+            DispatchMessageOperation("published", true, typeof(T), message, context, Stopwatch.GetElapsedTime(startedAt));
         }
         catch (Exception exception)
         {
-            DispatchMessageOperation("publish_faulted", false, typeof(T), context, Stopwatch.GetElapsedTime(startedAt), exception);
+            DispatchMessageOperation("publish_faulted", false, typeof(T), message, context, Stopwatch.GetElapsedTime(startedAt), exception);
             throw;
         }
     }
@@ -468,6 +468,7 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector, IConsumerMetho
         string kind,
         bool succeeded,
         Type messageType,
+        object message,
         SendContext context,
         TimeSpan duration,
         Exception? exception = null)
@@ -490,6 +491,7 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector, IConsumerMetho
             causationMessageId: context.CausationMessageId?.ToString(),
             requestId: context.RequestId?.ToString(),
             responseAddress: context.ResponseAddress?.ToString(),
-            messageIntent: context.Intent.ToString()));
+            messageIntent: context.Intent.ToString(),
+            message: message));
     }
 }

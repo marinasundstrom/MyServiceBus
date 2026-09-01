@@ -1,6 +1,8 @@
 using System.Reflection;
 using System.Globalization;
 using System.Net.Http.Json;
+using System.Text;
+using System.Text.Json;
 using System.Threading.Channels;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -27,6 +29,7 @@ public sealed class MonitoringExporter : BackgroundService, IBusHook, IScheduled
     private bool scheduledWorkSourcesAvailable = true;
     private IReadOnlyList<MonitoringRecurringJobItem> recurringJobs = [];
     private IReadOnlyList<MonitoringJobItem> jobs = [];
+    private static readonly JsonSerializerOptions MessageBodyJsonOptions = new(JsonSerializerDefaults.Web);
 
     public MonitoringExporter(
         HttpClient httpClient,
@@ -38,6 +41,8 @@ public sealed class MonitoringExporter : BackgroundService, IBusHook, IScheduled
         this.serviceProvider = serviceProvider;
         this.options = options;
         this.logger = logger;
+        if (options.MaxMessageBodyBytes <= 0)
+            throw new ArgumentOutOfRangeException(nameof(options.MaxMessageBodyBytes), "The maximum message body size must be greater than zero.");
         observations = Channel.CreateBounded<MonitoringObservation>(new BoundedChannelOptions(options.MaxQueueSize)
         {
             FullMode = BoundedChannelFullMode.Wait,
@@ -467,7 +472,9 @@ public sealed class MonitoringExporter : BackgroundService, IBusHook, IScheduled
             null);
 
     private MonitoringObservation CreateMessageObservation(MessageOperationHookEvent busEvent)
-        => new(
+    {
+        var body = CaptureMessageBody(busEvent);
+        return new(
             Interlocked.Increment(ref sequence),
             busEvent.OccurredAtUtc,
             busEvent.Kind,
@@ -492,7 +499,72 @@ public sealed class MonitoringExporter : BackgroundService, IBusHook, IScheduled
                 && options.CaptureSensitiveData(options.CaptureAddresses)
                 ? busEvent.ResponseAddress
                 : null,
-            MessageIntent: options.CaptureSensitiveData(options.CaptureRequestResponseMetadata) ? busEvent.MessageIntent : null);
+            MessageIntent: options.CaptureSensitiveData(options.CaptureRequestResponseMetadata) ? busEvent.MessageIntent : null,
+            MessageBody: body.Content,
+            MessageBodyContentType: body.ContentType,
+            MessageBodyStatus: body.Status,
+            MessageBodyOriginalBytes: body.OriginalBytes);
+    }
+
+    private CapturedMessageBody CaptureMessageBody(MessageOperationHookEvent busEvent)
+    {
+        if (!options.CaptureMessageBodies || busEvent.Message is null)
+            return default;
+
+        try
+        {
+            if (options.MessageBodyTypeFilter is not null && !options.MessageBodyTypeFilter(busEvent.MessageType))
+                return default;
+
+            var content = JsonSerializer.Serialize(busEvent.Message, busEvent.Message.GetType(), MessageBodyJsonOptions);
+            if (options.MessageBodyRedactor is not null)
+                content = options.MessageBodyRedactor(busEvent.MessageType, content);
+
+            var originalBytes = Encoding.UTF8.GetByteCount(content);
+            if (originalBytes <= options.MaxMessageBodyBytes)
+                return new(content, "application/json", "captured", originalBytes);
+
+            return new(
+                TruncateUtf8(content, options.MaxMessageBodyBytes),
+                "application/json",
+                "truncated",
+                originalBytes);
+        }
+        catch (Exception exception)
+        {
+            logger.LogDebug(exception, "Message body capture failed for {MessageType}", busEvent.MessageType);
+            return new(null, null, "serialization_failed", null);
+        }
+    }
+
+    private static string TruncateUtf8(string value, int maxBytes)
+    {
+        if (maxBytes <= 0)
+            return string.Empty;
+
+        var bytes = Encoding.UTF8.GetBytes(value);
+        var length = Math.Min(maxBytes, bytes.Length);
+        var strictUtf8 = new UTF8Encoding(false, true);
+        while (length > 0)
+        {
+            try
+            {
+                return strictUtf8.GetString(bytes, 0, length);
+            }
+            catch (DecoderFallbackException)
+            {
+                length--;
+            }
+        }
+
+        return string.Empty;
+    }
+
+    private readonly record struct CapturedMessageBody(
+        string? Content,
+        string? ContentType,
+        string? Status,
+        int? OriginalBytes);
 
     private MonitoringObservation CreateSagaObservation(SagaStateMachineHookEvent busEvent)
         => new(

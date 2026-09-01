@@ -4,6 +4,8 @@ import java.net.URI;
 import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.function.BiFunction;
+import java.util.function.Predicate;
 
 public final class MonitoringExporterOptions {
     private URI serviceAddress = URI.create("http://localhost:5310");
@@ -26,6 +28,10 @@ public final class MonitoringExporterOptions {
     private Boolean captureRequestResponseMetadata;
     private Boolean captureAddresses;
     private Boolean captureExceptionMessages;
+    private boolean captureMessageBodies;
+    private int maxMessageBodyBytes = 16 * 1024;
+    private Predicate<String> messageBodyTypeFilter;
+    private BiFunction<String, String, String> messageBodyRedactor;
 
     public URI getServiceAddress() {
         return serviceAddress;
@@ -188,6 +194,38 @@ public final class MonitoringExporterOptions {
 
     public void setCaptureExceptionMessages(boolean captureExceptionMessages) {
         this.captureExceptionMessages = captureExceptionMessages;
+    }
+
+    public boolean isCaptureMessageBodies() {
+        return captureMessageBodies;
+    }
+
+    public void setCaptureMessageBodies(boolean captureMessageBodies) {
+        this.captureMessageBodies = captureMessageBodies;
+    }
+
+    public int getMaxMessageBodyBytes() {
+        return maxMessageBodyBytes;
+    }
+
+    public void setMaxMessageBodyBytes(int maxMessageBodyBytes) {
+        this.maxMessageBodyBytes = maxMessageBodyBytes;
+    }
+
+    public Predicate<String> getMessageBodyTypeFilter() {
+        return messageBodyTypeFilter;
+    }
+
+    public void setMessageBodyTypeFilter(Predicate<String> messageBodyTypeFilter) {
+        this.messageBodyTypeFilter = messageBodyTypeFilter;
+    }
+
+    public BiFunction<String, String, String> getMessageBodyRedactor() {
+        return messageBodyRedactor;
+    }
+
+    public void setMessageBodyRedactor(BiFunction<String, String, String> messageBodyRedactor) {
+        this.messageBodyRedactor = messageBodyRedactor;
     }
 
     boolean captureSensitiveData(Boolean override) {

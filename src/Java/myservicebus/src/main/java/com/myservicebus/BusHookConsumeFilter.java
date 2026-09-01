@@ -38,7 +38,8 @@ final class BusHookConsumeFilter<T> implements Filter<ConsumeContext<T>> {
                     null,
                     context.getRequestId() == null ? null : context.getRequestId().toString(),
                     null,
-                    null));
+                    null,
+                    context.getMessage()));
         });
     }
 

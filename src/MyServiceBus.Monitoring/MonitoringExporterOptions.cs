@@ -29,6 +29,10 @@ public sealed class MonitoringExporterOptions
     public bool? CaptureRequestResponseMetadata { get; set; }
     public bool? CaptureAddresses { get; set; }
     public bool? CaptureExceptionMessages { get; set; }
+    public bool CaptureMessageBodies { get; set; }
+    public int MaxMessageBodyBytes { get; set; } = 16 * 1024;
+    public Func<string, bool>? MessageBodyTypeFilter { get; set; }
+    public Func<string, string, string>? MessageBodyRedactor { get; set; }
 
     internal bool CaptureSensitiveData(bool? value)
     {

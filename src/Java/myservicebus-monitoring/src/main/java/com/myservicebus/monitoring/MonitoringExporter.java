@@ -4,6 +4,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -79,6 +80,9 @@ public final class MonitoringExporter implements BusHook, ScheduledWorkObserver,
         }
         if (options.getMaxBatchSize() <= 0 || options.getMaxQueueSize() <= 0) {
             throw new IllegalArgumentException("Batch and queue sizes must be greater than zero");
+        }
+        if (options.getMaxMessageBodyBytes() <= 0) {
+            throw new IllegalArgumentException("The maximum message body size must be greater than zero");
         }
         if (options.getMaxScheduledWorkItems() <= 0 || options.getMaxJobItems() <= 0
                 || options.getMaxJobAttempts() <= 0 || options.getScheduledWorkHistory().isZero()
@@ -438,9 +442,10 @@ public final class MonitoringExporter implements BusHook, ScheduledWorkObserver,
             return new MonitoringProtocol.Observation(
                     sequence.incrementAndGet(), lifecycle.occurredAtUtc(), "bus_" + lifecycle.state(), true,
                     null, null, null, lifecycle.busAddress(), null, null, null, null, null, null, null, null, null, null,
-                    null, null);
+                    null, null, null, null, null, null, null, null, null);
         }
         if (busEvent instanceof MessageOperationHookEvent operation) {
+            CapturedMessageBody body = captureMessageBody(operation);
             return new MonitoringProtocol.Observation(
                     sequence.incrementAndGet(), operation.occurredAtUtc(), operation.kind(), operation.succeeded(),
                     operation.messageType(), operation.messageUrn(), operation.endpointName(),
@@ -457,7 +462,8 @@ public final class MonitoringExporter implements BusHook, ScheduledWorkObserver,
                             && options.captureSensitiveData(options.getCaptureAddresses())
                             ? operation.responseAddress()
                             : null,
-                    options.captureSensitiveData(options.getCaptureRequestResponseMetadata()) ? operation.messageIntent() : null);
+                    options.captureSensitiveData(options.getCaptureRequestResponseMetadata()) ? operation.messageIntent() : null,
+                    body.content(), body.contentType(), body.status(), body.originalBytes());
         }
         if (busEvent instanceof OutboxDeliveryHookEvent outbox) {
             Map<String, String> properties = new LinkedHashMap<>();
@@ -477,7 +483,7 @@ public final class MonitoringExporter implements BusHook, ScheduledWorkObserver,
             return new MonitoringProtocol.Observation(
                     sequence.incrementAndGet(), outbox.occurredAtUtc(), "outbox_dispatch_cycle", outbox.succeeded(),
                     null, null, outbox.serviceName(), null, outbox.durationMs(), outbox.failureCategory(), null,
-                    null, null, null, null, null, null, properties, null, null);
+                    null, null, null, null, null, null, properties, null, null, null, null, null, null, null, null, null);
         }
         if (busEvent instanceof SagaStateMachineHookEvent saga) {
             Map<String, String> properties = new LinkedHashMap<>();
@@ -495,9 +501,56 @@ public final class MonitoringExporter implements BusHook, ScheduledWorkObserver,
                     sequence.incrementAndGet(), saga.occurredAtUtc(), "saga_delivery", saga.succeeded(),
                     null, null, null, null, saga.durationMs(), saga.exceptionType(), saga.exceptionMessage(),
                     format(saga.sagaCorrelationId()), null, null, null, null, null, properties,
-                    saga.messageId(), null);
+                    saga.messageId(), null, null, null, null, null, null, null, null);
         }
         return null;
+    }
+
+    private CapturedMessageBody captureMessageBody(MessageOperationHookEvent operation) {
+        if (!options.isCaptureMessageBodies() || operation.message() == null) {
+            return CapturedMessageBody.EMPTY;
+        }
+        try {
+            if (options.getMessageBodyTypeFilter() != null
+                    && !options.getMessageBodyTypeFilter().test(operation.messageType())) {
+                return CapturedMessageBody.EMPTY;
+            }
+
+            String content = objectMapper.writeValueAsString(operation.message());
+            if (options.getMessageBodyRedactor() != null) {
+                content = options.getMessageBodyRedactor().apply(operation.messageType(), content);
+            }
+            int originalBytes = content.getBytes(StandardCharsets.UTF_8).length;
+            if (originalBytes <= options.getMaxMessageBodyBytes()) {
+                return new CapturedMessageBody(content, "application/json", "captured", originalBytes);
+            }
+            return new CapturedMessageBody(
+                    truncateUtf8(content, options.getMaxMessageBodyBytes()),
+                    "application/json", "truncated", originalBytes);
+        } catch (Exception exception) {
+            return new CapturedMessageBody(null, null, "serialization_failed", null);
+        }
+    }
+
+    private static String truncateUtf8(String value, int maxBytes) {
+        StringBuilder result = new StringBuilder();
+        int bytes = 0;
+        for (int offset = 0; offset < value.length();) {
+            int codePoint = value.codePointAt(offset);
+            String character = new String(Character.toChars(codePoint));
+            int characterBytes = character.getBytes(StandardCharsets.UTF_8).length;
+            if (bytes + characterBytes > maxBytes) {
+                break;
+            }
+            result.append(character);
+            bytes += characterBytes;
+            offset += Character.charCount(codePoint);
+        }
+        return result.toString();
+    }
+
+    private record CapturedMessageBody(String content, String contentType, String status, Integer originalBytes) {
+        private static final CapturedMessageBody EMPTY = new CapturedMessageBody(null, null, null, null);
     }
 
     private static String format(Object value) {

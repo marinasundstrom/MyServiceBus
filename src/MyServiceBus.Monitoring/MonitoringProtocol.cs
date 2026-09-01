@@ -45,7 +45,11 @@ public sealed record MonitoringObservation(
     string? CausationMessageId = null,
     string? RequestId = null,
     string? ResponseAddress = null,
-    string? MessageIntent = null);
+    string? MessageIntent = null,
+    string? MessageBody = null,
+    string? MessageBodyContentType = null,
+    string? MessageBodyStatus = null,
+    int? MessageBodyOriginalBytes = null);
 
 public sealed record MonitoringOutboxDispatcherSummary(
     string ApplicationName,

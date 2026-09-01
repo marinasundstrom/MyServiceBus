@@ -45,7 +45,7 @@ public class GenericRequestClient<TRequest> implements RequestClient<TRequest> {
         }
         CompletableFuture<TResponse> response = transport.sendRequest(requestType, context, responseType);
         observeRequest(context);
-        response.thenAccept(value -> observeResponse(context, responseType));
+        response.thenAccept(value -> observeResponse(context, responseType, value));
         return applyRequestPolicies(response, context);
     }
 
@@ -64,10 +64,11 @@ public class GenericRequestClient<TRequest> implements RequestClient<TRequest> {
                 null,
                 context.getRequestId() == null ? null : context.getRequestId().toString(),
                 context.getResponseAddress() == null ? null : context.getResponseAddress().toString(),
-                context.getIntent().name()));
+                context.getIntent().name(),
+                context.getMessage()));
     }
 
-    private void observeResponse(SendContext context, Class<?> responseType) {
+    private void observeResponse(SendContext context, Class<?> responseType, Object response) {
         if (hooks == null || !hooks.isEnabled()) {
             return;
         }
@@ -78,7 +79,7 @@ public class GenericRequestClient<TRequest> implements RequestClient<TRequest> {
                 context.getConversationId() == null ? null : context.getConversationId().toString(),
                 null, null, null, null,
                 context.getRequestId() == null ? null : context.getRequestId().toString(),
-                null, null));
+                null, null, response));
     }
 
     @Override

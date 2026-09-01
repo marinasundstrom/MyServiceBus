@@ -41,6 +41,7 @@ class MonitoringExporterTest {
         MonitoringExporterOptions options = new MonitoringExporterOptions();
         options.setCaptureProfile(MonitoringCaptureProfile.PRODUCTION);
 
+        assertTrue(!options.isCaptureMessageBodies());
         assertTrue(!options.captureSensitiveData(options.getCaptureMessageIdentity()));
         assertTrue(!options.captureSensitiveData(options.getCaptureCorrelationIdentity()));
         assertTrue(!options.captureSensitiveData(options.getCaptureRequestResponseMetadata()));
@@ -82,10 +83,14 @@ class MonitoringExporterTest {
         options.setServiceAddress(URI.create("http://localhost:" + server.getAddress().getPort()));
         options.setApplicationName("orders-java");
         options.setCaptureProfile(MonitoringCaptureProfile.DEVELOPMENT);
+        options.setCaptureMessageBodies(true);
+        options.setMaxMessageBodyBytes(48);
+        options.setMessageBodyTypeFilter(messageType -> messageType.equals(TestMessage.class.getName()));
+        options.setMessageBodyRedactor((messageType, body) -> body.replace("customer 42", "[redacted]"));
         options.getLabels().put("group", "commerce");
         options.setExportInterval(Duration.ofMillis(20));
         options.setHeartbeatInterval(Duration.ofSeconds(1));
-        options.setMaxBatchSize(1);
+        options.setMaxBatchSize(2);
 
         MonitoringExporter exporter = new MonitoringExporter(options);
         try {
@@ -100,6 +105,9 @@ class MonitoringExporterTest {
                     List.of(),
                     List.of(),
                     List.of(choreography)));
+            exporter.handle(MessageOperationHookEvent.create(
+                    "published", true, String.class, null, null, System.nanoTime(), null,
+                    null, null, null, null, null, null, null, null, null, "filtered secret"));
             exporter.handle(MessageOperationHookEvent.create(
                     "published",
                     true,
@@ -116,7 +124,8 @@ class MonitoringExporterTest {
                     "trigger-1",
                     "request-1",
                     "loopback://responses",
-                    "REPLY"));
+                    "REPLY",
+                    new TestMessage("customer 42 " + "x".repeat(100))));
 
             assertTrue(metadataReceived.await(2, TimeUnit.SECONDS));
             assertTrue(batchReceived.await(2, TimeUnit.SECONDS));
@@ -131,6 +140,11 @@ class MonitoringExporterTest {
             assertTrue(batchJson.get().contains("\"requestId\":\"request-1\""));
             assertTrue(batchJson.get().contains("\"responseAddress\":\"loopback://responses\""));
             assertTrue(batchJson.get().contains("\"messageIntent\":\"REPLY\""));
+            assertTrue(batchJson.get().contains("\"messageBodyStatus\":\"truncated\""));
+            assertTrue(batchJson.get().contains("\"messageBodyContentType\":\"application/json\""));
+            assertTrue(batchJson.get().contains("[redacted]"));
+            assertTrue(!batchJson.get().contains("customer 42"));
+            assertTrue(!batchJson.get().contains("filtered secret"));
         } finally {
             exporter.close();
             server.stop(0);

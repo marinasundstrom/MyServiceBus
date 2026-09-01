@@ -41,6 +41,8 @@ public class BusHookTests
             .Single(busEvent => busEvent.Kind == "consumed");
         published.MessageId.ShouldNotBeNullOrWhiteSpace();
         consumed.MessageId.ShouldBe(published.MessageId);
+        published.Message.ShouldBe(new TestMessage("hello"));
+        consumed.Message.ShouldBe(new TestMessage("hello"));
     }
 
     [Fact]
@@ -160,8 +162,13 @@ public class BusHookTests
             ServiceAddress = new Uri("http://monitoring.test"),
             ApplicationName = "tests",
             CaptureProfile = MonitoringCaptureProfile.Development,
+            CaptureMessageBodies = true,
+            MaxMessageBodyBytes = 48,
+            MessageBodyTypeFilter = messageType => messageType == typeof(TestMessage).FullName,
+            MessageBodyRedactor = (_, body) => body.Replace("customer 42", "[redacted]", StringComparison.Ordinal),
             ExportInterval = TimeSpan.FromMilliseconds(20),
-            HeartbeatInterval = TimeSpan.FromMinutes(1)
+            HeartbeatInterval = TimeSpan.FromMinutes(1),
+            MaxBatchSize = 2
         };
         var exporter = new MonitoringExporter(
             new HttpClient(handler) { BaseAddress = options.ServiceAddress },
@@ -174,19 +181,29 @@ public class BusHookTests
         exporter.Handle(MessageOperationHookEvent.Create(
             "published",
             true,
+            typeof(ReactionMessage).FullName!,
+            MessageUrn.For(typeof(ReactionMessage)),
+            null,
+            null,
+            TimeSpan.Zero,
+            message: new ReactionMessage("filtered secret")));
+        exporter.Handle(MessageOperationHookEvent.Create(
+            "published",
+            true,
             typeof(TestMessage).FullName!,
             MessageUrn.For(typeof(TestMessage)),
             null,
             "loopback://test-message",
             TimeSpan.Zero,
-            exception: new InvalidOperationException("customer 42"),
+            exception: new InvalidOperationException("test failure"),
             correlationId: "correlation-1",
             conversationId: "conversation-1",
             messageId: "message-1",
             causationMessageId: "trigger-1",
             requestId: "request-1",
             responseAddress: "loopback://responses",
-            messageIntent: "Reply"));
+            messageIntent: "Reply",
+            message: new TestMessage("customer 42 " + new string('x', 100))));
 
         var batchJson = await handler.BatchReceived.Task.WaitAsync(TimeSpan.FromSeconds(2));
         batchJson.ShouldContain("\"kind\":\"published\"");
@@ -195,6 +212,11 @@ public class BusHookTests
         batchJson.ShouldContain("\"requestId\":\"request-1\"");
         batchJson.ShouldContain("\"responseAddress\":\"loopback://responses\"");
         batchJson.ShouldContain("\"messageIntent\":\"Reply\"");
+        batchJson.ShouldContain("\"messageBodyStatus\":\"truncated\"");
+        batchJson.ShouldContain("\"messageBodyContentType\":\"application/json\"");
+        batchJson.ShouldContain("[redacted]");
+        batchJson.ShouldNotContain("customer 42");
+        batchJson.ShouldNotContain("filtered secret");
         await exporter.StopAsync(CancellationToken.None);
     }
 
@@ -235,7 +257,8 @@ public class BusHookTests
             causationMessageId: "trigger-1",
             requestId: "request-1",
             responseAddress: "loopback://responses",
-            messageIntent: "Send"));
+            messageIntent: "Send",
+            message: new TestMessage("secret production body")));
 
         var batchJson = await handler.BatchReceived.Task.WaitAsync(TimeSpan.FromSeconds(2));
         batchJson.ShouldContain("\"messageUrn\"");
@@ -249,6 +272,8 @@ public class BusHookTests
         batchJson.ShouldNotContain("trigger-1");
         batchJson.ShouldNotContain("request-1");
         batchJson.ShouldNotContain("loopback://responses");
+        batchJson.ShouldNotContain("secret production body");
+        batchJson.ShouldContain("\"messageBodyStatus\":null");
         await exporter.StopAsync(CancellationToken.None);
     }
 

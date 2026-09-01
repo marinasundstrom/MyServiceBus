@@ -101,6 +101,8 @@ class GenericRequestClientPolicyTest {
         assertEquals(operations.get(0).requestId(), operations.get(1).requestId());
         assertEquals("loopback://responses", operations.get(0).responseAddress());
         assertEquals(String.class.getName(), operations.get(1).messageType());
+        assertEquals(Request.class, operations.get(0).message().getClass());
+        assertEquals("ok", operations.get(1).message());
     }
 
     private static final class PendingTransport implements RequestClientTransport {
