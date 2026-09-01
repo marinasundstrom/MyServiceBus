@@ -39,6 +39,17 @@ builder.Services.AddServiceBus(x =>
         .Step<FulfillmentCompleted>("observe-fulfillment-completed", step => step
             .OwnedBy<FulfillmentCompletedConsumer>()
             .Terminates()));
+    x.AddChoreography("sample-parallel-order-checks", "1", "TestApp.CSharp", workflow => workflow
+        .Step<ParallelOrderChecksRequested>("start-parallel-checks", step => step
+            .OwnedBy<ParallelOrderChecksRequestedConsumer>()
+            .Publishes<PaymentCheckRequested>()
+            .Publishes<InventoryCheckRequested>())
+        .Step<PaymentCheckRequested>("check-payment", step => step
+            .OwnedBy<PaymentCheckRequestedConsumer>()
+            .Terminates())
+        .Step<InventoryCheckRequested>("check-inventory", step => step
+            .OwnedBy<InventoryCheckRequestedConsumer>()
+            .Terminates()));
     x.AddJobConsumer<DemoTrackedJobConsumer, DemoTrackedJob>(options => options
         .SetJobTypeName("sample-report")
         .SetConcurrentJobLimit(2)
@@ -180,6 +191,15 @@ app.MapPost("/workflows/fulfillment", async (IPublishEndpoint publishEndpoint, C
     return Results.Accepted(value: new { message.OrderId });
 })
 .WithName("Start_FulfillmentWorkflow")
+.WithTags("Workflows");
+
+app.MapPost("/workflows/parallel-checks", async (IPublishEndpoint publishEndpoint, CancellationToken cancellationToken = default) =>
+{
+    var message = new ParallelOrderChecksRequested(Guid.NewGuid());
+    await publishEndpoint.Publish(message, null, cancellationToken);
+    return Results.Accepted(value: new { message.OrderId });
+})
+.WithName("Start_ParallelOrderChecksWorkflow")
 .WithTags("Workflows");
 
 app.MapGet("/publish/fault", async (IMessageBus messageBus, ILogger<Program> logger, CancellationToken cancellationToken = default) =>
