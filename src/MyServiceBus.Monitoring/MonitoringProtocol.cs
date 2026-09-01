@@ -345,6 +345,11 @@ public sealed record MonitoringChoreographyRun(
         (false, true) => "converging",
         _ => "linear"
     };
+    public int DiagnosticIssueCount => Steps.Sum(step => step.OutputExpectations.Count(expectation => expectation.Status is
+        "missing_expected" or "below_minimum" or "above_maximum" or "timing_exceeded" or
+        "unexpected_observed" or "output_faulted"));
+    public int IndeterminateExpectationCount => Steps.Sum(step => step.OutputExpectations.Count(expectation =>
+        expectation.Status is "awaiting_evidence" or "insufficient_evidence" or "unsupported_operation"));
 }
 
 public sealed record MonitoringChoreographyRunStep(
@@ -364,7 +369,23 @@ public sealed record MonitoringChoreographyRunStep(
     string Status,
     int RetryCount,
     string? FailureType,
-    IReadOnlyList<MonitoringChoreographyRunOutput> Outputs);
+    IReadOnlyList<MonitoringChoreographyRunOutput> Outputs)
+{
+    public IReadOnlyList<MonitoringChoreographyRunOutputExpectation> OutputExpectations { get; init; } = [];
+}
+
+public sealed record MonitoringChoreographyRunOutputExpectation(
+    string OperationKind,
+    string? MessageUrn,
+    string? Destination,
+    string Requirement,
+    int? MinimumCount,
+    int? MaximumCount,
+    long? WithinMilliseconds,
+    int ObservedCount,
+    int FailedCount,
+    int LateCount,
+    string Status);
 
 public sealed record MonitoringChoreographyRunOutput(
     string OperationKind,

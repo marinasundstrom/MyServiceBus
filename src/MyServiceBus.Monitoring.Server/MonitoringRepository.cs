@@ -591,7 +591,7 @@ public sealed class MonitoringRepository
         var complete = dropped == 0 && allOnline;
         var runs = choreographies
             .SelectMany(choreography => choreography.DefinitionVersions.SelectMany(version =>
-                BuildChoreographyRuns(choreography, version, records, now)))
+                BuildChoreographyRuns(choreography, version, records, complete, now)))
             .OrderByDescending(run => run.LastActivityAtUtc)
             .Take(boundedLimit)
             .Select(run => run with
@@ -690,6 +690,7 @@ public sealed class MonitoringRepository
         MonitoringDeclaredChoreography choreography,
         string definitionVersion,
         IReadOnlyList<MonitoringObservationRecord> records,
+        bool evidenceComplete,
         DateTimeOffset now)
     {
         var declarations = choreography.Fragments
@@ -700,7 +701,7 @@ public sealed class MonitoringRepository
                 step.Id,
                 step.OwnerComponent,
                 step.TriggerMessageUrn,
-                step.Outputs.Any(output => output.Kind == ChoreographyOperationKind.Terminal))))
+                step.Outputs)))
             .ToArray();
         var nodes = records
             .Where(record => record.Observation.Kind is "consumed" or "consume_faulted"
@@ -775,7 +776,7 @@ public sealed class MonitoringRepository
             var roots = component.Where(node => node.ParentCount == 0).ToArray();
             if (roots.Length == 0)
                 roots = [component.MinBy(node => node.StartedAtUtc)!];
-            runs.Add(CreateRun(choreography.ChoreographyId, definitionVersion, roots, component, now));
+            runs.Add(CreateRun(choreography.ChoreographyId, definitionVersion, roots, component, evidenceComplete, now));
         }
         return runs;
     }
@@ -805,6 +806,7 @@ public sealed class MonitoringRepository
         string definitionVersion,
         IReadOnlyList<MutableChoreographyRunStep> roots,
         IReadOnlyList<MutableChoreographyRunStep> nodes,
+        bool evidenceComplete,
         DateTimeOffset now)
     {
         var rootMessageIds = roots
@@ -819,7 +821,7 @@ public sealed class MonitoringRepository
             .ThenBy(node => node.ApplicationName, StringComparer.Ordinal)
             .ThenBy(node => node.StepId, StringComparer.Ordinal)
             .ToArray();
-        var steps = ordered.Select((node, index) => node.ToImmutable(index + 1)).ToArray();
+        var steps = ordered.Select((node, index) => node.ToImmutable(index + 1, evidenceComplete, now)).ToArray();
         var startedAt = ordered.Min(node => node.StartedAtUtc);
         var lastActivityAt = ordered.Max(node => node.LastActivityAtUtc);
         var faulted = ordered.Any(node => node.Faulted);
@@ -852,7 +854,8 @@ public sealed class MonitoringRepository
         MonitoringChoreographyRun current,
         MonitoringChoreographyRun candidate)
     {
-        if (candidate.LastActivityAtUtc > current.LastActivityAtUtc
+        if ((candidate.LastActivityAtUtc >= current.LastActivityAtUtc
+                && candidate.Steps.Count >= current.Steps.Count)
             || candidate.Steps.Count > current.Steps.Count
             || StatusPriority(candidate.Status) > StatusPriority(current.Status))
             return candidate;
@@ -1907,7 +1910,10 @@ public sealed class MonitoringRepository
         string StepId,
         string? OwnerComponent,
         string TriggerMessageUrn,
-        bool Terminal);
+        IReadOnlyList<ChoreographyOutput> Outputs)
+    {
+        public bool Terminal => Outputs.Any(output => output.Kind == ChoreographyOperationKind.Terminal);
+    }
 
     private sealed record RunConsumptionKey(
         string ApplicationName,
@@ -1977,8 +1983,8 @@ public sealed class MonitoringRepository
             IReadOnlyList<MutableChoreographyRunStep> targets)
             => outputs.Add(new MutableChoreographyRunOutput(record, targets));
 
-        public MonitoringChoreographyRunStep ToImmutable(int sequence)
-            => new(
+        public MonitoringChoreographyRunStep ToImmutable(int sequence, bool evidenceComplete, DateTimeOffset now)
+            => new MonitoringChoreographyRunStep(
                 sequence,
                 StepKey,
                 outcome.ApplicationName,
@@ -1998,7 +2004,130 @@ public sealed class MonitoringRepository
                 outputs
                     .OrderBy(output => output.Record.Observation.OccurredAtUtc)
                     .Select(output => output.ToImmutable())
-                    .ToArray());
+                    .ToArray())
+            {
+                OutputExpectations = EvaluateOutputExpectations(
+                    evidenceComplete,
+                    now - LastActivityAtUtc > TimeSpan.FromSeconds(15))
+            };
+
+        private IReadOnlyList<MonitoringChoreographyRunOutputExpectation> EvaluateOutputExpectations(
+            bool evidenceComplete,
+            bool absenceConclusive)
+        {
+            var expectations = Declaration.Outputs.Select(declaration =>
+            {
+                if (declaration.Kind is ChoreographyOperationKind.Respond or ChoreographyOperationKind.Schedule)
+                    return CreateExpectation(declaration, 0, 0, 0, "unsupported_operation");
+                if (declaration.Kind == ChoreographyOperationKind.Terminal)
+                {
+                    var observed = outcome.Observation.Kind == "consumed" && !retryExhausted ? 1 : 0;
+                    return CreateExpectation(
+                        declaration,
+                        observed,
+                        0,
+                        0,
+                        observed > 0
+                            ? "exact_observed"
+                            : !evidenceComplete
+                                ? "insufficient_evidence"
+                                : absenceConclusive ? "missing_expected" : "awaiting_evidence");
+                }
+
+                var matching = outputs.Where(output => Matches(declaration, output.Record.Observation)).ToArray();
+                var observedCount = matching.Length;
+                var failedCount = matching.Count(output => output.Record.Observation.Succeeded == false);
+                var lateCount = declaration.WithinMilliseconds is not { } within
+                    ? 0
+                    : matching.Count(output => output.Record.Observation.OccurredAtUtc - StartedAtUtc > TimeSpan.FromMilliseconds(within));
+                var minimum = declaration.MinCount
+                    ?? (declaration.Requirement == ChoreographyRequirement.Expected ? 1 : 0);
+                var status = failedCount > 0
+                    ? "output_faulted"
+                    : declaration.MaxCount is { } maximum && observedCount > maximum
+                        ? "above_maximum"
+                        : lateCount > 0
+                            ? "timing_exceeded"
+                            : observedCount < minimum
+                                ? !evidenceComplete
+                                    ? "insufficient_evidence"
+                                    : !absenceConclusive
+                                        ? "awaiting_evidence"
+                                        : observedCount == 0 ? "missing_expected" : "below_minimum"
+                                : observedCount > 0
+                                    ? "exact_observed"
+                                    : declaration.Requirement == ChoreographyRequirement.Optional
+                                        ? "optional_not_observed"
+                                        : "informational_not_observed";
+                return CreateExpectation(declaration, observedCount, failedCount, lateCount, status);
+            }).ToList();
+
+            var unexpected = outputs
+                .Where(output => DiagnosticOperationKind(output.Record.Observation.Kind) is not null)
+                .Where(output => !Declaration.Outputs.Any(declaration => Matches(declaration, output.Record.Observation)))
+                .GroupBy(output => new
+                {
+                    Kind = DiagnosticOperationKind(output.Record.Observation.Kind)!,
+                    output.Record.Observation.MessageUrn,
+                    output.Record.Observation.DestinationAddress
+                })
+                .Select(group => new MonitoringChoreographyRunOutputExpectation(
+                    group.Key.Kind,
+                    group.Key.MessageUrn,
+                    group.Key.DestinationAddress,
+                    "undeclared",
+                    null,
+                    null,
+                    null,
+                    group.Count(),
+                    group.Count(output => output.Record.Observation.Succeeded == false),
+                    0,
+                    "unexpected_observed"));
+            expectations.AddRange(unexpected);
+            return expectations;
+        }
+
+        private static MonitoringChoreographyRunOutputExpectation CreateExpectation(
+            ChoreographyOutput declaration,
+            int observedCount,
+            int failedCount,
+            int lateCount,
+            string status)
+            => new(
+                OperationKind(declaration.Kind),
+                declaration.MessageUrn,
+                declaration.Destination,
+                declaration.Requirement.ToString().ToLowerInvariant(),
+                declaration.MinCount,
+                declaration.MaxCount,
+                declaration.WithinMilliseconds,
+                observedCount,
+                failedCount,
+                lateCount,
+                status);
+
+        private static bool Matches(ChoreographyOutput declaration, MonitoringObservation observation)
+            => string.Equals(OperationKind(declaration.Kind), DiagnosticOperationKind(observation.Kind), StringComparison.Ordinal)
+                && string.Equals(declaration.MessageUrn, observation.MessageUrn, StringComparison.Ordinal)
+                && (string.IsNullOrWhiteSpace(declaration.Destination)
+                    || string.Equals(declaration.Destination, observation.DestinationAddress, StringComparison.Ordinal));
+
+        private static string OperationKind(ChoreographyOperationKind kind) => kind switch
+        {
+            ChoreographyOperationKind.Send => "send",
+            ChoreographyOperationKind.Publish => "publish",
+            ChoreographyOperationKind.Respond => "respond",
+            ChoreographyOperationKind.Schedule => "schedule",
+            ChoreographyOperationKind.Terminal => "terminal",
+            _ => kind.ToString().ToLowerInvariant()
+        };
+
+        private static string? DiagnosticOperationKind(string observationKind) => observationKind switch
+        {
+            "sent" or "send_faulted" => "send",
+            "published" or "publish_faulted" => "publish",
+            _ => null
+        };
     }
 
     private sealed record MutableChoreographyRunOutput(

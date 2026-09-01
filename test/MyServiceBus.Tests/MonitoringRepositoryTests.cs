@@ -573,7 +573,13 @@ public class MonitoringRepositoryTests
         run.EvidenceComplete.ShouldBeTrue();
         run.Status.ShouldBe("live");
         run.LastActivityAtUtc.ShouldBe(now.AddSeconds(-1));
-        run.Steps.ShouldHaveSingleItem().StepId.ShouldBe("request-inventory");
+        var runStep = run.Steps.ShouldHaveSingleItem();
+        runStep.StepId.ShouldBe("request-inventory");
+        var expectation = runStep.OutputExpectations.ShouldHaveSingleItem();
+        expectation.Status.ShouldBe("exact_observed");
+        expectation.ObservedCount.ShouldBe(1);
+        run.DiagnosticIssueCount.ShouldBe(0);
+        run.IndeterminateExpectationCount.ShouldBe(0);
 
         repository.CaptureWorkflowRuns(now);
         var retained = repository.GetWorkflowRuns(
@@ -582,6 +588,104 @@ public class MonitoringRepositoryTests
         retained.Runs.ShouldHaveSingleItem().RunId.ShouldBe(run.RunId);
         repository.GetWorkflowRun(run.RunId, now)!.RunId.ShouldBe(run.RunId);
         repository.GetWorkflowRun(run.RunId, now.AddSeconds(30))!.Status.ShouldBe("no_recent_activity");
+    }
+
+    [Fact]
+    public void Repository_compares_declared_outputs_with_complete_exact_run_evidence()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var repository = new MonitoringRepository();
+        var choreography = new ChoreographyBuilder("order-diagnostics", "1", "orders")
+            .Step("check-order", "urn:message:OrderSubmitted", step => step
+                .Publishes("urn:message:InventoryRequested", output => output.AtLeast(2).Within(TimeSpan.FromSeconds(2)))
+                .Publishes("urn:message:PaymentRequested", output => output.Within(TimeSpan.FromMilliseconds(100))))
+            .Build();
+        repository.UpsertMetadata(WithChoreography(
+            CreateMetadata("orders", "orders-1", now, "commerce"), choreography));
+        repository.RecordBatch(CreateBatch(
+            "orders",
+            "orders-1",
+            now,
+            new MonitoringObservation(
+                1, now.AddSeconds(-30), "consumed", true, "OrderSubmitted", "urn:message:OrderSubmitted",
+                "orders", null, 5, null, null, null, "conversation", null, null,
+                MessageId: "root-message"),
+            new MonitoringObservation(
+                2, now.AddMilliseconds(-29_500), "published", true, "InventoryRequested", "urn:message:InventoryRequested",
+                null, "exchange:inventory", 2, null, null, null, "conversation", null, null,
+                MessageId: "inventory-message", CausationMessageId: "root-message"),
+            new MonitoringObservation(
+                3, now.AddMilliseconds(-29_400), "published", true, "PaymentRequested", "urn:message:PaymentRequested",
+                null, "exchange:payment", 2, null, null, null, "conversation", null, null,
+                MessageId: "payment-message", CausationMessageId: "root-message"),
+            new MonitoringObservation(
+                4, now.AddMilliseconds(-29_300), "published", true, "AuditRecorded", "urn:message:AuditRecorded",
+                null, "exchange:audit", 2, null, null, null, "conversation", null, null,
+                MessageId: "audit-message", CausationMessageId: "root-message")));
+
+        var run = repository.GetChoreographyRuns("order-diagnostics", 60, 20, now).Runs.ShouldHaveSingleItem();
+        var expectations = run.Steps.ShouldHaveSingleItem().OutputExpectations;
+        var inventory = expectations.Single(value => value.MessageUrn == "urn:message:InventoryRequested");
+        inventory.Status.ShouldBe("below_minimum");
+        inventory.MinimumCount.ShouldBe(2);
+        inventory.ObservedCount.ShouldBe(1);
+        var payment = expectations.Single(value => value.MessageUrn == "urn:message:PaymentRequested");
+        payment.Status.ShouldBe("timing_exceeded");
+        payment.LateCount.ShouldBe(1);
+        var unexpected = expectations.Single(value => value.MessageUrn == "urn:message:AuditRecorded");
+        unexpected.Status.ShouldBe("unexpected_observed");
+        unexpected.Requirement.ShouldBe("undeclared");
+        run.DiagnosticIssueCount.ShouldBe(3);
+        run.IndeterminateExpectationCount.ShouldBe(0);
+    }
+
+    [Fact]
+    public void Repository_does_not_claim_missing_outputs_when_run_evidence_is_incomplete()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var repository = new MonitoringRepository();
+        var choreography = new ChoreographyBuilder("order-diagnostics", "1", "orders")
+            .Step("check-order", "urn:message:OrderSubmitted", step => step
+                .Publishes("urn:message:InventoryRequested"))
+            .Build();
+        repository.UpsertMetadata(WithChoreography(
+            CreateMetadata("orders", "orders-1", now.AddMinutes(-1), "commerce"), choreography));
+        repository.RecordBatch(CreateBatch(
+            "orders",
+            "orders-1",
+            now,
+            new MonitoringObservation(
+                1, now.AddSeconds(-30), "consumed", true, "OrderSubmitted", "urn:message:OrderSubmitted",
+                "orders", null, 5, null, null, null, "conversation", null, null,
+                MessageId: "root-message")) with
+        { DroppedObservations = 1 });
+
+        var run = repository.GetChoreographyRuns("order-diagnostics", 60, 20, now).Runs.ShouldHaveSingleItem();
+        run.EvidenceComplete.ShouldBeFalse();
+        run.Steps.ShouldHaveSingleItem().OutputExpectations.ShouldHaveSingleItem()
+            .Status.ShouldBe("insufficient_evidence");
+        run.DiagnosticIssueCount.ShouldBe(0);
+        run.IndeterminateExpectationCount.ShouldBe(1);
+
+        var liveRepository = new MonitoringRepository();
+        liveRepository.UpsertMetadata(WithChoreography(
+            CreateMetadata("orders", "orders-1", now, "commerce"), choreography));
+        liveRepository.RecordBatch(CreateBatch(
+            "orders",
+            "orders-1",
+            now,
+            new MonitoringObservation(
+                1, now.AddSeconds(-1), "consumed", true, "OrderSubmitted", "urn:message:OrderSubmitted",
+                "orders", null, 5, null, null, null, "conversation", null, null,
+                MessageId: "live-root")));
+        var liveRun = liveRepository.GetChoreographyRuns("order-diagnostics", 60, 20, now).Runs.ShouldHaveSingleItem();
+        liveRun.Steps.ShouldHaveSingleItem().OutputExpectations.ShouldHaveSingleItem()
+            .Status.ShouldBe("awaiting_evidence");
+        liveRepository.CaptureWorkflowRuns(now);
+        liveRepository.CaptureWorkflowRuns(now.AddSeconds(30));
+        liveRepository.GetWorkflowRun(liveRun.RunId, now.AddSeconds(30))!
+            .Steps.ShouldHaveSingleItem().OutputExpectations.ShouldHaveSingleItem()
+            .Status.ShouldBe("missing_expected");
     }
 
     [Fact]
