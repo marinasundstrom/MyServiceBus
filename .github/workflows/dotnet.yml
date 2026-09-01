@@ -20,9 +20,9 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v6
         with:
           dotnet-version: '10.0.100'
       - name: Restore dependencies
@@ -47,7 +47,7 @@ jobs:
       - name: Verify .NET NativeAOT application
         run: ./eng/verify-dotnet-aot.sh
       - name: Setup .NET 11 preview
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v6
         with:
           dotnet-version: '11.0.100-preview.7.26381.103'
       - name: Build NuGet packages
