@@ -5,7 +5,12 @@ namespace TestApp;
 
 public sealed class OrderOrchestrationStateMachine : SagaStateMachine<OrderOrchestrationState>
 {
-    public OrderOrchestrationStateMachine(bool requireDurableRepository = false)
+    public OrderOrchestrationStateMachine()
+        : this(requireDurableRepository: false)
+    {
+    }
+
+    public OrderOrchestrationStateMachine(bool requireDurableRepository)
         : base("sample-order-orchestration", "1", "TestApp.CSharp")
     {
         InstanceState(state => state.CurrentState, (state, value) => state.CurrentState = value);
