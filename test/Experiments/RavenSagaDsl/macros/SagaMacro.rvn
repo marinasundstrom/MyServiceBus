@@ -1,0 +1,741 @@
+import System.*
+import System.Collections.Generic.*
+import System.Collections.Immutable.*
+import System.Text.*
+import Raven.CodeAnalysis.*
+import Raven.CodeAnalysis.Macros.*
+import Raven.CodeAnalysis.Syntax.*
+import Raven.CodeAnalysis.Text.*
+
+[assembly: RavenCompilerPlugin(typeof(SagaMacro))]
+
+class SagaMacro : IMacroDefinition, IMacroKeywordProvider, IMacroFragmentProvider, IMacroCompletionProvider {
+    static val KeywordBase: int => 84000
+
+    val Name: string => "Saga"
+    val Alias: string? => "saga"
+    val Documentation: string? => "Declares a MyServiceBus saga state machine and lowers it to the native .NET saga runtime."
+
+    val Keywords: ImmutableArray<MacroKeyword>
+        => [
+            MacroKeyword("data", KeywordBase + 1),
+            MacroKeyword("correlate", KeywordBase + 2),
+            MacroKeyword("by", KeywordBase + 3),
+            MacroKeyword("state", KeywordBase + 4),
+            MacroKeyword("initially", KeywordBase + 5),
+            MacroKeyword("in", KeywordBase + 6),
+            MacroKeyword("on", KeywordBase + 7),
+            MacroKeyword("set", KeywordBase + 8),
+            MacroKeyword("send", KeywordBase + 9),
+            MacroKeyword("publish", KeywordBase + 10),
+            MacroKeyword("transition", KeywordBase + 11),
+            MacroKeyword("finalize", KeywordBase + 12)
+        ]
+
+    func GetFragmentRegions(context: TokenTreeMacroContext) -> ImmutableArray<MacroFragmentRegion> {
+        let body = context.GetBodyText()
+        let lines = body.Replace("\r", "").Split('\n')
+        var regions: ImmutableArray<MacroFragmentRegion> = []
+        var lineStart = 0
+        var eventName: string? = null
+        var messageAlias = "message"
+        var index = 0
+
+        while index < lines.Length {
+            let rawLine = lines[index]
+            let line = rawLine.Trim()
+            if line.StartsWith("on ") && line.EndsWith("{") {
+                let header = line.Substring(3, line.Length - 4).Trim()
+                let parts = header.Split(' ', StringSplitOptions.RemoveEmptyEntries)
+                if parts.Length > 0 {
+                    eventName = parts[0]
+                    messageAlias = if parts.Length > 1 { parts[1] } else { "message" }
+                }
+            } else if eventName is not null && line == "}" {
+                eventName = null
+                messageAlias = "message"
+            } else if eventName is not null {
+                let expressionSpan = FindExpressionSpan(rawLine, lineStart, line)
+                if let span: TextSpan = expressionSpan {
+                    var locals: ImmutableArray<MacroFragmentLocal> = []
+                    if let currentEventName: string = eventName {
+                        if let type: ITypeSymbol = FindNamedType(context.Compilation.GlobalNamespace, currentEventName) {
+                            locals = locals.Add(context.CreateFragmentLocal(messageAlias, type))
+                        }
+                    }
+                    regions = regions.Add(context.CreateFragmentRegion(
+                        MacroFragmentKind.Expression,
+                        span,
+                        locals))
+                }
+            }
+
+            lineStart = lineStart + rawLine.Length + 1
+            index = index + 1
+        }
+        regions
+    }
+
+    func GetCompletions(
+        context: TokenTreeMacroContext,
+        bodyRelativePosition: int
+    ) -> ImmutableArray<MacroCompletionItem> {
+        let body = context.GetBodyText()
+        let lineStart = FindLineStart(body, bodyRelativePosition)
+        let beforeCursor = body.Substring(lineStart, bodyRelativePosition - lineStart)
+        let trimmed = beforeCursor.TrimStart()
+        let replacement = FindWordSpan(body, bodyRelativePosition)
+        let prefix = body.Substring(replacement.Start, replacement.Length)
+        let model = ParseForTooling(body.Substring(0, bodyRelativePosition))
+        var items: ImmutableArray<MacroCompletionItem> = []
+
+        if trimmed.StartsWith("transition ") || trimmed.StartsWith("in ") {
+            return AddNames(items, model.States, prefix, replacement, "saga state")
+        }
+        if trimmed.StartsWith("on ") {
+            return AddNames(items, model.Events, prefix, replacement, "correlated saga event")
+        }
+        if trimmed.StartsWith("set ") && !trimmed.Contains("=") {
+            return AddNames(items, model.DataFields, prefix, replacement, "saga data member")
+        }
+        if trimmed.StartsWith("correlate ") && trimmed.Contains(" by ") {
+            return AddNames(items, model.DataFields, prefix, replacement, "saga data member")
+        }
+        if trimmed.StartsWith("correlate ") {
+            return AddTypeNames(context.Compilation.GlobalNamespace, items, prefix, replacement)
+        }
+
+        if model.InBehavior {
+            items = AddItem(items, "set", prefix, replacement, "mutate saga data")
+            items = AddItem(items, "send", prefix, replacement, "send a command")
+            items = AddItem(items, "publish", prefix, replacement, "publish an event")
+            items = AddItem(items, "transition", prefix, replacement, "transition to a declared state")
+            return AddItem(items, "finalize", prefix, replacement, "finalize the saga")
+        }
+        if model.InState {
+            return AddItem(items, "on", prefix, replacement, "handle a correlated event")
+        }
+        if !model.InData {
+            items = AddItem(items, "data", prefix, replacement, "declare saga data")
+            items = AddItem(items, "correlate", prefix, replacement, "declare event correlation")
+            items = AddItem(items, "state", prefix, replacement, "declare a saga state")
+            items = AddItem(items, "initially", prefix, replacement, "declare initiating behavior")
+            return AddItem(items, "in", prefix, replacement, "declare behavior in a state")
+        }
+        []
+    }
+
+    func Expand(
+        declaration: FreestandingMacroDeclarationSyntax,
+        body: IMacroTokenStream,
+        context: TokenTreeMacroContext
+    ) -> FreestandingMacroExpansionResult {
+        try {
+            return ExpandCore(declaration, context)
+        } catch (Exception exception) {
+            return Error(context, "Saga macro implementation failure: ${exception.Message}\n${exception.StackTrace}")
+        }
+    }
+
+    static func ExpandCore(
+        declaration: FreestandingMacroDeclarationSyntax,
+        context: TokenTreeMacroContext
+    ) -> FreestandingMacroExpansionResult {
+        if declaration.ParameterList is ParameterListSyntax parameters && parameters.Parameters.Count > 0 {
+            return Error(context, "The prototype saga declaration does not accept header parameters.")
+        }
+
+        let model = Parse(context.GetBodyText())
+        if let message: string = model.Error {
+            return Error(context, message)
+        }
+        if model.DataFields.Count == 0 {
+            return Error(context, "A saga declaration requires a data block.")
+        }
+        if model.Events.Count == 0 {
+            return Error(context, "A saga declaration requires at least one correlation declaration.")
+        }
+        if model.Behaviors.Count == 0 {
+            return Error(context, "A saga declaration requires at least one behavior.")
+        }
+
+        let sagaName = declaration.Identifier.ValueText
+        let dataName = sagaName + "Data"
+        let source = Generate(sagaName, dataName, model)
+        let tree = Raven.CodeAnalysis.Syntax.SyntaxFactory.ParseSyntaxTree(source)
+        FreestandingMacroExpansionResult.FromMembers(tree.GetRoot().Members)
+    }
+
+    static func Parse(body: string) -> SagaModel {
+        let model = SagaModel()
+        try {
+            return ParseCore(body, model)
+        } catch (Exception exception) {
+            model.Error = "Saga DSL parser failure at '${model.Stage}': ${exception.Message}"
+            return model
+        }
+    }
+
+    static func ParseCore(body: string, model: SagaModel) -> SagaModel {
+        model.Stage = "split body"
+        let lines = body.Replace("\r", "").Split('\n')
+        var inData = false
+        var sourceState: string? = null
+        var currentBehavior: SagaBehaviorModel? = null
+
+        var lineIndex = 0
+        while lineIndex < lines.Length {
+            let rawLine = lines[lineIndex]
+            lineIndex = lineIndex + 1
+            var line = rawLine.Trim()
+            model.Stage = line
+            if line.Length == 0 {
+                continue
+            }
+            let comment = line.IndexOf("//")
+            if comment >= 0 {
+                line = line.Substring(0, comment).Trim()
+            }
+            if line.Length == 0 { continue }
+
+            if inData {
+                if line == "}" {
+                    inData = false
+                    continue
+                }
+                let colon = line.IndexOf(':')
+                if colon <= 0 || colon == line.Length - 1 {
+                    model.Error = "Saga data fields use 'Name: Type'."
+                    return model
+                }
+                let name = line.Substring(0, colon).Trim()
+                let typeName = line.Substring(colon + 1).Trim()
+                if HasDataField(model, name) {
+                    model.Error = "Saga data field '$name' is declared more than once."
+                    return model
+                }
+                model.DataFields.Add(SagaDataFieldModel(name, typeName))
+                continue
+            }
+
+            if let behavior: SagaBehaviorModel = currentBehavior {
+                if line == "}" {
+                    model.Behaviors.Add(behavior)
+                    currentBehavior = null
+                    continue
+                }
+                let activity = ParseActivity(line, behavior.MessageAlias)
+                if let message: string = activity.Error {
+                    model.Error = message
+                    return model
+                }
+                behavior.Activities.Add(activity)
+                continue
+            }
+
+            if let state: string = sourceState {
+                if line == "}" {
+                    sourceState = null
+                    continue
+                }
+                if !line.StartsWith("on ") || !line.EndsWith("{") {
+                    model.Error = "State behavior blocks contain 'on Message [alias] {' declarations."
+                    return model
+                }
+                let header = line.Substring(3, line.Length - 4).Trim()
+                let parts = header.Split(' ', StringSplitOptions.RemoveEmptyEntries)
+                if parts.Length == 0 || parts.Length > 2 {
+                    model.Error = "An on declaration uses 'on Message [alias] {'."
+                    return model
+                }
+                currentBehavior = SagaBehaviorModel(state, parts[0], if parts.Length == 2 { parts[1] } else { "message" })
+                continue
+            }
+
+            if line == "data {" {
+                inData = true
+            } else if line.StartsWith("correlate ") {
+                let parts = line.Split(' ', StringSplitOptions.RemoveEmptyEntries)
+                if parts.Length != 4 || parts[2] != "by" {
+                    model.Error = "Correlation uses 'correlate Message by SagaMember'."
+                    return model
+                }
+                if HasEvent(model, parts[1]) {
+                    model.Error = "Saga event '${parts[1]}' is correlated more than once."
+                    return model
+                }
+                model.Events.Add(SagaEventModel(parts[1], parts[3]))
+            } else if line.StartsWith("state ") {
+                let name = line.Substring(6).Trim()
+                if name.Length == 0 || model.States.Contains(name) {
+                    model.Error = "Saga states must have unique non-empty names."
+                    return model
+                }
+                model.States.Add(name)
+            } else if line == "initially {" {
+                sourceState = "__Initial"
+            } else if line.StartsWith("in ") && line.EndsWith("{") {
+                sourceState = line.Substring(3, line.Length - 4).Trim()
+            } else {
+                model.Error = "Unsupported saga declaration line '$line'."
+                return model
+            }
+        }
+
+        model.Stage = "validate block closure"
+        if inData || sourceState is not null || currentBehavior is not null {
+            model.Error = "The saga declaration contains an unclosed block."
+            return model
+        }
+
+        model.Stage = "validate behaviors"
+        var behaviorIndex = 0
+        while behaviorIndex < model.Behaviors.Count {
+            let behavior = model.Behaviors[behaviorIndex]
+            model.Stage = "validate ${behavior.SourceState}/${behavior.EventName}"
+            if !HasEvent(model, behavior.EventName) {
+                model.Error = "Behavior event '${behavior.EventName}' has no correlation declaration."
+                return model
+            }
+            if behavior.SourceState != "__Initial" && !model.States.Contains(behavior.SourceState) {
+                model.Error = "Behavior references undeclared state '${behavior.SourceState}'."
+                return model
+            }
+            if behavior.Activities.Count == 0 {
+                model.Error = "Behavior '${behavior.SourceState}/${behavior.EventName}' has no activities."
+                return model
+            }
+            let terminal = behavior.Activities[behavior.Activities.Count - 1]
+            if terminal.Kind != "transition" && terminal.Kind != "finalize" {
+                model.Error = "Behavior '${behavior.SourceState}/${behavior.EventName}' must end in transition or finalize."
+                return model
+            }
+            if terminal.Kind == "transition" && !model.States.Contains(terminal.Value) {
+                model.Error = "Transition targets undeclared state '${terminal.Value}'."
+                return model
+            }
+            behaviorIndex = behaviorIndex + 1
+        }
+
+        model.Stage = "validate correlations"
+        var eventIndex = 0
+        while eventIndex < model.Events.Count {
+            let eventModel = model.Events[eventIndex]
+            model.Stage = "validate correlation ${eventModel.Name}"
+            if !HasDataField(model, eventModel.SagaMember) {
+                model.Error = "Correlation for '${eventModel.Name}' references missing saga data field '${eventModel.SagaMember}'."
+                return model
+            }
+            eventIndex = eventIndex + 1
+        }
+
+        model
+    }
+
+    static func HasDataField(model: SagaModel, name: string) -> bool {
+        var index = 0
+        while index < model.DataFields.Count {
+            if model.DataFields[index].Name == name { return true }
+            index = index + 1
+        }
+        false
+    }
+
+    static func HasEvent(model: SagaModel, name: string) -> bool {
+        var index = 0
+        while index < model.Events.Count {
+            if model.Events[index].Name == name { return true }
+            index = index + 1
+        }
+        false
+    }
+
+    static func HasInitialBehavior(model: SagaModel, eventName: string) -> bool {
+        var index = 0
+        while index < model.Behaviors.Count {
+            let behavior = model.Behaviors[index]
+            if behavior.SourceState == "__Initial" && behavior.EventName == eventName { return true }
+            index = index + 1
+        }
+        false
+    }
+
+    static func ParseActivity(line: string, messageAlias: string) -> SagaActivityModel {
+        if line.StartsWith("set ") {
+            let assignment = line.Substring(4).Trim()
+            if !assignment.Contains("=") {
+                return SagaActivityModel.WithError("Set activities use 'set SagaMember = expression'.")
+            }
+            return SagaActivityModel("set", ReplaceMessageAlias(assignment, messageAlias))
+        }
+        if line.StartsWith("send ") {
+            let expression = line.Substring(5).Trim()
+            return MessageActivity("send", expression, messageAlias)
+        }
+        if line.StartsWith("publish ") {
+            let expression = line.Substring(8).Trim()
+            return MessageActivity("publish", expression, messageAlias)
+        }
+        if line.StartsWith("transition ") {
+            let target = line.Substring(11).Trim()
+            if target.Contains(" when ") {
+                return SagaActivityModel.WithError("Guarded transitions are not in the native version 1 saga profile yet.")
+            }
+            return SagaActivityModel("transition", target)
+        }
+        if line == "finalize" {
+            return SagaActivityModel("finalize", "")
+        }
+        if line.StartsWith("after ") {
+            return SagaActivityModel.WithError("Durable 'after' scheduling is not in the native version 1 saga profile yet.")
+        }
+        SagaActivityModel.WithError("Unsupported saga activity '$line'.")
+    }
+
+    static func MessageActivity(kind: string, expression: string, messageAlias: string) -> SagaActivityModel {
+        let open = expression.IndexOf('(')
+        if open <= 0 || !expression.EndsWith(")") {
+            return SagaActivityModel.WithError("$kind activities require a message constructor expression.")
+        }
+        let typeName = expression.Substring(0, open).Trim()
+        let generatedExpression = typeName + expression.Substring(open)
+        SagaActivityModel(kind, typeName + "|" + ReplaceMessageAlias(generatedExpression, messageAlias))
+    }
+
+    static func ReplaceMessageAlias(value: string, messageAlias: string) -> string {
+        value.Replace(messageAlias + ".", "context.Message.")
+    }
+
+    static func Generate(sagaName: string, dataName: string, model: SagaModel) -> string {
+        let source = StringBuilder()
+        source.Append("class ").Append(dataName).Append(" {")
+        source.Append("var CurrentState: string? = null;")
+        var dataFieldIndex = 0
+        while dataFieldIndex < model.DataFields.Count {
+            let dataField = model.DataFields[dataFieldIndex]
+            source.Append("var ").Append(dataField.Name).Append(": ").Append(dataField.TypeName)
+                .Append(" = default(").Append(dataField.TypeName).Append(");")
+            dataFieldIndex = dataFieldIndex + 1
+        }
+
+        let identityMember = model.Events[0].SagaMember
+        source.Append("init(id: System.Guid) { ").Append(identityMember).Append(" = id }")
+        source.Append("func Copy() -> ").Append(dataName).Append(" {")
+        source.Append("let copy = ").Append(dataName).Append("(").Append(identityMember).Append(");")
+        source.Append("copy.CurrentState = CurrentState;")
+        dataFieldIndex = 0
+        while dataFieldIndex < model.DataFields.Count {
+            let dataField = model.DataFields[dataFieldIndex]
+            if dataField.Name != identityMember {
+                source.Append("copy.").Append(dataField.Name).Append(" = ").Append(dataField.Name).Append(";")
+            }
+            dataFieldIndex = dataFieldIndex + 1
+        }
+        source.Append("return copy }")
+        source.Append("}")
+
+        source.Append("class ").Append(sagaName).Append(" : MyServiceBus.Orchestration.SagaStateMachine<")
+            .Append(dataName).Append("> {")
+        source.Append("init(): base(\"").Append(ToKebabCase(sagaName)).Append("\", \"1\", \"MyServiceBus.RavenSagaDslSample\") {")
+        source.Append("InstanceState(func (state) => state.CurrentState, func (state, value) { state.CurrentState = value });")
+        source.Append("InstanceFactory(func (id) => ").Append(dataName).Append("(id));")
+        source.Append("CloneInstance(func (state) => state.Copy());")
+
+        var stateIndex = 0
+        while stateIndex < model.States.Count {
+            let state = model.States[stateIndex]
+            source.Append("let ").Append(StateVariable(state)).Append(" = State(\"").Append(state).Append("\");")
+            stateIndex = stateIndex + 1
+        }
+
+        var eventIndex = 0
+        while eventIndex < model.Events.Count {
+            let eventModel = model.Events[eventIndex]
+            let creates = HasInitialBehavior(model, eventModel.Name)
+            source.Append("let ").Append(EventVariable(eventModel.Name)).Append(" = Event<").Append(eventModel.Name)
+                .Append(">(\"").Append(eventModel.Name).Append("\", func (correlation) => correlation.CorrelateById(\"")
+                .Append(eventModel.SagaMember).Append("\", \"").Append(eventModel.SagaMember)
+                .Append("\", func (message) => message.").Append(eventModel.SagaMember).Append(")")
+            if creates {
+                source.Append(".CreatesIfMissing()")
+            }
+            source.Append(");")
+            eventIndex = eventIndex + 1
+        }
+
+        var behaviorIndex = 0
+        while behaviorIndex < model.Behaviors.Count {
+            let behavior = model.Behaviors[behaviorIndex]
+            let binderName = "behavior" + behaviorIndex.ToString()
+            source.Append("let ").Append(binderName).Append(" = When(")
+                .Append(EventVariable(behavior.EventName)).Append(");")
+            var activityIndex = 0
+            while activityIndex < behavior.Activities.Count {
+                let activity = behavior.Activities[activityIndex]
+                AppendActivity(source, binderName, activity)
+                activityIndex = activityIndex + 1
+            }
+            if behavior.SourceState == "__Initial" {
+                _ = source.Append("Initially(").Append(binderName).Append(");")
+            } else {
+                _ = source.Append("During(").Append(StateVariable(behavior.SourceState)).Append(", ")
+                    .Append(binderName).Append(");")
+            }
+            behaviorIndex = behaviorIndex + 1
+        }
+
+        source.Append("RetainWhenFinalized();")
+        source.Append("} }")
+        source.ToString()
+    }
+
+    static func AppendActivity(source: StringBuilder, binderName: string, activity: SagaActivityModel) {
+        source.Append(binderName)
+        if activity.Kind == "set" {
+            source.Append(".Then(func (context) => context.Saga.").Append(activity.Value).Append(");")
+        } else if activity.Kind == "send" || activity.Kind == "publish" {
+            let separator = activity.Value.IndexOf('|')
+            let typeName = activity.Value.Substring(0, separator)
+            let expression = activity.Value.Substring(separator + 1)
+            if activity.Kind == "send" {
+                source.Append(".Send<").Append(typeName).Append(">(MyServiceBus.MessageUrn.For(typeof(")
+                    .Append(typeName).Append(")), \"queue:").Append(typeName).Append("\", func (context) => ")
+                    .Append(expression).Append(");")
+            } else {
+                source.Append(".Publish<").Append(typeName).Append(">(MyServiceBus.MessageUrn.For(typeof(")
+                    .Append(typeName).Append(")), func (context) => ").Append(expression).Append(");")
+            }
+        } else if activity.Kind == "transition" {
+            source.Append(".TransitionTo(").Append(StateVariable(activity.Value)).Append(");")
+        } else if activity.Kind == "finalize" {
+            source.Append(".FinalizeSaga();")
+        }
+    }
+
+    static func StateVariable(name: string) -> string => "state" + name
+    static func EventVariable(name: string) -> string => "event" + name
+
+    static func ToKebabCase(name: string) -> string {
+        let value = StringBuilder()
+        var index = 0
+        while index < name.Length {
+            let character = name[index]
+            if index > 0 && Char.IsUpper(character) {
+                value.Append('-')
+            }
+            value.Append(Char.ToLowerInvariant(character))
+            index = index + 1
+        }
+        value.ToString()
+    }
+
+    static func FindExpressionSpan(rawLine: string, lineStart: int, line: string) -> TextSpan? {
+        let contentStart = rawLine.IndexOf(line)
+        var relativeStart = -1
+        if line.StartsWith("set ") {
+            let equals = rawLine.IndexOf('=')
+            if equals >= 0 { relativeStart = equals + 1 }
+        } else if line.StartsWith("send ") {
+            relativeStart = contentStart + 5
+        } else if line.StartsWith("publish ") {
+            relativeStart = contentStart + 8
+        }
+        if relativeStart < 0 { return null }
+        while relativeStart < rawLine.Length && Char.IsWhiteSpace(rawLine[relativeStart]) {
+            relativeStart = relativeStart + 1
+        }
+        var relativeEnd = rawLine.Length
+        while relativeEnd > relativeStart && Char.IsWhiteSpace(rawLine[relativeEnd - 1]) {
+            relativeEnd = relativeEnd - 1
+        }
+        if relativeEnd == relativeStart { return null }
+        TextSpan(relativeStart + lineStart, relativeEnd - relativeStart)
+    }
+
+    static func FindNamedType(root: INamespaceSymbol, name: string) -> INamedTypeSymbol? {
+        let search = NamedTypeSearch()
+        FindNamedTypes(root, name, search)
+        if search.Count == 1 { return search.Found }
+        null
+    }
+
+    static func FindNamedTypes(root: INamespaceSymbol, name: string, search: NamedTypeSearch) {
+        let members = root.GetMembers()
+        var index = 0
+        while index < members.Length {
+            let member = members[index]
+            if member is INamedTypeSymbol type && type.Name == name {
+                search.Count = search.Count + 1
+                search.Found = type
+            }
+            if member is INamespaceSymbol child {
+                FindNamedTypes(child, name, search)
+            }
+            index = index + 1
+        }
+    }
+
+    static func FindLineStart(body: string, position: int) -> int {
+        var index = position - 1
+        while index >= 0 && body[index] != '\n' { index = index - 1 }
+        index + 1
+    }
+
+    static func FindWordSpan(body: string, position: int) -> TextSpan {
+        var start = position
+        while start > 0 {
+            let character = body[start - 1]
+            if !Char.IsLetterOrDigit(character) && character != '_' { break }
+            start = start - 1
+        }
+        TextSpan(start, position - start)
+    }
+
+    static func AddNames(
+        items: ImmutableArray<MacroCompletionItem>,
+        names: System.Collections.Generic.List<string>,
+        prefix: string,
+        span: TextSpan,
+        description: string
+    ) -> ImmutableArray<MacroCompletionItem> {
+        var result = items
+        var index = 0
+        while index < names.Count {
+            result = AddItem(result, names[index], prefix, span, description)
+            index = index + 1
+        }
+        result
+    }
+
+    static func AddItem(
+        items: ImmutableArray<MacroCompletionItem>,
+        value: string,
+        prefix: string,
+        span: TextSpan,
+        description: string
+    ) -> ImmutableArray<MacroCompletionItem> {
+        if !value.StartsWith(prefix) { return items }
+        items.Add(MacroCompletionItem(value, value, span, Description: description))
+    }
+
+    static func AddTypeNames(
+        root: INamespaceSymbol,
+        items: ImmutableArray<MacroCompletionItem>,
+        prefix: string,
+        span: TextSpan
+    ) -> ImmutableArray<MacroCompletionItem> {
+        if prefix.Length == 0 { return items }
+        var result = items
+        let members = root.GetMembers()
+        var index = 0
+        while index < members.Length {
+            let member = members[index]
+            if member is INamedTypeSymbol type
+                && type.TypeKind == TypeKind.Class
+                && !type.IsAbstract
+                && type.Arity == 0
+                && type.Name.StartsWith(prefix) {
+                let symbol: ISymbol = type
+                result = result.Add(MacroCompletionItem(
+                    type.Name,
+                    type.Name,
+                    span,
+                    Description: "message type",
+                    Symbol: symbol))
+            } else if member is INamespaceSymbol child {
+                result = AddTypeNames(child, result, prefix, span)
+            }
+            index = index + 1
+        }
+        result
+    }
+
+    static func ParseForTooling(body: string) -> SagaToolingModel {
+        let model = SagaToolingModel()
+        let lines = body.Replace("\r", "").Split('\n')
+        var index = 0
+        while index < lines.Length {
+            let line = lines[index].Trim()
+            if line == "data {" {
+                model.InData = true
+            } else if model.InData {
+                if line == "}" {
+                    model.InData = false
+                } else {
+                    let colon = line.IndexOf(':')
+                    if colon > 0 { AddUnique(model.DataFields, line.Substring(0, colon).Trim()) }
+                }
+            } else if model.InBehavior {
+                if line == "}" { model.InBehavior = false }
+            } else if model.InState {
+                if line == "}" {
+                    model.InState = false
+                } else if line.StartsWith("on ") && line.EndsWith("{") {
+                    model.InBehavior = true
+                }
+            } else if line.StartsWith("correlate ") {
+                let parts = line.Split(' ', StringSplitOptions.RemoveEmptyEntries)
+                if parts.Length > 1 { AddUnique(model.Events, parts[1]) }
+            } else if line.StartsWith("state ") {
+                AddUnique(model.States, line.Substring(6).Trim())
+            } else if line == "initially {" || (line.StartsWith("in ") && line.EndsWith("{")) {
+                model.InState = true
+            }
+            index = index + 1
+        }
+        model
+    }
+
+    static func AddUnique(values: System.Collections.Generic.List<string>, value: string) {
+        if value.Length > 0 && !values.Contains(value) { values.Add(value) }
+    }
+
+    static func Error(context: TokenTreeMacroContext, message: string) -> FreestandingMacroExpansionResult {
+        FreestandingMacroExpansionResult.FromDiagnostic(
+            context.CreateBodyDiagnostic(TextSpan(0, context.BodySpan.Length), message, code: "MSBSAGA001"))
+    }
+}
+
+class SagaToolingModel {
+    val DataFields = System.Collections.Generic.List<string>()
+    val Events = System.Collections.Generic.List<string>()
+    val States = System.Collections.Generic.List<string>()
+    var InData = false
+    var InState = false
+    var InBehavior = false
+}
+
+class NamedTypeSearch {
+    var Count = 0
+    var Found: INamedTypeSymbol? = null
+}
+
+class SagaModel {
+    val DataFields = System.Collections.Generic.List<SagaDataFieldModel>()
+    val Events = System.Collections.Generic.List<SagaEventModel>()
+    val States = System.Collections.Generic.List<string>()
+    val Behaviors = System.Collections.Generic.List<SagaBehaviorModel>()
+    var Error: string? = null
+    var Stage: string = "start"
+}
+
+class SagaDataFieldModel(val Name: string, val TypeName: string)
+class SagaEventModel(val Name: string, val SagaMember: string)
+
+class SagaBehaviorModel(
+    val SourceState: string,
+    val EventName: string,
+    val MessageAlias: string
+) {
+    val Activities = System.Collections.Generic.List<SagaActivityModel>()
+}
+
+class SagaActivityModel(val Kind: string, val Value: string) {
+    var Error: string? = null
+
+    static func WithError(message: string) -> SagaActivityModel {
+        let value = SagaActivityModel("error", "")
+        value.Error = message
+        value
+    }
+}

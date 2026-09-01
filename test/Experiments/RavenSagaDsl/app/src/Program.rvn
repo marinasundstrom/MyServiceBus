@@ -1,0 +1,79 @@
+namespace MyServiceBus.RavenSagaDslSample
+
+import System.Console.*
+import MyServiceBus.Orchestration.*
+
+record OrderSubmitted(OrderId: Guid)
+record InventoryReserved(OrderId: Guid)
+record PaymentReceived(OrderId: Guid)
+record ReserveInventory(OrderId: Guid)
+record CapturePayment(OrderId: Guid)
+record OrderCompleted(OrderId: Guid)
+
+saga! OrderSaga {
+    data {
+        OrderId: Guid
+        InventoryReserved: bool
+        PaymentReceived: bool
+    }
+
+    correlate OrderSubmitted by OrderId
+    correlate InventoryReserved by OrderId
+    correlate PaymentReceived by OrderId
+
+    state AwaitingInventory
+    state AwaitingPayment
+
+    initially {
+        on OrderSubmitted message {
+            send ReserveInventory(message.OrderId)
+            transition AwaitingInventory
+        }
+    }
+
+    in AwaitingInventory {
+        on InventoryReserved message {
+            set InventoryReserved = true
+            send CapturePayment(message.OrderId)
+            transition AwaitingPayment
+        }
+    }
+
+    in AwaitingPayment {
+        on PaymentReceived message {
+            set PaymentReceived = true
+            publish OrderCompleted(message.OrderId)
+            finalize
+        }
+    }
+}
+
+async func Main() -> Task {
+    let machine = OrderSaga()
+    let repository = InMemorySagaRepository<OrderSagaData>(func (state) => state.Copy())
+    let runtime = machine.CreateRuntime(repository)
+    let orderId = Guid.NewGuid()
+
+    let submitted = await runtime.Deliver(OrderSubmitted(orderId))
+    Assert(submitted.Created, "The initiating event should create the saga instance.")
+    Assert(submitted.EndState == "AwaitingInventory", "The initiating transition was not applied.")
+    Assert(submitted.Outgoing.Count == 1, "The initiating behavior should send one command.")
+    Assert(submitted.Outgoing[0].Kind == SagaActivityKind.Send, "ReserveInventory should be a send activity.")
+
+    let reserved = await runtime.Deliver(InventoryReserved(orderId))
+    Assert(reserved.EndState == "AwaitingPayment", "The inventory transition was not applied.")
+    Assert(reserved.Outgoing.Count == 1, "The inventory behavior should send one payment command.")
+
+    let paid = await runtime.Deliver(PaymentReceived(orderId))
+    Assert(paid.Completed, "The payment event should finalize the saga.")
+    Assert(paid.Outgoing.Count == 1, "The final behavior should publish completion.")
+    Assert(paid.Outgoing[0].Kind == SagaActivityKind.Publish, "OrderCompleted should be a publish activity.")
+
+    WriteLine("Raven saga macro sample passed through the MyServiceBus runtime.")
+}
+
+func Assert(condition: bool, message: string) {
+    if !condition {
+        throw InvalidOperationException(message)
+    }
+}

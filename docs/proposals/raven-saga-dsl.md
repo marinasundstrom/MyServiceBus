@@ -2,7 +2,7 @@
 
 ## Status
 
-Future exploration only. This document is neither a supported saga API commitment nor a commitment to Raven syntax.
+Executable prototype under `test/Experiments/RavenSagaDsl`; neither the prototype nor this document is a supported saga API commitment or a commitment to final Raven syntax.
 
 Target: a Raven-authored executable sample built on MyServiceBus's native saga runtime after MyServiceBus defines portable saga and state-machine semantics.
 
@@ -225,6 +225,16 @@ After the native MyServiceBus saga runtime and portable saga profile exist, add 
 The sample should exercise at least the familiar `Initially`/`During`/`When` model, correlation, transition, finalization, one scheduled event, and one request or composite event. Its documentation should show the equivalent MassTransit concepts and the corresponding C# and Java MyServiceBus projections without requiring identical syntax.
 
 The sample is evidence for Raven's projection and cross-language interoperability. It must not become the sole proof of portable saga behavior.
+
+### Current prototype boundary
+
+The first executable prototype now lowers a Raven declaration macro into the native .NET `SagaStateMachine<TSaga>` authoring API and executes the resulting definition through `SagaStateMachineRuntime<TSaga>`. It covers generated data, identity correlation, initial and state-specific behaviors, mutation, send, publish, transition, and finalization. It intentionally retains finalized instances so the experiment can inspect the runtime result.
+
+The prototype does not implement named final outcomes, guarded transitions, durable `after` scheduling, requests, or composite events. Those constructs remain in the fuller syntax proposal above, but the macro diagnoses them where applicable rather than assigning semantics that the portable version 1 runtime does not yet define. Its convention-based `send` destination is sample-only and must be replaced by an explicit or topology-resolved destination model before this becomes an authoring feature.
+
+The prototype also establishes a tooling boundary. Saga-owned positions complete from the declaration itself: correlated events after `on`, declared states after `in` and `transition`, saga-data members after `set` and `by`, and the supported activity vocabulary inside a behavior. The right-hand side of `set` and the outgoing constructor after `send` or `publish` are Raven expression fragments with a typed handler alias. Raven therefore owns expression parsing and ordinary language services only where the saga grammar explicitly admits an expression; it does not turn the behavior body into unrestricted host-language code.
+
+That distinction is part of the proposed language contract. A future implementation should model each position with an explicit expected category—state, event, data member, duration, destination, activity, type, or Raven expression—and produce recovery-aware diagnostics and completion from that category. Adding an escape hatch must not make invalid saga concepts appear valid merely because they form a valid Raven expression.
 
 ## Relationship to Choreography
 
