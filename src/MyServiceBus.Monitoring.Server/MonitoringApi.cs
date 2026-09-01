@@ -221,12 +221,20 @@ public static class MonitoringApi
         query.MapGet("/observations", (
             string? application,
             bool? attentionOnly,
+            string? category,
+            string? search,
             int? offset,
             int? limit,
             MonitoringRepository repository,
             MonitoringDisclosurePolicy disclosure) =>
         {
-            var page = repository.GetObservationIndex(application, attentionOnly ?? false, offset ?? 0, limit ?? 50);
+            var page = repository.GetObservationIndex(
+                application,
+                attentionOnly ?? false,
+                category,
+                search,
+                offset ?? 0,
+                limit ?? 50);
             return page with { Observations = disclosure.Apply(page.Observations) };
         })
             .WithSummary("List a filtered page of retained monitoring observations under the configured disclosure policy");

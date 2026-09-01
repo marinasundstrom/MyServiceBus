@@ -1,0 +1,28 @@
+<label class="time-window-selector">
+    <span>@Label</span>
+    <select value="@Value" @onchange="ChangeAsync" disabled="@Disabled" aria-label="@Label">
+        @foreach (var seconds in MonitoringWindow.SupportedSeconds)
+        {
+            <option value="@seconds">@MonitoringWindow.Format(seconds)</option>
+        }
+    </select>
+</label>
+
+@code {
+    [Parameter]
+    public string Label { get; set; } = "Window";
+
+    [Parameter]
+    public int Value { get; set; } = MonitoringWindow.DefaultSeconds;
+
+    [Parameter]
+    public bool Disabled { get; set; }
+
+    [Parameter]
+    public EventCallback<int> ValueChanged { get; set; }
+
+    private Task ChangeAsync(ChangeEventArgs args)
+        => int.TryParse(args.Value?.ToString(), out var seconds)
+            ? ValueChanged.InvokeAsync(seconds)
+            : Task.CompletedTask;
+}

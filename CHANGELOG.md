@@ -4,6 +4,7 @@ This changelog summarizes the bigger themes in the repository history rather tha
 
 ## Unreleased
 
+- Separated retained failure history from the recent-failure signal. The monitoring service now provides paginated failure/retry queries with application, category, and broad operational-identity search; the Dashboard keeps those filters in the URL while a configurable window controls only overview and navigation notifications.
 - Restored consistent vertical spacing between the message-flow map and request/response panel in both comfortable and compact Dashboard densities. Failed request/response exchanges now use the failure indicator and label their completed failure lane as a fault response instead of an indefinitely awaiting response.
 - Made paginated Dashboard views safe under live updates. The newest page continues to refresh automatically, while later pages hold a stable snapshot to prevent row drift and surface an explicit “Show latest” action when monitoring data changes.
 - Added server-side pagination and retained-result counts to the Dashboard message and failure indexes, with URL-backed message search and status filters that remain applied while paging. Workflow runs, declared workflows, and potentially large current-state tables for throughput, endpoints, replicas, scheduled work, recurring jobs, and tracked jobs now share the same reusable list pager.

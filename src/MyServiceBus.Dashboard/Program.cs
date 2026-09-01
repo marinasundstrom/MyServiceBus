@@ -11,6 +11,8 @@ builder.Services.AddRazorComponents()
 builder.Services.AddOptions<DashboardOptions>()
     .BindConfiguration(DashboardOptions.SectionName)
     .Validate(options => options.MonitoringServiceAddress.IsAbsoluteUri, "Dashboard:MonitoringServiceAddress must be an absolute URI.")
+    .Validate(options => MonitoringWindow.IsSupported(options.FailureSignalWindowSeconds),
+        $"Dashboard:FailureSignalWindowSeconds must be one of: {string.Join(", ", MonitoringWindow.SupportedSeconds)}.")
     .ValidateOnStart();
 builder.Services.PostConfigure<DashboardOptions>(options =>
 {

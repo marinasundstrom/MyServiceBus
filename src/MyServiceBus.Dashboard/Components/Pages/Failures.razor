@@ -2,74 +2,121 @@
 @rendermode InteractiveServer
 @inherits MonitoringPageBase
 @inject MonitoringApiClient Api
+@inject NavigationManager Navigation
 
 <PageTitle>Failures · MyServiceBus Monitoring</PageTitle>
-<DashboardPageHeader Eyebrow="Diagnostics" Title="Retries and failures" Description="Inspect messages that needed another attempt or could not be handled. Expand a row for correlation and exception details." />
+<DashboardPageHeader Eyebrow="Diagnostics" Title="Retries and failures" Description="Search the retained history of messages that needed another attempt or could not be handled. Expand a row for correlation and exception details." />
 
 <section class="panel failures-panel">
-    <div class="section-heading"><div><p class="eyebrow">Recent activity</p><h2>Messages needing attention</h2></div><span>@(CurrentPage?.Total ?? 0) retained · newest first</span></div>
+    <div class="section-heading">
+        <div><p class="eyebrow">Retained history</p><h2>Messages needing attention</h2></div>
+        <div class="section-heading-actions">
+            <span>@(CurrentPage?.Total ?? 0) matching · newest first</span>
+            <TimeWindowSelector Label="Recent failure signal" Value="Dashboard.FailureSignalWindowSeconds" ValueChanged="ChangeSignalWindowAsync" Disabled="loading" />
+        </div>
+    </div>
+
+    <form class="failure-filters" aria-label="Filter failures" @onsubmit="ApplyFiltersAsync" @onsubmit:preventDefault>
+        <label><span>Search</span><input type="search" placeholder="Message, exception, ID, or endpoint" @bind="search" /></label>
+        <label><span>Application</span><select @bind="application" @bind:after="FilterChangedAsync"><option value="all">All applications</option>@foreach (var item in Dashboard.Applications.OrderBy(item => item.ApplicationName, StringComparer.Ordinal)) {<option value="@item.ApplicationName">@item.ApplicationName</option>}</select></label>
+        <label><span>Type</span><select @bind="typeFilter" @bind:after="FilterChangedAsync"><option value="all">Failures and retries</option><option value="failure">Failures only</option><option value="retry">Retries only</option></select></label>
+        <button type="submit" class="workflow-filter-action" disabled="@loading">Search</button>
+        @if (FiltersApplied) {<button type="button" class="workflow-filter-reset" @onclick="ClearFiltersAsync" disabled="@loading">Clear</button>}
+    </form>
+
     @if (CurrentPage is not { } page || page.Observations.Count == 0)
     {
-        <p class="panel-empty">No retries or failures are present in the retained observations.</p>
+        <p class="panel-empty">@(FiltersApplied ? "No retained retries or failures match the current filters." : "No retries or failures are present in the retained observations.")</p>
     }
     else
     {
         <div class="event-list">
             @foreach (var record in page.Observations)
             {
-                <details class="event-row"><summary><span class="event-kind">@DisplayKind(record.Observation.Kind)</span><span class="event-summary"><strong>@record.ApplicationName</strong><small>@ShortMessageType(record.Observation.MessageType) · @record.InstanceId</small></span><time>@record.Observation.OccurredAtUtc.ToLocalTime().ToString("HH:mm:ss")</time></summary>
-                    <div class="event-detail"><span><small>Endpoint</small><strong>@ValueOrDash(record.Observation.EndpointName)</strong></span><span><small>Retry</small><strong>@RetryDescription(record.Observation)</strong></span><span><small>Exception</small><strong>@ValueOrDash(record.Observation.ExceptionType)</strong></span><span><small>Correlation ID</small><strong class="mono">@ValueOrDash(record.Observation.CorrelationId)</strong></span><span><small>Conversation ID</small><strong class="mono">@ValueOrDash(record.Observation.ConversationId)</strong></span><span><small>Trace ID</small><strong class="mono">@ValueOrDash(record.Observation.TraceId)</strong></span><span class="event-message"><small>Failure message</small><strong>@ValueOrDash(record.Observation.ExceptionMessage)</strong></span><span class="event-message"><small>Message URN</small><strong class="mono">@ValueOrDash(record.Observation.MessageUrn)</strong></span></div>
+                <details class="event-row"><summary><span class="event-kind">@DisplayKind(record.Observation.Kind)</span><span class="event-summary"><strong>@record.ApplicationName</strong><small>@ShortMessageType(record.Observation.MessageType) · @record.InstanceId</small></span><time>@record.Observation.OccurredAtUtc.ToLocalTime().ToString("MMM d, HH:mm:ss")</time></summary>
+                    <div class="event-detail"><span><small>Endpoint</small><strong>@ValueOrDash(record.Observation.EndpointName)</strong></span><span><small>Retry</small><strong>@RetryDescription(record.Observation)</strong></span><span><small>Exception</small><strong>@ValueOrDash(record.Observation.ExceptionType)</strong></span><span><small>Message ID</small><strong class="mono">@ValueOrDash(record.Observation.MessageId)</strong></span><span><small>Correlation ID</small><strong class="mono">@ValueOrDash(record.Observation.CorrelationId)</strong></span><span><small>Conversation ID</small><strong class="mono">@ValueOrDash(record.Observation.ConversationId)</strong></span><span><small>Trace ID</small><strong class="mono">@ValueOrDash(record.Observation.TraceId)</strong></span><span class="event-message"><small>Failure message</small><strong>@ValueOrDash(record.Observation.ExceptionMessage)</strong></span><span class="event-message"><small>Message URN</small><strong class="mono">@ValueOrDash(record.Observation.MessageUrn)</strong></span></div>
                 </details>
             }
         </div>
-        <ListPagination Offset="page.Offset"
-                        PageSize="page.Limit"
-                        ItemCount="page.Observations.Count"
-                        Total="page.Total"
-                        Disabled="loading"
-                        Live="true"
-                        UpdatesAvailable="updatesAvailable"
-                        ShowLatest="ShowLatestAsync"
-                        PageChanged="LoadPageAsync" />
+        <ListPagination Offset="page.Offset" PageSize="page.Limit" ItemCount="page.Observations.Count" Total="page.Total" Disabled="loading" Live="true" UpdatesAvailable="updatesAvailable" ShowLatest="ShowLatestAsync" PageChanged="LoadPageAsync" />
     }
 </section>
 
+<div class="guidance failure-history-guidance"><strong>History and signal are separate</strong><span>This list remains queryable until the monitoring retention policy purges it. “Recent failure signal” controls only the overview and navigation badge window; it never removes records from this history.</span></div>
+
 @code {
     private const int PageSize = 25;
+    private static readonly HashSet<string> SupportedTypes = ["failure", "retry"];
+
+    [SupplyParameterFromQuery(Name = "application")] public string? ApplicationQuery { get; set; }
+    [SupplyParameterFromQuery(Name = "type")] public string? TypeQuery { get; set; }
+    [SupplyParameterFromQuery(Name = "search")] public string? SearchQuery { get; set; }
+    [SupplyParameterFromQuery(Name = "window")] public int? WindowQuery { get; set; }
+
+    private string application = "all";
+    private string typeFilter = "all";
+    private string search = string.Empty;
     private MonitoringObservationIndexPage? queriedPage;
     private bool loading;
     private bool updatesAvailable;
+    private string? appliedQueryKey;
     private string? historicalHeadSignature;
 
     private MonitoringObservationIndexPage? CurrentPage => queriedPage ?? Dashboard.FailureObservationIndex;
+    private bool FiltersApplied => application != "all" || typeFilter != "all" || !string.IsNullOrWhiteSpace(search);
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var requestedApplication = string.IsNullOrWhiteSpace(ApplicationQuery) ? "all" : ApplicationQuery.Trim();
+        var requestedType = TypeQuery is not null && SupportedTypes.Contains(TypeQuery) ? TypeQuery : "all";
+        var requestedSearch = SearchQuery?.Trim() ?? string.Empty;
+        var requestedWindow = MonitoringWindow.Normalize(WindowQuery, Dashboard.DefaultFailureSignalWindowSeconds);
+        var queryKey = $"{requestedApplication}\u001f{requestedType}\u001f{requestedSearch}\u001f{requestedWindow}";
+        if (string.Equals(queryKey, appliedQueryKey, StringComparison.Ordinal)) return;
+
+        appliedQueryKey = queryKey;
+        application = requestedApplication;
+        typeFilter = requestedType;
+        search = requestedSearch;
+        await Dashboard.SetFailureSignalWindowAsync(requestedWindow);
+        if (!FiltersApplied) { queriedPage = null; return; }
+        await LoadPageAsync(0);
+    }
+
+    private Task ApplyFiltersAsync() { NavigateToQuery(); return Task.CompletedTask; }
+    private Task FilterChangedAsync() { NavigateToQuery(); return Task.CompletedTask; }
+    private Task ClearFiltersAsync() { application = "all"; typeFilter = "all"; search = string.Empty; NavigateToQuery(); return Task.CompletedTask; }
+    private Task ChangeSignalWindowAsync(int seconds) { NavigateToQuery(seconds); return Task.CompletedTask; }
+
+    private void NavigateToQuery(int? requestedWindow = null)
+    {
+        var parameters = new List<string>();
+        if (application != "all") parameters.Add($"application={Uri.EscapeDataString(application)}");
+        if (typeFilter != "all") parameters.Add($"type={Uri.EscapeDataString(typeFilter)}");
+        if (!string.IsNullOrWhiteSpace(search)) parameters.Add($"search={Uri.EscapeDataString(search.Trim())}");
+        var window = requestedWindow ?? Dashboard.FailureSignalWindowSeconds;
+        if (window != Dashboard.DefaultFailureSignalWindowSeconds) parameters.Add($"window={window}");
+        Navigation.NavigateTo(parameters.Count == 0 ? "/failures" : $"/failures?{string.Join("&", parameters)}", replace: true);
+    }
 
     private async Task LoadPageAsync(int offset)
     {
-        if (offset == 0)
-        {
-            queriedPage = null;
-            updatesAvailable = false;
-            historicalHeadSignature = null;
-            return;
-        }
-
+        if (offset == 0 && !FiltersApplied) { queriedPage = null; updatesAvailable = false; historicalHeadSignature = null; return; }
         loading = true;
         try
         {
-            queriedPage = await Api.GetRecentObservations(null, true, offset, PageSize, CancellationToken.None);
+            queriedPage = await Api.GetRecentObservations(application == "all" ? null : application, true, typeFilter == "all" ? null : typeFilter, search, offset, PageSize, CancellationToken.None);
             updatesAvailable = false;
             historicalHeadSignature = DashboardHeadSignature();
         }
-        finally
-        {
-            loading = false;
-        }
+        finally { loading = false; }
     }
 
     protected override void OnDashboardStateChanged()
     {
-        if (CurrentPage?.Offset > 0)
-            updatesAvailable |= !string.Equals(historicalHeadSignature, DashboardHeadSignature(), StringComparison.Ordinal);
+        var headChanged = !string.Equals(historicalHeadSignature, DashboardHeadSignature(), StringComparison.Ordinal);
+        if (CurrentPage?.Offset > 0) { updatesAvailable |= headChanged; return; }
+        if (FiltersApplied && headChanged && !loading) _ = InvokeAsync(() => LoadPageAsync(0));
     }
 
     private Task ShowLatestAsync() => LoadPageAsync(0);

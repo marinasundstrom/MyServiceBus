@@ -105,7 +105,7 @@
                 return "Failure summary unavailable";
 
             var coverage = summary.Complete ? string.Empty : " Monitoring coverage is incomplete.";
-            return $"{summary.FailureCount:N0} failures across {summary.AffectedApplicationCount:N0} applications in the last {summary.WindowSeconds} seconds.{coverage}";
+            return $"{summary.FailureCount:N0} failures across {summary.AffectedApplicationCount:N0} applications in the last {MonitoringWindow.Format(summary.WindowSeconds)}.{coverage}";
         }
     }
 

@@ -244,6 +244,16 @@ public class MonitoringRepositoryTests
         attentionPage.Total.ShouldBe(2);
         attentionPage.Observations.Single().Observation.Kind.ShouldBe("consume_faulted");
 
+        var failures = repository.GetObservationIndex("orders", true, "failure", "InvalidOperationException", 0, 10);
+        failures.Total.ShouldBe(1);
+        failures.Observations.Single().Observation.Kind.ShouldBe("consume_faulted");
+
+        var retries = repository.GetObservationIndex(null, true, "retry", "SubmitOrder", 0, 10);
+        retries.Total.ShouldBe(1);
+        retries.Observations.Single().Observation.Kind.ShouldBe("retry_attempted");
+
+        repository.GetObservationIndex(null, true, null, "missing identity", 0, 10).Total.ShouldBe(0);
+
         var recovered = repository.GetDashboardSummary(60, now.AddSeconds(61));
         recovered.FailureCount.ShouldBe(0);
         recovered.RetryCount.ShouldBe(0);

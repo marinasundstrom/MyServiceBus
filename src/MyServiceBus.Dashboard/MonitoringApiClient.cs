@@ -24,9 +24,9 @@ public sealed class MonitoringApiClient
             "/api/monitoring/v1/history",
             cancellationToken).ConfigureAwait(false);
 
-    public async Task<MonitoringDashboardSummary?> GetSummary(CancellationToken cancellationToken)
+    public async Task<MonitoringDashboardSummary?> GetSummary(int windowSeconds, CancellationToken cancellationToken)
         => await httpClient.GetFromJsonAsync<MonitoringDashboardSummary>(
-            "/api/monitoring/v1/summary?windowSeconds=60",
+            $"/api/monitoring/v1/summary?windowSeconds={windowSeconds}",
             cancellationToken).ConfigureAwait(false);
 
     public async Task<IReadOnlyList<MonitoringInstanceSummary>> GetInstances(CancellationToken cancellationToken)
@@ -39,24 +39,38 @@ public sealed class MonitoringApiClient
             cancellationToken).ConfigureAwait(false)
             ?? [];
 
-    public async Task<IReadOnlyList<MonitoringRateSummary>> GetRates(bool byInstance, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<MonitoringRateSummary>> GetRates(
+        bool byInstance,
+        int windowSeconds,
+        CancellationToken cancellationToken)
         => await httpClient.GetFromJsonAsync<MonitoringRateSummary[]>(
-            $"/api/monitoring/v1/metrics?windowSeconds=60&byInstance={byInstance.ToString().ToLowerInvariant()}",
+            $"/api/monitoring/v1/metrics?windowSeconds={windowSeconds}&byInstance={byInstance.ToString().ToLowerInvariant()}",
             cancellationToken).ConfigureAwait(false)
             ?? [];
 
-    public async Task<IReadOnlyList<MonitoringFlowEdge>> GetFlow(CancellationToken cancellationToken)
+    public Task<IReadOnlyList<MonitoringRateSummary>> GetRates(bool byInstance, CancellationToken cancellationToken)
+        => GetRates(byInstance, 60, cancellationToken);
+
+    public async Task<IReadOnlyList<MonitoringFlowEdge>> GetFlow(int windowSeconds, CancellationToken cancellationToken)
         => await httpClient.GetFromJsonAsync<MonitoringFlowEdge[]>(
-            "/api/monitoring/v1/flow?windowSeconds=300",
+            $"/api/monitoring/v1/flow?windowSeconds={windowSeconds}",
             cancellationToken).ConfigureAwait(false)
             ?? [];
+
+    public Task<IReadOnlyList<MonitoringFlowEdge>> GetFlow(CancellationToken cancellationToken)
+        => GetFlow(MonitoringWindow.DefaultSeconds, cancellationToken);
 
     public async Task<IReadOnlyList<MonitoringRequestResponseExchange>> GetRequestResponseExchanges(
+        int windowSeconds,
         CancellationToken cancellationToken)
         => await httpClient.GetFromJsonAsync<MonitoringRequestResponseExchange[]>(
-            "/api/monitoring/v1/request-response?windowSeconds=300",
+            $"/api/monitoring/v1/request-response?windowSeconds={windowSeconds}",
             cancellationToken).ConfigureAwait(false)
             ?? [];
+
+    public Task<IReadOnlyList<MonitoringRequestResponseExchange>> GetRequestResponseExchanges(
+        CancellationToken cancellationToken)
+        => GetRequestResponseExchanges(MonitoringWindow.DefaultSeconds, cancellationToken);
 
     public async Task<MonitoringRequestResponseExchangeDetail?> GetRequestResponseExchange(
         string requestId,
@@ -73,11 +87,14 @@ public sealed class MonitoringApiClient
             .ConfigureAwait(false);
     }
 
-    public async Task<IReadOnlyList<MonitoringReplicaFlowEdge>> GetReplicaFlow(CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<MonitoringReplicaFlowEdge>> GetReplicaFlow(int windowSeconds, CancellationToken cancellationToken)
         => await httpClient.GetFromJsonAsync<MonitoringReplicaFlowEdge[]>(
-            "/api/monitoring/v1/flow/replicas?windowSeconds=300",
+            $"/api/monitoring/v1/flow/replicas?windowSeconds={windowSeconds}",
             cancellationToken).ConfigureAwait(false)
             ?? [];
+
+    public Task<IReadOnlyList<MonitoringReplicaFlowEdge>> GetReplicaFlow(CancellationToken cancellationToken)
+        => GetReplicaFlow(MonitoringWindow.DefaultSeconds, cancellationToken);
 
     public async Task<IReadOnlyList<MonitoringDeclaredChoreography>> GetChoreographies(CancellationToken cancellationToken)
         => await httpClient.GetFromJsonAsync<MonitoringDeclaredChoreography[]>(
@@ -186,15 +203,23 @@ public sealed class MonitoringApiClient
             .ConfigureAwait(false);
     }
 
-    public async Task<IReadOnlyList<MonitoringTimeSeriesPoint>> GetTimeSeries(CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<MonitoringTimeSeriesPoint>> GetTimeSeries(
+        int windowSeconds,
+        int bucketSeconds,
+        CancellationToken cancellationToken)
         => await httpClient.GetFromJsonAsync<MonitoringTimeSeriesPoint[]>(
-            "/api/monitoring/v1/metrics/timeseries?windowSeconds=300&bucketSeconds=5",
+            $"/api/monitoring/v1/metrics/timeseries?windowSeconds={windowSeconds}&bucketSeconds={bucketSeconds}",
             cancellationToken).ConfigureAwait(false)
             ?? [];
+
+    public Task<IReadOnlyList<MonitoringTimeSeriesPoint>> GetTimeSeries(CancellationToken cancellationToken)
+        => GetTimeSeries(MonitoringWindow.DefaultSeconds, 5, cancellationToken);
 
     public async Task<MonitoringObservationIndexPage?> GetRecentObservations(
         string? application,
         bool attentionOnly,
+        string? category,
+        string? search,
         int offset,
         int limit,
         CancellationToken cancellationToken)
@@ -206,10 +231,20 @@ public sealed class MonitoringApiClient
             $"limit={Math.Clamp(limit, 1, 100)}"
         };
         AddQuery(parameters, "application", application);
+        AddQuery(parameters, "category", category);
+        AddQuery(parameters, "search", search);
         return await httpClient.GetFromJsonAsync<MonitoringObservationIndexPage>(
             $"/api/monitoring/v1/observations?{string.Join('&', parameters)}",
             cancellationToken).ConfigureAwait(false);
     }
+
+    public Task<MonitoringObservationIndexPage?> GetRecentObservations(
+        string? application,
+        bool attentionOnly,
+        int offset,
+        int limit,
+        CancellationToken cancellationToken)
+        => GetRecentObservations(application, attentionOnly, null, null, offset, limit, cancellationToken);
 
     public async Task<MonitoringMessageIndexPage?> GetMessages(
         string? application,

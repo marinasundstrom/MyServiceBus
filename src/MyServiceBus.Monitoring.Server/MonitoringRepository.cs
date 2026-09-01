@@ -1249,12 +1249,23 @@ public sealed class MonitoringRepository
         bool attentionOnly,
         int offset,
         int limit)
+        => GetObservationIndex(applicationName, attentionOnly, null, null, offset, limit);
+
+    public MonitoringObservationIndexPage GetObservationIndex(
+        string? applicationName,
+        bool attentionOnly,
+        string? category,
+        string? search,
+        int offset,
+        int limit)
     {
         lock (observationSync)
         {
             var observations = recentObservations
                 .Where(record => applicationName is null || string.Equals(record.ApplicationName, applicationName, StringComparison.Ordinal))
                 .Where(record => !attentionOnly || IsAttentionObservation(record.Observation))
+                .Where(record => MatchesAttentionCategory(record.Observation, category))
+                .Where(record => MatchesObservationSearch(record, search))
                 .OrderByDescending(record => record.Observation.OccurredAtUtc)
                 .ToArray();
 
@@ -1271,6 +1282,41 @@ public sealed class MonitoringRepository
     private static bool IsAttentionObservation(MonitoringObservation observation)
         => observation.Kind.Contains("fault", StringComparison.Ordinal)
             || observation.Kind.StartsWith("retry_", StringComparison.Ordinal);
+
+    private static bool MatchesAttentionCategory(MonitoringObservation observation, string? category)
+        => category switch
+        {
+            "failure" => observation.Kind.Contains("fault", StringComparison.Ordinal)
+                || string.Equals(observation.Kind, "retry_exhausted", StringComparison.Ordinal),
+            "retry" => observation.Kind.StartsWith("retry_", StringComparison.Ordinal)
+                && !string.Equals(observation.Kind, "retry_exhausted", StringComparison.Ordinal),
+            _ => true
+        };
+
+    private static bool MatchesObservationSearch(MonitoringObservationRecord record, string? search)
+    {
+        if (string.IsNullOrWhiteSpace(search))
+            return true;
+
+        var term = search.Trim();
+        var observation = record.Observation;
+        return Contains(record.ApplicationName, term)
+            || Contains(record.InstanceId, term)
+            || Contains(record.BusId, term)
+            || Contains(observation.Kind, term)
+            || Contains(observation.MessageType, term)
+            || Contains(observation.MessageUrn, term)
+            || Contains(observation.MessageId, term)
+            || Contains(observation.EndpointName, term)
+            || Contains(observation.ExceptionType, term)
+            || Contains(observation.ExceptionMessage, term)
+            || Contains(observation.CorrelationId, term)
+            || Contains(observation.ConversationId, term)
+            || Contains(observation.TraceId, term);
+    }
+
+    private static bool Contains(string? value, string term)
+        => value?.Contains(term, StringComparison.OrdinalIgnoreCase) == true;
 
     public IReadOnlyList<MonitoringObservationRecord> GetMessageObservations(string messageId)
     {

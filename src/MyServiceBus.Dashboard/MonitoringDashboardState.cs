@@ -19,9 +19,14 @@ public sealed class MonitoringDashboardState : IAsyncDisposable
     {
         this.api = api;
         this.options = options.Value;
+        DefaultFailureSignalWindowSeconds = this.options.FailureSignalWindowSeconds;
+        FailureSignalWindowSeconds = DefaultFailureSignalWindowSeconds;
     }
 
     public event Action? Changed;
+
+    public int DefaultFailureSignalWindowSeconds { get; }
+    public int FailureSignalWindowSeconds { get; private set; }
 
     public IReadOnlyList<MonitoringApplicationSummary> Applications { get; private set; } = [];
     public MonitoringHistorySummary? History { get; private set; }
@@ -68,6 +73,16 @@ public sealed class MonitoringDashboardState : IAsyncDisposable
         {
             startLock.Release();
         }
+    }
+
+    public async Task SetFailureSignalWindowAsync(int windowSeconds)
+    {
+        var normalized = MonitoringWindow.Normalize(windowSeconds, DefaultFailureSignalWindowSeconds);
+        if (normalized == FailureSignalWindowSeconds)
+            return;
+
+        FailureSignalWindowSeconds = normalized;
+        await RefreshAndNotifyAsync();
     }
 
     private async Task PollAsync()
@@ -124,7 +139,7 @@ public sealed class MonitoringDashboardState : IAsyncDisposable
         {
             var applications = api.GetApplications(stopping.Token);
             var history = api.GetHistory(stopping.Token);
-            var summary = api.GetSummary(stopping.Token);
+            var summary = api.GetSummary(FailureSignalWindowSeconds, stopping.Token);
             var instances = api.GetInstances(stopping.Token);
             var endpoints = api.GetEndpoints(stopping.Token);
             var applicationRates = api.GetRates(false, stopping.Token);

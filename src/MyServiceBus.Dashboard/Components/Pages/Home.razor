@@ -37,7 +37,7 @@ else
         <MetricValue Label="Applications" Value="@Dashboard.Applications.Count.ToString("N0")" />
         <MetricValue Label="Replicas online" Value="@($"{OnlineInstances:N0} / {TotalInstances:N0}")" Alert="@(OnlineInstances < TotalInstances)" />
         <MetricValue Label="Messages handled / sec" Value="@FormatRate(TotalConsumedRate)" />
-        <MetricValue Label="Failures · 60 sec" Value="@WindowFailures.ToString("N0")" Alert="@(WindowFailures > 0)" />
+        <MetricValue Label="@($"Failures · {MonitoringWindow.Format(Dashboard.FailureSignalWindowSeconds)}")" Value="@WindowFailures.ToString("N0")" Alert="@(WindowFailures > 0)" />
         <MetricValue Label="Monitoring data" Value="@(CompleteCoverage ? "Complete" : "Incomplete")" Alert="@(!CompleteCoverage)" />
     </section>
 
@@ -109,7 +109,7 @@ else
     private int OnlineInstances => Dashboard.Applications.Sum(application => application.OnlineInstances);
     private int TotalInstances => Dashboard.Applications.Sum(application => application.TotalInstances);
     private double TotalConsumedRate => Dashboard.ApplicationRates.Sum(rate => rate.Rates.ConsumedPerSecond);
-    private long WindowFailures => Dashboard.ApplicationRates.Sum(rate => Failures(rate.Counts));
+    private long WindowFailures => Dashboard.Summary?.FailureCount ?? 0;
     private bool CompleteCoverage => Dashboard.History is { } history
         && IsFresh(history)
         && history.Complete
