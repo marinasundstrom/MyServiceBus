@@ -115,6 +115,16 @@ flowchart LR
     Timeline -->|locate in model| Model
 ```
 
+### Workflow run analysis
+
+The next choreography drill-down should let an operator select one bounded causal chain and inspect it as a **workflow run** in the Dashboard. This is a presentation and monitoring projection over recorded messages, not a new choreography runtime or durable business-process instance. The run view should combine a left-to-right flow diagram with an ordered detail list so branches are visible without hiding exact timestamps and evidence.
+
+Each displayed step should map a consumed contract to the application, receive endpoint, and declared consumer or owning component when that mapping is known. It should show consumer execution duration, start and completion time, success or fault outcome, retry evidence, outgoing send or publication operations, and the next exactly matched consumption. Message transit time belongs on the connection between steps; consumer execution time belongs on the step itself. This distinction prevents broker delay from being misreported as handler latency.
+
+Failures should remain attached to the step or connection that produced the evidence: consumer faults and exhausted retries on a step, failed sends or publications on an outgoing operation, and missing or heuristic continuation as a separately qualified edge state. Selecting a node or edge should open the underlying safe observation details, including contract, application, endpoint, message and causation references, timestamps, duration, and failure category, while continuing to exclude payloads and arbitrary headers.
+
+For choreography, “run” means a bounded reconstruction with explicit confidence and coverage; it does not prove an authoritative start, current state, or completion. For orchestration, the same Dashboard shape can later be backed by the saga instance identity and persisted transition history, making its state and completion authoritative. The visual vocabulary should be shared while the evidence labels remain different.
+
 For an orchestration instance, the state-machine graph should keep the complete definition visible, emphasize the current state, mark traversed transitions, and distinguish pending timers or requests from completed work. Selecting a state or transition opens the matching records in the timeline rather than expanding the node into an unreadable diagnostic panel. The timeline is the detailed audit-like explanation; the graph remains the spatial explanation of possible and current progress.
 
 Recorded transition information should include safe workflow and definition identity, instance identity, previous and next state, triggering event contract, timestamp and duration, owning application and component, message and correlation references, emitted operation kinds and contracts, scheduled or unscheduled deadlines, attempt and repository-conflict outcome, and fault category. Payloads, arbitrary headers, exception messages, and saga data remain excluded by default. Choreography records reuse the applicable fields but replace authoritative state transitions with declared step identity, causal evidence, confidence, and coverage.
