@@ -1,0 +1,151 @@
+@implements IAsyncDisposable
+@inject IJSRuntime JavaScript
+
+<div class="workflow-run-map-shell saga-run-map-shell" @ref="map">
+    <svg class="workflow-run-map-canvas saga-run-map-canvas" role="img" aria-label="Saga state machine and observed path"></svg>
+    <div class="workflow-map-legend" aria-hidden="true">
+        <span><i class="observed"></i>Visited</span>
+        <span><i class="current"></i>Current</span>
+        <span><i class="declared"></i>Declared</span>
+        <span><i class="faulted"></i>Failed delivery</span>
+    </div>
+    <div class="flow-map-controls" aria-label="Saga state machine controls">
+        <button type="button" title="Zoom in" aria-label="Zoom in" @onclick="() => ZoomAsync(1.3)">+</button>
+        <button type="button" title="Zoom out" aria-label="Zoom out" @onclick="() => ZoomAsync(1 / 1.3)">−</button>
+        <button type="button" title="Reset view" aria-label="Reset view" @onclick="ResetAsync">↺</button>
+    </div>
+</div>
+
+@code {
+    private ElementReference map;
+    private IJSObjectReference? module;
+
+    [Parameter, EditorRequired]
+    public required MyServiceBus.Orchestration.SagaStateMachineDefinition Definition { get; set; }
+
+    [Parameter, EditorRequired]
+    public required MonitoringSagaInstance Instance { get; set; }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        module ??= await JavaScript.InvokeAsync<IJSObjectReference>("import", "./monitoringChart.js");
+        if (firstRender)
+            await module.InvokeVoidAsync("initializeSagaRunMap", map);
+
+        var states = new[] { MyServiceBus.Orchestration.SagaStateMachineDefinition.InitialState }
+            .Concat(Definition.States.Select(state => state.Id))
+            .Append(MyServiceBus.Orchestration.SagaStateMachineDefinition.FinalState)
+            .ToArray();
+        var visitedStates = Instance.Transitions
+            .SelectMany(transition => new[] { transition.BeginState, transition.EndState })
+            .Where(state => !string.IsNullOrWhiteSpace(state))
+            .ToHashSet(StringComparer.Ordinal);
+        var observed = Instance.Transitions
+            .Where(transition => transition.Succeeded &&
+                !string.IsNullOrWhiteSpace(transition.BeginState) &&
+                !string.IsNullOrWhiteSpace(transition.EndState))
+            .GroupBy(
+                transition => (transition.BeginState!, transition.EndState!, transition.EventId),
+                new TransitionKeyComparer())
+            .ToDictionary(group => group.Key, group => group.ToArray(), new TransitionKeyComparer());
+
+        var links = Definition.Behaviors
+            .Select(behavior =>
+            {
+                var target = TargetState(behavior);
+                var key = (behavior.SourceState, target, behavior.EventId);
+                observed.TryGetValue(key, out var deliveries);
+                return new
+                {
+                    Source = behavior.SourceState,
+                    Target = target,
+                    Event = behavior.EventId,
+                    ObservedCount = deliveries?.Length ?? 0,
+                    DurationMs = deliveries?.Where(delivery => delivery.DurationMs is not null)
+                        .Select(delivery => delivery.DurationMs!.Value)
+                        .DefaultIfEmpty()
+                        .Average(),
+                    Ignored = behavior.Activities.Any(activity => activity.Kind == MyServiceBus.Orchestration.SagaActivityKind.Ignore)
+                };
+            })
+            .Where(link => !string.IsNullOrWhiteSpace(link.Target))
+            .ToArray();
+
+        await module.InvokeVoidAsync(
+            "updateSagaRunMap",
+            map,
+            new
+            {
+                Nodes = states.Select((state, sequence) => new
+                {
+                    Id = state,
+                    Sequence = sequence,
+                    Visited = visitedStates.Contains(state),
+                    Current = string.Equals(state, Instance.CurrentState, StringComparison.Ordinal),
+                    Terminal = string.Equals(state, MyServiceBus.Orchestration.SagaStateMachineDefinition.FinalState, StringComparison.Ordinal)
+                }),
+                Links = links,
+                FailedDeliveries = Instance.Transitions
+                    .Where(transition => !transition.Succeeded)
+                    .Select(transition => new
+                    {
+                        State = transition.BeginState ?? Instance.CurrentState,
+                        Event = transition.EventId,
+                        transition.DurationMs
+                    })
+            });
+    }
+
+    private static string TargetState(MyServiceBus.Orchestration.SagaBehaviorDefinition behavior)
+    {
+        var finalActivity = behavior.Activities.LastOrDefault();
+        return finalActivity?.Kind switch
+        {
+            MyServiceBus.Orchestration.SagaActivityKind.Transition => finalActivity.TargetState ?? behavior.SourceState,
+            MyServiceBus.Orchestration.SagaActivityKind.Finalize => MyServiceBus.Orchestration.SagaStateMachineDefinition.FinalState,
+            MyServiceBus.Orchestration.SagaActivityKind.Ignore => behavior.SourceState,
+            _ => behavior.SourceState
+        };
+    }
+
+    private async Task ZoomAsync(double factor)
+    {
+        if (module is not null)
+            await module.InvokeVoidAsync("zoomSagaRunMap", map, factor);
+    }
+
+    private async Task ResetAsync()
+    {
+        if (module is not null)
+            await module.InvokeVoidAsync("resetSagaRunMap", map);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            if (module is not null)
+            {
+                await module.InvokeVoidAsync("disposeSagaRunMap", map);
+                await module.DisposeAsync();
+            }
+        }
+        catch (Exception exception) when (exception is JSException or JSDisconnectedException or ObjectDisposedException)
+        {
+        }
+    }
+
+    private sealed class TransitionKeyComparer : IEqualityComparer<(string Source, string Target, string Event)>
+    {
+        public bool Equals((string Source, string Target, string Event) x, (string Source, string Target, string Event) y)
+            => StringComparer.Ordinal.Equals(x.Source, y.Source) &&
+               StringComparer.Ordinal.Equals(x.Target, y.Target) &&
+               StringComparer.Ordinal.Equals(x.Event, y.Event);
+
+        public int GetHashCode((string Source, string Target, string Event) value)
+            => HashCode.Combine(
+                StringComparer.Ordinal.GetHashCode(value.Source),
+                StringComparer.Ordinal.GetHashCode(value.Target),
+                StringComparer.Ordinal.GetHashCode(value.Event));
+    }
+}

@@ -353,6 +353,33 @@ td small { display: block; margin-top: 4px; color: var(--text-dim); font-size: .
 .workflow-run-map-step { fill: var(--text); font-size: 13px; font-weight: 800; }
 .workflow-run-map-contract { fill: var(--text-dim); font-size: 9px; }
 .workflow-run-map-duration { fill: var(--text-soft); font-size: 9px; font-weight: 750; text-anchor: end; }
+.workflow-map-legend { position: absolute; left: 14px; bottom: 12px; display: flex; flex-wrap: wrap; gap: 8px 13px; padding: 7px 9px; border: 1px solid var(--border-subtle); border-radius: 8px; background: color-mix(in srgb, var(--surface-solid) 88%, transparent); color: var(--text-dim); font-size: .58rem; font-weight: 700; backdrop-filter: blur(8px); }
+.workflow-map-legend span { display: inline-flex; gap: 5px; align-items: center; }
+.workflow-map-legend i { width: 8px; height: 8px; border: 1px solid var(--border-strong); border-radius: 50%; background: var(--surface-raised); }
+.workflow-map-legend i.observed { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 35%, var(--surface-raised)); }
+.workflow-map-legend i.current { border-color: var(--accent); background: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent); }
+.workflow-map-legend i.faulted { border-color: var(--danger); background: var(--danger); }
+.workflow-run-section-heading { display: flex; gap: 24px; align-items: end; justify-content: space-between; padding: 18px 20px 12px; border-top: 1px solid var(--border); background: var(--surface-solid); }
+.workflow-run-section-heading h3 { margin: 2px 0 0; font-size: .95rem; }
+.workflow-run-section-heading p { max-width: 480px; margin: 0; color: var(--text-dim); font-size: .66rem; text-align: right; }
+.saga-delivery-history { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 255px), 1fr)); gap: 12px; padding: 18px 20px 22px; border-bottom: 1px solid var(--border); background: var(--surface-deep); }
+.saga-delivery-history .workflow-run-step { min-width: 0; }
+.saga-run-map-shell { min-height: 360px; border-top: 1px solid var(--border); }
+.saga-run-map-state rect { fill: var(--surface-raised); stroke: var(--border-strong); stroke-width: 1.25; }
+.saga-run-map-state.observed rect { fill: color-mix(in srgb, var(--surface-raised) 86%, var(--accent) 14%); stroke: color-mix(in srgb, var(--accent) 70%, var(--border)); stroke-width: 1.7; }
+.saga-run-map-state.current rect { fill: color-mix(in srgb, var(--surface-raised) 72%, var(--accent) 28%); stroke: var(--accent); stroke-width: 2.4; }
+.saga-run-map-state .state-kind { fill: var(--text-dim); font-size: 9px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.saga-run-map-state .state-name { fill: var(--text); font-size: 14px; font-weight: 800; text-anchor: middle; }
+.saga-run-map-state .state-status { fill: var(--text-dim); font-size: 9px; text-anchor: middle; }
+.saga-run-map-link { fill: none; stroke: var(--border-strong); stroke-width: 1.5; }
+.saga-run-map-link.observed { stroke: var(--accent); stroke-width: 2.6; }
+.saga-run-map-link.ignored { stroke-dasharray: 4 4; }
+.saga-run-map-arrow { fill: var(--border-strong); }
+.saga-run-map-arrow.observed { fill: var(--accent); }
+.saga-run-map-link-label { fill: var(--text-dim); font-size: 9px; font-weight: 700; text-anchor: middle; paint-order: stroke; stroke: var(--surface-deep); stroke-width: 6px; stroke-linejoin: round; }
+.saga-run-map-link-label.observed { fill: var(--text); }
+.saga-run-map-failure path { fill: none; stroke: var(--danger); stroke-width: 2.4; stroke-dasharray: 5 4; }
+.saga-run-map-failure text { fill: var(--danger); font-size: 9px; font-weight: 800; paint-order: stroke; stroke: var(--surface-deep); stroke-width: 5px; }
 .workflow-run-flow { display: flex; align-items: stretch; gap: 10px; overflow-x: auto; padding: 22px 20px; background: linear-gradient(var(--border-subtle) 1px, transparent 1px), linear-gradient(90deg, var(--border-subtle) 1px, transparent 1px); background-size: 42px 42px; }
 .workflow-run-connector { display: grid; flex: 0 0 24px; place-items: center; color: var(--accent); font-size: 1.25rem; }
 .workflow-run-step { flex: 0 0 265px; overflow: hidden; border: 1px solid var(--border-strong); border-radius: 12px; background: color-mix(in srgb, var(--surface-solid) 96%, transparent); box-shadow: 0 10px 24px rgb(0 0 0 / 14%); }
@@ -449,6 +476,8 @@ td small { display: block; margin-top: 4px; color: var(--text-dim); font-size: .
 :root[data-density="compact"] .workflow-run-flow { padding: 15px; }
 :root[data-density="compact"] .workflow-run-step { flex-basis: 240px; }
 :root[data-density="compact"] .workflow-run-step-body { padding: 10px; }
+:root[data-density="compact"] .workflow-run-section-heading { padding: 13px 15px 9px; }
+:root[data-density="compact"] .saga-delivery-history { gap: 9px; padding: 13px 15px 16px; }
 
 @media (max-width: 760px) {
     .theme-selector span, .density-selector span { display: none; }
