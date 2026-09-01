@@ -249,6 +249,31 @@ public sealed record MonitoringDeclaredChoreographyConnection(
     string TargetStepId,
     string MatchKind);
 
+public sealed record MonitoringChoreographyRuntimeSnapshot(
+    int WindowSeconds,
+    DateTimeOffset WindowStartUtc,
+    DateTimeOffset WindowEndUtc,
+    long DroppedObservations,
+    bool AllParticipantsOnline,
+    bool Complete,
+    IReadOnlyList<MonitoringChoreographyReactionRuntime> Reactions);
+
+public sealed record MonitoringChoreographyReactionRuntime(
+    string ChoreographyId,
+    string DefinitionVersion,
+    string ApplicationName,
+    string Owner,
+    string StepId,
+    int OutputIndex,
+    string TriggerMessageUrn,
+    ChoreographyOperationKind OperationKind,
+    string? OutputMessageUrn,
+    string? Destination,
+    long ObservedCount,
+    DateTimeOffset? FirstObservedAtUtc,
+    DateTimeOffset? LastObservedAtUtc,
+    string EvidenceStatus);
+
 public sealed record MonitoringDeclaredChoreographyFragment(
     string ApplicationName,
     string Owner,

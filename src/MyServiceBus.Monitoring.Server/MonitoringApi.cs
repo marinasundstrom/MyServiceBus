@@ -146,6 +146,9 @@ public static class MonitoringApi
             repository.GetDeclaredChoreographies(DateTimeOffset.UtcNow))
             .WithSummary("List merged application-declared choreography fragments and conflicts")
             .CacheOutput(policy => policy.Expire(TimeSpan.FromSeconds(5)));
+        query.MapGet("/choreographies/runtime", (int? windowSeconds, MonitoringRepository repository) =>
+            repository.GetChoreographyRuntime(windowSeconds ?? 300, DateTimeOffset.UtcNow))
+            .WithSummary("Compare declared choreography reactions with exact causal observations");
         query.MapGet("/observations", (string? application, int? limit, MonitoringRepository repository) =>
             repository.GetRecentObservations(application, limit ?? 100))
             .WithSummary("List recent bounded monitoring observations");

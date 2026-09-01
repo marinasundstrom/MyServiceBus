@@ -471,6 +471,86 @@ public sealed class MonitoringRepository
             .ToArray();
     }
 
+    public MonitoringChoreographyRuntimeSnapshot GetChoreographyRuntime(int windowSeconds, DateTimeOffset now)
+    {
+        var boundedWindow = Math.Clamp(windowSeconds, 10, (int)MetricRetention.TotalSeconds);
+        var choreographies = GetDeclaredChoreographies(now);
+        var causalEdges = GetCausalFlow(null, boundedWindow, now);
+        var declarations = choreographies
+            .SelectMany(choreography => choreography.Fragments.SelectMany(fragment => fragment.Steps.SelectMany(step =>
+                step.Outputs.Select((output, index) => new
+                {
+                    choreography.ChoreographyId,
+                    fragment.DefinitionVersion,
+                    fragment.ApplicationName,
+                    fragment.Owner,
+                    Step = step,
+                    Output = output,
+                    OutputIndex = index
+                }))))
+            .ToArray();
+
+        var reactions = declarations.Select(declaration =>
+        {
+            var observedKind = declaration.Output.Kind switch
+            {
+                ChoreographyOperationKind.Send => "sent",
+                ChoreographyOperationKind.Publish => "published",
+                _ => null
+            };
+            var matchingDeclarations = observedKind is null ? 0 : declarations.Count(candidate =>
+                string.Equals(candidate.ChoreographyId, declaration.ChoreographyId, StringComparison.Ordinal)
+                && string.Equals(candidate.DefinitionVersion, declaration.DefinitionVersion, StringComparison.Ordinal)
+                && string.Equals(candidate.ApplicationName, declaration.ApplicationName, StringComparison.Ordinal)
+                && string.Equals(candidate.Step.TriggerMessageUrn, declaration.Step.TriggerMessageUrn, StringComparison.Ordinal)
+                && candidate.Output.Kind == declaration.Output.Kind
+                && string.Equals(candidate.Output.MessageUrn, declaration.Output.MessageUrn, StringComparison.Ordinal)
+                && string.Equals(candidate.Output.Destination, declaration.Output.Destination, StringComparison.Ordinal));
+            MonitoringCausalFlowEdge[] matches = observedKind is null || matchingDeclarations != 1
+                ? []
+                : causalEdges.Where(edge =>
+                    string.Equals(edge.ApplicationName, declaration.ApplicationName, StringComparison.Ordinal)
+                    && string.Equals(edge.TriggerMessageUrn, declaration.Step.TriggerMessageUrn, StringComparison.Ordinal)
+                    && string.Equals(edge.OutputMessageUrn, declaration.Output.MessageUrn, StringComparison.Ordinal)
+                    && (string.IsNullOrWhiteSpace(declaration.Output.Destination)
+                        || string.Equals(edge.DestinationAddress, declaration.Output.Destination, StringComparison.Ordinal))
+                    && string.Equals(edge.OperationKind, observedKind, StringComparison.Ordinal)).ToArray();
+            var status = observedKind is null
+                ? "unsupported_operation"
+                : matchingDeclarations > 1
+                    ? "ambiguous_declaration"
+                    : matches.Length == 0 ? "no_exact_evidence" : "exact_causation";
+
+            return new MonitoringChoreographyReactionRuntime(
+                declaration.ChoreographyId,
+                declaration.DefinitionVersion,
+                declaration.ApplicationName,
+                declaration.Owner,
+                declaration.Step.Id,
+                declaration.OutputIndex,
+                declaration.Step.TriggerMessageUrn,
+                declaration.Output.Kind,
+                declaration.Output.MessageUrn,
+                declaration.Output.Destination,
+                matches.Sum(edge => edge.Count),
+                matches.Length == 0 ? null : matches.Min(edge => edge.FirstSeenAtUtc),
+                matches.Length == 0 ? null : matches.Max(edge => edge.LastSeenAtUtc),
+                status);
+        }).ToArray();
+        var rates = GetRates(null, boundedWindow, false, now);
+        var dropped = rates.Sum(rate => rate.DroppedObservations);
+        var allOnline = choreographies.SelectMany(choreography => choreography.Fragments)
+            .All(fragment => fragment.OnlineInstances > 0);
+        return new MonitoringChoreographyRuntimeSnapshot(
+            boundedWindow,
+            now.AddSeconds(-boundedWindow),
+            now,
+            dropped,
+            allOnline,
+            dropped == 0 && allOnline,
+            reactions);
+    }
+
     public IReadOnlyList<MonitoringObservationRecord> GetRecentObservations(string? applicationName, int limit)
     {
         lock (observationSync)

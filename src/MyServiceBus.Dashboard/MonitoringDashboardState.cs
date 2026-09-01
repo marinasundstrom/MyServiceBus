@@ -31,6 +31,7 @@ public sealed class MonitoringDashboardState : IAsyncDisposable
     public IReadOnlyList<MonitoringFlowEdge> Flow { get; private set; } = [];
     public IReadOnlyList<MonitoringReplicaFlowEdge> ReplicaFlow { get; private set; } = [];
     public IReadOnlyList<MonitoringDeclaredChoreography> Choreographies { get; private set; } = [];
+    public MonitoringChoreographyRuntimeSnapshot? ChoreographyRuntime { get; private set; }
     public IReadOnlyList<MonitoringObservationRecord> Observations { get; private set; } = [];
     public IReadOnlyList<MonitoringOutboxDispatcherSummary> OutboxDispatchers { get; private set; } = [];
     public IReadOnlyList<MonitoringScheduledWorkSummary> ScheduledWork { get; private set; } = [];
@@ -122,6 +123,7 @@ public sealed class MonitoringDashboardState : IAsyncDisposable
             var flow = api.GetFlow(stopping.Token);
             var replicaFlow = api.GetReplicaFlow(stopping.Token);
             var choreographies = api.GetChoreographies(stopping.Token);
+            var choreographyRuntime = api.GetChoreographyRuntime(stopping.Token);
             var timeSeries = api.GetTimeSeries(stopping.Token);
             var observations = api.GetRecentObservations(stopping.Token);
             var outboxDispatchers = api.GetOutboxDispatchers(stopping.Token);
@@ -139,6 +141,7 @@ public sealed class MonitoringDashboardState : IAsyncDisposable
                 flow,
                 replicaFlow,
                 choreographies,
+                choreographyRuntime,
                 timeSeries,
                 observations,
                 outboxDispatchers,
@@ -155,6 +158,7 @@ public sealed class MonitoringDashboardState : IAsyncDisposable
             Flow = flow.Result;
             ReplicaFlow = replicaFlow.Result;
             Choreographies = choreographies.Result;
+            ChoreographyRuntime = choreographyRuntime.Result;
             TimeSeries = timeSeries.Result;
             Observations = observations.Result;
             OutboxDispatchers = outboxDispatchers.Result;

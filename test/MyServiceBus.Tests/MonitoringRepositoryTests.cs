@@ -530,7 +530,12 @@ public class MonitoringRepositoryTests
     {
         var now = DateTimeOffset.UtcNow;
         var repository = new MonitoringRepository();
-        repository.UpsertMetadata(CreateMetadata("orders", "orders-1", now, "commerce"));
+        var choreography = new ChoreographyBuilder("order-fulfillment", "1", "orders")
+            .Step("request-inventory", "urn:message:OrderSubmitted", step => step
+                .Publishes("urn:message:InventoryRequested"))
+            .Build();
+        repository.UpsertMetadata(WithChoreography(
+            CreateMetadata("orders", "orders-1", now, "commerce"), choreography));
         repository.RecordBatch(CreateBatch(
             "orders",
             "orders-1",
@@ -552,6 +557,15 @@ public class MonitoringRepositoryTests
         edge.OperationKind.ShouldBe("published");
         edge.Count.ShouldBe(1);
         edge.MatchConfidence.ShouldBe("exact_causation");
+
+        var runtime = repository.GetChoreographyRuntime(60, now);
+        runtime.WindowSeconds.ShouldBe(60);
+        runtime.Complete.ShouldBeTrue();
+        var reaction = runtime.Reactions.ShouldHaveSingleItem();
+        reaction.ChoreographyId.ShouldBe("order-fulfillment");
+        reaction.StepId.ShouldBe("request-inventory");
+        reaction.ObservedCount.ShouldBe(1);
+        reaction.EvidenceStatus.ShouldBe("exact_causation");
     }
 
     [Fact]

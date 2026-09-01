@@ -276,6 +276,8 @@ td small { display: block; margin-top: 4px; color: var(--text-dim); font-size: .
 .workflow-arrow { color: var(--accent); font-size: 1.15rem; text-align: center; }
 .workflow-outputs { display: grid; gap: 7px; }
 .workflow-output { border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); }
+.workflow-evidence { margin-top: 8px !important; padding-top: 7px; border-top: 1px solid var(--border-subtle); }
+.workflow-evidence.observed { color: var(--accent); font-weight: 700; }
 .workflow-participant > footer { padding: 10px 17px; border-top: 1px solid var(--border); color: var(--text-dim); font-size: .63rem; }
 
 @media (max-width: 760px) {

@@ -63,6 +63,11 @@ public sealed class MonitoringApiClient
             cancellationToken).ConfigureAwait(false)
             ?? [];
 
+    public async Task<MonitoringChoreographyRuntimeSnapshot?> GetChoreographyRuntime(CancellationToken cancellationToken)
+        => await httpClient.GetFromJsonAsync<MonitoringChoreographyRuntimeSnapshot>(
+            "/api/monitoring/v1/choreographies/runtime?windowSeconds=300",
+            cancellationToken).ConfigureAwait(false);
+
     public async Task<IReadOnlyList<MonitoringTimeSeriesPoint>> GetTimeSeries(CancellationToken cancellationToken)
         => await httpClient.GetFromJsonAsync<MonitoringTimeSeriesPoint[]>(
             "/api/monitoring/v1/metrics/timeseries?windowSeconds=300&bucketSeconds=5",

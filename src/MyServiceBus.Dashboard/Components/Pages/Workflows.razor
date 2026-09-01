@@ -6,8 +6,15 @@
 <DashboardPageHeader Eyebrow="Coordination" Title="Declared workflows" Description="Explore the choreography that applications explicitly declare: which messages trigger local reactions, what those reactions emit, and which participants may react next." />
 
 <div class="guidance workflow-guidance">
-    <strong>Definition view</strong>
-    <span>This map shows application intent, not observed execution or authoritative workflow state. Replica counts describe declaration freshness.</span>
+    <strong>Declared intent with bounded evidence</strong>
+    <span>
+        This map keeps the definition stable and overlays exact causal send and publish counts from the last
+        @(Dashboard.ChoreographyRuntime?.WindowSeconds / 60 ?? 5) minutes. No evidence is not a failure or authoritative workflow state.
+        @if (Dashboard.ChoreographyRuntime is { Complete: false } coverage)
+        {
+            <text> Coverage is incomplete: @coverage.DroppedObservations observations were dropped or one or more participants are offline.</text>
+        }
+    </span>
 </div>
 
 @if (Dashboard.Choreographies.Count == 0)
@@ -71,12 +78,21 @@ else
                                     </div>
                                     <div class="workflow-arrow" aria-hidden="true">→</div>
                                     <div class="workflow-outputs">
-                                        @foreach (var output in step.Outputs)
+                                        @for (var outputIndex = 0; outputIndex < step.Outputs.Count; outputIndex++)
                                         {
+                                            var output = step.Outputs[outputIndex];
                                             <div class="workflow-output">
                                                 <small>@output.Kind.ToString()</small>
                                                 <strong>@OutputLabel(output.MessageUrn)</strong>
                                                 <span>@OutputDetail(choreography, fragment, step, output)</span>
+                                                @if (RuntimeFor(choreography, fragment, step, outputIndex) is { } runtime)
+                                                {
+                                                    <span class="workflow-evidence @(runtime.EvidenceStatus == "exact_causation" ? "observed" : null)">
+                                                        @(runtime.EvidenceStatus == "exact_causation"
+                                                            ? $"Observed {runtime.ObservedCount:N0} times · exact causation"
+                                                            : EvidenceLabel(runtime.EvidenceStatus))
+                                                    </span>
+                                                }
                                             </div>
                                         }
                                     </div>
@@ -145,4 +161,27 @@ else
             details.Add($"within {TimeSpan.FromMilliseconds(output.WithinMilliseconds.Value):g}");
         return string.Join(" · ", details);
     }
+
+    private MonitoringChoreographyReactionRuntime? RuntimeFor(
+        MonitoringDeclaredChoreography choreography,
+        MonitoringDeclaredChoreographyFragment fragment,
+        MyServiceBus.Choreography.ChoreographyStep step,
+        int outputIndex)
+    {
+        return Dashboard.ChoreographyRuntime?.Reactions.FirstOrDefault(reaction =>
+            string.Equals(reaction.ChoreographyId, choreography.ChoreographyId, StringComparison.Ordinal)
+            && string.Equals(reaction.DefinitionVersion, fragment.DefinitionVersion, StringComparison.Ordinal)
+            && string.Equals(reaction.ApplicationName, fragment.ApplicationName, StringComparison.Ordinal)
+            && string.Equals(reaction.Owner, fragment.Owner, StringComparison.Ordinal)
+            && string.Equals(reaction.StepId, step.Id, StringComparison.Ordinal)
+            && reaction.OutputIndex == outputIndex);
+    }
+
+    private static string EvidenceLabel(string status) => status switch
+    {
+        "no_exact_evidence" => "No exact evidence in this window",
+        "ambiguous_declaration" => "Declaration match is ambiguous",
+        "unsupported_operation" => "Runtime evidence not supported yet",
+        _ => DisplayKind(status)
+    };
 }
