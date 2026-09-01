@@ -21,6 +21,7 @@ import com.myservicebus.serialization.NServiceBusJsonSerializerFactory;
 import com.myservicebus.serialization.RawJsonSerializerFactory;
 import com.myservicebus.serialization.SerializerFactory;
 import com.myservicebus.topology.TopologyRegistry;
+import com.myservicebus.orchestration.SagaStateMachine;
 
 public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigurator {
 
@@ -35,6 +36,7 @@ public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigura
             new NServiceBusJsonSerializerFactory()));
     private String defaultContentType = com.myservicebus.serialization.DefaultInboundMessageResolver.ENVELOPE_CONTENT_TYPE;
     private final Set<Class<?>> consumerTypes = new HashSet<>();
+    private final Set<Class<?>> sagaStateMachineTypes = new HashSet<>();
     private final Logger logger = new ConsoleLoggerFactory(new ConsoleLoggerConfig())
             .create(BusRegistrationConfiguratorImpl.class);
     private java.util.function.BiConsumer<BusRegistrationContext, Object> transportConfigure;
@@ -51,6 +53,34 @@ public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigura
     @Override
     public void addChoreography(ChoreographyFragment fragment) {
         topology.registerChoreography(fragment);
+    }
+
+    @Override
+    public <TSaga, TStateMachine extends SagaStateMachine<TSaga>> void addSagaStateMachine(
+            Class<TStateMachine> stateMachineClass,
+            java.util.function.Supplier<TStateMachine> factory,
+            String endpointName) {
+        if (stateMachineClass == null) {
+            throw new IllegalArgumentException("stateMachineClass must not be null");
+        }
+        if (factory == null) {
+            throw new IllegalArgumentException("factory must not be null");
+        }
+        if (endpointName != null && endpointName.isBlank()) {
+            throw new IllegalArgumentException("endpointName must not be blank");
+        }
+        if (!sagaStateMachineTypes.add(stateMachineClass)) {
+            return;
+        }
+
+        TStateMachine stateMachine = factory.get();
+        var repository = stateMachine.createInMemoryRepository();
+        var runtime = stateMachine.createRuntime(repository);
+        String queueName = endpointName != null
+                ? endpointName
+                : stateMachine.definition().stateMachineId();
+        serviceCollection.addSingleton(stateMachineClass, () -> stateMachine);
+        stateMachine.registerConsumers(this, runtime, stateMachineClass, queueName);
     }
 
     @Override

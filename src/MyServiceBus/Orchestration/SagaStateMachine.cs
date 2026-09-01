@@ -184,6 +184,19 @@ public abstract class SagaStateMachine<TSaga>
         return new InMemorySagaRepository<TSaga>(cloneInstance!);
     }
 
+    internal InMemorySagaRepository<TSaga> CreateConfiguredInMemoryRepository()
+        => CreateInMemoryRepository();
+
+    internal void RegisterConsumers<TStateMachine>(
+        BusRegistrationConfigurator configurator,
+        SagaStateMachineRuntime<TSaga> runtime,
+        string endpointName)
+        where TStateMachine : SagaStateMachine<TSaga>
+    {
+        foreach (var @event in events)
+            @event.Register<TStateMachine>(configurator, runtime, endpointName);
+    }
+
     private void AddBehavior<TMessage>(string sourceState, EventActivityBinder<TSaga, TMessage> activity)
         where TMessage : class
     {
@@ -371,6 +384,11 @@ internal interface IEventRegistration<TSaga>
     string Id { get; }
     void Apply(SagaStateMachineDefinitionBuilder builder);
     void Bind(SagaStateMachineRuntimeBuilder<TSaga> builder);
+    void Register<TStateMachine>(
+        BusRegistrationConfigurator configurator,
+        SagaStateMachineRuntime<TSaga> runtime,
+        string endpointName)
+        where TStateMachine : SagaStateMachine<TSaga>;
 }
 
 internal sealed class EventRegistration<TSaga, TMessage> : IEventRegistration<TSaga>
@@ -416,6 +434,17 @@ internal sealed class EventRegistration<TSaga, TMessage> : IEventRegistration<TS
 
     public void Bind(SagaStateMachineRuntimeBuilder<TSaga> builder)
         => builder.Event(@event.Id, correlate);
+
+    public void Register<TStateMachine>(
+        BusRegistrationConfigurator configurator,
+        SagaStateMachineRuntime<TSaga> runtime,
+        string endpointName)
+        where TStateMachine : SagaStateMachine<TSaga>
+    {
+        configurator.AddConsumer<SagaStateMachineConsumer<TStateMachine, TSaga, TMessage>, TMessage>(
+            endpointName,
+            _ => new SagaStateMachineConsumer<TStateMachine, TSaga, TMessage>(runtime));
+    }
 }
 
 internal interface IBehaviorRegistration<TSaga>

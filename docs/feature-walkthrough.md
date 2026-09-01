@@ -914,6 +914,30 @@ When runtime monitoring is enabled, `GET /api/monitoring/v1/choreographies` merg
 
 The repository's mixed Aspire sample declares progressively richer views: `sample-local-order-observation` is one C# terminal reaction, `sample-order-submission` combines C# and Java declarations, `sample-parallel-order-checks` is a deterministic three-step C# fan-out, and `sample-fulfillment-handoff` follows a linear C# → Java → C# chain. Start the parallel sample with `POST /workflows/parallel-checks` and the handoff with `POST /workflows/fulfillment` on the C# app. Every declaration matches real consumers and emitted messages; none invents a coordinator. In the monitoring Dashboard, **Workflows → Workflow runs** queries retained runs by type, status, or identity and opens a direct, failure-aware diagram and detail URL. Exactly connected deliveries are assembled into one run; the list and detail identify linear, branching, and converging observed shapes, and the graph labels root fan-out, internal forks, and convergence without claiming business-level join semantics. Each step's **Declared output comparison** shows exact observed sends, publications, or a terminal outcome against declared count and timing intent. Expected absence is only reported after 15 seconds of inactivity with complete monitoring coverage; otherwise it remains awaiting or inconclusive. Findings are operational evidence, not an authoritative business-workflow failure. PostgreSQL-backed monitoring preserves those projections across collector restarts for the configured retention period and removes partial projections superseded by a later exact connection. **Declared workflows** separately shows the merged definitions. `Live activity`, `terminal observed`, and `no recent activity` remain evidence labels rather than authoritative choreography lifecycle states. Use the Dashboard's **Density** selector to retain the default comfortable layout or show a compact application-wide view.
 
+### Experimental saga state-machine registration
+
+After defining a native state machine as described in [Saga Native DSL](development/saga-native-dsl.md), register it with the same bus configurator used for consumers.
+
+#### C#
+
+```csharp
+services.AddServiceBus(configurator =>
+{
+    configurator.AddSagaStateMachine<OrderStateMachine, OrderState>();
+});
+```
+
+Pass an existing `OrderStateMachine` instance when construction needs application configuration, or pass an endpoint name to override the default state-machine ID.
+
+#### Java
+
+```java
+services.from(MessageBusServices.class).addServiceBus(configurator ->
+    configurator.addSagaStateMachine(OrderStateMachine.class));
+```
+
+Java also accepts a state-machine supplier and endpoint override. In both clients, registration binds every declared event contract to one endpoint, runs the machine through the ordinary consumer retry and fault pipeline, and sends or publishes outgoing activities through the active consume context. The current repository is volatile and the dispatch boundary is only logical: it is suitable for development and samples, not durable production workflow state or exactly-once outgoing delivery.
+
 ---
 
 ### Configuration
@@ -996,7 +1020,7 @@ public record OrderSubmitted;
 public record OrderSubmitted() { }
 ```
 
-Built-in endpoint name formatters include `DefaultEndpointNameFormatter`, `KebabCaseEndpointNameFormatter`, and `SnakeCaseEndpointNameFormatter`. Like MassTransit, automatic endpoint names are derived from the consumer type rather than the message type, and the `Consumer`, `Saga`, and `Activity` suffixes are removed before casing is applied. The suffix rules keep the naming surface compatible; they do not imply that saga or activity runtimes are currently implemented.
+Built-in endpoint name formatters include `DefaultEndpointNameFormatter`, `KebabCaseEndpointNameFormatter`, and `SnakeCaseEndpointNameFormatter`. Like MassTransit, automatic endpoint names are derived from the consumer type rather than the message type, and the `Consumer`, `Saga`, and `Activity` suffixes are removed before casing is applied. The suffix rules remain independent of the experimental saga state-machine runtime and do not imply durable saga support.
 
 ### JSON interoperability profiles
 

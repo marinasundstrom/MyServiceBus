@@ -1,6 +1,8 @@
 package com.myservicebus.orchestration;
 
 import com.myservicebus.MessageUrn;
+import com.myservicebus.BusRegistrationConfigurator;
+import com.myservicebus.ConsumeContext;
 import com.myservicebus.orchestration.SagaStateMachineRuntime.ActivityContext;
 
 import java.util.ArrayList;
@@ -186,10 +188,25 @@ public abstract class SagaStateMachine<TSaga> {
         completionPolicy = SagaCompletionPolicy.RETAIN;
     }
 
-    protected final InMemorySagaRepository<TSaga> createInMemoryRepository() {
+    public final InMemorySagaRepository<TSaga> createInMemoryRepository() {
         frozen = true;
         validateRuntimeConfiguration();
         return new InMemorySagaRepository<>(cloneInstance::apply);
+    }
+
+    /** Registers each declared event as an ordinary bus consumer on one endpoint. */
+    public final void registerConsumers(
+            BusRegistrationConfigurator configurator,
+            SagaStateMachineRuntime<TSaga> runtime,
+            Class<?> stateMachineClass,
+            String endpointName) {
+        Objects.requireNonNull(configurator, "configurator");
+        Objects.requireNonNull(runtime, "runtime");
+        Objects.requireNonNull(stateMachineClass, "stateMachineClass");
+        required(endpointName, "endpointName");
+        for (EventRegistration<?> event : events) {
+            event.register(configurator, runtime, stateMachineClass, endpointName);
+        }
     }
 
     private <TMessage> void addBehavior(
@@ -382,6 +399,41 @@ public abstract class SagaStateMachine<TSaga> {
         private void bind(SagaStateMachineRuntimeBuilder<TSaga> builder) {
             builder.event(event.id(), event.messageType(), correlation.correlate);
         }
+
+        private void register(
+                BusRegistrationConfigurator configurator,
+                SagaStateMachineRuntime<TSaga> runtime,
+                Class<?> stateMachineClass,
+                String endpointName) {
+            configurator.addConsumerMethod(
+                    stateMachineClass,
+                    event.messageType(),
+                    endpointName,
+                    true,
+                    null,
+                    (serviceProvider, context) -> runtime.deliver(
+                            context.getMessage(),
+                            operation -> dispatchOutgoing(context, operation))
+                            .thenApply(result -> (Void) null)
+                            .toCompletableFuture());
+        }
+    }
+
+    private static CompletableFuture<Void> dispatchOutgoing(
+            ConsumeContext<?> context,
+            SagaStateMachineRuntime.OutgoingOperation operation) {
+        return switch (operation.kind()) {
+            case SEND -> context.send(
+                    operation.destination(),
+                    operation.message(),
+                    context.getCancellationToken());
+            case PUBLISH -> context.publish(
+                    operation.message(),
+                    context.getCancellationToken());
+            default -> CompletableFuture.failedFuture(new IllegalStateException(
+                    "Saga outgoing operation '" + operation.kind()
+                            + "' cannot be dispatched through the bus."));
+        };
     }
 
     private final class BehaviorRegistration<TMessage> {

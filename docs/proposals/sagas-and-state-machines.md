@@ -2,7 +2,7 @@
 
 ## Status
 
-Active implementation proposal. The portable version 1 behavior is defined in the [Saga State-Machine Behavior specification](../specs/saga-state-machine-behavior.md), and matching low-level runtimes plus native C# and Java DSL foundations lower to the same canonical definition and execution sequence. They are not yet bus-integrated or supported as a complete saga feature.
+Active implementation proposal. The portable version 1 behavior is defined in the [Saga State-Machine Behavior specification](../specs/saga-state-machine-behavior.md), and matching low-level runtimes plus native C# and Java DSL foundations lower to the same canonical definition and execution sequence. Experimental registration now attaches declared events to one bus endpoint and dispatches outgoing work through the active consume context. Samples, topology, monitoring, and durable persistence remain before this is a complete saga feature.
 
 ## Summary
 
@@ -204,7 +204,7 @@ Scheduled events, requests, and composite events belong to the shared state-mach
 
 Topology should expose saga/state-machine identity, states, consumed and produced contracts, endpoint attachment, correlation shape, and persistence requirements without executable callbacks. Monitoring should cover state distribution, transitions, correlation failures, missing instances, repository conflicts, schedules, requests, faults, provider health, freshness, and completeness without exporting saga payloads by default.
 
-The dashboard should present orchestration and choreography through a related workflow vocabulary without pretending that their evidence is equivalent. An orchestrated saga has a framework-owned instance identity and persisted current state, so the dashboard can authoritatively show where that instance is, how it arrived there, what it is waiting for, and whether it completed or faulted. A choreographed flow is reconstructed from distributed declarations and bounded observations and must retain confidence and coverage labels. Shared maps, timelines, contract nodes, causal message edges, and application drill-downs can make the two styles comparable while state badges and lifecycle claims remain specific to orchestration.
+The dashboard should present orchestration and choreography through a related workflow vocabulary without pretending that their evidence is equivalent. Monitoring keeps choreography declarations/runs and saga definitions/instances/transitions as separate first-class bus models. `Workflow` is the collective query projection over those sources: each result carries its implementation kind and links back to the complete kind-specific record rather than flattening both into one storage model. An orchestrated saga has a framework-owned instance identity and persisted current state, so the dashboard can authoritatively show where that instance is, how it arrived there, what it is waiting for, and whether it completed or faulted. A choreographed flow is reconstructed from distributed declarations and bounded observations and must retain confidence and coverage labels. Shared maps, timelines, contract nodes, causal message edges, and application drill-downs can make the two styles comparable while state badges and lifecycle claims remain specific to orchestration.
 
 The orchestration drill-down should have a definition graph and an instance timeline. The graph renders initial, ordinary, and final states plus event-labeled transitions, keeps the full definition visible, highlights the selected instance's current state, marks its traversed path, and annotates pending timeouts or requests. Aggregate mode can place instance count, oldest age, transition rate, and fault count on the relevant states and edges. Selecting a graph element filters the ordered transition records rather than placing full operational detail inside nodes.
 
@@ -232,7 +232,7 @@ Broker tests should prove that C# and Java services exchange every saga input an
 2. Define canonical state-machine and failure-sequence fixtures.
 3. Define the normalized declaration, repository capabilities, topology, and monitoring contracts.
 4. Implement the smallest in-memory C# and Java runtimes with their native library DSLs. **Completed for the fundamental non-bus-integrated profile.**
-5. Complete the usable MVP vertical slice with bus registration and dispatch, ordinary retry/fault behavior, a focused sample, and one Aspire order-orchestration sample.
+5. Complete the usable MVP vertical slice with bus registration and dispatch, ordinary retry/fault behavior, a focused sample, and one Aspire order-orchestration sample. **Registration and dispatch are implemented; samples remain.**
 6. Project declarations and instance transitions into topology, monitoring, and an initial Dashboard orchestration view.
 7. Integrate transactional outbox and durable scheduling.
 8. Add one durable repository provider in each ecosystem and run restart and concurrency gates.

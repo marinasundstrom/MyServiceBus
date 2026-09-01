@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using MyServiceBus.Choreography;
+using MyServiceBus.Orchestration;
 using MyServiceBus.Topology;
 using MyServiceBus.Serialization;
 using System;
@@ -26,6 +27,7 @@ public class BusRegistrationConfigurator : IBusRegistrationConfigurator
     private string defaultContentType = InboundMessageResolver.EnvelopeContentType;
     private readonly TransportCapabilityRequirements capabilityRequirements = new();
     private readonly JobConsumerRegistry jobConsumers = new();
+    private readonly HashSet<Type> sagaStateMachines = new();
 
     public IServiceCollection Services { get; }
 
@@ -41,6 +43,32 @@ public class BusRegistrationConfigurator : IBusRegistrationConfigurator
     {
         _topology.RegisterChoreography(fragment);
     }
+
+    public void AddSagaStateMachine<TStateMachine, TSaga>(
+        TStateMachine stateMachine,
+        string? endpointName = null)
+        where TStateMachine : SagaStateMachine<TSaga>
+        where TSaga : class
+    {
+        ArgumentNullException.ThrowIfNull(stateMachine);
+        if (endpointName is not null)
+            ArgumentException.ThrowIfNullOrWhiteSpace(endpointName);
+        if (!sagaStateMachines.Add(typeof(TStateMachine)))
+            return;
+
+        var repository = stateMachine.CreateConfiguredInMemoryRepository();
+        var runtime = stateMachine.CreateRuntime(repository);
+        var queueName = endpointName ?? stateMachine.Definition.StateMachineId;
+
+        Services.AddSingleton(stateMachine);
+        Services.AddSingleton(repository);
+        stateMachine.RegisterConsumers<TStateMachine>(this, runtime, queueName);
+    }
+
+    public void AddSagaStateMachine<TStateMachine, TSaga>(string? endpointName = null)
+        where TStateMachine : SagaStateMachine<TSaga>, new()
+        where TSaga : class
+        => AddSagaStateMachine<TStateMachine, TSaga>(new TStateMachine(), endpointName);
 
     [RequiresDynamicCode("Runtime job consumer discovery closes generic registrations dynamically. Use the explicit job/message overload for NativeAOT.")]
     [RequiresUnreferencedCode("Runtime job consumer discovery cannot guarantee that generic interface metadata is preserved.")]

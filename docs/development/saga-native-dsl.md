@@ -2,7 +2,7 @@
 
 ## Status
 
-Design and acceptance contract for the first C# and Java authoring DSLs. The fundamental APIs illustrated here now lower to the shared normalized definition and in-memory execution runtime in both clients. They remain an experimental foundation until bus registration, dispatch, samples, topology, and monitoring complete the usable MVP.
+Design and acceptance contract for the first C# and Java authoring DSLs. The fundamental APIs illustrated here now lower to the shared normalized definition and in-memory execution runtime in both clients. Experimental registration attaches every declared event to one receive endpoint and dispatches outgoing work through the active consume context. Focused application samples, topology, monitoring, and an Aspire walkthrough remain before the usable MVP is complete.
 
 ## Design Goal
 
@@ -245,4 +245,4 @@ Before the fundamental DSL is complete, C# and Java tests must prove that:
 8. outgoing dispatch failure prevents the volatile instance from committing in both clients; and
 9. the DSL uses the existing low-level runtime rather than a parallel executor.
 
-Bus registration and dispatch plus the focused and Aspire samples are part of the usable MVP gate. Topology publication and minimal lifecycle monitoring should follow immediately so the sample is operationally legible. Durable repositories and richer Dashboard analysis remain later gates over the same machine definition.
+Bus registration and consume-context dispatch now satisfy the first runtime vertical slice. Focused and Aspire samples remain part of the usable MVP gate. Topology publication and minimal lifecycle monitoring should follow immediately so the sample is operationally legible. Durable repositories and richer Dashboard analysis remain later gates over the same machine definition.

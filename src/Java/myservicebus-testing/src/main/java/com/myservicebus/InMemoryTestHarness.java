@@ -158,9 +158,6 @@ public class InMemoryTestHarness implements RequestClientTransport, TransportSen
                     try {
                         ServiceProvider scoped = scope.getServiceProvider();
                         @SuppressWarnings("unchecked")
-                        com.myservicebus.Consumer<Object> consumer = (com.myservicebus.Consumer<Object>) scoped
-                                .getService(ct.getConsumerType());
-                        @SuppressWarnings("unchecked")
                         ConsumeContext<Object> consumeContext = new ConsumeContext<>(message, context.getHeaders(),
                                 responseAddress, faultAddress, null, context.getCancellationToken(),
                                 InMemoryTestHarness.this, java.net.URI.create("inmemory:bus"),
@@ -170,7 +167,20 @@ public class InMemoryTestHarness implements RequestClientTransport, TransportSen
                         ctxProvider.setContext(consumeContext);
                         CompletableFuture<Void> result;
                         try {
-                            result = consumer.consume(consumeContext).thenRun(() -> recordConsumed(message));
+                            if (ct.getMethodInvoker() != null) {
+                                @SuppressWarnings("unchecked")
+                                ConsumerMethodInvoker<Object> invoker =
+                                        (ConsumerMethodInvoker<Object>) ct.getMethodInvoker();
+                                result = invoker.invoke(scoped, consumeContext)
+                                        .thenRun(() -> recordConsumed(message));
+                            } else {
+                                @SuppressWarnings("unchecked")
+                                com.myservicebus.Consumer<Object> consumer =
+                                        (com.myservicebus.Consumer<Object>) scoped
+                                                .getService(ct.getConsumerType());
+                                result = consumer.consume(consumeContext)
+                                        .thenRun(() -> recordConsumed(message));
+                            }
                         } finally {
                             ctxProvider.clear();
                         }
