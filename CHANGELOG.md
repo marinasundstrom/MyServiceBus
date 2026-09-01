@@ -4,6 +4,7 @@ This changelog summarizes the bigger themes in the repository history rather tha
 
 ## Unreleased
 
+- Clarified the saga abstraction stack: shared semantics and normalized declarations, low-level C# and Java runtime APIs, native authoring DSLs built above them, and an optional Raven macro projection over the same .NET runtime. MassTransit remains the conceptual and behavioral baseline rather than an exact public-API template.
 - Added matching C# and Java saga state-machine declaration models and fluent builders. Both clients validate and deterministically normalize states, events, identity correlation, creation and missing-instance policies, ordered mutation and messaging activities, transitions, ignores, finalization, completion policy, and repository requirements against the same portable fixture.
 - Defined the portable version 1 saga state-machine behavior from the MassTransit 8.5.1 baseline, including explicit creation and missing-instance policies, deterministic behavior selection, ordered activities, finalization versus completion, failure and durability boundaries, and a canonical cross-language declaration fixture. The first runtime profile is deliberately limited to identity correlation and an in-memory repository while reserving durable, request, scheduling, composite, and named-terminal-outcome profiles.
 - Improved the shared Dashboard shell with a global live, polling, or unavailable monitoring status, last-update context, keyboard skip navigation, and clearer horizontal-navigation affordance at small widths.

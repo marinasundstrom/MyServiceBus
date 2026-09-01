@@ -24,6 +24,17 @@ The first executable profile is intentionally smaller than the complete feature:
 
 Query correlation, durable repositories, conflict retries, transactional outbox integration, schedules, requests, responses, composite events, exception activities, and multiple named final outcomes are specified as later profiles. Their place in the model is reserved, but the first runtime must not claim those capabilities.
 
+## Abstraction Layers
+
+This behavior is exposed at several levels without making any one syntax authoritative:
+
+1. The portable specification and normalized declaration define shared meaning, validation, topology, and conformance evidence.
+2. Low-level C# and Java runtime APIs implement correlation, instance access, behavior selection, ordered activities, persistence, and observations.
+3. Native C# and Java state-machine DSLs build executable definitions using those primitives. Their shapes may differ by language; the C# form may remain deliberately familiar to MassTransit users.
+4. Raven's future `saga!` macro generates artifacts for the same .NET declaration and runtime rather than introducing another saga engine.
+
+The compatibility target is the state-machine concepts and observable behavior in this specification. Exact MassTransit public interfaces, base classes, generic constraints, overloads, and fluent signatures are not compatibility requirements. The low-level APIs also should not be mistaken for the preferred application-facing DSL merely because they are implemented first.
+
 ## Definitions
 
 - **Definition**: the immutable state-machine declaration used for validation, execution, topology, and monitoring.

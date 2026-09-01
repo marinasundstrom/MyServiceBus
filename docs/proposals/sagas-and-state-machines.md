@@ -12,13 +12,16 @@ Applications can implement an orchestrator directly with consumers, messages, pe
 
 Sagas and state machines should become one coherent MyServiceBus orchestration feature implemented in both C# and Java. The implementation should be based on MassTransit's proven saga architecture, primitives, execution order, and observable behavior while remaining a MyServiceBus-owned reimplementation with no MassTransit runtime dependency.
 
-The complete feature has three distinct layers:
+The complete feature has four distinct layers:
 
 1. a language-neutral saga model, behavior specification, topology projection, and conformance suite;
-2. native C# and Java runtimes with corresponding library-based state-machine DSLs; and
-3. optional language projections, including a future Raven `saga!` macro that lowers into the same runtime model.
+2. low-level C# and Java runtime APIs for correlation, repositories, behavior selection, activities, persistence, and observations;
+3. native library-based state-machine DSLs that compile or build upon those low-level APIs; and
+4. optional language projections, including a future Raven `saga!` macro that lowers into the same .NET runtime model.
 
-The C# and Java DSLs are first-class product APIs. They must not be implemented in terms of the Raven macro, require compiler macros, or require code generation for correctness. Generated registration may optimize either client, but an explicit runtime registration path remains supported.
+The normalized descriptor builders and low-level runtime contracts are infrastructure APIs, not the final state-machine authoring experience. The C# and Java DSLs are first-class product APIs layered above them. They must not be implemented in terms of the Raven macro, require compiler macros, or require code generation for correctness. Generated registration may optimize either client, but an explicit runtime registration path remains supported.
+
+MassTransit compatibility is primarily conceptual and behavioral. MyServiceBus is not required to reproduce MassTransit's interfaces, inheritance hierarchy, overload set, or exact fluent signatures. One native DSL—especially the C# DSL—may intentionally resemble MassTransit's established `Initially`/`During`/`When` model because it is expressive and familiar, while Java and other projections can use language-appropriate shapes. Every abstraction level must still lower to the same MyServiceBus semantics and produce equivalent observable outcomes.
 
 ## Product Boundary
 
@@ -105,6 +108,8 @@ Each runtime associates local callbacks and native types with this definition. R
 
 C# and Java should each provide a normal library API for defining state machines. The APIs should be recognizably related and map unambiguously to the shared definition while using the host language's type system and asynchronous conventions.
 
+These authoring DSLs sit above the low-level execution and descriptor APIs. Application developers may use the lower level directly for framework integration, generated definitions, testing, or unusual dynamic composition, but ordinary applications should not need to assemble repository policies, transition tables, or activity pipelines manually.
+
 An exploratory C# shape may resemble:
 
 ```csharp
@@ -163,7 +168,7 @@ public final class OrderStateMachine extends SagaStateMachine<OrderState> {
 }
 ```
 
-These examples establish direction, not final signatures. The design must validate async activities, cancellation, exceptions, Java type erasure, source generation, annotation processing, NativeAOT, and GraalVM constraints before stabilization. The equivalent declaration must also be constructible explicitly through descriptors or builders so code generation is optional.
+These examples establish direction, not final signatures or an API-compatibility promise. The design must validate async activities, cancellation, exceptions, Java type erasure, source generation, annotation processing, NativeAOT, and GraalVM constraints before stabilization. The equivalent declaration must also be constructible explicitly through descriptors or builders so code generation is optional.
 
 ## Runtime Behavior
 

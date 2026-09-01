@@ -16,9 +16,9 @@ MyServiceBus should explore a Raven-native saga and state-machine DSL as part of
 
 The language-neutral saga model remains authoritative. Raven syntax must be an idiomatic projection over that model rather than the source from which C# or Java semantics are derived. C# and Java may expose different APIs while sharing the same concepts, observable outcomes, and conformance fixtures.
 
-This macro is not the general MyServiceBus state-machine DSL. The complete feature supplies independent, library-based C# and Java DSLs over their native MyServiceBus runtimes, including a non-generated registration path. The Raven macro is an optional compiler frontend over the same .NET definition and execution model.
+This macro is not the general MyServiceBus state-machine DSL. The complete feature supplies low-level runtime APIs plus independent, library-based C# and Java DSLs over their native MyServiceBus runtimes, including a non-generated registration path. The Raven macro is an optional higher-level compiler frontend over the same .NET definition and execution model.
 
-The portable model and every language projection should preserve the recognizable primitives and fundamental behavior of MassTransit saga state machines where they remain a sound cross-language fit. MyServiceBus should study MassTransit's implementation and use its proven architecture and behavioral model as the baseline for a MyServiceBus-owned reimplementation in C# and Java. It should not introduce an unrelated state-machine design merely for novelty. An experienced MassTransit user should not have to relearn what a state, event, initial behavior, state-specific behavior, transition, schedule, request, composite event, or finalization means. This follows the project-wide compatibility order of concept, behavior, API, and then language idiom.
+The portable model and every language projection should preserve the recognizable primitives and fundamental behavior of MassTransit saga state machines where they remain a sound cross-language fit. MyServiceBus should study MassTransit's implementation and use its proven architecture and behavioral model as the baseline for a MyServiceBus-owned reimplementation in C# and Java. It should not introduce an unrelated state-machine design merely for novelty. An experienced MassTransit user should not have to relearn what a state, event, initial behavior, state-specific behavior, transition, schedule, request, composite event, or finalization means. Exact API copying is not the goal: the low-level runtime, native DSLs, and Raven projection may use different interfaces and syntax while lowering to equivalent behavior.
 
 An initial syntax exploration may look like:
 
@@ -109,7 +109,7 @@ This can make state machines easier to:
 - analyze for unreachable states, incomplete correlation, ambiguous transitions, and missing terminal paths; and
 - use in documentation and executable samples without maintaining a second pseudocode representation.
 
-The native C# and Java DSLs remain complete alternatives and the primary portable-client APIs. Applications should be able to choose the host-language DSL or the Raven macro based on team preference, deployment constraints, and desired compiler diagnostics while receiving the same MyServiceBus runtime behavior.
+The native C# and Java DSLs remain complete alternatives and the primary application-authoring APIs. Lower-level APIs remain available for integrations and generated definitions. Applications should be able to choose the host-language DSL or the Raven macro based on team preference, deployment constraints, and desired compiler diagnostics while receiving the same MyServiceBus runtime behavior.
 
 ## MassTransit-Familiar Primitives
 
