@@ -78,7 +78,15 @@
                             </td>
                             <td>
                                 <strong>@(run.EvidenceComplete ? "Complete" : "Incomplete")</strong>
-                                @if (!run.EvidenceComplete)
+                                @if (run.DiagnosticIssueCount > 0)
+                                {
+                                    <small>@run.DiagnosticIssueCount declared/observed @(run.DiagnosticIssueCount == 1 ? "finding" : "findings")</small>
+                                }
+                                else if (run.IndeterminateExpectationCount > 0)
+                                {
+                                    <small>@run.IndeterminateExpectationCount pending or unsupported</small>
+                                }
+                                else if (!run.EvidenceComplete)
                                 {
                                     <small>@run.DroppedObservations dropped · @(run.AllParticipantsOnline ? "participants online" : "participant offline")</small>
                                 }

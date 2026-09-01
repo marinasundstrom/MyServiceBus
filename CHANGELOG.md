@@ -4,6 +4,8 @@ This changelog summarizes the bigger themes in the repository history rather tha
 
 ## Unreleased
 
+- Added completeness-gated declared-versus-observed diagnostics to retained choreography runs. Exact send, publish, and terminal evidence is compared with declared counts, destinations, and timing; missing expectations remain awaiting or inconclusive until inactivity and monitoring coverage support the finding.
+- Presented per-run output comparisons in the Dashboard run index and step detail, clearly separating operational findings from authoritative business-workflow failure and retaining explicit unsupported or incomplete states.
 - Reconciled exact-evidence workflow runs as connected graphs. Same-message delivery fan-out remains one run, later exact convergence replaces superseded partial roots in memory and PostgreSQL, and retained runs report root, branch, merge, and observed-shape metadata.
 - Extended workflow-run presentation with linear, branching, and converging shape summaries plus D3 activity labels for root fan-out, internal forks, and observed convergence. Chronological evidence cards no longer imply linear causation for non-linear runs, and the UI explicitly avoids treating convergence as a declared business join.
 - Added a deterministic runnable `sample-parallel-order-checks` choreography to the Aspire environment. One C# reaction publishes independent payment and inventory checks, producing a real three-step exact fan-out for Dashboard demonstrations and manual validation.

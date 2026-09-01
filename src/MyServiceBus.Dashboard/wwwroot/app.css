@@ -291,6 +291,8 @@ td small { display: block; margin-top: 4px; color: var(--text-dim); font-size: .
 .workflow-run-outcome dd { margin: 4px 0 0; overflow: hidden; font-size: .72rem; font-weight: 750; text-overflow: ellipsis; white-space: nowrap; }
 .workflow-run-coverage-warning { padding: 12px 20px; border-bottom: 1px solid color-mix(in srgb, #f1b861 45%, var(--border)); background: color-mix(in srgb, #f1b861 10%, var(--surface-deep)); color: var(--text-muted); font-size: .7rem; }
 .workflow-run-structure-note { padding: 10px 20px; border-bottom: 1px solid var(--border); background: color-mix(in srgb, var(--accent) 6%, var(--surface-deep)); color: var(--text-muted); font-size: .7rem; line-height: 1.45; }
+.workflow-run-diagnostic-warning { display: flex; gap: 12px; padding: 11px 20px; border-bottom: 1px solid color-mix(in srgb, #f1b861 48%, var(--border)); background: color-mix(in srgb, #f1b861 11%, var(--surface-deep)); color: var(--text-muted); font-size: .7rem; line-height: 1.45; }
+.workflow-run-diagnostic-warning strong { flex: 0 0 auto; color: #f1b861; }
 .workflow-map { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 16px; padding: 20px; background: linear-gradient(var(--border-subtle) 1px, transparent 1px), linear-gradient(90deg, var(--border-subtle) 1px, transparent 1px), var(--surface-deep); background-size: 42px 42px; }
 .workflow-participant { min-width: 0; overflow: hidden; border: 1px solid var(--border-strong); border-radius: 14px; background: color-mix(in srgb, var(--surface-solid) 96%, transparent); box-shadow: 0 12px 30px rgb(0 0 0 / 15%); }
 .workflow-participant > header { display: flex; justify-content: space-between; align-items: center; gap: 15px; padding: 15px 17px; border-bottom: 1px solid var(--border); background: color-mix(in srgb, var(--surface-raised) 70%, transparent); }
@@ -368,6 +370,20 @@ td small { display: block; margin-top: 4px; color: var(--text-dim); font-size: .
 .workflow-run-output span { color: var(--accent); font-size: .55rem; font-weight: 800; text-transform: uppercase; }
 .workflow-run-output strong { overflow: hidden; font-size: .65rem; text-align: right; text-overflow: ellipsis; white-space: nowrap; }
 .workflow-run-output small, .workflow-run-output em { grid-column: 1 / -1; color: var(--text-dim); font-size: .58rem; font-style: normal; }
+.workflow-run-expectations { display: grid; gap: 6px; margin-top: 11px; padding-top: 10px; border-top: 1px solid var(--border-subtle); }
+.workflow-run-expectations-label { color: var(--text-dim); font-size: .55rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.workflow-run-expectation { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 3px 7px; padding: 8px; border: 1px solid var(--border-subtle); border-radius: 7px; background: var(--surface-deep); }
+.workflow-run-expectation > span { color: var(--accent); font-size: .54rem; font-weight: 800; text-transform: uppercase; }
+.workflow-run-expectation > strong { overflow: hidden; font-size: .63rem; text-overflow: ellipsis; white-space: nowrap; }
+.workflow-run-expectation > em { color: var(--text-muted); font-size: .56rem; font-style: normal; font-weight: 750; text-align: right; }
+.workflow-run-expectation > small { grid-column: 1 / -1; color: var(--text-dim); font-size: .56rem; }
+.workflow-run-expectation.exact_observed { border-color: color-mix(in srgb, var(--accent) 35%, var(--border-subtle)); }
+.workflow-run-expectation.missing_expected,
+.workflow-run-expectation.below_minimum,
+.workflow-run-expectation.above_maximum,
+.workflow-run-expectation.timing_exceeded,
+.workflow-run-expectation.unexpected_observed,
+.workflow-run-expectation.output_faulted { border-color: color-mix(in srgb, #f1b861 55%, var(--border)); background: color-mix(in srgb, #f1b861 7%, var(--surface-deep)); }
 .workflow-runs > footer, .workflow-run-detail > footer { padding: 11px 20px; border-top: 1px solid var(--border); color: var(--text-dim); font-size: .62rem; }
 @keyframes workflow-live-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
 

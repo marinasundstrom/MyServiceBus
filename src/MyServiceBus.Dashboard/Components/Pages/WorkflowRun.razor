@@ -45,7 +45,7 @@ else
             <div>
                 <span class="run-status @run.Status"></span>
                 <strong>@RunStatus(run.Status)</strong>
-                <small>Reconstructed · @run.Confidence.Replace('_', ' ') · @ShapeLabel(run)</small>
+                <small>Reconstructed · @run.Confidence.Replace('_', ' ') · @ShapeLabel(run)@DiagnosticSummary(run)</small>
             </div>
             <span>Started @run.StartedAtUtc.ToLocalTime().ToString("MMM d, HH:mm:ss.fff") · last activity @run.LastActivityAtUtc.ToLocalTime().ToString("HH:mm:ss.fff")</span>
         </div>
@@ -54,6 +54,20 @@ else
         {
             <div class="workflow-run-coverage-warning">
                 Evidence is incomplete: @run.DroppedObservations observations were dropped or one or more declared participants were offline when this run was captured.
+            </div>
+        }
+
+        @if (run.DiagnosticIssueCount > 0)
+        {
+            <div class="workflow-run-diagnostic-warning">
+                <strong>@run.DiagnosticIssueCount declared/observed @(run.DiagnosticIssueCount == 1 ? "finding" : "findings")</strong>
+                <span>These findings compare local declarations with exact monitoring evidence. They are operational diagnostics, not proof that the business workflow failed.</span>
+            </div>
+        }
+        @if (run.IndeterminateExpectationCount > 0)
+        {
+            <div class="workflow-run-structure-note">
+                @run.IndeterminateExpectationCount output @(run.IndeterminateExpectationCount == 1 ? "expectation is" : "expectations are") pending, unsupported, or inconclusive because of evidence coverage.
             </div>
         }
 
@@ -109,6 +123,21 @@ else
                                 @if (!string.IsNullOrWhiteSpace(output.FailureType))
                                 {
                                     <em>@ContractLabel(output.FailureType)</em>
+                                }
+                            </div>
+                        }
+                        @if (step.OutputExpectations.Count > 0)
+                        {
+                            <div class="workflow-run-expectations">
+                                <span class="workflow-run-expectations-label">Declared output comparison</span>
+                                @foreach (var expectation in step.OutputExpectations)
+                                {
+                                    <div class="workflow-run-expectation @expectation.Status">
+                                        <span>@DisplayKind(expectation.OperationKind)</span>
+                                        <strong>@OutputLabel(expectation.MessageUrn)</strong>
+                                        <em>@ExpectationStatus(expectation.Status)</em>
+                                        <small>@ExpectationSummary(expectation)</small>
+                                    </div>
                                 }
                             </div>
                         }
@@ -208,6 +237,49 @@ else
         if (run.MergePointCount > 0)
             parts.Add($"{run.MergePointCount} exact convergence point{(run.MergePointCount == 1 ? string.Empty : "s")}");
         return string.Join(" and ", parts);
+    }
+
+    private static string DiagnosticSummary(MonitoringChoreographyRun run)
+        => run.DiagnosticIssueCount > 0
+            ? $" · {run.DiagnosticIssueCount} comparison {(run.DiagnosticIssueCount == 1 ? "finding" : "findings")}"
+            : run.IndeterminateExpectationCount > 0
+                ? $" · {run.IndeterminateExpectationCount} inconclusive"
+                : string.Empty;
+
+    private static string ExpectationStatus(string status) => status switch
+    {
+        "exact_observed" => "Observed as declared",
+        "awaiting_evidence" => "Awaiting evidence",
+        "insufficient_evidence" => "Evidence incomplete",
+        "missing_expected" => "Expected output not observed",
+        "below_minimum" => "Below declared minimum",
+        "above_maximum" => "Above declared maximum",
+        "timing_exceeded" => "Outside declared timing",
+        "unexpected_observed" => "Undeclared output observed",
+        "output_faulted" => "Output operation faulted",
+        "optional_not_observed" => "Optional · not observed",
+        "informational_not_observed" => "Informational · not observed",
+        "expectation_satisfied" => "Satisfied · no output required",
+        "unsupported_operation" => "Comparison not supported",
+        _ => DisplayKind(status)
+    };
+
+    private static string ExpectationSummary(MonitoringChoreographyRunOutputExpectation expectation)
+    {
+        var parts = new List<string> { $"Observed {expectation.ObservedCount}" };
+        if (expectation.MinimumCount is { } minimum)
+            parts.Add($"minimum {minimum}");
+        if (expectation.MaximumCount is { } maximum)
+            parts.Add($"maximum {maximum}");
+        if (expectation.WithinMilliseconds is { } within)
+            parts.Add($"within {FormatDuration(within)}");
+        if (expectation.FailedCount > 0)
+            parts.Add($"{expectation.FailedCount} faulted");
+        if (expectation.LateCount > 0)
+            parts.Add($"{expectation.LateCount} late");
+        if (expectation.Requirement != "undeclared")
+            parts.Add(expectation.Requirement);
+        return string.Join(" · ", parts);
     }
 
     private static string TargetLabel(MonitoringChoreographyRun run, string stepKey)
