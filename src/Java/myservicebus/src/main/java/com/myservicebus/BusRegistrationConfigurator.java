@@ -1,13 +1,29 @@
 package com.myservicebus;
 
-import com.myservicebus.di.ServiceCollection;
-import com.myservicebus.serialization.SerializerFactory;
-import com.myservicebus.BusFactoryConfigurator;
-import com.myservicebus.persistence.OutboxSession;
+import com.myservicebus.choreography.ChoreographyBuilder;
 import com.myservicebus.choreography.ChoreographyFragment;
+import com.myservicebus.di.ServiceCollection;
+import com.myservicebus.persistence.OutboxSession;
+import com.myservicebus.serialization.SerializerFactory;
 
 public interface BusRegistrationConfigurator {
     void addChoreography(ChoreographyFragment fragment);
+
+    default void addChoreography(ChoreographyBuilder builder) {
+        java.util.Objects.requireNonNull(builder, "builder");
+        addChoreography(builder.build());
+    }
+
+    default void addChoreography(
+            String choreographyId,
+            String definitionVersion,
+            String owner,
+            java.util.function.Consumer<ChoreographyBuilder> configure) {
+        java.util.Objects.requireNonNull(configure, "configure");
+        ChoreographyBuilder builder = new ChoreographyBuilder(choreographyId, definitionVersion, owner);
+        configure.accept(builder);
+        addChoreography(builder);
+    }
 
     <TConsumer extends JobConsumer<?>> void addJobConsumer(Class<TConsumer> consumerClass);
 

@@ -82,6 +82,43 @@ public class ChoreographyBuilderTests
         Assert.Same(fragment, Assert.Single(provider.GetRequiredService<IBusTopology>().Choreographies));
     }
 
+    [Fact]
+    public void Builds_and_registers_a_fragment_with_the_fluent_registration_overload()
+    {
+        var services = new ServiceCollection();
+
+        services.AddServiceBus(configurator =>
+        {
+            configurator.AddChoreography("orders", "1", "orders", workflow => workflow
+                .Step<OrderSubmitted>("submit", step => step
+                    .OwnedBy<OrderConsumer>()
+                    .Publishes<OrderAccepted>()));
+            configurator.UsingMediator();
+        });
+
+        using var provider = services.BuildServiceProvider();
+        var fragment = Assert.Single(provider.GetRequiredService<IBusTopology>().Choreographies);
+        Assert.Equal("orders", fragment.ChoreographyId);
+        Assert.Equal("submit", Assert.Single(fragment.Steps).Id);
+    }
+
+    [Fact]
+    public void Registers_an_existing_builder_with_the_bus_topology()
+    {
+        var choreography = new ChoreographyBuilder("orders", "1", "orders")
+            .Step<OrderSubmitted>("submit", step => step.Publishes<OrderAccepted>());
+        var services = new ServiceCollection();
+
+        services.AddServiceBus(configurator =>
+        {
+            configurator.AddChoreography(choreography);
+            configurator.UsingMediator();
+        });
+
+        using var provider = services.BuildServiceProvider();
+        Assert.Equal("orders", Assert.Single(provider.GetRequiredService<IBusTopology>().Choreographies).ChoreographyId);
+    }
+
     private sealed class OrderSubmitted;
     private sealed class OrderAccepted;
     private sealed class OrderConsumer;

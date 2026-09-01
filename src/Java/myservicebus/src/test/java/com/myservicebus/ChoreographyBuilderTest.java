@@ -80,6 +80,40 @@ class ChoreographyBuilderTest {
         assertEquals(fragment, topology.getChoreographies().get(0));
     }
 
+    @Test
+    void buildsAndRegistersFragmentWithFluentRegistrationOverload() {
+        ServiceCollection services = ServiceCollection.create();
+
+        services.from(MessageBusServices.class).addServiceBus(configurator ->
+                configurator.addChoreography("orders", "1", "orders", workflow -> workflow
+                        .step("submit", OrderSubmitted.class, step -> step
+                                .ownedBy(OrderConsumer.class)
+                                .publishes(OrderAccepted.class))));
+
+        var fragment = services.buildServiceProvider()
+                .getRequiredService(BusTopology.class)
+                .getChoreographies()
+                .get(0);
+        assertEquals("orders", fragment.choreographyId());
+        assertEquals("submit", fragment.steps().get(0).id());
+    }
+
+    @Test
+    void registersExistingBuilderWithBusTopology() {
+        var choreography = new ChoreographyBuilder("orders", "1", "orders")
+                .step("submit", OrderSubmitted.class, step -> step.publishes(OrderAccepted.class));
+        ServiceCollection services = ServiceCollection.create();
+
+        services.from(MessageBusServices.class).addServiceBus(configurator ->
+                configurator.addChoreography(choreography));
+
+        var fragment = services.buildServiceProvider()
+                .getRequiredService(BusTopology.class)
+                .getChoreographies()
+                .get(0);
+        assertEquals("orders", fragment.choreographyId());
+    }
+
     private static final class OrderSubmitted {
     }
 

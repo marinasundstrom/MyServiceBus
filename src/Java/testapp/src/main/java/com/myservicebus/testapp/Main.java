@@ -23,7 +23,6 @@ import com.myservicebus.PublishEndpoint;
 import com.myservicebus.di.ServiceCollection;
 import com.myservicebus.di.ServiceProvider;
 import com.myservicebus.di.ServiceScope;
-import com.myservicebus.choreography.ChoreographyBuilder;
 import com.myservicebus.inspection.InspectionServices;
 import com.myservicebus.monitoring.MonitoringExporter;
 import com.myservicebus.monitoring.MonitoringExporterOptions;
@@ -65,17 +64,17 @@ public class Main {
         services.from(MessageBusServices.class)
                 .addServiceBus(c -> {
                     GeneratedConsumerCatalog.INSTANCE.register(c);
-                    c.addChoreography(new ChoreographyBuilder(
+                    c.addChoreography(
                             "sample-order-submission",
                             "1",
-                            "TestApp.Java")
-                            .step("java-submit-order", SubmitOrder.class, step -> step
-                                    .ownedBy(SubmitOrderConsumer.class)
-                                    .publishes(OrderSubmitted.class))
-                            .step("java-order-submitted", OrderSubmitted.class, step -> step
-                                    .ownedBy(OrderSubmittedConsumer.class)
-                                    .terminates())
-                            .build());
+                            "TestApp.Java",
+                            workflow -> workflow
+                                    .step("java-submit-order", SubmitOrder.class, step -> step
+                                            .ownedBy(SubmitOrderConsumer.class)
+                                            .publishes(OrderSubmitted.class))
+                                    .step("java-order-submitted", OrderSubmitted.class, step -> step
+                                            .ownedBy(OrderSubmittedConsumer.class)
+                                            .terminates()));
                     c.addJobConsumer(DemoTrackedJobConsumer.class, DemoTrackedJob.class, options -> options
                             .setJobTypeName("sample-report")
                             .setConcurrentJobLimit(2)

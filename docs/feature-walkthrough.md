@@ -870,22 +870,20 @@ The first choreography API builds a portable, payload-free description of reacti
 #### C#
 
 ```csharp
-ChoreographyFragment fragment = new ChoreographyBuilder(
-        "order-fulfillment",
-        definitionVersion: "1",
-        owner: "orders")
-    .Step<OrderSubmitted>("reserve-inventory", step => step
-        .OwnedBy<SubmitOrderConsumer>()
-        .Sends<ReserveInventory>("queue:reserve-inventory", output => output
-            .Exactly(1)
-            .Within(TimeSpan.FromSeconds(5))))
-    .Step<OrderCompleted>("complete-order", step => step
-        .Terminates())
-    .Build();
-
 builder.Services.AddServiceBus(configurator =>
 {
-    configurator.AddChoreography(fragment);
+    configurator.AddChoreography(
+        "order-fulfillment",
+        definitionVersion: "1",
+        owner: "orders",
+        workflow => workflow
+            .Step<OrderSubmitted>("reserve-inventory", step => step
+                .OwnedBy<SubmitOrderConsumer>()
+                .Sends<ReserveInventory>("queue:reserve-inventory", output => output
+                    .Exactly(1)
+                    .Within(TimeSpan.FromSeconds(5))))
+            .Step<OrderCompleted>("complete-order", step => step
+                .Terminates()));
     // Register the consumers and transport normally.
 });
 ```
@@ -893,26 +891,24 @@ builder.Services.AddServiceBus(configurator =>
 #### Java
 
 ```java
-ChoreographyFragment fragment = new ChoreographyBuilder(
+services.from(MessageBusServices.class).addServiceBus(configurator -> {
+    configurator.addChoreography(
         "order-fulfillment",
         "1",
-        "orders")
-    .step("reserve-inventory", OrderSubmitted.class, step -> step
-        .ownedBy(SubmitOrderConsumer.class)
-        .sends(ReserveInventory.class, "queue:reserve-inventory", output -> output
-            .exactly(1)
-            .within(Duration.ofSeconds(5))))
-    .step("complete-order", OrderCompleted.class, step -> step
-        .terminates())
-    .build();
-
-services.from(MessageBusServices.class).addServiceBus(configurator -> {
-    configurator.addChoreography(fragment);
+        "orders",
+        workflow -> workflow
+            .step("reserve-inventory", OrderSubmitted.class, step -> step
+                .ownedBy(SubmitOrderConsumer.class)
+                .sends(ReserveInventory.class, "queue:reserve-inventory", output -> output
+                    .exactly(1)
+                    .within(Duration.ofSeconds(5))))
+            .step("complete-order", OrderCompleted.class, step -> step
+                .terminates()));
     // Register the consumers and transport normally.
 });
 ```
 
-Use `sends`, `publishes`, `responds`, `schedules`, or `terminates` to describe an outcome. An outcome is expected by default and may instead be informational or optional. Count and time expectations are diagnostic intent, not delivery guarantees or executable business predicates. Explicit message-URN overloads are available when cross-language contracts do not derive the same portable identity from their local type names. Registration rejects an unsupported schema, an invalid fragment, or two fragments with the same choreography and owner identity.
+The fluent registration overload is convenience over `ChoreographyBuilder`; it produces and registers the same normalized `ChoreographyFragment`. Applications may instead pass an existing builder, or pass a prebuilt fragment from generated code, a fixture, reusable configuration, or another tool. Use `sends`, `publishes`, `responds`, `schedules`, or `terminates` to describe an outcome. An outcome is expected by default and may instead be informational or optional. Count and time expectations are diagnostic intent, not delivery guarantees or executable business predicates. Explicit message-URN overloads are available when cross-language contracts do not derive the same portable identity from their local type names. Registration rejects an unsupported schema, an invalid fragment, or two fragments with the same choreography and owner identity.
 
 When runtime monitoring is enabled, `GET /api/monitoring/v1/choreographies` merges the fragments reported by participating applications. Identical declarations from replicas collapse into one fragment view with reporting and online instance counts. The Dashboard's **Workflows** page renders those declarations by application, consumed trigger, output, and matching downstream participant. Definition-version, owner, and step-ownership disagreement remains visible as configuration evidence; neither the query nor the map executes the choreography or claims that a business workflow has run or failed.
 

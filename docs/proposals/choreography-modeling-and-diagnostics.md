@@ -158,44 +158,40 @@ Identifiers remain payload-free operational metadata. Exporters still batch thro
 
 ## Native Declaration APIs
 
-C# and Java provide corresponding descriptor and builder APIs that produce the same normalized fragment. The fragment is registered explicitly with `AddChoreography` or `addChoreography`; registration validates it and includes it in normalized topology, inspection, and monitoring metadata.
+C# and Java provide corresponding descriptor and builder APIs that produce the same normalized fragment. The preferred application API configures the builder through `AddChoreography` or `addChoreography`; overloads also accept an existing builder or a prebuilt fragment for generated definitions, fixtures, reuse, and tooling. Every path validates and includes the same fragment in normalized topology, inspection, and monitoring metadata.
 
 The C# shape is:
 
 ```csharp
-ChoreographyFragment fragment = new ChoreographyBuilder(
+configurator.AddChoreography(
         "order-fulfillment",
         definitionVersion: "1",
-        owner: "orders")
-    .Step<OrderSubmitted>("reserve-inventory", step => step
-        .OwnedBy<SubmitOrderConsumer>()
-        .Sends<ReserveInventory>("queue:reserve-inventory", expect => expect
-            .Within(TimeSpan.FromSeconds(5))
-            .Exactly(1)))
-    .Step<InventoryReserved>("request-payment", step => step
-        .Publishes<PaymentRequested>())
-    .Build();
-
-configurator.AddChoreography(fragment);
+        owner: "orders",
+        workflow => workflow
+            .Step<OrderSubmitted>("reserve-inventory", step => step
+                .OwnedBy<SubmitOrderConsumer>()
+                .Sends<ReserveInventory>("queue:reserve-inventory", expect => expect
+                    .Within(TimeSpan.FromSeconds(5))
+                    .Exactly(1)))
+            .Step<InventoryReserved>("request-payment", step => step
+                .Publishes<PaymentRequested>()));
 ```
 
 The Java shape is:
 
 ```java
-ChoreographyFragment fragment = new ChoreographyBuilder(
+configurator.addChoreography(
         "order-fulfillment",
         "1",
-        "orders")
-    .step("reserve-inventory", OrderSubmitted.class, step -> step
-        .ownedBy(SubmitOrderConsumer.class)
-        .sends(ReserveInventory.class, "queue:reserve-inventory", expect -> expect
-            .within(Duration.ofSeconds(5))
-            .exactly(1)))
-    .step("request-payment", InventoryReserved.class, step -> step
-        .publishes(PaymentRequested.class))
-    .build();
-
-configurator.addChoreography(fragment);
+        "orders",
+        workflow -> workflow
+            .step("reserve-inventory", OrderSubmitted.class, step -> step
+                .ownedBy(SubmitOrderConsumer.class)
+                .sends(ReserveInventory.class, "queue:reserve-inventory", expect -> expect
+                    .within(Duration.ofSeconds(5))
+                    .exactly(1)))
+            .step("request-payment", InventoryReserved.class, step -> step
+                .publishes(PaymentRequested.class)));
 ```
 
 The normalized schema records the choreography and definition identities, owning application, stable step identity, trigger message URN, optional owning component, and ordered outputs. Outputs support `send`, `publish`, `respond`, `schedule`, and an explicit terminal outcome plus informational, optional, or expected requirements, bounded multiplicity, and a millisecond timing expectation. Explicit URN overloads support canonical cross-language definitions when language type names differ.
