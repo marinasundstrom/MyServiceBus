@@ -227,14 +227,18 @@ Start with the portable core, canonical fixtures, and one transport profile. Map
 
 **Exit criteria:** integrations preserve their native semantics, and every mutating operational action has an explicit security and audit model.
 
-## Future Area: Orchestration and Choreography
+## Future Area: Choreography, Then Orchestration
 
 **Outcome:** applications can model and observe long-running distributed workflows without confusing message delivery with business-process ownership.
 
-This is a directional area, not a committed release phase. It contains two related but different models:
+This is a directional area, not a committed release phase. Choreography is the first product focus; orchestration follows after its declaration, causation, completeness, and workflow-visualization foundations have been exercised. The area contains two related but different models:
 
-- **Orchestration**, including sagas and state machines, introduces an explicit coordinator with durable workflow state, correlation, concurrency control, timeouts, compensation, and recovery.
 - **Choreography** keeps services autonomous and coordinates through events. The existing publish/consume primitives can be used this way today, but first-class support would add clearer relationship modeling, monitoring, diagnostics, and guidance for detecting stalled, cyclic, or unexpectedly amplified flows.
+- **Orchestration**, including sagas and state machines, introduces an explicit coordinator with durable workflow state, correlation, concurrency control, timeouts, compensation, and recovery.
+
+The first investment in this area should be the read-only [Choreography Modeling and Diagnostics](proposals/choreography-modeling-and-diagnostics.md) slice. It separates configured routes, application-declared reactions, and bounded observed flow; strengthens observations with exact message and causal identity; and gates every diagnostic on confidence, freshness, and completeness. It does not introduce a coordinator or infer business failure from message traffic alone.
+
+This first slice must remain compatible with the existing MassTransit protocol and named transport profiles. Choreography declarations, graph identities, expectations, and Dashboard projections are local topology or operations metadata; they are not application messages and must not require new envelope fields or broker conventions. A MassTransit producer or consumer can therefore remain a participant in the message flow even though it does not publish MyServiceBus choreography declarations or completeness evidence.
 
 Before either area is promoted, the project must define portable C#↔Java semantics, persistence and provider boundaries, idempotency and concurrency rules, scheduling and outbox integration, topology projection, versioning, and application-centric monitoring. The [MyServiceBus saga runtime](proposals/sagas-and-state-machines.md) should be a C# and Java reimplementation based on MassTransit's proven architecture, primitives, and observable behavior—including states, events, initial and state-specific behaviors, transitions, correlation, schedules, requests, composite events, and finalization. MyServiceBus owns the resulting runtime and independent library DSLs; it does not require a MassTransit runtime dependency or the Raven macro. Any deliberate semantic divergence must be documented and covered by shared conformance evidence. Choreography tooling must not turn decentralized event reactions into a hidden central workflow engine.
 

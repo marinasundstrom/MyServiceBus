@@ -6,6 +6,10 @@ Future product-area proposal. This document defines the intended feature boundar
 
 ## Summary
 
+Sagas and state machines provide orchestration: centralized workflow coordination in which one component owns the broader process state and decides how participants should be directed through messages. “Centralized” refers to ownership of workflow knowledge and decisions, not to a single deployment or synchronous execution.
+
+Applications can implement an orchestrator directly with consumers, messages, persistence, and application-owned state. The proposed runtime and DSLs provide safer, more concise C# and Java abstractions for expressing that intent while preserving the same application ownership of business rules.
+
 Sagas and state machines should become one coherent MyServiceBus orchestration feature implemented in both C# and Java. The implementation should be based on MassTransit's proven saga architecture, primitives, execution order, and observable behavior while remaining a MyServiceBus-owned reimplementation with no MassTransit runtime dependency.
 
 The complete feature has three distinct layers:
@@ -38,6 +42,18 @@ The complete state-machine feature should include:
 - equivalent C# and Java conformance evidence.
 
 Consumer sagas, routing slips, compensation logs, and richer workflow-authoring tools are related but separable profiles. They should not enter the first state-machine runtime accidentally merely because MassTransit also supports them.
+
+## Protocol Compatibility and Innovation Boundary
+
+Saga execution sits above the messaging protocol. MyServiceBus may define its own C#, Java, and Raven authoring experiences plus its own runtime, repository, topology, and monitoring model while retaining MassTransit-compatible message contracts, envelopes, addressing, correlation headers, send and publish behavior, requests, responses, faults, and transport profiles.
+
+A MassTransit service can therefore consume commands or events emitted by a MyServiceBus saga and send correlated messages back, and a MyServiceBus service can participate in a workflow initiated by MassTransit. Neither side needs the other's state-machine DSL for message interoperability.
+
+That compatibility does not by itself make saga state portable. A MassTransit saga and a MyServiceBus saga do not share one live instance, repository record, scheduler token, or transition history unless a separate, explicit interoperability profile defines and verifies those boundaries. MyServiceBus can innovate above the wire while keeping every claimed protocol interaction covered by transport and cross-language conformance tests.
+
+The state-machine definition and executable activities are local to the coordinating service. Other services see only the messages it consumes and produces; they do not call its DSL or inspect its repository. The language-neutral definition gives the C# and Java clients aligned concepts, fixtures, topology, and monitoring, but it is not a new cross-service invocation protocol.
+
+Persistence, concurrency, retry, scheduling, and outbox behavior still require portable specification because they affect externally visible message outcomes after crashes, conflicts, duplicates, and timeouts. Internal freedom is compatible with protocol interoperability only when those observable outcomes remain deliberate and tested.
 
 ## MassTransit as the Baseline
 
@@ -172,6 +188,14 @@ Repository capabilities must state whether they support identity correlation, qu
 Scheduled events, requests, and composite events belong to the shared state-machine model. They must reuse MyServiceBus scheduling, request, fault, and outbox primitives rather than creating parallel infrastructure.
 
 Topology should expose saga/state-machine identity, states, consumed and produced contracts, endpoint attachment, correlation shape, and persistence requirements without executable callbacks. Monitoring should cover state distribution, transitions, correlation failures, missing instances, repository conflicts, schedules, requests, faults, provider health, freshness, and completeness without exporting saga payloads by default.
+
+The dashboard should present orchestration and choreography through a related workflow vocabulary without pretending that their evidence is equivalent. An orchestrated saga has a framework-owned instance identity and persisted current state, so the dashboard can authoritatively show where that instance is, how it arrived there, what it is waiting for, and whether it completed or faulted. A choreographed flow is reconstructed from distributed declarations and bounded observations and must retain confidence and coverage labels. Shared maps, timelines, contract nodes, causal message edges, and application drill-downs can make the two styles comparable while state badges and lifecycle claims remain specific to orchestration.
+
+The orchestration drill-down should have a definition graph and an instance timeline. The graph renders initial, ordinary, and final states plus event-labeled transitions, keeps the full definition visible, highlights the selected instance's current state, marks its traversed path, and annotates pending timeouts or requests. Aggregate mode can place instance count, oldest age, transition rate, and fault count on the relevant states and edges. Selecting a graph element filters the ordered transition records rather than placing full operational detail inside nodes.
+
+Each recorded transition should identify the definition and instance, previous and next state, triggering event contract, time and duration, owning application and component, message and correlation references, activities and outgoing operation contracts, scheduled deadlines, attempt or repository-conflict outcome, and fault category. Saga data, message bodies, arbitrary headers, and raw exception messages remain excluded by default.
+
+Workflow visibility remains read-only monitoring by default. Retry, skip, force-transition, compensate, or terminate operations would cross into a privileged control plane and require separate authorization, concurrency checks, confirmation, and audit semantics.
 
 ## Raven Projection
 

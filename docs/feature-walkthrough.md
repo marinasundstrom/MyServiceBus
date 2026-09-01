@@ -1236,6 +1236,8 @@ exporter.start(provider.getRequiredService(BusInspectionProvider.class));
 
 The proof-of-concept service accepts metadata, observation batches, and heartbeats under `/api/monitoring/v1`. Its query API exposes applications, replicas, metadata, bounded-window metrics, bucketed real-time series, recent observations, observed flow, outbox dispatcher operations, and a WebSocket invalidation stream. Replicas group automatically by application name; optional bounded labels such as `group`, `environment`, and `role` provide another display dimension. `MyServiceBus.Dashboard` is a separate Blazor application that consumes only those service APIs. OpenTelemetry collection remains separate; observations carry trace identifiers only as optional correlation references.
 
+Observed flow prefers exact envelope message identity when connecting a producer observation to consumption. Flow edges expose `matchConfidence` as `exact_message` when that identity is present on both sides or `correlated` when the collector must fall back to correlation, conversation, or trace identity. Consumer-originated outgoing operations also retain the consumed message identity, and the separate causal-flow query exposes those exact local trigger-to-output reactions as `exact_causation`. The future choreography model adds declarations, graph comparison, completeness rules, and diagnostics around that evidence.
+
 See [Runtime Monitoring](runtime-monitoring.md) for the complete Aspire walkthrough, service API, deployment boundary, and current MVP limitations.
 
 ---

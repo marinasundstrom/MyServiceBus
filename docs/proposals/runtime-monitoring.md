@@ -429,6 +429,8 @@ The monitoring service builds two graphs:
 
 Configured and observed edges remain distinct. Flow aggregation is bounded and never creates a permanent graph node per message.
 
+The observed graph prefers exact envelope message identity for producer-to-consumer delivery matching and reports `exact_message` or `correlated` confidence. Correlation fallback remains aggregate operational evidence and may span several concurrent messages. Consumer-originated outgoing operations now identify their consumed envelope through monitoring-only `causationMessageId`, including across PostgreSQL outbox dispatch; the separate causal-flow query reports those local reactions as `exact_causation`. The future [Choreography Modeling and Diagnostics](choreography-modeling-and-diagnostics.md) proposal adds application-declared reactions, broader confidence levels, and completeness-gated diagnostics while retaining this bounded monitoring model.
+
 ## Protocol
 
 ### Direction

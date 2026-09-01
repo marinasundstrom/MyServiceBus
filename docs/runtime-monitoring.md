@@ -82,6 +82,29 @@ System-wide focused views remain available when the operator needs to compare ap
 
 Graphs and maps are a continuing dashboard theme. They are implemented as distinct components rather than being embedded into individual pages, which keeps compact overview variants and full drill-down variants consistent. New domains such as sagas should follow the same shape: add only a concise health signal to the overview when it is broadly actionable, and put state distribution, transitions, faults, and correlations in a focused view.
 
+Workflows should eventually become a focused dashboard domain spanning both coordination styles. A choreography view reconstructs decentralized progress from declared reactions and bounded causal message evidence; it shows branches, cycles, missing expected observations, confidence, freshness, and coverage, but cannot claim an authoritative current state merely from silence or correlation. An orchestration view can additionally use persisted saga identity and transition evidence to show the authoritative current state, transition history, pending timeouts or requests, faults, and completion. Both should reuse maps, timelines, contract nodes, causal edges, and application drill-downs so an operator can follow one business process without losing the distinction between inferred and persisted truth.
+
+The useful navigation is aggregate to instance and back: begin with workflow health and state or step distribution, select an unhealthy path, inspect the participating services and causal messages, and—only where a saga owns the lifecycle—open the corresponding persisted instance. Instance identifiers and histories remain bounded operational data subject to authentication, retention, and redaction. Visibility does not authorize retrying, compensating, forcing a transition, or terminating a workflow; those are future control-plane operations.
+
+### Workflow visualization model
+
+The focused workflow experience should combine three synchronized views instead of forcing every fact onto one graph:
+
+1. **Definition map** — the relatively stable model. A choreography map groups reaction steps by owning application and connects trigger and output contracts. An orchestration map renders state-machine states and event-labeled transitions, including initial, final, timeout, and fault paths.
+2. **Runtime overlay** — aggregate recorded evidence on the definition. State nodes can show current instance counts, fault counts, and oldest age; reaction or transition edges can show observed count, latency, and evidence confidence. Missing declaration or observation appears as a diagnostic overlay rather than silently changing the definition.
+3. **Instance timeline** — the ordered record for one selected causal chain or saga instance. It shows consumed events, state before and after a transition, activities, outgoing messages, schedules, retries, persistence conflicts, faults, and completion with timestamps and owning application.
+
+```mermaid
+flowchart LR
+    Definition["Definition map\nstates or reaction steps"] -->|select node or edge| Runtime["Runtime overlay\ncounts, age, latency, faults"]
+    Runtime -->|select causal chain or saga| Timeline["Instance timeline\nrecorded events and transitions"]
+    Timeline -->|locate in model| Definition
+```
+
+For an orchestration instance, the state-machine graph should keep the complete definition visible, emphasize the current state, mark traversed transitions, and distinguish pending timers or requests from completed work. Selecting a state or transition opens the matching records in the timeline rather than expanding the node into an unreadable diagnostic panel. The timeline is the detailed audit-like explanation; the graph remains the spatial explanation of possible and current progress.
+
+Recorded transition information should include safe workflow and definition identity, instance identity, previous and next state, triggering event contract, timestamp and duration, owning application and component, message and correlation references, emitted operation kinds and contracts, scheduled or unscheduled deadlines, attempt and repository-conflict outcome, and fault category. Payloads, arbitrary headers, exception messages, and saga data remain excluded by default. Choreography records reuse the applicable fields but replace authoritative state transitions with declared step identity, causal evidence, confidence, and coverage.
+
 Broker inspection is a separate source of information from MyServiceBus monitoring. A future dashboard provider may query RabbitMQ, Azure Service Bus, or another broker management API with separately configured credentials. Queue-management, purge, replay, reset, and similar commands are a further control-plane capability: they require explicit authorization, confirmation, audit, and recoverability boundaries and must not be implied by read-only monitoring access.
 
 This supplied dashboard is one opinionated consumer of the monitoring APIs. A future engineering-focused dashboard could organize the same data around buses, endpoints, topology, and broker objects, closer to an infrastructure console, without changing this dashboard's application-developer purpose.
@@ -279,6 +302,8 @@ HTTP request → Checkout.Api
 ```
 
 This answers a different question from the monitoring overview. The dashboard shows the current shape and behavior of the system—applications, replicas, rates, latency, retries, failures, and observed aggregate flow. An OpenTelemetry backend shows the path and timing of one particular operation across service and messaging boundaries, including the work that caused the next message.
+
+Observed flow prefers exact envelope message identity when matching an outbound operation to its consumption and exposes `matchConfidence` as `exact_message` or `correlated`. Correlation, conversation, or trace fallback may span concurrent branches. Consumer-originated outgoing operations additionally carry `causationMessageId`; `GET /api/monitoring/v1/flow/causal` projects exact local trigger-to-output reactions with `exact_causation` confidence. This evidence is monitoring-only, survives PostgreSQL outbox dispatch, and does not add a wire header. The future [Choreography Modeling and Diagnostics](proposals/choreography-modeling-and-diagnostics.md) work adds declarations plus broader confidence and completeness rules for stronger diagnostics.
 
 When running the repository through Aspire, open the Aspire dashboard's telemetry trace view to inspect this complete request-and-message chain. The inbound HTTP span, MyServiceBus producer and consumer spans, and any other instrumented application work appear together in the same trace, provided every participating service exports the propagated context. The MyServiceBus monitoring dashboard remains the aggregate runtime overview alongside that per-operation Aspire view.
 
