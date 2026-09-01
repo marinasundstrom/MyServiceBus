@@ -178,6 +178,8 @@ public final class OrderStateMachine extends SagaStateMachine<OrderState> {
 
 These examples establish the preferred Automatonymous-shaped direction, not final signatures or a complete API-compatibility promise. The design must validate async activities, cancellation, exceptions, Java type erasure, source generation, annotation processing, NativeAOT, and GraalVM constraints before stabilization. The equivalent declaration must also be constructible explicitly through descriptors or builders so code generation is optional.
 
+The concrete lowering and acceptance contract is maintained in [Native Saga State-Machine DSL](../development/saga-native-dsl.md). It is the gate for implementing and reviewing the first native authoring surfaces.
+
 ## Runtime Behavior
 
 For each delivery, both runtimes should follow the same observable stages:
@@ -229,12 +231,14 @@ Broker tests should prove that C# and Java services exchange every saga input an
 1. Study the MassTransit 8.5.1 saga implementation and tests and write the portable behavior specification. **Completed for the version 1 subset.**
 2. Define canonical state-machine and failure-sequence fixtures.
 3. Define the normalized declaration, repository capabilities, topology, and monitoring contracts.
-4. Implement the smallest in-memory C# and Java runtimes with their native library DSLs.
-5. Integrate transactional outbox and durable scheduling.
-6. Add one durable repository provider in each ecosystem and run restart and concurrency gates.
-7. Add requests, scheduled events, composite events, and richer activities through shared fixtures.
-8. Build the Raven `saga!` sample over the ordinary .NET runtime.
-9. Promote only after cross-language, broker, persistence, recovery, and monitoring evidence passes on one commit.
+4. Implement the smallest in-memory C# and Java runtimes with their native library DSLs. **The low-level runtime is implemented; native DSLs are next.**
+5. Complete the usable MVP vertical slice with bus registration and dispatch, ordinary retry/fault behavior, a focused sample, and one Aspire order-orchestration sample.
+6. Project declarations and instance transitions into topology, monitoring, and an initial Dashboard orchestration view.
+7. Integrate transactional outbox and durable scheduling.
+8. Add one durable repository provider in each ecosystem and run restart and concurrency gates.
+9. Add requests, scheduled events, composite events, and richer activities through shared fixtures.
+10. Build the Raven `saga!` sample over the ordinary .NET runtime.
+11. Promote durable saga support only after cross-language, broker, persistence, recovery, and monitoring evidence passes on one commit.
 
 ## Open Questions
 
@@ -250,6 +254,7 @@ Broker tests should prove that C# and Java services exchange every saga input an
 - [MassTransit saga state machines](https://masstransit.io/documentation/patterns/saga/state-machine)
 - [MassTransit 8.5.1 source](https://github.com/MassTransit/MassTransit/tree/v8.5.1)
 - [Saga State-Machine Behavior](../specs/saga-state-machine-behavior.md)
+- [Native Saga State-Machine DSL](../development/saga-native-dsl.md)
 - [Raven Saga DSL Exploration](raven-saga-dsl.md)
 - [Topology Extension Model](../specs/topology-extension-model.md)
 - [Transactional Outbox and Inbox Specification](../specs/outbox-inbox.md)
