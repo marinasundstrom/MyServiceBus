@@ -412,8 +412,8 @@ runtime rather than emulating extension methods with a decorator call:
 val services = ServiceCollection.create()
 
 services.addServiceBus {
-    addConsumer<SubmitOrderConsumer>()
-    using<RabbitMqFactoryConfigurator> { context ->
+    consumer<SubmitOrderConsumer>()
+    transport<RabbitMqFactoryConfigurator> { context ->
         host("localhost")
         configureEndpoints(context)
     }
@@ -424,9 +424,24 @@ val bus = provider.getRequiredService<MessageBus>()
 bus.start()
 ```
 
-The first Kotlin slice retains the shared `CompletableFuture` consumer
-contract. Coroutine-native adapters will be layered over that runtime contract
-in a later slice.
+Kotlin consumers can suspend directly while retaining the shared scoped
+consumer pipeline and delivery semantics:
+
+```kotlin
+class SubmitOrderConsumer : SuspendConsumer<SubmitOrder> {
+    override suspend fun consume(context: ConsumeContext<SubmitOrder>) {
+        context.publishAwait(OrderSubmitted(context.message.orderId))
+    }
+}
+
+runBlocking {
+    bus.publishAwait(SubmitOrder(UUID.randomUUID()))
+}
+```
+
+MyServiceBus waits for the coroutine before acknowledging delivery. Failures
+continue through retry and fault handling, while cancellation flows in both
+directions between Kotlin coroutines and the JVM runtime.
 
 #### Azure Service Bus preview
 

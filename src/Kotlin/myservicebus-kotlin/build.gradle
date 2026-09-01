@@ -4,8 +4,9 @@ plugins {
 
 dependencies {
     api project(':myservicebus')
+    api "org.jetbrains.kotlinx:kotlinx-coroutines-core:${kotlinCoroutinesVersion}"
     testImplementation project(':myservicebus-rabbitmq')
-    testImplementation "org.jetbrains.kotlin:kotlin-test-junit5:2.2.10"
+    testImplementation "org.jetbrains.kotlin:kotlin-test-junit5:2.2.20"
 }
 
 kotlin {

@@ -15,7 +15,7 @@ export const install = {
     implementation 'io.github.marinasundstrom.myservicebus:myservicebus-rabbitmq:0.1.0-preview.9'
 }`,
   kotlin: `plugins {
-    kotlin("jvm") version "2.2.10"
+    kotlin("jvm") version "2.2.20"
 }
 
 dependencies {
@@ -59,8 +59,8 @@ bus.start();`,
   kotlin: `val services = ServiceCollection.create()
 
 services.addServiceBus {
-    addConsumer<SubmitOrderConsumer>()
-    using<RabbitMqFactoryConfigurator> { context ->
+    consumer<SubmitOrderConsumer>()
+    transport<RabbitMqFactoryConfigurator> { context ->
         host("localhost")
         configureEndpoints(context)
     }
@@ -92,11 +92,10 @@ public class SubmitOrderConsumer implements Consumer<SubmitOrder> {
   kotlin: `data class SubmitOrder(val orderId: UUID)
 data class OrderSubmitted(val orderId: UUID)
 
-class SubmitOrderConsumer : Consumer<SubmitOrder> {
-    override fun consume(
-        context: ConsumeContext<SubmitOrder>
-    ): CompletableFuture<Void> =
-        context.publish(OrderSubmitted(context.message.orderId))
+class SubmitOrderConsumer : SuspendConsumer<SubmitOrder> {
+    override suspend fun consume(context: ConsumeContext<SubmitOrder>) {
+        context.publishAwait(OrderSubmitted(context.message.orderId))
+    }
 }`,
 };
 
@@ -104,7 +103,9 @@ export const publish = {
   csharp: `var bus = app.Services.GetRequiredService<IMessageBus>();
 await bus.Publish(new SubmitOrder(Guid.NewGuid()));`,
   java: `bus.publish(new SubmitOrder(UUID.randomUUID())).join();`,
-  kotlin: `bus.publish(SubmitOrder(UUID.randomUUID())).join()`,
+  kotlin: `runBlocking {
+    bus.publishAwait(SubmitOrder(UUID.randomUUID()))
+}`,
 };
 
 <p className="docs-kicker">Getting started</p>

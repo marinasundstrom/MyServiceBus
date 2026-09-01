@@ -23,6 +23,7 @@ These dependencies mirror common practices in their respective ecosystems and ai
 
 - **Runtime**: the Java 17-compatible MyServiceBus JVM modules
 - **Language facade**: Kotlin standard library 2.2 through `myservicebus-kotlin`
+- **Asynchronous API**: `kotlinx-coroutines-core` 1.11 through `myservicebus-kotlin`
 - **Serialization in the sample**: `com.fasterxml.jackson.module:jackson-module-kotlin`
 
 The Kotlin facade is intentionally thin. Transports, topology, serialization,

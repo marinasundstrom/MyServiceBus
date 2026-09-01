@@ -1,0 +1,62 @@
+# JVM language projections
+
+MyServiceBus currently implements its JVM runtime in Java and layers the
+`myservicebus-kotlin` package on top. Kotlin is a main target, not a convenience
+wrapper, so the Java public API must not dictate Kotlin method and class shapes.
+
+## Boundary
+
+The shared JVM layer should own behavior that must remain identical:
+
+- transport adapters and broker lifecycle;
+- topology, endpoint naming, and message bindings;
+- envelopes, serialization, retry, fault, and settlement semantics;
+- scoped consumer execution and cancellation signals;
+- inspection and monitoring contracts.
+
+Language projections should own source-level experience:
+
+- Java can expose fluent configuration, class literals, functional interfaces,
+  and `CompletableFuture`;
+- Kotlin can expose receiver DSLs, reified types, suspending consumers,
+  coroutine cancellation, and Kotlin-friendly nullability and defaults.
+
+Both projections must enter the same topology and pipeline stages. A Kotlin
+consumer is not a parallel runtime path: its coroutine is adapted to the shared
+consumer completion contract at the projection boundary.
+
+## Current transition
+
+`myservicebus-kotlin` is the first explicit projection. Its configuration DSL
+uses composition around `BusRegistrationConfigurator`, and its coroutine bridge
+maps suspension, completion, failure, and cancellation onto the existing JVM
+pipeline. The DSL provides `jvm { ... }` only as an escape hatch for capabilities
+that do not yet have a Kotlin-native projection.
+
+This keeps ordinary Kotlin code independent from Java overloads while the
+shared implementation still resides in the Java modules.
+
+## Possible future module shape
+
+If the projections grow independently, the JVM artifacts may be reorganized
+around an implementation-focused shared core with separate Java and Kotlin
+public projections. That decision should be driven by concrete pressure rather
+than package symmetry. Useful triggers include:
+
+- Java API compatibility preventing an idiomatic Kotlin operation;
+- Kotlin types or coroutine dependencies leaking into shared transport code;
+- duplicated topology or pipeline behavior between language entry points;
+- an inability to test the shared behavioral contract without a public Java
+  facade.
+
+A split must not duplicate transports or create different wire behavior. It
+also must account for artifact migration, framework adapters, binary
+compatibility, and staged consumers before published coordinates change.
+
+## Verification
+
+Every projection should verify the same observable behavior—topology,
+delivery, failure, cancellation, scope lifetime, and wire representation—while
+also testing its language-specific API contract. Kotlin tests therefore cover
+both coroutine behavior and entry into the existing mediator and consumer
+pipelines.

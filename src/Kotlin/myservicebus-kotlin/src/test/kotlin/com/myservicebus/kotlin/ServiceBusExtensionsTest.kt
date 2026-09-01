@@ -16,13 +16,17 @@ class ServiceBusExtensionsTest {
     fun `service bus configuration uses Kotlin receiver extensions`() {
         val services = ServiceCollection.create()
         var transportConfigured = false
+        var jvmConfiguratorReached = false
 
         services.addServiceBus {
-            addConsumer<TestConsumer>()
-            using<RabbitMqFactoryConfigurator> { context: BusRegistrationContext ->
+            consumer<TestConsumer>()
+            transport<RabbitMqFactoryConfigurator> { context: BusRegistrationContext ->
                 host("localhost")
                 configureEndpoints(context)
                 transportConfigured = true
+            }
+            jvm {
+                jvmConfiguratorReached = serviceCollection === services
             }
         }
 
@@ -31,6 +35,7 @@ class ServiceBusExtensionsTest {
 
         assertNotNull(bus)
         assertTrue(transportConfigured)
+        assertTrue(jvmConfiguratorReached)
     }
 
     @Test

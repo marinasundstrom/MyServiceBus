@@ -9,6 +9,60 @@ import com.myservicebus.Consumer
 import com.myservicebus.MessageBusServices
 import com.myservicebus.di.ServiceCollection
 import com.myservicebus.di.ServiceProvider
+import com.myservicebus.mediator.Mediator
+import com.myservicebus.mediator.MediatorBus
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
+
+@DslMarker
+annotation class MyServiceBusDsl
+
+/**
+ * Kotlin configuration DSL backed by the shared JVM registration pipeline.
+ *
+ * The shared JVM configurator stays behind this projection so Java overloads
+ * do not become Kotlin's accidental public design.
+ */
+@MyServiceBusDsl
+class ServiceBusConfigurator internal constructor(
+    @PublishedApi internal val delegate: BusRegistrationConfigurator,
+) {
+    @PublishedApi
+    internal val registeredSuspendConsumers = mutableSetOf<Class<*>>()
+
+    /** Registers a Java-style consumer without a class literal. */
+    inline fun <reified TConsumer : Consumer<*>> consumer() {
+        delegate.addConsumer(TConsumer::class.java)
+    }
+
+    /** Registers a suspending Kotlin consumer and infers its message type. */
+    inline fun <reified TConsumer : SuspendConsumer<*>> consumer(
+        endpointName: String? = null,
+        dispatcher: CoroutineDispatcher = Dispatchers.Default,
+    ) {
+        val consumerType = TConsumer::class.java
+        if (registeredSuspendConsumers.add(consumerType)) {
+            delegate.registerSuspendConsumer(consumerType, endpointName, dispatcher)
+        }
+    }
+
+    /** Selects and configures a JVM transport with a Kotlin receiver lambda. */
+    inline fun <reified TConfigurator : BusFactoryConfigurator> transport(
+        noinline configure: TConfigurator.(BusRegistrationContext) -> Unit,
+    ) {
+        delegate.using(TConfigurator::class.java) { context, configurator ->
+            configurator.configure(context)
+        }
+    }
+
+    /**
+     * Accesses JVM configuration that does not yet have a Kotlin projection.
+     * Ordinary Kotlin configuration should prefer members on this DSL.
+     */
+    fun jvm(configure: BusRegistrationConfigurator.() -> Unit) {
+        delegate.configure()
+    }
+}
 
 /**
  * Adds MyServiceBus to this service collection using a Kotlin receiver lambda.
@@ -17,23 +71,16 @@ import com.myservicebus.di.ServiceProvider
  * `services.from(MessageBusServices.class).addServiceBus(...)` composition style.
  */
 fun ServiceCollection.addServiceBus(
-    configure: BusRegistrationConfigurator.() -> Unit = {},
+    configure: ServiceBusConfigurator.() -> Unit = {},
 ): ServiceCollection = MessageBusServices(this).addServiceBus { configurator ->
-    configurator.configure()
+    ServiceBusConfigurator(configurator).configure()
 }
 
-/** Registers a consumer without requiring a Java class literal at the call site. */
-inline fun <reified TConsumer : Any> BusRegistrationConfigurator.addConsumer() {
-    addConsumer(TConsumer::class.java)
-}
-
-/**
- * Selects a transport configurator and exposes it as the receiver of the configuration lambda.
- */
-inline fun <reified TConfigurator : BusFactoryConfigurator> BusRegistrationConfigurator.using(
-    noinline configure: TConfigurator.(BusRegistrationContext) -> Unit,
-): BusRegistrationConfigurator = using(TConfigurator::class.java) { context, configurator ->
-    configurator.configure(context)
+/** Creates an in-memory mediator using the same Kotlin consumer DSL. */
+fun ServiceCollection.createMediator(
+    configure: ServiceBusConfigurator.() -> Unit = {},
+): Mediator = MediatorBus.configure(this) { configurator ->
+    ServiceBusConfigurator(configurator).configure()
 }
 
 /** Registers a concrete scoped service using its public JVM type. */

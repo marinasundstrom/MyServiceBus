@@ -9,7 +9,7 @@ from ordinary configuration.
 
 ```kotlin
 plugins {
-    kotlin("jvm") version "2.2.10"
+    kotlin("jvm") version "2.2.20"
 }
 
 dependencies {
@@ -29,8 +29,8 @@ application's serializer.
 val services = ServiceCollection.create()
 
 services.addServiceBus {
-    addConsumer<SubmitOrderConsumer>()
-    using<RabbitMqFactoryConfigurator> { context ->
+    consumer<SubmitOrderConsumer>()
+    transport<RabbitMqFactoryConfigurator> { context ->
         host("localhost")
         configureEndpoints(context)
     }
@@ -43,8 +43,14 @@ bus.start()
 
 The `addServiceBus` extension is the Kotlin equivalent of Java's
 `services.from(MessageBusServices.class).addServiceBus(...)` decorator style.
-The Java API remains available when an application needs a lower-level or
-framework-owned integration boundary.
+Its Kotlin-owned DSL delegates to the complete JVM configurator, so advanced
+runtime features remain available through an explicit `jvm { ... }` escape
+hatch without making Java's overloads, decorator, and class-literal patterns
+the default Kotlin experience.
+
+The Kotlin module is a language projection over the existing JVM runtime. A
+future runtime split may make that boundary physical as well as conceptual;
+see [JVM language projections](../development/jvm-language-projections.md).
 
 ## Messages and consumers
 
@@ -52,14 +58,30 @@ framework-owned integration boundary.
 data class SubmitOrder(val orderId: UUID)
 data class OrderSubmitted(val orderId: UUID)
 
-class SubmitOrderConsumer : Consumer<SubmitOrder> {
-    override fun consume(context: ConsumeContext<SubmitOrder>): CompletableFuture<Void> =
-        context.publish(OrderSubmitted(context.message.orderId))
+class SubmitOrderConsumer : SuspendConsumer<SubmitOrder> {
+    override suspend fun consume(context: ConsumeContext<SubmitOrder>) {
+        context.publishAwait(OrderSubmitted(context.message.orderId))
+    }
 }
 ```
 
-Coroutine-native consumers are not part of this first slice. Until that API is
-introduced, Kotlin consumers implement the shared `CompletableFuture` contract.
+`SuspendConsumer` runs through the same scoped consumer pipeline as Java
+consumers. MyServiceBus waits for the suspended handler before acknowledging
+the message, propagates failures into retry and fault handling, and cancels the
+coroutine when message delivery is cancelled.
+
+Use `publishAwait`, `sendAwait`, `respondAwait`, and `getResponseAwait` from
+suspending application code. Matching mediator extensions are available as
+well. Cancelling the calling coroutine cancels both the MyServiceBus operation
+token and its underlying Java future.
+
+The same consumer syntax configures local dispatch:
+
+```kotlin
+val mediator = services.createMediator {
+    consumer<SubmitOrderConsumer>()
+}
+```
 
 ## Run the sample
 

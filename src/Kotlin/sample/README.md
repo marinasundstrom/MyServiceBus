@@ -3,7 +3,8 @@
 This project is the evolving executable sample and compatibility check for the
 Kotlin API. It currently demonstrates Kotlin-native service registration,
 reified consumer and transport selection, Kotlin data-class messages, RabbitMQ
-configuration, publishing, and consuming through the shared JVM runtime.
+configuration, a suspending consumer, and coroutine-native publishing through
+the shared JVM runtime.
 
 Start RabbitMQ from the repository root:
 
@@ -21,6 +22,6 @@ Set `RABBITMQ_HOST` and `RABBITMQ_PORT` to use a different broker. The sample
 publishes one `SubmitOrder`, waits for its consumer to publish
 `OrderSubmitted`, and then stops the bus.
 
-Coroutine-native consumers and awaiting operations will be added in a later
-Kotlin API slice. Until then, consumer implementations use the shared Java
-`CompletableFuture` contract.
+The consumer publishes its follow-up message with `publishAwait`, and the
+application uses the same suspending extension to publish the initial command.
+Cancellation and failures bridge to the shared Java runtime automatically.

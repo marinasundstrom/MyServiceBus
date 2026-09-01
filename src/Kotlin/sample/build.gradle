@@ -10,7 +10,7 @@ dependencies {
     implementation project(':myservicebus-rabbitmq')
     implementation "com.fasterxml.jackson.module:jackson-module-kotlin:${jacksonVersion}"
     runtimeOnly "org.slf4j:slf4j-simple:${slf4jVersion}"
-    testImplementation "org.jetbrains.kotlin:kotlin-test-junit5:2.2.10"
+    testImplementation "org.jetbrains.kotlin:kotlin-test-junit5:2.2.20"
 }
 
 kotlin {
