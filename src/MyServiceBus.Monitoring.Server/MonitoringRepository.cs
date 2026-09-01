@@ -2022,6 +2022,8 @@ public sealed class MonitoringRepository
                 if (declaration.Kind == ChoreographyOperationKind.Terminal)
                 {
                     var observed = outcome.Observation.Kind == "consumed" && !retryExhausted ? 1 : 0;
+                    var terminalMinimum = declaration.MinCount
+                        ?? (declaration.Requirement == ChoreographyRequirement.Expected ? 1 : 0);
                     return CreateExpectation(
                         declaration,
                         observed,
@@ -2029,9 +2031,13 @@ public sealed class MonitoringRepository
                         0,
                         observed > 0
                             ? "exact_observed"
-                            : !evidenceComplete
+                            : observed < terminalMinimum && !evidenceComplete
                                 ? "insufficient_evidence"
-                                : absenceConclusive ? "missing_expected" : "awaiting_evidence");
+                                : observed < terminalMinimum && !absenceConclusive
+                                    ? "awaiting_evidence"
+                                    : observed < terminalMinimum
+                                        ? "missing_expected"
+                                        : SatisfiedAbsenceStatus(declaration.Requirement));
                 }
 
                 var matching = outputs.Where(output => Matches(declaration, output.Record.Observation)).ToArray();
@@ -2056,9 +2062,7 @@ public sealed class MonitoringRepository
                                         : observedCount == 0 ? "missing_expected" : "below_minimum"
                                 : observedCount > 0
                                     ? "exact_observed"
-                                    : declaration.Requirement == ChoreographyRequirement.Optional
-                                        ? "optional_not_observed"
-                                        : "informational_not_observed";
+                                    : SatisfiedAbsenceStatus(declaration.Requirement);
                 return CreateExpectation(declaration, observedCount, failedCount, lateCount, status);
             }).ToList();
 
@@ -2086,6 +2090,13 @@ public sealed class MonitoringRepository
             expectations.AddRange(unexpected);
             return expectations;
         }
+
+        private static string SatisfiedAbsenceStatus(ChoreographyRequirement requirement) => requirement switch
+        {
+            ChoreographyRequirement.Optional => "optional_not_observed",
+            ChoreographyRequirement.Informational => "informational_not_observed",
+            _ => "expectation_satisfied"
+        };
 
         private static MonitoringChoreographyRunOutputExpectation CreateExpectation(
             ChoreographyOutput declaration,

@@ -598,7 +598,8 @@ public class MonitoringRepositoryTests
         var choreography = new ChoreographyBuilder("order-diagnostics", "1", "orders")
             .Step("check-order", "urn:message:OrderSubmitted", step => step
                 .Publishes("urn:message:InventoryRequested", output => output.AtLeast(2).Within(TimeSpan.FromSeconds(2)))
-                .Publishes("urn:message:PaymentRequested", output => output.Within(TimeSpan.FromMilliseconds(100))))
+                .Publishes("urn:message:PaymentRequested", output => output.Within(TimeSpan.FromMilliseconds(100)))
+                .Publishes("urn:message:NoOutputRequired", output => output.Exactly(0)))
             .Build();
         repository.UpsertMetadata(WithChoreography(
             CreateMetadata("orders", "orders-1", now, "commerce"), choreography));
@@ -635,6 +636,8 @@ public class MonitoringRepositoryTests
         var unexpected = expectations.Single(value => value.MessageUrn == "urn:message:AuditRecorded");
         unexpected.Status.ShouldBe("unexpected_observed");
         unexpected.Requirement.ShouldBe("undeclared");
+        expectations.Single(value => value.MessageUrn == "urn:message:NoOutputRequired")
+            .Status.ShouldBe("expectation_satisfied");
         run.DiagnosticIssueCount.ShouldBe(3);
         run.IndeterminateExpectationCount.ShouldBe(0);
     }
