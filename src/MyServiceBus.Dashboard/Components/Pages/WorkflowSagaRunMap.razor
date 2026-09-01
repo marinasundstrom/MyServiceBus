@@ -2,12 +2,19 @@
 @inject IJSRuntime JavaScript
 
 <div class="workflow-run-map-shell saga-run-map-shell" @ref="map">
-    <svg class="workflow-run-map-canvas saga-run-map-canvas" role="img" aria-label="Saga state machine and observed path"></svg>
+    <svg class="workflow-run-map-canvas saga-run-map-canvas" role="img" aria-label="@(Instance is null ? "Declared saga state machine" : "Saga state machine and observed path")"></svg>
     <div class="workflow-map-legend" aria-hidden="true">
-        <span><i class="observed"></i>Visited</span>
-        <span><i class="current"></i>Current</span>
-        <span><i class="declared"></i>Declared</span>
-        <span><i class="faulted"></i>Failed delivery</span>
+        @if (Instance is null)
+        {
+            <span><i class="declared"></i>Declared state and transition</span>
+        }
+        else
+        {
+            <span><i class="observed"></i>Visited</span>
+            <span><i class="current"></i>Current</span>
+            <span><i class="declared"></i>Declared</span>
+            <span><i class="faulted"></i>Failed delivery</span>
+        }
     </div>
     <div class="flow-map-controls" aria-label="Saga state machine controls">
         <button type="button" title="Zoom in" aria-label="Zoom in" @onclick="() => ZoomAsync(1.3)">+</button>
@@ -23,8 +30,8 @@
     [Parameter, EditorRequired]
     public required MyServiceBus.Orchestration.SagaStateMachineDefinition Definition { get; set; }
 
-    [Parameter, EditorRequired]
-    public required MonitoringSagaInstance Instance { get; set; }
+    [Parameter]
+    public MonitoringSagaInstance? Instance { get; set; }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -36,11 +43,12 @@
             .Concat(Definition.States.Select(state => state.Id))
             .Append(MyServiceBus.Orchestration.SagaStateMachineDefinition.FinalState)
             .ToArray();
-        var visitedStates = Instance.Transitions
+        var transitions = Instance?.Transitions ?? [];
+        var visitedStates = transitions
             .SelectMany(transition => new[] { transition.BeginState, transition.EndState })
             .Where(state => !string.IsNullOrWhiteSpace(state))
             .ToHashSet(StringComparer.Ordinal);
-        var observed = Instance.Transitions
+        var observed = transitions
             .Where(transition => transition.Succeeded &&
                 !string.IsNullOrWhiteSpace(transition.BeginState) &&
                 !string.IsNullOrWhiteSpace(transition.EndState))
@@ -81,15 +89,15 @@
                     Id = state,
                     Sequence = sequence,
                     Visited = visitedStates.Contains(state),
-                    Current = string.Equals(state, Instance.CurrentState, StringComparison.Ordinal),
+                    Current = string.Equals(state, Instance?.CurrentState, StringComparison.Ordinal),
                     Terminal = string.Equals(state, MyServiceBus.Orchestration.SagaStateMachineDefinition.FinalState, StringComparison.Ordinal)
                 }),
                 Links = links,
-                FailedDeliveries = Instance.Transitions
+                FailedDeliveries = transitions
                     .Where(transition => !transition.Succeeded)
                     .Select(transition => new
                     {
-                        State = transition.BeginState ?? Instance.CurrentState,
+                        State = transition.BeginState ?? Instance?.CurrentState ?? MyServiceBus.Orchestration.SagaStateMachineDefinition.InitialState,
                         Event = transition.EventId,
                         transition.DurationMs
                     })
