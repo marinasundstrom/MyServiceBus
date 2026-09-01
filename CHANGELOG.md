@@ -4,6 +4,9 @@ This changelog summarizes the bigger themes in the repository history rather tha
 
 ## Unreleased
 
+- Improved the shared Dashboard shell with a global live, polling, or unavailable monitoring status, last-update context, keyboard skip navigation, and clearer horizontal-navigation affordance at small widths.
+- Corrected workflow activity layout so sibling branches in the same application occupy distinct vertical slots, with wider levels and bounded labels that keep observed fork nodes and causal edges readable.
+- Defined request/response workflow visualization as one correlated paired interaction with an activity-graph overview, sequence-style timing detail, and distinct fault or timeout returns rather than an apparent independent fork.
 - Added completeness-gated declared-versus-observed diagnostics to retained choreography runs. Exact send, publish, and terminal evidence is compared with declared counts, destinations, and timing; missing expectations remain awaiting or inconclusive until inactivity and monitoring coverage support the finding.
 - Presented per-run output comparisons in the Dashboard run index and step detail, clearly separating operational findings from authoritative business-workflow failure and retaining explicit unsupported or incomplete states.
 - Reconciled exact-evidence workflow runs as connected graphs. Same-message delivery fan-out remains one run, later exact convergence replaces superseded partial roots in memory and PostgreSQL, and retained runs report root, branch, merge, and observed-shape metadata.

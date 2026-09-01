@@ -757,20 +757,29 @@ class WorkflowRunMap {
             node.level = Math.max(node.level, index);
         });
 
-        const applications = d3.groups(nodes, node => node.application)
-            .sort(([, left], [, right]) => d3.ascending(d3.min(left, node => node.sequence), d3.min(right, node => node.sequence)))
-            .map(([application], index) => ({ application, index, y: 90 + index * 145 }));
+        const applicationGroups = d3.groups(nodes, node => node.application)
+            .sort(([, left], [, right]) => d3.ascending(d3.min(left, node => node.sequence), d3.min(right, node => node.sequence)));
+        let laneTop = 18;
+        const applications = applicationGroups.map(([application, members], index) => {
+            const maximumLevelOccupancy = d3.max(
+                d3.rollups(members, values => values.length, node => node.level),
+                ([, count]) => count) || 1;
+            const height = Math.max(136, 34 + maximumLevelOccupancy * 86 + (maximumLevelOccupancy - 1) * 22 + 16);
+            const lane = { application, index, top: laneTop, height };
+            laneTop += height + 18;
+            return lane;
+        });
         const laneByApplication = new Map(applications.map(lane => [lane.application, lane]));
-        const width = Math.max(620, (d3.max(nodes, node => node.level) + 1) * 300 + 220);
-        const height = Math.max(300, applications.length * 145 + 45);
+        const width = Math.max(620, (d3.max(nodes, node => node.level) + 1) * 380 + 220);
+        const height = Math.max(300, laneTop + 9);
         const occupied = new Map();
         nodes.sort((left, right) => d3.ascending(left.sequence, right.sequence)).forEach(node => {
             const lane = laneByApplication.get(node.application);
             const positionKey = `${node.application}:${node.level}`;
             const offset = occupied.get(positionKey) || 0;
             occupied.set(positionKey, offset + 1);
-            node.x = 180 + node.level * 300 + offset * 35;
-            node.y = lane.y;
+            node.x = 180 + node.level * 380;
+            node.y = lane.top + 77 + offset * 108;
         });
         links.forEach(link => {
             link.sourceNode = nodeById.get(link.source);
@@ -803,13 +812,13 @@ class WorkflowRunMap {
             });
         selection.select("rect")
             .attr("x", 18)
-            .attr("y", lane => lane.y - 62)
+            .attr("y", lane => lane.top)
             .attr("width", width - 36)
-            .attr("height", 124)
+            .attr("height", lane => lane.height)
             .attr("rx", 12);
         selection.select("text")
             .attr("x", 34)
-            .attr("y", lane => lane.y - 43)
+            .attr("y", lane => lane.top + 20)
             .text(lane => lane.application);
     }
 
@@ -831,7 +840,7 @@ class WorkflowRunMap {
             .attr("class", "workflow-run-map-link-label")
             .attr("x", link => (link.sourceNode.x + link.targetNode.x) / 2)
             .attr("y", link => (link.sourceNode.y + link.targetNode.y) / 2 - 8)
-            .text(link => `${link.operation} ${link.message} · ${formatMilliseconds(link.handoffDurationMs)}`);
+            .text(link => `${link.operation} ${trimText(link.message, 14)} · ${formatMilliseconds(link.handoffDurationMs)}`);
     }
 
     renderNodes(nodes) {
@@ -859,7 +868,7 @@ class WorkflowRunMap {
             return labels.join(" · ");
         });
         selection.select(".workflow-run-map-step").text(node => trimText(node.label, 28));
-        selection.select(".workflow-run-map-contract").text(node => `Consumes ${trimText(node.contract, 22)}`);
+        selection.select(".workflow-run-map-contract").text(node => `Consumes ${trimText(node.contract, 16)}`);
         selection.select(".workflow-run-map-duration").text(node => formatMilliseconds(node.durationMs));
     }
 

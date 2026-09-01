@@ -10,10 +10,6 @@
         <h1>Operational overview</h1>
         <p class="lede">The current health and activity of every participating MyServiceBus application.</p>
     </div>
-    <div class="connection @(Dashboard.Error is null ? "online" : "offline")">
-        <span></span>
-        @(Dashboard.Error is not null ? "Monitoring service unavailable" : Dashboard.LiveConnected ? "Live updates connected" : "Polling monitoring service")
-    </div>
 </section>
 
 @if (Dashboard.History is { } history)

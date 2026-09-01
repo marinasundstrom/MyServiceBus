@@ -3,6 +3,7 @@
 @inject MonitoringDashboardState Dashboard
 
 <div class="app-shell">
+    <a class="skip-link" href="#main-content">Skip to dashboard content</a>
     <aside class="sidebar">
         <a class="sidebar-brand" href="/" aria-label="MyServiceBus monitoring overview">
             <span class="brand-mark">MSB</span>
@@ -40,15 +41,18 @@
 
     <div class="content-shell">
         <header class="topbar">
-            <div>
-                <strong>Operations</strong>
-                <span>Build and operate distributed apps</span>
+            <div class="topbar-status">
+                <span class="status-dot @ConnectionClass"></span>
+                <div>
+                    <strong role="status" aria-live="polite">@ConnectionTitle</strong>
+                    <span>@ConnectionDetail</span>
+                </div>
             </div>
             <ThemeSelector />
             <DensitySelector />
         </header>
 
-        <main>
+        <main id="main-content" tabindex="-1">
             @Body
         </main>
     </div>
@@ -57,6 +61,15 @@
 @code {
     private long FailureCount => Dashboard.Summary?.FailureCount ?? 0;
     private string FailureBadgeText => FailureCount > 99 ? "99+" : FailureCount.ToString();
+    private string ConnectionClass => Dashboard.Error is null ? "online" : string.Empty;
+    private string ConnectionTitle => Dashboard.Error is not null
+        ? "Monitoring unavailable"
+        : Dashboard.LiveConnected ? "Live monitoring" : "Monitoring by polling";
+    private string ConnectionDetail => Dashboard.Error is not null
+        ? $"Last data {Dashboard.UpdatedAt.ToLocalTime():HH:mm:ss}"
+        : Dashboard.LiveConnected
+            ? $"Updated {Dashboard.UpdatedAt.ToLocalTime():HH:mm:ss}"
+            : $"Every 15 seconds · updated {Dashboard.UpdatedAt.ToLocalTime():HH:mm:ss}";
 
     private string FailureBadgeTitle
     {
