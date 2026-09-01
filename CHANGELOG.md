@@ -4,6 +4,7 @@ This changelog summarizes the bigger themes in the repository history rather tha
 
 ## Unreleased
 
+- Defined the portable version 1 saga state-machine behavior from the MassTransit 8.5.1 baseline, including explicit creation and missing-instance policies, deterministic behavior selection, ordered activities, finalization versus completion, failure and durability boundaries, and a canonical cross-language declaration fixture. The first runtime profile is deliberately limited to identity correlation and an in-memory repository while reserving durable, request, scheduling, composite, and named-terminal-outcome profiles.
 - Improved the shared Dashboard shell with a global live, polling, or unavailable monitoring status, last-update context, keyboard skip navigation, and clearer horizontal-navigation affordance at small widths.
 - Corrected workflow activity layout so sibling branches in the same application occupy distinct vertical slots, with wider levels and bounded labels that keep observed fork nodes and causal edges readable.
 - Defined request/response workflow visualization as one correlated paired interaction with an activity-graph overview, sequence-style timing detail, and distinct fault or timeout returns rather than an apparent independent fork.

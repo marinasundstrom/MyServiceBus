@@ -242,7 +242,7 @@ Choreography support remains decentralized and does not use this DSL. Its declar
 
 ## References
 
-- [MassTransit saga state-machine concepts](https://masstransit.massient.com/concepts/saga-state-machines/)
+- [MassTransit saga state machines](https://masstransit.io/documentation/patterns/saga/state-machine)
 - [MassTransit 8.5.1 source](https://github.com/MassTransit/MassTransit/tree/v8.5.1)
 - [Sagas and State Machines Proposal](sagas-and-state-machines.md)
 - [MyServiceBus Design Goals](../development/design-goals.md)

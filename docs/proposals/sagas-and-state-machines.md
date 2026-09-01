@@ -2,7 +2,7 @@
 
 ## Status
 
-Future product-area proposal. This document defines the intended feature boundary and investigation sequence; it is not yet a supported API or runtime commitment.
+Active implementation proposal. The portable version 1 behavior is now defined in the [Saga State-Machine Behavior specification](../specs/saga-state-machine-behavior.md); no saga API or runtime is supported yet.
 
 ## Summary
 
@@ -213,7 +213,7 @@ Broker tests should prove that C# and Java services exchange every saga input an
 
 ## Recommended Sequence
 
-1. Study the MassTransit 8.5.1 saga implementation and tests and write the portable behavior specification.
+1. Study the MassTransit 8.5.1 saga implementation and tests and write the portable behavior specification. **Completed for the version 1 subset.**
 2. Define canonical state-machine and failure-sequence fixtures.
 3. Define the normalized declaration, repository capabilities, topology, and monitoring contracts.
 4. Implement the smallest in-memory C# and Java runtimes with their native library DSLs.
@@ -225,18 +225,18 @@ Broker tests should prove that C# and Java services exchange every saga input an
 
 ## Open Questions
 
-1. Which MassTransit version is the normative implementation-study baseline?
-2. Should the first release include consumer sagas or only declarative state machines?
-3. Which correlation queries can providers support portably?
-4. How is current state encoded and versioned for in-flight definition upgrades?
-5. Which activity extension model remains safe and idiomatic in both languages?
-6. Which durable provider should become the first production candidate?
-7. When, if ever, should one persisted instance be executable interchangeably by C# and Java?
+1. Should the first release include consumer sagas or only declarative state machines?
+2. Which correlation queries can providers support portably?
+3. How is current state encoded and versioned for in-flight definition upgrades?
+4. Which activity extension model remains safe and idiomatic in both languages?
+5. Which durable provider should become the first production candidate?
+6. When, if ever, should one persisted instance be executable interchangeably by C# and Java?
 
 ## References
 
-- [MassTransit saga state-machine concepts](https://masstransit.massient.com/concepts/saga-state-machines/)
+- [MassTransit saga state machines](https://masstransit.io/documentation/patterns/saga/state-machine)
 - [MassTransit 8.5.1 source](https://github.com/MassTransit/MassTransit/tree/v8.5.1)
+- [Saga State-Machine Behavior](../specs/saga-state-machine-behavior.md)
 - [Raven Saga DSL Exploration](raven-saga-dsl.md)
 - [Topology Extension Model](../specs/topology-extension-model.md)
 - [Transactional Outbox and Inbox Specification](../specs/outbox-inbox.md)
