@@ -51,10 +51,10 @@ else
         }
 
         <div class="workflow-run-section-heading">
-            <div><span class="eyebrow">Execution</span><h3>Committed delivery history</h3></div>
+            <div><span class="eyebrow">Execution</span><h3>Delivery attempt history</h3></div>
             <p>Each card represents one delivery attempt; failures never imply a committed transition.</p>
         </div>
-        <div class="saga-delivery-history" aria-label="Committed saga delivery history">
+        <div class="saga-delivery-history" aria-label="Saga delivery attempt history">
             @for (var index = 0; index < instance.Transitions.Count; index++)
             {
                 var transition = instance.Transitions[index];

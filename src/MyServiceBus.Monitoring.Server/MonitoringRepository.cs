@@ -608,7 +608,6 @@ public sealed class MonitoringRepository
             {
                 var ordered = group.OrderBy(record => record.Observation.OccurredAtUtc).ToArray();
                 var last = ordered[^1];
-                var lastSuccessful = ordered.LastOrDefault(record => record.Observation.Succeeded == true);
                 var transitions = ordered.Select(record => new MonitoringSagaTransition(
                     record.Observation.OccurredAtUtc,
                     SagaProperty(record, "event_id"),
@@ -623,20 +622,21 @@ public sealed class MonitoringRepository
                     record.Observation.ExceptionType,
                     record.Observation.ExceptionMessage,
                     record.Observation.MessageId)).ToArray();
-                var completed = lastSuccessful is not null && SagaBooleanProperty(lastSuccessful, "completed");
-                var instancePresent = lastSuccessful is not null && SagaBooleanProperty(lastSuccessful, "instance_present");
+                var stateEvidence = transitions.LastOrDefault(HasCommittedStateEvidence);
+                var completed = stateEvidence?.Completed == true;
+                var instancePresent = stateEvidence?.InstancePresent == true;
                 return new MonitoringSagaInstance(
                     group.Key.StateMachineId,
                     SagaProperty(last, "definition_version"),
                     group.Key.ApplicationName,
                     group.Key.CorrelationId,
                     completed ? "completed" : instancePresent ? "active" : "not-present",
-                    SagaOptionalProperty(lastSuccessful, "end_state") ?? SagaStateMachineDefinition.InitialState,
+                    stateEvidence?.EndState ?? SagaStateMachineDefinition.InitialState,
                     instancePresent,
                     last.Observation.Succeeded == true,
                     ordered[0].Observation.OccurredAtUtc,
                     last.Observation.OccurredAtUtc,
-                    completed ? lastSuccessful!.Observation.OccurredAtUtc : null,
+                    completed ? stateEvidence!.OccurredAtUtc : null,
                     transitions);
             })
             .ToArray();
@@ -677,17 +677,27 @@ public sealed class MonitoringRepository
             .OrderBy(transition => transition.OccurredAtUtc)
             .ThenBy(transition => transition.EventId, StringComparer.Ordinal)
             .ToArray();
+        var stateEvidence = transitions.LastOrDefault(HasCommittedStateEvidence);
+        var completed = stateEvidence?.Completed == true;
+        var instancePresent = stateEvidence?.InstancePresent == true;
         return latest with
         {
+            Status = completed ? "completed" : instancePresent ? "active" : "not-present",
+            CurrentState = stateEvidence?.EndState ?? SagaStateMachineDefinition.InitialState,
+            InstancePresent = instancePresent,
             StartedAtUtc = current.StartedAtUtc < candidate.StartedAtUtc
                 ? current.StartedAtUtc
                 : candidate.StartedAtUtc,
             LastActivityAtUtc = current.LastActivityAtUtc > candidate.LastActivityAtUtc
                 ? current.LastActivityAtUtc
                 : candidate.LastActivityAtUtc,
+            CompletedAtUtc = completed ? stateEvidence!.OccurredAtUtc : null,
             Transitions = transitions
         };
     }
+
+    private static bool HasCommittedStateEvidence(MonitoringSagaTransition transition)
+        => transition.Succeeded && !string.IsNullOrWhiteSpace(transition.EndState);
 
     private void PruneSagaInstances(DateTimeOffset cutoff)
     {
