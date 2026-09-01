@@ -55,6 +55,10 @@ public final class InteropTestPeer {
             com.myservicebus.persistence.postgresql.TrackedJobPostgreSqlInteropPeer.run(args);
             return;
         }
+        if (args.length > 0 && "workflow-coordinator".equals(args[0])) {
+            WorkflowCoordinatorInteropPeer.run(args);
+            return;
+        }
         if (args.length > 0 && args[0].startsWith("azure-")) {
             AzureServiceBusInteropPeer.run(args);
             return;
@@ -66,7 +70,7 @@ public final class InteropTestPeer {
 
         if (args.length != 5) {
             throw new IllegalArgumentException(
-                    "Expected: <consume|consume-unrecognized|consume-fault|produce|send|request|request-fault|respond|fault|workflow-participant> <exchange> <queue> <value> <durable-exchange>");
+                    "Expected: <consume|consume-unrecognized|consume-fault|produce|send|request|request-fault|respond|fault|workflow-participant|workflow-coordinator> <exchange> <queue> <value> <durable-exchange>");
         }
 
         String host = requiredEnvironment("RABBITMQ_HOST");
