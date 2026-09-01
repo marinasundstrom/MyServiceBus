@@ -52,6 +52,14 @@ The MVP includes:
 
 The MVP does not yet include authentication, general long-range historical metric queries, alerting or scaling recommendations, broker queue depth, host saturation, broker administration, or payload-byte limits. PostgreSQL adds durable collection, restart recovery, and retained workflow-run drill-down; other metric queries still expose only the active 15-minute read-model window. The dashboard uses WebSocket invalidations to re-query HTTP snapshots, with a 15-second polling fallback.
 
+## Capture, Retention, and Disclosure
+
+The monitored bus process is the first privacy boundary. Its exporter decides what may leave the service before an observation is serialized or sent. `MonitoringCaptureProfile.Auto` uses `MYSERVICEBUS_ENVIRONMENT` in both clients, with the usual .NET environment variables as C# fallbacks. `Development` enables detailed operational identities, addresses, request/response metadata, and exception messages; every other environment uses the restricted `Production` baseline. Explicit `CaptureMessageIdentity`, `CaptureCorrelationIdentity`, `CaptureRequestResponseMetadata`, `CaptureAddresses`, and `CaptureExceptionMessages` values override either baseline independently. Message types, endpoint identities, outcome, duration, exception type, and aggregate counters remain available in the restricted profile.
+
+Message bodies and arbitrary headers are not captured by the current protocol. A future bounded payload option must be separately explicit, size-limited, content-type aware, and redactable; it must never become an accidental consequence of enabling ordinary monitoring. This is especially useful for time-bounded development debugging, but production enablement must be an affirmative service-owner decision.
+
+The monitoring service is a second, independent boundary. It owns storage retention and purging for facts it was intentionally given. It may also apply a disclosure policy when serving retained data—for example, returning aggregates to most callers while revealing identifiers or payloads only to an authorized debugging role. Disclosure redaction does not replace exporter-side minimization, and storage retention does not grant a dashboard permission to see everything retained. Authentication, caller-specific disclosure profiles, and audit remain production work.
+
 ## Dashboard Experience
 
 The dashboard is both an operations tool and a development tool for understanding and debugging a distributed application. Its main objects are the distributed application and the services or sub-applications that participate in it—not bus instances. It is not primarily a bus-administration console. The monitoring service keeps precise MyServiceBus terms and identities, while the dashboard progressively reveals endpoints, buses, transports, and topology when they explain participant behavior.
@@ -86,7 +94,7 @@ System-wide focused views remain available when the operator needs to compare ap
 - **Applications** explains logical applications and replicas, then compares load, latency, retries, failures, runtime, and transport.
 - **Receive endpoints** combines exported topology with current activity so configured, offline, healthy, and faulting endpoints remain distinguishable.
 - **Throughput** expands the compact landing-page chart into a five-minute streamed graph and application rate breakdown.
-- **Message flow** defaults to applications and observed message paths, with throughput encoded in line weight and exact rates available alongside the map. Its **Detailed** mode expands replicas into application groups and draws the directly correlated replica-to-replica paths.
+- **Message flow** defaults to applications and observed message paths, with throughput encoded in line weight and exact rates available alongside the map. Its **Detailed** mode expands replicas into application groups and draws the directly correlated replica-to-replica paths. Explicit request metadata additionally produces paired request/response exchanges with forward and return messages, current round-trip stage, failures, and elapsed time.
 - **Failures** exposes bounded failure and retry metadata without capturing message bodies or arbitrary headers.
 - **Outbox** separates dispatcher backlog and delivery pressure from broker transit and consumer processing.
 
@@ -361,7 +369,7 @@ The monitoring service does not receive or store OpenTelemetry spans. MyServiceB
 
 This keeps the monitoring service focused on MyServiceBus topology and runtime state while existing OpenTelemetry collectors and backends continue to own traces, metrics, and logs.
 
-Failed-message inspection intentionally excludes message bodies and arbitrary headers. The prototype exposes only operational metadata already present in hook observations: message identity, endpoint, retry attempt, exception detail, correlation, conversation, and trace identifiers.
+Failed-message inspection currently excludes message bodies and arbitrary headers. Detailed operational metadata is controlled by the exporting service's capture profile rather than assumed to be available.
 
 ## Deployment and Security Boundary
 
@@ -372,6 +380,6 @@ ghcr.io/marinasundstrom/myservicebus-monitoring-collector:0.1.0-preview.8
 ghcr.io/marinasundstrom/myservicebus-monitoring-dashboard:0.1.0-preview.8
 ```
 
-The collector listens on port `8080`. The dashboard also listens on port `8080` and reads its collector base address from `Dashboard:MonitoringServiceAddress` (for example, `Dashboard__MonitoringServiceAddress`). The default in-memory collector is intended for local development and controlled evaluation; PostgreSQL provides restart durability but does not make the unauthenticated preview a production monitoring system. Before exposing either deployment outside a trusted network, add host-level authentication and authorization, request and payload limits, TLS, and an explicit retention policy. Do not send message bodies, arbitrary headers, credentials, or broker-management data through the monitoring protocol.
+The collector listens on port `8080`. The dashboard also listens on port `8080` and reads its collector base address from `Dashboard:MonitoringServiceAddress` (for example, `Dashboard__MonitoringServiceAddress`). The default in-memory collector is intended for local development and controlled evaluation; PostgreSQL provides restart durability but does not make the unauthenticated preview a production monitoring system. Before exposing either deployment outside a trusted network, add host-level authentication and authorization, request and payload limits, TLS, an explicit retention policy, and a disclosure policy. Never export credentials or broker-management data. Payload capture, when implemented, must remain explicit and bounded.
 
 For the longer-term design and vocabulary, see the [Runtime Monitoring Proposal](proposals/runtime-monitoring.md).

@@ -20,6 +20,12 @@ public final class MonitoringExporterOptions {
     private int maxJobItems = 1_000;
     private int maxJobAttempts = 10;
     private Duration scheduledWorkHistory = Duration.ofHours(24);
+    private MonitoringCaptureProfile captureProfile = MonitoringCaptureProfile.AUTO;
+    private Boolean captureMessageIdentity;
+    private Boolean captureCorrelationIdentity;
+    private Boolean captureRequestResponseMetadata;
+    private Boolean captureAddresses;
+    private Boolean captureExceptionMessages;
 
     public URI getServiceAddress() {
         return serviceAddress;
@@ -134,5 +140,69 @@ public final class MonitoringExporterOptions {
 
     public void setScheduledWorkHistory(Duration scheduledWorkHistory) {
         this.scheduledWorkHistory = scheduledWorkHistory;
+    }
+
+    public MonitoringCaptureProfile getCaptureProfile() {
+        return captureProfile;
+    }
+
+    public void setCaptureProfile(MonitoringCaptureProfile captureProfile) {
+        this.captureProfile = captureProfile;
+    }
+
+    public Boolean getCaptureMessageIdentity() {
+        return captureMessageIdentity;
+    }
+
+    public void setCaptureMessageIdentity(boolean captureMessageIdentity) {
+        this.captureMessageIdentity = captureMessageIdentity;
+    }
+
+    public Boolean getCaptureCorrelationIdentity() {
+        return captureCorrelationIdentity;
+    }
+
+    public void setCaptureCorrelationIdentity(boolean captureCorrelationIdentity) {
+        this.captureCorrelationIdentity = captureCorrelationIdentity;
+    }
+
+    public Boolean getCaptureRequestResponseMetadata() {
+        return captureRequestResponseMetadata;
+    }
+
+    public void setCaptureRequestResponseMetadata(boolean captureRequestResponseMetadata) {
+        this.captureRequestResponseMetadata = captureRequestResponseMetadata;
+    }
+
+    public Boolean getCaptureAddresses() {
+        return captureAddresses;
+    }
+
+    public void setCaptureAddresses(boolean captureAddresses) {
+        this.captureAddresses = captureAddresses;
+    }
+
+    public Boolean getCaptureExceptionMessages() {
+        return captureExceptionMessages;
+    }
+
+    public void setCaptureExceptionMessages(boolean captureExceptionMessages) {
+        this.captureExceptionMessages = captureExceptionMessages;
+    }
+
+    boolean captureSensitiveData(Boolean override) {
+        if (override != null) {
+            return override;
+        }
+        return switch (captureProfile) {
+            case DEVELOPMENT -> true;
+            case PRODUCTION -> false;
+            case AUTO -> isDevelopmentEnvironment();
+        };
+    }
+
+    private static boolean isDevelopmentEnvironment() {
+        String environment = System.getenv("MYSERVICEBUS_ENVIRONMENT");
+        return environment != null && environment.equalsIgnoreCase("Development");
     }
 }

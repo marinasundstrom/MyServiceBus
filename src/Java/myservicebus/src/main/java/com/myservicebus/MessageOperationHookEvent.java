@@ -20,7 +20,34 @@ public record MessageOperationHookEvent(
         Integer retryAttempt,
         Integer retryLimit,
         String messageId,
-        String causationMessageId) implements BusHookEvent {
+        String causationMessageId,
+        String requestId,
+        String responseAddress,
+        String messageIntent) implements BusHookEvent {
+
+    public MessageOperationHookEvent(
+            Instant occurredAtUtc,
+            String kind,
+            boolean succeeded,
+            String messageType,
+            String messageUrn,
+            String endpointName,
+            String destinationAddress,
+            double durationMs,
+            String exceptionType,
+            String exceptionMessage,
+            String correlationId,
+            String conversationId,
+            String traceId,
+            String spanId,
+            Integer retryAttempt,
+            Integer retryLimit,
+            String messageId,
+            String causationMessageId) {
+        this(occurredAtUtc, kind, succeeded, messageType, messageUrn, endpointName, destinationAddress,
+                durationMs, exceptionType, exceptionMessage, correlationId, conversationId, traceId, spanId,
+                retryAttempt, retryLimit, messageId, causationMessageId, null, null, null);
+    }
 
     public MessageOperationHookEvent(
             Instant occurredAtUtc,
@@ -42,7 +69,7 @@ public record MessageOperationHookEvent(
             String messageId) {
         this(occurredAtUtc, kind, succeeded, messageType, messageUrn, endpointName, destinationAddress,
                 durationMs, exceptionType, exceptionMessage, correlationId, conversationId, traceId, spanId,
-                retryAttempt, retryLimit, messageId, null);
+                retryAttempt, retryLimit, messageId, null, null, null, null);
     }
 
     public static MessageOperationHookEvent create(
@@ -106,6 +133,28 @@ public record MessageOperationHookEvent(
             Integer retryLimit,
             String messageId,
             String causationMessageId) {
+        return create(kind, succeeded, messageType, endpointName, destinationAddress, startedAtNanos,
+                exception, correlationId, conversationId, retryAttempt, retryLimit, messageId, causationMessageId,
+                null, null, null);
+    }
+
+    public static MessageOperationHookEvent create(
+            String kind,
+            boolean succeeded,
+            Class<?> messageType,
+            String endpointName,
+            String destinationAddress,
+            long startedAtNanos,
+            Throwable exception,
+            String correlationId,
+            String conversationId,
+            Integer retryAttempt,
+            Integer retryLimit,
+            String messageId,
+            String causationMessageId,
+            String requestId,
+            String responseAddress,
+            String messageIntent) {
         return new MessageOperationHookEvent(
                 Instant.now(),
                 kind,
@@ -124,6 +173,9 @@ public record MessageOperationHookEvent(
                 retryAttempt,
                 retryLimit,
                 messageId,
-                causationMessageId);
+                causationMessageId,
+                requestId,
+                responseAddress,
+                messageIntent);
     }
 }

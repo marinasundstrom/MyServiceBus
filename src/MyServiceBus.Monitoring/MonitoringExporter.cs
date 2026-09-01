@@ -475,18 +475,24 @@ public sealed class MonitoringExporter : BackgroundService, IBusHook, IScheduled
             busEvent.MessageType,
             busEvent.MessageUrn,
             busEvent.EndpointName,
-            busEvent.DestinationAddress,
+            options.CaptureSensitiveData(options.CaptureAddresses) ? busEvent.DestinationAddress : null,
             busEvent.DurationMs,
             busEvent.ExceptionType,
-            busEvent.ExceptionMessage,
-            busEvent.CorrelationId,
-            busEvent.ConversationId,
+            options.CaptureSensitiveData(options.CaptureExceptionMessages) ? busEvent.ExceptionMessage : null,
+            options.CaptureSensitiveData(options.CaptureCorrelationIdentity) ? busEvent.CorrelationId : null,
+            options.CaptureSensitiveData(options.CaptureCorrelationIdentity) ? busEvent.ConversationId : null,
             busEvent.TraceId,
             busEvent.SpanId,
             busEvent.RetryAttempt,
             busEvent.RetryLimit,
-            MessageId: busEvent.MessageId,
-            CausationMessageId: busEvent.CausationMessageId);
+            MessageId: options.CaptureSensitiveData(options.CaptureMessageIdentity) ? busEvent.MessageId : null,
+            CausationMessageId: options.CaptureSensitiveData(options.CaptureMessageIdentity) ? busEvent.CausationMessageId : null,
+            RequestId: options.CaptureSensitiveData(options.CaptureRequestResponseMetadata) ? busEvent.RequestId : null,
+            ResponseAddress: options.CaptureSensitiveData(options.CaptureRequestResponseMetadata)
+                && options.CaptureSensitiveData(options.CaptureAddresses)
+                ? busEvent.ResponseAddress
+                : null,
+            MessageIntent: options.CaptureSensitiveData(options.CaptureRequestResponseMetadata) ? busEvent.MessageIntent : null);
 
     private MonitoringObservation CreateSagaObservation(SagaStateMachineHookEvent busEvent)
         => new(

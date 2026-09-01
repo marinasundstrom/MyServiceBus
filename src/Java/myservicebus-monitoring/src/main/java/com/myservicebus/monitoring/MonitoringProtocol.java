@@ -46,7 +46,36 @@ public final class MonitoringProtocol {
             Integer retryLimit,
             Map<String, String> properties,
             String messageId,
-            String causationMessageId) {
+            String causationMessageId,
+            String requestId,
+            String responseAddress,
+            String messageIntent) {
+        public Observation(
+                long sequence,
+                Instant occurredAtUtc,
+                String kind,
+                Boolean succeeded,
+                String messageType,
+                String messageUrn,
+                String endpointName,
+                String destinationAddress,
+                Double durationMs,
+                String exceptionType,
+                String exceptionMessage,
+                String correlationId,
+                String conversationId,
+                String traceId,
+                String spanId,
+                Integer retryAttempt,
+                Integer retryLimit,
+                Map<String, String> properties,
+                String messageId,
+                String causationMessageId) {
+            this(sequence, occurredAtUtc, kind, succeeded, messageType, messageUrn, endpointName,
+                    destinationAddress, durationMs, exceptionType, exceptionMessage, correlationId,
+                    conversationId, traceId, spanId, retryAttempt, retryLimit, properties, messageId,
+                    causationMessageId, null, null, null);
+        }
     }
 
     public record ObservationBatch(

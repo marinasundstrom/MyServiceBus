@@ -109,7 +109,7 @@ MassTransit compatibility is not a requirement. Alignment means recognizable mes
 - MassTransit API, protocol, dashboard, or wire compatibility for monitoring.
 - Broker administration, queue browsing, requeue, purge, or dead-letter operations.
 - Guaranteed audit delivery.
-- Message-body or arbitrary-header capture.
+- Implicit or unbounded message-body and arbitrary-header capture. A future explicit, bounded debugging profile may carry selected payload content.
 - Receiving, storing, proxying, or querying OpenTelemetry data in the monitoring service.
 - Alerting in the first version.
 - Multiple coordinated monitoring-service replicas in the first version.

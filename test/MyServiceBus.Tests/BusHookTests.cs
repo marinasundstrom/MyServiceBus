@@ -159,6 +159,7 @@ public class BusHookTests
         {
             ServiceAddress = new Uri("http://monitoring.test"),
             ApplicationName = "tests",
+            CaptureProfile = MonitoringCaptureProfile.Development,
             ExportInterval = TimeSpan.FromMilliseconds(20),
             HeartbeatInterval = TimeSpan.FromMinutes(1)
         };
@@ -178,13 +179,76 @@ public class BusHookTests
             null,
             "loopback://test-message",
             TimeSpan.Zero,
+            exception: new InvalidOperationException("customer 42"),
+            correlationId: "correlation-1",
+            conversationId: "conversation-1",
             messageId: "message-1",
-            causationMessageId: "trigger-1"));
+            causationMessageId: "trigger-1",
+            requestId: "request-1",
+            responseAddress: "loopback://responses",
+            messageIntent: "Reply"));
 
         var batchJson = await handler.BatchReceived.Task.WaitAsync(TimeSpan.FromSeconds(2));
         batchJson.ShouldContain("\"kind\":\"published\"");
         batchJson.ShouldContain("\"messageId\":\"message-1\"");
         batchJson.ShouldContain("\"causationMessageId\":\"trigger-1\"");
+        batchJson.ShouldContain("\"requestId\":\"request-1\"");
+        batchJson.ShouldContain("\"responseAddress\":\"loopback://responses\"");
+        batchJson.ShouldContain("\"messageIntent\":\"Reply\"");
+        await exporter.StopAsync(CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task Production_capture_profile_excludes_sensitive_message_metadata()
+    {
+        var handler = new RecordingHttpHandler();
+        var services = new ServiceCollection()
+            .AddSingleton<IBusInspectionProvider>(new StubInspectionProvider());
+        await using var provider = services.BuildServiceProvider();
+        var options = new MonitoringExporterOptions
+        {
+            ServiceAddress = new Uri("http://monitoring.test"),
+            ApplicationName = "production-tests",
+            CaptureProfile = MonitoringCaptureProfile.Production,
+            ExportInterval = TimeSpan.FromMilliseconds(20),
+            HeartbeatInterval = TimeSpan.FromMinutes(1)
+        };
+        var exporter = new MonitoringExporter(
+            new HttpClient(handler) { BaseAddress = options.ServiceAddress },
+            provider,
+            options,
+            NullLogger<MonitoringExporter>.Instance);
+
+        await exporter.StartAsync(CancellationToken.None);
+        exporter.Handle(MessageOperationHookEvent.Create(
+            "sent",
+            false,
+            typeof(TestMessage).FullName!,
+            MessageUrn.For(typeof(TestMessage)),
+            "orders",
+            "loopback://orders",
+            TimeSpan.FromMilliseconds(4),
+            new InvalidOperationException("customer 42"),
+            "correlation-1",
+            "conversation-1",
+            messageId: "message-1",
+            causationMessageId: "trigger-1",
+            requestId: "request-1",
+            responseAddress: "loopback://responses",
+            messageIntent: "Send"));
+
+        var batchJson = await handler.BatchReceived.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        batchJson.ShouldContain("\"messageUrn\"");
+        batchJson.ShouldContain("\"durationMs\"");
+        batchJson.ShouldContain("\"exceptionType\"");
+        batchJson.ShouldNotContain("customer 42");
+        batchJson.ShouldNotContain("loopback://orders");
+        batchJson.ShouldNotContain("correlation-1");
+        batchJson.ShouldNotContain("conversation-1");
+        batchJson.ShouldNotContain("message-1");
+        batchJson.ShouldNotContain("trigger-1");
+        batchJson.ShouldNotContain("request-1");
+        batchJson.ShouldNotContain("loopback://responses");
         await exporter.StopAsync(CancellationToken.None);
     }
 

@@ -42,7 +42,10 @@ public sealed record MonitoringObservation(
     int? RetryLimit = null,
     IReadOnlyDictionary<string, string>? Properties = null,
     string? MessageId = null,
-    string? CausationMessageId = null);
+    string? CausationMessageId = null,
+    string? RequestId = null,
+    string? ResponseAddress = null,
+    string? MessageIntent = null);
 
 public sealed record MonitoringOutboxDispatcherSummary(
     string ApplicationName,
@@ -579,6 +582,27 @@ public sealed record MonitoringFlowEdge(
     DateTimeOffset FirstSeenAtUtc,
     DateTimeOffset LastSeenAtUtc,
     string MatchConfidence);
+
+public sealed record MonitoringRequestResponseExchange(
+    string RequestId,
+    string Status,
+    string RequesterApplication,
+    string RequesterInstanceId,
+    string? ResponderApplication,
+    string? ResponderInstanceId,
+    string? RequestMessageType,
+    string? RequestMessageUrn,
+    string? ResponseMessageType,
+    string? ResponseMessageUrn,
+    string? ResponseAddress,
+    DateTimeOffset StartedAtUtc,
+    DateTimeOffset LastActivityAtUtc,
+    DateTimeOffset? RequestConsumedAtUtc,
+    DateTimeOffset? ResponseSentAtUtc,
+    DateTimeOffset? ResponseConsumedAtUtc,
+    double DurationMs,
+    bool HasFailures,
+    string EvidenceStatus);
 
 public sealed record MonitoringReplicaFlowEdge(
     string SourceApplication,

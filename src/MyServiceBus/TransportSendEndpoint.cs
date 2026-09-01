@@ -89,7 +89,10 @@ internal class TransportSendEndpoint : ISendEndpoint
                 sendContext.CorrelationId,
                 sendContext.ConversationId?.ToString(),
                 messageId: sendContext.MessageId,
-                causationMessageId: sendContext.CausationMessageId?.ToString()));
+                causationMessageId: sendContext.CausationMessageId?.ToString(),
+                requestId: sendContext.RequestId?.ToString(),
+                responseAddress: sendContext.ResponseAddress?.ToString(),
+                messageIntent: sendContext.Intent.ToString()));
         }
     }
 }

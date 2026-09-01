@@ -249,7 +249,10 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
             context.CorrelationId,
             context.ConversationId?.ToString(),
             messageId: context.MessageId,
-            causationMessageId: context.CausationMessageId?.ToString()));
+            causationMessageId: context.CausationMessageId?.ToString(),
+            requestId: context.RequestId?.ToString(),
+            responseAddress: context.ResponseAddress?.ToString(),
+            messageIntent: context.Intent.ToString()));
     }
 
 }

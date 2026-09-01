@@ -84,7 +84,10 @@ public sealed class TransportOutboxDispatcher : IOutboxTransportDispatcher
             message.CorrelationId?.ToString(),
             message.ConversationId?.ToString(),
             messageId: message.MessageId.ToString(),
-            causationMessageId: message.CausationMessageId?.ToString()));
+            causationMessageId: message.CausationMessageId?.ToString(),
+            requestId: message.RequestId?.ToString(),
+            responseAddress: message.ResponseAddress?.ToString(),
+            messageIntent: MapIntent(message.Intent).ToString()));
     }
 
     private static string DisplayMessageType(string messageUrn)

@@ -443,10 +443,21 @@ public final class MonitoringExporter implements BusHook, ScheduledWorkObserver,
         if (busEvent instanceof MessageOperationHookEvent operation) {
             return new MonitoringProtocol.Observation(
                     sequence.incrementAndGet(), operation.occurredAtUtc(), operation.kind(), operation.succeeded(),
-                    operation.messageType(), operation.messageUrn(), operation.endpointName(), operation.destinationAddress(),
-                    operation.durationMs(), operation.exceptionType(), operation.exceptionMessage(), operation.correlationId(),
-                    operation.conversationId(), operation.traceId(), operation.spanId(), operation.retryAttempt(),
-                    operation.retryLimit(), null, operation.messageId(), operation.causationMessageId());
+                    operation.messageType(), operation.messageUrn(), operation.endpointName(),
+                    options.captureSensitiveData(options.getCaptureAddresses()) ? operation.destinationAddress() : null,
+                    operation.durationMs(), operation.exceptionType(),
+                    options.captureSensitiveData(options.getCaptureExceptionMessages()) ? operation.exceptionMessage() : null,
+                    options.captureSensitiveData(options.getCaptureCorrelationIdentity()) ? operation.correlationId() : null,
+                    options.captureSensitiveData(options.getCaptureCorrelationIdentity()) ? operation.conversationId() : null,
+                    operation.traceId(), operation.spanId(), operation.retryAttempt(), operation.retryLimit(), null,
+                    options.captureSensitiveData(options.getCaptureMessageIdentity()) ? operation.messageId() : null,
+                    options.captureSensitiveData(options.getCaptureMessageIdentity()) ? operation.causationMessageId() : null,
+                    options.captureSensitiveData(options.getCaptureRequestResponseMetadata()) ? operation.requestId() : null,
+                    options.captureSensitiveData(options.getCaptureRequestResponseMetadata())
+                            && options.captureSensitiveData(options.getCaptureAddresses())
+                            ? operation.responseAddress()
+                            : null,
+                    options.captureSensitiveData(options.getCaptureRequestResponseMetadata()) ? operation.messageIntent() : null);
         }
         if (busEvent instanceof OutboxDeliveryHookEvent outbox) {
             Map<String, String> properties = new LinkedHashMap<>();

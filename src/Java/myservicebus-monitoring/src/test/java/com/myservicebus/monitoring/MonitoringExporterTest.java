@@ -37,6 +37,21 @@ import com.sun.net.httpserver.HttpServer;
 
 class MonitoringExporterTest {
     @Test
+    void productionCaptureProfileExcludesSensitiveMetadataUnlessOverridden() {
+        MonitoringExporterOptions options = new MonitoringExporterOptions();
+        options.setCaptureProfile(MonitoringCaptureProfile.PRODUCTION);
+
+        assertTrue(!options.captureSensitiveData(options.getCaptureMessageIdentity()));
+        assertTrue(!options.captureSensitiveData(options.getCaptureCorrelationIdentity()));
+        assertTrue(!options.captureSensitiveData(options.getCaptureRequestResponseMetadata()));
+        assertTrue(!options.captureSensitiveData(options.getCaptureAddresses()));
+        assertTrue(!options.captureSensitiveData(options.getCaptureExceptionMessages()));
+
+        options.setCaptureRequestResponseMetadata(true);
+        assertTrue(options.captureSensitiveData(options.getCaptureRequestResponseMetadata()));
+    }
+
+    @Test
     void exporterRegistersMetadataAndSendsObservationBatches() throws Exception {
         CountDownLatch metadataReceived = new CountDownLatch(1);
         CountDownLatch batchReceived = new CountDownLatch(1);
@@ -66,6 +81,7 @@ class MonitoringExporterTest {
         MonitoringExporterOptions options = new MonitoringExporterOptions();
         options.setServiceAddress(URI.create("http://localhost:" + server.getAddress().getPort()));
         options.setApplicationName("orders-java");
+        options.setCaptureProfile(MonitoringCaptureProfile.DEVELOPMENT);
         options.getLabels().put("group", "commerce");
         options.setExportInterval(Duration.ofMillis(20));
         options.setHeartbeatInterval(Duration.ofSeconds(1));
@@ -97,7 +113,10 @@ class MonitoringExporterTest {
                     null,
                     null,
                     "message-1",
-                    "trigger-1"));
+                    "trigger-1",
+                    "request-1",
+                    "loopback://responses",
+                    "REPLY"));
 
             assertTrue(metadataReceived.await(2, TimeUnit.SECONDS));
             assertTrue(batchReceived.await(2, TimeUnit.SECONDS));
@@ -109,6 +128,9 @@ class MonitoringExporterTest {
             assertTrue(batchJson.get().contains("\"kind\":\"published\""));
             assertTrue(batchJson.get().contains("\"messageId\":\"message-1\""));
             assertTrue(batchJson.get().contains("\"causationMessageId\":\"trigger-1\""));
+            assertTrue(batchJson.get().contains("\"requestId\":\"request-1\""));
+            assertTrue(batchJson.get().contains("\"responseAddress\":\"loopback://responses\""));
+            assertTrue(batchJson.get().contains("\"messageIntent\":\"REPLY\""));
         } finally {
             exporter.close();
             server.stop(0);
