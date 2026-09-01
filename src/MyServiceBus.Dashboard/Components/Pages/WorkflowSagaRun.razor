@@ -43,24 +43,21 @@ else
         @if (Definition is { } definition)
         {
             <div class="workflow-run-structure-note">Definition @definition.DefinitionVersion · owner @definition.Owner · endpoint @DefinitionDeployment?.EndpointName</div>
-            <div class="workflow-run-flow" aria-label="Declared saga state machine">
-                @foreach (var state in DeclaredStates(definition))
-                {
-                    <article class="workflow-run-step @(state == instance.CurrentState ? "live" : null)">
-                        <header><span>State</span><strong>@state</strong></header>
-                        <div class="workflow-run-step-body">
-                            <p>@(state == instance.CurrentState ? "Current committed state" : "Declared state")</p>
-                        </div>
-                    </article>
-                }
+            <div class="workflow-run-section-heading">
+                <div><span class="eyebrow">State machine</span><h3>Declared model and observed path</h3></div>
+                <p>Visited states and committed transitions are highlighted as deliveries arrive.</p>
             </div>
+            <WorkflowSagaRunMap Definition="definition" Instance="instance" />
         }
 
-        <div class="workflow-run-flow" aria-label="Committed saga delivery history">
+        <div class="workflow-run-section-heading">
+            <div><span class="eyebrow">Execution</span><h3>Committed delivery history</h3></div>
+            <p>Each card represents one delivery attempt; failures never imply a committed transition.</p>
+        </div>
+        <div class="saga-delivery-history" aria-label="Committed saga delivery history">
             @for (var index = 0; index < instance.Transitions.Count; index++)
             {
                 var transition = instance.Transitions[index];
-                @if (index > 0) { <div class="workflow-run-connector" aria-hidden="true">→</div> }
                 <article class="workflow-run-step @(transition.Succeeded ? null : "faulted")">
                     <header>
                         <span>Delivery @(index + 1)</span>
@@ -119,11 +116,6 @@ else
             loading = false;
         }
     }
-
-    private static IEnumerable<string> DeclaredStates(MyServiceBus.Orchestration.SagaStateMachineDefinition definition)
-        => new[] { MyServiceBus.Orchestration.SagaStateMachineDefinition.InitialState }
-            .Concat(definition.States.Select(state => state.Id))
-            .Append(MyServiceBus.Orchestration.SagaStateMachineDefinition.FinalState);
 
     private static string OutcomeClass(MonitoringSagaInstance value)
         => !value.LastDeliverySucceeded ? "faulted" : value.Status;

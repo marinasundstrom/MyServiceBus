@@ -43,19 +43,13 @@ else
                     <div><span class="status-dot @(deployment.OnlineInstanceCount > 0 ? "online" : "offline")"></span><strong>@deployment.ApplicationName</strong><small>Owner @deployment.Owner</small></div>
                     <span>@deployment.EndpointName · @deployment.OnlineInstanceCount/@deployment.InstanceCount online</span>
                 </header>
+                <div class="workflow-run-section-heading">
+                    <div><span class="eyebrow">State machine</span><h3>States and event transitions</h3></div>
+                    <p>The diagram shows declared behavior. Open a run to overlay one instance's committed path.</p>
+                </div>
+                <WorkflowSagaRunMap Definition="deployment.Definition" />
                 <div class="workflow-reactions">
-                    <section class="workflow-reaction">
-                        <div class="workflow-step-label">States</div>
-                        <div class="workflow-outputs">
-                            <div class="workflow-output"><small>Built in</small><strong>Initial</strong></div>
-                            @foreach (var state in deployment.Definition.States)
-                            {
-                                <div class="workflow-output"><small>State</small><strong>@state.Id</strong></div>
-                            }
-                            <div class="workflow-output"><small>Built in</small><strong>Final</strong></div>
-                        </div>
-                    </section>
-                    @foreach (var behavior in deployment.Definition.Behaviors)
+                    @foreach (var behavior in OrderedBehaviors(deployment.Definition))
                     {
                         <section class="workflow-reaction">
                             <div class="workflow-step-label">@behavior.SourceState</div>
@@ -99,4 +93,17 @@ else
 
     private static string SagaActivityLabel(MyServiceBus.Orchestration.SagaActivityDefinition activity)
         => activity.TargetState ?? activity.MessageUrn?.Split('.', ':').Last() ?? activity.ActivityId ?? activity.Kind.ToString();
+
+    private static IEnumerable<MyServiceBus.Orchestration.SagaBehaviorDefinition> OrderedBehaviors(
+        MyServiceBus.Orchestration.SagaStateMachineDefinition definition)
+    {
+        var stateOrder = definition.States
+            .Select((state, index) => (state.Id, Order: index + 1))
+            .ToDictionary(item => item.Id, item => item.Order, StringComparer.Ordinal);
+        stateOrder[MyServiceBus.Orchestration.SagaStateMachineDefinition.InitialState] = 0;
+        stateOrder[MyServiceBus.Orchestration.SagaStateMachineDefinition.AnyState] = int.MaxValue;
+        return definition.Behaviors
+            .OrderBy(behavior => stateOrder.GetValueOrDefault(behavior.SourceState, int.MaxValue - 1))
+            .ThenBy(behavior => behavior.EventId, StringComparer.Ordinal);
+    }
 }

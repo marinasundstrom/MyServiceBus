@@ -2,6 +2,7 @@
 @rendermode InteractiveServer
 @inherits MonitoringPageBase
 @inject MonitoringApiClient Api
+@inject NavigationManager Navigation
 
 <PageTitle>Workflow Runs · MyServiceBus Monitoring</PageTitle>
 <DashboardPageHeader Eyebrow="Coordination" Title="Workflows" Description="Follow reconstructed choreography runs and committed saga transitions, including live activity, timing, and failures." />
@@ -16,14 +17,14 @@
         <span>Live as observations arrive · @(CurrentPage?.Total ?? 0) retained runs</span>
     </div>
 
-    <div class="workflow-run-filters" aria-label="Filter workflow runs">
+    <form class="workflow-run-filters" aria-label="Filter workflow runs" @onsubmit="ApplyFiltersAsync" @onsubmit:preventDefault>
         <label>
             <span>Search</span>
-            <input type="search" placeholder="Workflow or run identity" @bind="search" @bind:event="oninput" />
+            <input type="search" placeholder="Workflow or run identity" @bind="search" />
         </label>
         <label>
             <span>Type</span>
-            <select @bind="typeFilter">
+            <select @bind="typeFilter" @bind:after="FilterChangedAsync">
                 <option value="all">All types</option>
                 <option value="choreography">Choreography</option>
                 <option value="saga">Saga / orchestration</option>
@@ -31,7 +32,7 @@
         </label>
         <label>
             <span>Status</span>
-            <select @bind="statusFilter">
+            <select @bind="statusFilter" @bind:after="FilterChangedAsync">
                 <option value="all">All statuses</option>
                 <option value="live">Live activity</option>
                 <option value="terminal_observed">Terminal observed</option>
@@ -42,8 +43,12 @@
                 <option value="not-present">Saga not present</option>
             </select>
         </label>
-        <button type="button" class="workflow-filter-action" @onclick="ApplyFiltersAsync" disabled="@loading">Apply filters</button>
-    </div>
+        <button type="submit" class="workflow-filter-action" disabled="@loading">Search</button>
+        @if (FiltersApplied)
+        {
+            <button type="button" class="workflow-filter-reset" @onclick="ClearFiltersAsync" disabled="@loading">Clear</button>
+        }
+    </form>
 
     @if (CurrentPage is not { } page || page.Runs.Count == 0)
     {
@@ -51,51 +56,30 @@
     }
     else
     {
-        <div class="table-wrap">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Status</th>
-                        <th>Workflow</th>
-                        <th>Type</th>
-                        <th>Activity</th>
-                        <th>Execution</th>
-                        <th>Evidence</th>
-                        <th></th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (var run in page.Runs)
-                    {
-                        <tr class="workflow-run-row @run.Status">
-                            <td><span class="run-status @run.Status"></span><strong>@RunStatus(run.Status)</strong></td>
-                            <td><strong>@run.WorkflowId</strong><small>Run @Abbreviate(run.DetailIdentity)</small></td>
-                            <td>@CoordinationType(run.Kind)</td>
-                            <td>
-                                <strong>@run.StartedAtUtc.ToLocalTime().ToString("MMM d, HH:mm:ss")</strong>
-                                <small>Last @run.LastActivityAtUtc.ToLocalTime().ToString("HH:mm:ss.fff")</small>
-                            </td>
-                            <td>
-                                <strong>@FormatDuration(run.DurationMs)</strong>
-                                <small>@run.EvidenceCount @(run.Kind == "saga" ? "deliveries" : "observed steps")@if (!string.IsNullOrWhiteSpace(run.CurrentState)) {<text> · @run.CurrentState</text>}</small>
-                            </td>
-                            <td>
-                                @if (run.Kind == "saga")
-                                {
-                                    <strong>Committed transitions</strong>
-                                    <small>@(run.HasFailures ? "Includes failed delivery" : "Bounded observation window")</small>
-                                }
-                                else
-                                {
-                                    <strong>@(run.EvidenceComplete == true ? "Complete" : "Incomplete")</strong>
-                                    <small>Reconstructed evidence</small>
-                                }
-                            </td>
-                            <td><a class="section-link" href="@RunHref(run)">View run →</a></td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
+        <div class="workflow-run-list" role="list">
+            @foreach (var run in page.Runs)
+            {
+                <a class="workflow-run-list-item @run.Status" href="@RunHref(run)" role="listitem">
+                    <div class="workflow-run-list-status">
+                        <span class="run-status @run.Status"></span>
+                        <strong>@RunStatus(run.Status)</strong>
+                    </div>
+                    <div class="workflow-run-list-identity">
+                        <strong>@run.WorkflowId</strong>
+                        <small>Run @Abbreviate(run.DetailIdentity)</small>
+                    </div>
+                    <span class="workflow-kind @run.Kind">@CoordinationType(run.Kind)</span>
+                    <div class="workflow-run-list-timing">
+                        <strong>@FormatDuration(run.DurationMs)</strong>
+                        <small>Started @run.StartedAtUtc.ToLocalTime().ToString("MMM d, HH:mm:ss")</small>
+                    </div>
+                    <div class="workflow-run-list-evidence">
+                        <strong>@EvidenceTitle(run)</strong>
+                        <small>@EvidenceDetail(run)</small>
+                    </div>
+                    <span class="workflow-run-list-arrow" aria-hidden="true">→</span>
+                </a>
+            }
         </div>
         <div class="workflow-run-pagination">
             <span>Showing @(page.Offset + 1)–@Math.Min(page.Offset + page.Runs.Count, page.Total) of @(page.Total)</span>
@@ -114,15 +98,86 @@
 
 @code {
     private const int PageSize = 25;
+    private static readonly HashSet<string> SupportedStatuses =
+    [
+        "live", "terminal_observed", "faulted", "no_recent_activity", "active", "completed", "not-present"
+    ];
+
+    [SupplyParameterFromQuery(Name = "status")]
+    public string? StatusQuery { get; set; }
+
+    [SupplyParameterFromQuery(Name = "type")]
+    public string? TypeQuery { get; set; }
+
+    [SupplyParameterFromQuery(Name = "search")]
+    public string? SearchQuery { get; set; }
+
     private string search = string.Empty;
     private string typeFilter = "all";
     private string statusFilter = "all";
     private MonitoringWorkflowRunIndexPage? queriedPage;
     private bool loading;
+    private string? appliedQueryKey;
 
     private MonitoringWorkflowRunIndexPage? CurrentPage => queriedPage ?? Dashboard.WorkflowRunIndex;
+    private bool FiltersApplied => typeFilter != "all" || statusFilter != "all" || !string.IsNullOrWhiteSpace(search);
 
-    private Task ApplyFiltersAsync() => LoadPageAsync(0);
+    protected override async Task OnParametersSetAsync()
+    {
+        var requestedStatus = StatusQuery is not null && SupportedStatuses.Contains(StatusQuery)
+            ? StatusQuery
+            : "all";
+        var requestedType = TypeQuery is "choreography" or "saga" ? TypeQuery : "all";
+        var requestedSearch = SearchQuery?.Trim() ?? string.Empty;
+        var queryKey = $"{requestedType}\u001f{requestedStatus}\u001f{requestedSearch}";
+        if (string.Equals(queryKey, appliedQueryKey, StringComparison.Ordinal))
+            return;
+
+        appliedQueryKey = queryKey;
+        statusFilter = requestedStatus;
+        typeFilter = requestedType;
+        search = requestedSearch;
+        if (!FiltersApplied)
+        {
+            queriedPage = null;
+            return;
+        }
+
+        await LoadPageAsync(0);
+    }
+
+    private Task ApplyFiltersAsync()
+    {
+        NavigateToFilters();
+        return Task.CompletedTask;
+    }
+
+    private Task FilterChangedAsync()
+    {
+        NavigateToFilters();
+        return Task.CompletedTask;
+    }
+
+    private Task ClearFiltersAsync()
+    {
+        search = string.Empty;
+        typeFilter = "all";
+        statusFilter = "all";
+        Navigation.NavigateTo("/workflows", replace: true);
+        return Task.CompletedTask;
+    }
+
+    private void NavigateToFilters()
+    {
+        var parameters = new List<string>();
+        if (typeFilter != "all")
+            parameters.Add($"type={Uri.EscapeDataString(typeFilter)}");
+        if (statusFilter != "all")
+            parameters.Add($"status={Uri.EscapeDataString(statusFilter)}");
+        if (!string.IsNullOrWhiteSpace(search))
+            parameters.Add($"search={Uri.EscapeDataString(search.Trim())}");
+        Navigation.NavigateTo(parameters.Count == 0 ? "/workflows" : $"/workflows?{string.Join("&", parameters)}", replace: true);
+    }
 
     private Task PreviousPageAsync()
         => LoadPageAsync(Math.Max(0, (CurrentPage?.Offset ?? 0) - PageSize));
@@ -176,6 +231,22 @@
 
     private static string FormatDuration(double milliseconds)
         => milliseconds >= 1_000 ? $"{milliseconds / 1_000:0.##} s" : $"{milliseconds:0.##} ms";
+
+    private static string EvidenceTitle(MonitoringWorkflowRunSummary run)
+        => run.Kind == "saga"
+            ? SagaEvidenceTitle(run)
+            : $"{run.EvidenceCount} observed {(run.EvidenceCount == 1 ? "step" : "steps")}";
+
+    private static string SagaEvidenceTitle(MonitoringWorkflowRunSummary run)
+    {
+        var deliveries = $"{run.EvidenceCount} {(run.EvidenceCount == 1 ? "delivery" : "deliveries")}";
+        return string.IsNullOrWhiteSpace(run.CurrentState) ? deliveries : $"{deliveries} · {run.CurrentState}";
+    }
+
+    private static string EvidenceDetail(MonitoringWorkflowRunSummary run)
+        => run.Kind == "saga"
+            ? run.HasFailures ? "Committed evidence · includes failure" : "Committed transition evidence"
+            : run.EvidenceComplete == true ? "Complete reconstructed evidence" : "Incomplete reconstructed evidence";
 
     private static string Abbreviate(string value)
         => value.Length <= 12 ? value : $"{value[..8]}…{value[^4..]}";

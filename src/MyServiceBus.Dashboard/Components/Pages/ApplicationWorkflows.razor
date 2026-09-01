@@ -1,0 +1,140 @@
+@page "/applications/{ApplicationName}/workflows"
+@rendermode InteractiveServer
+@inherits ApplicationPageBase
+
+<PageTitle>Workflows · @ApplicationName · MyServiceBus Monitoring</PageTitle>
+<DashboardPageHeader Eyebrow="Application" Title="@ApplicationName" Description="See the declared coordination models this application participates in and the latest workflow evidence involving those models." />
+<ApplicationNavigation ApplicationName="@ApplicationName" />
+
+@if (Application is null)
+{
+    <section class="empty-state"><h2>Application not found</h2><p>This application may not have registered yet, or its monitoring lease may have expired.</p></section>
+}
+else
+{
+    <section class="overview-grid application-workflow-summary">
+        <MetricValue Label="Declared workflows" Value="@DeclaredWorkflows.Count.ToString("N0")" />
+        <MetricValue Label="Recent runs" Value="@RecentRuns.Count.ToString("N0")" />
+        <MetricValue Label="Active runs" Value="@ActiveRuns.ToString("N0")" />
+        <MetricValue Label="Failed runs" Value="@FailedRuns.ToString("N0")" Alert="@(FailedRuns > 0)" />
+    </section>
+
+    <section class="panel application-workflow-panel">
+        <div class="section-heading">
+            <div><p class="eyebrow">Participation</p><h2>Declared workflows</h2></div>
+            <a class="section-link" href="/workflows/declared">Open workflow catalog →</a>
+        </div>
+        @if (DeclaredWorkflows.Count == 0)
+        {
+            <p class="panel-empty">This application has not reported a choreography fragment or saga state-machine definition.</p>
+        }
+        else
+        {
+            <div class="table-wrap">
+                <table>
+                    <thead><tr><th>Workflow</th><th>Coordination</th><th>Role</th><th>Availability</th><th></th></tr></thead>
+                    <tbody>
+                    @foreach (var workflow in DeclaredWorkflows)
+                    {
+                        <tr>
+                            <td><strong>@workflow.WorkflowId</strong><small>Version @string.Join(", ", workflow.DefinitionVersions)</small></td>
+                            <td>@KindLabel(workflow.Kind)</td>
+                            <td>@ParticipationLabel(workflow)</td>
+                            <td>@workflow.OnlineInstanceCount/@workflow.ReportingInstanceCount online</td>
+                            <td><a class="section-link" href="@DefinitionHref(workflow)">View definition →</a></td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </section>
+
+    <section class="panel application-workflow-panel">
+        <div class="section-heading">
+            <div><p class="eyebrow">Operational evidence</p><h2>Recent workflow runs</h2></div>
+            <a class="section-link" href="/workflows">Open all runs →</a>
+        </div>
+        @if (RecentRuns.Count == 0)
+        {
+            <p class="panel-empty">No retained runs currently involve this application's declared workflows.</p>
+        }
+        else
+        {
+            <div class="application-workflow-runs">
+                @foreach (var run in RecentRuns.Take(12))
+                {
+                    <a class="application-workflow-run" href="@RunHref(run)">
+                        <span class="run-status @run.Status"></span>
+                        <div><strong>@run.WorkflowId</strong><small>@KindLabel(run.Kind) · @run.LastActivityAtUtc.ToLocalTime().ToString("MMM d, HH:mm:ss")</small></div>
+                        <div><strong>@RunStatus(run.Status)</strong><small>@run.EvidenceCount @(run.Kind == "saga" ? "deliveries" : "observed steps") · @FormatDuration(run.DurationMs)</small></div>
+                        <span aria-hidden="true">→</span>
+                    </a>
+                }
+            </div>
+        }
+    </section>
+}
+
+@code {
+    private IReadOnlySet<string> ParticipatingWorkflowIds
+        => Dashboard.Choreographies
+            .Where(choreography => choreography.Fragments.Any(fragment => string.Equals(fragment.ApplicationName, ApplicationName, StringComparison.Ordinal)))
+            .Select(choreography => choreography.ChoreographyId)
+            .Concat(Dashboard.Sagas
+                .Where(saga => saga.Deployments.Any(deployment => string.Equals(deployment.ApplicationName, ApplicationName, StringComparison.Ordinal)))
+                .Select(saga => saga.StateMachineId))
+            .ToHashSet(StringComparer.Ordinal);
+
+    private IReadOnlyList<MonitoringWorkflowCatalogItem> DeclaredWorkflows
+        => Dashboard.WorkflowCatalog
+            .Where(workflow => ParticipatingWorkflowIds.Contains(workflow.WorkflowId))
+            .OrderBy(workflow => workflow.WorkflowId, StringComparer.Ordinal)
+            .ToArray();
+
+    private IReadOnlyList<MonitoringWorkflowRunSummary> RecentRuns
+        => (Dashboard.WorkflowRunIndex?.Runs ?? [])
+            .Where(run => ParticipatingWorkflowIds.Contains(run.WorkflowId))
+            .OrderByDescending(run => run.LastActivityAtUtc)
+            .ToArray();
+
+    private int ActiveRuns => RecentRuns.Count(run => run.Status is "live" or "active");
+    private int FailedRuns => RecentRuns.Count(run => run.HasFailures || run.Status == "faulted");
+
+    private string ParticipationLabel(MonitoringWorkflowCatalogItem workflow)
+    {
+        if (workflow.Kind == "saga")
+            return "Orchestrator";
+        var participantCount = Dashboard.Choreographies
+            .FirstOrDefault(choreography => string.Equals(choreography.ChoreographyId, workflow.WorkflowId, StringComparison.Ordinal))?
+            .Fragments.Count(fragment => string.Equals(fragment.ApplicationName, ApplicationName, StringComparison.Ordinal)) ?? 0;
+        return participantCount == 1 ? "Participant" : $"Participant · {participantCount} fragments";
+    }
+
+    private static string KindLabel(string kind) => kind == "saga" ? "Saga / orchestration" : "Choreography";
+
+    private static string DefinitionHref(MonitoringWorkflowCatalogItem workflow)
+        => workflow.Kind == "saga"
+            ? $"/workflows/sagas/{Uri.EscapeDataString(workflow.WorkflowId)}"
+            : $"/workflows/choreographies/{Uri.EscapeDataString(workflow.WorkflowId)}";
+
+    private static string RunHref(MonitoringWorkflowRunSummary run)
+        => run.Kind == "saga"
+            ? $"/workflows/sagas/{Uri.EscapeDataString(run.WorkflowId)}/{Uri.EscapeDataString(run.DetailIdentity)}"
+            : $"/workflows/runs/{Uri.EscapeDataString(run.DetailIdentity)}";
+
+    private static string RunStatus(string status) => status switch
+    {
+        "live" => "Live activity",
+        "terminal_observed" => "Terminal observed",
+        "faulted" => "Failed",
+        "no_recent_activity" => "No recent activity",
+        "active" => "Active",
+        "completed" => "Completed",
+        "not-present" => "Not present",
+        _ => DisplayKind(status)
+    };
+
+    private static string FormatDuration(double milliseconds)
+        => milliseconds >= 1_000 ? $"{milliseconds / 1_000:0.##} s" : $"{milliseconds:0.##} ms";
+}

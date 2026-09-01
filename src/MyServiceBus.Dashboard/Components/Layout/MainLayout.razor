@@ -21,7 +21,13 @@
             <NavLink href="/endpoints">Endpoints</NavLink>
             <NavLink href="/throughput">Throughput</NavLink>
             <NavLink href="/flow">Message flow</NavLink>
-            <NavLink href="/workflows">Workflows</NavLink>
+            <NavLink href="@WorkflowsHref" Match="NavLinkMatch.Prefix">
+                <span>Workflows</span>
+                @if (WorkflowFailureCount > 0)
+                {
+                    <span class="nav-badge" title="@WorkflowFailureBadgeTitle" aria-label="@WorkflowFailureBadgeTitle">@WorkflowFailureBadgeText</span>
+                }
+            </NavLink>
             <span class="nav-label">Reliability</span>
             <NavLink href="/failures">
                 <span>Failures</span>
@@ -61,6 +67,10 @@
 @code {
     private long FailureCount => Dashboard.Summary?.FailureCount ?? 0;
     private string FailureBadgeText => FailureCount > 99 ? "99+" : FailureCount.ToString();
+    private int WorkflowFailureCount => Dashboard.WorkflowRunIndex?.Runs.Count(run => run.Status == "faulted") ?? 0;
+    private string WorkflowsHref => WorkflowFailureCount > 0 ? "/workflows?status=faulted" : "/workflows";
+    private string WorkflowFailureBadgeText => WorkflowFailureCount > 99 ? "99+" : WorkflowFailureCount.ToString();
+    private string WorkflowFailureBadgeTitle => $"{WorkflowFailureCount:N0} failed workflow run{(WorkflowFailureCount == 1 ? string.Empty : "s")} in the retained monitoring window";
     private string ConnectionClass => Dashboard.Error is null ? "online" : string.Empty;
     private string ConnectionTitle => Dashboard.Error is not null
         ? "Monitoring unavailable"

@@ -5,6 +5,13 @@
 <PageTitle>Message Flow · MyServiceBus Monitoring</PageTitle>
 <DashboardPageHeader Eyebrow="System map" Title="Message flow" Description="Explore which applications exchange messages and the observed traffic between them. This map is reconstructed from recent correlated activity." />
 
+<section class="overview-grid flow-summary-grid">
+    <MetricValue Label="Applications exchanging messages" Value="@ObservedApplicationCount.ToString("N0")" />
+    <MetricValue Label="Application relationships" Value="@ApplicationRelationships.Count.ToString("N0")" />
+    <MetricValue Label="Message paths" Value="@Dashboard.Flow.Count.ToString("N0")" />
+    <MetricValue Label="Messages · 5 min" Value="@Dashboard.Flow.Sum(edge => edge.Count).ToString("N0")" />
+</section>
+
 <section class="panel flow-map-panel">
     <div class="section-heading flow-map-heading">
         <div><p class="eyebrow">Live system map</p><h2>@(_view == FlowView.Applications ? "Observed application flow" : "Replica flow by application")</h2></div>
@@ -37,10 +44,26 @@
     }
     else if (_view == FlowView.Applications)
     {
-        <div class="flow-list">
-            @foreach (var edge in Dashboard.Flow)
+        <div class="flow-relationship-list">
+            @foreach (var relationship in ApplicationRelationships)
             {
-                <div class="flow-edge"><strong>@edge.SourceApplication</strong><span>→</span><strong>@edge.TargetApplication</strong><small>@ShortMessageType(edge.MessageType) · @edge.Count.ToString("N0") @(edge.Count == 1 ? "message" : "messages")</small></div>
+                <article class="flow-relationship">
+                    <header>
+                        <div class="flow-relationship-route">
+                            <strong>@relationship.SourceApplication</strong>
+                            <span>→</span>
+                            <strong>@relationship.TargetApplication</strong>
+                            <em>@(relationship.Internal ? "Internal" : "Cross-application")</em>
+                        </div>
+                        <div><strong>@relationship.MessageCount.ToString("N0")</strong><small>@relationship.Paths.Count path@(relationship.Paths.Count == 1 ? null : "s")</small></div>
+                    </header>
+                    <div class="flow-relationship-paths">
+                        @foreach (var path in relationship.Paths)
+                        {
+                            <div><strong>@path.Message</strong><span>@DisplayKind(path.OperationKind)</span><small>@path.Count.ToString("N0") @(path.Count == 1 ? "message" : "messages")</small></div>
+                        }
+                    </div>
+                </article>
             }
         </div>
     }
@@ -63,6 +86,32 @@
 @code {
     private FlowView _view = FlowView.Applications;
 
+    private IReadOnlyList<ApplicationRelationship> ApplicationRelationships
+        => Dashboard.Flow
+            .GroupBy(edge => (edge.SourceApplication, edge.TargetApplication))
+            .Select(group => new ApplicationRelationship(
+                group.Key.SourceApplication,
+                group.Key.TargetApplication,
+                string.Equals(group.Key.SourceApplication, group.Key.TargetApplication, StringComparison.Ordinal),
+                group.Sum(edge => edge.Count),
+                group.GroupBy(edge => (edge.MessageType, edge.OperationKind))
+                    .Select(paths => new RelationshipPath(
+                        ShortMessageType(paths.Key.MessageType),
+                        paths.Key.OperationKind,
+                        paths.Sum(edge => edge.Count)))
+                    .OrderByDescending(path => path.Count)
+                    .ThenBy(path => path.Message, StringComparer.Ordinal)
+                    .ToArray()))
+            .OrderByDescending(relationship => relationship.MessageCount)
+            .ThenBy(relationship => relationship.SourceApplication, StringComparer.Ordinal)
+            .ThenBy(relationship => relationship.TargetApplication, StringComparer.Ordinal)
+            .ToArray();
+
+    private int ObservedApplicationCount => Dashboard.Flow
+        .SelectMany(edge => new[] { edge.SourceApplication, edge.TargetApplication })
+        .Distinct(StringComparer.Ordinal)
+        .Count();
+
     private string ViewClass(FlowView view) => _view == view ? "active" : string.Empty;
 
     private enum FlowView
@@ -70,4 +119,13 @@
         Applications,
         Replicas
     }
+
+    private sealed record ApplicationRelationship(
+        string SourceApplication,
+        string TargetApplication,
+        bool Internal,
+        long MessageCount,
+        IReadOnlyList<RelationshipPath> Paths);
+
+    private sealed record RelationshipPath(string Message, string OperationKind, long Count);
 }

@@ -4,7 +4,9 @@ const colors = ["#55d6a9", "#69a8ff", "#f2bd5c", "#d68cff", "#ff837a", "#66d7e8"
 const flowMaps = new WeakMap();
 const replicaFlowMaps = new WeakMap();
 const workflowRunMaps = new WeakMap();
+const sagaRunMaps = new WeakMap();
 let workflowRunMapSequence = 0;
+let sagaRunMapSequence = 0;
 
 export function renderThroughputChart(element, rawPoints, compact = false) {
     const points = rawPoints.map(point => ({
@@ -671,6 +673,204 @@ class ReplicaFlowMap {
     }
 }
 
+export function initializeSagaRunMap(element) {
+    disposeSagaRunMap(element);
+    sagaRunMaps.set(element, new SagaRunMap(element));
+}
+
+export function updateSagaRunMap(element, graph) {
+    sagaRunMaps.get(element)?.update(graph);
+}
+
+export function zoomSagaRunMap(element, factor) {
+    sagaRunMaps.get(element)?.zoomBy(factor);
+}
+
+export function resetSagaRunMap(element) {
+    sagaRunMaps.get(element)?.fitToContent(true);
+}
+
+export function disposeSagaRunMap(element) {
+    const map = sagaRunMaps.get(element);
+    if (map) {
+        map.dispose();
+        sagaRunMaps.delete(element);
+    }
+}
+
+class SagaRunMap {
+    constructor(element) {
+        this.element = element;
+        this.svg = d3.select(element).select(".saga-run-map-canvas");
+        this.stage = this.svg.append("g").attr("class", "saga-run-map-stage");
+        this.linkGroup = this.stage.append("g");
+        this.labelGroup = this.stage.append("g");
+        this.failureGroup = this.stage.append("g");
+        this.nodeGroup = this.stage.append("g");
+        this.markerId = `saga-run-arrow-${++sagaRunMapSequence}`;
+        this.observedMarkerId = `${this.markerId}-observed`;
+        const definitions = this.svg.append("defs");
+        this.appendMarker(definitions, this.markerId, "saga-run-map-arrow");
+        this.appendMarker(definitions, this.observedMarkerId, "saga-run-map-arrow observed");
+        this.zoom = d3.zoom()
+            .scaleExtent([0.35, 3.5])
+            .on("zoom", event => this.stage.attr("transform", event.transform));
+        this.svg.call(this.zoom);
+        this.structureKey = null;
+    }
+
+    appendMarker(definitions, id, className) {
+        definitions.append("marker")
+            .attr("id", id)
+            .attr("viewBox", "0 -5 10 10")
+            .attr("refX", 9)
+            .attr("refY", 0)
+            .attr("markerWidth", 7)
+            .attr("markerHeight", 7)
+            .attr("markerUnits", "userSpaceOnUse")
+            .attr("orient", "auto")
+            .append("path")
+            .attr("d", "M0,-5L10,0L0,5")
+            .attr("class", className);
+    }
+
+    update(graph) {
+        const nodes = (graph?.nodes || []).map(node => ({ ...node, level: null }));
+        const nodeById = new Map(nodes.map(node => [node.id, node]));
+        const links = (graph?.links || [])
+            .filter(link => nodeById.has(link.source) && nodeById.has(link.target))
+            .map((link, index) => ({ ...link, id: `${link.source}:${link.event}:${link.target}:${index}` }));
+        const outgoing = d3.group(links.filter(link => link.source !== link.target), link => link.source);
+        const initial = nodeById.get("Initial") || nodes[0];
+        if (initial) initial.level = 0;
+        const queue = initial ? [initial] : [];
+        while (queue.length) {
+            const source = queue.shift();
+            for (const link of outgoing.get(source.id) || []) {
+                const target = nodeById.get(link.target);
+                if (target.level !== null) continue;
+                target.level = source.level + 1;
+                queue.push(target);
+            }
+        }
+        let fallbackLevel = d3.max(nodes, node => node.level ?? 0) || 0;
+        nodes.filter(node => node.level === null).forEach(node => node.level = ++fallbackLevel);
+        const finalNode = nodeById.get("Final");
+        if (finalNode) finalNode.level = Math.max(finalNode.level, d3.max(nodes, node => node.level) || 0);
+
+        const occupied = new Map();
+        nodes.sort((left, right) => d3.ascending(left.sequence, right.sequence)).forEach(node => {
+            const offset = occupied.get(node.level) || 0;
+            occupied.set(node.level, offset + 1);
+            node.x = 150 + node.level * 305;
+            node.y = 105 + offset * 132;
+        });
+        links.forEach(link => {
+            link.sourceNode = nodeById.get(link.source);
+            link.targetNode = nodeById.get(link.target);
+        });
+        const failures = (graph?.failedDeliveries || [])
+            .filter(delivery => nodeById.has(delivery.state))
+            .map((delivery, index) => ({ ...delivery, id: `${delivery.state}:${delivery.event}:${index}`, node: nodeById.get(delivery.state) }));
+        const width = Math.max(650, (d3.max(nodes, node => node.level) + 1) * 305);
+        const height = Math.max(310, (d3.max(occupied.values()) || 1) * 132 + 92);
+        const structureKey = JSON.stringify({ nodes: nodes.map(node => node.id), links: links.map(link => link.id), failures: failures.map(failure => failure.id) });
+        const structureChanged = structureKey !== this.structureKey;
+        this.structureKey = structureKey;
+        this.svg.attr("viewBox", `0 0 ${width} ${height}`);
+        this.element.style.minHeight = `${Math.min(500, Math.max(340, height))}px`;
+        this.renderLinks(links);
+        this.renderFailures(failures);
+        this.renderNodes(nodes);
+        if (structureChanged) queueMicrotask(() => this.fitToContent(false));
+    }
+
+    renderLinks(links) {
+        this.linkGroup.selectAll("path")
+            .data(links, link => link.id)
+            .join("path")
+            .attr("class", link => `saga-run-map-link${link.observedCount > 0 ? " observed" : ""}${link.ignored ? " ignored" : ""}`)
+            .attr("marker-end", link => `url(#${link.observedCount > 0 ? this.observedMarkerId : this.markerId})`)
+            .attr("d", link => this.linkPath(link));
+        this.labelGroup.selectAll("text")
+            .data(links, link => link.id)
+            .join("text")
+            .attr("class", link => `saga-run-map-link-label${link.observedCount > 0 ? " observed" : ""}`)
+            .attr("x", link => link.source === link.target ? link.sourceNode.x : (link.sourceNode.x + link.targetNode.x) / 2)
+            .attr("y", link => link.source === link.target ? link.sourceNode.y - 83 : (link.sourceNode.y + link.targetNode.y) / 2 - 10)
+            .text(link => `${trimText(link.event, 24)}${link.observedCount > 0 ? ` · ${link.observedCount} × · ${formatMilliseconds(link.durationMs)}` : ""}`);
+    }
+
+    renderFailures(failures) {
+        const selection = this.failureGroup.selectAll("g")
+            .data(failures, failure => failure.id)
+            .join(enter => {
+                const group = enter.append("g").attr("class", "saga-run-map-failure");
+                group.append("path");
+                group.append("text");
+                return group;
+            });
+        selection.select("path")
+            .attr("d", failure => `M${failure.node.x},${failure.node.y + 42} v48 h72`);
+        selection.select("text")
+            .attr("x", failure => failure.node.x + 78)
+            .attr("y", failure => failure.node.y + 94)
+            .text(failure => `${trimText(failure.event, 22)} failed · ${formatMilliseconds(failure.durationMs)}`);
+    }
+
+    renderNodes(nodes) {
+        const selection = this.nodeGroup.selectAll("g")
+            .data(nodes, node => node.id)
+            .join(enter => {
+                const group = enter.append("g").attr("class", "saga-run-map-state");
+                group.append("rect").attr("x", -100).attr("y", -42).attr("width", 200).attr("height", 84).attr("rx", 42);
+                group.append("text").attr("class", "state-kind").attr("x", -76).attr("y", -17);
+                group.append("text").attr("class", "state-name").attr("y", 5);
+                group.append("text").attr("class", "state-status").attr("y", 25);
+                return group;
+            });
+        selection
+            .attr("class", node => `saga-run-map-state${node.visited ? " observed" : ""}${node.current ? " current" : ""}`)
+            .attr("transform", node => `translate(${node.x},${node.y})`);
+        selection.select(".state-kind").text(node => node.terminal ? "Final state" : node.id === "Initial" ? "Initial state" : "State");
+        selection.select(".state-name").text(node => trimText(node.id, 25));
+        selection.select(".state-status").text(node => node.current ? "Current committed state" : node.visited ? "Visited" : "Not visited");
+    }
+
+    linkPath(link) {
+        if (link.source === link.target)
+            return `M${link.sourceNode.x + 54},${link.sourceNode.y - 35} C${link.sourceNode.x + 125},${link.sourceNode.y - 110} ${link.sourceNode.x - 125},${link.sourceNode.y - 110} ${link.sourceNode.x - 54},${link.sourceNode.y - 35}`;
+        const startX = link.sourceNode.x + 100;
+        const endX = link.targetNode.x - 100;
+        const middleX = (startX + endX) / 2;
+        return `M${startX},${link.sourceNode.y} C${middleX},${link.sourceNode.y} ${middleX},${link.targetNode.y} ${endX},${link.targetNode.y}`;
+    }
+
+    fitToContent(animate) {
+        const stage = this.stage.node();
+        if (!stage) return;
+        const bounds = stage.getBBox();
+        if (bounds.width <= 0 || bounds.height <= 0) return;
+        const width = Math.max(this.element.clientWidth, 320);
+        const height = Math.max(this.element.clientHeight, 320);
+        const scale = Math.min(1.2, width / (bounds.width + 80), height / (bounds.height + 100));
+        const transform = d3.zoomIdentity
+            .translate(width / 2 - (bounds.x + bounds.width / 2) * scale, height / 2 - (bounds.y + bounds.height / 2) * scale)
+            .scale(scale);
+        const selection = animate ? this.svg.transition().duration(180) : this.svg;
+        selection.call(this.zoom.transform, transform);
+    }
+
+    zoomBy(factor) {
+        this.svg.call(this.zoom.scaleBy, Number.isFinite(factor) && factor > 0 ? factor : 1);
+    }
+
+    dispose() {
+        this.svg.on(".zoom", null);
+        this.svg.selectAll("*").remove();
+    }
+}
+
 export function initializeWorkflowRunMap(element) {
     disposeWorkflowRunMap(element);
     workflowRunMaps.set(element, new WorkflowRunMap(element));
@@ -840,7 +1040,7 @@ class WorkflowRunMap {
             .attr("class", "workflow-run-map-link-label")
             .attr("x", link => (link.sourceNode.x + link.targetNode.x) / 2)
             .attr("y", link => (link.sourceNode.y + link.targetNode.y) / 2 - 8)
-            .text(link => `${link.operation} ${trimText(link.message, 14)} · ${formatMilliseconds(link.handoffDurationMs)}`);
+            .text(link => `${link.operation} ${trimText(link.message, 14)} · ${link.metric || formatMilliseconds(link.handoffDurationMs)}`);
     }
 
     renderNodes(nodes) {
@@ -865,11 +1065,12 @@ class WorkflowRunMap {
             if (node.rootFanOutCount > 1) labels.push(`ROOT ×${node.rootFanOutCount}`);
             if (node.branchCount > 1) labels.push(`FORK ×${node.branchCount}`);
             if (node.mergeCount > 1) labels.push(`MERGE ×${node.mergeCount}`);
+            if (node.terminal) labels.push("TERMINAL");
             return labels.join(" · ");
         });
         selection.select(".workflow-run-map-step").text(node => trimText(node.label, 28));
         selection.select(".workflow-run-map-contract").text(node => `Consumes ${trimText(node.contract, 16)}`);
-        selection.select(".workflow-run-map-duration").text(node => formatMilliseconds(node.durationMs));
+        selection.select(".workflow-run-map-duration").text(node => node.metric || formatMilliseconds(node.durationMs));
     }
 
     fitToContent(animate) {
