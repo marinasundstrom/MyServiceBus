@@ -2,7 +2,7 @@
 
 ## Status
 
-Design and acceptance contract for the first C# and Java authoring DSLs. The low-level normalized definition and in-memory execution primitives exist; the APIs illustrated here are the next implementation layer and are not yet supported public signatures.
+Design and acceptance contract for the first C# and Java authoring DSLs. The fundamental APIs illustrated here now lower to the shared normalized definition and in-memory execution runtime in both clients. They remain an experimental foundation until bus registration, dispatch, samples, topology, and monitoring complete the usable MVP.
 
 ## Design Goal
 
@@ -41,7 +41,7 @@ The first DSL must express one order coordinator with:
 - initiating `OrderSubmitted` identity correlation;
 - existing-only `PaymentReceived` and `ProcessingCompleted` correlation;
 - ordered mutation, send, publish, transition, and finalize activities;
-- exact-state behavior plus `DuringAny` ignore;
+- exact-state behavior, with `DuringAny` ignore covered by a supplementary conformance machine;
 - missing-instance discard and fault policies; and
 - delete-on-finalized completion.
 
@@ -109,7 +109,6 @@ public sealed class OrderStateMachine : SagaStateMachine<OrderState>
                     context => new OrderCompleted(context.Message.OrderId))
                 .Finalize());
 
-        DuringAny(Ignore<OrderStatusRequested>());
         DeleteWhenFinalized();
     }
 }
@@ -127,7 +126,7 @@ public final class OrderStateMachine extends SagaStateMachine<OrderState> {
     private final Event<ProcessingCompleted> processingCompleted;
 
     public OrderStateMachine() {
-        super("order-state-machine", "1", "orders");
+        super("order-state-machine", "1", "orders", "urn:message:Contracts:OrderState");
 
         instanceState(OrderState::currentState, OrderState::setCurrentState);
         instanceFactory(OrderState::new);
@@ -181,7 +180,6 @@ public final class OrderStateMachine extends SagaStateMachine<OrderState> {
                                 context -> new OrderCompleted(context.message().orderId()))
                         .finalizeSaga());
 
-        duringAny(ignore(OrderStatusRequested.class));
         deleteWhenFinalized();
     }
 }

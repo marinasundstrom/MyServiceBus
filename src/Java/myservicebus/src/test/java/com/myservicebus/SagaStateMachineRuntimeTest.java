@@ -225,11 +225,11 @@ class SagaStateMachineRuntimeTest {
                         .publish("urn:message:Contracts:OrderCompleted")
                         .finalizeSaga())
                 .initially("OrderSubmitted", behavior -> behavior
-                        .mutate("capture-order")
+                        .mutate("Initial.OrderSubmitted.0")
                         .send("urn:message:Contracts:ReserveInventory", "queue:reserve-inventory")
                         .transitionTo("AwaitingPayment"))
                 .during("AwaitingPayment", "PaymentReceived", behavior -> behavior
-                        .mutate("record-payment")
+                        .mutate("AwaitingPayment.PaymentReceived.0")
                         .transitionTo("Processing"))
                 .build();
     }

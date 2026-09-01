@@ -2,7 +2,7 @@
 
 ## Status
 
-Active implementation proposal. The portable version 1 behavior is defined in the [Saga State-Machine Behavior specification](../specs/saga-state-machine-behavior.md), and matching low-level C# and Java in-memory execution foundations are implemented. They are not yet bus-integrated or supported as a complete saga feature.
+Active implementation proposal. The portable version 1 behavior is defined in the [Saga State-Machine Behavior specification](../specs/saga-state-machine-behavior.md), and matching low-level runtimes plus native C# and Java DSL foundations lower to the same canonical definition and execution sequence. They are not yet bus-integrated or supported as a complete saga feature.
 
 ## Summary
 
@@ -231,7 +231,7 @@ Broker tests should prove that C# and Java services exchange every saga input an
 1. Study the MassTransit 8.5.1 saga implementation and tests and write the portable behavior specification. **Completed for the version 1 subset.**
 2. Define canonical state-machine and failure-sequence fixtures.
 3. Define the normalized declaration, repository capabilities, topology, and monitoring contracts.
-4. Implement the smallest in-memory C# and Java runtimes with their native library DSLs. **The low-level runtime is implemented; native DSLs are next.**
+4. Implement the smallest in-memory C# and Java runtimes with their native library DSLs. **Completed for the fundamental non-bus-integrated profile.**
 5. Complete the usable MVP vertical slice with bus registration and dispatch, ordinary retry/fault behavior, a focused sample, and one Aspire order-orchestration sample.
 6. Project declarations and instance transitions into topology, monitoring, and an initial Dashboard orchestration view.
 7. Integrate transactional outbox and durable scheduling.

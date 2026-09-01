@@ -62,7 +62,7 @@
       "activities": [
         {
           "kind": "mutate",
-          "activityId": "record-payment"
+          "activityId": "AwaitingPayment.PaymentReceived.0"
         },
         {
           "kind": "transition",
@@ -76,7 +76,7 @@
       "activities": [
         {
           "kind": "mutate",
-          "activityId": "capture-order"
+          "activityId": "Initial.OrderSubmitted.0"
         },
         {
           "kind": "send",

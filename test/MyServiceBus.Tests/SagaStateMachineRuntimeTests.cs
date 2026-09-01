@@ -209,11 +209,11 @@ public class SagaStateMachineRuntimeTests
             .Publish("urn:message:Contracts:OrderCompleted")
             .Finalize())
         .Initially("OrderSubmitted", behavior => behavior
-            .Mutate("capture-order")
+            .Mutate("Initial.OrderSubmitted.0")
             .Send("urn:message:Contracts:ReserveInventory", "queue:reserve-inventory")
             .TransitionTo("AwaitingPayment"))
         .During("AwaitingPayment", "PaymentReceived", behavior => behavior
-            .Mutate("record-payment")
+            .Mutate("AwaitingPayment.PaymentReceived.0")
             .TransitionTo("Processing"))
         .Build();
 
