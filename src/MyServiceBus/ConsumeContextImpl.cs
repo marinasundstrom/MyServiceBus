@@ -98,11 +98,11 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
             await _sendPipe.Send(context);
             var typed = message is T t ? t : (T)MessageProxy.Create(typeof(T), message);
             await transport.Send(typed, context, effectiveCancellationToken);
-            Dispatch("published", true, typeof(T), context, startedAt);
+            Dispatch("published", true, typeof(T), typed, context, startedAt);
         }
         catch (Exception exception)
         {
-            Dispatch("publish_faulted", false, typeof(T), context, startedAt, exception);
+            Dispatch("publish_faulted", false, typeof(T), message, context, startedAt, exception);
             throw;
         }
     }
@@ -136,11 +136,11 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
             await _sendPipe.Send(context);
             var typed = message is T t ? t : (T)MessageProxy.Create(typeof(T), message);
             await transport.Send(typed, context, cancellationToken);
-            Dispatch("sent", true, typeof(T), context, startedAt);
+            Dispatch("sent", true, typeof(T), typed, context, startedAt);
         }
         catch (Exception exception)
         {
-            Dispatch("send_faulted", false, typeof(T), context, startedAt, exception);
+            Dispatch("send_faulted", false, typeof(T), message, context, startedAt, exception);
             throw;
         }
     }
@@ -176,11 +176,11 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
         {
             await _sendPipe.Send(context);
             await transport.Send(fault, context, cancellationToken);
-            Dispatch("fault_published", true, typeof(Fault<TMessage>), context, startedAt);
+            Dispatch("fault_published", true, typeof(Fault<TMessage>), fault, context, startedAt);
         }
         catch (Exception publishException)
         {
-            Dispatch("fault_publish_faulted", false, typeof(Fault<TMessage>), context, startedAt, publishException);
+            Dispatch("fault_publish_faulted", false, typeof(Fault<TMessage>), fault, context, startedAt, publishException);
             throw;
         }
     }
@@ -230,6 +230,7 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
         string kind,
         bool succeeded,
         Type messageType,
+        object message,
         SendContext context,
         long startedAt,
         Exception? exception = null)
@@ -249,7 +250,11 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
             context.CorrelationId,
             context.ConversationId?.ToString(),
             messageId: context.MessageId,
-            causationMessageId: context.CausationMessageId?.ToString()));
+            causationMessageId: context.CausationMessageId?.ToString(),
+            requestId: context.RequestId?.ToString(),
+            responseAddress: context.ResponseAddress?.ToString(),
+            messageIntent: context.Intent.ToString(),
+            message: message));
     }
 
 }

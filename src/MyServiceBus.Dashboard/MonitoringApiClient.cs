@@ -51,6 +51,28 @@ public sealed class MonitoringApiClient
             cancellationToken).ConfigureAwait(false)
             ?? [];
 
+    public async Task<IReadOnlyList<MonitoringRequestResponseExchange>> GetRequestResponseExchanges(
+        CancellationToken cancellationToken)
+        => await httpClient.GetFromJsonAsync<MonitoringRequestResponseExchange[]>(
+            "/api/monitoring/v1/request-response?windowSeconds=300",
+            cancellationToken).ConfigureAwait(false)
+            ?? [];
+
+    public async Task<MonitoringRequestResponseExchangeDetail?> GetRequestResponseExchange(
+        string requestId,
+        bool includeMessageBodies,
+        CancellationToken cancellationToken)
+    {
+        using var response = await httpClient.GetAsync(
+            $"/api/monitoring/v1/request-response/{Uri.EscapeDataString(requestId)}?includeMessageBodies={includeMessageBodies.ToString().ToLowerInvariant()}",
+            cancellationToken).ConfigureAwait(false);
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            return null;
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<MonitoringRequestResponseExchangeDetail>(cancellationToken)
+            .ConfigureAwait(false);
+    }
+
     public async Task<IReadOnlyList<MonitoringReplicaFlowEdge>> GetReplicaFlow(CancellationToken cancellationToken)
         => await httpClient.GetFromJsonAsync<MonitoringReplicaFlowEdge[]>(
             "/api/monitoring/v1/flow/replicas?windowSeconds=300",
@@ -173,6 +195,20 @@ public sealed class MonitoringApiClient
     public async Task<IReadOnlyList<MonitoringObservationRecord>> GetRecentObservations(CancellationToken cancellationToken)
         => await httpClient.GetFromJsonAsync<MonitoringObservationRecord[]>(
             "/api/monitoring/v1/observations?limit=100",
+            cancellationToken).ConfigureAwait(false)
+            ?? [];
+
+    public async Task<IReadOnlyList<MonitoringMessageSummary>> GetMessages(CancellationToken cancellationToken)
+        => await httpClient.GetFromJsonAsync<MonitoringMessageSummary[]>(
+            "/api/monitoring/v1/messages?limit=100",
+            cancellationToken).ConfigureAwait(false)
+            ?? [];
+
+    public async Task<IReadOnlyList<MonitoringObservationRecord>> GetMessageObservations(
+        string messageId,
+        CancellationToken cancellationToken)
+        => await httpClient.GetFromJsonAsync<MonitoringObservationRecord[]>(
+            $"/api/monitoring/v1/messages/{Uri.EscapeDataString(messageId)}/observations",
             cancellationToken).ConfigureAwait(false)
             ?? [];
 

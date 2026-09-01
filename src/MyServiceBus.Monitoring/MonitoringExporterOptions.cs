@@ -1,5 +1,12 @@
 namespace MyServiceBus.Monitoring;
 
+public enum MonitoringCaptureProfile
+{
+    Auto,
+    Development,
+    Production
+}
+
 public sealed class MonitoringExporterOptions
 {
     public required Uri ServiceAddress { get; set; }
@@ -16,4 +23,35 @@ public sealed class MonitoringExporterOptions
     public int MaxJobItems { get; set; } = 1_000;
     public int MaxJobAttempts { get; set; } = 10;
     public TimeSpan ScheduledWorkHistory { get; set; } = TimeSpan.FromHours(24);
+    public MonitoringCaptureProfile CaptureProfile { get; set; } = MonitoringCaptureProfile.Auto;
+    public bool? CaptureMessageIdentity { get; set; }
+    public bool? CaptureCorrelationIdentity { get; set; }
+    public bool? CaptureRequestResponseMetadata { get; set; }
+    public bool? CaptureAddresses { get; set; }
+    public bool? CaptureExceptionMessages { get; set; }
+    public bool CaptureMessageBodies { get; set; }
+    public int MaxMessageBodyBytes { get; set; } = 16 * 1024;
+    public Func<string, bool>? MessageBodyTypeFilter { get; set; }
+    public Func<string, string, string>? MessageBodyRedactor { get; set; }
+
+    internal bool CaptureSensitiveData(bool? value)
+    {
+        if (value.HasValue)
+            return value.Value;
+
+        return CaptureProfile switch
+        {
+            MonitoringCaptureProfile.Development => true,
+            MonitoringCaptureProfile.Production => false,
+            _ => IsDevelopmentEnvironment()
+        };
+    }
+
+    private static bool IsDevelopmentEnvironment()
+    {
+        var environment = Environment.GetEnvironmentVariable("MYSERVICEBUS_ENVIRONMENT")
+            ?? Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT")
+            ?? Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT");
+        return string.Equals(environment, "Development", StringComparison.OrdinalIgnoreCase);
+    }
 }

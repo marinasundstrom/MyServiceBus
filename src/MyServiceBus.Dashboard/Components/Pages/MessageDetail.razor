@@ -1,0 +1,145 @@
+@page "/messages/{MessageId}"
+@rendermode InteractiveServer
+@inherits MonitoringPageBase
+@inject MonitoringApiClient Api
+@inject Microsoft.Extensions.Options.IOptions<DashboardOptions> Options
+
+<PageTitle>Message · MyServiceBus Monitoring</PageTitle>
+<DashboardPageHeader Eyebrow="Development diagnostics" Title="Message detail" Description="Follow one exact message through observed operations, caused messages, request-response activity, and saga evidence." />
+
+@if (!Options.Value.Features.Messages)
+{
+    <section class="empty-state"><h2>Message inspection is not enabled</h2><p>This development-oriented feature is hidden unless <code>Dashboard:Features:Messages</code> is enabled.</p></section>
+}
+else if (loading)
+{
+    <section class="empty-state"><h2>Loading message</h2></section>
+}
+else if (Observations.Count == 0)
+{
+    <section class="empty-state"><h2>Message not available</h2><p>The identity is outside the retention window or was not exported.</p><a class="section-link" href="/messages">← Back to messages</a></section>
+}
+else
+{
+    <div class="workflow-run-breadcrumb"><a href="/messages">Messages</a><span>→</span><span class="mono">@MessageId</span></div>
+
+    <section class="panel message-detail">
+        <div class="message-detail-heading">
+            <div><p class="eyebrow">@ShortMessageType(Primary?.Observation.MessageType)</p><h2 class="mono">@MessageId</h2><p>@OutcomeDescription</p></div>
+            <dl>
+                <div><dt>First observed</dt><dd>@Observations.Min(record => record.Observation.OccurredAtUtc).ToLocalTime().ToString("MMM d, HH:mm:ss.fff")</dd></div>
+                <div><dt>Last observed</dt><dd>@Observations.Max(record => record.Observation.OccurredAtUtc).ToLocalTime().ToString("MMM d, HH:mm:ss.fff")</dd></div>
+                <div><dt>Applications</dt><dd>@string.Join(", ", Observations.Select(record => record.ApplicationName).Distinct(StringComparer.Ordinal))</dd></div>
+                <div><dt>Evidence</dt><dd>@Observations.Count observations</dd></div>
+            </dl>
+        </div>
+
+        <div class="detail-grid message-detail-grid">
+            <section class="message-body-panel">
+                <div class="workflow-run-section-heading"><div><p class="eyebrow">Disclosure-safe content</p><h3>Message body</h3></div><p>@BodyDescription</p></div>
+                @if (BodyObservation?.Observation.MessageBody is { } body)
+                {
+                    <pre class="message-body"><code>@body</code></pre>
+                }
+                else
+                {
+                    <p class="panel-empty">@BodyDescription</p>
+                }
+            </section>
+            <section class="message-identity-panel">
+                <div class="workflow-run-section-heading"><div><p class="eyebrow">Cross-concept identity</p><h3>Relationships</h3></div></div>
+                <dl class="message-identities">
+                    <div><dt>Correlation</dt><dd class="mono">@ValueOrDash(Primary?.Observation.CorrelationId)</dd></div>
+                    <div><dt>Conversation</dt><dd class="mono">@ValueOrDash(Primary?.Observation.ConversationId)</dd></div>
+                    <div><dt>Request</dt><dd class="mono">@ValueOrDash(Primary?.Observation.RequestId)</dd></div>
+                    <div><dt>Caused by</dt><dd>@IdentityLink(Primary?.Observation.CausationMessageId)</dd></div>
+                    <div><dt>Trace</dt><dd class="mono">@ValueOrDash(Primary?.Observation.TraceId)</dd></div>
+                    <div><dt>URN</dt><dd class="mono">@ValueOrDash(Primary?.Observation.MessageUrn)</dd></div>
+                </dl>
+            </section>
+        </div>
+
+        <div class="workflow-run-section-heading"><div><p class="eyebrow">Ordered evidence</p><h3>Message timeline</h3></div><p>Includes exact operations caused by this message and observations sharing its request identity.</p></div>
+        <div class="message-timeline">
+            @foreach (var record in Observations)
+            {
+                <article class="message-timeline-item @(record.Observation.Succeeded == false ? "faulted" : null)">
+                    <time>@record.Observation.OccurredAtUtc.ToLocalTime().ToString("HH:mm:ss.fff")</time>
+                    <div><strong>@DisplayKind(record.Observation.Kind)</strong><small>@record.ApplicationName · @record.InstanceId</small></div>
+                    <div><strong>@ShortMessageType(record.Observation.MessageType)</strong><small>@ValueOrDash(record.Observation.EndpointName)</small></div>
+                    <div><strong>@FormatDuration(record.Observation.DurationMs)</strong><small>@TimelineRelationship(record.Observation)</small></div>
+                    @if (!string.IsNullOrWhiteSpace(record.Observation.MessageId) && record.Observation.MessageId != MessageId)
+                    {
+                        <a href="@($"/messages/{Uri.EscapeDataString(record.Observation.MessageId)}")">Open message →</a>
+                    }
+                </article>
+            }
+        </div>
+    </section>
+}
+
+@code {
+    [Parameter] public string MessageId { get; set; } = string.Empty;
+
+    private IReadOnlyList<MonitoringObservationRecord> Observations { get; set; } = [];
+    private bool loading = true;
+    private string? loadedMessageId;
+    private MonitoringObservationRecord? Primary => Observations.FirstOrDefault(record => record.Observation.MessageId == MessageId)
+        ?? Observations.FirstOrDefault();
+    private MonitoringObservationRecord? BodyObservation => Observations.FirstOrDefault(record =>
+        record.Observation.MessageId == MessageId && (record.Observation.MessageBody is not null || record.Observation.MessageBodyStatus is not null));
+    private string OutcomeDescription => Observations.Any(record => record.Observation.Succeeded == false)
+        ? "A failure is present in the retained evidence."
+        : Observations.Any(record => record.Observation.Kind == "consumed")
+            ? "The monitoring service observed this message being consumed."
+            : "The monitoring service has partial operation evidence for this message.";
+    private string BodyDescription => BodyObservation?.Observation.MessageBodyStatus switch
+    {
+        "captured" => "The collector disclosed the complete exporter-captured JSON body.",
+        "truncated" => $"The exporter truncated the redacted JSON body from {BodyObservation.Observation.MessageBodyOriginalBytes:N0} UTF-8 bytes.",
+        "redacted" => "The collector replaced the retained body under its disclosure policy.",
+        "withheld" => "The collector retained body evidence but withheld its content under the current disclosure policy.",
+        "serialization_failed" => "The exporter could not serialize the message for monitoring; message processing was unaffected.",
+        _ => "No body was exported for this message."
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        await base.OnInitializedAsync();
+        if (Options.Value.Features.Messages)
+            await LoadAsync();
+        else
+            loading = false;
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (Options.Value.Features.Messages && loadedMessageId is not null && loadedMessageId != MessageId)
+            await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        loading = true;
+        try
+        {
+            Observations = await Api.GetMessageObservations(Uri.UnescapeDataString(MessageId), CancellationToken.None);
+            loadedMessageId = MessageId;
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private MarkupString IdentityLink(string? identity)
+        => string.IsNullOrWhiteSpace(identity)
+            ? new MarkupString("—")
+            : new MarkupString($"<a class=\"mono\" href=\"/messages/{Uri.EscapeDataString(identity)}\">{System.Net.WebUtility.HtmlEncode(identity)}</a>");
+
+    private string TimelineRelationship(MonitoringObservation observation)
+        => observation.MessageId == MessageId ? "This message"
+            : observation.CausationMessageId == MessageId ? "Caused operation"
+            : observation.RequestId == Primary?.Observation.RequestId ? "Same request"
+            : "Related evidence";
+}

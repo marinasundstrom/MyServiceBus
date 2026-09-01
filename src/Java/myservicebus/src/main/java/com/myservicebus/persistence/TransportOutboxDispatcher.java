@@ -98,7 +98,11 @@ public final class TransportOutboxDispatcher implements OutboxTransportDispatche
                 null,
                 null,
                 message.messageId().toString(),
-                message.causationMessageId() == null ? null : message.causationMessageId().toString());
+                message.causationMessageId() == null ? null : message.causationMessageId().toString(),
+                message.requestId() == null ? null : message.requestId().toString(),
+                message.responseAddress() == null ? null : message.responseAddress().toString(),
+                message.intent().name(),
+                null);
         for (BusHook hook : hooks) {
             try {
                 hook.handle(event);

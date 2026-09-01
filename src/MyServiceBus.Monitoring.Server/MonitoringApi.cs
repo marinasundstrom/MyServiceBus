@@ -218,9 +218,28 @@ public static class MonitoringApi
             .WithSummary("Get one retained workflow run by stable identity")
             .Produces<MonitoringChoreographyRun>()
             .Produces(StatusCodes.Status404NotFound);
-        query.MapGet("/observations", (string? application, int? limit, MonitoringRepository repository) =>
-            repository.GetRecentObservations(application, limit ?? 100))
-            .WithSummary("List recent bounded monitoring observations");
+        query.MapGet("/observations", (
+            string? application,
+            int? limit,
+            MonitoringRepository repository,
+            MonitoringDisclosurePolicy disclosure) =>
+            disclosure.Apply(repository.GetRecentObservations(application, limit ?? 100)))
+            .WithSummary("List recent bounded monitoring observations under the configured disclosure policy");
+        query.MapGet("/messages/{messageId}/observations", (
+            string messageId,
+            MonitoringRepository repository,
+            MonitoringDisclosurePolicy disclosure) =>
+            disclosure.Apply(repository.GetMessageObservations(messageId)))
+            .WithSummary("Get the exact message, caused operations, and request-response observations under the configured disclosure policy");
+        query.MapGet("/messages", (
+            string? application,
+            string? status,
+            string? search,
+            int? limit,
+            MonitoringRepository repository,
+            MonitoringDisclosurePolicy disclosure) =>
+            repository.GetMessages(application, status, search, limit ?? 100).Select(disclosure.Apply).ToArray())
+            .WithSummary("Query monitoring-owned message summaries merged across producer and consumer observations");
         query.MapGet("/metrics", (string? application, int? windowSeconds, bool? byInstance, MonitoringRepository repository) =>
             repository.GetRates(application, windowSeconds ?? 60, byInstance ?? false, DateTimeOffset.UtcNow))
             .WithSummary("Query rates, counts, latency, retries, and failures for a time window");
@@ -230,6 +249,23 @@ public static class MonitoringApi
         query.MapGet("/flow", (string? application, int? windowSeconds, MonitoringRepository repository) =>
             repository.GetFlow(application, windowSeconds ?? 300, DateTimeOffset.UtcNow))
             .WithSummary("Query observed application message-flow paths");
+        query.MapGet("/request-response", (string? application, int? windowSeconds, MonitoringRepository repository) =>
+            repository.GetRequestResponseExchanges(application, windowSeconds ?? 300, DateTimeOffset.UtcNow))
+            .WithSummary("Query request/response exchanges reconstructed from explicit request metadata");
+        query.MapGet("/request-response/{requestId}", (
+            string requestId,
+            bool? includeMessageBodies,
+            MonitoringRepository repository,
+            MonitoringDisclosurePolicy disclosure) =>
+        {
+            var exchange = repository.GetRequestResponseExchange(requestId);
+            return exchange is null
+                ? Results.NotFound()
+                : Results.Ok(disclosure.Apply(exchange, includeMessageBodies == true));
+        })
+            .WithSummary("Get one request/response exchange with disclosure-safe constituent message evidence")
+            .Produces<MonitoringRequestResponseExchangeDetail>()
+            .Produces(StatusCodes.Status404NotFound);
         query.MapGet("/flow/replicas", (string? application, int? windowSeconds, MonitoringRepository repository) =>
             repository.GetReplicaFlow(application, windowSeconds ?? 300, DateTimeOffset.UtcNow))
             .WithSummary("Query observed message-flow paths between application replicas");

@@ -1,10 +1,15 @@
 package com.myservicebus;
 
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.Duration;
+import java.net.URI;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -62,6 +67,42 @@ class GenericRequestClientPolicyTest {
 
         assertTrue(alreadyCancelled.isCancelled());
         assertTrue(!secondTransport.sent.get());
+    }
+
+    @Test
+    void reportsRequestAndResponseObservationsWithExplicitRequestIdentity() {
+        List<BusHookEvent> events = new ArrayList<>();
+        BusHookDispatcher hooks = new BusHookDispatcher(Set.of(events::add), null);
+        RequestClientTransport transport = new RequestClientTransport() {
+            @Override
+            public <TRequest, TResponse> CompletableFuture<TResponse> sendRequest(
+                    Class<TRequest> requestType, SendContext context, Class<TResponse> responseType) {
+                context.setResponseAddress(URI.create("loopback://responses"));
+                @SuppressWarnings("unchecked")
+                TResponse response = (TResponse) "ok";
+                return CompletableFuture.completedFuture(response);
+            }
+
+            @Override
+            public <TRequest, T1, T2> CompletableFuture<Response2<T1, T2>> sendRequest(
+                    Class<TRequest> requestType, SendContext context, Class<T1> responseType1, Class<T2> responseType2) {
+                throw new UnsupportedOperationException();
+            }
+        };
+        RequestClient<Request> client = new GenericRequestClient<>(
+                Request.class, transport, URI.create("loopback://requests"), RequestTimeout.DEFAULT, hooks);
+
+        client.getResponse(new Request(), String.class).join();
+
+        List<MessageOperationHookEvent> operations = events.stream()
+                .map(MessageOperationHookEvent.class::cast)
+                .toList();
+        assertEquals(List.of("sent", "consumed"), operations.stream().map(MessageOperationHookEvent::kind).toList());
+        assertEquals(operations.get(0).requestId(), operations.get(1).requestId());
+        assertEquals("loopback://responses", operations.get(0).responseAddress());
+        assertEquals(String.class.getName(), operations.get(1).messageType());
+        assertEquals(Request.class, operations.get(0).message().getClass());
+        assertEquals("ok", operations.get(1).message());
     }
 
     private static final class PendingTransport implements RequestClientTransport {

@@ -15,7 +15,15 @@ builder.Services.AddOptions<MonitoringStorageOptions>()
         || string.Equals(options.Provider, "PostgreSql", StringComparison.OrdinalIgnoreCase),
         "Monitoring storage provider must be InMemory or PostgreSql.")
     .ValidateOnStart();
+builder.Services.AddOptions<MonitoringDisclosureOptions>()
+    .BindConfiguration(MonitoringDisclosureOptions.SectionName)
+    .Validate(options => Enum.IsDefined(options.MessageBodies), "Monitoring message-body disclosure mode is invalid.")
+    .Validate(options => !string.IsNullOrWhiteSpace(options.MessageBodyRedactionText)
+        && options.MessageBodyRedactionText.Length <= 256,
+        "Monitoring message-body redaction text must contain between 1 and 256 characters.")
+    .ValidateOnStart();
 builder.Services.AddSingleton<MonitoringRepository>();
+builder.Services.AddSingleton<MonitoringDisclosurePolicy>();
 builder.Services.AddSingleton<MonitoringChangeFeed>();
 builder.Services.AddSingleton<MonitoringIngestService>();
 

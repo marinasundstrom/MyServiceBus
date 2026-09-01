@@ -1,0 +1,95 @@
+@page "/messages"
+@rendermode InteractiveServer
+@inherits MonitoringPageBase
+@inject Microsoft.Extensions.Options.IOptions<DashboardOptions> Options
+
+<PageTitle>Messages · MyServiceBus Monitoring</PageTitle>
+<DashboardPageHeader Eyebrow="Development diagnostics" Title="Messages" Description="Inspect individual messages and exact lifecycle evidence. Identities and bodies appear only when the exporting service and collector disclosure policy permit them." />
+
+@if (!Options.Value.Features.Messages)
+{
+    <section class="empty-state"><h2>Message inspection is not enabled</h2><p>This development-oriented feature is hidden unless <code>Dashboard:Features:Messages</code> is enabled.</p></section>
+}
+else
+{
+<section class="panel message-index">
+    <div class="section-heading">
+        <div><p class="eyebrow">Retained observations</p><h2>Individual messages</h2></div>
+        <span>@FilteredMessages.Count of @MessageSummaries.Count messages</span>
+    </div>
+    <div class="message-filters">
+        <label><span>Search</span><input type="search" placeholder="Message type, ID, or application" @bind="search" @bind:event="oninput" /></label>
+        <label><span>Status</span><select @bind="status"><option value="">All statuses</option><option value="failed">Failed</option><option value="handled">Handled</option><option value="observed">Observed</option></select></label>
+    </div>
+
+    @if (MessageSummaries.Count == 0)
+    {
+        <p class="panel-empty">No retained observations contain a message identity. Enable message-identity capture in the exporting application to inspect individual messages.</p>
+    }
+    else if (FilteredMessages.Count == 0)
+    {
+        <p class="panel-empty">No messages match the current filters.</p>
+    }
+    else
+    {
+        <div class="message-list">
+            @foreach (var message in FilteredMessages)
+            {
+                <a class="message-list-item @message.Status" href="@($"/messages/{Uri.EscapeDataString(message.MessageId)}")">
+                    <span class="run-status @(message.Status == "failed" ? "faulted" : message.Status == "handled" ? "terminal_observed" : null)"></span>
+                    <div><strong>@ShortMessageType(message.MessageType)</strong><small class="mono">@message.MessageId</small></div>
+                    <div><strong>@ParticipantLabel(message)</strong><small>@message.ObservationCount observations · @FlowLabel(message)</small></div>
+                    <div><strong>@BodyLabel(message.MessageBodyStatus)</strong><small>@StatusLabel(message.Status)</small></div>
+                    <time>@message.LastObservedAtUtc.ToLocalTime().ToString("MMM d, HH:mm:ss")</time>
+                    <span aria-hidden="true">→</span>
+                </a>
+            }
+        </div>
+    }
+</section>
+}
+
+@code {
+    private string search = string.Empty;
+    private string status = string.Empty;
+
+    private IReadOnlyList<MonitoringMessageSummary> MessageSummaries => Dashboard.Messages;
+
+    private IReadOnlyList<MonitoringMessageSummary> FilteredMessages
+        => MessageSummaries.Where(message =>
+                (string.IsNullOrWhiteSpace(status) || message.Status == status)
+                && (string.IsNullOrWhiteSpace(search)
+                    || message.MessageId.Contains(search, StringComparison.OrdinalIgnoreCase)
+                    || (message.MessageType?.Contains(search, StringComparison.OrdinalIgnoreCase) ?? false)
+                    || message.ParticipantApplications.Any(application => application.Contains(search, StringComparison.OrdinalIgnoreCase))))
+            .ToArray();
+
+    private static string StatusLabel(string value) => value switch
+    {
+        "failed" => "Failure observed",
+        "handled" => "Consumption observed",
+        _ => "Operation observed"
+    };
+
+    private static string BodyLabel(string? value) => value switch
+    {
+        "captured" => "Body available",
+        "truncated" => "Truncated body",
+        "redacted" => "Body redacted",
+        "withheld" => "Body withheld",
+        "serialization_failed" => "Capture failed",
+        _ => "No body captured"
+    };
+
+    private static string ParticipantLabel(MonitoringMessageSummary message)
+        => message.ParticipantApplications.Count == 0
+            ? "Unknown participant"
+            : string.Join(", ", message.ParticipantApplications);
+
+    private static string FlowLabel(MonitoringMessageSummary message)
+        => message.ProducerApplications.Count > 0 && message.ConsumerApplications.Count > 0
+            ? $"{string.Join(", ", message.ProducerApplications)} → {string.Join(", ", message.ConsumerApplications)}"
+            : message.ProducerApplications.Count > 0 ? "Producer observed"
+            : message.ConsumerApplications.Count > 0 ? "Consumer observed"
+            : "Partial evidence";
+}

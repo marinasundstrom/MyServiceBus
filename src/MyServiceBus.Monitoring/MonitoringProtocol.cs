@@ -42,7 +42,14 @@ public sealed record MonitoringObservation(
     int? RetryLimit = null,
     IReadOnlyDictionary<string, string>? Properties = null,
     string? MessageId = null,
-    string? CausationMessageId = null);
+    string? CausationMessageId = null,
+    string? RequestId = null,
+    string? ResponseAddress = null,
+    string? MessageIntent = null,
+    string? MessageBody = null,
+    string? MessageBodyContentType = null,
+    string? MessageBodyStatus = null,
+    int? MessageBodyOriginalBytes = null);
 
 public sealed record MonitoringOutboxDispatcherSummary(
     string ApplicationName,
@@ -568,6 +575,23 @@ public sealed record MonitoringObservationRecord(
     string BusId,
     MonitoringObservation Observation);
 
+public sealed record MonitoringMessageSummary(
+    string MessageId,
+    string? MessageType,
+    string? MessageUrn,
+    string Status,
+    IReadOnlyList<string> ProducerApplications,
+    IReadOnlyList<string> ConsumerApplications,
+    IReadOnlyList<string> ParticipantApplications,
+    int ObservationCount,
+    DateTimeOffset FirstObservedAtUtc,
+    DateTimeOffset LastObservedAtUtc,
+    string? CorrelationId,
+    string? ConversationId,
+    string? RequestId,
+    string? CausationMessageId,
+    string? MessageBodyStatus);
+
 public sealed record MonitoringFlowEdge(
     string SourceApplication,
     string TargetApplication,
@@ -579,6 +603,33 @@ public sealed record MonitoringFlowEdge(
     DateTimeOffset FirstSeenAtUtc,
     DateTimeOffset LastSeenAtUtc,
     string MatchConfidence);
+
+public sealed record MonitoringRequestResponseExchange(
+    string RequestId,
+    string Status,
+    string RequesterApplication,
+    string RequesterInstanceId,
+    string? ResponderApplication,
+    string? ResponderInstanceId,
+    string? RequestMessageType,
+    string? RequestMessageUrn,
+    string? RequestMessageId,
+    string? ResponseMessageType,
+    string? ResponseMessageUrn,
+    string? ResponseMessageId,
+    string? ResponseAddress,
+    DateTimeOffset StartedAtUtc,
+    DateTimeOffset LastActivityAtUtc,
+    DateTimeOffset? RequestConsumedAtUtc,
+    DateTimeOffset? ResponseSentAtUtc,
+    DateTimeOffset? ResponseConsumedAtUtc,
+    double DurationMs,
+    bool HasFailures,
+    string EvidenceStatus);
+
+public sealed record MonitoringRequestResponseExchangeDetail(
+    MonitoringRequestResponseExchange Exchange,
+    IReadOnlyList<MonitoringObservationRecord> Observations);
 
 public sealed record MonitoringReplicaFlowEdge(
     string SourceApplication,

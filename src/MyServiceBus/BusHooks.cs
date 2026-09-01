@@ -40,7 +40,11 @@ public sealed record MessageOperationHookEvent(
     int? RetryAttempt,
     int? RetryLimit,
     string? MessageId,
-    string? CausationMessageId = null) : BusHookEvent(OccurredAtUtc)
+    string? CausationMessageId = null,
+    string? RequestId = null,
+    string? ResponseAddress = null,
+    string? MessageIntent = null,
+    object? Message = null) : BusHookEvent(OccurredAtUtc)
 {
     public static MessageOperationHookEvent Create(
         string kind,
@@ -56,7 +60,11 @@ public sealed record MessageOperationHookEvent(
         int? retryAttempt = null,
         int? retryLimit = null,
         string? messageId = null,
-        string? causationMessageId = null)
+        string? causationMessageId = null,
+        string? requestId = null,
+        string? responseAddress = null,
+        string? messageIntent = null,
+        object? message = null)
     {
         var activity = Activity.Current;
         return new MessageOperationHookEvent(
@@ -77,7 +85,11 @@ public sealed record MessageOperationHookEvent(
             retryAttempt,
             retryLimit,
             messageId,
-            causationMessageId);
+            causationMessageId,
+            requestId,
+            responseAddress,
+            messageIntent,
+            message);
     }
 }
 
@@ -151,7 +163,9 @@ internal sealed class BusHookRetryObserver : IRetryObserver
             context.ConversationId?.ToString(),
             retryEvent.Attempt,
             retryEvent.RetryLimit,
-            context.MessageId?.ToString()));
+            context.MessageId?.ToString(),
+            requestId: context.RequestId?.ToString(),
+            message: message));
     }
 }
 
@@ -229,7 +243,9 @@ internal sealed class BusHookConsumeFilter<TMessage> : IFilter<ConsumeContext<TM
                 exception,
                 context.CorrelationId?.ToString(),
                 context.ConversationId?.ToString(),
-                messageId: context.MessageId?.ToString()));
+                messageId: context.MessageId?.ToString(),
+                requestId: context.RequestId?.ToString(),
+                message: context.Message));
         }
     }
 }

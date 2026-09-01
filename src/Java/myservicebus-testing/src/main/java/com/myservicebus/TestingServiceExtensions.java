@@ -16,7 +16,10 @@ public class TestingServiceExtensions {
         services.addSingleton(RequestClientTransport.class,
                 sp -> () -> (RequestClientTransport) sp.getService(InMemoryTestHarness.class));
         services.addScoped(ScopedClientFactory.class,
-                sp -> () -> new RequestClientFactory(sp.getService(RequestClientTransport.class)));
+                sp -> () -> new RequestClientFactory(
+                        sp.getService(RequestClientTransport.class),
+                        sp.getServices(BusHook.class),
+                        sp.getService(com.myservicebus.logging.LoggerFactory.class)));
 
         return services;
     }

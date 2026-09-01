@@ -4,6 +4,8 @@ import java.net.URI;
 import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.function.BiFunction;
+import java.util.function.Predicate;
 
 public final class MonitoringExporterOptions {
     private URI serviceAddress = URI.create("http://localhost:5310");
@@ -20,6 +22,16 @@ public final class MonitoringExporterOptions {
     private int maxJobItems = 1_000;
     private int maxJobAttempts = 10;
     private Duration scheduledWorkHistory = Duration.ofHours(24);
+    private MonitoringCaptureProfile captureProfile = MonitoringCaptureProfile.AUTO;
+    private Boolean captureMessageIdentity;
+    private Boolean captureCorrelationIdentity;
+    private Boolean captureRequestResponseMetadata;
+    private Boolean captureAddresses;
+    private Boolean captureExceptionMessages;
+    private boolean captureMessageBodies;
+    private int maxMessageBodyBytes = 16 * 1024;
+    private Predicate<String> messageBodyTypeFilter;
+    private BiFunction<String, String, String> messageBodyRedactor;
 
     public URI getServiceAddress() {
         return serviceAddress;
@@ -134,5 +146,101 @@ public final class MonitoringExporterOptions {
 
     public void setScheduledWorkHistory(Duration scheduledWorkHistory) {
         this.scheduledWorkHistory = scheduledWorkHistory;
+    }
+
+    public MonitoringCaptureProfile getCaptureProfile() {
+        return captureProfile;
+    }
+
+    public void setCaptureProfile(MonitoringCaptureProfile captureProfile) {
+        this.captureProfile = captureProfile;
+    }
+
+    public Boolean getCaptureMessageIdentity() {
+        return captureMessageIdentity;
+    }
+
+    public void setCaptureMessageIdentity(boolean captureMessageIdentity) {
+        this.captureMessageIdentity = captureMessageIdentity;
+    }
+
+    public Boolean getCaptureCorrelationIdentity() {
+        return captureCorrelationIdentity;
+    }
+
+    public void setCaptureCorrelationIdentity(boolean captureCorrelationIdentity) {
+        this.captureCorrelationIdentity = captureCorrelationIdentity;
+    }
+
+    public Boolean getCaptureRequestResponseMetadata() {
+        return captureRequestResponseMetadata;
+    }
+
+    public void setCaptureRequestResponseMetadata(boolean captureRequestResponseMetadata) {
+        this.captureRequestResponseMetadata = captureRequestResponseMetadata;
+    }
+
+    public Boolean getCaptureAddresses() {
+        return captureAddresses;
+    }
+
+    public void setCaptureAddresses(boolean captureAddresses) {
+        this.captureAddresses = captureAddresses;
+    }
+
+    public Boolean getCaptureExceptionMessages() {
+        return captureExceptionMessages;
+    }
+
+    public void setCaptureExceptionMessages(boolean captureExceptionMessages) {
+        this.captureExceptionMessages = captureExceptionMessages;
+    }
+
+    public boolean isCaptureMessageBodies() {
+        return captureMessageBodies;
+    }
+
+    public void setCaptureMessageBodies(boolean captureMessageBodies) {
+        this.captureMessageBodies = captureMessageBodies;
+    }
+
+    public int getMaxMessageBodyBytes() {
+        return maxMessageBodyBytes;
+    }
+
+    public void setMaxMessageBodyBytes(int maxMessageBodyBytes) {
+        this.maxMessageBodyBytes = maxMessageBodyBytes;
+    }
+
+    public Predicate<String> getMessageBodyTypeFilter() {
+        return messageBodyTypeFilter;
+    }
+
+    public void setMessageBodyTypeFilter(Predicate<String> messageBodyTypeFilter) {
+        this.messageBodyTypeFilter = messageBodyTypeFilter;
+    }
+
+    public BiFunction<String, String, String> getMessageBodyRedactor() {
+        return messageBodyRedactor;
+    }
+
+    public void setMessageBodyRedactor(BiFunction<String, String, String> messageBodyRedactor) {
+        this.messageBodyRedactor = messageBodyRedactor;
+    }
+
+    boolean captureSensitiveData(Boolean override) {
+        if (override != null) {
+            return override;
+        }
+        return switch (captureProfile) {
+            case DEVELOPMENT -> true;
+            case PRODUCTION -> false;
+            case AUTO -> isDevelopmentEnvironment();
+        };
+    }
+
+    private static boolean isDevelopmentEnvironment() {
+        String environment = System.getenv("MYSERVICEBUS_ENVIRONMENT");
+        return environment != null && environment.equalsIgnoreCase("Development");
     }
 }

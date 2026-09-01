@@ -1,6 +1,29 @@
+@inject NavigationManager Navigation
+@inject Microsoft.Extensions.Options.IOptions<DashboardOptions> Options
+
 <Router AppAssembly="typeof(Program).Assembly">
     <Found Context="routeData">
-        <RouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)" />
+        @if (IsEnabledRoute)
+        {
+            <RouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)" />
+        }
+        else
+        {
+            <LayoutView Layout="typeof(Layout.MainLayout)">
+                <section class="empty-state"><h1>Dashboard feature not enabled</h1><p>This optional capability domain is hidden by the Dashboard feature policy.</p><a class="section-link" href="/">← Back to overview</a></section>
+            </LayoutView>
+        }
         <FocusOnNavigate RouteData="routeData" Selector="h1" />
     </Found>
 </Router>
+
+@code {
+    private string CurrentPath => "/" + Navigation.ToBaseRelativePath(Navigation.Uri).Split('?', '#')[0].Trim('/');
+    private bool IsEnabledRoute
+        => (!CurrentPath.StartsWith("/messages", StringComparison.OrdinalIgnoreCase) || Options.Value.Features.Messages)
+            && (!IsWorkflowRoute || Options.Value.Features.Workflows);
+    private bool IsWorkflowRoute
+        => CurrentPath.StartsWith("/workflows", StringComparison.OrdinalIgnoreCase)
+            || CurrentPath.StartsWith("/applications/", StringComparison.OrdinalIgnoreCase)
+                && CurrentPath.EndsWith("/workflows", StringComparison.OrdinalIgnoreCase);
+}

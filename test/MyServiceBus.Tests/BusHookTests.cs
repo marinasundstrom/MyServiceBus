@@ -41,6 +41,8 @@ public class BusHookTests
             .Single(busEvent => busEvent.Kind == "consumed");
         published.MessageId.ShouldNotBeNullOrWhiteSpace();
         consumed.MessageId.ShouldBe(published.MessageId);
+        published.Message.ShouldBe(new TestMessage("hello"));
+        consumed.Message.ShouldBe(new TestMessage("hello"));
     }
 
     [Fact]
@@ -159,8 +161,14 @@ public class BusHookTests
         {
             ServiceAddress = new Uri("http://monitoring.test"),
             ApplicationName = "tests",
+            CaptureProfile = MonitoringCaptureProfile.Development,
+            CaptureMessageBodies = true,
+            MaxMessageBodyBytes = 48,
+            MessageBodyTypeFilter = messageType => messageType == typeof(TestMessage).FullName,
+            MessageBodyRedactor = (_, body) => body.Replace("customer 42", "[redacted]", StringComparison.Ordinal),
             ExportInterval = TimeSpan.FromMilliseconds(20),
-            HeartbeatInterval = TimeSpan.FromMinutes(1)
+            HeartbeatInterval = TimeSpan.FromMinutes(1),
+            MaxBatchSize = 2
         };
         var exporter = new MonitoringExporter(
             new HttpClient(handler) { BaseAddress = options.ServiceAddress },
@@ -173,18 +181,99 @@ public class BusHookTests
         exporter.Handle(MessageOperationHookEvent.Create(
             "published",
             true,
+            typeof(ReactionMessage).FullName!,
+            MessageUrn.For(typeof(ReactionMessage)),
+            null,
+            null,
+            TimeSpan.Zero,
+            message: new ReactionMessage("filtered secret")));
+        exporter.Handle(MessageOperationHookEvent.Create(
+            "published",
+            true,
             typeof(TestMessage).FullName!,
             MessageUrn.For(typeof(TestMessage)),
             null,
             "loopback://test-message",
             TimeSpan.Zero,
+            exception: new InvalidOperationException("test failure"),
+            correlationId: "correlation-1",
+            conversationId: "conversation-1",
             messageId: "message-1",
-            causationMessageId: "trigger-1"));
+            causationMessageId: "trigger-1",
+            requestId: "request-1",
+            responseAddress: "loopback://responses",
+            messageIntent: "Reply",
+            message: new TestMessage("customer 42 " + new string('x', 100))));
 
         var batchJson = await handler.BatchReceived.Task.WaitAsync(TimeSpan.FromSeconds(2));
         batchJson.ShouldContain("\"kind\":\"published\"");
         batchJson.ShouldContain("\"messageId\":\"message-1\"");
         batchJson.ShouldContain("\"causationMessageId\":\"trigger-1\"");
+        batchJson.ShouldContain("\"requestId\":\"request-1\"");
+        batchJson.ShouldContain("\"responseAddress\":\"loopback://responses\"");
+        batchJson.ShouldContain("\"messageIntent\":\"Reply\"");
+        batchJson.ShouldContain("\"messageBodyStatus\":\"truncated\"");
+        batchJson.ShouldContain("\"messageBodyContentType\":\"application/json\"");
+        batchJson.ShouldContain("[redacted]");
+        batchJson.ShouldNotContain("customer 42");
+        batchJson.ShouldNotContain("filtered secret");
+        await exporter.StopAsync(CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task Production_capture_profile_excludes_sensitive_message_metadata()
+    {
+        var handler = new RecordingHttpHandler();
+        var services = new ServiceCollection()
+            .AddSingleton<IBusInspectionProvider>(new StubInspectionProvider());
+        await using var provider = services.BuildServiceProvider();
+        var options = new MonitoringExporterOptions
+        {
+            ServiceAddress = new Uri("http://monitoring.test"),
+            ApplicationName = "production-tests",
+            CaptureProfile = MonitoringCaptureProfile.Production,
+            ExportInterval = TimeSpan.FromMilliseconds(20),
+            HeartbeatInterval = TimeSpan.FromMinutes(1)
+        };
+        var exporter = new MonitoringExporter(
+            new HttpClient(handler) { BaseAddress = options.ServiceAddress },
+            provider,
+            options,
+            NullLogger<MonitoringExporter>.Instance);
+
+        await exporter.StartAsync(CancellationToken.None);
+        exporter.Handle(MessageOperationHookEvent.Create(
+            "sent",
+            false,
+            typeof(TestMessage).FullName!,
+            MessageUrn.For(typeof(TestMessage)),
+            "orders",
+            "loopback://orders",
+            TimeSpan.FromMilliseconds(4),
+            new InvalidOperationException("customer 42"),
+            "correlation-1",
+            "conversation-1",
+            messageId: "message-1",
+            causationMessageId: "trigger-1",
+            requestId: "request-1",
+            responseAddress: "loopback://responses",
+            messageIntent: "Send",
+            message: new TestMessage("secret production body")));
+
+        var batchJson = await handler.BatchReceived.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        batchJson.ShouldContain("\"messageUrn\"");
+        batchJson.ShouldContain("\"durationMs\"");
+        batchJson.ShouldContain("\"exceptionType\"");
+        batchJson.ShouldNotContain("customer 42");
+        batchJson.ShouldNotContain("loopback://orders");
+        batchJson.ShouldNotContain("correlation-1");
+        batchJson.ShouldNotContain("conversation-1");
+        batchJson.ShouldNotContain("message-1");
+        batchJson.ShouldNotContain("trigger-1");
+        batchJson.ShouldNotContain("request-1");
+        batchJson.ShouldNotContain("loopback://responses");
+        batchJson.ShouldNotContain("secret production body");
+        batchJson.ShouldContain("\"messageBodyStatus\":null");
         await exporter.StopAsync(CancellationToken.None);
     }
 

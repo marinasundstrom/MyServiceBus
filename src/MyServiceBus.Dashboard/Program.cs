@@ -12,6 +12,11 @@ builder.Services.AddOptions<DashboardOptions>()
     .BindConfiguration(DashboardOptions.SectionName)
     .Validate(options => options.MonitoringServiceAddress.IsAbsoluteUri, "Dashboard:MonitoringServiceAddress must be an absolute URI.")
     .ValidateOnStart();
+builder.Services.PostConfigure<DashboardOptions>(options =>
+{
+    if (builder.Configuration[$"{DashboardOptions.SectionName}:Features:Messages"] is null)
+        options.Features.Messages = builder.Environment.IsDevelopment();
+});
 builder.Services.AddHttpClient<MonitoringApiClient>((services, client) =>
 {
     client.BaseAddress = services.GetRequiredService<IOptions<DashboardOptions>>().Value.MonitoringServiceAddress;

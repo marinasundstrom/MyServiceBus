@@ -80,6 +80,7 @@ class BusHookTest {
                 .findFirst()
                 .orElseThrow(() -> new AssertionError(RecordingHook.EVENTS.toString()));
         assertNotNull(published.messageId());
+        assertEquals(new TestMessage("hello"), published.message());
     }
 
     @Test

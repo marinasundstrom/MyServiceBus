@@ -50,7 +50,32 @@ The MVP includes:
 - transparent history freshness, coverage, and durability status
 - an optional Entity Framework Core PostgreSQL history provider with automatic migrations, deduplicated batches, bounded retention, and active-window restoration after restart
 
-The MVP does not yet include authentication, general long-range historical metric queries, alerting or scaling recommendations, broker queue depth, host saturation, broker administration, or payload-byte limits. PostgreSQL adds durable collection, restart recovery, and retained workflow-run drill-down; other metric queries still expose only the active 15-minute read-model window. The dashboard uses WebSocket invalidations to re-query HTTP snapshots, with a 15-second polling fallback.
+The MVP does not yet include authentication, general long-range historical metric queries, alerting or scaling recommendations, broker queue depth, host saturation, or broker administration. PostgreSQL adds durable collection, restart recovery, and retained workflow-run drill-down; other metric queries still expose only the active 15-minute read-model window. The dashboard uses WebSocket invalidations to re-query HTTP snapshots, with a 15-second polling fallback. Its development-oriented message-body inspector is guarded by independent exporter, collector-disclosure, and Dashboard feature settings and is not yet a caller-authorized production inspection surface.
+
+## Capture, Retention, and Disclosure
+
+In monitoring and Dashboard language, a **message** is the logical unit followed through the system. Its **message body** is the application payload. Its **envelope** is the complete transported representation: the body plus message identity, correlation and request metadata, addresses, and transport or application headers. The Dashboard keeps the shorter user-facing term **message** and reveals envelope metadata as message details; it does not present envelopes as a competing top-level concept.
+
+The monitored bus process is the first privacy boundary. Its exporter decides what may leave the service before an observation is serialized or sent. `MonitoringCaptureProfile.Auto` uses `MYSERVICEBUS_ENVIRONMENT` in both clients, with the usual .NET environment variables as C# fallbacks. `Development` enables detailed operational identities, addresses, request/response metadata, and exception messages; every other environment uses the restricted `Production` baseline. Explicit `CaptureMessageIdentity`, `CaptureCorrelationIdentity`, `CaptureRequestResponseMetadata`, `CaptureAddresses`, and `CaptureExceptionMessages` values override either baseline independently. Message types, endpoint identities, outcome, duration, exception type, and aggregate counters remain available in the restricted profile.
+
+Message-body capture is a separate opt-in and remains disabled even under the `Development` profile. When enabled, the exporter can select message types, redact serialized JSON inside the application process, and truncate the result to a configured UTF-8 byte limit before transmission. Observations identify captured, truncated, and serialization-failed bodies and include the redacted serialized byte count before truncation when available. A truncated body is debugging text and is not guaranteed to remain valid JSON. Arbitrary envelope headers remain excluded. Future header capture must be an explicit allowlist with value transformation or removal at the exporter; capturing every header and asking the collector to repair it later is not an acceptable default. Production enablement must be an affirmative service-owner decision; never depend on the collector to remove a secret that should not leave the service.
+
+The monitoring service is a second, independent boundary. It owns storage retention and purging for facts it was intentionally given. Its global `Monitoring:Disclosure:MessageBodies` query policy defaults to `Omit`; `Redact` replaces the complete retained body with `Monitoring:Disclosure:MessageBodyRedactionText`, while `Full` returns the retained body. The policy is applied to response copies and does not rewrite stored observations. The same boundary can later omit or redact specific retained header names and values before serving them. This preview-wide setting is not a substitute for authorization: authentication, caller-specific disclosure profiles, and audit remain production work. Disclosure redaction does not replace exporter-side minimization, and storage retention does not grant a dashboard permission to see everything retained.
+
+For example, a controlled debugging deployment can return a visible placeholder while retaining selected exporter-redacted bodies for a later authorized workflow:
+
+```json
+{
+  "Monitoring": {
+    "Disclosure": {
+      "MessageBodies": "Redact",
+      "MessageBodyRedactionText": "[retained body hidden]"
+    }
+  }
+}
+```
+
+Use `Monitoring__Disclosure__MessageBodies` and `Monitoring__Disclosure__MessageBodyRedactionText` for environment-variable configuration. Until caller authorization exists, prefer `Omit` or `Redact`; `Full` is an explicit trusted-environment debugging choice.
 
 ## Dashboard Experience
 
@@ -86,7 +111,7 @@ System-wide focused views remain available when the operator needs to compare ap
 - **Applications** explains logical applications and replicas, then compares load, latency, retries, failures, runtime, and transport.
 - **Receive endpoints** combines exported topology with current activity so configured, offline, healthy, and faulting endpoints remain distinguishable.
 - **Throughput** expands the compact landing-page chart into a five-minute streamed graph and application rate breakdown.
-- **Message flow** defaults to applications and observed message paths, with throughput encoded in line weight and exact rates available alongside the map. Its **Detailed** mode expands replicas into application groups and draws the directly correlated replica-to-replica paths.
+- **Message flow** defaults to applications and observed message paths, with throughput encoded in line weight and exact rates available alongside the map. Its **Detailed** mode expands replicas into application groups and draws the directly correlated replica-to-replica paths. Explicit request metadata additionally produces paired request/response exchanges with forward and return messages, current round-trip stage, failures, and elapsed time.
 - **Failures** exposes bounded failure and retry metadata without capturing message bodies or arbitrary headers.
 - **Outbox** separates dispatcher backlog and delivery pressure from broker transit and consumer processing.
 
@@ -95,6 +120,12 @@ Graphs and maps are a continuing dashboard theme. They are implemented as distin
 Workflows are a focused dashboard domain with separate **Workflow runs** and **Declared workflows** tabs. The runs tab is the operational entry point: it queries the monitoring-owned retained projection with server-side type, status, and identity filters plus pagination, then links directly to a stable run detail with the D3 activity diagram and ordered evidence. The declared tab is the stable catalog: its definition map groups reactions by participating application, connects consumed triggers to declared outputs and matching downstream participants, and keeps versions, definition conflicts, replica availability, capture freshness, and aggregate exact-causation evidence visible. Silence is labeled as no exact evidence, never as a missed reaction, failed workflow, or authoritative state. An orchestration view can additionally use persisted saga identity and transition evidence to show authoritative current state, transition history, pending timeouts or requests, faults, and completion. Both reuse maps, timelines, contract nodes, causal edges, and application drill-downs while preserving the distinction between reconstructed and persisted truth.
 
 Dashboard density is a local presentation preference. **Comfortable** remains the default; **Compact** tightens navigation, headings, cards, tables, filters, and workflow detail for operators who prefer more information at once or use smaller screens. It does not change query windows, retention, aggregation, or monitoring semantics.
+
+Dashboard capability domains are configurable independently of fundamental operations views. `Dashboard:Features:Workflows` defaults to `true` and can hide workflow navigation and stop workflow queries when an installation does not use choreography or sagas. `Dashboard:Features:Messages` defaults to `true` only when the Dashboard host environment is `Development`; it is hidden and not queried in production or shared environments unless explicitly enabled. Fundamental application, endpoint, throughput, flow, and failure views are not optional feature flags. Environment-variable equivalents use `Dashboard__Features__Workflows` and `Dashboard__Features__Messages`.
+
+When message inspection is enabled, the Dashboard does not merge raw producer and consumer records itself. The monitoring service owns a bounded message projection keyed by exact message identity, merging send or publish evidence, consumers, participants, outcomes, body-disclosure status, and request or causation relationships. A message detail query adds caused operations and observations sharing the request identity, allowing the same evidence to be linked from message flow, workflows, sagas, failures, and future application pages. The Dashboard only filters and presents that service-owned model. Message identity capture, exporter body capture, collector disclosure, retention, and the Dashboard feature flag are independent gates; enabling the page cannot reveal data that an earlier gate withheld.
+
+Request/response remains a first-class **exchange projection over two related messages**, not another wire primitive or a duplicate store. The request and response retain their own message identities and lifecycle pages; explicit request identity lets the monitoring service pair them and calculate requester, responder, pending or completed state, round-trip duration, and failures. The exchange inspector presents an HTTP-inspector-like request and response view with safe envelope metadata, an ordered timeline, and links to each constituent message. It requests bodies only when the Dashboard message-inspection feature is enabled, after which the collector disclosure policy still independently decides whether content is returned. When request metadata is not exported, the collector leaves the exchange unpaired rather than inferring an authoritative relationship from payloads or timing.
 
 The same domain can eventually include a **Discovered patterns** view for systems that have no formal workflow definition. Repeated causal paths may be grouped into workflow-shaped candidates and shown with their time window, sample count, participating applications and contracts, confidence, and coverage. The dashboard must label these as recurring observed patterns rather than declared choreography. It may help an owner draft a declaration, but it must not create or register one automatically.
 
@@ -204,6 +235,12 @@ builder.Services.AddServiceBusMonitoring(options =>
     options.InstanceId = Environment.MachineName;
     options.Labels["group"] = "commerce";
     options.Labels["environment"] = "production";
+
+    // Optional, disabled by default in every capture profile.
+    options.CaptureMessageBodies = true;
+    options.MaxMessageBodyBytes = 16 * 1024;
+    options.MessageBodyTypeFilter = type => type.StartsWith("Orders.Contracts.", StringComparison.Ordinal);
+    options.MessageBodyRedactor = (_, json) => RedactMonitoringJson(json);
 });
 ```
 
@@ -223,6 +260,12 @@ monitoring.setServiceAddress(URI.create("http://monitoring-service:8080"));
 monitoring.setApplicationName("Orders.Worker");
 monitoring.getLabels().put("group", "commerce");
 monitoring.getLabels().put("environment", "production");
+
+// Optional, disabled by default in every capture profile.
+monitoring.setCaptureMessageBodies(true);
+monitoring.setMaxMessageBodyBytes(16 * 1024);
+monitoring.setMessageBodyTypeFilter(type -> type.startsWith("com.example.orders.contracts."));
+monitoring.setMessageBodyRedactor((type, json) -> redactMonitoringJson(json));
 
 MonitoringExporter exporter = MonitoringServices.addMonitoring(services, monitoring);
 ServiceProvider provider = services.buildServiceProvider();
@@ -361,7 +404,7 @@ The monitoring service does not receive or store OpenTelemetry spans. MyServiceB
 
 This keeps the monitoring service focused on MyServiceBus topology and runtime state while existing OpenTelemetry collectors and backends continue to own traces, metrics, and logs.
 
-Failed-message inspection intentionally excludes message bodies and arbitrary headers. The prototype exposes only operational metadata already present in hook observations: message identity, endpoint, retry attempt, exception detail, correlation, conversation, and trace identifiers.
+The failed-message Dashboard currently does not disclose captured bodies, and arbitrary headers remain excluded from export. Detailed operational metadata is controlled by the exporting service's capture settings rather than assumed to be available. Collector-side authorization, disclosure redaction, and audit are the next separate boundary before payloads are presented in the Dashboard.
 
 ## Deployment and Security Boundary
 
@@ -372,6 +415,6 @@ ghcr.io/marinasundstrom/myservicebus-monitoring-collector:0.1.0-preview.8
 ghcr.io/marinasundstrom/myservicebus-monitoring-dashboard:0.1.0-preview.8
 ```
 
-The collector listens on port `8080`. The dashboard also listens on port `8080` and reads its collector base address from `Dashboard:MonitoringServiceAddress` (for example, `Dashboard__MonitoringServiceAddress`). The default in-memory collector is intended for local development and controlled evaluation; PostgreSQL provides restart durability but does not make the unauthenticated preview a production monitoring system. Before exposing either deployment outside a trusted network, add host-level authentication and authorization, request and payload limits, TLS, and an explicit retention policy. Do not send message bodies, arbitrary headers, credentials, or broker-management data through the monitoring protocol.
+The collector listens on port `8080`. The dashboard also listens on port `8080` and reads its collector base address from `Dashboard:MonitoringServiceAddress` (for example, `Dashboard__MonitoringServiceAddress`). The default in-memory collector is intended for local development and controlled evaluation; PostgreSQL provides restart durability but does not make the unauthenticated preview a production monitoring system. Before exposing either deployment outside a trusted network, add host-level authentication and authorization, request and payload limits, TLS, an explicit retention policy, and a disclosure policy. Never export credentials or broker-management data. Keep payload capture explicit, selected, redacted before export, and bounded.
 
 For the longer-term design and vocabulary, see the [Runtime Monitoring Proposal](proposals/runtime-monitoring.md).

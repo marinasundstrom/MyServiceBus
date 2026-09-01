@@ -1,0 +1,206 @@
+@page "/request-response/{RequestId}"
+@rendermode InteractiveServer
+@inherits MonitoringPageBase
+@inject MonitoringApiClient Api
+@inject Microsoft.Extensions.Options.IOptions<DashboardOptions> Options
+
+<PageTitle>Request / Response · MyServiceBus Monitoring</PageTitle>
+<DashboardPageHeader Eyebrow="Observed exchange" Title="Request / response" Description="Inspect a paired interaction reconstructed from explicit request identity. The request and response remain independently observable messages." />
+
+@if (loading)
+{
+    <section class="empty-state"><h2>Loading exchange</h2></section>
+}
+else if (Detail is null)
+{
+    <section class="empty-state"><h2>Exchange not available</h2><p>The request identity is outside the retention window or no longer has enough evidence to reconstruct an exchange.</p><a class="section-link" href="/flow">← Back to message flow</a></section>
+}
+else
+{
+    var exchange = Detail.Exchange;
+    <div class="workflow-run-breadcrumb"><a href="/flow">Message flow</a><span>→</span><span>Request / response</span><span>→</span><span class="mono">@RequestId</span></div>
+
+    <section class="panel request-response-detail">
+        <div class="request-response-detail-heading">
+            <div>
+                <span class="run-status @(exchange.HasFailures ? "failed" : exchange.Status)"></span>
+                <div><p class="eyebrow">@StatusLabel(exchange.Status)</p><h2 class="mono">@exchange.RequestId</h2><p>@EvidenceDescription(exchange)</p></div>
+            </div>
+            <dl>
+                <div><dt>Duration</dt><dd>@FormatDuration(exchange.DurationMs)</dd></div>
+                <div><dt>Evidence</dt><dd>@exchange.EvidenceStatus</dd></div>
+                <div><dt>Started</dt><dd>@exchange.StartedAtUtc.ToLocalTime().ToString("MMM d, HH:mm:ss.fff")</dd></div>
+                <div><dt>Last activity</dt><dd>@exchange.LastActivityAtUtc.ToLocalTime().ToString("MMM d, HH:mm:ss.fff")</dd></div>
+            </dl>
+        </div>
+
+        <div class="exchange-route" aria-label="Request and response route">
+            <div><p class="eyebrow">Requester</p><strong>@exchange.RequesterApplication</strong><small>@exchange.RequesterInstanceId</small></div>
+            <span><b>Request →</b><b>← Response</b></span>
+            <div><p class="eyebrow">Responder</p><strong>@(exchange.ResponderApplication ?? "Awaiting responder")</strong><small>@(exchange.ResponderInstanceId ?? "No consumer evidence")</small></div>
+        </div>
+
+        <div class="exchange-message-grid">
+            <section class="exchange-message request">
+                <div class="workflow-run-section-heading"><div><p class="eyebrow">Outbound request</p><h3>@ShortMessageType(exchange.RequestMessageType)</h3></div>@MessageIdentity(exchange.RequestMessageId)</div>
+                <dl class="exchange-envelope">
+                    <div><dt>Message ID</dt><dd class="mono">@ValueOrDash(exchange.RequestMessageId)</dd></div>
+                    <div><dt>URN</dt><dd class="mono">@ValueOrDash(exchange.RequestMessageUrn)</dd></div>
+                    <div><dt>Destination</dt><dd class="mono">@ValueOrDash(RequestOperation?.Observation.DestinationAddress)</dd></div>
+                    <div><dt>Response address</dt><dd class="mono">@ValueOrDash(exchange.ResponseAddress)</dd></div>
+                    <div><dt>Correlation</dt><dd class="mono">@ValueOrDash(RequestOperation?.Observation.CorrelationId)</dd></div>
+                    <div><dt>Conversation</dt><dd class="mono">@ValueOrDash(RequestOperation?.Observation.ConversationId)</dd></div>
+                </dl>
+                <div class="exchange-body-heading"><strong>Message body</strong><span>@BodyLabel(RequestBody)</span></div>
+                @if (RequestBody?.Observation.MessageBody is { } requestBody)
+                {
+                    <pre class="message-body"><code>@requestBody</code></pre>
+                }
+                else
+                {
+                    <p class="panel-empty">@BodyDescription(RequestBody)</p>
+                }
+            </section>
+
+            <section class="exchange-message response">
+                <div class="workflow-run-section-heading"><div><p class="eyebrow">Return response</p><h3>@(exchange.ResponseMessageType is null ? "Awaiting response" : ShortMessageType(exchange.ResponseMessageType))</h3></div>@MessageIdentity(exchange.ResponseMessageId)</div>
+                <dl class="exchange-envelope">
+                    <div><dt>Message ID</dt><dd class="mono">@ValueOrDash(exchange.ResponseMessageId)</dd></div>
+                    <div><dt>URN</dt><dd class="mono">@ValueOrDash(exchange.ResponseMessageUrn)</dd></div>
+                    <div><dt>Destination</dt><dd class="mono">@ValueOrDash(ResponseOperation?.Observation.DestinationAddress)</dd></div>
+                    <div><dt>Intent</dt><dd>@ValueOrDash(ResponseOperation?.Observation.MessageIntent)</dd></div>
+                    <div><dt>Correlation</dt><dd class="mono">@ValueOrDash(ResponseOperation?.Observation.CorrelationId)</dd></div>
+                    <div><dt>Caused by</dt><dd class="mono">@ValueOrDash(ResponseOperation?.Observation.CausationMessageId)</dd></div>
+                </dl>
+                <div class="exchange-body-heading"><strong>Message body</strong><span>@BodyLabel(ResponseBody)</span></div>
+                @if (ResponseBody?.Observation.MessageBody is { } responseBody)
+                {
+                    <pre class="message-body"><code>@responseBody</code></pre>
+                }
+                else
+                {
+                    <p class="panel-empty">@BodyDescription(ResponseBody)</p>
+                }
+            </section>
+        </div>
+
+        <div class="workflow-run-section-heading"><div><p class="eyebrow">Ordered evidence</p><h3>Exchange timeline</h3></div><p>Every retained observation with this explicit request identity.</p></div>
+        <div class="message-timeline">
+            @foreach (var record in Detail.Observations)
+            {
+                <article class="message-timeline-item @(record.Observation.Succeeded == false ? "faulted" : null)">
+                    <time>@record.Observation.OccurredAtUtc.ToLocalTime().ToString("HH:mm:ss.fff")</time>
+                    <div><strong>@DisplayKind(record.Observation.Kind)</strong><small>@record.ApplicationName · @record.InstanceId</small></div>
+                    <div><strong>@ShortMessageType(record.Observation.MessageType)</strong><small>@ValueOrDash(record.Observation.EndpointName)</small></div>
+                    <div><strong>@FormatDuration(record.Observation.DurationMs)</strong><small>@MessageRole(record.Observation.MessageId, exchange)</small></div>
+                    @if (Options.Value.Features.Messages && !string.IsNullOrWhiteSpace(record.Observation.MessageId))
+                    {
+                        <a href="@($"/messages/{Uri.EscapeDataString(record.Observation.MessageId)}")">Open message →</a>
+                    }
+                </article>
+            }
+        </div>
+    </section>
+}
+
+@code {
+    [Parameter] public string RequestId { get; set; } = string.Empty;
+
+    private MonitoringRequestResponseExchangeDetail? Detail { get; set; }
+    private bool loading = true;
+    private string? loadedRequestId;
+    private MonitoringObservationRecord? RequestOperation => FindOperation(Detail?.Exchange.RequestMessageId, "sent", "published", "send_faulted", "publish_faulted");
+    private MonitoringObservationRecord? ResponseOperation => FindOperation(Detail?.Exchange.ResponseMessageId, "sent", "published", "send_faulted", "publish_faulted");
+    private MonitoringObservationRecord? RequestBody => FindBody(Detail?.Exchange.RequestMessageId);
+    private MonitoringObservationRecord? ResponseBody => FindBody(Detail?.Exchange.ResponseMessageId);
+
+    protected override async Task OnInitializedAsync()
+    {
+        await base.OnInitializedAsync();
+        await LoadAsync();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (loadedRequestId is not null && loadedRequestId != RequestId)
+            await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        loading = true;
+        try
+        {
+            Detail = await Api.GetRequestResponseExchange(
+                Uri.UnescapeDataString(RequestId),
+                Options.Value.Features.Messages,
+                CancellationToken.None);
+            loadedRequestId = RequestId;
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private MonitoringObservationRecord? FindOperation(string? messageId, params string[] kinds)
+        => Detail?.Observations.FirstOrDefault(record =>
+            record.Observation.MessageId == messageId && kinds.Contains(record.Observation.Kind, StringComparer.Ordinal));
+
+    private MonitoringObservationRecord? FindBody(string? messageId)
+        => Detail?.Observations.FirstOrDefault(record =>
+            record.Observation.MessageId == messageId
+            && (record.Observation.MessageBody is not null || record.Observation.MessageBodyStatus is not null));
+
+    private RenderFragment MessageIdentity(string? messageId) => builder =>
+    {
+        if (!Options.Value.Features.Messages || string.IsNullOrWhiteSpace(messageId))
+            return;
+        builder.OpenElement(0, "a");
+        builder.AddAttribute(1, "href", $"/messages/{Uri.EscapeDataString(messageId)}");
+        builder.AddContent(2, "Open message →");
+        builder.CloseElement();
+    };
+
+    private string BodyLabel(MonitoringObservationRecord? record)
+        => !Options.Value.Features.Messages ? "Message inspection disabled" : record?.Observation.MessageBodyStatus switch
+        {
+            "captured" => "Available",
+            "truncated" => "Truncated",
+            "redacted" => "Redacted",
+            "withheld" => "Withheld",
+            "serialization_failed" => "Capture failed",
+            _ => "Not captured"
+        };
+
+    private string BodyDescription(MonitoringObservationRecord? record)
+        => !Options.Value.Features.Messages
+            ? "Enable the Dashboard message-inspection feature to request disclosed message content."
+            : record?.Observation.MessageBodyStatus switch
+            {
+                "redacted" => "The collector replaced the retained body under its disclosure policy.",
+                "withheld" => "The collector withheld the retained body under its disclosure policy.",
+                "serialization_failed" => "The exporter could not serialize this body; message processing was unaffected.",
+                "truncated" => "The exporter supplied bounded debugging text rather than the complete body.",
+                _ => "No body was exported for this message."
+            };
+
+    private static string MessageRole(string? messageId, MonitoringRequestResponseExchange exchange)
+        => messageId == exchange.RequestMessageId ? "Request message"
+            : messageId == exchange.ResponseMessageId ? "Response message"
+            : "Exchange evidence";
+
+    private static string StatusLabel(string status) => status switch
+    {
+        "completed" => "Completed round trip",
+        "response_sent" => "Response sent",
+        "processing" => "Processing request",
+        "failed" => "Failed exchange",
+        _ => "Request sent"
+    };
+
+    private static string EvidenceDescription(MonitoringRequestResponseExchange exchange)
+        => exchange.HasFailures ? "Failure evidence is present in this explicitly paired exchange."
+            : exchange.EvidenceStatus == "complete" ? "Both message deliveries were observed across the complete round trip."
+            : "The exchange is still running or only part of its lifecycle was retained.";
+}

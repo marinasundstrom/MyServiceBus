@@ -56,6 +56,9 @@ public class Main {
         monitoringOptions.getLabels().put("environment",
                 System.getenv().getOrDefault("ENVIRONMENT", "Development"));
         monitoringOptions.getLabels().put("role", "worker");
+        monitoringOptions.setCaptureMessageBodies(true);
+        monitoringOptions.setMaxMessageBodyBytes(8 * 1024);
+        monitoringOptions.setMessageBodyTypeFilter(messageType -> messageType.startsWith("com.myservicebus.testapp."));
         MonitoringExporter monitoringExporter = MonitoringServices.addMonitoring(services, monitoringOptions);
 
         String rabbitMqHost = System.getenv().getOrDefault("RABBITMQ_HOST", "localhost");
