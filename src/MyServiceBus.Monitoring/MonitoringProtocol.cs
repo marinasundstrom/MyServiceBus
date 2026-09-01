@@ -283,6 +283,13 @@ public sealed record MonitoringChoreographyRunSnapshot(
     bool Complete,
     IReadOnlyList<MonitoringChoreographyRun> Runs);
 
+public sealed record MonitoringWorkflowRunPage(
+    int Offset,
+    int Limit,
+    int Total,
+    DateTimeOffset CapturedAtUtc,
+    IReadOnlyList<MonitoringChoreographyRun> Runs);
+
 public sealed record MonitoringChoreographyRun(
     string ChoreographyId,
     string DefinitionVersion,
@@ -293,9 +300,13 @@ public sealed record MonitoringChoreographyRun(
     double ObservedDurationMs,
     string Status,
     string Confidence,
+    bool EvidenceComplete,
+    long DroppedObservations,
+    bool AllParticipantsOnline,
     IReadOnlyList<MonitoringChoreographyRunStep> Steps)
 {
     public string CoordinationType => "choreography";
+    public string LifecycleAuthority => "reconstructed_evidence";
 }
 
 public sealed record MonitoringChoreographyRunStep(

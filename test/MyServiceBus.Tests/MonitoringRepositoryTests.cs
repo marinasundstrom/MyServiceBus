@@ -569,9 +569,19 @@ public class MonitoringRepositoryTests
 
         var run = repository.GetChoreographyRuns("order-fulfillment", 60, 20, now).Runs.ShouldHaveSingleItem();
         run.CoordinationType.ShouldBe("choreography");
+        run.LifecycleAuthority.ShouldBe("reconstructed_evidence");
+        run.EvidenceComplete.ShouldBeTrue();
         run.Status.ShouldBe("live");
         run.LastActivityAtUtc.ShouldBe(now.AddSeconds(-1));
         run.Steps.ShouldHaveSingleItem().StepId.ShouldBe("request-inventory");
+
+        repository.CaptureWorkflowRuns(now);
+        var retained = repository.GetWorkflowRuns(
+            "order-fulfillment", "choreography", "live", "incoming-1", null, null, 0, 10, now);
+        retained.Total.ShouldBe(1);
+        retained.Runs.ShouldHaveSingleItem().RunId.ShouldBe(run.RunId);
+        repository.GetWorkflowRun(run.RunId, now)!.RunId.ShouldBe(run.RunId);
+        repository.GetWorkflowRun(run.RunId, now.AddSeconds(30))!.Status.ShouldBe("no_recent_activity");
     }
 
     [Fact]

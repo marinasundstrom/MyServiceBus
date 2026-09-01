@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Text.Json;
+using Microsoft.Extensions.Options;
 using MyServiceBus.Choreography;
 using MyServiceBus.Monitoring;
 
@@ -18,8 +19,15 @@ public sealed class MonitoringRepository
     private readonly ConcurrentDictionary<InstanceKey, MonitoringScheduledWorkSnapshot> scheduledWork = new();
     private readonly ConcurrentDictionary<InstanceKey, MonitoringRecurringJobSnapshot> recurringJobs = new();
     private readonly ConcurrentDictionary<InstanceKey, MonitoringJobSnapshot> jobs = new();
+    private readonly ConcurrentDictionary<string, MonitoringChoreographyRun> workflowRuns = new(StringComparer.Ordinal);
+    private readonly TimeSpan workflowRunRetention;
     private readonly DateTimeOffset serviceStartedAtUtc = DateTimeOffset.UtcNow;
     private long lastIngestUtcTicks;
+
+    public MonitoringRepository(IOptions<MonitoringStorageOptions>? storageOptions = null)
+    {
+        workflowRunRetention = storageOptions?.Value.Retention ?? TimeSpan.FromDays(7);
+    }
 
     public void UpsertMetadata(MonitoringMetadata metadata)
     {
@@ -576,24 +584,102 @@ public sealed class MonitoringRepository
                 .ToArray();
         }
 
+        var rates = GetRates(null, boundedWindow, false, now);
+        var dropped = rates.Sum(rate => rate.DroppedObservations);
+        var allOnline = choreographies.SelectMany(choreography => choreography.Fragments)
+            .All(fragment => fragment.OnlineInstances > 0);
+        var complete = dropped == 0 && allOnline;
         var runs = choreographies
             .SelectMany(choreography => choreography.DefinitionVersions.SelectMany(version =>
                 BuildChoreographyRuns(choreography, version, records, now)))
             .OrderByDescending(run => run.LastActivityAtUtc)
             .Take(boundedLimit)
+            .Select(run => run with
+            {
+                EvidenceComplete = complete,
+                DroppedObservations = dropped,
+                AllParticipantsOnline = allOnline
+            })
             .ToArray();
-        var rates = GetRates(null, boundedWindow, false, now);
-        var dropped = rates.Sum(rate => rate.DroppedObservations);
-        var allOnline = choreographies.SelectMany(choreography => choreography.Fragments)
-            .All(fragment => fragment.OnlineInstances > 0);
         return new MonitoringChoreographyRunSnapshot(
             boundedWindow,
             windowStart,
             now,
             dropped,
             allOnline,
-            dropped == 0 && allOnline,
+            complete,
             runs);
+    }
+
+    public IReadOnlyList<MonitoringChoreographyRun> CaptureWorkflowRuns(DateTimeOffset now)
+    {
+        var projected = GetChoreographyRuns(null, (int)MetricRetention.TotalSeconds, 100, now).Runs;
+        foreach (var run in projected)
+        {
+            workflowRuns.AddOrUpdate(
+                run.RunId,
+                run,
+                (_, current) => PreferWorkflowRun(current, run));
+        }
+        PruneWorkflowRuns(now - workflowRunRetention);
+        return projected;
+    }
+
+    public void RestoreWorkflowRuns(IEnumerable<MonitoringChoreographyRun> runs, DateTimeOffset now)
+    {
+        foreach (var run in runs.Where(run => run.LastActivityAtUtc >= now - workflowRunRetention))
+        {
+            workflowRuns.AddOrUpdate(
+                run.RunId,
+                run,
+                (_, current) => PreferWorkflowRun(current, run));
+        }
+        PruneWorkflowRuns(now - workflowRunRetention);
+    }
+
+    public MonitoringWorkflowRunPage GetWorkflowRuns(
+        string? workflow,
+        string? coordinationType,
+        string? status,
+        string? search,
+        DateTimeOffset? startedAfterUtc,
+        DateTimeOffset? startedBeforeUtc,
+        int offset,
+        int limit,
+        DateTimeOffset now)
+    {
+        PruneWorkflowRuns(now - workflowRunRetention);
+        var boundedOffset = Math.Max(0, offset);
+        var boundedLimit = Math.Clamp(limit, 1, 100);
+        var query = workflowRuns.Values
+            .Select(run => WithCurrentStatus(run, now))
+            .Where(run => string.IsNullOrWhiteSpace(workflow)
+                || string.Equals(run.ChoreographyId, workflow, StringComparison.Ordinal))
+            .Where(run => string.IsNullOrWhiteSpace(coordinationType)
+                || string.Equals(run.CoordinationType, coordinationType, StringComparison.OrdinalIgnoreCase))
+            .Where(run => string.IsNullOrWhiteSpace(status)
+                || string.Equals(run.Status, status, StringComparison.OrdinalIgnoreCase))
+            .Where(run => !startedAfterUtc.HasValue || run.StartedAtUtc >= startedAfterUtc.Value)
+            .Where(run => !startedBeforeUtc.HasValue || run.StartedAtUtc <= startedBeforeUtc.Value)
+            .Where(run => string.IsNullOrWhiteSpace(search)
+                || run.ChoreographyId.Contains(search, StringComparison.OrdinalIgnoreCase)
+                || run.RunId.Contains(search, StringComparison.OrdinalIgnoreCase)
+                || run.RootMessageId.Contains(search, StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(run => run.LastActivityAtUtc)
+            .ThenBy(run => run.RunId, StringComparer.Ordinal)
+            .ToArray();
+        return new MonitoringWorkflowRunPage(
+            boundedOffset,
+            boundedLimit,
+            query.Length,
+            now,
+            query.Skip(boundedOffset).Take(boundedLimit).ToArray());
+    }
+
+    public MonitoringChoreographyRun? GetWorkflowRun(string runId, DateTimeOffset now)
+    {
+        PruneWorkflowRuns(now - workflowRunRetention);
+        return workflowRuns.TryGetValue(runId, out var run) ? WithCurrentStatus(run, now) : null;
     }
 
     private static IReadOnlyList<MonitoringChoreographyRun> BuildChoreographyRuns(
@@ -744,7 +830,48 @@ public sealed class MonitoringRepository
             Math.Max(0, (lastActivityAt - startedAt).TotalMilliseconds),
             status,
             "exact_causation",
+            false,
+            0,
+            false,
             steps);
+    }
+
+    private static MonitoringChoreographyRun PreferWorkflowRun(
+        MonitoringChoreographyRun current,
+        MonitoringChoreographyRun candidate)
+    {
+        if (candidate.LastActivityAtUtc > current.LastActivityAtUtc
+            || candidate.Steps.Count > current.Steps.Count
+            || StatusPriority(candidate.Status) > StatusPriority(current.Status))
+            return candidate;
+        return current with
+        {
+            EvidenceComplete = candidate.EvidenceComplete,
+            DroppedObservations = candidate.DroppedObservations,
+            AllParticipantsOnline = candidate.AllParticipantsOnline
+        };
+    }
+
+    private static MonitoringChoreographyRun WithCurrentStatus(MonitoringChoreographyRun run, DateTimeOffset now)
+    {
+        if (run.Status is "faulted" or "terminal_observed")
+            return run;
+        var status = now - run.LastActivityAtUtc <= TimeSpan.FromSeconds(15) ? "live" : "no_recent_activity";
+        return string.Equals(run.Status, status, StringComparison.Ordinal) ? run : run with { Status = status };
+    }
+
+    private static int StatusPriority(string status) => status switch
+    {
+        "faulted" => 4,
+        "terminal_observed" => 3,
+        "live" => 2,
+        _ => 1
+    };
+
+    private void PruneWorkflowRuns(DateTimeOffset cutoff)
+    {
+        foreach (var run in workflowRuns.Where(pair => pair.Value.LastActivityAtUtc < cutoff))
+            workflowRuns.TryRemove(run.Key, out _);
     }
 
     public IReadOnlyList<MonitoringObservationRecord> GetRecentObservations(string? applicationName, int limit)

@@ -16,6 +16,7 @@ public interface IMonitoringHistoryStore
     Task StoreScheduledWorkAsync(MonitoringScheduledWorkSnapshot snapshot, CancellationToken cancellationToken);
     Task StoreRecurringJobsAsync(MonitoringRecurringJobSnapshot snapshot, CancellationToken cancellationToken);
     Task StoreJobsAsync(MonitoringJobSnapshot snapshot, CancellationToken cancellationToken);
+    Task StoreWorkflowRunsAsync(IReadOnlyList<MonitoringChoreographyRun> runs, CancellationToken cancellationToken);
 }
 
 public sealed record MonitoringHistoryRestore(
@@ -25,6 +26,7 @@ public sealed record MonitoringHistoryRestore(
     IReadOnlyList<MonitoringScheduledWorkSnapshot> ScheduledWork,
     IReadOnlyList<MonitoringRecurringJobSnapshot> RecurringJobs,
     IReadOnlyList<MonitoringJobSnapshot> Jobs,
+    IReadOnlyList<MonitoringChoreographyRun> WorkflowRuns,
     DateTimeOffset? LastIngestAtUtc);
 
 public sealed class InMemoryMonitoringHistoryStore : IMonitoringHistoryStore
@@ -36,7 +38,7 @@ public sealed class InMemoryMonitoringHistoryStore : IMonitoringHistoryStore
     public Task InitializeAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
     public Task<MonitoringHistoryRestore> RestoreAsync(DateTimeOffset observationCutoff, CancellationToken cancellationToken)
-        => Task.FromResult(new MonitoringHistoryRestore([], [], [], [], [], [], null));
+        => Task.FromResult(new MonitoringHistoryRestore([], [], [], [], [], [], [], null));
 
     public Task StoreMetadataAsync(MonitoringMetadata metadata, CancellationToken cancellationToken) => Task.CompletedTask;
     public Task StoreBatchAsync(MonitoringObservationBatch batch, CancellationToken cancellationToken) => Task.CompletedTask;
@@ -44,4 +46,5 @@ public sealed class InMemoryMonitoringHistoryStore : IMonitoringHistoryStore
     public Task StoreScheduledWorkAsync(MonitoringScheduledWorkSnapshot snapshot, CancellationToken cancellationToken) => Task.CompletedTask;
     public Task StoreRecurringJobsAsync(MonitoringRecurringJobSnapshot snapshot, CancellationToken cancellationToken) => Task.CompletedTask;
     public Task StoreJobsAsync(MonitoringJobSnapshot snapshot, CancellationToken cancellationToken) => Task.CompletedTask;
+    public Task StoreWorkflowRunsAsync(IReadOnlyList<MonitoringChoreographyRun> runs, CancellationToken cancellationToken) => Task.CompletedTask;
 }

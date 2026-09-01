@@ -63,6 +63,11 @@ public sealed class PostgreSqlMonitoringHistoryStore : IMonitoringHistoryStore
         var jobRows = await context.Jobs.AsNoTracking()
             .OrderBy(value => value.ReceivedAtUtc)
             .ToArrayAsync(cancellationToken);
+        var workflowCutoff = DateTimeOffset.UtcNow - options.Retention;
+        var workflowRunRows = await context.WorkflowRuns.AsNoTracking()
+            .Where(value => value.LastActivityAtUtc >= workflowCutoff)
+            .OrderBy(value => value.LastActivityAtUtc)
+            .ToArrayAsync(cancellationToken);
 
         var lastIngest = metadataRows.Select(value => (DateTimeOffset?)value.ReceivedAtUtc)
             .Concat(batchRows.Select(value => (DateTimeOffset?)value.ReceivedAtUtc))
@@ -70,6 +75,7 @@ public sealed class PostgreSqlMonitoringHistoryStore : IMonitoringHistoryStore
             .Concat(scheduledWorkRows.Select(value => (DateTimeOffset?)value.ReceivedAtUtc))
             .Concat(recurringJobRows.Select(value => (DateTimeOffset?)value.ReceivedAtUtc))
             .Concat(jobRows.Select(value => (DateTimeOffset?)value.ReceivedAtUtc))
+            .Concat(workflowRunRows.Select(value => (DateTimeOffset?)value.UpdatedAtUtc))
             .Max();
 
         return new MonitoringHistoryRestore(
@@ -79,6 +85,7 @@ public sealed class PostgreSqlMonitoringHistoryStore : IMonitoringHistoryStore
             scheduledWorkRows.Select(value => Deserialize<MonitoringScheduledWorkSnapshot>(value.Payload)).ToArray(),
             recurringJobRows.Select(value => Deserialize<MonitoringRecurringJobSnapshot>(value.Payload)).ToArray(),
             jobRows.Select(value => Deserialize<MonitoringJobSnapshot>(value.Payload)).ToArray(),
+            workflowRunRows.Select(value => Deserialize<MonitoringChoreographyRun>(value.Payload)).ToArray(),
             lastIngest);
     }
 
@@ -266,6 +273,38 @@ public sealed class PostgreSqlMonitoringHistoryStore : IMonitoringHistoryStore
         SetEarlierHistoryBoundary(receivedAt);
     }
 
+    public async Task StoreWorkflowRunsAsync(
+        IReadOnlyList<MonitoringChoreographyRun> runs,
+        CancellationToken cancellationToken)
+    {
+        if (runs.Count == 0)
+            return;
+
+        var updatedAt = DateTimeOffset.UtcNow;
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        foreach (var run in runs)
+        {
+            var entity = await context.WorkflowRuns.FindAsync([run.RunId], cancellationToken);
+            if (entity is null)
+            {
+                entity = new MonitoringWorkflowRunEntity { RunId = run.RunId };
+                context.WorkflowRuns.Add(entity);
+            }
+            entity.WorkflowId = run.ChoreographyId;
+            entity.CoordinationType = run.CoordinationType;
+            entity.Status = run.Status;
+            entity.StartedAtUtc = run.StartedAtUtc;
+            entity.LastActivityAtUtc = run.LastActivityAtUtc;
+            entity.UpdatedAtUtc = updatedAt;
+            entity.Payload = JsonSerializer.Serialize(run, JsonOptions);
+        }
+        await context.SaveChangesAsync(cancellationToken);
+        await context.WorkflowRuns
+            .Where(value => value.LastActivityAtUtc < updatedAt - options.Retention)
+            .ExecuteDeleteAsync(cancellationToken);
+        SetEarlierHistoryBoundary(runs.Min(run => run.StartedAtUtc));
+    }
+
     private async Task RefreshHistoryBoundaryAsync(
         MonitoringHistoryDbContext context,
         CancellationToken cancellationToken)
@@ -276,7 +315,8 @@ public sealed class PostgreSqlMonitoringHistoryStore : IMonitoringHistoryStore
         var scheduledWork = await context.ScheduledWork.Select(value => (DateTimeOffset?)value.ReceivedAtUtc).MinAsync(cancellationToken);
         var recurringJobs = await context.RecurringJobs.Select(value => (DateTimeOffset?)value.ReceivedAtUtc).MinAsync(cancellationToken);
         var jobs = await context.Jobs.Select(value => (DateTimeOffset?)value.ReceivedAtUtc).MinAsync(cancellationToken);
-        var earliest = new[] { metadata, batches, heartbeat, scheduledWork, recurringJobs, jobs }
+        var workflowRuns = await context.WorkflowRuns.Select(value => (DateTimeOffset?)value.StartedAtUtc).MinAsync(cancellationToken);
+        var earliest = new[] { metadata, batches, heartbeat, scheduledWork, recurringJobs, jobs, workflowRuns }
             .Where(value => value.HasValue).Min();
         if (earliest.HasValue)
             Interlocked.Exchange(ref historyAvailableFromUtcTicks, earliest.Value.UtcTicks);
