@@ -29,6 +29,7 @@ dotnet pack "$repository_root/src/MyServiceBus/MyServiceBus.csproj" \
   -p:PackageVersion="$package_version"
 
 projects=(
+  MyServiceBus.Generators
   MyServiceBus.Serialization.Bson
   MyServiceBus.PostgreSql
   MyServiceBus.Inspection
