@@ -294,17 +294,24 @@ flowchart LR
     Inspection --> Exporter["Optional monitoring exporter\nbounded local batches"]
     Hooks --> Exporter
     Persistence["Optional persistence contributor\noutbox and inbox state"] -.-> Exporter
-    Exporter --> Service["Monitoring service\ndistributed runtime model"]
+    Exporter --> Service["Monitoring service\ningest and validation"]
     BrokerAdapter["Optional broker metrics adapter"] -.-> Service
-    Service --> Query["HTTP query API"]
-    Service --> Live["WebSocket invalidations"]
+    Service --> Store["Retained monitoring data\nvolatile or durable"]
+    Store --> Projection["Reusable projections\nsnapshots, graphs, diagnostics"]
+    Projection --> Query["HTTP query API"]
+    Projection --> Live["WebSocket invalidations"]
     Query --> CLI["CLI and support tools"]
     Query --> Dashboard["Standalone read-only dashboard"]
+    Query -.-> Alerting["Future alerting service\nrules and alert lifecycle"]
     Live --> Dashboard
     Telemetry["External OpenTelemetry backend"] -.-> Dashboard
 ```
 
-Inspection describes configured endpoints, consumers, contracts, instances, versions, and capabilities. General-purpose immutable hooks expose bus activity to any addon or application handler. The monitoring exporter is one hook implementation: it buffers bounded batches and sends them to the central service. Applications do not store monitoring history or expose monitoring query endpoints. Broker depth and broker-native health belong to optional broker-specific metrics adapters, while outbox and inbox state belongs to optional persistence-provider contributors. The monitoring read model may correlate these views, but it does not take ownership of dispatch or persistence.
+Inspection describes configured endpoints, consumers, contracts, instances, versions, and capabilities. General-purpose immutable hooks expose bus activity to any addon or application handler. The monitoring exporter is one hook implementation: it buffers bounded batches and sends them to the central service. Applications do not store monitoring history or expose monitoring query endpoints. The monitoring service owns ingestion, retention, retrieval, and reusable projections over those inputs. It may construct a projection on demand, maintain it incrementally, persist it as a replaceable read model, or cache it briefly, but the query contract must preserve capture time, window, freshness, completeness, and bounded-staleness semantics.
+
+Dashboards own presentation, navigation, and interaction. Domain interpretation—such as merging workflow declarations, connecting steps, identifying a recurring workflow-shaped pattern, or comparing it with observations—belongs to the monitoring service so CLIs, support tools, and alternative dashboards receive the same model. A projection remains derived monitoring evidence; materializing or caching it does not turn it into source data or authoritative application state. Broker depth and broker-native health belong to optional broker-specific metrics adapters, while outbox and inbox state belongs to optional persistence-provider contributors. The monitoring read model may correlate these views, but it does not take ownership of dispatch or application persistence.
+
+Alerting is a separate service and lifecycle boundary. It consumes supported monitoring queries, snapshots, or a future durable feed and owns rules, thresholds, evaluation state, deduplication, suppression, acknowledgement, recovery, notifications, and audit. It does not ingest directly from application exporters or couple itself to the monitoring service's storage schema. The Dashboard WebSocket invalidation stream is not a reliable alert feed.
 
 Inspection must consume the stable topology query API. It must not infer endpoint durability, exchange types, addresses, or terminal destinations from a broker scheme or naming suffix. The normalized model and transport projection are defined in the [Topology Model Specification](specs/topology-model-spec.md).
 

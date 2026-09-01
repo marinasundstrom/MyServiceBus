@@ -12,6 +12,16 @@ C# and Java applications
 
 Messaging does not depend on this path. If the monitoring service is unavailable or an export fails, message processing continues.
 
+## Monitoring Service Boundary
+
+The monitoring service is first a collector and owner of monitoring data. Exporters send versioned application metadata, heartbeats, observations, and provider snapshots to it; the service validates and retains those inputs using volatile memory or its configured durable provider. Query clients retrieve data from the service rather than reaching back into applications.
+
+The service is also the owner of shared monitoring projections. It constructs application and endpoint summaries, time-window metrics, observed flow, declared-workflow graphs, snapshots, diagnostics, and eventually recurring workflow-pattern candidates from retained inputs. The Dashboard owns presentation and interaction—not the semantic identification of a workflow, connection, or deviation. This keeps the HTTP API useful to other dashboards, CLIs, support tools, and integrations and prevents each client from inventing a different model.
+
+Alerting is a separate future service that consumes monitoring data. It will own rule evaluation and alert lifecycle concerns such as thresholds, deduplication, suppression, acknowledgement, recovery, notifications, and audit. It should consume supported snapshots, queries, or a future durable change feed from monitoring rather than connect to application exporters or read the monitoring database directly. The current WebSocket stream only invalidates Dashboard reads and is not a durable alert feed.
+
+A projection may be calculated on demand, incrementally maintained, or cached briefly. Those are internal optimization choices as long as the query preserves explicit capture time, window, freshness, completeness, and bounded-staleness semantics. The current summary and declared-choreography projections use a five-second HTTP output cache; ingest and retained source records are not rewritten into projected truth.
+
 ## MVP Status
 
 The proof of concept is suitable to ship as an **experimental MVP**, not as a production monitoring system. The end-to-end Aspire stack has been exercised with C# and Java clients, RabbitMQ, the collector, HTTP queries, the WebSocket invalidation stream, and the Blazor dashboard.
@@ -253,7 +263,7 @@ The contract is versioned but remains preview. The `/v1` route and each ingest b
 
 All routes in the table are relative to `/api/monitoring/v1`. Ingest clients must register metadata before sending observations, heartbeats, or authoritative snapshots for that application-instance-bus identity. Successful writes return `202 Accepted`; invalid protocol data returns `400`, and writes for an unregistered identity return `404` or `409` as described by OpenAPI. An accepted snapshot replaces that identity's current view: omission from a successfully accepted snapshot means “not present now,” not “unknown historically.”
 
-`/summary` is the lightweight shell read model. It reports rolling failure and retry counts, affected applications, unhealthy outbox dispatchers, faulted and running tracked jobs, monitored and stale application counts, latest monitoring and observation timestamps, and whether the selected window is complete. Its response is cached for five seconds by the monitoring service so many dashboards share one projection. `CapturedAtUtc`, `WindowStartUtc`, and `WindowSeconds` make that bounded staleness explicit.
+`/summary` is the lightweight shell read model. It reports rolling failure and retry counts, affected applications, unhealthy outbox dispatchers, faulted and running tracked jobs, monitored and stale application counts, latest monitoring and observation timestamps, and whether the selected window is complete. Its response is cached for five seconds by the monitoring service so many dashboards share one projection. The declared-choreography query uses the same short cache because merging fragments and constructing graph connections are also service-owned projections. `CapturedAtUtc`, `WindowStartUtc`, and `WindowSeconds` make bounded staleness explicit where the model is windowed.
 
 The Failures navigation badge uses only the rolling failure count. It disappears as the window clears, displays `99+` rather than expanding indefinitely, and remains a link to the focused failure view. It is neither an unread count nor an alert and therefore has no acknowledgement state. Alert evaluation, thresholds, suppression, recovery, acknowledgement, and notification belong to the future alerting service rather than raw monitoring observations.
 

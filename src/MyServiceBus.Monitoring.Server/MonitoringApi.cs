@@ -144,7 +144,8 @@ public static class MonitoringApi
             .Produces(StatusCodes.Status404NotFound);
         query.MapGet("/choreographies", (MonitoringRepository repository) =>
             repository.GetDeclaredChoreographies(DateTimeOffset.UtcNow))
-            .WithSummary("List merged application-declared choreography fragments and conflicts");
+            .WithSummary("List merged application-declared choreography fragments and conflicts")
+            .CacheOutput(policy => policy.Expire(TimeSpan.FromSeconds(5)));
         query.MapGet("/observations", (string? application, int? limit, MonitoringRepository repository) =>
             repository.GetRecentObservations(application, limit ?? 100))
             .WithSummary("List recent bounded monitoring observations");

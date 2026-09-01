@@ -51,6 +51,20 @@ Do not build inside the monitoring service:
 
 The monitoring service is a domain-specific read-model service, not a new observability platform. Broker inspection, shared alert evaluation, and privileged administration have different data, credential, and safety boundaries and should remain separate capabilities.
 
+### Collector, storage, and projection boundary
+
+The monitoring service owns three related responsibilities:
+
+1. **Collect and retain facts** — accept versioned metadata, heartbeats, observations, and authoritative provider snapshots from exporters; validate their monitoring identity; and retain them according to the configured volatile or durable storage and retention policy.
+2. **Return retained data** — expose current records and bounded historical records without requiring a dashboard or another client to contact participating applications.
+3. **Construct reusable projections** — derive application summaries, rates, topology and flow graphs, declared workflows, point-in-time snapshots, diagnostics, and future discovered coordination patterns from retained inputs.
+
+Projection semantics belong to the monitoring service and its query contracts. A dashboard may choose layout, filtering, formatting, and interaction, but it must not independently invent domain relationships that another query client would calculate differently. In particular, future workflow identification and deviation analysis run in the monitoring service; the Dashboard renders the resulting candidate pattern, evidence, confidence, freshness, and coverage.
+
+A future alerting service is another consumer of monitoring data, not part of this service. It owns alert rules, evaluation state, thresholds, deduplication, suppression, acknowledgement, recovery, notification delivery, and audit. It should consume supported monitoring snapshots, queries, or a purpose-designed durable change feed rather than reading application exporters or the monitoring database directly. The current WebSocket invalidation stream is a best-effort dashboard refresh mechanism and is not a durable alert-evaluation feed.
+
+Projections may be computed on demand, incrementally maintained, persisted as replaceable read models, or cached for a short bounded period. That is an implementation choice behind the query contract. Every response whose meaning depends on time must expose its capture time, requested or effective window, freshness, and completeness as applicable. Cached results must have bounded staleness and must never be presented as source observations or authoritative application state merely because the service materialized them.
+
 ## Naming And MassTransit Alignment
 
 Use familiar MassTransit terminology where the concepts match, without copying its API or deployment model.
