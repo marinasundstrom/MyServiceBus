@@ -2,7 +2,7 @@
 
 ## Status
 
-Active implementation proposal. The portable version 1 behavior is now defined in the [Saga State-Machine Behavior specification](../specs/saga-state-machine-behavior.md); no saga API or runtime is supported yet.
+Active implementation proposal. The portable version 1 behavior is defined in the [Saga State-Machine Behavior specification](../specs/saga-state-machine-behavior.md), and matching low-level C# and Java in-memory execution foundations are implemented. They are not yet bus-integrated or supported as a complete saga feature.
 
 ## Summary
 

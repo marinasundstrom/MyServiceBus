@@ -1,0 +1,58 @@
+{
+  "schemaVersion": 1,
+  "stateMachineId": "order-state-machine",
+  "deliveries": [
+    {
+      "status": "consumed",
+      "correlationId": "11111111-1111-1111-1111-111111111111",
+      "beginState": "Initial",
+      "endState": "AwaitingPayment",
+      "created": true,
+      "completed": false,
+      "instancePresent": true,
+      "outgoing": [
+        {
+          "kind": "send",
+          "messageUrn": "urn:message:Contracts:ReserveInventory",
+          "destination": "queue:reserve-inventory"
+        }
+      ]
+    },
+    {
+      "status": "consumed",
+      "correlationId": "11111111-1111-1111-1111-111111111111",
+      "beginState": "AwaitingPayment",
+      "endState": "Processing",
+      "created": false,
+      "completed": false,
+      "instancePresent": true,
+      "outgoing": []
+    },
+    {
+      "status": "consumed",
+      "correlationId": "11111111-1111-1111-1111-111111111111",
+      "beginState": "Processing",
+      "endState": "Final",
+      "created": false,
+      "completed": true,
+      "instancePresent": false,
+      "outgoing": [
+        {
+          "kind": "publish",
+          "messageUrn": "urn:message:Contracts:OrderCompleted",
+          "destination": null
+        }
+      ]
+    },
+    {
+      "status": "missing-discarded",
+      "correlationId": "11111111-1111-1111-1111-111111111111",
+      "beginState": null,
+      "endState": null,
+      "created": false,
+      "completed": false,
+      "instancePresent": false,
+      "outgoing": []
+    }
+  ]
+}

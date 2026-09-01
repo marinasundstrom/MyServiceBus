@@ -35,6 +35,12 @@ This behavior is exposed at several levels without making any one syntax authori
 
 The compatibility target is the state-machine concepts and observable behavior in this specification. Exact MassTransit public interfaces, base classes, generic constraints, overloads, and fluent signatures are not compatibility requirements. The low-level APIs also should not be mistaken for the preferred application-facing DSL merely because they are implemented first.
 
+## Current Implementation Boundary
+
+The first matching C# and Java low-level runtimes now execute the version 1 subset against volatile in-memory repositories. Native callbacks bind message types, correlation selectors, saga factories and cloning, state accessors, mutations, and outgoing message factories to a validated normalized definition. The runtimes serialize work per correlation identity, execute activities in order against a cloned working instance, commit only after the behavior succeeds, and return logically captured send or publish operations with the transition result.
+
+This is execution-foundation evidence, not yet a supported bus-integrated saga feature. No receive endpoint is registered automatically, captured outgoing work is not dispatched to a broker, and the in-memory logical capture is not a durable transactional outbox. Process loss discards all instances. The low-level activity-index binding is intended for adapters, generators, and the future native DSL implementations rather than ordinary application authoring.
+
 ## Definitions
 
 - **Definition**: the immutable state-machine declaration used for validation, execution, topology, and monitoring.
@@ -69,7 +75,7 @@ State-machine definition
 
 Native message types, property expressions, delegates, lambdas, dependency containers, repository sessions, and activity callbacks stay in the local runtime. Stable member identities describe their meaning for validation and inspection; they are not expressions executed from a JSON fixture.
 
-The canonical fixture at `test/fixtures/state-machines/v1/basic-order-state-machine.json` defines the serialized ordering and vocabulary for version 1 declarations. Arrays are ordered deterministically by stable ID except that activities retain declaration order because order is behavioral.
+The canonical fixture at `test/fixtures/state-machines/v1/basic-order-state-machine.json` defines the serialized ordering and vocabulary for version 1 declarations. `basic-order-sequence.json` defines matching observable creation, transition, outgoing-operation, finalization, deletion, and missing-discard outcomes. Arrays are ordered deterministically by stable ID except that activities retain declaration order because order is behavioral.
 
 ## Validation
 
