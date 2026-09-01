@@ -8,9 +8,25 @@ using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Logging;
 using MyServiceBus.Monitoring;
 using MyServiceBus.Generated;
+using MyServiceBus.Persistence;
+using MyServiceBus.Persistence.PostgreSql;
+using Npgsql;
 using OpenTelemetry.Trace;
 
+const string sagaServiceName = "testapp-csharp-sagas";
 var builder = WebApplication.CreateBuilder(args);
+var sagaConnectionString = builder.Configuration.GetConnectionString("outbox");
+var sagaDataSource = sagaConnectionString is null ? null : NpgsqlDataSource.Create(sagaConnectionString);
+
+if (sagaDataSource is not null)
+{
+    builder.Services.AddSingleton(sagaDataSource);
+    builder.Services.AddPostgreSqlOutboxDelivery(sagaServiceName, options =>
+    {
+        options.OwnerId = $"testapp-{Environment.MachineName}-{Environment.ProcessId}";
+        options.PollInterval = TimeSpan.FromMilliseconds(250);
+    });
+}
 
 builder.AddServiceDefaults();
 builder.Services.AddScoped<GeneratedConsumerAudit>();
@@ -18,7 +34,19 @@ builder.Services.AddScoped<GeneratedConsumerAudit>();
 builder.Services.AddServiceBus(x =>
 {
     x.AddGeneratedConsumers();
-    x.AddSagaStateMachine<OrderOrchestrationStateMachine, OrderOrchestrationState>();
+    if (sagaDataSource is null)
+    {
+        x.AddSagaStateMachine<OrderOrchestrationStateMachine, OrderOrchestrationState>(
+            new OrderOrchestrationStateMachine());
+    }
+    else
+    {
+        x.UseBusOutbox();
+        x.AddPostgreSqlSagaStateMachine<OrderOrchestrationStateMachine, OrderOrchestrationState>(
+            new OrderOrchestrationStateMachine(requireDurableRepository: true),
+            sagaServiceName,
+            sagaType: "sample-order-orchestration");
+    }
     x.AddChoreography("sample-order-submission", "1", "TestApp.CSharp", workflow => workflow
         .Step<SubmitOrder>("csharp-submit-order", step => step
             .OwnedBy<SubmitOrderConsumer>()
@@ -99,6 +127,9 @@ builder.Services.AddHealthChecks()
 builder.Services.AddOpenApi();
 
 var app = builder.Build();
+
+if (sagaDataSource is not null)
+    await PostgreSqlSchema.EnsureCreatedAsync(sagaDataSource);
 
 var recurringJobs = app.Services.GetRequiredService<IRecurringJobScheduler>();
 var sampleReportIdentity = new RecurringJobIdentity("sample-report", "aspire-demo");
@@ -210,7 +241,8 @@ app.MapPost("/workflows/orchestration", async (IPublishEndpoint publishEndpoint,
     return Results.Accepted(value: new
     {
         message.OrderId,
-        Coordinator = nameof(OrderOrchestrationStateMachine)
+        Coordinator = nameof(OrderOrchestrationStateMachine),
+        Repository = sagaDataSource is null ? "in-memory" : "postgresql"
     });
 })
 .WithName("Start_OrderOrchestrationWorkflow")

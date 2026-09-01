@@ -34,13 +34,15 @@ builder.AddProject<MyServiceBus_Dashboard>("monitoring-dashboard")
 
 var csharpTestApp = builder.AddProject<TestApp>("testapp")
     .WithReference(rabbitmq)
+    .WithReference(outbox)
     .WithEnvironment("MONITORING_SERVICE_URL", monitoringService.GetEndpoint("http"))
     .WithEnvironment("OTEL_EXPORTER_OTLP_METRICS_DEFAULT_HISTOGRAM_AGGREGATION", "explicit_bucket_histogram")
     .WithEnvironment("RABBITMQ_HOST", rabbitmq.Resource.PrimaryEndpoint.Property(EndpointProperty.Host))
     .WithEnvironment("RABBITMQ_PORT", rabbitmq.Resource.PrimaryEndpoint.Property(EndpointProperty.Port))
     .WithExternalHttpEndpoints()
     .WaitFor(monitoringService)
-    .WaitFor(rabbitmq);
+    .WaitFor(rabbitmq)
+    .WaitFor(outbox);
 
 var massTransitTestApp = builder.AddProject<TestApp_MassTransit>("testapp-masstransit")
     .WithReference(rabbitmq)

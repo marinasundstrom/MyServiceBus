@@ -5,12 +5,20 @@ namespace TestApp;
 
 public sealed class OrderOrchestrationStateMachine : SagaStateMachine<OrderOrchestrationState>
 {
-    public OrderOrchestrationStateMachine()
+    public OrderOrchestrationStateMachine(bool requireDurableRepository = false)
         : base("sample-order-orchestration", "1", "TestApp.CSharp")
     {
         InstanceState(state => state.CurrentState, (state, value) => state.CurrentState = value);
         InstanceFactory(id => new OrderOrchestrationState { CorrelationId = id });
         CloneInstance(state => state.Copy());
+        if (requireDurableRepository)
+        {
+            RepositoryRequirements(new SagaRepositoryRequirements(
+                SagaCorrelationKind.Identity,
+                SagaConcurrencyKind.Pessimistic,
+                SagaDurabilityKind.Durable,
+                SagaOutboxKind.Transactional));
+        }
 
         var awaitingInventory = State("AwaitingInventory");
         var awaitingPayment = State("AwaitingPayment");
