@@ -110,6 +110,14 @@ C# and Java should each provide a normal library API for defining state machines
 
 These authoring DSLs sit above the low-level execution and descriptor APIs. Application developers may use the lower level directly for framework integration, generated definitions, testing, or unusual dynamic composition, but ordinary applications should not need to assemble repository policies, transition tables, or activity pipelines manually.
 
+The preferred starting point for the C# authoring DSL is the Automatonymous model now embodied by MassTransit state machines. Its core vocabulary and composition order are proven and familiar: declare `State` and `Event<T>` members, configure instance state and correlation, then compose `Initially`, `During`, `DuringAny`, `When`, ordered activities, transitions, ignores, and finalization. Common definitions should look and behave familiar enough that a MassTransit user can translate them mechanically.
+
+This direction does not require source compatibility with Automatonymous or MassTransit. MyServiceBus can omit legacy overloads, separate low-level runtime contracts from authoring concerns, make normalized identities and provider capabilities explicit, improve validation and diagnostics, and use newer C# facilities where they make definitions clearer. Deviations should serve a concrete usability, portability, correctness, AOT, or monitoring goal and remain documented. The Java DSL should preserve the same conceptual structure and behavior while using JVM-idiomatic types and asynchronous forms rather than imitating C# syntax.
+
+The reference DSL also defines a completeness boundary for fundamental saga support. Its common concepts must be implementable by composing public low-level primitives for instance state, event identity and correlation, creation and missing-instance policy, exact-state and any-state behavior selection, ordered activities, transition and finalization, repository transactions, outgoing-work capture, and observations. The DSL must not contain a second hidden execution path. If an ordinary DSL construct cannot lower through those primitives, the primitive layer is incomplete or the construct belongs to a separately declared advanced capability profile.
+
+This boundary does not force every historical Automatonymous feature into the first release. Requests, durable schedules, composite events, exception branches, query correlation, and richer hierarchical behavior enter through explicit profiles after their persistence and failure semantics are defined. Once included, however, they extend the same low-level runtime and normalized definition rather than bypassing them.
+
 An exploratory C# shape may resemble:
 
 ```csharp
@@ -168,7 +176,7 @@ public final class OrderStateMachine extends SagaStateMachine<OrderState> {
 }
 ```
 
-These examples establish direction, not final signatures or an API-compatibility promise. The design must validate async activities, cancellation, exceptions, Java type erasure, source generation, annotation processing, NativeAOT, and GraalVM constraints before stabilization. The equivalent declaration must also be constructible explicitly through descriptors or builders so code generation is optional.
+These examples establish the preferred Automatonymous-shaped direction, not final signatures or a complete API-compatibility promise. The design must validate async activities, cancellation, exceptions, Java type erasure, source generation, annotation processing, NativeAOT, and GraalVM constraints before stabilization. The equivalent declaration must also be constructible explicitly through descriptors or builders so code generation is optional.
 
 ## Runtime Behavior
 

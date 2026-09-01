@@ -35,6 +35,8 @@ This behavior is exposed at several levels without making any one syntax authori
 
 The compatibility target is the state-machine concepts and observable behavior in this specification. Exact MassTransit public interfaces, base classes, generic constraints, overloads, and fluent signatures are not compatibility requirements. The low-level APIs also should not be mistaken for the preferred application-facing DSL merely because they are implemented first.
 
+The planned Automatonymous-shaped native DSL is a primitive-completeness gate. Every common DSL construct must lower into the same public correlation, repository, behavior, activity, transition, completion, outgoing-work, and observation contracts available to generated definitions and lower-level integrations. DSL-only execution semantics are not permitted. Features outside the current primitive set require an explicit capability and conformance profile before the DSL exposes them.
+
 ## Current Implementation Boundary
 
 The first matching C# and Java low-level runtimes now execute the version 1 subset against volatile in-memory repositories. Native callbacks bind message types, correlation selectors, saga factories and cloning, state accessors, mutations, and outgoing message factories to a validated normalized definition. The runtimes serialize work per correlation identity, execute activities in order against a cloned working instance, commit only after the behavior succeeds, and return logically captured send or publish operations with the transition result.

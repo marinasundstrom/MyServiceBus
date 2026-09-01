@@ -134,6 +134,8 @@ The first specification pass should begin from the established MassTransit state
 
 The mapping is semantic rather than necessarily textual. For example, Raven's `in AwaitingPayment` can lower to the MyServiceBus equivalent of MassTransit's `During(AwaitingPayment, ...)`, and `transition Processing` can lower to the equivalent of `TransitionTo(Processing)`, without requiring either spelling in the portable contract. Conversely, a concise Raven feature must not silently weaken correlation, persistence, retry, outbox, or completion behavior established by the MassTransit baseline.
 
+The ordinary C# DSL is expected to begin from the Automatonymous-style composition model, preserving substantial familiarity for common state-machine definitions while allowing deliberate MyServiceBus improvements. Raven is a higher-level projection over that same executable model, not the reason the C# DSL exists and not a separate runtime. The Java DSL maps the same states, events, behaviors, and ordered activities through idiomatic JVM APIs.
+
 The initial scope should favor the common state-machine path. Consumer sagas, routing slips, and every advanced Automatonymous expression are separate compatibility decisions and should not be folded into the first DSL merely because MassTransit supports them.
 
 ## MassTransit-Based Reimplementation
