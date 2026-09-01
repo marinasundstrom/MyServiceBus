@@ -1,5 +1,5 @@
 <section class="panel instances scheduled-work-panel">
-    <div class="section-heading"><div><p class="eyebrow">Current state</p><h2>Messages and jobs</h2></div><span>Pending work and recent outcomes</span></div>
+    <div class="section-heading"><div><p class="eyebrow">Current state</p><h2>Messages and jobs</h2></div><span>@Items.Count tracked · pending work and recent outcomes</span></div>
     @if (Items.Count == 0)
     {
         <p class="panel-empty">No scheduled work has been reported. The application may not use scheduling, may be offline, or may be connected through a provider that does not report scheduled state yet.</p>
@@ -9,7 +9,7 @@
         <div class="table-wrap"><table>
             <thead><tr><th>Status</th><th>Application</th><th>Scheduled item</th><th>Due</th><th>Operation</th><th>Provider</th><th>Participant</th><th>Attempt</th></tr></thead>
             <tbody>
-                @foreach (var item in Items)
+                @foreach (var item in PageItems)
                 {
                     <tr>
                         <td><span class="status-dot @StatusClass(item.Work.Status)"></span><strong>@item.Work.Status</strong><small>@ValueOrDash(item.Work.FailureCategory)</small></td>
@@ -24,12 +24,25 @@
                 }
             </tbody>
         </table></div>
+        <ListPagination Offset="EffectiveOffset" PageSize="PageSize" ItemCount="PageItems.Count" Total="Items.Count" PageChanged="ChangePageAsync" />
     }
 </section>
 
 @code {
+    private const int PageSize = 25;
+
     [Parameter, EditorRequired]
     public required IReadOnlyList<MonitoringScheduledWorkSummary> Items { get; set; }
+
+    private int offset;
+    private int EffectiveOffset => Items.Count == 0 ? 0 : Math.Min(offset, (Items.Count - 1) / PageSize * PageSize);
+    private IReadOnlyList<MonitoringScheduledWorkSummary> PageItems => Items.Skip(EffectiveOffset).Take(PageSize).ToArray();
+
+    private Task ChangePageAsync(int value)
+    {
+        offset = value;
+        return Task.CompletedTask;
+    }
 
     private static string StatusClass(string status) => status switch
     {

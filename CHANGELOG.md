@@ -4,7 +4,7 @@ This changelog summarizes the bigger themes in the repository history rather tha
 
 ## Unreleased
 
-- Added server-side pagination and retained-result counts to the Dashboard message index, with URL-backed search and status filters that remain applied while paging. Workflow runs now share the same reusable list pager.
+- Added server-side pagination and retained-result counts to the Dashboard message index, with URL-backed search and status filters that remain applied while paging. Workflow runs and potentially large current-state tables for endpoints, replicas, scheduled work, recurring jobs, and tracked jobs now share the same reusable list pager.
 - Improved the Dashboard shell at phone widths with concise live-status text, fully readable theme and density choices, a visual continuation cue for the horizontally scrollable section navigation, and route-aware scrolling that keeps the active section visible. Workflow guidance now describes saga transition retention as monitoring-service policy instead of the obsolete live-window-only limitation.
 - Preserved authoritative committed saga state when retained monitoring history is merged with later failed and recovered delivery attempts. Saga run detail now labels the sequence as delivery-attempt history so visible failures are not described as committed transitions.
 - Added matching C# and Java PostgreSQL saga recovery gates over the real state-machine runtime. They verify rollback of state and transactionally staged outgoing envelopes after a failed attempt, restart recovery through newly constructed runtimes, pessimistic serialization of competing same-correlation deliveries, durable final-instance deletion, and retention of only committed outbox records.

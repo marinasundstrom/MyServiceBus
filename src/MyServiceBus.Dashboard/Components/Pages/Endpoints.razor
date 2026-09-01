@@ -26,7 +26,7 @@ else
             <table>
                 <thead><tr><th>Status</th><th>Endpoint</th><th>Application</th><th>Replicas</th><th>Handled / sec</th><th>Retries</th><th>Failures</th><th>Consumers</th><th>Messages</th><th>Transport</th></tr></thead>
                 <tbody>
-                    @foreach (var endpoint in Dashboard.Endpoints.OrderBy(StatusRank).ThenBy(endpoint => endpoint.ApplicationName).ThenBy(endpoint => endpoint.EndpointName))
+                    @foreach (var endpoint in PageEndpoints)
                     {
                         <tr>
                             <td><span class="status-dot @StatusClass(endpoint)"></span>@StatusLabel(endpoint)</td>
@@ -44,12 +44,30 @@ else
                 </tbody>
             </table>
         </div>
+        <ListPagination Offset="EffectiveOffset" PageSize="PageSize" ItemCount="PageEndpoints.Count" Total="Dashboard.Endpoints.Count" PageChanged="ChangePageAsync" />
         <p class="table-note">“Handled / sec” counts successfully consumed messages. Retry and failure totals cover the same 60-second window.</p>
     </section>
 }
 
 @code {
+    private const int PageSize = 25;
+    private int offset;
+
     private int AttentionCount => Dashboard.Endpoints.Count(endpoint => !IsAvailable(endpoint) || endpoint.Faulted > 0);
+    private int EffectiveOffset => Dashboard.Endpoints.Count == 0 ? 0 : Math.Min(offset, (Dashboard.Endpoints.Count - 1) / PageSize * PageSize);
+    private IReadOnlyList<MonitoringEndpointSummary> PageEndpoints => Dashboard.Endpoints
+        .OrderBy(StatusRank)
+        .ThenBy(endpoint => endpoint.ApplicationName)
+        .ThenBy(endpoint => endpoint.EndpointName)
+        .Skip(EffectiveOffset)
+        .Take(PageSize)
+        .ToArray();
+
+    private Task ChangePageAsync(int value)
+    {
+        offset = value;
+        return Task.CompletedTask;
+    }
 
     private static bool IsAvailable(MonitoringEndpointSummary endpoint) => endpoint.OnlineInstances > 0;
 

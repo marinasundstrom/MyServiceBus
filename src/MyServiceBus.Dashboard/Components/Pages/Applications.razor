@@ -58,7 +58,7 @@ else
             <table>
                 <thead><tr><th>Status</th><th>Group / application</th><th>Replica</th><th>Handled / sec</th><th>Load share</th><th>p95 time</th><th>Retries</th><th>Failures</th><th>Transport</th></tr></thead>
                 <tbody>
-                    @foreach (var instance in Dashboard.Instances.OrderBy(GetGroup).ThenBy(instance => instance.ApplicationName).ThenBy(instance => instance.InstanceId))
+                    @foreach (var instance in PageInstances)
                     {
                         var rate = InstanceRate(instance.ApplicationName, instance.InstanceId);
                         <tr>
@@ -74,12 +74,31 @@ else
                 </tbody>
             </table>
         </div>
+        <ListPagination Offset="EffectiveInstanceOffset" PageSize="PageSize" ItemCount="PageInstances.Count" Total="Dashboard.Instances.Count" PageChanged="ChangeInstancePageAsync" />
     </section>
 }
 
 @code {
+    private const int PageSize = 25;
+    private int instanceOffset;
+
     private IEnumerable<IGrouping<string, MonitoringApplicationSummary>> GroupedApplications
         => Dashboard.Applications.GroupBy(GetGroup).OrderBy(group => group.Key, StringComparer.Ordinal);
+
+    private int EffectiveInstanceOffset => Dashboard.Instances.Count == 0 ? 0 : Math.Min(instanceOffset, (Dashboard.Instances.Count - 1) / PageSize * PageSize);
+    private IReadOnlyList<MonitoringInstanceSummary> PageInstances => Dashboard.Instances
+        .OrderBy(GetGroup)
+        .ThenBy(instance => instance.ApplicationName)
+        .ThenBy(instance => instance.InstanceId)
+        .Skip(EffectiveInstanceOffset)
+        .Take(PageSize)
+        .ToArray();
+
+    private Task ChangeInstancePageAsync(int value)
+    {
+        instanceOffset = value;
+        return Task.CompletedTask;
+    }
 
     private MonitoringRateSummary? ApplicationRate(string applicationName)
         => Dashboard.ApplicationRates.FirstOrDefault(rate => rate.ApplicationName == applicationName);
