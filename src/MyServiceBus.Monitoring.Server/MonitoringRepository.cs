@@ -1242,16 +1242,35 @@ public sealed class MonitoringRepository
     }
 
     public IReadOnlyList<MonitoringObservationRecord> GetRecentObservations(string? applicationName, int limit)
+        => GetObservationIndex(applicationName, false, 0, limit).Observations;
+
+    public MonitoringObservationIndexPage GetObservationIndex(
+        string? applicationName,
+        bool attentionOnly,
+        int offset,
+        int limit)
     {
         lock (observationSync)
         {
-            return recentObservations
+            var observations = recentObservations
                 .Where(record => applicationName is null || string.Equals(record.ApplicationName, applicationName, StringComparison.Ordinal))
+                .Where(record => !attentionOnly || IsAttentionObservation(record.Observation))
                 .OrderByDescending(record => record.Observation.OccurredAtUtc)
-                .Take(Math.Clamp(limit, 1, RecentObservationLimit))
                 .ToArray();
+
+            var normalizedOffset = Math.Max(0, offset);
+            var normalizedLimit = Math.Clamp(limit, 1, 100);
+            return new MonitoringObservationIndexPage(
+                normalizedOffset,
+                normalizedLimit,
+                observations.Length,
+                observations.Skip(normalizedOffset).Take(normalizedLimit).ToArray());
         }
     }
+
+    private static bool IsAttentionObservation(MonitoringObservation observation)
+        => observation.Kind.Contains("fault", StringComparison.Ordinal)
+            || observation.Kind.StartsWith("retry_", StringComparison.Ordinal);
 
     public IReadOnlyList<MonitoringObservationRecord> GetMessageObservations(string messageId)
     {

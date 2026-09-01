@@ -238,6 +238,12 @@ public class MonitoringRepositoryTests
         active.LatestObservationAtUtc.ShouldBe(now.AddSeconds(-3));
         active.Complete.ShouldBeTrue();
 
+        var attentionPage = repository.GetObservationIndex("orders", true, 1, 1);
+        attentionPage.Offset.ShouldBe(1);
+        attentionPage.Limit.ShouldBe(1);
+        attentionPage.Total.ShouldBe(2);
+        attentionPage.Observations.Single().Observation.Kind.ShouldBe("consume_faulted");
+
         var recovered = repository.GetDashboardSummary(60, now.AddSeconds(61));
         recovered.FailureCount.ShouldBe(0);
         recovered.RetryCount.ShouldBe(0);

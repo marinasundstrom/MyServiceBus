@@ -1,31 +1,53 @@
 @page "/failures"
 @rendermode InteractiveServer
 @inherits MonitoringPageBase
+@inject MonitoringApiClient Api
 
 <PageTitle>Failures · MyServiceBus Monitoring</PageTitle>
 <DashboardPageHeader Eyebrow="Diagnostics" Title="Retries and failures" Description="Inspect messages that needed another attempt or could not be handled. Expand a row for correlation and exception details." />
 
 <section class="panel failures-panel">
-    <div class="section-heading"><div><p class="eyebrow">Recent activity</p><h2>Messages needing attention</h2></div><span>Newest first</span></div>
-    @if (SignificantObservations.Count == 0)
+    <div class="section-heading"><div><p class="eyebrow">Recent activity</p><h2>Messages needing attention</h2></div><span>@(CurrentPage?.Total ?? 0) retained · newest first</span></div>
+    @if (CurrentPage is not { } page || page.Observations.Count == 0)
     {
         <p class="panel-empty">No retries or failures are present in the retained observations.</p>
     }
     else
     {
         <div class="event-list">
-            @foreach (var record in SignificantObservations)
+            @foreach (var record in page.Observations)
             {
                 <details class="event-row"><summary><span class="event-kind">@DisplayKind(record.Observation.Kind)</span><span class="event-summary"><strong>@record.ApplicationName</strong><small>@ShortMessageType(record.Observation.MessageType) · @record.InstanceId</small></span><time>@record.Observation.OccurredAtUtc.ToLocalTime().ToString("HH:mm:ss")</time></summary>
                     <div class="event-detail"><span><small>Endpoint</small><strong>@ValueOrDash(record.Observation.EndpointName)</strong></span><span><small>Retry</small><strong>@RetryDescription(record.Observation)</strong></span><span><small>Exception</small><strong>@ValueOrDash(record.Observation.ExceptionType)</strong></span><span><small>Correlation ID</small><strong class="mono">@ValueOrDash(record.Observation.CorrelationId)</strong></span><span><small>Conversation ID</small><strong class="mono">@ValueOrDash(record.Observation.ConversationId)</strong></span><span><small>Trace ID</small><strong class="mono">@ValueOrDash(record.Observation.TraceId)</strong></span><span class="event-message"><small>Failure message</small><strong>@ValueOrDash(record.Observation.ExceptionMessage)</strong></span><span class="event-message"><small>Message URN</small><strong class="mono">@ValueOrDash(record.Observation.MessageUrn)</strong></span></div>
                 </details>
             }
         </div>
+        <ListPagination Offset="page.Offset"
+                        PageSize="page.Limit"
+                        ItemCount="page.Observations.Count"
+                        Total="page.Total"
+                        Disabled="loading"
+                        PageChanged="LoadPageAsync" />
     }
 </section>
 
 @code {
-    private IReadOnlyList<MonitoringObservationRecord> SignificantObservations
-        => Dashboard.Observations.Where(record => record.Observation.Kind.Contains("fault", StringComparison.Ordinal)
-            || record.Observation.Kind.StartsWith("retry_", StringComparison.Ordinal)).ToArray();
+    private const int PageSize = 25;
+    private MonitoringObservationIndexPage? queriedPage;
+    private bool loading;
+
+    private MonitoringObservationIndexPage? CurrentPage => queriedPage ?? Dashboard.FailureObservationIndex;
+
+    private async Task LoadPageAsync(int offset)
+    {
+        loading = true;
+        try
+        {
+            queriedPage = await Api.GetRecentObservations(null, true, offset, PageSize, CancellationToken.None);
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
 }

@@ -220,11 +220,16 @@ public static class MonitoringApi
             .Produces(StatusCodes.Status404NotFound);
         query.MapGet("/observations", (
             string? application,
+            bool? attentionOnly,
+            int? offset,
             int? limit,
             MonitoringRepository repository,
             MonitoringDisclosurePolicy disclosure) =>
-            disclosure.Apply(repository.GetRecentObservations(application, limit ?? 100)))
-            .WithSummary("List recent bounded monitoring observations under the configured disclosure policy");
+        {
+            var page = repository.GetObservationIndex(application, attentionOnly ?? false, offset ?? 0, limit ?? 50);
+            return page with { Observations = disclosure.Apply(page.Observations) };
+        })
+            .WithSummary("List a filtered page of retained monitoring observations under the configured disclosure policy");
         query.MapGet("/messages/{messageId}/observations", (
             string messageId,
             MonitoringRepository repository,

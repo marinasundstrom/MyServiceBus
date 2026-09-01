@@ -40,7 +40,7 @@ public sealed class MonitoringDashboardState : IAsyncDisposable
     public MonitoringChoreographyRuntimeSnapshot? ChoreographyRuntime { get; private set; }
     public MonitoringWorkflowRunPage? WorkflowRuns { get; private set; }
     public MonitoringWorkflowRunIndexPage? WorkflowRunIndex { get; private set; }
-    public IReadOnlyList<MonitoringObservationRecord> Observations { get; private set; } = [];
+    public MonitoringObservationIndexPage? FailureObservationIndex { get; private set; }
     public MonitoringMessageIndexPage? MessageIndex { get; private set; }
     public IReadOnlyList<MonitoringOutboxDispatcherSummary> OutboxDispatchers { get; private set; } = [];
     public IReadOnlyList<MonitoringScheduledWorkSummary> ScheduledWork { get; private set; } = [];
@@ -151,7 +151,7 @@ public sealed class MonitoringDashboardState : IAsyncDisposable
                 ? api.GetWorkflowRunIndex(null, null, null, null, 0, 100, stopping.Token)
                 : Task.FromResult<MonitoringWorkflowRunIndexPage?>(null);
             var timeSeries = api.GetTimeSeries(stopping.Token);
-            var observations = api.GetRecentObservations(stopping.Token);
+            var observations = api.GetRecentObservations(null, true, 0, 25, stopping.Token);
             var messages = options.Features.Messages
                 ? api.GetMessages(null, null, null, 0, 25, stopping.Token)
                 : Task.FromResult<MonitoringMessageIndexPage?>(null);
@@ -200,7 +200,7 @@ public sealed class MonitoringDashboardState : IAsyncDisposable
             WorkflowRuns = workflowRuns.Result;
             WorkflowRunIndex = workflowRunIndex.Result;
             TimeSeries = timeSeries.Result;
-            Observations = observations.Result;
+            FailureObservationIndex = observations.Result;
             MessageIndex = messages.Result;
             OutboxDispatchers = outboxDispatchers.Result;
             ScheduledWork = scheduledWork.Result;
