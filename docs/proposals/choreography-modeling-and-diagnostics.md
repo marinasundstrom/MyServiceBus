@@ -2,7 +2,7 @@
 
 ## Status
 
-Future product-area proposal with its first foundation slices implemented. Message-operation observations carry message identity and consume-to-outbound causal identity in C# and Java. The collector prefers exact envelope matches for deliveries, reports correlation fallback explicitly, and exposes exact local reactions separately. Matching C# and Java builders produce the same versioned, deterministic choreography fragment from a shared fixture. Applications can register validated fragments, and topology version 2 plus inspection and monitoring metadata expose them without changing delivery. The monitoring service now merges cross-application fragments, collapses identical replica declarations, retains freshness, and reports definition conflicts through a read-only query. Declared-versus-observed graph comparison, behavioral diagnostics, and the focused Dashboard view remain future work. This document is not a supported lifecycle API, alerting service, or workflow runtime commitment.
+Future product-area proposal with its first foundation slices implemented. Message-operation observations carry message identity and consume-to-outbound causal identity in C# and Java. The collector prefers exact envelope matches for deliveries, reports correlation fallback explicitly, and exposes exact local reactions separately. Matching C# and Java builders produce the same versioned, deterministic choreography fragment from a shared fixture. Applications can register validated fragments, and topology version 2 plus inspection and monitoring metadata expose them without changing delivery. The monitoring service merges cross-application fragments, collapses identical replica declarations, retains freshness, and reports definition conflicts through a read-only query. The Dashboard now renders this declared definition map grouped by application before attempting observed deviations. Declared-versus-observed comparison, behavioral diagnostics, and runtime overlays remain future work. This document is not a supported lifecycle API, alerting service, or workflow runtime commitment.
 
 ## Summary
 
@@ -302,7 +302,7 @@ The executable choreography sample should first reuse the mixed C# and Java moni
 4. Extend exact producer-to-consumer matching into explicit consume-to-outbound causation (**implemented first slice**).
 5. Attach the implemented declaration builders to registration and add normalized topology relationships (**implemented first slice**).
 6. Implement graph comparison and diagnostics in the monitoring service with completeness gates.
-7. Add the focused dashboard view and cross-language sample.
+7. Add the focused declared-workflow dashboard view (**implemented first view**) and cross-language sample.
 8. Explore bounded recurring-pattern discovery and breakout visualization only after exact causal chains and comparison evidence are trustworthy.
 9. Evaluate demand for an explicit per-conversation lifecycle model only after the bounded diagnostic model has production evidence.
 

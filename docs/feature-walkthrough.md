@@ -914,7 +914,7 @@ services.from(MessageBusServices.class).addServiceBus(configurator -> {
 
 Use `sends`, `publishes`, `responds`, `schedules`, or `terminates` to describe an outcome. An outcome is expected by default and may instead be informational or optional. Count and time expectations are diagnostic intent, not delivery guarantees or executable business predicates. Explicit message-URN overloads are available when cross-language contracts do not derive the same portable identity from their local type names. Registration rejects an unsupported schema, an invalid fragment, or two fragments with the same choreography and owner identity.
 
-When runtime monitoring is enabled, `GET /api/monitoring/v1/choreographies` merges the fragments reported by participating applications. Identical declarations from replicas collapse into one fragment view with reporting and online instance counts. Definition-version, owner, and step-ownership disagreement is returned as configuration evidence; the query does not execute the choreography or claim that a business workflow has failed.
+When runtime monitoring is enabled, `GET /api/monitoring/v1/choreographies` merges the fragments reported by participating applications. Identical declarations from replicas collapse into one fragment view with reporting and online instance counts. The Dashboard's **Workflows** page renders those declarations by application, consumed trigger, output, and matching downstream participant. Definition-version, owner, and step-ownership disagreement remains visible as configuration evidence; neither the query nor the map executes the choreography or claims that a business workflow has run or failed.
 
 ---
 

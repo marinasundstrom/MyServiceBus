@@ -252,6 +252,31 @@ td small { display: block; margin-top: 4px; color: var(--text-dim); font-size: .
 .map-help { margin: 0; padding: 12px 18px; border-top: 1px solid var(--border); color: var(--text-dim); font-size: .7rem; }
 .flow-detail-panel { margin-top: 18px; overflow: hidden; }
 .failures-panel { overflow: hidden; }
+.workflow-guidance { margin-top: -10px; }
+.workflow-panel { margin-top: 22px; overflow: hidden; }
+.workflow-heading > div:first-child { min-width: 0; }
+.workflow-badges { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 13px; }
+.workflow-badges .pill { padding: 5px 8px; }
+.workflow-conflict { padding: 5px 8px; border: 1px solid color-mix(in srgb, var(--danger) 50%, var(--border)); border-radius: 999px; background: var(--danger-surface); color: var(--danger); font-size: .69rem; font-weight: 750; }
+.workflow-map { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 16px; padding: 20px; background: linear-gradient(var(--border-subtle) 1px, transparent 1px), linear-gradient(90deg, var(--border-subtle) 1px, transparent 1px), var(--surface-deep); background-size: 42px 42px; }
+.workflow-participant { min-width: 0; overflow: hidden; border: 1px solid var(--border-strong); border-radius: 14px; background: color-mix(in srgb, var(--surface-solid) 96%, transparent); box-shadow: 0 12px 30px rgb(0 0 0 / 15%); }
+.workflow-participant > header { display: flex; justify-content: space-between; align-items: center; gap: 15px; padding: 15px 17px; border-bottom: 1px solid var(--border); background: color-mix(in srgb, var(--surface-raised) 70%, transparent); }
+.workflow-participant > header > div { min-width: 0; }
+.workflow-participant > header strong { font-size: .88rem; }
+.workflow-participant > header small { display: block; margin: 4px 0 0 18px; color: var(--text-dim); font-size: .66rem; }
+.workflow-participant > header > span { flex: 0 0 auto; color: var(--text-dim); font-size: .68rem; }
+.workflow-reactions { padding: 5px 17px; }
+.workflow-reaction { display: grid; grid-template-columns: minmax(105px, .8fr) 22px minmax(145px, 1fr); gap: 9px; align-items: center; padding: 16px 0; border-bottom: 1px solid var(--border-subtle); }
+.workflow-reaction:last-child { border-bottom: 0; }
+.workflow-step-label { grid-column: 1 / -1; color: var(--text-dim); font-size: .63rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.workflow-trigger, .workflow-output { min-width: 0; padding: 11px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface-deep); }
+.workflow-trigger small, .workflow-output small { display: block; color: var(--accent); font-size: .59rem; font-weight: 800; letter-spacing: .09em; text-transform: uppercase; }
+.workflow-trigger strong, .workflow-output strong { display: block; margin-top: 5px; overflow: hidden; color: var(--text-soft); font-size: .76rem; text-overflow: ellipsis; white-space: nowrap; }
+.workflow-trigger span, .workflow-output span { display: block; margin-top: 5px; overflow-wrap: anywhere; color: var(--text-dim); font-size: .62rem; line-height: 1.35; }
+.workflow-arrow { color: var(--accent); font-size: 1.15rem; text-align: center; }
+.workflow-outputs { display: grid; gap: 7px; }
+.workflow-output { border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); }
+.workflow-participant > footer { padding: 10px 17px; border-top: 1px solid var(--border); color: var(--text-dim); font-size: .63rem; }
 
 @media (max-width: 760px) {
     .theme-selector span { display: none; }
@@ -274,6 +299,7 @@ td small { display: block; margin-top: 4px; color: var(--text-dim); font-size: .
     .replica-flow-map-shell, .replica-flow-map-canvas { min-height: 520px; }
     .flow-map-heading { gap: 12px; }
     .flow-view-options { align-items: flex-start; }
+    .workflow-map { grid-template-columns: 1fr; padding: 12px; }
 }
 
 @media (max-width: 1100px) and (min-width: 761px) {
@@ -296,4 +322,7 @@ td small { display: block; margin-top: 4px; color: var(--text-dim); font-size: .
     .section-heading { align-items: start; flex-direction: column; }
     .application-overview-grid { grid-template-columns: 1fr; }
     .chart.compact { padding-inline: 8px; }
+    .workflow-reaction { grid-template-columns: 1fr; }
+    .workflow-step-label { grid-column: auto; }
+    .workflow-arrow { transform: rotate(90deg); }
 }

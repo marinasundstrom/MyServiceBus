@@ -1,0 +1,140 @@
+@page "/workflows"
+@rendermode InteractiveServer
+@inherits MonitoringPageBase
+
+<PageTitle>Declared Workflows · MyServiceBus Monitoring</PageTitle>
+<DashboardPageHeader Eyebrow="Coordination" Title="Declared workflows" Description="Explore the choreography that applications explicitly declare: which messages trigger local reactions, what those reactions emit, and which participants may react next." />
+
+<div class="guidance workflow-guidance">
+    <strong>Definition view</strong>
+    <span>This map shows application intent, not observed execution or authoritative workflow state. Replica counts describe declaration freshness.</span>
+</div>
+
+@if (Dashboard.Choreographies.Count == 0)
+{
+    <section class="empty-state">
+        <h2>No declared workflows</h2>
+        <p>Applications appear here after they register choreography fragments and export monitoring metadata.</p>
+    </section>
+}
+else
+{
+    @foreach (var choreography in Dashboard.Choreographies)
+    {
+        <section class="panel workflow-panel">
+            <div class="section-heading workflow-heading">
+                <div>
+                    <p class="eyebrow">Declared choreography</p>
+                    <h2>@choreography.ChoreographyId</h2>
+                    <div class="workflow-badges">
+                        @foreach (var version in choreography.DefinitionVersions)
+                        {
+                            <span class="pill">Version @version</span>
+                        }
+                        @foreach (var conflict in choreography.ConflictKinds)
+                        {
+                            <span class="workflow-conflict">@ConflictLabel(conflict)</span>
+                        }
+                    </div>
+                </div>
+                <span>@choreography.Fragments.Count @(choreography.Fragments.Count == 1 ? "participant" : "participants") · captured @choreography.LastCapturedAtUtc.ToLocalTime().ToString("MMM d, HH:mm:ss")</span>
+            </div>
+
+            <div class="workflow-map" aria-label="Declared reactions grouped by application">
+                @foreach (var fragment in choreography.Fragments)
+                {
+                    <article class="workflow-participant">
+                        <header>
+                            <div>
+                                <span class="status-dot @(fragment.OnlineInstances > 0 ? "online" : "offline")"></span>
+                                <strong>@fragment.ApplicationName</strong>
+                                @if (!string.Equals(fragment.ApplicationName, fragment.Owner, StringComparison.Ordinal))
+                                {
+                                    <small>Owner @fragment.Owner</small>
+                                }
+                            </div>
+                            <span>@fragment.OnlineInstances/@fragment.ReportingInstances online</span>
+                        </header>
+
+                        <div class="workflow-reactions">
+                            @foreach (var step in fragment.Steps)
+                            {
+                                <section class="workflow-reaction">
+                                    <div class="workflow-step-label">@step.Id</div>
+                                    <div class="workflow-trigger">
+                                        <small>Consumes</small>
+                                        <strong>@ContractLabel(step.TriggerMessageUrn)</strong>
+                                        @if (!string.IsNullOrWhiteSpace(step.OwnerComponent))
+                                        {
+                                            <span>@step.OwnerComponent</span>
+                                        }
+                                    </div>
+                                    <div class="workflow-arrow" aria-hidden="true">→</div>
+                                    <div class="workflow-outputs">
+                                        @foreach (var output in step.Outputs)
+                                        {
+                                            <div class="workflow-output">
+                                                <small>@output.Kind.ToString()</small>
+                                                <strong>@OutputLabel(output.MessageUrn)</strong>
+                                                <span>@OutputDetail(choreography, output)</span>
+                                            </div>
+                                        }
+                                    </div>
+                                </section>
+                            }
+                        </div>
+
+                        <footer>Definition @fragment.DefinitionVersion · last reported @fragment.LastCapturedAtUtc.ToLocalTime().ToString("HH:mm:ss")</footer>
+                    </article>
+                }
+            </div>
+        </section>
+    }
+}
+
+@code {
+    private static string ConflictLabel(string conflict) => conflict switch
+    {
+        "definition_version" => "Version conflict",
+        "step_ownership" => "Step ownership conflict",
+        "owner" => "Owner conflict",
+        _ => DisplayKind(conflict)
+    };
+
+    private static string OutputLabel(string? messageUrn)
+        => string.IsNullOrWhiteSpace(messageUrn) ? "Terminal" : ContractLabel(messageUrn);
+
+    private static string ContractLabel(string value) => value.Split('.', ':').Last();
+
+    private static string OutputDetail(
+        MonitoringDeclaredChoreography choreography,
+        MyServiceBus.Choreography.ChoreographyOutput output)
+    {
+        var details = new List<string>();
+        if (!string.IsNullOrWhiteSpace(output.Destination))
+            details.Add(output.Destination);
+
+        var targets = choreography.Fragments
+            .Where(fragment => fragment.Steps.Any(step => string.Equals(step.TriggerMessageUrn, output.MessageUrn, StringComparison.Ordinal)))
+            .Select(fragment => fragment.ApplicationName)
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(application => application, StringComparer.Ordinal)
+            .ToArray();
+        if (targets.Length > 0)
+            details.Add($"next: {string.Join(", ", targets)}");
+
+        details.Add(output.Requirement.ToString().ToLowerInvariant());
+        if (output.MinCount == output.MaxCount && output.MinCount.HasValue)
+            details.Add($"exactly {output.MinCount}");
+        else
+        {
+            if (output.MinCount.HasValue)
+                details.Add($"at least {output.MinCount}");
+            if (output.MaxCount.HasValue)
+                details.Add($"at most {output.MaxCount}");
+        }
+        if (output.WithinMilliseconds.HasValue)
+            details.Add($"within {TimeSpan.FromMilliseconds(output.WithinMilliseconds.Value):g}");
+        return string.Join(" · ", details);
+    }
+}
