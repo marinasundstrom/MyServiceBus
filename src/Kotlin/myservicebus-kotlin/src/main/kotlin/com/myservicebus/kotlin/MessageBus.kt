@@ -1,7 +1,6 @@
 package com.myservicebus.kotlin
 
 import com.myservicebus.MessageBus as JvmMessageBus
-import com.myservicebus.PublishContext
 import com.myservicebus.topology.BusTopology
 import java.net.URI
 import java.time.Duration
@@ -37,7 +36,7 @@ class MessageBus internal constructor(
 
     override suspend fun publish(message: Any, configure: PublishContext.() -> Unit) {
         awaitOperation { cancellationToken ->
-            delegate.publish(message, { context -> context.configure() }, cancellationToken)
+            delegate.publish(message, { context -> PublishContext(context).configure() }, cancellationToken)
         }
     }
 

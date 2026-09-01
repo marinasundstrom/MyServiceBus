@@ -98,7 +98,10 @@ fun main() = runBlocking {
             }
         }
 
-        bus.publish(order)
+        bus.publish(order) {
+            correlationId = order.orderId
+            headers["sample-language"] = "kotlin"
+        }
         println("Published SubmitOrder ${order.orderId}")
 
         val consumedOrderId = withTimeout(10_000) { SubmitOrderConsumer.received.await() }

@@ -54,6 +54,12 @@ ordinary Kotlin endpoint-provider facade can resolve an endpoint directly. This
 kind of distinction is why the Kotlin projection also serves as an architectural
 test of what behavior belongs in a future shared JVM core.
 
+Configuration callbacks follow the same boundary. Kotlin-owned `PublishContext`
+and `SendContext` receivers expose the shared mutable metadata as properties and
+adapt the completed configuration back into the exact Java context instance.
+This keeps configuration source independent from Java accessor conventions
+without copying state or creating a second outbound-message model.
+
 Language projections also act as design tests for the shared implementation.
 For example, a Kotlin suspend-handler interface adds an intermediate generic
 contract; supporting it requires the mediator to resolve inherited response

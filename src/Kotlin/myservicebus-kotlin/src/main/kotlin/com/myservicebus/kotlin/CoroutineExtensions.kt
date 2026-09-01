@@ -7,11 +7,9 @@ import com.myservicebus.ConsumeContext as JvmConsumeContext
 import com.myservicebus.ConsumerMethodInvoker
 import com.myservicebus.DefaultEndpointNameFormatter
 import com.myservicebus.MessageConsumer
-import com.myservicebus.PublishContext
 import com.myservicebus.PublishEndpoint as JvmPublishEndpoint
 import com.myservicebus.RequestClient
 import com.myservicebus.ResultHandler
-import com.myservicebus.SendContext
 import com.myservicebus.SendEndpoint as JvmSendEndpoint
 import com.myservicebus.mediator.Mediator as JvmMediator
 import com.myservicebus.tasks.CancellationToken
@@ -172,7 +170,7 @@ suspend fun <TMessage : Any> JvmPublishEndpoint.publishAwait(
     configure: PublishContext.() -> Unit,
 ) {
     awaitOperation { cancellationToken ->
-        publish(message, { context -> context.configure() }, cancellationToken)
+        publish(message, { context -> PublishContext(context).configure() }, cancellationToken)
     }
 }
 
@@ -187,7 +185,7 @@ suspend fun <TMessage : Any> JvmSendEndpoint.sendAwait(
     configure: SendContext.() -> Unit,
 ) {
     awaitOperation { cancellationToken ->
-        send(message, { context -> context.configure() }, cancellationToken)
+        send(message, { context -> SendContext(context).configure() }, cancellationToken)
     }
 }
 
@@ -212,7 +210,7 @@ suspend inline fun <TRequest, reified TResponse : Any> RequestClient<TRequest>.r
     getResponse(
         request,
         TResponse::class.java,
-        { context -> context.configure() },
+        { context -> SendContext(context).configure() },
         cancellationToken,
     )
 }
@@ -237,7 +235,7 @@ suspend inline fun <TRequest, reified TFirst : Any, reified TSecond : Any>
             request,
             TFirst::class.java,
             TSecond::class.java,
-            { context -> context.configure() },
+            { context -> SendContext(context).configure() },
             cancellationToken,
         )
     }.match(

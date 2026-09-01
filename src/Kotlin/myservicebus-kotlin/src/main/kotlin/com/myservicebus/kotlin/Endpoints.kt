@@ -1,9 +1,7 @@
 package com.myservicebus.kotlin
 
-import com.myservicebus.PublishContext
 import com.myservicebus.PublishEndpoint as JvmPublishEndpoint
 import com.myservicebus.PublishEndpointProvider as JvmPublishEndpointProvider
-import com.myservicebus.SendContext
 import com.myservicebus.SendEndpoint as JvmSendEndpoint
 import com.myservicebus.SendEndpointProvider as JvmSendEndpointProvider
 
@@ -48,7 +46,7 @@ internal class JvmPublishEndpointFacade(
 
     override suspend fun publish(message: Any, configure: PublishContext.() -> Unit) {
         awaitOperation { cancellationToken ->
-            delegate.publish(message, { context -> context.configure() }, cancellationToken)
+            delegate.publish(message, { context -> PublishContext(context).configure() }, cancellationToken)
         }
     }
 }
@@ -69,7 +67,7 @@ internal class JvmSendEndpointFacade(
 
     override suspend fun send(message: Any, configure: SendContext.() -> Unit) {
         awaitOperation { cancellationToken ->
-            delegate.send(message, { context -> context.configure() }, cancellationToken)
+            delegate.send(message, { context -> SendContext(context).configure() }, cancellationToken)
         }
     }
 }

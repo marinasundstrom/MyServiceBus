@@ -4,7 +4,7 @@ import com.myservicebus.RequestClient
 import com.myservicebus.RequestTimeout
 import com.myservicebus.Response2
 import com.myservicebus.ScopedClientFactory
-import com.myservicebus.SendContext
+import com.myservicebus.SendContext as JvmSendContext
 import com.myservicebus.di.ServiceCollection
 import com.myservicebus.kotlin.ConsumeContext
 import com.myservicebus.kotlin.Consumer
@@ -22,6 +22,7 @@ import com.myservicebus.kotlin.request
 import com.myservicebus.kotlin.requestOneOf
 import java.net.URI
 import java.util.concurrent.CompletableFuture
+import java.util.UUID
 import kotlinx.coroutines.runBlocking
 
 data class PackageSmokeMessage(val value: String)
@@ -61,16 +62,19 @@ class PackageSmokeHandler : SuspendHandler<PackageSmokeRequest, PackageSmokeResp
 }
 
 private class PackageSmokeRequestClient : RequestClient<PackageSmokeRequest> {
+    lateinit var context: JvmSendContext
+
     override fun <TResponse : Any?> getResponse(
-        context: SendContext,
+        context: JvmSendContext,
         responseType: Class<TResponse>,
     ): CompletableFuture<TResponse> = error("Single response is not used by this smoke test.")
 
     override fun <T1 : Any?, T2 : Any?> getResponse(
-        context: SendContext,
+        context: JvmSendContext,
         responseType1: Class<T1>,
         responseType2: Class<T2>,
     ): CompletableFuture<Response2<T1, T2>> {
+        this.context = context
         val response: Response2<PackageSmokeResponse, PackageSmokeRejection> =
             Response2.fromT2(PackageSmokeRejection("rejected"))
         @Suppress("UNCHECKED_CAST")
@@ -116,11 +120,18 @@ fun main() = runBlocking {
     val response: PackageSmokeResponse = mediator.request(PackageSmokeRequest("request-smoke"))
     check(response.value == "request-smoke")
 
+    val correlationId = UUID.randomUUID()
+    val requestClient = PackageSmokeClientFactory()
+        .createRequestClient<PackageSmokeRequest>() as PackageSmokeRequestClient
     val result: RequestResult<PackageSmokeResponse, PackageSmokeRejection> =
-        PackageSmokeClientFactory()
-            .createRequestClient<PackageSmokeRequest>()
-            .requestOneOf(PackageSmokeRequest("one-of-smoke"))
+        requestClient.requestOneOf(PackageSmokeRequest("one-of-smoke")) {
+            headers["projection"] = "kotlin"
+            this.correlationId = correlationId
+            check(jvm { this.correlationId } == correlationId)
+        }
     check(result is RequestResult.Second && result.message.value == "rejected")
+    check(requestClient.context.headers["projection"] == "kotlin")
+    check(requestClient.context.correlationId == correlationId)
 
     println("Verified the staged MyServiceBus Kotlin Maven package from a consumer project.")
 }

@@ -4,7 +4,7 @@ import com.myservicebus.ConsumeContext as JvmConsumeContext
 import com.myservicebus.MediatorResponseTypeException
 import com.myservicebus.RequestClient
 import com.myservicebus.Response2
-import com.myservicebus.SendContext
+import com.myservicebus.SendContext as JvmSendContext
 import com.myservicebus.SendEndpoint
 import com.myservicebus.SendEndpointProvider
 import com.myservicebus.di.ServiceCollection
@@ -136,13 +136,19 @@ class CoroutineExtensionsTest {
     @Test
     fun `request client projects typed response and Kotlin context configuration`() = runBlocking {
         val client = CapturingRequestClient()
+        val correlationId = UUID.randomUUID()
+        var jvmContextReached = false
 
         val response: OrderStatus = client.request(LookupOrder("B-17")) {
             headers["trace-id"] = "kotlin-request"
+            this.correlationId = correlationId
+            jvmContextReached = jvm { this.correlationId == correlationId }
         }
 
         assertEquals(OrderStatus("B-17", "remote"), response)
         assertEquals("kotlin-request", client.context.headers["trace-id"])
+        assertEquals(correlationId, client.context.correlationId)
+        assertTrue(jvmContextReached)
     }
 
     @Test
@@ -168,6 +174,8 @@ class CoroutineExtensionsTest {
         val messageId = UUID.randomUUID()
         val correlationId = UUID.randomUUID()
         val conversationId = UUID.randomUUID()
+        val publishedCorrelationId = UUID.randomUUID()
+        var publishJvmContextReached = false
         val sharedContext = JvmConsumeContext(
             incoming,
             mutableMapOf<String, Any>("trace-id" to "context-projection"),
@@ -186,7 +194,11 @@ class CoroutineExtensionsTest {
         )
         val context = ConsumeContext(sharedContext)
 
-        context.publish(ProjectedEvent("published")) { headers["operation"] = "publish" }
+        context.publish(ProjectedEvent("published")) {
+            headers["operation"] = "publish"
+            this.correlationId = publishedCorrelationId
+            publishJvmContextReached = jvm { this.correlationId == publishedCorrelationId }
+        }
         context.send("loopback://commands", ProjectedCommand("sent")) { headers["operation"] = "send" }
         context.respond(ProjectedResponse("responded")) { headers["operation"] = "respond" }
         context.forward("loopback://audit", ProjectedEvent("forwarded"))
@@ -210,6 +222,8 @@ class CoroutineExtensionsTest {
         assertEquals(conversationId, endpoints.contexts[1].conversationId)
         assertEquals(correlationId, endpoints.contexts[1].initiatorId)
         assertEquals(messageId, endpoints.contexts[1].causationMessageId)
+        assertEquals(publishedCorrelationId, endpoints.contexts[0].correlationId)
+        assertTrue(publishJvmContextReached)
         assertEquals("context-projection", endpoints.contexts.last().headers["trace-id"])
     }
 
@@ -338,10 +352,10 @@ class CancellableHandler : SuspendHandler<CancellableRequest, CancellableRespons
 }
 
 private class CapturingRequestClient : RequestClient<LookupOrder> {
-    lateinit var context: SendContext
+    lateinit var context: JvmSendContext
 
     override fun <TResponse : Any?> getResponse(
-        context: SendContext,
+        context: JvmSendContext,
         responseType: Class<TResponse>,
     ): CompletableFuture<TResponse> {
         this.context = context
@@ -351,7 +365,7 @@ private class CapturingRequestClient : RequestClient<LookupOrder> {
     }
 
     override fun <T1 : Any?, T2 : Any?> getResponse(
-        context: SendContext,
+        context: JvmSendContext,
         responseType1: Class<T1>,
         responseType2: Class<T2>,
     ): CompletableFuture<Response2<T1, T2>> {
@@ -365,10 +379,10 @@ private class CapturingRequestClient : RequestClient<LookupOrder> {
 
 private class RecordingSendEndpointProvider : SendEndpointProvider {
     val messages = mutableListOf<Any?>()
-    val contexts = mutableListOf<SendContext>()
+    val contexts = mutableListOf<JvmSendContext>()
 
     override fun getSendEndpoint(uri: String): SendEndpoint = object : SendEndpoint {
-        override fun send(context: SendContext): CompletableFuture<Void> {
+        override fun send(context: JvmSendContext): CompletableFuture<Void> {
             contexts += context
             return send(context.message, context.cancellationToken)
         }

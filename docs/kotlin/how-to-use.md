@@ -85,10 +85,22 @@ instead of exposing Java futures. Scoped Kotlin endpoint contracts resolve from
 the same service scope as their JVM counterparts, preserving consume context,
 outbox capture, headers, and cancellation.
 
-The Kotlin `MessageBus`, `Mediator`, and `ConsumeContext` facades have explicit
-`jvm { ... }` escape hatches for shared runtime capabilities that have not been
-projected. Transitional `publishAwait` and `sendAwait` extensions remain only
-for code that deliberately works with a raw Java endpoint.
+Configured operations receive Kotlin-owned `PublishContext` and `SendContext`
+receivers as well. Message identifiers, addresses, intent, scheduling, and
+headers are ordinary mutable properties rather than Java getter/setter calls:
+
+```kotlin
+publishEndpoint.publish(OrderSubmitted(orderId)) {
+    correlationId = orderId
+    headers["tenant"] = "north"
+}
+```
+
+The Kotlin `MessageBus`, `Mediator`, `ConsumeContext`, `PublishContext`, and
+`SendContext` facades have explicit `jvm { ... }` escape hatches for shared
+runtime capabilities that have not been projected. Transitional `publishAwait`
+and `sendAwait` extensions remain only for code that deliberately works with a
+raw Java endpoint.
 `RequestClient.request` is already collision-free. Cancelling the calling
 coroutine cancels both the MyServiceBus operation token and its underlying Java
 future.

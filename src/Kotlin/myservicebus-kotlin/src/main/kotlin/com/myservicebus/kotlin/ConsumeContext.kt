@@ -1,8 +1,6 @@
 package com.myservicebus.kotlin
 
 import com.myservicebus.ConsumeContext as JvmConsumeContext
-import com.myservicebus.PublishContext
-import com.myservicebus.SendContext
 import com.myservicebus.tasks.CancellationToken
 import java.util.UUID
 
@@ -53,7 +51,7 @@ class ConsumeContext<TMessage : Any> internal constructor(
     /** Publishes a configured message and suspends until completion. */
     override suspend fun publish(message: Any, configure: PublishContext.() -> Unit) {
         awaitOperation { cancellationToken ->
-            delegate.publish(message, { context -> context.configure() }, cancellationToken)
+            delegate.publish(message, { context -> PublishContext(context).configure() }, cancellationToken)
         }
     }
 
@@ -68,7 +66,7 @@ class ConsumeContext<TMessage : Any> internal constructor(
     /** Sends a configured message while preserving the consumed message's metadata. */
     override suspend fun send(destination: String, message: Any, configure: SendContext.() -> Unit) {
         awaitOperation { cancellationToken ->
-            delegate.send(destination, message, { context -> context.configure() }, cancellationToken)
+            delegate.send(destination, message, { context -> SendContext(context).configure() }, cancellationToken)
         }
     }
 
@@ -80,7 +78,7 @@ class ConsumeContext<TMessage : Any> internal constructor(
     /** Responds with a configured message and suspends until completion. */
     suspend fun respond(message: Any, configure: SendContext.() -> Unit) {
         awaitOperation { cancellationToken ->
-            delegate.respond(message, { context -> context.configure() }, cancellationToken)
+            delegate.respond(message, { context -> SendContext(context).configure() }, cancellationToken)
         }
     }
 
