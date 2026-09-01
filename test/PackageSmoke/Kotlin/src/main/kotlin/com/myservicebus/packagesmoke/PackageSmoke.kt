@@ -29,7 +29,7 @@ data class PackageSmokeRequest(val value: String)
 data class PackageSmokeResponse(val value: String)
 
 class PackageSmokeHandler : SuspendHandler<PackageSmokeRequest, PackageSmokeResponse> {
-    override suspend fun execute(request: PackageSmokeRequest): PackageSmokeResponse =
+    override suspend fun handle(request: PackageSmokeRequest): PackageSmokeResponse =
         PackageSmokeResponse(request.value)
 }
 

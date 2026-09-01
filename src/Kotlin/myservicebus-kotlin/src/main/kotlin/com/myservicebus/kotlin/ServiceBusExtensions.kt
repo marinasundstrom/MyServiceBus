@@ -28,7 +28,7 @@ class ServiceBusConfigurator internal constructor(
     @PublishedApi internal val delegate: BusRegistrationConfigurator,
 ) {
     @PublishedApi
-    internal val registeredSuspendConsumers = mutableSetOf<Class<*>>()
+    internal val registeredKotlinConsumers = mutableSetOf<Class<*>>()
 
     /** Registers a Java-style consumer without a class literal. */
     inline fun <reified TConsumer : Consumer<*>> consumer() {
@@ -36,8 +36,14 @@ class ServiceBusConfigurator internal constructor(
     }
 
     /** Registers a suspending request handler with an inferred response type. */
-    inline fun <reified THandler : SuspendHandler<*, *>> handler() {
-        delegate.addConsumer(THandler::class.java)
+    inline fun <reified THandler : SuspendHandler<*, *>> handler(
+        endpointName: String? = null,
+        dispatcher: CoroutineDispatcher = Dispatchers.Default,
+    ) {
+        val handlerType = THandler::class.java
+        if (registeredKotlinConsumers.add(handlerType)) {
+            delegate.registerSuspendHandler(handlerType, endpointName, dispatcher)
+        }
     }
 
     /** Registers a suspending Kotlin consumer and infers its message type. */
@@ -46,7 +52,7 @@ class ServiceBusConfigurator internal constructor(
         dispatcher: CoroutineDispatcher = Dispatchers.Default,
     ) {
         val consumerType = TConsumer::class.java
-        if (registeredSuspendConsumers.add(consumerType)) {
+        if (registeredKotlinConsumers.add(consumerType)) {
             delegate.registerSuspendConsumer(consumerType, endpointName, dispatcher)
         }
     }

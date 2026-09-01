@@ -231,8 +231,10 @@ data class LookupOrder(val orderId: String)
 
 data class OrderStatus(val orderId: String, val status: String)
 
-class LookupOrderHandler : SuspendHandler<LookupOrder, OrderStatus> {
-    override suspend fun execute(request: LookupOrder): OrderStatus {
+abstract class BaseSuspendHandler<TRequest : Any, TResponse : Any> : SuspendHandler<TRequest, TResponse>
+
+class LookupOrderHandler : BaseSuspendHandler<LookupOrder, OrderStatus>() {
+    override suspend fun handle(request: LookupOrder): OrderStatus {
         delay(1)
         return OrderStatus(request.orderId, "ready")
     }
@@ -243,7 +245,7 @@ data class CancellableRequest(val value: String)
 data class CancellableResponse(val value: String)
 
 class CancellableHandler : SuspendHandler<CancellableRequest, CancellableResponse> {
-    override suspend fun execute(request: CancellableRequest): CancellableResponse {
+    override suspend fun handle(request: CancellableRequest): CancellableResponse {
         started.complete(Unit)
         try {
             awaitCancellation()

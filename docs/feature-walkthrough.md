@@ -780,7 +780,7 @@ System.out.println(response.getStatus());
 
 ```kotlin
 class CheckOrderStatusHandler : SuspendHandler<CheckOrderStatus, OrderStatus> {
-    override suspend fun execute(request: CheckOrderStatus): OrderStatus =
+    override suspend fun handle(request: CheckOrderStatus): OrderStatus =
         OrderStatus(request.orderId, "Pending")
 }
 
@@ -792,9 +792,10 @@ val response: OrderStatus = mediator.request(CheckOrderStatus(UUID.randomUUID())
 println(response.status)
 ```
 
-`SuspendHandler` projects onto the same JVM `HandlerWithResult` contract. The
-shared pipeline delivers the returned value through the request's response
-address and preserves its correlation metadata.
+`SuspendHandler` projects onto the async-shape-neutral JVM `ResultHandler`
+metadata contract. Its Kotlin adapter enters the same scoped pipeline, delivers
+the returned value through the request's response address, and preserves its
+correlation metadata.
 
 The C# client provides the analogous `IRequestClientFactory` for creating `IRequestClient<T>` instances when you need to specify a destination address or default timeout. Kotlin can use the JVM `RequestClientFactory` and call the suspending `client.request(...)` projection for broker-backed requests.
 

@@ -31,12 +31,12 @@ contract; supporting it requires the mediator to resolve inherited response
 types correctly instead of assuming every Java handler implements the result
 interface directly.
 
-The current `SuspendHandler` also demonstrates where a physical split may help:
-Java's inherited `handle(request): CompletableFuture<Response>` overload
-prevents the Kotlin projection from declaring the same source-level name as
-`suspend fun handle(request): Response`. The preview Kotlin interface uses
-`execute` while the shared behavior remains correct; this name can be revisited
-if the public projections later depend on a narrower implementation contract.
+The first `SuspendHandler` experiment exposed that inheriting Java's
+`handle(request): CompletableFuture<Response>` overload prevents Kotlin from
+declaring the natural `suspend fun handle(request): Response` signature. The
+shared JVM layer now carries only a `ResultHandler<Request, Response>` metadata
+contract at that boundary. Java's `HandlerWithResult` and Kotlin's
+`SuspendHandler` project their own execution shapes onto it.
 
 ## Current transition
 

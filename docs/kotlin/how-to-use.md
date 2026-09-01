@@ -93,7 +93,7 @@ data class LookupOrder(val orderId: UUID)
 data class OrderStatus(val orderId: UUID, val status: String)
 
 class LookupOrderHandler : SuspendHandler<LookupOrder, OrderStatus> {
-    override suspend fun execute(request: LookupOrder): OrderStatus =
+    override suspend fun handle(request: LookupOrder): OrderStatus =
         OrderStatus(request.orderId, "Pending")
 }
 
@@ -106,7 +106,9 @@ val status: OrderStatus = mediator.request(LookupOrder(orderId))
 
 The explicit result type on `status` lets Kotlin infer the reified response
 type. Cancelling the calling coroutine cancels the mediator operation and the
-suspending handler.
+suspending handler. `SuspendHandler` supplies Kotlin's native `suspend fun
+handle(...)` shape over the async-shape-neutral JVM `ResultHandler` metadata
+contract; it does not inherit Java's `CompletableFuture` handler methods.
 
 ## Run the sample
 

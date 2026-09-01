@@ -6,11 +6,11 @@ import com.myservicebus.BusRegistrationConfigurator
 import com.myservicebus.ConsumeContext
 import com.myservicebus.ConsumerMethodInvoker
 import com.myservicebus.DefaultEndpointNameFormatter
-import com.myservicebus.HandlerWithResult
 import com.myservicebus.MessageConsumer
 import com.myservicebus.PublishContext
 import com.myservicebus.PublishEndpoint
 import com.myservicebus.RequestClient
+import com.myservicebus.ResultHandler
 import com.myservicebus.SendContext
 import com.myservicebus.SendEndpoint
 import com.myservicebus.mediator.Mediator
@@ -27,7 +27,6 @@ import kotlin.coroutines.resumeWithException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
@@ -39,15 +38,8 @@ fun interface SuspendConsumer<TMessage : Any> {
 }
 
 /** A request handler that returns its response from suspending Kotlin code. */
-fun interface SuspendHandler<TRequest : Any, TResponse : Any> : HandlerWithResult<TRequest, TResponse> {
-    suspend fun execute(request: TRequest): TResponse
-
-    override fun handle(
-        message: TRequest,
-        cancellationToken: CancellationToken,
-    ): CompletableFuture<TResponse> = coroutineFuture(cancellationToken, Dispatchers.Default) {
-        execute(message)
-    }
+fun interface SuspendHandler<TRequest : Any, TResponse : Any> : ResultHandler<TRequest, TResponse> {
+    suspend fun handle(request: TRequest): TResponse
 }
 
 @PublishedApi
@@ -56,7 +48,7 @@ internal fun BusRegistrationConfigurator.registerSuspendConsumer(
     endpointName: String?,
     dispatcher: CoroutineDispatcher,
 ) {
-    val messageType = suspendConsumerMessageType(consumerType)
+    val messageType = contractTypeArguments(consumerType, SuspendConsumer::class.java).single()
     val annotationEndpoint = consumerType.getAnnotation(MessageConsumer::class.java)
         ?.value
         ?.takeIf(String::isNotBlank)
@@ -85,36 +77,77 @@ internal fun BusRegistrationConfigurator.registerSuspendConsumer(
     )
 }
 
-private fun suspendConsumerMessageType(consumerType: Class<*>): Class<*> {
-    val resolved = findSuspendConsumerMessageType(consumerType, emptyMap())
-    return when (resolved) {
-        is Class<*> -> resolved
-        is ParameterizedType -> resolved.rawType as? Class<*>
-        else -> null
-    } ?: throw IllegalArgumentException(
-        "${consumerType.name} must implement SuspendConsumer with a concrete message type.",
+@PublishedApi
+internal fun BusRegistrationConfigurator.registerSuspendHandler(
+    handlerType: Class<out SuspendHandler<*, *>>,
+    endpointName: String?,
+    dispatcher: CoroutineDispatcher,
+) {
+    val (requestType, _) = contractTypeArguments(handlerType, SuspendHandler::class.java)
+    val annotationEndpoint = handlerType.getAnnotation(MessageConsumer::class.java)
+        ?.value
+        ?.takeIf(String::isNotBlank)
+    val resolvedEndpoint = endpointName
+        ?: annotationEndpoint
+        ?: DefaultEndpointNameFormatter.INSTANCE.format(handlerType)
+    val endpointNameExplicit = endpointName != null || annotationEndpoint != null
+
+    @Suppress("UNCHECKED_CAST")
+    val concreteHandlerType = handlerType as Class<Any>
+    @Suppress("UNCHECKED_CAST")
+    val concreteRequestType = requestType as Class<Any>
+
+    serviceCollection.addScoped(concreteHandlerType, concreteHandlerType)
+    addConsumerMethod(
+        handlerType,
+        concreteRequestType,
+        resolvedEndpoint,
+        endpointNameExplicit,
+        if (endpointNameExplicit) null else handlerType,
+        ConsumerMethodInvoker { provider, context ->
+            @Suppress("UNCHECKED_CAST")
+            val handler = provider.getRequiredService(concreteHandlerType) as SuspendHandler<Any, Any>
+            handler.handleAsync(context, dispatcher)
+        },
     )
 }
 
-private fun findSuspendConsumerMessageType(
+private fun contractTypeArguments(concreteType: Class<*>, contractType: Class<*>): List<Class<*>> {
+    val resolved = findContractTypeArguments(concreteType, contractType, emptyMap())
+        ?: throw IllegalArgumentException(
+            "${concreteType.name} must implement ${contractType.simpleName} with concrete type arguments.",
+        )
+    return resolved.map { type ->
+        when (type) {
+            is Class<*> -> type
+            is ParameterizedType -> type.rawType as? Class<*>
+            else -> null
+        } ?: throw IllegalArgumentException(
+            "${concreteType.name} must implement ${contractType.simpleName} with concrete type arguments.",
+        )
+    }
+}
+
+private fun findContractTypeArguments(
     type: Type,
+    contractType: Class<*>,
     bindings: Map<TypeVariable<*>, Type>,
-): Type? = when (type) {
+): List<Type>? = when (type) {
     is Class<*> -> type.genericInterfaces.firstNotNullOfOrNull {
-        findSuspendConsumerMessageType(it, bindings)
-    } ?: type.genericSuperclass?.let { findSuspendConsumerMessageType(it, bindings) }
+        findContractTypeArguments(it, contractType, bindings)
+    } ?: type.genericSuperclass?.let { findContractTypeArguments(it, contractType, bindings) }
 
     is ParameterizedType -> {
         val rawType = type.rawType as? Class<*> ?: return null
         val resolvedArguments = type.actualTypeArguments.map { resolveType(it, bindings) }
-        if (rawType == SuspendConsumer::class.java) {
-            resolvedArguments.single()
+        if (rawType == contractType) {
+            resolvedArguments
         } else {
             val nestedBindings = bindings + rawType.typeParameters.zip(resolvedArguments)
             rawType.genericInterfaces.firstNotNullOfOrNull {
-                findSuspendConsumerMessageType(it, nestedBindings)
+                findContractTypeArguments(it, contractType, nestedBindings)
             } ?: rawType.genericSuperclass?.let {
-                findSuspendConsumerMessageType(it, nestedBindings)
+                findContractTypeArguments(it, contractType, nestedBindings)
             }
         }
     }
@@ -234,6 +267,13 @@ internal fun <TMessage : Any> SuspendConsumer<TMessage>.consumeAsync(
     dispatcher: CoroutineDispatcher,
 ): CompletableFuture<Void> = coroutineFuture(context.cancellationToken, dispatcher) {
     consume(context)
+}.asVoidFuture()
+
+private fun SuspendHandler<Any, Any>.handleAsync(
+    context: ConsumeContext<Any>,
+    dispatcher: CoroutineDispatcher,
+): CompletableFuture<Void> = coroutineFuture(context.cancellationToken, dispatcher) {
+    context.respondAwait(handle(context.message))
 }.asVoidFuture()
 
 private fun <T> coroutineFuture(

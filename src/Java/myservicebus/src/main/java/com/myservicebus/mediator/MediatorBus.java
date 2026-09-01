@@ -3,7 +3,7 @@ package com.myservicebus.mediator;
 import com.myservicebus.BusRegistrationConfigurator;
 import com.myservicebus.BusRegistrationConfiguratorImpl;
 import com.myservicebus.EntityNameFormatter;
-import com.myservicebus.HandlerWithResult;
+import com.myservicebus.ResultHandler;
 import com.myservicebus.MediatorHandlerCardinalityException;
 import com.myservicebus.MediatorHandlerNotFoundException;
 import com.myservicebus.MediatorResponseTypeException;
@@ -183,7 +183,7 @@ public class MediatorBus implements Mediator {
                 nestedBindings.put(parameters[i], resolveType(arguments[i], bindings));
             }
 
-            if (rawType == HandlerWithResult.class) {
+            if (rawType == ResultHandler.class) {
                 Class<?> resultType = classFromType(resolveType(arguments[1], bindings));
                 if (resultType != null) {
                     resultTypes.add(resultType);

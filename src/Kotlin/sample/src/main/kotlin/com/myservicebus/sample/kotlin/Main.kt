@@ -40,7 +40,7 @@ class SubmitOrderConsumer : SuspendConsumer<SubmitOrder> {
 }
 
 class LookupOrderHandler : SuspendHandler<LookupOrder, OrderStatus> {
-    override suspend fun execute(request: LookupOrder): OrderStatus =
+    override suspend fun handle(request: LookupOrder): OrderStatus =
         OrderStatus(request.orderId, "Pending")
 }
 

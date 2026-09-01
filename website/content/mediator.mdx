@@ -70,7 +70,7 @@ var response = await client.GetResponseAsync<OrderView>(
 OrderView order = mediator.send(
     new GetOrder(orderId)).join();`,
   kotlin: `class GetOrderHandler : SuspendHandler<GetOrder, OrderView> {
-    override suspend fun execute(request: GetOrder): OrderView =
+    override suspend fun handle(request: GetOrder): OrderView =
         findOrder(request.orderId)
 }
 
