@@ -153,7 +153,8 @@ public class BusHookTests
     [Fact]
     public async Task Monitoring_exporter_drains_events_that_arrive_after_an_empty_interval()
     {
-        var handler = new RecordingHttpHandler();
+        var handler = new RecordingHttpHandler(
+            batch => batch.Contains("\"messageId\":\"message-1\"", StringComparison.Ordinal));
         var services = new ServiceCollection()
             .AddSingleton<IBusInspectionProvider>(new StubInspectionProvider());
         await using var provider = services.BuildServiceProvider();
@@ -506,7 +507,8 @@ public class BusHookTests
             CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<JobAttemptState>>([attempt]);
     }
 
-    private sealed class RecordingHttpHandler : HttpMessageHandler
+    private sealed class RecordingHttpHandler(
+        Func<string, bool>? batchPredicate = null) : HttpMessageHandler
     {
         public TaskCompletionSource<string> BatchReceived { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public TaskCompletionSource<string> ScheduledWorkReceived { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -517,7 +519,8 @@ public class BusHookTests
             var json = request.Content is null
                 ? string.Empty
                 : await request.Content.ReadAsStringAsync(cancellationToken);
-            if (request.RequestUri?.AbsolutePath.EndsWith("observations:batch", StringComparison.Ordinal) == true)
+            if (request.RequestUri?.AbsolutePath.EndsWith("observations:batch", StringComparison.Ordinal) == true
+                && (batchPredicate is null || batchPredicate(json)))
                 BatchReceived.TrySetResult(json);
             if (request.RequestUri?.AbsolutePath.EndsWith("scheduled-work", StringComparison.Ordinal) == true)
                 ScheduledWorkReceived.TrySetResult(json);
