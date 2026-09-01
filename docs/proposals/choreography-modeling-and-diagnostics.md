@@ -24,7 +24,7 @@ Choreography is the first workflow-coordination experience to design and deliver
 
 ## Product Boundary
 
-Choreography is decentralized workflow coordination and has no central coordinator. Participants react to messages according to their own local rules and collectively produce the broader process. Each service owns its consumers, business decisions, and outgoing messages. A declaration describes those independently owned reactions; it does not move their execution into a monitoring service or create shared workflow state.
+Choreography is decentralized workflow coordination and has no central coordinator. Participants react to messages according to their own local rules and collectively produce the broader process. That workflow knowledge commonly appears inline: a consumer handles one contract, makes a local decision, and sends or publishes the next contract. Each service owns its consumers, business decisions, and outgoing messages. A choreography declaration enriches those independently owned reactions with shared workflow, step, ownership, expectation, and monitoring context; it does not move their execution into a monitoring service or create shared workflow state.
 
 Applications can implement these reactions directly with the existing publish, send, and consume APIs. The proposed feature adds a clearer portable way to express that intent and diagnose its observed behavior in C# and Java; it does not claim ownership of the underlying business workflow.
 

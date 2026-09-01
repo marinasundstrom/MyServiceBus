@@ -6,7 +6,7 @@ Active implementation proposal. The portable version 1 behavior is defined in th
 
 ## Summary
 
-Sagas and state machines provide orchestration: centralized workflow coordination in which one component owns the broader process state and decides how participants should be directed through messages. “Centralized” refers to ownership of workflow knowledge and decisions, not to a single deployment or synchronous execution.
+Sagas and state machines provide orchestration: centralized workflow coordination in which one component owns the broader process state and decides how participants should be directed through messages. The coordinator is defined separately from the participants whose capabilities it coordinates and is normally hosted by one coordinating service. It sits between those services in the workflow relationship by consuming their messages and directing subsequent work, not by absorbing their local business responsibilities. “Centralized” refers to ownership of workflow knowledge and decisions, not to a single deployment or synchronous execution.
 
 Applications can implement an orchestrator directly with consumers, messages, persistence, and application-owned state. The proposed runtime and DSLs provide safer, more concise C# and Java abstractions for expressing that intent while preserving the same application ownership of business rules.
 
