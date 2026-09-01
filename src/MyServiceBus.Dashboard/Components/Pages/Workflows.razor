@@ -1,9 +1,10 @@
-@page "/workflows"
+@page "/workflows/declared"
 @rendermode InteractiveServer
 @inherits MonitoringPageBase
 
 <PageTitle>Declared Workflows · MyServiceBus Monitoring</PageTitle>
-<DashboardPageHeader Eyebrow="Coordination" Title="Declared workflows" Description="Explore the choreography that applications explicitly declare: which messages trigger local reactions, what those reactions emit, and which participants may react next." />
+<DashboardPageHeader Eyebrow="Coordination" Title="Workflows" Description="Explore the choreography that applications explicitly declare: which messages trigger local reactions, what those reactions emit, and which participants may react next." />
+<WorkflowTabs Active="declared" />
 
 <div class="guidance workflow-guidance">
     <strong>Declared intent with bounded evidence</strong>
@@ -104,104 +105,11 @@ else
                     </article>
                 }
             </div>
-
-            @if (RunsFor(choreography.ChoreographyId) is { Length: > 0 } runs)
-            {
-                var selectedRun = SelectedRun(choreography.ChoreographyId, runs);
-                <section class="workflow-runs" aria-label="Reconstructed workflow runs">
-                    <div class="workflow-run-heading">
-                        <div>
-                            <p class="eyebrow">Exact causal evidence</p>
-                            <h3>Workflow runs</h3>
-                        </div>
-                        <span>Live as observations arrive · @runs.Length recent @(runs.Length == 1 ? "run" : "runs")</span>
-                    </div>
-                    <div class="workflow-run-selector" role="list" aria-label="Select a reconstructed run">
-                        @foreach (var run in runs.Take(8))
-                        {
-                            <button type="button"
-                                    class="@(run.RunId == selectedRun.RunId ? "selected" : null)"
-                                    @onclick="() => SelectRun(choreography.ChoreographyId, run.RunId)">
-                                <span class="run-status @run.Status"></span>
-                                <strong>@RunStatus(run.Status)</strong>
-                                <small>@run.LastActivityAtUtc.ToLocalTime().ToString("HH:mm:ss") · @run.Steps.Count steps</small>
-                            </button>
-                        }
-                    </div>
-
-                    <div class="workflow-run-summary">
-                        <div>
-                            <span class="run-status @selectedRun.Status"></span>
-                            <strong>@RunStatus(selectedRun.Status)</strong>
-                            <small>Reconstructed · @selectedRun.Confidence.Replace('_', ' ')</small>
-                        </div>
-                        <span>Observed span @FormatDuration(selectedRun.ObservedDurationMs) · last activity @selectedRun.LastActivityAtUtc.ToLocalTime().ToString("HH:mm:ss.fff")</span>
-                    </div>
-
-                    <WorkflowRunMap @key="selectedRun.RunId" Run="selectedRun" />
-
-                    <div class="workflow-run-flow" aria-label="Ordered workflow run step evidence">
-                        @for (var stepIndex = 0; stepIndex < selectedRun.Steps.Count; stepIndex++)
-                        {
-                            var step = selectedRun.Steps[stepIndex];
-                            @if (stepIndex > 0)
-                            {
-                                <div class="workflow-run-connector" aria-hidden="true">→</div>
-                            }
-                            <article class="workflow-run-step @step.Status">
-                                <header>
-                                    <span>Step @step.Sequence</span>
-                                    <strong>@step.ApplicationName</strong>
-                                    <small>@step.StartedAtUtc.ToLocalTime().ToString("HH:mm:ss.fff")</small>
-                                </header>
-                                <div class="workflow-run-step-body">
-                                    <span class="workflow-run-contract">Consumes <strong>@ContractLabel(step.TriggerMessageUrn)</strong></span>
-                                    <h4>@step.StepId</h4>
-                                    <p>@(step.OwnerComponent ?? step.EndpointName ?? step.Owner)</p>
-                                    <dl>
-                                        <div><dt>Handler</dt><dd>@FormatDuration(step.DurationMs)</dd></div>
-                                        <div><dt>Outcome</dt><dd>@DisplayKind(step.Status)</dd></div>
-                                        @if (step.RetryCount > 0)
-                                        {
-                                            <div><dt>Retries</dt><dd>@step.RetryCount</dd></div>
-                                        }
-                                    </dl>
-                                    @if (!string.IsNullOrWhiteSpace(step.FailureType))
-                                    {
-                                        <div class="workflow-run-failure">@ContractLabel(step.FailureType)</div>
-                                    }
-                                    @foreach (var output in step.Outputs)
-                                    {
-                                        <div class="workflow-run-output @(output.Succeeded ? null : "faulted")">
-                                            <span>@DisplayKind(output.OperationKind)</span>
-                                            <strong>@OutputLabel(output.MessageUrn)</strong>
-                                            <small>@FormatDuration(output.DurationMs)</small>
-                                            @foreach (var target in output.Targets)
-                                            {
-                                                <em>Handoff @FormatDuration(target.HandoffDurationMs) → @TargetLabel(selectedRun, target.StepKey)</em>
-                                            }
-                                            @if (!string.IsNullOrWhiteSpace(output.FailureType))
-                                            {
-                                                <em>@ContractLabel(output.FailureType)</em>
-                                            }
-                                        </div>
-                                    }
-                                </div>
-                            </article>
-                        }
-                    </div>
-                    <footer>
-                        Run identity @Abbreviate(selectedRun.RootMessageId) · this is a bounded reconstruction, not authoritative workflow state.
-                    </footer>
-                </section>
-            }
         </section>
     }
 }
 
 @code {
-    private readonly Dictionary<string, string> selectedRunIds = new(StringComparer.Ordinal);
-
     private static string ConflictLabel(string conflict) => conflict switch
     {
         "definition_version" => "Version conflict",
@@ -260,15 +168,13 @@ else
         MonitoringDeclaredChoreographyFragment fragment,
         MyServiceBus.Choreography.ChoreographyStep step,
         int outputIndex)
-    {
-        return Dashboard.ChoreographyRuntime?.Reactions.FirstOrDefault(reaction =>
+        => Dashboard.ChoreographyRuntime?.Reactions.FirstOrDefault(reaction =>
             string.Equals(reaction.ChoreographyId, choreography.ChoreographyId, StringComparison.Ordinal)
             && string.Equals(reaction.DefinitionVersion, fragment.DefinitionVersion, StringComparison.Ordinal)
             && string.Equals(reaction.ApplicationName, fragment.ApplicationName, StringComparison.Ordinal)
             && string.Equals(reaction.Owner, fragment.Owner, StringComparison.Ordinal)
             && string.Equals(reaction.StepId, step.Id, StringComparison.Ordinal)
             && reaction.OutputIndex == outputIndex);
-    }
 
     private static string EvidenceLabel(string status) => status switch
     {
@@ -277,46 +183,4 @@ else
         "unsupported_operation" => "Runtime evidence not supported yet",
         _ => DisplayKind(status)
     };
-
-    private MonitoringChoreographyRun[] RunsFor(string choreographyId)
-        => Dashboard.ChoreographyRuns?.Runs
-            .Where(run => string.Equals(run.ChoreographyId, choreographyId, StringComparison.Ordinal))
-            .OrderByDescending(run => run.LastActivityAtUtc)
-            .ToArray()
-            ?? [];
-
-    private MonitoringChoreographyRun SelectedRun(
-        string choreographyId,
-        IReadOnlyList<MonitoringChoreographyRun> runs)
-    {
-        if (selectedRunIds.TryGetValue(choreographyId, out var runId))
-            return runs.FirstOrDefault(run => string.Equals(run.RunId, runId, StringComparison.Ordinal)) ?? runs[0];
-        return runs[0];
-    }
-
-    private void SelectRun(string choreographyId, string runId)
-        => selectedRunIds[choreographyId] = runId;
-
-    private static string RunStatus(string status) => status switch
-    {
-        "live" => "Live activity",
-        "terminal_observed" => "Terminal observed",
-        "faulted" => "Fault evidence",
-        "no_recent_activity" => "No recent activity",
-        _ => DisplayKind(status)
-    };
-
-    private static string FormatDuration(double milliseconds)
-        => milliseconds >= 1_000
-            ? $"{milliseconds / 1_000:0.##} s"
-            : $"{milliseconds:0.##} ms";
-
-    private static string TargetLabel(MonitoringChoreographyRun run, string stepKey)
-    {
-        var target = run.Steps.FirstOrDefault(step => string.Equals(step.StepKey, stepKey, StringComparison.Ordinal));
-        return target is null ? "next step" : $"{target.ApplicationName}/{target.StepId}";
-    }
-
-    private static string Abbreviate(string value)
-        => value.Length <= 12 ? value : $"{value[..8]}…{value[^4..]}";
 }

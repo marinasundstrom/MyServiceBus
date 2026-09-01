@@ -568,6 +568,7 @@ public class MonitoringRepositoryTests
         reaction.EvidenceStatus.ShouldBe("exact_causation");
 
         var run = repository.GetChoreographyRuns("order-fulfillment", 60, 20, now).Runs.ShouldHaveSingleItem();
+        run.CoordinationType.ShouldBe("choreography");
         run.Status.ShouldBe("live");
         run.LastActivityAtUtc.ShouldBe(now.AddSeconds(-1));
         run.Steps.ShouldHaveSingleItem().StepId.ShouldBe("request-inventory");

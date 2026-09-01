@@ -70,7 +70,7 @@ public sealed class MonitoringApiClient
 
     public async Task<MonitoringChoreographyRunSnapshot?> GetChoreographyRuns(CancellationToken cancellationToken)
         => await httpClient.GetFromJsonAsync<MonitoringChoreographyRunSnapshot>(
-            "/api/monitoring/v1/choreographies/runs?windowSeconds=300&limit=20",
+            "/api/monitoring/v1/choreographies/runs?windowSeconds=300&limit=100",
             cancellationToken).ConfigureAwait(false);
 
     public async Task<IReadOnlyList<MonitoringTimeSeriesPoint>> GetTimeSeries(CancellationToken cancellationToken)

@@ -4,6 +4,7 @@ This changelog summarizes the bigger themes in the repository history rather tha
 
 ## Unreleased
 
+- Split the Dashboard's Workflows domain into a default filterable run index and a separate declared-workflow catalog. Run rows expose coordination type, status, timing, and step count and open a dedicated failure-aware D3 activity detail whose pan, zoom, and reset state survives live data refreshes.
 - Expanded the Aspire sample with simple, fan-out, and cross-language linear choreography declarations, including a runnable C# → Java → C# fulfillment handoff.
 
 - Added live-updating reconstructed choreography runs to monitoring and the Dashboard. Exact message and causation identity now assemble bounded declared steps across applications, preserving handler duration, outgoing-operation duration, observed handoff time, retries, downstream targets, and localized consumer or outbound faults. A D3 activity diagram places steps in application swimlanes above the ordered evidence breakdown, while the UI distinguishes live activity, observed terminal reactions, inactivity, and faults without claiming authoritative choreography state.

@@ -293,7 +293,10 @@ public sealed record MonitoringChoreographyRun(
     double ObservedDurationMs,
     string Status,
     string Confidence,
-    IReadOnlyList<MonitoringChoreographyRunStep> Steps);
+    IReadOnlyList<MonitoringChoreographyRunStep> Steps)
+{
+    public string CoordinationType => "choreography";
+}
 
 public sealed record MonitoringChoreographyRunStep(
     int Sequence,

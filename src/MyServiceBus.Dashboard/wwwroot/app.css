@@ -258,6 +258,31 @@ td small { display: block; margin-top: 4px; color: var(--text-dim); font-size: .
 .workflow-badges { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 13px; }
 .workflow-badges .pill { padding: 5px 8px; }
 .workflow-conflict { padding: 5px 8px; border: 1px solid color-mix(in srgb, var(--danger) 50%, var(--border)); border-radius: 999px; background: var(--danger-surface); color: var(--danger); font-size: .69rem; font-weight: 750; }
+.workflow-tabs { display: flex; gap: 5px; margin: -14px 0 28px; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+.workflow-tabs a { padding: 10px 14px; border-radius: 8px; color: var(--text-muted); font-size: .78rem; font-weight: 750; text-decoration: none; }
+.workflow-tabs a:hover, .workflow-tabs a:focus-visible, .workflow-tabs a.active { outline: none; background: var(--surface-raised); color: var(--text); }
+.workflow-tabs a.active { box-shadow: inset 0 -3px 0 var(--accent); }
+.workflow-run-index { margin-bottom: 24px; overflow: hidden; }
+.workflow-run-filters { display: grid; grid-template-columns: minmax(240px, 1fr) minmax(170px, .35fr) minmax(190px, .4fr); gap: 12px; padding: 18px 22px; border-bottom: 1px solid var(--border); background: var(--surface-deep); }
+.workflow-run-filters label { display: grid; gap: 6px; }
+.workflow-run-filters label > span { color: var(--text-dim); font-size: .65rem; font-weight: 750; letter-spacing: .06em; text-transform: uppercase; }
+.workflow-run-filters input, .workflow-run-filters select { min-width: 0; padding: 10px 11px; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--surface-solid); color: var(--text); font: inherit; font-size: .76rem; }
+.workflow-run-filters input:focus, .workflow-run-filters select:focus { outline: 2px solid color-mix(in srgb, var(--accent) 40%, transparent); border-color: var(--accent); }
+.workflow-run-row td:first-child { display: flex; align-items: center; gap: 2px; }
+.workflow-run-row td:first-child strong { font-size: .75rem; }
+.workflow-run-row.faulted { background: color-mix(in srgb, var(--danger-surface) 72%, transparent); }
+.workflow-run-breadcrumb { display: flex; gap: 9px; align-items: center; margin: -8px 0 16px; color: var(--text-dim); font-size: .74rem; }
+.workflow-run-breadcrumb a { color: var(--accent); text-decoration: none; }
+.workflow-run-detail { overflow: hidden; }
+.workflow-run-outcome { display: grid; grid-template-columns: 12px minmax(260px, 1fr) minmax(390px, 1.2fr); gap: 16px; align-items: start; padding: 24px 26px; border-bottom: 1px solid var(--border); background: color-mix(in srgb, var(--surface-raised) 78%, transparent); }
+.workflow-run-outcome.faulted { border-color: color-mix(in srgb, var(--danger) 42%, var(--border)); background: var(--danger-surface); }
+.workflow-run-outcome > .run-status { margin-top: 7px; }
+.workflow-run-outcome h2 { margin: 3px 0 5px; font-size: 1.35rem; }
+.workflow-run-outcome > div > p:last-child { margin: 0; color: var(--text-dim); font-size: .75rem; line-height: 1.5; }
+.workflow-run-outcome dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; margin: 0; }
+.workflow-run-outcome dl div { padding: 10px 12px; border: 1px solid var(--border-subtle); border-radius: 8px; background: color-mix(in srgb, var(--surface-solid) 75%, transparent); }
+.workflow-run-outcome dt { color: var(--text-dim); font-size: .58rem; text-transform: uppercase; }
+.workflow-run-outcome dd { margin: 4px 0 0; overflow: hidden; font-size: .72rem; font-weight: 750; text-overflow: ellipsis; white-space: nowrap; }
 .workflow-map { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 16px; padding: 20px; background: linear-gradient(var(--border-subtle) 1px, transparent 1px), linear-gradient(90deg, var(--border-subtle) 1px, transparent 1px), var(--surface-deep); background-size: 42px 42px; }
 .workflow-participant { min-width: 0; overflow: hidden; border: 1px solid var(--border-strong); border-radius: 14px; background: color-mix(in srgb, var(--surface-solid) 96%, transparent); box-shadow: 0 12px 30px rgb(0 0 0 / 15%); }
 .workflow-participant > header { display: flex; justify-content: space-between; align-items: center; gap: 15px; padding: 15px 17px; border-bottom: 1px solid var(--border); background: color-mix(in srgb, var(--surface-raised) 70%, transparent); }
@@ -334,7 +359,7 @@ td small { display: block; margin-top: 4px; color: var(--text-dim); font-size: .
 .workflow-run-output span { color: var(--accent); font-size: .55rem; font-weight: 800; text-transform: uppercase; }
 .workflow-run-output strong { overflow: hidden; font-size: .65rem; text-align: right; text-overflow: ellipsis; white-space: nowrap; }
 .workflow-run-output small, .workflow-run-output em { grid-column: 1 / -1; color: var(--text-dim); font-size: .58rem; font-style: normal; }
-.workflow-runs > footer { padding: 11px 20px; border-top: 1px solid var(--border); color: var(--text-dim); font-size: .62rem; }
+.workflow-runs > footer, .workflow-run-detail > footer { padding: 11px 20px; border-top: 1px solid var(--border); color: var(--text-dim); font-size: .62rem; }
 @keyframes workflow-live-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
 
 @media (max-width: 760px) {
@@ -352,6 +377,9 @@ td small { display: block; margin-top: 4px; color: var(--text-dim); font-size: .
     .detail-grid { grid-template-columns: 1fr; }
     .application-detail-grid { grid-template-columns: 1fr; }
     .endpoint-summary-grid { grid-template-columns: 1fr; }
+    .workflow-run-filters { grid-template-columns: 1fr; }
+    .workflow-run-outcome { grid-template-columns: 12px 1fr; }
+    .workflow-run-outcome dl { grid-column: 2; }
     .event-detail { grid-template-columns: 1fr; margin-left: 0; }
     .event-message { grid-column: auto; }
     .flow-map-shell, .flow-map-canvas { min-height: 430px; }

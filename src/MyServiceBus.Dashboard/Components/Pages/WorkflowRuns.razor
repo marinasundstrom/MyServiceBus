@@ -1,0 +1,128 @@
+@page "/workflows"
+@rendermode InteractiveServer
+@inherits MonitoringPageBase
+
+<PageTitle>Workflow Runs · MyServiceBus Monitoring</PageTitle>
+<DashboardPageHeader Eyebrow="Coordination" Title="Workflows" Description="Follow individual coordination runs reconstructed from exact message causation, including live activity, timing, and failures." />
+<WorkflowTabs Active="runs" />
+
+<section class="panel workflow-run-index">
+    <div class="section-heading">
+        <div>
+            <p class="eyebrow">Operational evidence</p>
+            <h2>Workflow runs</h2>
+        </div>
+        <span>Live as observations arrive · @(Dashboard.ChoreographyRuns?.Runs.Count ?? 0) recent runs</span>
+    </div>
+
+    <div class="workflow-run-filters" aria-label="Filter workflow runs">
+        <label>
+            <span>Search</span>
+            <input type="search" placeholder="Workflow or run identity" @bind="search" @bind:event="oninput" />
+        </label>
+        <label>
+            <span>Type</span>
+            <select @bind="typeFilter">
+                <option value="all">All types</option>
+                <option value="choreography">Choreography</option>
+                <option value="orchestration">Orchestration / Saga</option>
+            </select>
+        </label>
+        <label>
+            <span>Status</span>
+            <select @bind="statusFilter">
+                <option value="all">All statuses</option>
+                <option value="live">Live activity</option>
+                <option value="terminal_observed">Terminal observed</option>
+                <option value="faulted">Failed</option>
+                <option value="no_recent_activity">No recent activity</option>
+            </select>
+        </label>
+    </div>
+
+    @if (FilteredRuns.Length == 0)
+    {
+        <div class="panel-empty">No workflow runs match the current filters.</div>
+    }
+    else
+    {
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Status</th>
+                        <th>Workflow</th>
+                        <th>Type</th>
+                        <th>Started</th>
+                        <th>Last activity</th>
+                        <th>Observed span</th>
+                        <th>Steps</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var run in FilteredRuns)
+                    {
+                        <tr class="workflow-run-row @run.Status">
+                            <td><span class="run-status @run.Status"></span><strong>@RunStatus(run.Status)</strong></td>
+                            <td><strong>@run.ChoreographyId</strong><small>Run @Abbreviate(run.RootMessageId)</small></td>
+                            <td>@CoordinationType(run.CoordinationType)</td>
+                            <td>@run.StartedAtUtc.ToLocalTime().ToString("MMM d, HH:mm:ss")</td>
+                            <td>@run.LastActivityAtUtc.ToLocalTime().ToString("HH:mm:ss.fff")</td>
+                            <td>@FormatDuration(run.ObservedDurationMs)</td>
+                            <td>@run.Steps.Count</td>
+                            <td><a class="section-link" href="@RunHref(run)">View run →</a></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</section>
+
+<div class="guidance workflow-guidance">
+    <strong>Evidence, not authority</strong>
+    <span>Runs are reconstructed from bounded exact-causation observations. A terminal observation means the declared terminal activity was seen; it does not make choreography a centralized state machine.</span>
+</div>
+
+@code {
+    private string search = string.Empty;
+    private string typeFilter = "all";
+    private string statusFilter = "all";
+
+    private MonitoringChoreographyRun[] FilteredRuns => Dashboard.ChoreographyRuns?.Runs
+        .Where(run => typeFilter == "all" || string.Equals(run.CoordinationType, typeFilter, StringComparison.Ordinal))
+        .Where(run => statusFilter == "all" || string.Equals(run.Status, statusFilter, StringComparison.Ordinal))
+        .Where(run => string.IsNullOrWhiteSpace(search)
+            || run.ChoreographyId.Contains(search, StringComparison.OrdinalIgnoreCase)
+            || run.RunId.Contains(search, StringComparison.OrdinalIgnoreCase)
+            || run.RootMessageId.Contains(search, StringComparison.OrdinalIgnoreCase))
+        .OrderByDescending(run => run.LastActivityAtUtc)
+        .ToArray()
+        ?? [];
+
+    private static string RunHref(MonitoringChoreographyRun run)
+        => $"/workflows/runs/{Uri.EscapeDataString(run.RunId)}";
+
+    private static string CoordinationType(string type) => type switch
+    {
+        "choreography" => "Choreography",
+        "orchestration" => "Orchestration / Saga",
+        _ => DisplayKind(type)
+    };
+
+    private static string RunStatus(string status) => status switch
+    {
+        "live" => "Live activity",
+        "terminal_observed" => "Terminal observed",
+        "faulted" => "Failed",
+        "no_recent_activity" => "No recent activity",
+        _ => DisplayKind(status)
+    };
+
+    private static string FormatDuration(double milliseconds)
+        => milliseconds >= 1_000 ? $"{milliseconds / 1_000:0.##} s" : $"{milliseconds:0.##} ms";
+
+    private static string Abbreviate(string value)
+        => value.Length <= 12 ? value : $"{value[..8]}…{value[^4..]}";
+}

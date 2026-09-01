@@ -680,6 +680,14 @@ export function updateWorkflowRunMap(element, graph) {
     workflowRunMaps.get(element)?.update(graph);
 }
 
+export function zoomWorkflowRunMap(element, factor) {
+    workflowRunMaps.get(element)?.zoomBy(factor);
+}
+
+export function resetWorkflowRunMap(element) {
+    workflowRunMaps.get(element)?.fitToContent(true);
+}
+
 export function disposeWorkflowRunMap(element) {
     const map = workflowRunMaps.get(element);
     if (map) {
@@ -717,16 +725,7 @@ class WorkflowRunMap {
             .scaleExtent([0.45, 3])
             .on("zoom", event => this.stage.attr("transform", event.transform));
         this.svg.call(this.zoom);
-        this.registerControls();
-    }
-
-    registerControls() {
-        this.element.querySelector('[data-workflow-run-action="zoom-in"]')
-            ?.addEventListener("click", this.zoomIn = () => this.svg.transition().duration(160).call(this.zoom.scaleBy, 1.3));
-        this.element.querySelector('[data-workflow-run-action="zoom-out"]')
-            ?.addEventListener("click", this.zoomOut = () => this.svg.transition().duration(160).call(this.zoom.scaleBy, 1 / 1.3));
-        this.element.querySelector('[data-workflow-run-action="reset"]')
-            ?.addEventListener("click", this.reset = () => this.fitToContent(true));
+        this.structureKey = null;
     }
 
     update(graph) {
@@ -777,13 +776,20 @@ class WorkflowRunMap {
             link.sourceNode = nodeById.get(link.source);
             link.targetNode = nodeById.get(link.target);
         });
+        const structureKey = JSON.stringify({
+            nodes: nodes.map(node => node.id),
+            links: links.map(link => `${link.source}->${link.target}`),
+            applications: applications.map(lane => lane.application)
+        });
+        const structureChanged = structureKey !== this.structureKey;
+        this.structureKey = structureKey;
 
         this.svg.attr("viewBox", `0 0 ${width} ${height}`);
         this.element.style.minHeight = `${Math.min(520, Math.max(320, height))}px`;
         this.renderLanes(applications, width);
         this.renderLinks(links);
         this.renderNodes(nodes);
-        queueMicrotask(() => this.fitToContent(false));
+        if (structureChanged) queueMicrotask(() => this.fitToContent(false));
     }
 
     renderLanes(lanes, width) {
@@ -864,10 +870,12 @@ class WorkflowRunMap {
         selection.call(this.zoom.transform, transform);
     }
 
+    zoomBy(factor) {
+        const boundedFactor = Number.isFinite(factor) && factor > 0 ? factor : 1;
+        this.svg.call(this.zoom.scaleBy, boundedFactor);
+    }
+
     dispose() {
-        this.element.querySelector('[data-workflow-run-action="zoom-in"]')?.removeEventListener("click", this.zoomIn);
-        this.element.querySelector('[data-workflow-run-action="zoom-out"]')?.removeEventListener("click", this.zoomOut);
-        this.element.querySelector('[data-workflow-run-action="reset"]')?.removeEventListener("click", this.reset);
         this.svg.on(".zoom", null);
         this.svg.selectAll("*").remove();
     }
