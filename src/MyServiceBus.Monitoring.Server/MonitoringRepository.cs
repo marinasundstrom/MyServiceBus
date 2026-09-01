@@ -620,6 +620,7 @@ public sealed class MonitoringRepository
                 run.RunId,
                 run,
                 (_, current) => PreferWorkflowRun(current, run));
+            RemoveSupersededWorkflowRuns(run);
         }
         PruneWorkflowRuns(now - workflowRunRetention);
         return projected;
@@ -627,13 +628,16 @@ public sealed class MonitoringRepository
 
     public void RestoreWorkflowRuns(IEnumerable<MonitoringChoreographyRun> runs, DateTimeOffset now)
     {
-        foreach (var run in runs.Where(run => run.LastActivityAtUtc >= now - workflowRunRetention))
+        var retainedRuns = runs.Where(run => run.LastActivityAtUtc >= now - workflowRunRetention).ToArray();
+        foreach (var run in retainedRuns)
         {
             workflowRuns.AddOrUpdate(
                 run.RunId,
                 run,
                 (_, current) => PreferWorkflowRun(current, run));
         }
+        foreach (var run in retainedRuns.Where(run => run.RootMessageIds.Count > 1))
+            RemoveSupersededWorkflowRuns(run);
         PruneWorkflowRuns(now - workflowRunRetention);
     }
 
@@ -754,39 +758,33 @@ public sealed class MonitoringRepository
                     : nodesByMessageId.GetValueOrDefault(output.Observation.MessageId) ?? [];
                 node.AddOutput(output, targets);
                 foreach (var target in targets)
-                    target.AddParent(node.StepKey);
+                    target.AddParent(node);
             }
         }
 
-        var runRoots = nodes
-            .Where(node => node.ParentCount == 0)
-            .GroupBy(node => node.MessageId, StringComparer.Ordinal)
-            .Select(group => group.ToArray())
-            .ToList();
-
         var claimed = new HashSet<MutableChoreographyRunStep>();
         var runs = new List<MonitoringChoreographyRun>();
-        foreach (var roots in runRoots)
+        foreach (var seed in nodes
+                     .OrderBy(node => node.StartedAtUtc)
+                     .ThenBy(node => node.StepKey, StringComparer.Ordinal))
         {
-            var reachable = TraverseRun(roots).Where(claimed.Add).ToArray();
-            if (reachable.Length == 0)
+            if (claimed.Contains(seed))
                 continue;
-            runs.Add(CreateRun(choreography.ChoreographyId, definitionVersion, roots[0].MessageId, reachable, now));
-        }
-        foreach (var orphan in nodes)
-        {
-            if (claimed.Contains(orphan))
-                continue;
-            var reachable = TraverseRun([orphan]).Where(claimed.Add).ToArray();
-            runs.Add(CreateRun(choreography.ChoreographyId, definitionVersion, orphan.MessageId, reachable, now));
+            var component = TraverseRunComponent(seed, nodesByMessageId).ToArray();
+            claimed.UnionWith(component);
+            var roots = component.Where(node => node.ParentCount == 0).ToArray();
+            if (roots.Length == 0)
+                roots = [component.MinBy(node => node.StartedAtUtc)!];
+            runs.Add(CreateRun(choreography.ChoreographyId, definitionVersion, roots, component, now));
         }
         return runs;
     }
 
-    private static IEnumerable<MutableChoreographyRunStep> TraverseRun(
-        IReadOnlyList<MutableChoreographyRunStep> roots)
+    private static IEnumerable<MutableChoreographyRunStep> TraverseRunComponent(
+        MutableChoreographyRunStep seed,
+        IReadOnlyDictionary<string, MutableChoreographyRunStep[]> nodesByMessageId)
     {
-        var pending = new Queue<MutableChoreographyRunStep>(roots);
+        var pending = new Queue<MutableChoreographyRunStep>([seed]);
         var visited = new HashSet<MutableChoreographyRunStep>();
         while (pending.TryDequeue(out var node))
         {
@@ -795,16 +793,27 @@ public sealed class MonitoringRepository
             yield return node;
             foreach (var target in node.Targets)
                 pending.Enqueue(target);
+            foreach (var parent in node.Parents)
+                pending.Enqueue(parent);
+            foreach (var peer in nodesByMessageId.GetValueOrDefault(node.MessageId) ?? [])
+                pending.Enqueue(peer);
         }
     }
 
     private static MonitoringChoreographyRun CreateRun(
         string choreographyId,
         string definitionVersion,
-        string rootMessageId,
+        IReadOnlyList<MutableChoreographyRunStep> roots,
         IReadOnlyList<MutableChoreographyRunStep> nodes,
         DateTimeOffset now)
     {
+        var rootMessageIds = roots
+            .OrderBy(node => node.StartedAtUtc)
+            .ThenBy(node => node.MessageId, StringComparer.Ordinal)
+            .Select(node => node.MessageId)
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+        var rootMessageId = rootMessageIds[0];
         var ordered = nodes
             .OrderBy(node => node.StartedAtUtc)
             .ThenBy(node => node.ApplicationName, StringComparer.Ordinal)
@@ -833,7 +842,10 @@ public sealed class MonitoringRepository
             false,
             0,
             false,
-            steps);
+            steps)
+        {
+            RootMessageIds = rootMessageIds
+        };
     }
 
     private static MonitoringChoreographyRun PreferWorkflowRun(
@@ -872,6 +884,20 @@ public sealed class MonitoringRepository
     {
         foreach (var run in workflowRuns.Where(pair => pair.Value.LastActivityAtUtc < cutoff))
             workflowRuns.TryRemove(run.Key, out _);
+    }
+
+    private void RemoveSupersededWorkflowRuns(MonitoringChoreographyRun candidate)
+    {
+        if (candidate.RootMessageIds.Count <= 1)
+            return;
+        var roots = candidate.RootMessageIds.ToHashSet(StringComparer.Ordinal);
+        foreach (var pair in workflowRuns.Where(pair =>
+                     !string.Equals(pair.Key, candidate.RunId, StringComparison.Ordinal)
+                     && string.Equals(pair.Value.ChoreographyId, candidate.ChoreographyId, StringComparison.Ordinal)
+                     && string.Equals(pair.Value.DefinitionVersion, candidate.DefinitionVersion, StringComparison.Ordinal)
+                     && pair.Value.RootMessageIds.Count > 0
+                     && pair.Value.RootMessageIds.All(roots.Contains)))
+            workflowRuns.TryRemove(pair.Key, out _);
     }
 
     public IReadOnlyList<MonitoringObservationRecord> GetRecentObservations(string? applicationName, int limit)
@@ -1893,7 +1919,7 @@ public sealed class MonitoringRepository
     {
         private readonly MonitoringObservationRecord outcome;
         private readonly List<MutableChoreographyRunOutput> outputs = new();
-        private readonly HashSet<string> parents = new(StringComparer.Ordinal);
+        private readonly HashSet<MutableChoreographyRunStep> parents = new();
         private int retryCount;
         private bool retryExhausted;
         private string? retryFailureType;
@@ -1924,12 +1950,13 @@ public sealed class MonitoringRepository
                 ? outputs.Max(output => output.Record.Observation.OccurredAtUtc)
                 : outcome.Observation.OccurredAtUtc;
         public int ParentCount => parents.Count;
+        public IEnumerable<MutableChoreographyRunStep> Parents => parents;
         public IEnumerable<MutableChoreographyRunStep> Targets => outputs.SelectMany(output => output.Targets).Distinct();
         public bool Faulted => outcome.Observation.Kind == "consume_faulted"
             || retryExhausted
             || outputs.Any(output => output.Record.Observation.Succeeded == false);
 
-        public void AddParent(string stepKey) => parents.Add(stepKey);
+        public void AddParent(MutableChoreographyRunStep parent) => parents.Add(parent);
 
         public void AddRetries(IEnumerable<MonitoringObservationRecord> records)
         {

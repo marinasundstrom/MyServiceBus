@@ -112,7 +112,15 @@ public sealed class PostgreSqlMonitoringHistoryTests : IAsyncLifetime
             0,
             true,
             []);
-        await first.StoreWorkflowRunsAsync([workflowRun], CancellationToken.None);
+        var secondPartialRun = workflowRun with
+        {
+            RunId = "order-fulfillment:1:message-2",
+            RootMessageId = "message-2",
+            RootMessageIds = ["message-2"]
+        };
+        await first.StoreWorkflowRunsAsync([workflowRun, secondPartialRun], CancellationToken.None);
+        var combinedRun = workflowRun with { RootMessageIds = ["message-1", "message-2"] };
+        await first.StoreWorkflowRunsAsync([combinedRun], CancellationToken.None);
 
         var restarted = new PostgreSqlMonitoringHistoryStore(contextFactory, options);
         await restarted.InitializeAsync(CancellationToken.None);
@@ -126,7 +134,9 @@ public sealed class PostgreSqlMonitoringHistoryTests : IAsyncLifetime
         Assert.Single(restored.Heartbeats);
         Assert.Single(restored.ScheduledWork);
         Assert.Single(restored.ScheduledWork[0].Items);
-        Assert.Equal(workflowRun.RunId, Assert.Single(restored.WorkflowRuns).RunId);
+        var restoredRun = Assert.Single(restored.WorkflowRuns);
+        Assert.Equal(workflowRun.RunId, restoredRun.RunId);
+        Assert.Equal(["message-1", "message-2"], restoredRun.RootMessageIds);
         Assert.Equal("batch-1", restored.Batches[0].BatchId);
         Assert.NotNull(restored.LastIngestAtUtc);
     }

@@ -656,6 +656,166 @@ public class MonitoringRepositoryTests
     }
 
     [Fact]
+    public void Repository_keeps_exact_fan_out_in_one_run_and_reports_branch_structure()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var repository = new MonitoringRepository();
+        repository.UpsertMetadata(WithChoreography(
+            CreateMetadata("orders", "orders-1", now, "commerce"),
+            CreateChoreography("orders", "1", "dispatch-order", "urn:message:OrderSubmitted", "urn:message:OrderAccepted")));
+        repository.UpsertMetadata(WithChoreography(
+            CreateMetadata("inventory", "inventory-1", now, "commerce"),
+            CreateChoreography("inventory", "1", "reserve-inventory", "urn:message:OrderAccepted", null)));
+        repository.UpsertMetadata(WithChoreography(
+            CreateMetadata("billing", "billing-1", now, "commerce"),
+            CreateChoreography("billing", "1", "authorize-payment", "urn:message:OrderAccepted", null)));
+
+        repository.RecordBatch(CreateBatch(
+            "orders",
+            "orders-1",
+            now,
+            new MonitoringObservation(
+                1, now.AddSeconds(-4), "consumed", true, "OrderSubmitted", "urn:message:OrderSubmitted",
+                "orders", null, 10, null, null, null, "conversation", null, null,
+                MessageId: "root-message"),
+            new MonitoringObservation(
+                2, now.AddSeconds(-3), "published", true, "OrderAccepted", "urn:message:OrderAccepted",
+                null, "exchange:accepted", 2, null, null, null, "conversation", null, null,
+                MessageId: "fan-out-message", CausationMessageId: "root-message")));
+        repository.RecordBatch(CreateBatch(
+            "inventory",
+            "inventory-1",
+            now,
+            new MonitoringObservation(
+                1, now.AddSeconds(-2), "consumed", true, "OrderAccepted", "urn:message:OrderAccepted",
+                "inventory", null, 8, null, null, null, "conversation", null, null,
+                MessageId: "fan-out-message")));
+        repository.RecordBatch(CreateBatch(
+            "billing",
+            "billing-1",
+            now,
+            new MonitoringObservation(
+                1, now.AddSeconds(-1), "consumed", true, "OrderAccepted", "urn:message:OrderAccepted",
+                "billing", null, 7, null, null, null, "conversation", null, null,
+                MessageId: "fan-out-message")));
+
+        var run = repository.GetChoreographyRuns("order-fulfillment", 60, 20, now).Runs.ShouldHaveSingleItem();
+        run.Steps.Count.ShouldBe(3);
+        run.RootMessageIds.ShouldBe(["root-message"]);
+        run.RootCount.ShouldBe(1);
+        run.BranchPointCount.ShouldBe(1);
+        run.MergePointCount.ShouldBe(0);
+        run.ObservedShape.ShouldBe("branching");
+        run.Steps.Single(step => step.StepId == "dispatch-order")
+            .Outputs.ShouldHaveSingleItem().Targets.Count.ShouldBe(2);
+    }
+
+    [Fact]
+    public void Repository_groups_root_message_delivery_fan_out_under_one_run_identity()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var repository = new MonitoringRepository();
+        repository.UpsertMetadata(WithChoreography(
+            CreateMetadata("orders", "orders-1", now, "commerce"),
+            CreateChoreography("orders", "1", "observe-order", "urn:message:OrderSubmitted", null)));
+        repository.UpsertMetadata(WithChoreography(
+            CreateMetadata("analytics", "analytics-1", now, "commerce"),
+            CreateChoreography("analytics", "1", "measure-order", "urn:message:OrderSubmitted", null)));
+        repository.RecordBatch(CreateBatch(
+            "orders",
+            "orders-1",
+            now,
+            new MonitoringObservation(
+                1, now.AddSeconds(-2), "consumed", true, "OrderSubmitted", "urn:message:OrderSubmitted",
+                "orders", null, 10, null, null, null, "conversation", null, null,
+                MessageId: "shared-root")));
+        repository.RecordBatch(CreateBatch(
+            "analytics",
+            "analytics-1",
+            now,
+            new MonitoringObservation(
+                1, now.AddSeconds(-1), "consumed", true, "OrderSubmitted", "urn:message:OrderSubmitted",
+                "analytics", null, 8, null, null, null, "conversation", null, null,
+                MessageId: "shared-root")));
+
+        var run = repository.GetChoreographyRuns("order-fulfillment", 60, 20, now).Runs.ShouldHaveSingleItem();
+        run.Steps.Count.ShouldBe(2);
+        run.RootMessageIds.ShouldBe(["shared-root"]);
+        run.RootCount.ShouldBe(1);
+        run.BranchPointCount.ShouldBe(1);
+        run.MergePointCount.ShouldBe(0);
+        run.ObservedShape.ShouldBe("branching");
+    }
+
+    [Fact]
+    public void Repository_merges_exactly_connected_roots_instead_of_claiming_a_shared_descendant()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var repository = new MonitoringRepository();
+        repository.UpsertMetadata(WithChoreography(
+            CreateMetadata("orders", "orders-1", now, "commerce"),
+            CreateChoreography("orders", "1", "accept-order", "urn:message:OrderSubmitted", "urn:message:Ready")));
+        repository.UpsertMetadata(WithChoreography(
+            CreateMetadata("billing", "billing-1", now, "commerce"),
+            CreateChoreography("billing", "1", "accept-payment", "urn:message:PaymentSubmitted", "urn:message:Ready")));
+        repository.UpsertMetadata(WithChoreography(
+            CreateMetadata("fulfillment", "fulfillment-1", now, "commerce"),
+            CreateChoreography("fulfillment", "1", "complete-order", "urn:message:Ready", null)));
+
+        repository.RecordBatch(CreateBatch(
+            "orders",
+            "orders-1",
+            now,
+            new MonitoringObservation(
+                1, now.AddSeconds(-6), "consumed", true, "OrderSubmitted", "urn:message:OrderSubmitted",
+                "orders", null, 10, null, null, null, "conversation", null, null,
+                MessageId: "root-order"),
+            new MonitoringObservation(
+                2, now.AddSeconds(-4), "published", true, "Ready", "urn:message:Ready",
+                null, "exchange:ready", 2, null, null, null, "conversation", null, null,
+                MessageId: "shared-message", CausationMessageId: "root-order")));
+        repository.RecordBatch(CreateBatch(
+            "billing",
+            "billing-1",
+            now,
+            new MonitoringObservation(
+                1, now.AddSeconds(-5), "consumed", true, "PaymentSubmitted", "urn:message:PaymentSubmitted",
+                "billing", null, 9, null, null, null, "conversation", null, null,
+                MessageId: "root-payment"),
+            new MonitoringObservation(
+                2, now.AddSeconds(-3), "published", true, "Ready", "urn:message:Ready",
+                null, "exchange:ready", 2, null, null, null, "conversation", null, null,
+                MessageId: "shared-message", CausationMessageId: "root-payment")));
+
+        repository.CaptureWorkflowRuns(now.AddSeconds(-2.5));
+        repository.GetWorkflowRuns(
+            "order-fulfillment", null, null, null, null, null, 0, 10, now.AddSeconds(-2.5)).Total.ShouldBe(2);
+
+        repository.RecordBatch(CreateBatch(
+            "fulfillment",
+            "fulfillment-1",
+            now,
+            new MonitoringObservation(
+                1, now.AddSeconds(-2), "consumed", true, "Ready", "urn:message:Ready",
+                "fulfillment", null, 8, null, null, null, "conversation", null, null,
+                MessageId: "shared-message")));
+
+        var run = repository.GetChoreographyRuns("order-fulfillment", 60, 20, now).Runs.ShouldHaveSingleItem();
+        run.Steps.Count.ShouldBe(3);
+        run.RootMessageIds.ShouldBe(["root-order", "root-payment"]);
+        run.RootCount.ShouldBe(2);
+        run.BranchPointCount.ShouldBe(0);
+        run.MergePointCount.ShouldBe(1);
+        run.ObservedShape.ShouldBe("converging");
+
+        repository.CaptureWorkflowRuns(now);
+        var retained = repository.GetWorkflowRuns(
+            "order-fulfillment", null, null, null, null, null, 0, 10, now);
+        retained.Total.ShouldBe(1);
+        retained.Runs.ShouldHaveSingleItem().RootMessageIds.ShouldBe(["root-order", "root-payment"]);
+    }
+
+    [Fact]
     public void Repository_combines_endpoint_topology_across_replicas_with_recent_activity()
     {
         var now = DateTimeOffset.UtcNow;

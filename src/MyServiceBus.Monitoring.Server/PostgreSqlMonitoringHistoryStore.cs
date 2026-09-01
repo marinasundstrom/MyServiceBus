@@ -298,6 +298,22 @@ public sealed class PostgreSqlMonitoringHistoryStore : IMonitoringHistoryStore
             entity.UpdatedAtUtc = updatedAt;
             entity.Payload = JsonSerializer.Serialize(run, JsonOptions);
         }
+        foreach (var run in runs.Where(run => run.RootMessageIds.Count > 1))
+        {
+            var roots = run.RootMessageIds.ToHashSet(StringComparer.Ordinal);
+            var possibleSuperseded = await context.WorkflowRuns
+                .Where(value => value.WorkflowId == run.ChoreographyId
+                    && value.RunId != run.RunId)
+                .ToArrayAsync(cancellationToken);
+            foreach (var entity in possibleSuperseded)
+            {
+                var existing = Deserialize<MonitoringChoreographyRun>(entity.Payload);
+                if (string.Equals(existing.DefinitionVersion, run.DefinitionVersion, StringComparison.Ordinal)
+                    && existing.RootMessageIds.Count > 0
+                    && existing.RootMessageIds.All(roots.Contains))
+                    context.WorkflowRuns.Remove(entity);
+            }
+        }
         await context.SaveChangesAsync(cancellationToken);
         await context.WorkflowRuns
             .Where(value => value.LastActivityAtUtc < updatedAt - options.Retention)

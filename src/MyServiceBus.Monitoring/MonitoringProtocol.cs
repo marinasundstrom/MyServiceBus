@@ -307,6 +307,44 @@ public sealed record MonitoringChoreographyRun(
 {
     public string CoordinationType => "choreography";
     public string LifecycleAuthority => "reconstructed_evidence";
+    public IReadOnlyList<string> RootMessageIds { get; init; } = [RootMessageId];
+    public int RootCount => RootMessageIds.Count;
+    public int BranchPointCount
+    {
+        get
+        {
+            var targets = Steps.SelectMany(step => step.Outputs)
+                .SelectMany(output => output.Targets)
+                .Select(target => target.StepKey)
+                .ToHashSet(StringComparer.Ordinal);
+            var internalBranches = Steps.Count(step => step.Outputs
+                .SelectMany(output => output.Targets)
+                .Select(target => target.StepKey)
+                .Distinct(StringComparer.Ordinal)
+                .Skip(1)
+                .Any());
+            var rootDeliveryBranches = Steps
+                .Where(step => !targets.Contains(step.StepKey))
+                .GroupBy(step => step.MessageId, StringComparer.Ordinal)
+                .Count(group => group.Skip(1).Any());
+            return internalBranches + rootDeliveryBranches;
+        }
+    }
+    public int MergePointCount => Steps
+        .SelectMany(step => step.Outputs.SelectMany(output => output.Targets.Select(target => new
+        {
+            Source = step.StepKey,
+            Target = target.StepKey
+        })))
+        .GroupBy(edge => edge.Target, StringComparer.Ordinal)
+        .Count(group => group.Select(edge => edge.Source).Distinct(StringComparer.Ordinal).Skip(1).Any());
+    public string ObservedShape => (BranchPointCount > 0, MergePointCount > 0) switch
+    {
+        (true, true) => "branching_and_converging",
+        (true, false) => "branching",
+        (false, true) => "converging",
+        _ => "linear"
+    };
 }
 
 public sealed record MonitoringChoreographyRunStep(
