@@ -39,6 +39,7 @@ const sections = [
       ['Message scheduling', '/docs/scheduling'],
       ['Consumer methods', '/docs/consumer-methods'],
       ['.NET 11 and unions', '/docs/dotnet-11-unions'],
+      ['Raven (preview)', '/docs/raven'],
       ['Platform parity', '/docs/platform-parity'],
       ['Supported versions', '/docs/supported-versions'],
       ['AOT compilation', '/docs/native-aot'],

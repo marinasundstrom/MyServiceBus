@@ -19,7 +19,7 @@ async func Main() -> Task {
     let topology = provider.GetRequiredService<TopologyRegistry>()
     Assert(topology.Consumers.Count == 2, "The Raven union consumer should expand into two registrations.")
     Assert(topology.ReceiveEndpoints.Count == 1, "Both Raven union cases should share one endpoint.")
-    Assert(topology.Messages.All(message => message.MessageType != typeof(System.Union<SubmitOrder, CancelOrder>)), "The Raven union carrier leaked into topology.")
+    Assert(topology.Messages.All(message => message.MessageType != typeof(OrderCommand)), "The Raven union carrier leaked into topology.")
 
     let hostedService = provider.GetRequiredService<IHostedService>()
     await hostedService.StartAsync(CancellationToken.None)
@@ -43,19 +43,18 @@ func Assert(condition: bool, message: string) {
 
 record SubmitOrder(OrderId: string)
 record CancelOrder(OrderId: string)
+union OrderCommand(SubmitOrder | CancelOrder)
 
 class UnionConsumerAudit {
     val Events = List<string>()
 }
 
 [Consumer("orders")]
-class OrderConsumers {
-    func Consume(
-        message: SubmitOrder | CancelOrder,
-        audit: UnionConsumerAudit) {
-        match message {
-            SubmitOrder(let orderId) => audit.Events.Add("submit:$orderId")
-            CancelOrder(let orderId) => audit.Events.Add("cancel:$orderId")
-        }
+func Consume(
+    message: OrderCommand,
+    audit: UnionConsumerAudit) {
+    match message {
+        SubmitOrder(let orderId) => audit.Events.Add("submit:$orderId")
+        CancelOrder(let orderId) => audit.Events.Add("cancel:$orderId")
     }
 }
