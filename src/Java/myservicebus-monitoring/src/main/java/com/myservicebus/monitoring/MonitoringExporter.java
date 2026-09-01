@@ -26,6 +26,7 @@ import com.myservicebus.BusHookEvent;
 import com.myservicebus.BusLifecycleHookEvent;
 import com.myservicebus.MessageOperationHookEvent;
 import com.myservicebus.OutboxDeliveryHookEvent;
+import com.myservicebus.SagaStateMachineHookEvent;
 import com.myservicebus.RecurringJobSource;
 import com.myservicebus.RecurringJobState;
 import com.myservicebus.JobAttemptState;
@@ -466,6 +467,24 @@ public final class MonitoringExporter implements BusHook, ScheduledWorkObserver,
                     sequence.incrementAndGet(), outbox.occurredAtUtc(), "outbox_dispatch_cycle", outbox.succeeded(),
                     null, null, outbox.serviceName(), null, outbox.durationMs(), outbox.failureCategory(), null,
                     null, null, null, null, null, null, properties, null, null);
+        }
+        if (busEvent instanceof SagaStateMachineHookEvent saga) {
+            Map<String, String> properties = new LinkedHashMap<>();
+            properties.put("state_machine_id", saga.stateMachineId());
+            properties.put("definition_version", saga.definitionVersion());
+            properties.put("owner", saga.owner());
+            properties.put("event_id", saga.eventId());
+            properties.put("status", saga.status());
+            properties.put("begin_state", format(saga.beginState()));
+            properties.put("end_state", format(saga.endState()));
+            properties.put("created", Boolean.toString(saga.created()));
+            properties.put("completed", Boolean.toString(saga.completed()));
+            properties.put("instance_present", Boolean.toString(saga.instancePresent()));
+            return new MonitoringProtocol.Observation(
+                    sequence.incrementAndGet(), saga.occurredAtUtc(), "saga_delivery", saga.succeeded(),
+                    null, null, null, null, saga.durationMs(), saga.exceptionType(), saga.exceptionMessage(),
+                    format(saga.sagaCorrelationId()), null, null, null, null, null, properties,
+                    saga.messageId(), null);
         }
         return null;
     }

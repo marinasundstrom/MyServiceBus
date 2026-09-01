@@ -57,7 +57,7 @@ class SendEndpointProviderImpl implements SendEndpointProvider {
 
     @Override
     public SendEndpoint getSendEndpoint(String uri) {
-        if (consumeContext != null) {
+        if ((outboxSession == null || outboxSession.getWriter() == null) && consumeContext != null) {
             return consumeContext.getSendEndpoint(uri);
         }
 

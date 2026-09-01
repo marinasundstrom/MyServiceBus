@@ -1,5 +1,6 @@
 using MyServiceBus.Choreography;
 using MyServiceBus.Inspection;
+using MyServiceBus.Orchestration;
 
 namespace MyServiceBus.Monitoring;
 
@@ -248,6 +249,86 @@ public sealed record MonitoringDeclaredChoreographyConnection(
     string TargetOwner,
     string TargetStepId,
     string MatchKind);
+
+public sealed record MonitoringDeclaredSagaStateMachine(
+    string StateMachineId,
+    IReadOnlyList<string> DefinitionVersions,
+    IReadOnlyList<string> ConflictKinds,
+    DateTimeOffset LastCapturedAtUtc,
+    IReadOnlyList<MonitoringDeclaredSagaStateMachineDeployment> Deployments);
+
+public sealed record MonitoringDeclaredSagaStateMachineDeployment(
+    string ApplicationName,
+    string Owner,
+    string EndpointName,
+    SagaStateMachineDefinition Definition,
+    int InstanceCount,
+    int OnlineInstanceCount,
+    DateTimeOffset LastCapturedAtUtc);
+
+public sealed record MonitoringSagaInstance(
+    string StateMachineId,
+    string DefinitionVersion,
+    string ApplicationName,
+    string CorrelationId,
+    string Status,
+    string CurrentState,
+    bool InstancePresent,
+    bool LastDeliverySucceeded,
+    DateTimeOffset StartedAtUtc,
+    DateTimeOffset LastActivityAtUtc,
+    DateTimeOffset? CompletedAtUtc,
+    IReadOnlyList<MonitoringSagaTransition> Transitions);
+
+public sealed record MonitoringSagaTransition(
+    DateTimeOffset OccurredAtUtc,
+    string EventId,
+    string DeliveryStatus,
+    string? BeginState,
+    string? EndState,
+    bool Succeeded,
+    bool Created,
+    bool Completed,
+    bool InstancePresent,
+    double? DurationMs,
+    string? ExceptionType,
+    string? ExceptionMessage,
+    string? MessageId);
+
+public sealed record MonitoringWorkflowCatalogItem(
+    string WorkflowId,
+    string Kind,
+    string LifecycleAuthority,
+    IReadOnlyList<string> DefinitionVersions,
+    IReadOnlyList<string> Owners,
+    IReadOnlyList<string> ConflictKinds,
+    int ParticipantCount,
+    int ReportingInstanceCount,
+    int OnlineInstanceCount,
+    int ObservedRunCount,
+    DateTimeOffset LastCapturedAtUtc);
+
+public sealed record MonitoringWorkflowRunIndexPage(
+    int Offset,
+    int Limit,
+    int Total,
+    DateTimeOffset CapturedAtUtc,
+    IReadOnlyList<MonitoringWorkflowRunSummary> Runs);
+
+public sealed record MonitoringWorkflowRunSummary(
+    string WorkflowId,
+    string RunId,
+    string Kind,
+    string LifecycleAuthority,
+    string Status,
+    DateTimeOffset StartedAtUtc,
+    DateTimeOffset LastActivityAtUtc,
+    double DurationMs,
+    int EvidenceCount,
+    string? CurrentState,
+    bool? EvidenceComplete,
+    bool HasFailures,
+    string DetailIdentity);
 
 public sealed record MonitoringChoreographyRuntimeSnapshot(
     int WindowSeconds,

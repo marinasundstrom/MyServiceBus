@@ -8,6 +8,9 @@ public interface BusTopology {
     List<ConsumerTopology> getConsumers();
     List<ReceiveEndpointDefinition> getReceiveEndpoints();
     List<ChoreographyFragment> getChoreographies();
+    default List<SagaStateMachineTopology> getSagaStateMachines() {
+        return List.of();
+    }
 
     default TopologySnapshot getSnapshot() {
         return TopologySnapshots.create(this);

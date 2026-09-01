@@ -30,3 +30,15 @@ The sample declares workflows at several levels of complexity for the monitoring
 `/request` and `/request_multi` send a `TestRequest`. Their `*/fault` variants mark the request so `TestRequestConsumer` intentionally faults.
 
 See `/Users/robert/Projects/MyServiceBus/src/TestApp/TestApp.http` for ready-made requests.
+
+## Order orchestration sample
+
+`POST /workflows/orchestration` starts `OrderOrchestrationStateMachine`, an experimental volatile saga hosted by the C# service:
+
+1. the coordinator consumes `OrderOrchestrationStarted` and sends `OrchestrationInventoryRequested` to the Java service;
+2. Java publishes `OrchestrationInventoryReserved` after its local inventory reaction;
+3. the coordinator sends `OrchestrationPaymentRequested` to a C# participant;
+4. the participant publishes `OrchestrationPaymentCaptured`; and
+5. the coordinator publishes `OrderOrchestrationCompleted` and finalizes the instance.
+
+The sample deliberately keeps inventory and payment behavior in their participant services. The saga owns only the cross-service process, its correlation identity, and current state. Its repository is process-local and volatile, so this demonstrates the authoring and bus-execution path rather than production durability.

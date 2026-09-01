@@ -8,6 +8,8 @@ The matching inbox protects consumer-side database effects from broker redeliver
 
 MyServiceBus follows MassTransit's useful distinction between a **Bus Outbox** for messages produced in an application scope and a **Consumer Outbox** that combines inbox deduplication with outgoing capture around a consumer. Teams can use [MassTransit's outbox documentation](https://masstransit.massient.com/concepts/outbox) as conceptual background.
 
+Scoped send and publish providers prefer an active `OutboxSession` even while a consume context is present. This lets a consumer or saga repository open a database transaction, attach the scoped outbox writer, execute application behavior, and commit state plus outgoing intent without those messages bypassing the transaction through the live broker context.
+
 MyServiceBus documentation remains authoritative for configuration, supported behavior, and release status. MassTransit configuration snippets are not source-compatible MyServiceBus examples, and MyServiceBus does not claim every ordering, locking, delivery-service, or exactly-once behavior described for a particular MassTransit version.
 
 The persistence compatibility promise is MyServiceBus C# ↔ MyServiceBus Java. Both implementations use one normalized MyServiceBus PostgreSQL model. MassTransit outbox tables, storage providers, delivery services, and future commercial releases are not compatibility targets; only separately versioned and tested broker-envelope interoperability claims apply.

@@ -9,8 +9,10 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.function.Consumer;
+import java.util.function.Function;
 
 import com.myservicebus.di.ServiceCollection;
+import com.myservicebus.di.ServiceProvider;
 import com.myservicebus.choreography.ChoreographyFragment;
 import com.myservicebus.logging.ConsoleLoggerConfig;
 import com.myservicebus.logging.ConsoleLoggerFactory;
@@ -21,6 +23,9 @@ import com.myservicebus.serialization.NServiceBusJsonSerializerFactory;
 import com.myservicebus.serialization.RawJsonSerializerFactory;
 import com.myservicebus.serialization.SerializerFactory;
 import com.myservicebus.topology.TopologyRegistry;
+import com.myservicebus.orchestration.SagaStateMachine;
+import com.myservicebus.orchestration.SagaRepository;
+import com.myservicebus.orchestration.SagaRepositoryCapabilities;
 
 public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigurator {
 
@@ -35,6 +40,7 @@ public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigura
             new NServiceBusJsonSerializerFactory()));
     private String defaultContentType = com.myservicebus.serialization.DefaultInboundMessageResolver.ENVELOPE_CONTENT_TYPE;
     private final Set<Class<?>> consumerTypes = new HashSet<>();
+    private final Set<Class<?>> sagaStateMachineTypes = new HashSet<>();
     private final Logger logger = new ConsoleLoggerFactory(new ConsoleLoggerConfig())
             .create(BusRegistrationConfiguratorImpl.class);
     private java.util.function.BiConsumer<BusRegistrationContext, Object> transportConfigure;
@@ -51,6 +57,77 @@ public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigura
     @Override
     public void addChoreography(ChoreographyFragment fragment) {
         topology.registerChoreography(fragment);
+    }
+
+    @Override
+    public <TSaga, TStateMachine extends SagaStateMachine<TSaga>> void addSagaStateMachine(
+            Class<TStateMachine> stateMachineClass,
+            java.util.function.Supplier<TStateMachine> factory,
+            SagaRepository<TSaga> repository,
+            String endpointName) {
+        if (stateMachineClass == null) {
+            throw new IllegalArgumentException("stateMachineClass must not be null");
+        }
+        if (factory == null) {
+            throw new IllegalArgumentException("factory must not be null");
+        }
+        if (endpointName != null && endpointName.isBlank()) {
+            throw new IllegalArgumentException("endpointName must not be blank");
+        }
+        if (!sagaStateMachineTypes.add(stateMachineClass)) {
+            return;
+        }
+
+        TStateMachine stateMachine = factory.get();
+        SagaRepository<TSaga> selectedRepository = repository != null
+                ? repository
+                : stateMachine.createInMemoryRepository();
+        registerSagaStateMachine(
+                stateMachineClass,
+                stateMachine,
+                selectedRepository.capabilities(),
+                ignored -> selectedRepository,
+                endpointName);
+    }
+
+    @Override
+    public <TSaga, TStateMachine extends SagaStateMachine<TSaga>> void addSagaStateMachine(
+            Class<TStateMachine> stateMachineClass,
+            java.util.function.Supplier<TStateMachine> factory,
+            SagaRepositoryCapabilities capabilities,
+            Function<ServiceProvider, SagaRepository<TSaga>> repositoryFactory,
+            String endpointName) {
+        if (stateMachineClass == null || factory == null || capabilities == null || repositoryFactory == null) {
+            throw new IllegalArgumentException("Saga state machine registration arguments must not be null");
+        }
+        if (endpointName != null && endpointName.isBlank()) {
+            throw new IllegalArgumentException("endpointName must not be blank");
+        }
+        if (!sagaStateMachineTypes.add(stateMachineClass)) {
+            return;
+        }
+        registerSagaStateMachine(stateMachineClass, factory.get(), capabilities, repositoryFactory, endpointName);
+    }
+
+    private <TSaga, TStateMachine extends SagaStateMachine<TSaga>> void registerSagaStateMachine(
+            Class<TStateMachine> stateMachineClass,
+            TStateMachine stateMachine,
+            SagaRepositoryCapabilities capabilities,
+            Function<ServiceProvider, SagaRepository<TSaga>> repositoryFactory,
+            String endpointName) {
+        capabilities.ensureSupports(
+                stateMachine.definition().repositoryRequirements(),
+                stateMachine.definition().completionPolicy());
+        String queueName = endpointName != null
+                ? endpointName
+                : stateMachine.definition().stateMachineId();
+        topology.registerSagaStateMachine(stateMachine.definition(), queueName);
+        serviceCollection.addSingleton(stateMachineClass, () -> stateMachine);
+        stateMachine.registerConsumers(
+                this,
+                provider -> stateMachine.createRuntime(repositoryFactory.apply(provider)),
+                stateMachineClass,
+                queueName);
     }
 
     @Override

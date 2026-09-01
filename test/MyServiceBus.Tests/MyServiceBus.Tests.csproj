@@ -40,6 +40,9 @@
     <None Include="../fixtures/choreography/v1/*.json"
           Link="choreography-fixtures/%(Filename)%(Extension)"
           CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../fixtures/state-machines/v1/*.json"
+          Link="state-machine-fixtures/%(Filename)%(Extension)"
+          CopyToOutputDirectory="PreserveNewest" />
     <None Include="../fixtures/serialization/v1/*.base64"
           Link="serialization-fixtures/%(Filename)%(Extension)"
           CopyToOutputDirectory="PreserveNewest" />

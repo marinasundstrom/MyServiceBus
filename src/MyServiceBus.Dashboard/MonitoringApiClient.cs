@@ -63,6 +63,56 @@ public sealed class MonitoringApiClient
             cancellationToken).ConfigureAwait(false)
             ?? [];
 
+    public async Task<IReadOnlyList<MonitoringDeclaredSagaStateMachine>> GetSagas(CancellationToken cancellationToken)
+        => await httpClient.GetFromJsonAsync<MonitoringDeclaredSagaStateMachine[]>(
+            "/api/monitoring/v1/sagas",
+            cancellationToken).ConfigureAwait(false)
+            ?? [];
+
+    public async Task<IReadOnlyList<MonitoringWorkflowCatalogItem>> GetWorkflowCatalog(CancellationToken cancellationToken)
+        => await httpClient.GetFromJsonAsync<MonitoringWorkflowCatalogItem[]>(
+            "/api/monitoring/v1/workflows",
+            cancellationToken).ConfigureAwait(false)
+            ?? [];
+
+    public async Task<MonitoringWorkflowRunIndexPage?> GetWorkflowRunIndex(
+        string? workflow,
+        string? kind,
+        string? status,
+        string? search,
+        int offset,
+        int limit,
+        CancellationToken cancellationToken)
+    {
+        var parameters = new List<string>
+        {
+            $"offset={Math.Max(0, offset)}",
+            $"limit={Math.Clamp(limit, 1, 100)}"
+        };
+        AddQuery(parameters, "workflow", workflow);
+        AddQuery(parameters, "kind", kind);
+        AddQuery(parameters, "status", status);
+        AddQuery(parameters, "search", search);
+        return await httpClient.GetFromJsonAsync<MonitoringWorkflowRunIndexPage>(
+            $"/api/monitoring/v1/workflow-runs/index?{string.Join('&', parameters)}",
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task<MonitoringSagaInstance?> GetSagaInstance(
+        string stateMachineId,
+        string correlationId,
+        CancellationToken cancellationToken)
+    {
+        using var response = await httpClient.GetAsync(
+            $"/api/monitoring/v1/sagas/{Uri.EscapeDataString(stateMachineId)}/instances/{Uri.EscapeDataString(correlationId)}",
+            cancellationToken).ConfigureAwait(false);
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            return null;
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<MonitoringSagaInstance>(cancellationToken)
+            .ConfigureAwait(false);
+    }
+
     public async Task<MonitoringChoreographyRuntimeSnapshot?> GetChoreographyRuntime(CancellationToken cancellationToken)
         => await httpClient.GetFromJsonAsync<MonitoringChoreographyRuntimeSnapshot>(
             "/api/monitoring/v1/choreographies/runtime?windowSeconds=300",

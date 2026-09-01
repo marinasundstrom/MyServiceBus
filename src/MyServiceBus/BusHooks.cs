@@ -100,6 +100,25 @@ public sealed record OutboxDeliveryHookEvent(
     double? OldestUndispatchedAgeMs,
     string? FailureCategory) : BusHookEvent(OccurredAtUtc);
 
+public sealed record SagaStateMachineHookEvent(
+    DateTimeOffset OccurredAtUtc,
+    bool Succeeded,
+    double DurationMs,
+    string StateMachineId,
+    string DefinitionVersion,
+    string Owner,
+    string EventId,
+    string Status,
+    Guid? SagaCorrelationId,
+    string? BeginState,
+    string? EndState,
+    bool Created,
+    bool Completed,
+    bool InstancePresent,
+    string? ExceptionType,
+    string? ExceptionMessage,
+    string? MessageId) : BusHookEvent(OccurredAtUtc);
+
 internal sealed class BusHookRetryObserver : IRetryObserver
 {
     private readonly IBusHookDispatcher dispatcher;

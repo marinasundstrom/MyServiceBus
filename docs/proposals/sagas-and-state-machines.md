@@ -2,23 +2,26 @@
 
 ## Status
 
-Future product-area proposal. This document defines the intended feature boundary and investigation sequence; it is not yet a supported API or runtime commitment.
+Active implementation proposal. The portable version 1 behavior is defined in the [Saga State-Machine Behavior specification](../specs/saga-state-machine-behavior.md), and matching low-level runtimes plus native C# and Java DSL foundations lower to the same canonical definition and execution sequence. Both runtimes now use public provider-neutral repository transactions and validate declared requirements against provider capabilities; the only built-in provider remains volatile. Experimental registration attaches declared events to one bus endpoint, dispatches outgoing work through the active consume context, exports the normalized definition through topology and inspection, and emits payload-free lifecycle observations after repository commit. The collector exposes dedicated definition and bounded instance-transition saga queries plus shared workflow catalog and run-index projections. The Dashboard renders saga definitions and an initial committed-transition instance view. Focused tests and a mixed C#/Java Aspire order workflow demonstrate the vertical slice. Durable lifecycle retention, rich state-machine visualization, and the first durable repository/outbox provider remain before this is a complete saga feature.
 
 ## Summary
 
-Sagas and state machines provide orchestration: centralized workflow coordination in which one component owns the broader process state and decides how participants should be directed through messages. “Centralized” refers to ownership of workflow knowledge and decisions, not to a single deployment or synchronous execution.
+Sagas and state machines provide orchestration: centralized workflow coordination in which one component owns the broader process state and decides how participants should be directed through messages. The coordinator is defined separately from the participants whose capabilities it coordinates and is normally hosted by one coordinating service. It sits between those services in the workflow relationship by consuming their messages and directing subsequent work, not by absorbing their local business responsibilities. “Centralized” refers to ownership of workflow knowledge and decisions, not to a single deployment or synchronous execution.
 
 Applications can implement an orchestrator directly with consumers, messages, persistence, and application-owned state. The proposed runtime and DSLs provide safer, more concise C# and Java abstractions for expressing that intent while preserving the same application ownership of business rules.
 
 Sagas and state machines should become one coherent MyServiceBus orchestration feature implemented in both C# and Java. The implementation should be based on MassTransit's proven saga architecture, primitives, execution order, and observable behavior while remaining a MyServiceBus-owned reimplementation with no MassTransit runtime dependency.
 
-The complete feature has three distinct layers:
+The complete feature has four distinct layers:
 
 1. a language-neutral saga model, behavior specification, topology projection, and conformance suite;
-2. native C# and Java runtimes with corresponding library-based state-machine DSLs; and
-3. optional language projections, including a future Raven `saga!` macro that lowers into the same runtime model.
+2. low-level C# and Java runtime APIs for correlation, repositories, behavior selection, activities, persistence, and observations;
+3. native library-based state-machine DSLs that compile or build upon those low-level APIs; and
+4. optional language projections, including a future Raven `saga!` macro that lowers into the same .NET runtime model.
 
-The C# and Java DSLs are first-class product APIs. They must not be implemented in terms of the Raven macro, require compiler macros, or require code generation for correctness. Generated registration may optimize either client, but an explicit runtime registration path remains supported.
+The normalized descriptor builders and low-level runtime contracts are infrastructure APIs, not the final state-machine authoring experience. The C# and Java DSLs are first-class product APIs layered above them. They must not be implemented in terms of the Raven macro, require compiler macros, or require code generation for correctness. Generated registration may optimize either client, but an explicit runtime registration path remains supported.
+
+MassTransit compatibility is primarily conceptual and behavioral. MyServiceBus is not required to reproduce MassTransit's interfaces, inheritance hierarchy, overload set, or exact fluent signatures. One native DSL—especially the C# DSL—may intentionally resemble MassTransit's established `Initially`/`During`/`When` model because it is expressive and familiar, while Java and other projections can use language-appropriate shapes. Every abstraction level must still lower to the same MyServiceBus semantics and produce equivalent observable outcomes.
 
 ## Product Boundary
 
@@ -105,6 +108,16 @@ Each runtime associates local callbacks and native types with this definition. R
 
 C# and Java should each provide a normal library API for defining state machines. The APIs should be recognizably related and map unambiguously to the shared definition while using the host language's type system and asynchronous conventions.
 
+These authoring DSLs sit above the low-level execution and descriptor APIs. Application developers may use the lower level directly for framework integration, generated definitions, testing, or unusual dynamic composition, but ordinary applications should not need to assemble repository policies, transition tables, or activity pipelines manually.
+
+The preferred starting point for the C# authoring DSL is the Automatonymous model now embodied by MassTransit state machines. Its core vocabulary and composition order are proven and familiar: declare `State` and `Event<T>` members, configure instance state and correlation, then compose `Initially`, `During`, `DuringAny`, `When`, ordered activities, transitions, ignores, and finalization. Common definitions should look and behave familiar enough that a MassTransit user can translate them mechanically.
+
+This direction does not require source compatibility with Automatonymous or MassTransit. MyServiceBus can omit legacy overloads, separate low-level runtime contracts from authoring concerns, make normalized identities and provider capabilities explicit, improve validation and diagnostics, and use newer C# facilities where they make definitions clearer. Deviations should serve a concrete usability, portability, correctness, AOT, or monitoring goal and remain documented. The Java DSL should preserve the same conceptual structure and behavior while using JVM-idiomatic types and asynchronous forms rather than imitating C# syntax.
+
+The reference DSL also defines a completeness boundary for fundamental saga support. Its common concepts must be implementable by composing public low-level primitives for instance state, event identity and correlation, creation and missing-instance policy, exact-state and any-state behavior selection, ordered activities, transition and finalization, repository transactions, outgoing-work capture, and observations. The DSL must not contain a second hidden execution path. If an ordinary DSL construct cannot lower through those primitives, the primitive layer is incomplete or the construct belongs to a separately declared advanced capability profile.
+
+This boundary does not force every historical Automatonymous feature into the first release. Requests, durable schedules, composite events, exception branches, query correlation, and richer hierarchical behavior enter through explicit profiles after their persistence and failure semantics are defined. Once included, however, they extend the same low-level runtime and normalized definition rather than bypassing them.
+
 An exploratory C# shape may resemble:
 
 ```csharp
@@ -163,7 +176,9 @@ public final class OrderStateMachine extends SagaStateMachine<OrderState> {
 }
 ```
 
-These examples establish direction, not final signatures. The design must validate async activities, cancellation, exceptions, Java type erasure, source generation, annotation processing, NativeAOT, and GraalVM constraints before stabilization. The equivalent declaration must also be constructible explicitly through descriptors or builders so code generation is optional.
+These examples establish the preferred Automatonymous-shaped direction, not final signatures or a complete API-compatibility promise. The design must validate async activities, cancellation, exceptions, Java type erasure, source generation, annotation processing, NativeAOT, and GraalVM constraints before stabilization. The equivalent declaration must also be constructible explicitly through descriptors or builders so code generation is optional.
+
+The concrete lowering and acceptance contract is maintained in [Native Saga State-Machine DSL](../development/saga-native-dsl.md). It is the gate for implementing and reviewing the first native authoring surfaces.
 
 ## Runtime Behavior
 
@@ -189,7 +204,7 @@ Scheduled events, requests, and composite events belong to the shared state-mach
 
 Topology should expose saga/state-machine identity, states, consumed and produced contracts, endpoint attachment, correlation shape, and persistence requirements without executable callbacks. Monitoring should cover state distribution, transitions, correlation failures, missing instances, repository conflicts, schedules, requests, faults, provider health, freshness, and completeness without exporting saga payloads by default.
 
-The dashboard should present orchestration and choreography through a related workflow vocabulary without pretending that their evidence is equivalent. An orchestrated saga has a framework-owned instance identity and persisted current state, so the dashboard can authoritatively show where that instance is, how it arrived there, what it is waiting for, and whether it completed or faulted. A choreographed flow is reconstructed from distributed declarations and bounded observations and must retain confidence and coverage labels. Shared maps, timelines, contract nodes, causal message edges, and application drill-downs can make the two styles comparable while state badges and lifecycle claims remain specific to orchestration.
+The dashboard should present orchestration and choreography through a related workflow vocabulary without pretending that their evidence is equivalent. Monitoring keeps choreography declarations/runs and saga definitions/instances/transitions as separate first-class bus models. `Workflow` is the collective query projection over those sources: each result carries its implementation kind and links back to the complete kind-specific record rather than flattening both into one storage model. An orchestrated saga has a framework-owned instance identity and persisted current state, so the dashboard can authoritatively show where that instance is, how it arrived there, what it is waiting for, and whether it completed or faulted. A choreographed flow is reconstructed from distributed declarations and bounded observations and must retain confidence and coverage labels. Shared maps, timelines, contract nodes, causal message edges, and application drill-downs can make the two styles comparable while state badges and lifecycle claims remain specific to orchestration.
 
 The orchestration drill-down should have a definition graph and an instance timeline. The graph renders initial, ordinary, and final states plus event-labeled transitions, keeps the full definition visible, highlights the selected instance's current state, marks its traversed path, and annotates pending timeouts or requests. Aggregate mode can place instance count, oldest age, transition rate, and fault count on the relevant states and edges. Selecting a graph element filters the ordered transition records rather than placing full operational detail inside nodes.
 
@@ -213,30 +228,33 @@ Broker tests should prove that C# and Java services exchange every saga input an
 
 ## Recommended Sequence
 
-1. Study the MassTransit 8.5.1 saga implementation and tests and write the portable behavior specification.
+1. Study the MassTransit 8.5.1 saga implementation and tests and write the portable behavior specification. **Completed for the version 1 subset.**
 2. Define canonical state-machine and failure-sequence fixtures.
 3. Define the normalized declaration, repository capabilities, topology, and monitoring contracts.
-4. Implement the smallest in-memory C# and Java runtimes with their native library DSLs.
-5. Integrate transactional outbox and durable scheduling.
-6. Add one durable repository provider in each ecosystem and run restart and concurrency gates.
-7. Add requests, scheduled events, composite events, and richer activities through shared fixtures.
-8. Build the Raven `saga!` sample over the ordinary .NET runtime.
-9. Promote only after cross-language, broker, persistence, recovery, and monitoring evidence passes on one commit.
+4. Implement the smallest in-memory C# and Java runtimes with their native library DSLs. **Completed for the fundamental non-bus-integrated profile.**
+5. Complete the usable MVP vertical slice with bus registration and dispatch, ordinary retry/fault behavior, a focused sample, and one Aspire order-orchestration sample. **Completed for the experimental volatile profile.**
+6. Project declarations and instance transitions into topology, monitoring, and an initial Dashboard orchestration view. **Completed for the bounded monitoring profile: separate saga queries remain authoritative, while shared workflow projections provide navigation without flattening the models. Durable retention and richer graph presentation remain.**
+7. Integrate transactional outbox and durable scheduling.
+8. Add one durable repository provider in each ecosystem and run restart and concurrency gates.
+9. Add requests, scheduled events, composite events, and richer activities through shared fixtures.
+10. Build the Raven `saga!` sample over the ordinary .NET runtime.
+11. Promote durable saga support only after cross-language, broker, persistence, recovery, and monitoring evidence passes on one commit.
 
 ## Open Questions
 
-1. Which MassTransit version is the normative implementation-study baseline?
-2. Should the first release include consumer sagas or only declarative state machines?
-3. Which correlation queries can providers support portably?
-4. How is current state encoded and versioned for in-flight definition upgrades?
-5. Which activity extension model remains safe and idiomatic in both languages?
-6. Which durable provider should become the first production candidate?
-7. When, if ever, should one persisted instance be executable interchangeably by C# and Java?
+1. Should the first release include consumer sagas or only declarative state machines?
+2. Which correlation queries can providers support portably?
+3. How is current state encoded and versioned for in-flight definition upgrades?
+4. Which activity extension model remains safe and idiomatic in both languages?
+5. Which durable provider should become the first production candidate?
+6. When, if ever, should one persisted instance be executable interchangeably by C# and Java?
 
 ## References
 
-- [MassTransit saga state-machine concepts](https://masstransit.massient.com/concepts/saga-state-machines/)
+- [MassTransit saga state machines](https://masstransit.io/documentation/patterns/saga/state-machine)
 - [MassTransit 8.5.1 source](https://github.com/MassTransit/MassTransit/tree/v8.5.1)
+- [Saga State-Machine Behavior](../specs/saga-state-machine-behavior.md)
+- [Native Saga State-Machine DSL](../development/saga-native-dsl.md)
 - [Raven Saga DSL Exploration](raven-saga-dsl.md)
 - [Topology Extension Model](../specs/topology-extension-model.md)
 - [Transactional Outbox and Inbox Specification](../specs/outbox-inbox.md)

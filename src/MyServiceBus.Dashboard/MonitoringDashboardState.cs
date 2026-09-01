@@ -31,8 +31,11 @@ public sealed class MonitoringDashboardState : IAsyncDisposable
     public IReadOnlyList<MonitoringFlowEdge> Flow { get; private set; } = [];
     public IReadOnlyList<MonitoringReplicaFlowEdge> ReplicaFlow { get; private set; } = [];
     public IReadOnlyList<MonitoringDeclaredChoreography> Choreographies { get; private set; } = [];
+    public IReadOnlyList<MonitoringDeclaredSagaStateMachine> Sagas { get; private set; } = [];
+    public IReadOnlyList<MonitoringWorkflowCatalogItem> WorkflowCatalog { get; private set; } = [];
     public MonitoringChoreographyRuntimeSnapshot? ChoreographyRuntime { get; private set; }
     public MonitoringWorkflowRunPage? WorkflowRuns { get; private set; }
+    public MonitoringWorkflowRunIndexPage? WorkflowRunIndex { get; private set; }
     public IReadOnlyList<MonitoringObservationRecord> Observations { get; private set; } = [];
     public IReadOnlyList<MonitoringOutboxDispatcherSummary> OutboxDispatchers { get; private set; } = [];
     public IReadOnlyList<MonitoringScheduledWorkSummary> ScheduledWork { get; private set; } = [];
@@ -124,8 +127,11 @@ public sealed class MonitoringDashboardState : IAsyncDisposable
             var flow = api.GetFlow(stopping.Token);
             var replicaFlow = api.GetReplicaFlow(stopping.Token);
             var choreographies = api.GetChoreographies(stopping.Token);
+            var sagas = api.GetSagas(stopping.Token);
+            var workflowCatalog = api.GetWorkflowCatalog(stopping.Token);
             var choreographyRuntime = api.GetChoreographyRuntime(stopping.Token);
             var workflowRuns = api.GetWorkflowRuns(null, null, null, null, null, null, 0, 100, stopping.Token);
+            var workflowRunIndex = api.GetWorkflowRunIndex(null, null, null, null, 0, 100, stopping.Token);
             var timeSeries = api.GetTimeSeries(stopping.Token);
             var observations = api.GetRecentObservations(stopping.Token);
             var outboxDispatchers = api.GetOutboxDispatchers(stopping.Token);
@@ -143,8 +149,11 @@ public sealed class MonitoringDashboardState : IAsyncDisposable
                 flow,
                 replicaFlow,
                 choreographies,
+                sagas,
+                workflowCatalog,
                 choreographyRuntime,
                 workflowRuns,
+                workflowRunIndex,
                 timeSeries,
                 observations,
                 outboxDispatchers,
@@ -161,8 +170,11 @@ public sealed class MonitoringDashboardState : IAsyncDisposable
             Flow = flow.Result;
             ReplicaFlow = replicaFlow.Result;
             Choreographies = choreographies.Result;
+            Sagas = sagas.Result;
+            WorkflowCatalog = workflowCatalog.Result;
             ChoreographyRuntime = choreographyRuntime.Result;
             WorkflowRuns = workflowRuns.Result;
+            WorkflowRunIndex = workflowRunIndex.Result;
             TimeSeries = timeSeries.Result;
             Observations = observations.Result;
             OutboxDispatchers = outboxDispatchers.Result;

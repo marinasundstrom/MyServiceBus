@@ -9,6 +9,7 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
     <PackageReference Include="Microsoft.OpenApi" />
+    <PackageReference Include="Npgsql" />
     <PackageReference Include="OpenTelemetry.Extensions.Hosting" />
     <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" />
     <PackageReference Include="OpenTelemetry.Instrumentation.Http" />
@@ -21,6 +22,7 @@
                       ReferenceOutputAssembly="false" />
     <ProjectReference Include="../AspireApp.ServiceDefaults/AspireApp.ServiceDefaults.csproj" />
     <ProjectReference Include="../MyServiceBus.Monitoring/MyServiceBus.Monitoring.csproj" />
+    <ProjectReference Include="../MyServiceBus.PostgreSql/MyServiceBus.PostgreSql.csproj" />
     <ProjectReference Include="../MyServiceBus.RabbitMq/MyServiceBus.RabbitMq.csproj" />
     <ProjectReference Include="../TestApp.Contracts/TestApp.Contracts.csproj" />
   </ItemGroup>

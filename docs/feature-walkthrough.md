@@ -865,7 +865,7 @@ When an application also has a broker-backed bus, publish events that represent 
 
 ### Declaring choreography intent (preview)
 
-The first choreography API builds a portable, payload-free description of reactions owned by one application. Registering the fragment makes it part of the normalized topology and inspection metadata exported to monitoring. It does not register consumers, execute reactions, add message headers, or create a coordinator.
+The first choreography API builds a portable, payload-free description of reactions owned by one application. It is the current low-level descriptor and registration surface, not a commitment that every future C#, Java, or Raven authoring DSL must reproduce this builder syntax. Registering the fragment makes it part of the normalized topology and inspection metadata exported to monitoring. It does not register consumers, execute reactions, add message headers, or create a coordinator.
 
 #### C#
 
@@ -912,7 +912,35 @@ The fluent registration overload is convenience over `ChoreographyBuilder`; it p
 
 When runtime monitoring is enabled, `GET /api/monitoring/v1/choreographies` merges the fragments reported by participating applications. Identical declarations from replicas collapse into one fragment view with reporting and online instance counts. The query supplies version-scoped `declared_contract` connections from each output to steps consuming the same contract, and the Dashboard's **Workflows** page renders those relationships by application. `GET /api/monitoring/v1/choreographies/runtime?windowSeconds=300` separately overlays exact consumed-message-to-send or consumed-message-to-publish counts for the selected window. Contract continuity is not proof that a route exists or a message was delivered, and no exact evidence is not a failure. Definition-version, owner, and step-ownership disagreement remains visible as configuration evidence; neither query executes the choreography or claims authoritative workflow state.
 
-The repository's mixed Aspire sample declares progressively richer views: `sample-local-order-observation` is one C# terminal reaction, `sample-order-submission` combines C# and Java declarations, `sample-parallel-order-checks` is a deterministic three-step C# fan-out, and `sample-fulfillment-handoff` follows a linear C# → Java → C# chain. Start the parallel sample with `POST /workflows/parallel-checks` and the handoff with `POST /workflows/fulfillment` on the C# app. Every declaration matches real consumers and emitted messages; none invents a coordinator. In the monitoring Dashboard, **Workflows → Workflow runs** queries retained runs by type, status, or identity and opens a direct, failure-aware diagram and detail URL. Exactly connected deliveries are assembled into one run; the list and detail identify linear, branching, and converging observed shapes, and the graph labels root fan-out, internal forks, and convergence without claiming business-level join semantics. Each step's **Declared output comparison** shows exact observed sends, publications, or a terminal outcome against declared count and timing intent. Expected absence is only reported after 15 seconds of inactivity with complete monitoring coverage; otherwise it remains awaiting or inconclusive. Findings are operational evidence, not an authoritative business-workflow failure. PostgreSQL-backed monitoring preserves those projections across collector restarts for the configured retention period and removes partial projections superseded by a later exact connection. **Declared workflows** separately shows the merged definitions. `Live activity`, `terminal observed`, and `no recent activity` remain evidence labels rather than authoritative choreography lifecycle states. Use the Dashboard's **Density** selector to retain the default comfortable layout or show a compact application-wide view.
+The repository's mixed Aspire sample declares progressively richer views: `sample-local-order-observation` is one C# terminal reaction, `sample-order-submission` combines C# and Java declarations, `sample-parallel-order-checks` is a deterministic three-step C# fan-out, and `sample-fulfillment-handoff` follows a linear C# → Java → C# chain. Start the parallel sample with `POST /workflows/parallel-checks` and the handoff with `POST /workflows/fulfillment` on the C# app. `POST /workflows/orchestration` starts the separate `sample-order-orchestration` saga: a C# coordinator sends inventory work to Java, advances after Java publishes its result, sends payment work to a C# participant, and publishes completion before deleting its finalized instance. Under Aspire, the coordinator persists each intermediate state in PostgreSQL and captures outgoing work in the same transaction; the response identifies the selected repository. Standalone TestApp execution falls back explicitly to the volatile repository when no `outbox` connection string is configured. Every choreography declaration matches real consumers and emitted messages; the orchestration sample instead has one explicit process owner. The RabbitMQ acceptance suite additionally reverses ownership—Java coordinates C# work—while MassTransit starts and observes both variants. In the monitoring Dashboard, **Workflows → Workflow runs** queries retained runs by type, status, or identity and opens a direct, failure-aware diagram and detail URL. Exactly connected deliveries are assembled into one run; the list and detail identify linear, branching, and converging observed shapes, and the graph labels root fan-out, internal forks, and convergence without claiming business-level join semantics. Each step's **Declared output comparison** shows exact observed sends, publications, or a terminal outcome against declared count and timing intent. Expected absence is only reported after 15 seconds of inactivity with complete monitoring coverage; otherwise it remains awaiting or inconclusive. Findings are operational evidence, not an authoritative business-workflow failure. PostgreSQL-backed monitoring preserves those projections across collector restarts for the configured retention period and removes partial projections superseded by a later exact connection. **Declared workflows** is a shared catalog; each choreography and saga opens on its own definition page. Saga runs open a separate current-state and committed-transition view, while `Live activity`, `terminal observed`, and `no recent activity` remain choreography evidence labels rather than authoritative lifecycle states. Use the Dashboard's **Density** selector to retain the default comfortable layout or show a compact application-wide view.
+
+The opt-in RabbitMQ interoperability suite also verifies the workflow boundary with real peers: MassTransit publishes a workflow-start event, a C# MyServiceBus saga sends correlated work to a Java MyServiceBus participant, Java publishes the result, and the saga publishes completion back to a MassTransit consumer. This proves interoperability at the service contracts and envelopes; it does not imply that local choreography declarations or saga persistence models are shared with MassTransit.
+
+### Experimental saga state-machine registration
+
+After defining a native state machine as described in [Saga Native DSL](development/saga-native-dsl.md), register it with the same bus configurator used for consumers.
+
+#### C#
+
+```csharp
+services.AddServiceBus(configurator =>
+{
+    configurator.AddSagaStateMachine<OrderStateMachine, OrderState>();
+});
+```
+
+Pass an existing `OrderStateMachine` instance when construction needs application configuration, or pass an endpoint name to override the default state-machine ID.
+
+The overload accepting `ISagaRepository<OrderState>` selects an explicit provider. The capabilities-plus-factory overload instead resolves a repository inside each consumer scope, which is the appropriate boundary for transaction-scoped durable providers. A machine can call `RepositoryRequirements(...)` during construction to require durable storage, a concurrency mode, or a transactional outbox. Registration compares those requirements with the declared capabilities and throws `SagaRepositoryCapabilityException` before endpoint startup when they are incompatible. `InMemorySagaRepository<TSaga>` advertises identity correlation, single-process concurrency, volatile durability, a logical outbox boundary, and final-instance deletion. The PostgreSQL package adds `AddPostgreSqlSagaStateMachine(...)`: it advertises durable identity storage, pessimistic correlation-scoped concurrency, final deletion, and an atomic PostgreSQL outbox.
+
+#### Java
+
+```java
+services.from(MessageBusServices.class).addServiceBus(configurator ->
+    configurator.addSagaStateMachine(OrderStateMachine.class));
+```
+
+Java also accepts a state-machine supplier and endpoint override. Its four-argument registration overload accepts a `SagaRepository<OrderState>` provider; the capabilities-plus-factory form resolves one from the active `ServiceProvider`. `repositoryRequirements(...)` declares the same capability needs as C#. In both clients, registration binds every declared event contract to one endpoint and runs the machine through the ordinary consumer retry and fault pipeline. Saga activities use scoped send and publish providers: without an active outbox they retain consume-context behavior, while an active outbox captures them in the provider's transaction. `PostgreSqlSagas.addSagaStateMachine(...)` selects the same durable and transactional profile as the C# helper. The in-memory profile remains useful for development and samples; it does not provide restart durability or atomic broker intent.
 
 ---
 
@@ -996,7 +1024,7 @@ public record OrderSubmitted;
 public record OrderSubmitted() { }
 ```
 
-Built-in endpoint name formatters include `DefaultEndpointNameFormatter`, `KebabCaseEndpointNameFormatter`, and `SnakeCaseEndpointNameFormatter`. Like MassTransit, automatic endpoint names are derived from the consumer type rather than the message type, and the `Consumer`, `Saga`, and `Activity` suffixes are removed before casing is applied. The suffix rules keep the naming surface compatible; they do not imply that saga or activity runtimes are currently implemented.
+Built-in endpoint name formatters include `DefaultEndpointNameFormatter`, `KebabCaseEndpointNameFormatter`, and `SnakeCaseEndpointNameFormatter`. Like MassTransit, automatic endpoint names are derived from the consumer type rather than the message type, and the `Consumer`, `Saga`, and `Activity` suffixes are removed before casing is applied. The suffix rules remain independent of the experimental saga state-machine runtime and do not imply durable saga support.
 
 ### JSON interoperability profiles
 

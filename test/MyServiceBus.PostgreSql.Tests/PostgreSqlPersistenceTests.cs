@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using MyServiceBus.Persistence;
 using MyServiceBus.Persistence.PostgreSql;
+using MyServiceBus.Orchestration;
 using MyServiceBus.Serialization;
 using Npgsql;
 using Testcontainers.PostgreSql;
@@ -30,9 +31,10 @@ public sealed class PostgreSqlPersistenceTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Version_two_schema_migrates_to_scheduling_recurring_and_tracked_jobs()
+    public async Task Version_two_schema_migrates_to_scheduling_recurring_tracked_jobs_and_sagas()
     {
         await using (var command = dataSource.CreateCommand("""
+            DROP TABLE myservicebus.saga_instance;
             DROP TABLE myservicebus.job_attempt;
             DROP TABLE myservicebus.recurring_job_occurrence;
             DROP TABLE myservicebus.job;
@@ -68,12 +70,13 @@ public sealed class PostgreSqlPersistenceTests : IAsyncLifetime
                 to_regclass('myservicebus.recurring_job_definition') IS NOT NULL,
                 to_regclass('myservicebus.recurring_job_occurrence') IS NOT NULL,
                 to_regclass('myservicebus.job') IS NOT NULL,
-                to_regclass('myservicebus.job_attempt') IS NOT NULL
+                to_regclass('myservicebus.job_attempt') IS NOT NULL,
+                to_regclass('myservicebus.saga_instance') IS NOT NULL
             FROM myservicebus.schema_version WHERE singleton;
             """);
         await using var reader = await verification.ExecuteReaderAsync();
         Assert.True(await reader.ReadAsync());
-        Assert.Equal(5, reader.GetInt32(0));
+        Assert.Equal(6, reader.GetInt32(0));
         Assert.True(reader.GetBoolean(1));
         Assert.True(reader.GetBoolean(2));
         Assert.True(reader.GetBoolean(3));
@@ -81,6 +84,40 @@ public sealed class PostgreSqlPersistenceTests : IAsyncLifetime
         Assert.True(reader.GetBoolean(5));
         Assert.True(reader.GetBoolean(6));
         Assert.True(reader.GetBoolean(7));
+        Assert.True(reader.GetBoolean(8));
+    }
+
+    [Fact]
+    public async Task Saga_repository_persists_updates_and_deletes_final_instances()
+    {
+        var correlationId = Guid.NewGuid();
+        var repository = new PostgreSqlSagaRepository<TestSaga>(
+            dataSource, new OutboxSession(), ServiceName, "tests.order-saga");
+
+        await repository.Execute(
+            correlationId,
+            static (_, _) => ValueTask.FromResult(
+                SagaRepositoryTransaction<TestSaga, bool>.Upsert(
+                    new TestSaga { State = "AwaitingPayment", Attempts = 1 }, true)));
+
+        var loaded = await repository.Execute(
+            correlationId,
+            static (instance, _) => ValueTask.FromResult(
+                SagaRepositoryTransaction<TestSaga, TestSaga?>.NoChange(instance)));
+
+        Assert.NotNull(loaded);
+        Assert.Equal("AwaitingPayment", loaded.State);
+        Assert.Equal(1, loaded.Attempts);
+        Assert.Equal(SagaOutboxKind.Transactional, repository.Capabilities.Outbox);
+
+        await repository.Execute(
+            correlationId,
+            static (_, _) => ValueTask.FromResult(SagaRepositoryTransaction<TestSaga, bool>.Delete(true)));
+        var deleted = await repository.Execute(
+            correlationId,
+            static (instance, _) => ValueTask.FromResult(
+                SagaRepositoryTransaction<TestSaga, TestSaga?>.NoChange(instance)));
+        Assert.Null(deleted);
     }
 
     [Fact]
@@ -1004,6 +1041,13 @@ public sealed class PostgreSqlPersistenceTests : IAsyncLifetime
         public int Attempts => Volatile.Read(ref attempts);
 
         public void IncrementAttempts() => Interlocked.Increment(ref attempts);
+    }
+
+    private sealed class TestSaga
+    {
+        public string State { get; set; } = string.Empty;
+
+        public int Attempts { get; set; }
     }
 
     private sealed record CrossLanguageTrackedJob(string Origin);

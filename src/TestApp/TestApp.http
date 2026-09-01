@@ -44,3 +44,7 @@ GET {{TestApp_HostAddress}}/request_multi
 GET {{TestApp_HostAddress}}/request_multi/fault
 
 ###
+
+POST {{TestApp_HostAddress}}/workflows/orchestration
+
+###

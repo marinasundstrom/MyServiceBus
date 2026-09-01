@@ -1,0 +1,106 @@
+{
+  "schemaVersion": 1,
+  "stateMachineId": "order-state-machine",
+  "definitionVersion": "1",
+  "owner": "orders",
+  "sagaDataUrn": "urn:message:Contracts:OrderState",
+  "stateMember": "CurrentState",
+  "completionPolicy": "delete-when-finalized",
+  "repositoryRequirements": {
+    "correlation": "identity",
+    "concurrency": "single-process",
+    "durability": "volatile",
+    "outbox": "logical"
+  },
+  "states": [
+    {
+      "id": "AwaitingPayment"
+    },
+    {
+      "id": "Processing"
+    }
+  ],
+  "events": [
+    {
+      "id": "OrderSubmitted",
+      "messageUrn": "urn:message:Contracts:OrderSubmitted",
+      "correlation": {
+        "kind": "identity",
+        "sagaMember": "CorrelationId",
+        "messageMember": "OrderId"
+      },
+      "creationPolicy": "if-missing",
+      "missingInstancePolicy": "fault"
+    },
+    {
+      "id": "PaymentReceived",
+      "messageUrn": "urn:message:Contracts:PaymentReceived",
+      "correlation": {
+        "kind": "identity",
+        "sagaMember": "CorrelationId",
+        "messageMember": "OrderId"
+      },
+      "creationPolicy": "existing-only",
+      "missingInstancePolicy": "discard"
+    },
+    {
+      "id": "ProcessingCompleted",
+      "messageUrn": "urn:message:Contracts:ProcessingCompleted",
+      "correlation": {
+        "kind": "identity",
+        "sagaMember": "CorrelationId",
+        "messageMember": "OrderId"
+      },
+      "creationPolicy": "existing-only",
+      "missingInstancePolicy": "fault"
+    }
+  ],
+  "behaviors": [
+    {
+      "sourceState": "AwaitingPayment",
+      "eventId": "PaymentReceived",
+      "activities": [
+        {
+          "kind": "mutate",
+          "activityId": "AwaitingPayment.PaymentReceived.0"
+        },
+        {
+          "kind": "transition",
+          "targetState": "Processing"
+        }
+      ]
+    },
+    {
+      "sourceState": "Initial",
+      "eventId": "OrderSubmitted",
+      "activities": [
+        {
+          "kind": "mutate",
+          "activityId": "Initial.OrderSubmitted.0"
+        },
+        {
+          "kind": "send",
+          "messageUrn": "urn:message:Contracts:ReserveInventory",
+          "destination": "queue:reserve-inventory"
+        },
+        {
+          "kind": "transition",
+          "targetState": "AwaitingPayment"
+        }
+      ]
+    },
+    {
+      "sourceState": "Processing",
+      "eventId": "ProcessingCompleted",
+      "activities": [
+        {
+          "kind": "publish",
+          "messageUrn": "urn:message:Contracts:OrderCompleted"
+        },
+        {
+          "kind": "finalize"
+        }
+      ]
+    }
+  ]
+}

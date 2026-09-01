@@ -146,6 +146,44 @@ public static class MonitoringApi
             repository.GetDeclaredChoreographies(DateTimeOffset.UtcNow))
             .WithSummary("List merged application-declared choreography fragments and conflicts")
             .CacheOutput(policy => policy.Expire(TimeSpan.FromSeconds(5)));
+        query.MapGet("/sagas", (MonitoringRepository repository) =>
+            repository.GetDeclaredSagaStateMachines(DateTimeOffset.UtcNow))
+            .WithSummary("List registered saga state-machine definitions and deployment conflicts")
+            .CacheOutput(policy => policy.Expire(TimeSpan.FromSeconds(5)));
+        query.MapGet("/sagas/instances", (string? stateMachine, string? status, MonitoringRepository repository) =>
+            repository.GetSagaInstances(stateMachine, status))
+            .WithSummary("List recently observed saga instances and authoritative committed transitions");
+        query.MapGet("/sagas/{stateMachine}/instances/{correlationId}", (
+            string stateMachine,
+            string correlationId,
+            MonitoringRepository repository) =>
+        {
+            var instance = repository.GetSagaInstance(stateMachine, correlationId);
+            return instance is null ? Results.NotFound() : Results.Ok(instance);
+        })
+            .WithSummary("Get one recently observed saga instance and its committed transitions")
+            .Produces<MonitoringSagaInstance>()
+            .Produces(StatusCodes.Status404NotFound);
+        query.MapGet("/workflows", (MonitoringRepository repository) =>
+            repository.GetWorkflowCatalog(DateTimeOffset.UtcNow))
+            .WithSummary("List declared choreography and saga workflows through a shared reference projection")
+            .CacheOutput(policy => policy.Expire(TimeSpan.FromSeconds(5)));
+        query.MapGet("/workflow-runs/index", (
+            string? workflow,
+            string? kind,
+            string? status,
+            string? search,
+            int? offset,
+            int? limit,
+            MonitoringRepository repository) => repository.GetWorkflowRunIndex(
+                workflow,
+                kind,
+                status,
+                search,
+                offset ?? 0,
+                limit ?? 50,
+                DateTimeOffset.UtcNow))
+            .WithSummary("List choreography runs and saga instances through a shared reference projection");
         query.MapGet("/choreographies/runtime", (int? windowSeconds, MonitoringRepository repository) =>
             repository.GetChoreographyRuntime(windowSeconds ?? 300, DateTimeOffset.UtcNow))
             .WithSummary("Compare declared choreography reactions with exact causal observations");

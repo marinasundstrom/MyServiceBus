@@ -65,7 +65,8 @@ public sealed class BusInspectionProvider : IBusInspectionProvider
             messages,
             endpoints,
             consumers,
-            topology.Choreographies);
+            topology.Choreographies,
+            topology.SagaStateMachines ?? []);
     }
 
     private static IReadOnlyDictionary<string, object?> EmptyProperties()

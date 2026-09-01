@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using MyServiceBus.Choreography;
+using MyServiceBus.Orchestration;
 using MyServiceBus.Topology;
 using MyServiceBus.Serialization;
 using System;
@@ -26,6 +27,7 @@ public class BusRegistrationConfigurator : IBusRegistrationConfigurator
     private string defaultContentType = InboundMessageResolver.EnvelopeContentType;
     private readonly TransportCapabilityRequirements capabilityRequirements = new();
     private readonly JobConsumerRegistry jobConsumers = new();
+    private readonly HashSet<Type> sagaStateMachines = new();
 
     public IServiceCollection Services { get; }
 
@@ -41,6 +43,94 @@ public class BusRegistrationConfigurator : IBusRegistrationConfigurator
     {
         _topology.RegisterChoreography(fragment);
     }
+
+    public void AddSagaStateMachine<TStateMachine, TSaga>(
+        TStateMachine stateMachine,
+        string? endpointName = null)
+        where TStateMachine : SagaStateMachine<TSaga>
+        where TSaga : class
+    {
+        ArgumentNullException.ThrowIfNull(stateMachine);
+        if (sagaStateMachines.Contains(typeof(TStateMachine)))
+            return;
+
+        var repository = stateMachine.CreateConfiguredInMemoryRepository();
+        if (RegisterSagaStateMachine(
+            stateMachine,
+            repository.Capabilities,
+            _ => repository,
+            endpointName))
+        {
+            Services.AddSingleton(repository);
+            Services.AddSingleton<ISagaRepository<TSaga>>(repository);
+        }
+    }
+
+    public void AddSagaStateMachine<TStateMachine, TSaga>(
+        TStateMachine stateMachine,
+        ISagaRepository<TSaga> repository,
+        string? endpointName = null)
+        where TStateMachine : SagaStateMachine<TSaga>
+        where TSaga : class
+    {
+        ArgumentNullException.ThrowIfNull(stateMachine);
+        ArgumentNullException.ThrowIfNull(repository);
+        if (RegisterSagaStateMachine(
+            stateMachine,
+            repository.Capabilities,
+            _ => repository,
+            endpointName))
+        {
+            Services.AddSingleton<ISagaRepository<TSaga>>(repository);
+        }
+    }
+
+    public void AddSagaStateMachine<TStateMachine, TSaga>(
+        TStateMachine stateMachine,
+        SagaRepositoryCapabilities capabilities,
+        Func<IServiceProvider, ISagaRepository<TSaga>> repositoryFactory,
+        string? endpointName = null)
+        where TStateMachine : SagaStateMachine<TSaga>
+        where TSaga : class
+    {
+        ArgumentNullException.ThrowIfNull(stateMachine);
+        ArgumentNullException.ThrowIfNull(capabilities);
+        ArgumentNullException.ThrowIfNull(repositoryFactory);
+        RegisterSagaStateMachine(stateMachine, capabilities, repositoryFactory, endpointName);
+    }
+
+    private bool RegisterSagaStateMachine<TStateMachine, TSaga>(
+        TStateMachine stateMachine,
+        SagaRepositoryCapabilities capabilities,
+        Func<IServiceProvider, ISagaRepository<TSaga>> repositoryFactory,
+        string? endpointName)
+        where TStateMachine : SagaStateMachine<TSaga>
+        where TSaga : class
+    {
+        if (endpointName is not null)
+            ArgumentException.ThrowIfNullOrWhiteSpace(endpointName);
+        if (!sagaStateMachines.Add(typeof(TStateMachine)))
+            return false;
+
+        capabilities.EnsureSupports(
+            stateMachine.Definition.RepositoryRequirements,
+            stateMachine.Definition.CompletionPolicy);
+        var queueName = endpointName ?? stateMachine.Definition.StateMachineId;
+
+        _topology.RegisterSagaStateMachine(stateMachine.Definition, queueName);
+
+        Services.AddSingleton(stateMachine);
+        stateMachine.RegisterConsumers<TStateMachine>(
+            this,
+            serviceProvider => stateMachine.CreateRuntime(repositoryFactory(serviceProvider)),
+            queueName);
+        return true;
+    }
+
+    public void AddSagaStateMachine<TStateMachine, TSaga>(string? endpointName = null)
+        where TStateMachine : SagaStateMachine<TSaga>, new()
+        where TSaga : class
+        => AddSagaStateMachine<TStateMachine, TSaga>(new TStateMachine(), endpointName);
 
     [RequiresDynamicCode("Runtime job consumer discovery closes generic registrations dynamically. Use the explicit job/message overload for NativeAOT.")]
     [RequiresUnreferencedCode("Runtime job consumer discovery cannot guarantee that generic interface metadata is preserved.")]

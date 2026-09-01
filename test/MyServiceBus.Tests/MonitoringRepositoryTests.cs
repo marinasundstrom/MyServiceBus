@@ -3,10 +3,82 @@ using MyServiceBus;
 using MyServiceBus.Choreography;
 using MyServiceBus.Monitoring;
 using MyServiceBus.Monitoring.Server;
+using MyServiceBus.Orchestration;
+using MyServiceBus.Topology;
 using Shouldly;
 
 public class MonitoringRepositoryTests
 {
+    [Fact]
+    public void Repository_keeps_saga_definitions_separate_and_reports_deployment_conflicts()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var repository = new MonitoringRepository();
+        var version1 = CreateSagaDefinition("1");
+        var version2 = CreateSagaDefinition("2");
+        repository.UpsertMetadata(WithSaga(
+            CreateMetadata("orders", "orders-1", now, "commerce"),
+            version1,
+            "order-saga"));
+        repository.UpsertMetadata(WithSaga(
+            CreateMetadata("orders", "orders-2", now, "commerce"),
+            version1,
+            "order-saga"));
+        repository.UpsertMetadata(WithSaga(
+            CreateMetadata("orders-v2", "orders-v2-1", now, "commerce"),
+            version2,
+            "order-saga-v2"));
+
+        var saga = repository.GetDeclaredSagaStateMachines(now).ShouldHaveSingleItem();
+
+        saga.StateMachineId.ShouldBe("order-state-machine");
+        saga.DefinitionVersions.ShouldBe(["1", "2"]);
+        saga.ConflictKinds.ShouldContain("definition_version_conflict");
+        saga.Deployments.Count.ShouldBe(2);
+        saga.Deployments.Single(item => item.Definition.DefinitionVersion == "1").InstanceCount.ShouldBe(2);
+        repository.GetDeclaredChoreographies(now).ShouldBeEmpty();
+        var catalog = repository.GetWorkflowCatalog(now).ShouldHaveSingleItem();
+        catalog.Kind.ShouldBe("saga");
+        catalog.LifecycleAuthority.ShouldBe("committed_transition_evidence");
+        catalog.ReportingInstanceCount.ShouldBe(3);
+    }
+
+    [Fact]
+    public void Repository_projects_committed_saga_transitions_without_claiming_choreography()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var repository = new MonitoringRepository();
+        repository.UpsertMetadata(CreateMetadata("orders", "orders-1", now, "commerce"));
+        repository.RecordBatch(CreateBatch(
+            "orders",
+            "orders-1",
+            now,
+            CreateSagaObservation(1, now.AddSeconds(-2), "OrderSubmitted", "consumed", "Initial", "AwaitingPayment", true, false),
+            CreateSagaObservation(2, now.AddSeconds(-1), "PaymentReceived", "consumed", "AwaitingPayment", "Final", false, true)))
+            .ShouldBeTrue();
+
+        var instance = repository.GetSagaInstances("order-state-machine", "completed").ShouldHaveSingleItem();
+
+        instance.Status.ShouldBe("completed");
+        instance.CurrentState.ShouldBe("Final");
+        instance.InstancePresent.ShouldBeFalse();
+        instance.LastDeliverySucceeded.ShouldBeTrue();
+        instance.Transitions.Count.ShouldBe(2);
+        instance.Transitions[0].Created.ShouldBeTrue();
+        instance.Transitions[1].Completed.ShouldBeTrue();
+        repository.GetDeclaredChoreographies(now).ShouldBeEmpty();
+        var selected = repository.GetSagaInstance("order-state-machine", instance.CorrelationId).ShouldNotBeNull();
+        selected.CorrelationId.ShouldBe(instance.CorrelationId);
+        selected.CurrentState.ShouldBe(instance.CurrentState);
+        var index = repository.GetWorkflowRunIndex(
+            "order-state-machine", "saga", "completed", null, 0, 10, now);
+        var indexed = index.Runs.ShouldHaveSingleItem();
+        indexed.Kind.ShouldBe("saga");
+        indexed.LifecycleAuthority.ShouldBe("committed_transition_evidence");
+        indexed.CurrentState.ShouldBe("Final");
+        indexed.DetailIdentity.ShouldBe(instance.CorrelationId);
+    }
+
     [Fact]
     public void Dashboard_summary_is_explicit_when_no_monitoring_data_is_available()
     {
@@ -1004,6 +1076,36 @@ public class MonitoringRepositoryTests
                 [fragment])
         };
 
+    private static MonitoringMetadata WithSaga(
+        MonitoringMetadata metadata,
+        SagaStateMachineDefinition definition,
+        string endpointName)
+        => metadata with
+        {
+            Bus = new BusInspectionSnapshot(
+                metadata.Bus.TransportName,
+                metadata.Bus.Address,
+                metadata.Bus.CapturedAt,
+                metadata.Bus.Messages,
+                metadata.Bus.ReceiveEndpoints,
+                metadata.Bus.Consumers,
+                sagaStateMachines: [new SagaStateMachineTopology(definition, endpointName)])
+        };
+
+    private static SagaStateMachineDefinition CreateSagaDefinition(string definitionVersion)
+        => new SagaStateMachineDefinitionBuilder(
+                "order-state-machine",
+                definitionVersion,
+                "orders",
+                "urn:message:Contracts:OrderState",
+                "CurrentState")
+            .State("Running")
+            .Event("OrderSubmitted", "urn:message:Contracts:OrderSubmitted", @event => @event
+                .CorrelateById("CorrelationId", "OrderId")
+                .CreatesIfMissing())
+            .Initially("OrderSubmitted", behavior => behavior.TransitionTo("Running"))
+            .Build();
+
     private static ChoreographyFragment CreateChoreography(
         string owner,
         string definitionVersion,
@@ -1036,6 +1138,46 @@ public class MonitoringRepositoryTests
             0,
             now,
             observations);
+
+    private static MonitoringObservation CreateSagaObservation(
+        long sequence,
+        DateTimeOffset occurredAtUtc,
+        string eventId,
+        string deliveryStatus,
+        string beginState,
+        string endState,
+        bool created,
+        bool completed)
+        => new(
+            sequence,
+            occurredAtUtc,
+            "saga_delivery",
+            true,
+            null,
+            null,
+            null,
+            null,
+            5,
+            null,
+            null,
+            "00000000-0000-0000-0000-000000000123",
+            null,
+            null,
+            null,
+            Properties: new Dictionary<string, string>
+            {
+                ["state_machine_id"] = "order-state-machine",
+                ["definition_version"] = "1",
+                ["owner"] = "orders",
+                ["event_id"] = eventId,
+                ["status"] = deliveryStatus,
+                ["begin_state"] = beginState,
+                ["end_state"] = endState,
+                ["created"] = created.ToString(),
+                ["completed"] = completed.ToString(),
+                ["instance_present"] = (!completed).ToString()
+            },
+            MessageId: $"message-{sequence}");
 
     private static MonitoringObservation CreateOutboxObservation(
         long sequence,

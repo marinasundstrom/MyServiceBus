@@ -1,0 +1,102 @@
+@page "/workflows/sagas/{StateMachineId}"
+@rendermode InteractiveServer
+@inherits MonitoringPageBase
+
+<PageTitle>Declared Saga · MyServiceBus Monitoring</PageTitle>
+<DashboardPageHeader Eyebrow="Coordination" Title="Declared saga" Description="Inspect the states, events, ordered activities, repository requirements, and deployments for one saga state machine." />
+<WorkflowTabs Active="declared" />
+
+@if (Saga is not { } saga)
+{
+    <section class="empty-state">
+        <h2>Saga definition not available</h2>
+        <p>No exported state-machine definition matches this identity.</p>
+        <a class="section-link" href="/workflows/declared">← Back to declared workflows</a>
+    </section>
+}
+else
+{
+    <div class="workflow-run-breadcrumb"><a href="/workflows/declared">Declared workflows</a><span>→</span><strong>@saga.StateMachineId</strong></div>
+    <section class="panel workflow-panel">
+        <div class="section-heading workflow-heading">
+            <div>
+                <p class="eyebrow">Centralized coordination relationship</p>
+                <h2>@saga.StateMachineId</h2>
+                <div class="workflow-badges">
+                    @foreach (var version in saga.DefinitionVersions)
+                    {
+                        <span class="pill">Version @version</span>
+                    }
+                    @foreach (var conflict in saga.ConflictKinds)
+                    {
+                        <span class="workflow-conflict">@ConflictLabel(conflict)</span>
+                    }
+                </div>
+            </div>
+            <span>@saga.Deployments.Sum(deployment => deployment.OnlineInstanceCount)/@saga.Deployments.Sum(deployment => deployment.InstanceCount) service instances online</span>
+        </div>
+
+        @foreach (var deployment in saga.Deployments)
+        {
+            <article class="workflow-participant">
+                <header>
+                    <div><span class="status-dot @(deployment.OnlineInstanceCount > 0 ? "online" : "offline")"></span><strong>@deployment.ApplicationName</strong><small>Owner @deployment.Owner</small></div>
+                    <span>@deployment.EndpointName · @deployment.OnlineInstanceCount/@deployment.InstanceCount online</span>
+                </header>
+                <div class="workflow-reactions">
+                    <section class="workflow-reaction">
+                        <div class="workflow-step-label">States</div>
+                        <div class="workflow-outputs">
+                            <div class="workflow-output"><small>Built in</small><strong>Initial</strong></div>
+                            @foreach (var state in deployment.Definition.States)
+                            {
+                                <div class="workflow-output"><small>State</small><strong>@state.Id</strong></div>
+                            }
+                            <div class="workflow-output"><small>Built in</small><strong>Final</strong></div>
+                        </div>
+                    </section>
+                    @foreach (var behavior in deployment.Definition.Behaviors)
+                    {
+                        <section class="workflow-reaction">
+                            <div class="workflow-step-label">@behavior.SourceState</div>
+                            <div class="workflow-trigger"><small>On event</small><strong>@behavior.EventId</strong></div>
+                            <div class="workflow-arrow" aria-hidden="true">→</div>
+                            <div class="workflow-outputs">
+                                @foreach (var activity in behavior.Activities)
+                                {
+                                    <div class="workflow-output"><small>@activity.Kind</small><strong>@SagaActivityLabel(activity)</strong></div>
+                                }
+                            </div>
+                        </section>
+                    }
+                </div>
+                <footer>@deployment.Definition.RepositoryRequirements.Durability repository · @deployment.Definition.CompletionPolicy</footer>
+            </article>
+        }
+    </section>
+
+    <div class="guidance workflow-guidance">
+        <strong>Definition, not instance state</strong>
+        <span>This page describes the state machine deployed by the coordinating service. Open a saga run to inspect one correlated instance and its bounded committed-transition history.</span>
+    </div>
+}
+
+@code {
+    [Parameter] public string StateMachineId { get; set; } = string.Empty;
+
+    private MonitoringDeclaredSagaStateMachine? Saga
+        => Dashboard.Sagas.FirstOrDefault(saga => string.Equals(
+            saga.StateMachineId,
+            Uri.UnescapeDataString(StateMachineId),
+            StringComparison.Ordinal));
+
+    private static string ConflictLabel(string conflict) => conflict switch
+    {
+        "definition_version_conflict" => "Version conflict",
+        "owner_conflict" => "Owner conflict",
+        _ => DisplayKind(conflict)
+    };
+
+    private static string SagaActivityLabel(MyServiceBus.Orchestration.SagaActivityDefinition activity)
+        => activity.TargetState ?? activity.MessageUrn?.Split('.', ':').Last() ?? activity.ActivityId ?? activity.Kind.ToString();
+}

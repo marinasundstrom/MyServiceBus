@@ -16,6 +16,8 @@ import com.myservicebus.persistence.OutboxLeaseRequest;
 import com.myservicebus.persistence.OutboxMessage;
 import com.myservicebus.persistence.OutboxMessageFactory;
 import com.myservicebus.persistence.OutboxSession;
+import com.myservicebus.orchestration.SagaOutboxKind;
+import com.myservicebus.orchestration.SagaRepositoryTransaction;
 import com.myservicebus.persistence.OutboxTransportDispatcher;
 import com.myservicebus.ScheduleCancellationResult;
 import com.myservicebus.SchedulingDurability;
@@ -86,13 +88,14 @@ class PostgreSqlPersistenceTest {
     private static final String SERVICE_NAME = "orders-service";
 
     @Test
-    void versionTwoSchemaMigratesToSchedulingRecurringAndTrackedJobs() throws Exception {
+    void versionTwoSchemaMigratesToSchedulingRecurringTrackedJobsAndSagas() throws Exception {
         try (PostgreSQLContainer container = startContainer()) {
             DataSource dataSource = dataSource(container);
             PostgreSqlSchema.ensureCreated(dataSource);
             try (Connection connection = dataSource.getConnection();
                     Statement statement = connection.createStatement()) {
                 statement.execute("""
+                        DROP TABLE myservicebus.saga_instance;
                         DROP TABLE myservicebus.job_attempt;
                         DROP TABLE myservicebus.recurring_job_occurrence;
                         DROP TABLE myservicebus.job;
@@ -128,11 +131,12 @@ class PostgreSqlPersistenceTest {
                                 to_regclass('myservicebus.recurring_job_definition') IS NOT NULL,
                                 to_regclass('myservicebus.recurring_job_occurrence') IS NOT NULL,
                                 to_regclass('myservicebus.job') IS NOT NULL,
-                                to_regclass('myservicebus.job_attempt') IS NOT NULL
+                                to_regclass('myservicebus.job_attempt') IS NOT NULL,
+                                to_regclass('myservicebus.saga_instance') IS NOT NULL
                             FROM myservicebus.schema_version WHERE singleton;
                             """)) {
                 assertTrue(result.next());
-                assertEquals(5, result.getInt(1));
+                assertEquals(6, result.getInt(1));
                 assertTrue(result.getBoolean(2));
                 assertTrue(result.getBoolean(3));
                 assertTrue(result.getBoolean(4));
@@ -140,7 +144,36 @@ class PostgreSqlPersistenceTest {
                 assertTrue(result.getBoolean(6));
                 assertTrue(result.getBoolean(7));
                 assertTrue(result.getBoolean(8));
+                assertTrue(result.getBoolean(9));
             }
+        }
+    }
+
+    @Test
+    void sagaRepositoryPersistsUpdatesAndDeletesFinalInstances() throws Exception {
+        try (PostgreSQLContainer container = startContainer()) {
+            DataSource dataSource = dataSource(container);
+            PostgreSqlSchema.ensureCreated(dataSource);
+            UUID correlationId = UUID.randomUUID();
+            PostgreSqlSagaRepository<TestSaga> repository = new PostgreSqlSagaRepository<>(
+                    dataSource, new OutboxSession(), SERVICE_NAME, "tests.order-saga",
+                    TestSaga.class, new com.fasterxml.jackson.databind.ObjectMapper());
+
+            repository.execute(correlationId, ignored -> CompletableFuture.completedFuture(
+                    SagaRepositoryTransaction.upsert(new TestSaga("AwaitingPayment", 1), true)))
+                    .toCompletableFuture().join();
+            TestSaga loaded = repository.execute(correlationId, instance -> CompletableFuture.completedFuture(
+                    SagaRepositoryTransaction.noChange(instance))).toCompletableFuture().join();
+
+            assertEquals("AwaitingPayment", loaded.state);
+            assertEquals(1, loaded.attempts);
+            assertEquals(SagaOutboxKind.TRANSACTIONAL, repository.capabilities().outbox());
+
+            repository.execute(correlationId, ignored -> CompletableFuture.completedFuture(
+                    SagaRepositoryTransaction.<TestSaga, Boolean>delete(true))).toCompletableFuture().join();
+            TestSaga deleted = repository.execute(correlationId, instance -> CompletableFuture.completedFuture(
+                    SagaRepositoryTransaction.noChange(instance))).toCompletableFuture().join();
+            assertEquals(null, deleted);
         }
     }
 
@@ -1025,6 +1058,19 @@ class PostgreSqlPersistenceTest {
     private static final class DurableJobRecorder {
         private final AtomicInteger attempts = new AtomicInteger();
         private volatile int lastValue;
+    }
+
+    public static final class TestSaga {
+        public String state;
+        public int attempts;
+
+        public TestSaga() {
+        }
+
+        public TestSaga(String state, int attempts) {
+            this.state = state;
+            this.attempts = attempts;
+        }
     }
 
     private record DurableRetryJob() {

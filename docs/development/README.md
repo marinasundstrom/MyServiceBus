@@ -14,6 +14,8 @@ Start with:
 - [Union-Typed Consumers Proposal](../proposals/union-typed-consumers.md)
 - [Choreography Modeling and Diagnostics Proposal](../proposals/choreography-modeling-and-diagnostics.md)
 - [Sagas and State Machines Proposal](../proposals/sagas-and-state-machines.md)
+- [Saga State-Machine Behavior](../specs/saga-state-machine-behavior.md)
+- [Native Saga State-Machine DSL](saga-native-dsl.md)
 - [Raven Saga DSL Exploration](../proposals/raven-saga-dsl.md)
 - [Minimum Viable Client for Another Language](minimum-viable-language-client.md)
 - [MyServiceBus Architecture](../myservicebus-architecture.md)

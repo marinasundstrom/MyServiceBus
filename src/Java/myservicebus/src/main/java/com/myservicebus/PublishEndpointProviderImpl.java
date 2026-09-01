@@ -40,7 +40,7 @@ class PublishEndpointProviderImpl implements PublishEndpointProvider {
     @Override
     public PublishEndpoint getPublishEndpoint() {
         ConsumeContext<?> ctx = contextProvider.getContext();
-        if (ctx != null) {
+        if ((outboxSession == null || outboxSession.getWriter() == null) && ctx != null) {
             return ctx;
         }
         if (outboxSession != null) {

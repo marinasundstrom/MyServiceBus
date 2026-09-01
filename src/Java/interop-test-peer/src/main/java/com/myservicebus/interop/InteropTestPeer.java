@@ -3,6 +3,7 @@ package com.myservicebus.interop;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.myservicebus.Envelope;
+import com.myservicebus.EntityNameFormatter;
 import com.myservicebus.ExceptionInfo;
 import com.myservicebus.Fault;
 import com.myservicebus.MessageUrn;
@@ -54,6 +55,10 @@ public final class InteropTestPeer {
             com.myservicebus.persistence.postgresql.TrackedJobPostgreSqlInteropPeer.run(args);
             return;
         }
+        if (args.length > 0 && "workflow-coordinator".equals(args[0])) {
+            WorkflowCoordinatorInteropPeer.run(args);
+            return;
+        }
         if (args.length > 0 && args[0].startsWith("azure-")) {
             AzureServiceBusInteropPeer.run(args);
             return;
@@ -65,7 +70,7 @@ public final class InteropTestPeer {
 
         if (args.length != 5) {
             throw new IllegalArgumentException(
-                    "Expected: <consume|consume-unrecognized|consume-fault|produce|send|request|request-fault|respond|fault> <exchange> <queue> <value> <durable-exchange>");
+                    "Expected: <consume|consume-unrecognized|consume-fault|produce|send|request|request-fault|respond|fault|workflow-participant|workflow-coordinator> <exchange> <queue> <value> <durable-exchange>");
         }
 
         String host = requiredEnvironment("RABBITMQ_HOST");
@@ -100,9 +105,62 @@ public final class InteropTestPeer {
             consumeNServiceBus(transportFactory, args[1], args[2], args[3]);
         } else if ("nservicebus-send".equals(args[0])) {
             sendNServiceBus(transportFactory, args[2], args[3]);
+        } else if ("workflow-participant".equals(args[0])) {
+            participateInWorkflow(transportFactory, args[1], args[2], args[3]);
         } else {
             throw new IllegalArgumentException("Unknown mode: " + args[0]);
         }
+    }
+
+    private static void participateInWorkflow(
+            RabbitMqTransportFactory transportFactory,
+            String requestExchange,
+            String queueName,
+            String expectedOrderId) throws Exception {
+        MessageBinding binding = new MessageBinding();
+        binding.setMessageType(TestApp.InteropWorkflowWorkRequested.class);
+        binding.setEntityName(requestExchange);
+        CompletableFuture<UUID> received = new CompletableFuture<>();
+        DefaultInboundMessageResolver resolver =
+                new DefaultInboundMessageResolver(new EnvelopeMessageDeserializer());
+        ReceiveTransport receiveTransport = transportFactory.createReceiveTransport(
+                queueName,
+                List.of(binding),
+                transportMessage -> {
+                    try {
+                        TestApp.InteropWorkflowWorkRequested message = resolver.resolve(transportMessage)
+                                .getMessage(TestApp.InteropWorkflowWorkRequested.class);
+                        received.complete(message.getOrderId());
+                        return CompletableFuture.completedFuture(null);
+                    } catch (Exception exception) {
+                        return CompletableFuture.failedFuture(exception);
+                    }
+                },
+                MessageUrn.forClass(TestApp.InteropWorkflowWorkRequested.class)::equals,
+                1);
+
+        receiveTransport.start();
+        System.out.println("READY");
+        System.out.flush();
+        try {
+            UUID orderId = received.get(20, TimeUnit.SECONDS);
+            if (!expectedOrderId.equals(orderId.toString())) {
+                throw new IllegalStateException(
+                        "Expected workflow order '" + expectedOrderId + "' but received '" + orderId + "'");
+            }
+
+            TestApp.InteropWorkflowWorkCompleted completed = new TestApp.InteropWorkflowWorkCompleted();
+            completed.setOrderId(orderId);
+            SendContext context = new SendContext(completed, CancellationToken.none());
+            byte[] body = context.serialize(new EnvelopeMessageSerializer());
+            String responseExchange = EntityNameFormatter.format(TestApp.InteropWorkflowWorkCompleted.class);
+            transportFactory.getSendTransport(responseExchange, true, false).send(body);
+            System.out.println("COMPLETED");
+            System.out.flush();
+        } finally {
+            receiveTransport.stop();
+        }
+        System.exit(0);
     }
 
     private static void consumeNServiceBus(

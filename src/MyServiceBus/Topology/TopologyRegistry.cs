@@ -4,6 +4,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Reflection;
 using MyServiceBus.Choreography;
+using MyServiceBus.Orchestration;
 
 namespace MyServiceBus.Topology;
 
@@ -13,9 +14,29 @@ public class TopologyRegistry : IBusTopology
     public List<ConsumerTopology> Consumers { get; } = new();
     private readonly List<ReceiveEndpointDefinition> _receiveEndpoints = new();
     private readonly List<ChoreographyFragment> choreographies = new();
+    private readonly List<SagaStateMachineTopology> sagaStateMachines = new();
 
     public IReadOnlyList<ReceiveEndpointDefinition> ReceiveEndpoints => _receiveEndpoints;
     public IReadOnlyList<ChoreographyFragment> Choreographies => choreographies;
+    public IReadOnlyList<SagaStateMachineTopology> SagaStateMachines => sagaStateMachines;
+
+    public void RegisterSagaStateMachine(SagaStateMachineDefinition definition, string endpointName)
+    {
+        ArgumentNullException.ThrowIfNull(definition);
+        ArgumentException.ThrowIfNullOrWhiteSpace(endpointName);
+        definition.Validate();
+
+        if (sagaStateMachines.Any(existing =>
+            string.Equals(existing.Definition.StateMachineId, definition.StateMachineId, StringComparison.Ordinal) &&
+            string.Equals(existing.Definition.Owner, definition.Owner, StringComparison.Ordinal)))
+        {
+            throw new ArgumentException(
+                $"Saga state machine '{definition.StateMachineId}' is already registered by '{definition.Owner}'.",
+                nameof(definition));
+        }
+
+        sagaStateMachines.Add(new SagaStateMachineTopology(definition, endpointName));
+    }
 
     public void RegisterChoreography(ChoreographyFragment fragment)
     {
