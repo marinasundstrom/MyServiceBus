@@ -57,12 +57,14 @@ public final class ChoreographyBuilder {
         List<ChoreographyStep> normalizedSteps = steps.stream()
                 .sorted(Comparator.comparing(ChoreographyStep::id))
                 .toList();
-        return new ChoreographyFragment(
+        ChoreographyFragment fragment = new ChoreographyFragment(
                 ChoreographyFragment.CURRENT_SCHEMA_VERSION,
                 choreographyId,
                 definitionVersion,
                 owner,
                 normalizedSteps);
+        fragment.validate();
+        return fragment;
     }
 
     static String required(String value, String parameterName) {

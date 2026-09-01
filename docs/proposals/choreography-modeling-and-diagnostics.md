@@ -2,7 +2,7 @@
 
 ## Status
 
-Future product-area proposal with its first foundation slices implemented. Message-operation observations carry message identity and consume-to-outbound causal identity in C# and Java. The collector prefers exact envelope matches for deliveries, reports correlation fallback explicitly, and exposes exact local reactions separately. Matching C# and Java builders now produce the same versioned, deterministic choreography fragment from a shared fixture. Registration, topology publication, fragment merging, graph comparison, diagnostics, and the focused Dashboard view remain future work. This document is not a supported lifecycle API, alerting service, or workflow runtime commitment.
+Future product-area proposal with its first foundation slices implemented. Message-operation observations carry message identity and consume-to-outbound causal identity in C# and Java. The collector prefers exact envelope matches for deliveries, reports correlation fallback explicitly, and exposes exact local reactions separately. Matching C# and Java builders produce the same versioned, deterministic choreography fragment from a shared fixture. Applications can register validated fragments, and topology version 2 plus inspection and monitoring metadata expose them without changing delivery. Cross-application fragment merging, graph comparison, diagnostics, and the focused Dashboard view remain future work. This document is not a supported lifecycle API, alerting service, or workflow runtime commitment.
 
 ## Summary
 
@@ -148,7 +148,7 @@ Identifiers remain payload-free operational metadata. Exporters still batch thro
 
 ## Native Declaration APIs
 
-C# and Java provide corresponding descriptor and builder APIs that produce the same normalized fragment. The current builders are deliberately standalone: they establish the portable declaration before it is attached to bus registration, topology export, or monitoring.
+C# and Java provide corresponding descriptor and builder APIs that produce the same normalized fragment. The fragment is registered explicitly with `AddChoreography` or `addChoreography`; registration validates it and includes it in normalized topology, inspection, and monitoring metadata.
 
 The C# shape is:
 
@@ -165,6 +165,8 @@ ChoreographyFragment fragment = new ChoreographyBuilder(
     .Step<InventoryReserved>("request-payment", step => step
         .Publishes<PaymentRequested>())
     .Build();
+
+configurator.AddChoreography(fragment);
 ```
 
 The Java shape is:
@@ -182,6 +184,8 @@ ChoreographyFragment fragment = new ChoreographyBuilder(
     .step("request-payment", InventoryReserved.class, step -> step
         .publishes(PaymentRequested.class))
     .build();
+
+configurator.addChoreography(fragment);
 ```
 
 The normalized schema records the choreography and definition identities, owning application, stable step identity, trigger message URN, optional owning component, and ordered outputs. Outputs support `send`, `publish`, `respond`, `schedule`, and an explicit terminal outcome plus informational, optional, or expected requirements, bounded multiplicity, and a millisecond timing expectation. Explicit URN overloads support canonical cross-language definitions when language type names differ.
@@ -276,7 +280,7 @@ Canonical fixtures should prove that C# and Java serialize equivalent fragments 
 - conflicting definition versions; and
 - canonical ordering and stable identities.
 
-The executable sample should use at least one C# and one Java service and demonstrate both a healthy path and deliberately unhealthy paths for missing routing, a bounded timeout expectation, and unexpected amplification.
+The executable choreography sample should first reuse the mixed C# and Java monitoring environment and demonstrate both a healthy path and deliberately unhealthy paths for missing routing, a bounded timeout expectation, and unexpected amplification. A dedicated Aspire workflow application becomes more valuable with the orchestration runtime, when it can demonstrate persisted saga state, timeouts, recovery, and Dashboard state-machine views. That later environment should also include an event leaving the orchestrator boundary for a choreographed reaction, proving that both coordination relationships can coexist.
 
 ## Recommended Delivery Sequence
 
@@ -284,7 +288,7 @@ The executable sample should use at least one C# and one Java service and demons
 2. Add canonical declaration fixtures and matching C# and Java builders (**implemented first slice**); add diagnostic fixtures before choosing their final APIs.
 3. Extend the monitoring observation contract with message, initiator, causation, operation, and parent-span identities; message and causal identity are implemented.
 4. Extend exact producer-to-consumer matching into explicit consume-to-outbound causation (**implemented first slice**).
-5. Attach the implemented declaration builders to registration and add normalized topology relationships.
+5. Attach the implemented declaration builders to registration and add normalized topology relationships (**implemented first slice**).
 6. Implement graph comparison and diagnostics in the monitoring service with completeness gates.
 7. Add the focused dashboard view and cross-language sample.
 8. Evaluate demand for an explicit per-conversation lifecycle model only after the bounded diagnostic model has production evidence.

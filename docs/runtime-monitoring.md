@@ -214,6 +214,8 @@ The monitoring service never connects directly to application databases or mutat
 
 The prototype uses `/api/monitoring/v1` for both ingest and query operations. The monitoring service publishes a generated OpenAPI 3.1 document at `/openapi/v1.json`. This is the primary machine-readable contract for teams building another dashboard, exporter, or integration. The document separates **Monitoring ingest** operations from **Monitoring queries** and includes the current JSON schemas and HTTP response codes.
 
+Registered choreography fragments travel with the existing payload-free bus inspection snapshot in application metadata. The exporter does not place them on application messages, and the collector does not execute them. They are the declared-graph input for future merging, comparison, diagnostics, and Dashboard workflow maps.
+
 The contract is versioned but remains preview. The `/v1` route and each ingest body's `protocolVersion` identify the current wire generation; they do not imply stable-release compatibility guarantees before MyServiceBus 1.0. Integrators should generate clients from the document they deploy with and must preserve unknown additive response fields.
 
 | Method | Route | Purpose |

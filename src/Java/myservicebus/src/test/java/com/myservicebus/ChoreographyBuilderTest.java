@@ -2,6 +2,8 @@ package com.myservicebus;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.myservicebus.choreography.ChoreographyBuilder;
+import com.myservicebus.di.ServiceCollection;
+import com.myservicebus.topology.BusTopology;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
@@ -62,6 +64,20 @@ class ChoreographyBuilderTest {
                 () -> new ChoreographyBuilder("orders", "1", "orders")
                         .step("submit", OrderSubmitted.class, step -> step
                                 .publishes(OrderAccepted.class, output -> output.atLeast(2).atMost(1))));
+    }
+
+    @Test
+    void registersFragmentWithBusTopology() {
+        var fragment = new ChoreographyBuilder("orders", "1", "orders")
+                .step("submit", OrderSubmitted.class, step -> step.publishes(OrderAccepted.class))
+                .build();
+        ServiceCollection services = ServiceCollection.create();
+
+        services.from(MessageBusServices.class).addServiceBus(configurator ->
+                configurator.addChoreography(fragment));
+
+        var topology = services.buildServiceProvider().getRequiredService(BusTopology.class);
+        assertEquals(fragment, topology.getChoreographies().get(0));
     }
 
     private static final class OrderSubmitted {

@@ -87,7 +87,7 @@ The [Topology Model Specification](specs/topology-model-spec.md) defines the tar
 
 The [MVP Release Gate](development/mvp-release-gate.md) defines the release boundary and the remaining packaging, documentation, and release-candidate work that follows this fundamentals gate.
 
-**Status:** implemented. The normalized query APIs, version 1 canonical fixture, receive-endpoint intent, inspection consumption, synchronized snapshot-version constants, profile-neutral runtime endpoint topology, and named RabbitMQ receive-topology projection are implemented in C# and Java. Legacy transport overloads remain compatibility adapters. The [Topology Extension Model](specs/topology-extension-model.md) validates additive saga and outbox nodes plus a materially different Azure Service Bus projection without prematurely implementing those features.
+**Status:** implemented. The normalized query APIs, historical version 1 and current version 2 canonical fixtures, receive-endpoint intent, inspection consumption, synchronized snapshot-version constants, profile-neutral runtime endpoint topology, named RabbitMQ receive-topology projection, and registered choreography-fragment collection are implemented in C# and Java. Legacy transport overloads remain compatibility adapters. The [Topology Extension Model](specs/topology-extension-model.md) validates additive saga and outbox nodes plus a materially different Azure Service Bus projection without prematurely implementing those features.
 
 ## Mediator and In-Memory Stability Gate
 
@@ -244,7 +244,7 @@ Before either area is promoted, the project must define portable C#↔Java seman
 
 After those portable saga semantics exist, an executable Raven sample should explore a compiler-backed [`saga!` DSL](proposals/raven-saga-dsl.md) as an idiomatic projection over the native MyServiceBus runtime. The experiment must lower to MyServiceBus state-machine behavior plus ordinary portable saga descriptors, message operations, topology, persistence, and monitoring rather than making Raven syntax part of the portable specification or adding Raven-specific transport behavior.
 
-**Current status:** future area. MyServiceBus has supporting messaging and monitoring primitives but no supported saga repository, saga state-machine runtime, compensation engine, workflow definition API, or choreography-specific lifecycle model.
+**Current status:** foundation in progress. MyServiceBus has supporting messaging and monitoring primitives plus matching C# and Java choreography declaration, validation, registration, topology, inspection, and metadata export. Cross-application graph merging and choreography diagnostics remain future work, and there is no supported saga repository, saga state-machine runtime, compensation engine, or choreography-specific lifecycle model.
 
 ## Candidate Backlog
 

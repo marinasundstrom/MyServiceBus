@@ -26,11 +26,12 @@ The normalized model contains these corresponding concepts:
 
 | Concept | Required portable data |
 | --- | --- |
-| Bus topology | model version, messages, receive endpoints, consumers, bindings |
+| Bus topology | model version, messages, receive endpoints, consumers, bindings, choreography fragments |
 | Message topology | stable contract identity, message URN, entity name, implemented contract identities |
 | Receive endpoint topology | stable endpoint identity, endpoint name, logical address, durability intent, temporary intent, bindings, attached consumers |
 | Consumer topology | stable consumer identity, consumer type identity, endpoint identity, consumed contract identities |
 | Message binding | endpoint identity, contract identity, entity name, binding kind |
+| Choreography fragment | schema version, choreography and definition identity, owner, declared reaction steps and outcomes |
 
 Type objects such as .NET `Type` and Java `Class<?>` may remain available in language-native configuration APIs, but language-neutral queries use stable string identities and message URNs. Callback/delegate fields are runtime configuration and are never part of the normalized snapshot.
 
@@ -60,14 +61,14 @@ RabbitMQ projects that intent into `RabbitMqReceiveEndpointTopology`, applying `
 Each client must provide:
 
 - a read-only bus-topology entry point
-- deterministic enumeration or query of messages, endpoints, consumers, and bindings
+- deterministic enumeration or query of messages, endpoints, consumers, bindings, and choreography fragments
 - stable identities suitable for joining nodes without relying on object identity
 - a snapshot boundary so callers do not observe configuration mutating underneath a query
 - corresponding public concepts across C# and Java, with idiomatic naming and collection APIs
 
 The mutable registration registry and the public query model may be separate types. This is preferred when it prevents configuration callbacks or implementation state from leaking into the stable API.
 
-The initial C# and Java query entry points are `IBusTopology.GetSnapshot()` and `BusTopology.getSnapshot()`. They return versioned immutable snapshot records with corresponding message, receive-endpoint, consumer, and binding nodes. Version 1 uses `endpoint:<name>` endpoint identities, message URNs as contract identities, and logical `queue:<name>` endpoint addresses. These logical addresses are not serialized broker addresses.
+The C# and Java query entry points are `IBusTopology.GetSnapshot()` and `BusTopology.getSnapshot()`. They return versioned immutable snapshot records. Version 1 established message, receive-endpoint, consumer, and binding nodes using `endpoint:<name>` endpoint identities, message URNs as contract identities, and logical `queue:<name>` endpoint addresses. Version 2 adds required, deterministically ordered choreography fragments without changing those identities. These logical addresses are not serialized broker addresses.
 
 The mutable registries retain corresponding `ReceiveEndpointDefinition` records as the source of normalized durability and temporary intent. Consumer registration currently creates the durable, non-temporary service-endpoint definition supported by both reference runtimes. Additional public endpoint-intent configuration must not be exposed until both transport contracts can validate and honor it.
 
@@ -87,10 +88,10 @@ Evolution follows these rules:
 
 Snapshot versioning is independent from package versions, the MassTransit envelope format, and individual transport-profile versions. A change in one contract does not imply a change in the others.
 
-Sagas should extend the model with saga/state-machine identities, consumed and produced contracts, endpoint attachment, and persistence requirements. Outbox support should expose its configured delivery guarantee, scope, and persistence integration without leaking provider objects. New transports add projections and capability data; they do not redefine portable node identity.
+Choreography fragments are local declarative metadata and do not provision broker entities or alter message envelopes. Sagas should extend the model with saga/state-machine identities, consumed and produced contracts, endpoint attachment, and persistence requirements. Outbox support should expose its configured delivery guarantee, scope, and persistence integration without leaking provider objects. New transports add projections and capability data; they do not redefine portable node identity.
 
 The [Topology Extension Model](topology-extension-model.md) validates these rules against prospective saga, outbox, and Azure Service Bus requirements and defines the boundary between portable nodes, transport projections, and runtime providers.
 
 ## Conformance
 
-C# and Java topology conformance tests must build equivalent configurations and compare canonical language-neutral snapshots. The version 1 fixtures live under `test/fixtures/topology/v1`. Tests must cover ordering, stable identities, implemented contracts, multiple consumers on one endpoint, transport extensions, and omission of runtime-only callbacks. The same fixtures become inputs for inspection and dashboard tests later.
+C# and Java topology conformance tests must build equivalent configurations and compare canonical language-neutral snapshots. Versioned fixtures remain under `test/fixtures/topology/v<version>`; version 2 is the current emitted contract and version 1 remains historical evidence. Tests must cover ordering, stable identities, implemented contracts, multiple consumers on one endpoint, choreography fragments, transport extensions, and omission of runtime-only callbacks. The same fixtures become inputs for inspection and dashboard tests later.

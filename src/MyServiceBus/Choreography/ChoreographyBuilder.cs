@@ -46,12 +46,14 @@ public sealed class ChoreographyBuilder
             throw new InvalidOperationException("A choreography fragment must declare at least one step.");
         }
 
-        return new ChoreographyFragment(
+        var fragment = new ChoreographyFragment(
             ChoreographyFragment.CurrentSchemaVersion,
             choreographyId,
             definitionVersion,
             owner,
             steps.OrderBy(step => step.Id, StringComparer.Ordinal).ToArray());
+        fragment.Validate();
+        return fragment;
     }
 
     internal static string Required(string value, string parameterName)

@@ -1,4 +1,5 @@
 using MyServiceBus.Topology;
+using MyServiceBus.Choreography;
 using System.Text.Json;
 
 namespace MyServiceBus.Tests;
@@ -17,6 +18,7 @@ public class TopologySnapshotTests
         Assert.Equal("urn:message:Contracts:OrderSubmitted", Assert.Single(snapshot.Messages).Id);
         Assert.Equal("queue:orders", Assert.Single(snapshot.ReceiveEndpoints).LogicalAddress);
         Assert.Equal("publish", Assert.Single(snapshot.Bindings).Kind);
+        Assert.Equal("order-fulfillment", Assert.Single(snapshot.Choreographies).ChoreographyId);
     }
 
     [Fact]
@@ -28,6 +30,11 @@ public class TopologySnapshotTests
             "orders",
             configurePipe: null,
             typeof(OrderSubmitted));
+        registry.RegisterChoreography(new ChoreographyBuilder("order-fulfillment", "1", "orders")
+            .Step<OrderSubmitted>("accept-order", step => step
+                .OwnedBy<OrderConsumer>()
+                .Publishes<OrderAccepted>(output => output.Exactly(1).Within(TimeSpan.FromSeconds(5))))
+            .Build());
 
         var snapshot = ((IBusTopology)registry).GetSnapshot();
 
@@ -56,6 +63,11 @@ public class TopologySnapshotTests
         Assert.Equal("publish", binding.Kind);
         Assert.Equal([consumer.Id], endpoint.ConsumerIds);
         Assert.Equal([binding.Id], endpoint.BindingIds);
+
+        var choreography = Assert.Single(snapshot.Choreographies);
+        Assert.Equal("order-fulfillment", choreography.ChoreographyId);
+        Assert.Equal("orders", choreography.Owner);
+        Assert.Equal(MessageUrn.For(typeof(OrderSubmitted)), Assert.Single(choreography.Steps).TriggerMessageUrn);
     }
 
     [Fact]
@@ -89,9 +101,25 @@ public class TopologySnapshotTests
         Assert.Equal(endpoint.Id, Assert.Single(snapshot.Consumers).EndpointId);
     }
 
+    [Fact]
+    public void Rejects_duplicate_or_unsupported_choreography_fragments()
+    {
+        var registry = new TopologyRegistry();
+        var fragment = new ChoreographyBuilder("orders", "1", "orders")
+            .Step<OrderSubmitted>("submit", step => step.Terminates())
+            .Build();
+
+        registry.RegisterChoreography(fragment);
+
+        Assert.Throws<ArgumentException>(() => registry.RegisterChoreography(fragment));
+        Assert.Throws<InvalidOperationException>(() =>
+            new TopologyRegistry().RegisterChoreography(fragment with { SchemaVersion = 999 }));
+    }
+
     private interface IOrderEvent;
 
     private sealed class OrderSubmitted : IOrderEvent;
+    private sealed class OrderAccepted;
 
     private sealed class OrderConsumer;
 }

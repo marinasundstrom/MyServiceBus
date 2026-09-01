@@ -1,5 +1,6 @@
 package com.myservicebus.topology;
 
+import com.myservicebus.choreography.ChoreographyFragment;
 import java.util.List;
 
 public record TopologySnapshot(
@@ -7,15 +8,17 @@ public record TopologySnapshot(
         List<Message> messages,
         List<ReceiveEndpoint> receiveEndpoints,
         List<Consumer> consumers,
-        List<Binding> bindings) {
+        List<Binding> bindings,
+        List<ChoreographyFragment> choreographies) {
 
-    public static final int CURRENT_VERSION = 1;
+    public static final int CURRENT_VERSION = 2;
 
     public TopologySnapshot {
         messages = List.copyOf(messages);
         receiveEndpoints = List.copyOf(receiveEndpoints);
         consumers = List.copyOf(consumers);
         bindings = List.copyOf(bindings);
+        choreographies = List.copyOf(choreographies);
     }
 
     public record Message(

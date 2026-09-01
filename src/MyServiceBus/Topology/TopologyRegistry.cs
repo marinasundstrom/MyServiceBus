@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Reflection;
+using MyServiceBus.Choreography;
 
 namespace MyServiceBus.Topology;
 
@@ -11,8 +12,27 @@ public class TopologyRegistry : IBusTopology
     public List<MessageTopology> Messages { get; } = new();
     public List<ConsumerTopology> Consumers { get; } = new();
     private readonly List<ReceiveEndpointDefinition> _receiveEndpoints = new();
+    private readonly List<ChoreographyFragment> choreographies = new();
 
     public IReadOnlyList<ReceiveEndpointDefinition> ReceiveEndpoints => _receiveEndpoints;
+    public IReadOnlyList<ChoreographyFragment> Choreographies => choreographies;
+
+    public void RegisterChoreography(ChoreographyFragment fragment)
+    {
+        ArgumentNullException.ThrowIfNull(fragment);
+        fragment.Validate();
+
+        if (choreographies.Any(existing =>
+            string.Equals(existing.ChoreographyId, fragment.ChoreographyId, StringComparison.Ordinal) &&
+            string.Equals(existing.Owner, fragment.Owner, StringComparison.Ordinal)))
+        {
+            throw new ArgumentException(
+                $"Choreography '{fragment.ChoreographyId}' already has a fragment owned by '{fragment.Owner}'.",
+                nameof(fragment));
+        }
+
+        choreographies.Add(fragment);
+    }
 
     public void RegisterMessage<T>(string entityName)
     {

@@ -4,8 +4,11 @@ import com.myservicebus.di.ServiceCollection;
 import com.myservicebus.serialization.SerializerFactory;
 import com.myservicebus.BusFactoryConfigurator;
 import com.myservicebus.persistence.OutboxSession;
+import com.myservicebus.choreography.ChoreographyFragment;
 
 public interface BusRegistrationConfigurator {
+    void addChoreography(ChoreographyFragment fragment);
+
     <TConsumer extends JobConsumer<?>> void addJobConsumer(Class<TConsumer> consumerClass);
 
     default <TJob, TConsumer extends JobConsumer<TJob>> void addJobConsumer(

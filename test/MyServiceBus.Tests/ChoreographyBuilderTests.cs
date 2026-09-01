@@ -1,6 +1,8 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Microsoft.Extensions.DependencyInjection;
 using MyServiceBus.Choreography;
+using MyServiceBus.Topology;
 
 namespace MyServiceBus.Tests;
 
@@ -60,6 +62,24 @@ public class ChoreographyBuilderTests
         Assert.Throws<InvalidOperationException>(() => new ChoreographyBuilder("orders", "1", "orders").Build());
         Assert.Throws<InvalidOperationException>(() => new ChoreographyBuilder("orders", "1", "orders")
             .Step<OrderSubmitted>("submit", step => step.Publishes<OrderAccepted>(output => output.AtLeast(2).AtMost(1))));
+    }
+
+    [Fact]
+    public void Registers_a_fragment_with_the_bus_topology()
+    {
+        var fragment = new ChoreographyBuilder("orders", "1", "orders")
+            .Step<OrderSubmitted>("submit", step => step.Publishes<OrderAccepted>())
+            .Build();
+        var services = new ServiceCollection();
+
+        services.AddServiceBus(configurator =>
+        {
+            configurator.AddChoreography(fragment);
+            configurator.UsingMediator();
+        });
+
+        using var provider = services.BuildServiceProvider();
+        Assert.Same(fragment, Assert.Single(provider.GetRequiredService<IBusTopology>().Choreographies));
     }
 
     private sealed class OrderSubmitted;

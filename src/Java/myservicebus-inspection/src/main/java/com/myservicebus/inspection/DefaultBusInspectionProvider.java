@@ -71,6 +71,7 @@ public final class DefaultBusInspectionProvider implements BusInspectionProvider
                 Instant.now(),
                 messages,
                 endpoints,
-                consumers);
+                consumers,
+                topology.choreographies());
     }
 }

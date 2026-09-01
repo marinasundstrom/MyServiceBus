@@ -11,6 +11,7 @@ import java.util.Set;
 import java.util.function.Consumer;
 
 import com.myservicebus.di.ServiceCollection;
+import com.myservicebus.choreography.ChoreographyFragment;
 import com.myservicebus.logging.ConsoleLoggerConfig;
 import com.myservicebus.logging.ConsoleLoggerFactory;
 import com.myservicebus.logging.Logger;
@@ -45,6 +46,11 @@ public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigura
         this.serviceCollection = serviceCollection;
         sendConfigurator.useFilter(new OpenTelemetrySendFilter());
         publishConfigurator.useFilter(new OpenTelemetryPublishFilter());
+    }
+
+    @Override
+    public void addChoreography(ChoreographyFragment fragment) {
+        topology.registerChoreography(fragment);
     }
 
     @Override

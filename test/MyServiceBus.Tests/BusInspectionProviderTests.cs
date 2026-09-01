@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using MyServiceBus;
+using MyServiceBus.Choreography;
 using MyServiceBus.Inspection;
 using MyServiceBus.Serialization;
 using MyServiceBus.Topology;
@@ -13,6 +14,9 @@ public class BusInspectionProviderTests
         var registry = new TopologyRegistry();
         registry.RegisterMessage<TestMessage>("test-message");
         registry.RegisterConsumer<TestConsumer>("test-queue", null, typeof(TestMessage));
+        registry.RegisterChoreography(new ChoreographyBuilder("test-flow", "1", "test-service")
+            .Step<TestMessage>("handle-test", step => step.Terminates())
+            .Build());
         registry.Consumers[0].PrefetchCount = 8;
 
         var bus = CreateBus(registry);
@@ -24,6 +28,8 @@ public class BusInspectionProviderTests
         snapshot.Messages.Count.ShouldBe(1);
         snapshot.ReceiveEndpoints.Count.ShouldBe(1);
         snapshot.Consumers.Count.ShouldBe(1);
+        snapshot.Choreographies.Count.ShouldBe(1);
+        snapshot.Choreographies[0].ChoreographyId.ShouldBe("test-flow");
         snapshot.ReceiveEndpoints[0].EndpointName.ShouldBe("test-queue");
         snapshot.ReceiveEndpoints[0].Address.ShouldBe("queue:test-queue");
         snapshot.ReceiveEndpoints[0].Bindings[0].MessageUrn.ShouldBe(MessageUrn.For(typeof(TestMessage)));

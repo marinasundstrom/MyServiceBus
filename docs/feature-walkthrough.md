@@ -865,7 +865,7 @@ When an application also has a broker-backed bus, publish events that represent 
 
 ### Declaring choreography intent (preview)
 
-The first choreography API builds a portable, payload-free description of reactions owned by one application. It does not register consumers, execute reactions, add message headers, or create a coordinator. The C# and Java builders below produce the same normalized fragment; a later slice will attach fragments to topology and monitoring.
+The first choreography API builds a portable, payload-free description of reactions owned by one application. Registering the fragment makes it part of the normalized topology and inspection metadata exported to monitoring. It does not register consumers, execute reactions, add message headers, or create a coordinator.
 
 #### C#
 
@@ -882,6 +882,12 @@ ChoreographyFragment fragment = new ChoreographyBuilder(
     .Step<OrderCompleted>("complete-order", step => step
         .Terminates())
     .Build();
+
+builder.Services.AddServiceBus(configurator =>
+{
+    configurator.AddChoreography(fragment);
+    // Register the consumers and transport normally.
+});
 ```
 
 #### Java
@@ -899,9 +905,14 @@ ChoreographyFragment fragment = new ChoreographyBuilder(
     .step("complete-order", OrderCompleted.class, step -> step
         .terminates())
     .build();
+
+services.from(MessageBusServices.class).addServiceBus(configurator -> {
+    configurator.addChoreography(fragment);
+    // Register the consumers and transport normally.
+});
 ```
 
-Use `sends`, `publishes`, `responds`, `schedules`, or `terminates` to describe an outcome. An outcome is expected by default and may instead be informational or optional. Count and time expectations are diagnostic intent, not delivery guarantees or executable business predicates. Explicit message-URN overloads are available when cross-language contracts do not derive the same portable identity from their local type names.
+Use `sends`, `publishes`, `responds`, `schedules`, or `terminates` to describe an outcome. An outcome is expected by default and may instead be informational or optional. Count and time expectations are diagnostic intent, not delivery guarantees or executable business predicates. Explicit message-URN overloads are available when cross-language contracts do not derive the same portable identity from their local type names. Registration rejects an unsupported schema, an invalid fragment, or two fragments with the same choreography and owner identity.
 
 ---
 
