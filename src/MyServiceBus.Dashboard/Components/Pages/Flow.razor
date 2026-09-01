@@ -62,7 +62,7 @@
                         </div>
                         <div class="request-response-participant"><strong>@(exchange.ResponderApplication ?? "Awaiting responder")</strong><small>@(exchange.ResponderInstanceId ?? "No consumer evidence")</small></div>
                     </div>
-                    <footer><span>Requested @exchange.StartedAtUtc.LocalDateTime.ToString("HH:mm:ss.fff")</span><span>@EvidenceLabel(exchange)</span></footer>
+                    <footer><span>Requested @exchange.StartedAtUtc.LocalDateTime.ToString("HH:mm:ss.fff")</span><span>@EvidenceLabel(exchange)</span><a href="@($"/request-response/{Uri.EscapeDataString(exchange.RequestId)}")">Inspect exchange →</a></footer>
                 </article>
             }
         </div>

@@ -413,9 +413,18 @@ public class MonitoringRepositoryTests
         exchange.RequesterApplication.ShouldBe("gateway");
         exchange.ResponderApplication.ShouldBe("pricing");
         exchange.RequestMessageType.ShouldBe("PriceRequest");
+        exchange.RequestMessageId.ShouldBe("request-message");
         exchange.ResponseMessageType.ShouldBe("PriceResponse");
+        exchange.ResponseMessageId.ShouldBe("response-message");
         exchange.DurationMs.ShouldBe(40);
         exchange.EvidenceStatus.ShouldBe("complete");
+
+        var detail = repository.GetRequestResponseExchange("request-1").ShouldNotBeNull();
+        detail.Exchange.ShouldBe(exchange);
+        detail.Observations.Count.ShouldBe(4);
+        var detailTimes = detail.Observations.Select(record => record.Observation.OccurredAtUtc).ToArray();
+        detailTimes.ShouldBe(detailTimes.Order().ToArray());
+        repository.GetRequestResponseExchange("missing").ShouldBeNull();
         repository.GetRequestResponseExchanges("unrelated", 60, now).ShouldBeEmpty();
     }
 

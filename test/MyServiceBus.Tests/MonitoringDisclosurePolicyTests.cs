@@ -49,6 +49,32 @@ public class MonitoringDisclosurePolicyTests
         policy.Apply(retained).ShouldBeSameAs(retained);
     }
 
+    [Fact]
+    public void Exchange_detail_requires_the_caller_to_request_bodies_even_under_full_disclosure()
+    {
+        var retained = CreateRecord();
+        var detail = new MonitoringRequestResponseExchangeDetail(
+            new MonitoringRequestResponseExchange(
+                "request-1", "requested", "orders", "orders-1", null, null,
+                "SubmitOrder", "urn:message:SubmitOrder", "message-1",
+                null, null, null, "loopback://response",
+                retained.Observation.OccurredAtUtc, retained.Observation.OccurredAtUtc,
+                null, null, null, 0, false, "partial"),
+            [retained]);
+        var policy = CreatePolicy(new MonitoringDisclosureOptions
+        {
+            MessageBodies = MonitoringMessageBodyDisclosure.Full
+        });
+
+        var omitted = policy.Apply(detail, includeMessageBodies: false);
+        var disclosed = policy.Apply(detail, includeMessageBodies: true);
+
+        omitted.Observations.ShouldHaveSingleItem().Observation.MessageBody.ShouldBeNull();
+        omitted.Observations[0].Observation.MessageBodyStatus.ShouldBe("withheld");
+        disclosed.Observations.ShouldBeSameAs(detail.Observations);
+        retained.Observation.MessageBody.ShouldBe("{\"secret\":\"value\"}");
+    }
+
     private static MonitoringDisclosurePolicy CreatePolicy(MonitoringDisclosureOptions options)
         => new(Options.Create(options));
 

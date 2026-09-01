@@ -58,6 +58,21 @@ public sealed class MonitoringApiClient
             cancellationToken).ConfigureAwait(false)
             ?? [];
 
+    public async Task<MonitoringRequestResponseExchangeDetail?> GetRequestResponseExchange(
+        string requestId,
+        bool includeMessageBodies,
+        CancellationToken cancellationToken)
+    {
+        using var response = await httpClient.GetAsync(
+            $"/api/monitoring/v1/request-response/{Uri.EscapeDataString(requestId)}?includeMessageBodies={includeMessageBodies.ToString().ToLowerInvariant()}",
+            cancellationToken).ConfigureAwait(false);
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            return null;
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<MonitoringRequestResponseExchangeDetail>(cancellationToken)
+            .ConfigureAwait(false);
+    }
+
     public async Task<IReadOnlyList<MonitoringReplicaFlowEdge>> GetReplicaFlow(CancellationToken cancellationToken)
         => await httpClient.GetFromJsonAsync<MonitoringReplicaFlowEdge[]>(
             "/api/monitoring/v1/flow/replicas?windowSeconds=300",

@@ -252,6 +252,20 @@ public static class MonitoringApi
         query.MapGet("/request-response", (string? application, int? windowSeconds, MonitoringRepository repository) =>
             repository.GetRequestResponseExchanges(application, windowSeconds ?? 300, DateTimeOffset.UtcNow))
             .WithSummary("Query request/response exchanges reconstructed from explicit request metadata");
+        query.MapGet("/request-response/{requestId}", (
+            string requestId,
+            bool? includeMessageBodies,
+            MonitoringRepository repository,
+            MonitoringDisclosurePolicy disclosure) =>
+        {
+            var exchange = repository.GetRequestResponseExchange(requestId);
+            return exchange is null
+                ? Results.NotFound()
+                : Results.Ok(disclosure.Apply(exchange, includeMessageBodies == true));
+        })
+            .WithSummary("Get one request/response exchange with disclosure-safe constituent message evidence")
+            .Produces<MonitoringRequestResponseExchangeDetail>()
+            .Produces(StatusCodes.Status404NotFound);
         query.MapGet("/flow/replicas", (string? application, int? windowSeconds, MonitoringRepository repository) =>
             repository.GetReplicaFlow(application, windowSeconds ?? 300, DateTimeOffset.UtcNow))
             .WithSummary("Query observed message-flow paths between application replicas");

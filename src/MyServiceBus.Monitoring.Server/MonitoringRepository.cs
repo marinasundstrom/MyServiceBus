@@ -1632,6 +1632,30 @@ public sealed class MonitoringRepository
             .ToArray();
     }
 
+    public MonitoringRequestResponseExchangeDetail? GetRequestResponseExchange(string requestId)
+    {
+        if (string.IsNullOrWhiteSpace(requestId))
+            return null;
+
+        MonitoringObservationRecord[] records;
+        lock (observationSync)
+        {
+            records = recentObservations
+                .Where(record => string.Equals(record.Observation.RequestId, requestId, StringComparison.Ordinal))
+                .OrderBy(record => record.Observation.OccurredAtUtc)
+                .ToArray();
+        }
+
+        if (records.Length == 0)
+            return null;
+
+        var exchange = records
+            .GroupBy(record => record.Observation.RequestId!, StringComparer.Ordinal)
+            .Select(ProjectRequestResponseExchange)
+            .SingleOrDefault();
+        return exchange is null ? null : new MonitoringRequestResponseExchangeDetail(exchange, records);
+    }
+
     private static MonitoringRequestResponseExchange? ProjectRequestResponseExchange(
         IGrouping<string, MonitoringObservationRecord> group)
     {
@@ -1682,8 +1706,10 @@ public sealed class MonitoringRepository
             responder?.InstanceId,
             requestSent.Observation.MessageType,
             requestSent.Observation.MessageUrn,
+            requestSent.Observation.MessageId,
             responseSent?.Observation.MessageType,
             responseSent?.Observation.MessageUrn,
+            responseSent?.Observation.MessageId,
             requestSent.Observation.ResponseAddress,
             requestSent.Observation.OccurredAtUtc,
             last,

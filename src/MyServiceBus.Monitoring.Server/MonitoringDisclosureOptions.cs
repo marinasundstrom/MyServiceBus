@@ -42,6 +42,16 @@ public sealed class MonitoringDisclosurePolicy
             _ => message
         };
 
+    public MonitoringRequestResponseExchangeDetail Apply(
+        MonitoringRequestResponseExchangeDetail detail,
+        bool includeMessageBodies)
+        => detail with
+        {
+            Observations = includeMessageBodies
+                ? Apply(detail.Observations)
+                : detail.Observations.Select(OmitBody).ToArray()
+        };
+
     private MonitoringObservationRecord Apply(MonitoringObservationRecord record)
     {
         var observation = record.Observation;
@@ -68,4 +78,18 @@ public sealed class MonitoringDisclosurePolicy
 
         return record with { Observation = disclosed };
     }
+
+    private static MonitoringObservationRecord OmitBody(MonitoringObservationRecord record)
+        => record.Observation.MessageBody is null
+            ? record
+            : record with
+            {
+                Observation = record.Observation with
+                {
+                    MessageBody = null,
+                    MessageBodyContentType = null,
+                    MessageBodyStatus = "withheld",
+                    MessageBodyOriginalBytes = null
+                }
+            };
 }

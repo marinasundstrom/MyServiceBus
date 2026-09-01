@@ -4,6 +4,7 @@ This changelog summarizes the bigger themes in the repository history rather tha
 
 ## Unreleased
 
+- Added a stable request/response exchange inspector over the monitoring-owned relationship projection. Exact request and response message identities link to their independent lifecycles, ordered exchange evidence remains available without payload inspection, and bodies are requested only when both the Dashboard message feature and collector disclosure policy allow them.
 - Clarified monitoring terminology around messages, bodies, and transport envelopes, and defined request/response as a relationship projection with exporter-first header minimization and independent collector disclosure.
 
 - Added a monitoring-owned individual-message projection that merges exact producer and consumer evidence, caused operations, request-response observations, participant applications, outcomes, and disclosure-safe body state. A compact Dashboard message index and detail timeline consume that projection. Dashboard feature policy now keeps message inspection development-only by default and allows optional workflow and message domains to be hidden and skipped without making fundamental operations views configurable.

@@ -613,8 +613,10 @@ public sealed record MonitoringRequestResponseExchange(
     string? ResponderInstanceId,
     string? RequestMessageType,
     string? RequestMessageUrn,
+    string? RequestMessageId,
     string? ResponseMessageType,
     string? ResponseMessageUrn,
+    string? ResponseMessageId,
     string? ResponseAddress,
     DateTimeOffset StartedAtUtc,
     DateTimeOffset LastActivityAtUtc,
@@ -624,6 +626,10 @@ public sealed record MonitoringRequestResponseExchange(
     double DurationMs,
     bool HasFailures,
     string EvidenceStatus);
+
+public sealed record MonitoringRequestResponseExchangeDetail(
+    MonitoringRequestResponseExchange Exchange,
+    IReadOnlyList<MonitoringObservationRecord> Observations);
 
 public sealed record MonitoringReplicaFlowEdge(
     string SourceApplication,
