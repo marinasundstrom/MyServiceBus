@@ -303,8 +303,9 @@ td small { display: block; margin-top: 4px; color: var(--text-dim); font-size: .
 .flow-relationship-paths span { color: var(--text-dim); font-size: .58rem; text-transform: capitalize; }
 .flow-relationship-paths small { color: var(--text-soft); font-size: .61rem; font-weight: 700; }
 .request-response-list { display: grid; gap: 12px; padding: 16px 20px 20px; background: var(--surface-deep); }
+.request-response-panel { margin-top: 18px; overflow: hidden; }
 .request-response-exchange { padding: 13px 14px; border: 1px solid var(--border); border-radius: 11px; background: var(--surface-solid); }
-.request-response-exchange.failed { border-color: color-mix(in srgb, var(--danger) 45%, var(--border)); }
+.request-response-exchange.failed { border-color: color-mix(in srgb, var(--danger) 45%, var(--border)); background: color-mix(in srgb, var(--danger-surface) 55%, var(--surface-solid)); }
 .request-response-exchange > header, .request-response-exchange > header > div, .request-response-exchange > footer { display: flex; gap: 8px; align-items: center; }
 .request-response-exchange > header, .request-response-exchange > footer { justify-content: space-between; }
 .request-response-exchange > header { font-size: .7rem; }
@@ -634,6 +635,7 @@ td small { display: block; margin-top: 4px; color: var(--text-dim); font-size: .
 :root[data-density="compact"] .replica-flow-map-canvas { min-height: 540px; }
 :root[data-density="compact"] .flow-relationship-list { gap: 9px; padding: 11px 14px 14px; }
 :root[data-density="compact"] .message-filters { padding: 10px 14px; }
+:root[data-density="compact"] .request-response-panel { margin-top: 12px; }
 :root[data-density="compact"] .message-list-item { gap: 10px; padding: 9px 14px; }
 :root[data-density="compact"] .message-detail-heading { padding: 16px 18px; }
 :root[data-density="compact"] .message-timeline-item { padding: 9px 14px; }
