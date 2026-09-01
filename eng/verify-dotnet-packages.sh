@@ -2,14 +2,17 @@
 set -eu
 
 package_dir="${1:-artifacts/packages}"
-version="${2:-0.1.0-preview.8}"
-packages="Sundstrom.MyServiceBus.Abstractions Sundstrom.MyServiceBus Sundstrom.MyServiceBus.Serialization.Bson Sundstrom.MyServiceBus.PostgreSql Sundstrom.MyServiceBus.Inspection Sundstrom.MyServiceBus.Monitoring Sundstrom.MyServiceBus.RabbitMq Sundstrom.MyServiceBus.AzureServiceBus Sundstrom.MyServiceBus.AmazonSqs Sundstrom.MyServiceBus.Testing"
+version="${2:-0.1.0-preview.9}"
+packages="Sundstrom.MyServiceBus.Abstractions Sundstrom.MyServiceBus Sundstrom.MyServiceBus.Generators Sundstrom.MyServiceBus.Serialization.Bson Sundstrom.MyServiceBus.PostgreSql Sundstrom.MyServiceBus.Inspection Sundstrom.MyServiceBus.Monitoring Sundstrom.MyServiceBus.RabbitMq Sundstrom.MyServiceBus.AzureServiceBus Sundstrom.MyServiceBus.AmazonSqs Sundstrom.MyServiceBus.Testing"
 
 for package_id in $packages; do
   package="$package_dir/$package_id.$version.nupkg"
-  symbols="$package_dir/$package_id.$version.snupkg"
   test -f "$package"
-  test -f "$symbols"
+
+  if [ "$package_id" != "Sundstrom.MyServiceBus.Generators" ]; then
+    symbols="$package_dir/$package_id.$version.snupkg"
+    test -f "$symbols"
+  fi
 
   nuspec="$(unzip -p "$package" '*.nuspec')"
   printf '%s' "$nuspec" | grep -Fq "<id>$package_id</id>"
@@ -18,6 +21,9 @@ for package_id in $packages; do
   printf '%s' "$nuspec" | grep -Fq '<license type="expression">MIT</license>'
   printf '%s' "$nuspec" | grep -Fq '<projectUrl>https://github.com/marinasundstrom/MyServiceBus</projectUrl>'
 done
+
+generator_contents="$(unzip -Z1 "$package_dir/Sundstrom.MyServiceBus.Generators.$version.nupkg")"
+printf '%s\n' "$generator_contents" | grep -Fq 'analyzers/dotnet/cs/MyServiceBus.Generators.dll'
 
 for package_id in Sundstrom.MyServiceBus.Abstractions Sundstrom.MyServiceBus; do
   package="$package_dir/$package_id.$version.nupkg"
@@ -31,6 +37,6 @@ for package_id in Sundstrom.MyServiceBus.Abstractions Sundstrom.MyServiceBus; do
 done
 
 actual_packages="$(find "$package_dir" -maxdepth 1 -type f \( -name '*.nupkg' -o -name '*.snupkg' \) | wc -l | tr -d ' ')"
-test "$actual_packages" = 20
+test "$actual_packages" = 21
 
-echo "Verified ten NuGet packages and ten symbol packages for $version, including the experimental .NET 11 core assets."
+echo "Verified eleven NuGet packages and ten symbol packages for $version, including the analyzer-only generator and experimental .NET 11 core assets."

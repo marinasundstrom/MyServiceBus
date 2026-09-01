@@ -216,7 +216,7 @@ Workflow visibility remains read-only monitoring by default. Retry, skip, force-
 
 ## Raven Projection
 
-The future [Raven Saga DSL Exploration](raven-saga-dsl.md) is an optional compiler projection over this feature. A Raven `saga!` declaration should lower into the same MyServiceBus definition and runtime used by the ordinary C# library DSL. Once the shared infrastructure is stable, this projection can provide a more approachable, workflow-oriented authoring experience than either native fluent API while preserving those C# and Java APIs as complete alternatives.
+The experimental [Raven Saga DSL](raven-saga-dsl.md) is an optional compiler projection over this feature. Its executable `saga!` prototype lowers into the same MyServiceBus definition and runtime used by the ordinary C# library DSL. As the shared infrastructure matures, this projection can provide a more approachable, workflow-oriented authoring experience than either native fluent API while preserving those C# and Java APIs as complete alternatives.
 
 The macro must not be required to define or execute a C# or Java state machine, construct the portable definition, persist or monitor instances, register state machines without generation, or pass the shared conformance suite. Its value is readable domain-order syntax, Raven-native static analysis, generated registration, stronger diagnostics, and executable documentation; it is not the architectural center of the saga feature.
 

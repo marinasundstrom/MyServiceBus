@@ -27,8 +27,8 @@ exporter.start(inspectionProvider);`,
 
 export const exporterInstall = {
   csharp: `dotnet add package Sundstrom.MyServiceBus.Monitoring \\
-  --version 0.1.0-preview.8`,
-  java: `implementation 'io.github.marinasundstrom.myservicebus:myservicebus-monitoring:0.1.0-preview.8'`,
+  --version 0.1.0-preview.9`,
+  java: `implementation 'io.github.marinasundstrom.myservicebus:myservicebus-monitoring:0.1.0-preview.9'`,
 };
 
 <p className="docs-kicker">Optional addon · Experimental</p>
@@ -175,8 +175,8 @@ Open the <code>monitoring-dashboard</code> resource, then call the sample applic
 The exporter is a client package. The collector and Blazor dashboard are separate applications, published as versioned Linux container images for AMD64 and ARM64:
 
 <CodeViewer
-  code={`ghcr.io/marinasundstrom/myservicebus-monitoring-collector:0.1.0-preview.8
-ghcr.io/marinasundstrom/myservicebus-monitoring-dashboard:0.1.0-preview.8`}
+  code={`ghcr.io/marinasundstrom/myservicebus-monitoring-collector:0.1.0-preview.9
+ghcr.io/marinasundstrom/myservicebus-monitoring-dashboard:0.1.0-preview.9`}
   label="Monitoring container images"
   language="plaintext"
 />

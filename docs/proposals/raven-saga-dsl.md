@@ -12,7 +12,7 @@ Parent feature proposal: [Sagas and State Machines](sagas-and-state-machines.md)
 
 ## Summary
 
-MyServiceBus should explore a Raven-native saga and state-machine DSL as part of a future sample. The DSL would provide a concise declaration of states, handled messages, activities, and transitions while using MyServiceBus's own saga runtime, wire contracts, persistence behavior, topology, and monitoring model.
+MyServiceBus is exploring a Raven-native saga and state-machine DSL through the executable prototype. The DSL provides a concise declaration of states, handled messages, activities, and transitions while using MyServiceBus's own saga runtime, wire contracts, persistence behavior, topology, and monitoring model.
 
 The language-neutral saga model remains authoritative. Raven syntax must be an idiomatic projection over that model rather than the source from which C# or Java semantics are derived. C# and Java may expose different APIs while sharing the same concepts, observable outcomes, and conformance fixtures.
 

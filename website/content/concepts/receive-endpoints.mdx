@@ -44,7 +44,7 @@ Sharing is useful when several message types belong to one operational boundary:
 - Backpressure should apply to the group as a whole.
 - Their relative arrival order matters to one aggregate or workflow.
 
-The same property is likely to be useful for future saga support: one saga endpoint can bind every command and event that advances the saga. Sagas are not implemented yet, but the endpoint model does not require one queue per message type.
+Saga registration uses the same property: one state machine binds every declared event that advances it to a shared receive endpoint. The endpoint model does not require one queue per message type.
 
 ## One queue is not a total processing-order guarantee
 

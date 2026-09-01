@@ -4,6 +4,9 @@ This changelog summarizes the bigger themes in the repository history rather tha
 
 ## Unreleased
 
+## 0.1.0-preview.9 - 2026-09-01
+
+- Added the previously documented `Sundstrom.MyServiceBus.Generators` analyzer to the NuGet publication, artifact verifier, staged package consumer, public artifact catalog, and release checklist.
 - Added an executable Raven `saga!` macro experiment that generates an ordinary MyServiceBus .NET saga data type and native state machine, then verifies correlation, mutation, send, publish, transition, and finalization through the existing runtime. The prototype contributes declaration-aware completion for saga-owned positions and typed Raven expression fragments only where values are admitted; unsupported guarded, named-final, and durable-timeout semantics remain explicit prototype gaps. A dedicated website guide presents the broader preview Raven integration through a compilable RabbitMQ quick start, record deconstruction, consumer functions, named parenthesized unions, exhaustive pattern matching, and the saga DSL. The packaged union smoke now proves a namespace-level consumer function over Raven's named union while keeping the concrete messages in topology.
 - Separated retained failure history from the recent-failure signal. The monitoring service now provides paginated failure/retry queries with application, category, and broad operational-identity search; the Dashboard keeps those filters in the URL while a configurable window controls only overview and navigation notifications.
 - Restored consistent vertical spacing between the message-flow map and request/response panel in both comfortable and compact Dashboard densities. Failed request/response exchanges now use the failure indicator and label their completed failure lane as a fault response instead of an indefinitely awaiting response.

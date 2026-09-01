@@ -25,10 +25,11 @@ Create a trusted publishing policy for the NuGet.org account that owns the MySer
 
 Enter only the workflow filename, not the `.github/workflows/` path. The workflow supplies the public NuGet.org profile username directly to `NuGet/login`; no NuGet API-key secret is required. GitHub OIDC is exchanged for a short-lived key immediately before publication.
 
-The trusted policy owner must own all ten package IDs:
+The trusted policy owner must own all eleven package IDs:
 
 - `Sundstrom.MyServiceBus.Abstractions`
 - `Sundstrom.MyServiceBus`
+- `Sundstrom.MyServiceBus.Generators`
 - `Sundstrom.MyServiceBus.Serialization.Bson`
 - `Sundstrom.MyServiceBus.PostgreSql`
 - `Sundstrom.MyServiceBus.Inspection`
@@ -70,7 +71,7 @@ Using one immutable tag for both workflows prevents a branch update from causing
 1. In GitHub Actions, run **Publish Maven Central preview** and select the release tag.
 2. Wait for the workflow to reach Maven Central state `PUBLISHING` or `PUBLISHED`. It tests all Java modules, creates signed publications, verifies a clean consumer, uploads one bundle containing all fourteen artifacts, and waits for Central to validate and accept it. Publication then continues asynchronously in Central.
 3. Run **Publish NuGet preview** and select the same release tag.
-4. Confirm that all ten NuGet packages and symbol packages were accepted.
+4. Confirm that all eleven NuGet packages and the ten symbol packages were accepted. The analyzer-only generator package does not produce a symbol package.
 5. Run **Publish monitoring images** from the same tag and confirm that the separately deployable collector and dashboard images were accepted by GitHub Container Registry for AMD64 and ARM64.
 6. Verify the version on Maven Central, NuGet.org, and GitHub Container Registry after registry indexing completes.
 7. Create the GitHub prerelease and use the same version in its title and release notes.
