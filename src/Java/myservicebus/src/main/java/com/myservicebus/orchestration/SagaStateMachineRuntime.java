@@ -16,7 +16,7 @@ import java.util.function.Function;
 /** Executes a normalized state-machine definition against a volatile repository. */
 public final class SagaStateMachineRuntime<TSaga> {
     private final SagaStateMachineDefinition definition;
-    private final InMemorySagaRepository<TSaga> repository;
+    private final SagaRepository<TSaga> repository;
     private final Function<UUID, TSaga> instanceFactory;
     private final Function<TSaga, String> getState;
     private final BiConsumer<TSaga, String> setState;
@@ -25,7 +25,7 @@ public final class SagaStateMachineRuntime<TSaga> {
 
     SagaStateMachineRuntime(
             SagaStateMachineDefinition definition,
-            InMemorySagaRepository<TSaga> repository,
+            SagaRepository<TSaga> repository,
             Function<UUID, TSaga> instanceFactory,
             Function<TSaga, String> getState,
             BiConsumer<TSaga, String> setState,
@@ -86,7 +86,7 @@ public final class SagaStateMachineRuntime<TSaga> {
                 if (eventBinding.event().missingInstancePolicy()
                         == SagaMissingInstancePolicy.DISCARD) {
                     return CompletableFuture.completedFuture(
-                            InMemorySagaRepository.Transaction.noChange(new DeliveryResult(
+                            SagaRepositoryTransaction.noChange(new DeliveryResult(
                                     DeliveryStatus.MISSING_DISCARDED,
                                     correlationId,
                                     null,
@@ -120,7 +120,7 @@ public final class SagaStateMachineRuntime<TSaga> {
             if (behavior.activities().size() == 1
                     && behavior.activities().get(0).kind() == SagaActivityKind.IGNORE) {
                 return CompletableFuture.completedFuture(
-                        InMemorySagaRepository.Transaction.noChange(new DeliveryResult(
+                        SagaRepositoryTransaction.noChange(new DeliveryResult(
                                 DeliveryStatus.IGNORED,
                                 correlationId,
                                 beginState,
@@ -162,8 +162,8 @@ public final class SagaStateMachineRuntime<TSaga> {
                         !delete,
                         List.copyOf(outgoing));
                 return delete
-                        ? InMemorySagaRepository.Transaction.delete(result)
-                        : InMemorySagaRepository.Transaction.upsert(instance, result);
+                        ? SagaRepositoryTransaction.delete(result)
+                        : SagaRepositoryTransaction.upsert(instance, result);
             });
         });
     }

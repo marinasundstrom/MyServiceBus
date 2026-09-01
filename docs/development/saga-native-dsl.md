@@ -2,7 +2,7 @@
 
 ## Status
 
-Design and acceptance contract for the first C# and Java authoring DSLs. The fundamental APIs illustrated here now lower to the shared normalized definition and in-memory execution runtime in both clients. Experimental registration attaches every declared event to one receive endpoint and dispatches outgoing work through the active consume context. Matching focused tests and a mixed C#/Java Aspire order workflow demonstrate the vertical slice. Definition topology, bounded committed-transition monitoring, and an initial Dashboard instance view are implemented; durable persistence and lifecycle retention remain before the feature is production-capable.
+Design and acceptance contract for the first C# and Java authoring DSLs. The fundamental APIs illustrated here now lower to the shared normalized definition and provider-neutral repository runtime in both clients. The built-in provider is still in-memory and volatile. Experimental registration attaches every declared event to one receive endpoint and dispatches outgoing work through the active consume context. Matching focused tests and a mixed C#/Java Aspire order workflow demonstrate the vertical slice. Definition topology, bounded committed-transition monitoring, and an initial Dashboard instance view are implemented; a durable provider, transactional outbox integration, and lifecycle retention remain before the feature is production-capable.
 
 ## Design Goal
 
@@ -218,9 +218,9 @@ A state machine is frozen when its definition or runtime is first requested. Mut
 The same machine object supplies:
 
 - its immutable normalized `SagaStateMachineDefinition` for inspection and topology; and
-- a runtime factory accepting a repository, which binds the stored native callbacks to the low-level executor.
+- a runtime factory accepting `ISagaRepository<TSaga>` or `SagaRepository<TSaga>`, which binds the stored native callbacks to the low-level executor.
 
-The DSL does not own a singleton repository. Registration chooses repository lifetime and provider, validates its capabilities against the definition, and creates the consumer adapter.
+The DSL does not own a singleton repository. Registration chooses repository lifetime and provider, validates its declared correlation, concurrency, durability, outbox, and final-deletion capabilities against the definition, and creates the consumer adapter. `InMemorySagaRepository` implements this same contract rather than using a private runtime path.
 
 ## Deliberate Initial Deviations
 
@@ -245,4 +245,4 @@ Before the fundamental DSL is complete, C# and Java tests must prove that:
 8. outgoing dispatch failure prevents the volatile instance from committing in both clients; and
 9. the DSL uses the existing low-level runtime rather than a parallel executor.
 
-Bus registration, consume-context dispatch, focused tests, and the mixed Aspire order sample now satisfy the first runtime vertical slice. Both clients also publish the normalized saga definition and endpoint attachment through topology and inspection and emit payload-free lifecycle observations after repository commit. The monitoring service exposes separate replica-aware definition and bounded instance-transition queries plus shared workflow catalog and run-index projections. The Dashboard renders saga definitions and a selected instance's current state and committed transition timeline without flattening that evidence into choreography. Durable lifecycle retention, durable repositories, and richer graph analysis remain later gates over the same machine definition.
+Bus registration, consume-context dispatch, focused tests, and the mixed Aspire order sample now satisfy the first runtime vertical slice. Both runtimes execute through matching public repository and transaction contracts, and capability validation rejects a volatile provider when a machine requires durable storage or a transactional outbox. Both clients also publish the normalized saga definition and endpoint attachment through topology and inspection and emit payload-free lifecycle observations after repository commit. The monitoring service exposes separate replica-aware definition and bounded instance-transition queries plus shared workflow catalog and run-index projections. The Dashboard renders saga definitions and a selected instance's current state and committed transition timeline without flattening that evidence into choreography. Durable lifecycle retention, the first durable repository/outbox provider, and richer graph analysis remain later gates over the same machine definition.

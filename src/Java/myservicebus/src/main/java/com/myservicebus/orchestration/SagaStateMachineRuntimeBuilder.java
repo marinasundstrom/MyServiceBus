@@ -18,7 +18,7 @@ import java.util.function.Function;
 /** Binds executable application callbacks to a normalized saga definition. */
 public final class SagaStateMachineRuntimeBuilder<TSaga> {
     private final SagaStateMachineDefinition definition;
-    private final InMemorySagaRepository<TSaga> repository;
+    private final SagaRepository<TSaga> repository;
     private final Function<UUID, TSaga> instanceFactory;
     private final Function<TSaga, String> getState;
     private final BiConsumer<TSaga, String> setState;
@@ -27,7 +27,7 @@ public final class SagaStateMachineRuntimeBuilder<TSaga> {
 
     public SagaStateMachineRuntimeBuilder(
             SagaStateMachineDefinition definition,
-            InMemorySagaRepository<TSaga> repository,
+            SagaRepository<TSaga> repository,
             Function<UUID, TSaga> instanceFactory,
             Function<TSaga, String> getState,
             BiConsumer<TSaga, String> setState) {

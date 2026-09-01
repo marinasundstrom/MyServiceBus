@@ -11,7 +11,7 @@ public sealed class SagaStateMachineRuntime<TSaga>
     where TSaga : class
 {
     private readonly SagaStateMachineDefinition definition;
-    private readonly InMemorySagaRepository<TSaga> repository;
+    private readonly ISagaRepository<TSaga> repository;
     private readonly Func<Guid, TSaga> instanceFactory;
     private readonly Func<TSaga, string?> getState;
     private readonly Action<TSaga, string> setState;
@@ -22,7 +22,7 @@ public sealed class SagaStateMachineRuntime<TSaga>
 
     internal SagaStateMachineRuntime(
         SagaStateMachineDefinition definition,
-        InMemorySagaRepository<TSaga> repository,
+        ISagaRepository<TSaga> repository,
         Func<Guid, TSaga> instanceFactory,
         Func<TSaga, string?> getState,
         Action<TSaga, string> setState,
@@ -78,7 +78,7 @@ public sealed class SagaStateMachineRuntime<TSaga>
 
         return await repository.Execute(
             correlationId,
-            async storedInstance =>
+            async (storedInstance, _) =>
             {
                 var created = storedInstance is null;
                 if (created && eventBinding.Event.CreationPolicy == SagaCreationPolicy.ExistingOnly)
@@ -241,7 +241,7 @@ public sealed class SagaStateMachineRuntimeBuilder<TSaga>
     where TSaga : class
 {
     private readonly SagaStateMachineDefinition definition;
-    private readonly InMemorySagaRepository<TSaga> repository;
+    private readonly ISagaRepository<TSaga> repository;
     private readonly Func<Guid, TSaga> instanceFactory;
     private readonly Func<TSaga, string?> getState;
     private readonly Action<TSaga, string> setState;
@@ -250,7 +250,7 @@ public sealed class SagaStateMachineRuntimeBuilder<TSaga>
 
     public SagaStateMachineRuntimeBuilder(
         SagaStateMachineDefinition definition,
-        InMemorySagaRepository<TSaga> repository,
+        ISagaRepository<TSaga> repository,
         Func<Guid, TSaga> instanceFactory,
         Func<TSaga, string?> getState,
         Action<TSaga, string> setState)
@@ -479,7 +479,7 @@ internal delegate ValueTask SagaActivityExecutor<TSaga>(
 /// <summary>
 /// Volatile, process-local saga storage with per-instance transactional mutation.
 /// </summary>
-public sealed class InMemorySagaRepository<TSaga>
+public sealed class InMemorySagaRepository<TSaga> : ISagaRepository<TSaga>
     where TSaga : class
 {
     private readonly ConcurrentDictionary<Guid, TSaga> instances = new();
@@ -490,6 +490,14 @@ public sealed class InMemorySagaRepository<TSaga>
     {
         this.clone = clone ?? throw new ArgumentNullException(nameof(clone));
     }
+
+    public SagaRepositoryCapabilities Capabilities { get; } = new(
+        "in-memory",
+        SagaCorrelationKind.Identity,
+        SagaConcurrencyKind.SingleProcess,
+        SagaDurabilityKind.Volatile,
+        SagaOutboxKind.Logical,
+        true);
 
     public int Count => instances.Count;
 
@@ -505,17 +513,21 @@ public sealed class InMemorySagaRepository<TSaga>
         return false;
     }
 
-    internal async ValueTask<TResult> Execute<TResult>(
+    public async ValueTask<TResult> Execute<TResult>(
         Guid correlationId,
-        Func<TSaga?, ValueTask<SagaRepositoryTransaction<TSaga, TResult>>> execute,
-        CancellationToken cancellationToken)
+        Func<TSaga?, CancellationToken, ValueTask<SagaRepositoryTransaction<TSaga, TResult>>> execute,
+        CancellationToken cancellationToken = default)
     {
+        if (correlationId == Guid.Empty)
+            throw new ArgumentException("The saga correlation ID cannot be empty.", nameof(correlationId));
+        ArgumentNullException.ThrowIfNull(execute);
+
         var instanceLock = locks.GetOrAdd(correlationId, static _ => new SemaphoreSlim(1, 1));
         await instanceLock.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
             var workingCopy = instances.TryGetValue(correlationId, out var stored) ? clone(stored) : null;
-            var transaction = await execute(workingCopy).ConfigureAwait(false);
+            var transaction = await execute(workingCopy, cancellationToken).ConfigureAwait(false);
             switch (transaction.Mutation)
             {
                 case SagaRepositoryMutation.Upsert:
@@ -534,27 +546,4 @@ public sealed class InMemorySagaRepository<TSaga>
             instanceLock.Release();
         }
     }
-}
-
-internal sealed record SagaRepositoryTransaction<TSaga, TResult>(
-    SagaRepositoryMutation Mutation,
-    TSaga? Instance,
-    TResult Result)
-    where TSaga : class
-{
-    public static SagaRepositoryTransaction<TSaga, TResult> NoChange(TResult result)
-        => new(SagaRepositoryMutation.None, null, result);
-
-    public static SagaRepositoryTransaction<TSaga, TResult> Upsert(TSaga instance, TResult result)
-        => new(SagaRepositoryMutation.Upsert, instance, result);
-
-    public static SagaRepositoryTransaction<TSaga, TResult> Delete(TResult result)
-        => new(SagaRepositoryMutation.Delete, null, result);
-}
-
-internal enum SagaRepositoryMutation
-{
-    None,
-    Upsert,
-    Delete
 }

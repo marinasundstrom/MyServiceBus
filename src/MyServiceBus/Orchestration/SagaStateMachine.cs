@@ -21,6 +21,11 @@ public abstract class SagaStateMachine<TSaga>
     private Func<Guid, TSaga>? instanceFactory;
     private Func<TSaga, TSaga>? cloneInstance;
     private SagaCompletionPolicy completionPolicy = SagaCompletionPolicy.Retain;
+    private SagaRepositoryRequirements repositoryRequirements = new(
+        SagaCorrelationKind.Identity,
+        SagaConcurrencyKind.SingleProcess,
+        SagaDurabilityKind.Volatile,
+        SagaOutboxKind.Logical);
     private SagaStateMachineDefinition? definition;
     private bool frozen;
 
@@ -59,6 +64,7 @@ public abstract class SagaStateMachine<TSaga>
                 @event.Apply(builder);
             foreach (var behavior in behaviors)
                 behavior.Apply(builder);
+            builder.Requires(repositoryRequirements);
             if (completionPolicy == SagaCompletionPolicy.DeleteWhenFinalized)
                 builder.DeleteWhenFinalized();
             definition = builder.Build();
@@ -66,9 +72,10 @@ public abstract class SagaStateMachine<TSaga>
         }
     }
 
-    public SagaStateMachineRuntime<TSaga> CreateRuntime(InMemorySagaRepository<TSaga> repository)
+    public SagaStateMachineRuntime<TSaga> CreateRuntime(ISagaRepository<TSaga> repository)
     {
         ArgumentNullException.ThrowIfNull(repository);
+        repository.Capabilities.EnsureSupports(Definition.RepositoryRequirements, Definition.CompletionPolicy);
         var runtimeBuilder = new SagaStateMachineRuntimeBuilder<TSaga>(
             Definition,
             repository,
@@ -177,6 +184,12 @@ public abstract class SagaStateMachine<TSaga>
     {
         EnsureMutable();
         completionPolicy = SagaCompletionPolicy.Retain;
+    }
+
+    protected void RepositoryRequirements(SagaRepositoryRequirements requirements)
+    {
+        EnsureMutable();
+        repositoryRequirements = requirements ?? throw new ArgumentNullException(nameof(requirements));
     }
 
     protected InMemorySagaRepository<TSaga> CreateInMemoryRepository()

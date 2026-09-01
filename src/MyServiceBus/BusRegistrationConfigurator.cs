@@ -51,20 +51,47 @@ public class BusRegistrationConfigurator : IBusRegistrationConfigurator
         where TSaga : class
     {
         ArgumentNullException.ThrowIfNull(stateMachine);
-        if (endpointName is not null)
-            ArgumentException.ThrowIfNullOrWhiteSpace(endpointName);
-        if (!sagaStateMachines.Add(typeof(TStateMachine)))
+        if (sagaStateMachines.Contains(typeof(TStateMachine)))
             return;
 
         var repository = stateMachine.CreateConfiguredInMemoryRepository();
+        if (RegisterSagaStateMachine(stateMachine, repository, endpointName))
+            Services.AddSingleton(repository);
+    }
+
+    public void AddSagaStateMachine<TStateMachine, TSaga>(
+        TStateMachine stateMachine,
+        ISagaRepository<TSaga> repository,
+        string? endpointName = null)
+        where TStateMachine : SagaStateMachine<TSaga>
+        where TSaga : class
+    {
+        ArgumentNullException.ThrowIfNull(stateMachine);
+        ArgumentNullException.ThrowIfNull(repository);
+        RegisterSagaStateMachine(stateMachine, repository, endpointName);
+    }
+
+    private bool RegisterSagaStateMachine<TStateMachine, TSaga>(
+        TStateMachine stateMachine,
+        ISagaRepository<TSaga> repository,
+        string? endpointName)
+        where TStateMachine : SagaStateMachine<TSaga>
+        where TSaga : class
+    {
+        if (endpointName is not null)
+            ArgumentException.ThrowIfNullOrWhiteSpace(endpointName);
+        if (!sagaStateMachines.Add(typeof(TStateMachine)))
+            return false;
+
         var runtime = stateMachine.CreateRuntime(repository);
         var queueName = endpointName ?? stateMachine.Definition.StateMachineId;
 
         _topology.RegisterSagaStateMachine(stateMachine.Definition, queueName);
 
         Services.AddSingleton(stateMachine);
-        Services.AddSingleton(repository);
+        Services.AddSingleton<ISagaRepository<TSaga>>(repository);
         stateMachine.RegisterConsumers<TStateMachine>(this, runtime, queueName);
+        return true;
     }
 
     public void AddSagaStateMachine<TStateMachine, TSaga>(string? endpointName = null)

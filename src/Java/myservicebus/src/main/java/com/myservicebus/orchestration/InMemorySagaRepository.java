@@ -1,6 +1,7 @@
 package com.myservicebus.orchestration;
 
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
@@ -10,13 +11,24 @@ import java.util.function.Function;
 import java.util.function.UnaryOperator;
 
 /** Volatile, process-local saga storage with per-instance transactional mutation. */
-public final class InMemorySagaRepository<TSaga> {
+public final class InMemorySagaRepository<TSaga> implements SagaRepository<TSaga> {
     private final Map<UUID, TSaga> instances = new ConcurrentHashMap<>();
     private final Map<UUID, Semaphore> locks = new ConcurrentHashMap<>();
     private final UnaryOperator<TSaga> clone;
 
     public InMemorySagaRepository(UnaryOperator<TSaga> clone) {
-        this.clone = clone;
+        this.clone = Objects.requireNonNull(clone, "clone");
+    }
+
+    @Override
+    public SagaRepositoryCapabilities capabilities() {
+        return new SagaRepositoryCapabilities(
+                "in-memory",
+                SagaCorrelationKind.IDENTITY,
+                SagaConcurrencyKind.SINGLE_PROCESS,
+                SagaDurabilityKind.VOLATILE,
+                SagaOutboxKind.LOGICAL,
+                true);
     }
 
     public int count() {
@@ -28,9 +40,12 @@ public final class InMemorySagaRepository<TSaga> {
         return instance == null ? null : clone.apply(instance);
     }
 
-    <TResult> CompletionStage<TResult> execute(
+    @Override
+    public <TResult> CompletionStage<TResult> execute(
             UUID correlationId,
-            Function<TSaga, CompletionStage<Transaction<TSaga, TResult>>> execute) {
+            Function<TSaga, CompletionStage<SagaRepositoryTransaction<TSaga, TResult>>> execute) {
+        Objects.requireNonNull(correlationId, "correlationId");
+        Objects.requireNonNull(execute, "execute");
         Semaphore lock = locks.computeIfAbsent(correlationId, ignored -> new Semaphore(1));
         try {
             lock.acquire();
@@ -39,7 +54,7 @@ public final class InMemorySagaRepository<TSaga> {
             return CompletableFuture.failedFuture(exception);
         }
 
-        CompletionStage<Transaction<TSaga, TResult>> stage;
+        CompletionStage<SagaRepositoryTransaction<TSaga, TResult>> stage;
         try {
             TSaga stored = instances.get(correlationId);
             stage = execute.apply(stored == null ? null : clone.apply(stored));
@@ -59,29 +74,4 @@ public final class InMemorySagaRepository<TSaga> {
         }).whenComplete((result, exception) -> lock.release());
     }
 
-    record Transaction<TSaga, TResult>(
-            Mutation mutation,
-            TSaga instance,
-            TResult result) {
-
-        static <TSaga, TResult> Transaction<TSaga, TResult> noChange(TResult result) {
-            return new Transaction<>(Mutation.NONE, null, result);
-        }
-
-        static <TSaga, TResult> Transaction<TSaga, TResult> upsert(
-                TSaga instance,
-                TResult result) {
-            return new Transaction<>(Mutation.UPSERT, instance, result);
-        }
-
-        static <TSaga, TResult> Transaction<TSaga, TResult> delete(TResult result) {
-            return new Transaction<>(Mutation.DELETE, null, result);
-        }
-    }
-
-    enum Mutation {
-        NONE,
-        UPSERT,
-        DELETE
-    }
 }

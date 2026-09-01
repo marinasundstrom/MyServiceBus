@@ -4,6 +4,7 @@ import com.myservicebus.choreography.ChoreographyBuilder;
 import com.myservicebus.choreography.ChoreographyFragment;
 import com.myservicebus.di.ServiceCollection;
 import com.myservicebus.persistence.OutboxSession;
+import com.myservicebus.orchestration.SagaRepository;
 import com.myservicebus.orchestration.SagaStateMachine;
 import com.myservicebus.serialization.SerializerFactory;
 
@@ -20,18 +21,26 @@ public interface BusRegistrationConfigurator {
                         "Saga state machine must have an accessible no-argument constructor or be registered with a factory.",
                         exception);
             }
-        }, null);
+        }, (String) null);
     }
 
     default <TSaga, TStateMachine extends SagaStateMachine<TSaga>> void addSagaStateMachine(
             Class<TStateMachine> stateMachineClass,
             java.util.function.Supplier<TStateMachine> factory) {
-        addSagaStateMachine(stateMachineClass, factory, null);
+        addSagaStateMachine(stateMachineClass, factory, (String) null);
+    }
+
+    default <TSaga, TStateMachine extends SagaStateMachine<TSaga>> void addSagaStateMachine(
+            Class<TStateMachine> stateMachineClass,
+            java.util.function.Supplier<TStateMachine> factory,
+            String endpointName) {
+        addSagaStateMachine(stateMachineClass, factory, null, endpointName);
     }
 
     <TSaga, TStateMachine extends SagaStateMachine<TSaga>> void addSagaStateMachine(
             Class<TStateMachine> stateMachineClass,
             java.util.function.Supplier<TStateMachine> factory,
+            SagaRepository<TSaga> repository,
             String endpointName);
 
     default void addChoreography(ChoreographyBuilder builder) {

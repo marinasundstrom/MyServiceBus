@@ -3,6 +3,12 @@ package com.myservicebus;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.myservicebus.orchestration.InMemorySagaRepository;
+import com.myservicebus.orchestration.SagaConcurrencyKind;
+import com.myservicebus.orchestration.SagaCorrelationKind;
+import com.myservicebus.orchestration.SagaDurabilityKind;
+import com.myservicebus.orchestration.SagaOutboxKind;
+import com.myservicebus.orchestration.SagaRepositoryCapabilityException;
+import com.myservicebus.orchestration.SagaRepositoryRequirements;
 import com.myservicebus.orchestration.SagaStateMachine;
 import com.myservicebus.orchestration.SagaStateMachineRuntime;
 import org.junit.jupiter.api.Test;
@@ -11,6 +17,8 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class SagaStateMachineDslTest {
     private static final UUID ORDER_ID = UUID.fromString(
@@ -43,13 +51,38 @@ class SagaStateMachineDslTest {
         assertEquals(sequenceFixture, objectMapper.valueToTree(results));
     }
 
+    @Test
+    void rejectsARepositoryThatCannotMeetDeclaredRequirements() {
+        OrderStateMachine machine = new OrderStateMachine(true);
+        InMemorySagaRepository<OrderState> repository = machine.createRepository();
+
+        SagaRepositoryCapabilityException exception = assertThrows(
+                SagaRepositoryCapabilityException.class,
+                () -> machine.createRuntime(repository));
+
+        assertEquals("in-memory", exception.provider());
+        assertTrue(exception.unsupportedCapabilities().contains("durable storage"));
+        assertTrue(exception.unsupportedCapabilities().contains("transactional outbox"));
+    }
+
     private static final class OrderStateMachine extends SagaStateMachine<OrderState> {
         private OrderStateMachine() {
+            this(false);
+        }
+
+        private OrderStateMachine(boolean requiresDurableRepository) {
             super("order-state-machine", "1", "orders", "urn:message:Contracts:OrderState");
 
             instanceState(state -> state.currentState, (state, value) -> state.currentState = value);
             instanceFactory(OrderState::new);
             cloneInstance(OrderState::copy);
+            if (requiresDurableRepository) {
+                repositoryRequirements(new SagaRepositoryRequirements(
+                        SagaCorrelationKind.IDENTITY,
+                        SagaConcurrencyKind.OPTIMISTIC,
+                        SagaDurabilityKind.DURABLE,
+                        SagaOutboxKind.TRANSACTIONAL));
+            }
 
             State awaitingPayment = state("AwaitingPayment");
             State processing = state("Processing");

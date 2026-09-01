@@ -16,6 +16,7 @@ public class SagaStateMachineBusRegistrationTests
         await using var provider = services.BuildServiceProvider();
         var harness = provider.GetRequiredService<InMemoryTestHarness>();
         var repository = provider.GetRequiredService<InMemorySagaRepository<OrderState>>();
+        Assert.Same(repository, provider.GetRequiredService<ISagaRepository<OrderState>>());
         var reserveInventory = new List<ReserveInventory>();
         var orderCompleted = new List<OrderCompleted>();
         harness.RegisterHandler<ReserveInventory>(context =>

@@ -20,6 +20,19 @@ public interface IBusRegistrationConfigurator : IRegistrationConfigurator
         where TSaga : class;
 
     /// <summary>
+    /// Registers a saga state machine against an explicitly selected repository provider.
+    /// </summary>
+    /// <exception cref="SagaRepositoryCapabilityException">
+    /// The repository cannot satisfy the state machine's declared requirements.
+    /// </exception>
+    void AddSagaStateMachine<TStateMachine, TSaga>(
+        TStateMachine stateMachine,
+        ISagaRepository<TSaga> repository,
+        string? endpointName = null)
+        where TStateMachine : SagaStateMachine<TSaga>
+        where TSaga : class;
+
+    /// <summary>
     /// Constructs and registers an in-memory saga state machine with a public parameterless constructor.
     /// </summary>
     void AddSagaStateMachine<TStateMachine, TSaga>(string? endpointName = null)

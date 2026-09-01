@@ -22,6 +22,7 @@ import com.myservicebus.serialization.RawJsonSerializerFactory;
 import com.myservicebus.serialization.SerializerFactory;
 import com.myservicebus.topology.TopologyRegistry;
 import com.myservicebus.orchestration.SagaStateMachine;
+import com.myservicebus.orchestration.SagaRepository;
 
 public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigurator {
 
@@ -59,6 +60,7 @@ public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigura
     public <TSaga, TStateMachine extends SagaStateMachine<TSaga>> void addSagaStateMachine(
             Class<TStateMachine> stateMachineClass,
             java.util.function.Supplier<TStateMachine> factory,
+            SagaRepository<TSaga> repository,
             String endpointName) {
         if (stateMachineClass == null) {
             throw new IllegalArgumentException("stateMachineClass must not be null");
@@ -74,8 +76,10 @@ public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigura
         }
 
         TStateMachine stateMachine = factory.get();
-        var repository = stateMachine.createInMemoryRepository();
-        var runtime = stateMachine.createRuntime(repository);
+        SagaRepository<TSaga> selectedRepository = repository != null
+                ? repository
+                : stateMachine.createInMemoryRepository();
+        var runtime = stateMachine.createRuntime(selectedRepository);
         String queueName = endpointName != null
                 ? endpointName
                 : stateMachine.definition().stateMachineId();

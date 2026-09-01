@@ -33,6 +33,11 @@ public abstract class SagaStateMachine<TSaga> {
     private Function<UUID, TSaga> instanceFactory;
     private Function<TSaga, TSaga> cloneInstance;
     private SagaCompletionPolicy completionPolicy = SagaCompletionPolicy.RETAIN;
+    private SagaRepositoryRequirements repositoryRequirements = new SagaRepositoryRequirements(
+            SagaCorrelationKind.IDENTITY,
+            SagaConcurrencyKind.SINGLE_PROCESS,
+            SagaDurabilityKind.VOLATILE,
+            SagaOutboxKind.LOGICAL);
     private SagaStateMachineDefinition definition;
     private boolean frozen;
 
@@ -69,6 +74,7 @@ public abstract class SagaStateMachine<TSaga> {
         for (BehaviorRegistration<?> behavior : behaviors) {
             behavior.apply(builder);
         }
+        builder.requires(repositoryRequirements);
         if (completionPolicy == SagaCompletionPolicy.DELETE_WHEN_FINALIZED) {
             builder.deleteWhenFinalized();
         }
@@ -77,8 +83,11 @@ public abstract class SagaStateMachine<TSaga> {
     }
 
     public final SagaStateMachineRuntime<TSaga> createRuntime(
-            InMemorySagaRepository<TSaga> repository) {
+            SagaRepository<TSaga> repository) {
         Objects.requireNonNull(repository, "repository");
+        repository.capabilities().ensureSupports(
+                definition().repositoryRequirements(),
+                definition().completionPolicy());
         SagaStateMachineRuntimeBuilder<TSaga> builder = new SagaStateMachineRuntimeBuilder<>(
                 definition(),
                 repository,
@@ -189,6 +198,11 @@ public abstract class SagaStateMachine<TSaga> {
     protected final void retainWhenFinalized() {
         ensureMutable();
         completionPolicy = SagaCompletionPolicy.RETAIN;
+    }
+
+    protected final void repositoryRequirements(SagaRepositoryRequirements requirements) {
+        ensureMutable();
+        repositoryRequirements = Objects.requireNonNull(requirements, "requirements");
     }
 
     public final InMemorySagaRepository<TSaga> createInMemoryRepository() {
