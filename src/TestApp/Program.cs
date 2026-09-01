@@ -25,6 +25,20 @@ builder.Services.AddServiceBus(x =>
         .Step<OrderSubmitted>("csharp-order-submitted", step => step
             .OwnedBy<OrderSubmittedConsumer>()
             .Terminates()));
+    x.AddChoreography("sample-local-order-observation", "1", "TestApp.CSharp", workflow => workflow
+        .Step<OrderSubmitted>("observe-order-submitted", step => step
+            .OwnedBy<OrderSubmittedConsumer>()
+            .Terminates()));
+    x.AddChoreography("sample-fulfillment-handoff", "1", "TestApp.CSharp", workflow => workflow
+        .Step<FulfillmentRequested>("start-fulfillment", step => step
+            .OwnedBy<FulfillmentRequestedConsumer>()
+            .Publishes<InventoryReservationRequested>())
+        .Step<InventoryReserved>("confirm-inventory", step => step
+            .OwnedBy<InventoryReservedConsumer>()
+            .Publishes<FulfillmentCompleted>())
+        .Step<FulfillmentCompleted>("observe-fulfillment-completed", step => step
+            .OwnedBy<FulfillmentCompletedConsumer>()
+            .Terminates()));
     x.AddJobConsumer<DemoTrackedJobConsumer, DemoTrackedJob>(options => options
         .SetJobTypeName("sample-report")
         .SetConcurrentJobLimit(2)
@@ -158,6 +172,15 @@ app.MapGet("/publish", async (IMessageBus messageBus, ILogger<Program> logger, C
 })
 .WithName("Test_Publish")
 .WithTags("Test");
+
+app.MapPost("/workflows/fulfillment", async (IPublishEndpoint publishEndpoint, CancellationToken cancellationToken = default) =>
+{
+    var message = new FulfillmentRequested(Guid.NewGuid());
+    await publishEndpoint.Publish(message, null, cancellationToken);
+    return Results.Accepted(value: new { message.OrderId });
+})
+.WithName("Start_FulfillmentWorkflow")
+.WithTags("Workflows");
 
 app.MapGet("/publish/fault", async (IMessageBus messageBus, ILogger<Program> logger, CancellationToken cancellationToken = default) =>
 {

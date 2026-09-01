@@ -4,6 +4,8 @@ This changelog summarizes the bigger themes in the repository history rather tha
 
 ## Unreleased
 
+- Expanded the Aspire sample with simple, fan-out, and cross-language linear choreography declarations, including a runnable C# → Java → C# fulfillment handoff.
+
 - Added live-updating reconstructed choreography runs to monitoring and the Dashboard. Exact message and causation identity now assemble bounded declared steps across applications, preserving handler duration, outgoing-operation duration, observed handoff time, retries, downstream targets, and localized consumer or outbound faults. A D3 activity diagram places steps in application swimlanes above the ordered evidence breakdown, while the UI distinguishes live activity, observed terminal reactions, inactivity, and faults without claiming authoritative choreography state.
 - Prioritized a Dashboard workflow-run drill-down for the choreography MVP: a monitoring-owned bounded causal reconstruction presented as a flow diagram and ordered step breakdown, with application and consumer mapping, separate handler and handoff duration, emitted messages, retries, and localized failures. The design keeps reconstructed choreography evidence distinct from an authoritative saga instance.
 - Added the first declared-choreography runtime overlay. The monitoring service now compares declared send and publish reactions with exact consume-to-outbound causal observations inside a bounded window, reports counts, timestamps, evidence status, dropped observations, participant availability, and completeness, and the Workflows page displays that evidence without interpreting silence as a missed reaction or workflow failure.

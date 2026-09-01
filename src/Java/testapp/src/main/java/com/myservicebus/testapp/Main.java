@@ -75,6 +75,14 @@ public class Main {
                                     .step("java-order-submitted", OrderSubmitted.class, step -> step
                                             .ownedBy(OrderSubmittedConsumer.class)
                                             .terminates()));
+                    c.addChoreography(
+                            "sample-fulfillment-handoff",
+                            "1",
+                            "TestApp.Java",
+                            workflow -> workflow
+                                    .step("reserve-inventory", InventoryReservationRequested.class, step -> step
+                                            .ownedBy(InventoryReservationRequestedConsumer.class)
+                                            .publishes(InventoryReserved.class)));
                     c.addJobConsumer(DemoTrackedJobConsumer.class, DemoTrackedJob.class, options -> options
                             .setJobTypeName("sample-report")
                             .setConcurrentJobLimit(2)
