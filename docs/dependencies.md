@@ -18,3 +18,12 @@ This document lists the primary libraries used by the reference MyServiceBus cli
 - **Transport**: `com.rabbitmq:amqp-client`
 
 These dependencies mirror common practices in their respective ecosystems and aim to keep the clients lightweight while remaining familiar to platform developers.
+
+## Kotlin
+
+- **Runtime**: the Java 17-compatible MyServiceBus JVM modules
+- **Language facade**: Kotlin standard library 2.2 through `myservicebus-kotlin`
+- **Serialization in the sample**: `com.fasterxml.jackson.module:jackson-module-kotlin`
+
+The Kotlin facade is intentionally thin. Transports, topology, serialization,
+and delivery semantics continue to come from the shared JVM runtime.

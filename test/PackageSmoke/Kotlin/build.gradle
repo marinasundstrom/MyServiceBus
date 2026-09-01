@@ -1,0 +1,45 @@
+plugins {
+    id 'org.jetbrains.kotlin.jvm' version '2.2.10'
+    id 'application'
+}
+
+def stagingRepositoryRoot = providers.gradleProperty('stagingRepositoryRoot').get()
+
+repositories {
+    [
+        'myservicebus-abstractions',
+        'myservicebus-di',
+        'myservicebus-logging',
+        'myservicebus-tasks',
+        'myservicebus',
+        'myservicebus-processor',
+        'myservicebus-serialization-bson',
+        'myservicebus-postgresql',
+        'myservicebus-inspection',
+        'myservicebus-monitoring',
+        'myservicebus-rabbitmq',
+        'myservicebus-azure-service-bus',
+        'myservicebus-amazon-sqs',
+        'myservicebus-testing'
+    ].each { module ->
+        maven {
+            url = uri("${stagingRepositoryRoot}/src/Java/${module}/build/repository")
+        }
+    }
+    maven {
+        url = uri("${stagingRepositoryRoot}/src/Kotlin/myservicebus-kotlin/build/repository")
+    }
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'io.github.marinasundstrom.myservicebus:myservicebus-kotlin:0.1.0-preview.9'
+}
+
+kotlin {
+    jvmToolchain(17)
+}
+
+application {
+    mainClass = 'com.myservicebus.packagesmoke.PackageSmokeKt'
+}

@@ -3,7 +3,7 @@
 This guide compares basic usage of MyServiceBus in C# and Java. It is split into basics and advanced sections so newcomers can focus on fundamental messaging patterns before exploring configuration and other features.
 
 For an explanation of why the C# and Java examples differ, see the [design decisions](development/design-decisions.md).  
-For Java build and run instructions, including JDK 17 setup and how to run the test app, see [`src/Java/README.md`](../src/Java/README.md).
+For Java build and run instructions, including JDK 17 setup and how to run the test app, see [`src/Java/README.md`](../src/Java/README.md). Kotlin uses the same JVM runtime through native extensions; see the [Kotlin guide](kotlin/how-to-use.md) and [executable sample](../src/Kotlin/sample).
 
 ## Contents
 
@@ -366,7 +366,7 @@ services.from(MessageBusServices.class)
 
 ServiceProvider serviceProvider = services.buildServiceProvider();
 MessageBus bus = serviceProvider.getService(MessageBus.class);
-bus.start().join();
+bus.start();
 ```
 
 `addServiceBus` activates consumers using `ScopeConsumerFactory`, so they can resolve dependencies from the `ServiceProvider`.
@@ -402,6 +402,31 @@ public final class OrderConsumers {
 ```
 
 Use `cfg.addConsumerMethods(OrderConsumers.class)` for reflection discovery, or add `myservicebus-processor` to the build's `annotationProcessor` configuration and register `GeneratedConsumerCatalog.INSTANCE`. The processor is JSR 269 tooling and does not lock the application to Spring, Quarkus, Micronaut, or another framework.
+
+#### Kotlin
+
+Kotlin uses native extension functions over the same service collection and
+runtime rather than emulating extension methods with a decorator call:
+
+```kotlin
+val services = ServiceCollection.create()
+
+services.addServiceBus {
+    addConsumer<SubmitOrderConsumer>()
+    using<RabbitMqFactoryConfigurator> { context ->
+        host("localhost")
+        configureEndpoints(context)
+    }
+}
+
+val provider = services.buildServiceProvider()
+val bus = provider.getRequiredService<MessageBus>()
+bus.start()
+```
+
+The first Kotlin slice retains the shared `CompletableFuture` consumer
+contract. Coroutine-native adapters will be layered over that runtime contract
+in a later slice.
 
 #### Azure Service Bus preview
 

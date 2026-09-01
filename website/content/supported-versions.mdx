@@ -4,6 +4,7 @@ export const versions = [
   ['MyServiceBus', '0.1.0-preview.9', 'Only the newest preview is actively supported before 1.0.'],
   ['.NET', '.NET 10', 'All C# packages target net10.0; the abstractions and core runtime also carry experimental net11.0 assets.'],
   ['Java', 'Java 17 or newer', 'Published bytecode and APIs target Java 17; Temurin 17 is the release-gating JDK.'],
+  ['Kotlin', 'Kotlin 2.2', 'The Kotlin facade is compiled with Kotlin 2.2.10 and targets the shared Java 17-compatible runtime.'],
   ['PostgreSQL', '17 / 17.6 baseline', 'Transactional outbox and inbox provider.'],
   ['RabbitMQ', '4.1 / 4.1.8 baseline', 'Declared RabbitMQ transport profile.'],
   ['Azure Service Bus', 'Standard tier', 'Live cloud topology and delivery profile.'],
@@ -20,7 +21,7 @@ export const versions = [
 
 <div className="callout callout-accent">
   <strong>Language target and runtime target are not the same decision</strong>
-  <p>All C# packages target <code>net10.0</code>, which defines the ordinary supported .NET framework surface. The abstractions and core runtime additionally include experimental <code>net11.0</code> assets for union semantics. Java publishes Java 17-compatible class files and APIs while using modern Java 17 features and idioms. Newer JDKs are expected to run the packages, but they are not release-gating environments today.</p>
+  <p>All C# packages target <code>net10.0</code>, which defines the ordinary supported .NET framework surface. The abstractions and core runtime additionally include experimental <code>net11.0</code> assets for union semantics. Java publishes Java 17-compatible class files and APIs while using modern Java 17 features and idioms. The Kotlin facade targets that same JVM runtime and is compiled with Kotlin 2.2.10. Newer JDKs are expected to run the packages, but they are not release-gating environments today.</p>
 </div>
 
 <div className="parity-table-wrap">
@@ -40,7 +41,7 @@ export const versions = [
 
 ## Modern, idiomatic clients within those baselines
 
-C# stays familiar to modern .NET and MassTransit users. Java uses records, sealed types where useful, <code>Instant</code>, <code>Duration</code>,{' '} <code>CompletionStage</code>, annotation processing, and Java-style composition. Behavioral parity does not require either client to imitate the other language.
+C# stays familiar to modern .NET and MassTransit users. Java uses records, sealed types where useful, <code>Instant</code>, <code>Duration</code>,{' '} <code>CompletionStage</code>, annotation processing, and Java-style composition. Kotlin uses extension functions, receiver lambdas, reified type parameters, and data classes over the same JVM behavior. Behavioral parity does not require one client to imitate another language.
 
 <div className="callout">
   <strong>Changing a baseline requires evidence</strong>

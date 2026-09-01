@@ -9,3 +9,10 @@ gradle \
   --refresh-dependencies \
   -PstagingRepositoryRoot="$repository_root/src/Java" \
   run
+
+gradle \
+  --project-dir "$repository_root/test/PackageSmoke/Kotlin" \
+  --no-daemon \
+  --refresh-dependencies \
+  -PstagingRepositoryRoot="$repository_root" \
+  run

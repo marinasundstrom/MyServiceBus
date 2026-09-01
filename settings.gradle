@@ -5,6 +5,12 @@ def javaDir = 'src/Java'
 include 'myservicebus'
 project(':myservicebus').projectDir = file("${javaDir}/myservicebus")
 
+include 'myservicebus-kotlin'
+project(':myservicebus-kotlin').projectDir = file('src/Kotlin/myservicebus-kotlin')
+
+include 'kotlin-sample'
+project(':kotlin-sample').projectDir = file('src/Kotlin/sample')
+
 include 'myservicebus-serialization-bson'
 project(':myservicebus-serialization-bson').projectDir = file("${javaDir}/myservicebus-serialization-bson")
 

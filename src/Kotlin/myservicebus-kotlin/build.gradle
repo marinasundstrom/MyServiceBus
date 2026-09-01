@@ -1,0 +1,13 @@
+plugins {
+    id 'org.jetbrains.kotlin.jvm'
+}
+
+dependencies {
+    api project(':myservicebus')
+    testImplementation project(':myservicebus-rabbitmq')
+    testImplementation "org.jetbrains.kotlin:kotlin-test-junit5:2.2.10"
+}
+
+kotlin {
+    jvmToolchain(17)
+}
