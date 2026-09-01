@@ -52,6 +52,27 @@ public class GeneratedConsumerCatalogTest {
     }
 
     @Test
+    public void registersTheOrderOrchestrationInventoryParticipant() {
+        ServiceCollection services = ServiceCollection.create();
+        BusRegistrationConfiguratorImpl configurator = new BusRegistrationConfiguratorImpl(services);
+        GeneratedConsumerCatalog.INSTANCE.register(configurator);
+        configurator.complete();
+
+        var topology = services.buildServiceProvider()
+                .getRequiredService(com.myservicebus.topology.TopologyRegistry.class);
+        var consumer = topology.getConsumers().stream()
+                .filter(candidate -> candidate.getBindings().get(0).getMessageType()
+                        .equals(OrchestrationInventoryRequested.class))
+                .findFirst()
+                .orElseThrow();
+
+        Assertions.assertEquals("OrchestrationInventoryRequested", consumer.getQueueName());
+        Assertions.assertEquals(
+                OrchestrationInventoryRequestedConsumer.class,
+                consumer.getConsumerType());
+    }
+
+    @Test
     @SuppressWarnings("unchecked")
     public void generatedResponseMethodRespondsWithCompletedValue() throws Exception {
         ServiceCollection services = ServiceCollection.create();

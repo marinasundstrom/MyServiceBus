@@ -18,6 +18,7 @@ builder.Services.AddScoped<GeneratedConsumerAudit>();
 builder.Services.AddServiceBus(x =>
 {
     x.AddGeneratedConsumers();
+    x.AddSagaStateMachine<OrderOrchestrationStateMachine, OrderOrchestrationState>();
     x.AddChoreography("sample-order-submission", "1", "TestApp.CSharp", workflow => workflow
         .Step<SubmitOrder>("csharp-submit-order", step => step
             .OwnedBy<SubmitOrderConsumer>()
@@ -200,6 +201,19 @@ app.MapPost("/workflows/parallel-checks", async (IPublishEndpoint publishEndpoin
     return Results.Accepted(value: new { message.OrderId });
 })
 .WithName("Start_ParallelOrderChecksWorkflow")
+.WithTags("Workflows");
+
+app.MapPost("/workflows/orchestration", async (IPublishEndpoint publishEndpoint, CancellationToken cancellationToken = default) =>
+{
+    var message = new OrderOrchestrationStarted(Guid.NewGuid());
+    await publishEndpoint.Publish(message, null, cancellationToken);
+    return Results.Accepted(value: new
+    {
+        message.OrderId,
+        Coordinator = nameof(OrderOrchestrationStateMachine)
+    });
+})
+.WithName("Start_OrderOrchestrationWorkflow")
 .WithTags("Workflows");
 
 app.MapGet("/publish/fault", async (IMessageBus messageBus, ILogger<Program> logger, CancellationToken cancellationToken = default) =>
