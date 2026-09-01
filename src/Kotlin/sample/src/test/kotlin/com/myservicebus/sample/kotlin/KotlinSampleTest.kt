@@ -1,8 +1,8 @@
 package com.myservicebus.sample.kotlin
 
-import com.myservicebus.MessageBus
 import com.myservicebus.SendContext
 import com.myservicebus.kotlin.getRequiredService
+import com.myservicebus.kotlin.MessageBus
 import com.myservicebus.serialization.ByteArrayMessageBody
 import com.myservicebus.serialization.EnvelopeMessageDeserializer
 import com.myservicebus.serialization.EnvelopeMessageSerializer

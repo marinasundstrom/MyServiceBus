@@ -8,12 +8,12 @@ import com.myservicebus.ConsumerMethodInvoker
 import com.myservicebus.DefaultEndpointNameFormatter
 import com.myservicebus.MessageConsumer
 import com.myservicebus.PublishContext
-import com.myservicebus.PublishEndpoint
+import com.myservicebus.PublishEndpoint as JvmPublishEndpoint
 import com.myservicebus.RequestClient
 import com.myservicebus.ResultHandler
 import com.myservicebus.SendContext
-import com.myservicebus.SendEndpoint
-import com.myservicebus.mediator.Mediator
+import com.myservicebus.SendEndpoint as JvmSendEndpoint
+import com.myservicebus.mediator.Mediator as JvmMediator
 import com.myservicebus.tasks.CancellationToken
 import com.myservicebus.tasks.CancellationTokenSource
 import java.lang.reflect.ParameterizedType
@@ -162,12 +162,12 @@ private fun resolveType(type: Type, bindings: Map<TypeVariable<*>, Type>): Type 
     if (type is TypeVariable<*>) bindings[type]?.let { resolveType(it, bindings) } ?: type else type
 
 /** Publishes a message and suspends until the delivery operation completes. */
-suspend fun <TMessage : Any> PublishEndpoint.publishAwait(message: TMessage) {
+suspend fun <TMessage : Any> JvmPublishEndpoint.publishAwait(message: TMessage) {
     awaitOperation { cancellationToken -> publish(message, cancellationToken) }
 }
 
 /** Publishes a configured message and suspends until the delivery operation completes. */
-suspend fun <TMessage : Any> PublishEndpoint.publishAwait(
+suspend fun <TMessage : Any> JvmPublishEndpoint.publishAwait(
     message: TMessage,
     configure: PublishContext.() -> Unit,
 ) {
@@ -177,12 +177,12 @@ suspend fun <TMessage : Any> PublishEndpoint.publishAwait(
 }
 
 /** Sends a message and suspends until the delivery operation completes. */
-suspend fun <TMessage : Any> SendEndpoint.sendAwait(message: TMessage) {
+suspend fun <TMessage : Any> JvmSendEndpoint.sendAwait(message: TMessage) {
     awaitOperation { cancellationToken -> send(message, cancellationToken) }
 }
 
 /** Sends a configured message and suspends until the delivery operation completes. */
-suspend fun <TMessage : Any> SendEndpoint.sendAwait(
+suspend fun <TMessage : Any> JvmSendEndpoint.sendAwait(
     message: TMessage,
     configure: SendContext.() -> Unit,
 ) {
@@ -246,17 +246,17 @@ suspend inline fun <TRequest, reified TFirst : Any, reified TSecond : Any>
     )
 
 /** Publishes through the in-memory mediator and awaits every matching handler. */
-suspend fun Mediator.publishAwait(message: Any) {
+suspend fun JvmMediator.publishAwait(message: Any) {
     awaitOperation { cancellationToken -> publish(message, cancellationToken) }
 }
 
 /** Sends through the in-memory mediator and awaits the matching handler. */
-suspend fun Mediator.sendAwait(message: Any) {
+suspend fun JvmMediator.sendAwait(message: Any) {
     awaitOperation { cancellationToken -> send(message, cancellationToken) }
 }
 
 /** Sends a mediator request and returns its typed response. */
-suspend inline fun <reified TResponse : Any> Mediator.request(message: Any): TResponse =
+suspend inline fun <reified TResponse : Any> JvmMediator.request(message: Any): TResponse =
     awaitOperation { cancellationToken ->
         send(message, TResponse::class.java, cancellationToken)
     }

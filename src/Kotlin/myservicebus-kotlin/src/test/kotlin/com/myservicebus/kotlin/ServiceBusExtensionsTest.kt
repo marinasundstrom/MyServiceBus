@@ -3,12 +3,13 @@ package com.myservicebus.kotlin
 import com.myservicebus.BusRegistrationContext
 import com.myservicebus.ConsumeContext
 import com.myservicebus.Consumer
-import com.myservicebus.MessageBus
+import com.myservicebus.MessageBus as JvmMessageBus
 import com.myservicebus.di.ServiceCollection
 import com.myservicebus.rabbitmq.RabbitMqFactoryConfigurator
 import java.util.concurrent.CompletableFuture
 import kotlin.test.Test
 import kotlin.test.assertNotNull
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class ServiceBusExtensionsTest {
@@ -32,8 +33,17 @@ class ServiceBusExtensionsTest {
 
         val provider = services.buildServiceProvider()
         val bus = provider.getRequiredService<MessageBus>()
+        val jvmBus = provider.getRequiredService<JvmMessageBus>()
 
         assertNotNull(bus)
+        assertSame(bus, bus.publishEndpoint)
+        assertTrue(bus.jvm { this } === jvmBus)
+        provider.createScope().use { scope ->
+            val scopedProvider = scope.serviceProvider
+            assertNotNull(scopedProvider.getRequiredService<PublishEndpoint>())
+            assertNotNull(scopedProvider.getRequiredService<PublishEndpointProvider>().publishEndpoint)
+            assertNotNull(scopedProvider.getRequiredService<SendEndpointProvider>())
+        }
         assertTrue(transportConfigured)
         assertTrue(jvmConfiguratorReached)
     }

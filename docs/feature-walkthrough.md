@@ -435,7 +435,7 @@ class SubmitOrderConsumer : Consumer<SubmitOrder> {
 }
 
 runBlocking {
-    bus.publishAwait(SubmitOrder(UUID.randomUUID()))
+    bus.publish(SubmitOrder(UUID.randomUUID()))
 }
 ```
 
@@ -443,7 +443,10 @@ MyServiceBus waits for the coroutine before acknowledging delivery. Failures
 continue through retry and fault handling, while cancellation flows in both
 directions between Kotlin coroutines and the JVM runtime. Kotlin owns this
 `Consumer` and `ConsumeContext` surface, so its suspending methods keep familiar
-messaging names without colliding with Java future-returning members.
+messaging names without colliding with Java future-returning members. The same
+projection owns `MessageBus`, `Mediator`, and scoped publish/send endpoint
+contracts, so ordinary Kotlin application code uses `publish`, `send`, and
+`request` throughout.
 
 #### Azure Service Bus preview
 

@@ -6,13 +6,18 @@ import com.myservicebus.BusFactoryConfigurator
 import com.myservicebus.BusRegistrationConfigurator
 import com.myservicebus.BusRegistrationContext
 import com.myservicebus.Consumer as JvmConsumer
+import com.myservicebus.MessageBus as JvmMessageBus
 import com.myservicebus.MessageBusServices
+import com.myservicebus.PublishEndpoint as JvmPublishEndpoint
+import com.myservicebus.PublishEndpointProvider as JvmPublishEndpointProvider
 import com.myservicebus.RequestClient
 import com.myservicebus.ScopedClientFactory
+import com.myservicebus.SendEndpointProvider as JvmSendEndpointProvider
 import com.myservicebus.di.ServiceCollection
 import com.myservicebus.di.ServiceProvider
-import com.myservicebus.mediator.Mediator
+import com.myservicebus.di.ServiceProviderBasedProvider
 import com.myservicebus.mediator.MediatorBus
+import java.util.function.Supplier
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 
@@ -85,16 +90,51 @@ class ServiceBusConfigurator internal constructor(
  */
 fun ServiceCollection.addServiceBus(
     configure: ServiceBusConfigurator.() -> Unit = {},
-): ServiceCollection = MessageBusServices(this).addServiceBus { configurator ->
-    ServiceBusConfigurator(configurator).configure()
+): ServiceCollection {
+    val services = MessageBusServices(this).addServiceBus { configurator ->
+        ServiceBusConfigurator(configurator).configure()
+    }
+    services.tryAddSingleton(
+        MessageBus::class.java,
+        ServiceProviderBasedProvider { provider ->
+            Supplier { MessageBus(provider.getRequiredService(JvmMessageBus::class.java)) }
+        },
+    )
+    services.tryAddScoped(
+        PublishEndpoint::class.java,
+        ServiceProviderBasedProvider { provider ->
+            Supplier { JvmPublishEndpointFacade(provider.getRequiredService(JvmPublishEndpoint::class.java)) }
+        },
+    )
+    services.tryAddScoped(
+        PublishEndpointProvider::class.java,
+        ServiceProviderBasedProvider { provider ->
+            Supplier {
+                JvmPublishEndpointProviderFacade(
+                    provider.getRequiredService(JvmPublishEndpointProvider::class.java),
+                )
+            }
+        },
+    )
+    services.tryAddScoped(
+        SendEndpointProvider::class.java,
+        ServiceProviderBasedProvider { provider ->
+            Supplier {
+                JvmSendEndpointProviderFacade(provider.getRequiredService(JvmSendEndpointProvider::class.java))
+            }
+        },
+    )
+    return services
 }
 
 /** Creates an in-memory mediator using the same Kotlin consumer DSL. */
 fun ServiceCollection.createMediator(
     configure: ServiceBusConfigurator.() -> Unit = {},
-): Mediator = MediatorBus.configure(this) { configurator ->
-    ServiceBusConfigurator(configurator).configure()
-}
+): Mediator = Mediator(
+    MediatorBus.configure(this) { configurator ->
+        ServiceBusConfigurator(configurator).configure()
+    },
+)
 
 /** Registers a concrete scoped service using its public JVM type. */
 inline fun <reified T : Any> ServiceCollection.addScoped() {

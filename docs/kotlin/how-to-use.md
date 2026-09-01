@@ -39,6 +39,10 @@ services.addServiceBus {
 val provider = services.buildServiceProvider()
 val bus = provider.getRequiredService<MessageBus>()
 bus.start()
+
+runBlocking {
+    bus.publish(SubmitOrder(UUID.randomUUID()))
+}
 ```
 
 The `addServiceBus` extension is the Kotlin equivalent of Java's
@@ -73,13 +77,21 @@ overloads. MyServiceBus still runs the consumer through the shared scoped
 pipeline, waits before acknowledging the message, propagates failures into
 retry and fault handling, and cancels the coroutine when delivery is cancelled.
 
-The `jvm { ... }` escape hatch on `ConsumeContext` exposes capabilities that do
-not yet have a Kotlin projection. Raw Java `PublishEndpoint`, `SendEndpoint`,
-and `Mediator` values still use transitional `publishAwait` and `sendAwait`
-extensions until Kotlin-owned endpoint projections replace their colliding Java
-members. `RequestClient.request` is already collision-free. Cancelling the
-calling coroutine cancels both the MyServiceBus operation token and its
-underlying Java future.
+The Kotlin module reconstructs the application messaging boundary with its own
+`MessageBus`, `Mediator`, `PublishEndpoint`, `PublishEndpointProvider`,
+`SendEndpoint`, and `SendEndpointProvider` facades. Their asynchronous members
+use the familiar `publish`, `send`, and `request` terms because they suspend
+instead of exposing Java futures. Scoped Kotlin endpoint contracts resolve from
+the same service scope as their JVM counterparts, preserving consume context,
+outbox capture, headers, and cancellation.
+
+The Kotlin `MessageBus`, `Mediator`, and `ConsumeContext` facades have explicit
+`jvm { ... }` escape hatches for shared runtime capabilities that have not been
+projected. Transitional `publishAwait` and `sendAwait` extensions remain only
+for code that deliberately works with a raw Java endpoint.
+`RequestClient.request` is already collision-free. Cancelling the calling
+coroutine cancels both the MyServiceBus operation token and its underlying Java
+future.
 
 The same consumer syntax configures local dispatch:
 
@@ -87,6 +99,8 @@ The same consumer syntax configures local dispatch:
 val mediator = services.createMediator {
     consumer<SubmitOrderConsumer>()
 }
+
+mediator.send(SubmitOrder(UUID.randomUUID()))
 ```
 
 ## Suspending request handlers

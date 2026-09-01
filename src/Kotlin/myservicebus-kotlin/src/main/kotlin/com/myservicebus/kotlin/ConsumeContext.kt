@@ -14,7 +14,7 @@ import java.util.UUID
  */
 class ConsumeContext<TMessage : Any> internal constructor(
     internal val delegate: JvmConsumeContext<TMessage>,
-) {
+) : PublishEndpoint, SendEndpointProvider {
     val message: TMessage
         get() = delegate.message
 
@@ -46,24 +46,27 @@ class ConsumeContext<TMessage : Any> internal constructor(
         get() = delegate.cancellationToken
 
     /** Publishes a message and suspends until the shared operation completes. */
-    suspend fun publish(message: Any) {
+    override suspend fun publish(message: Any) {
         awaitOperation { cancellationToken -> delegate.publish(message, cancellationToken) }
     }
 
     /** Publishes a configured message and suspends until completion. */
-    suspend fun publish(message: Any, configure: PublishContext.() -> Unit) {
+    override suspend fun publish(message: Any, configure: PublishContext.() -> Unit) {
         awaitOperation { cancellationToken ->
             delegate.publish(message, { context -> context.configure() }, cancellationToken)
         }
     }
 
-    /** Sends a message to a destination and suspends until completion. */
-    suspend fun send(destination: String, message: Any) {
+    override fun getSendEndpoint(destination: String): SendEndpoint =
+        JvmSendEndpointFacade(delegate.getSendEndpoint(destination))
+
+    /** Sends while preserving the correlation and causation metadata of the consumed message. */
+    override suspend fun send(destination: String, message: Any) {
         awaitOperation { cancellationToken -> delegate.send(destination, message, cancellationToken) }
     }
 
-    /** Sends a configured message to a destination and suspends until completion. */
-    suspend fun send(destination: String, message: Any, configure: SendContext.() -> Unit) {
+    /** Sends a configured message while preserving the consumed message's metadata. */
+    override suspend fun send(destination: String, message: Any, configure: SendContext.() -> Unit) {
         awaitOperation { cancellationToken ->
             delegate.send(destination, message, { context -> context.configure() }, cancellationToken)
         }

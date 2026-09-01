@@ -1,6 +1,5 @@
 package com.myservicebus.packagesmoke
 
-import com.myservicebus.MessageBus
 import com.myservicebus.RequestClient
 import com.myservicebus.RequestTimeout
 import com.myservicebus.Response2
@@ -9,13 +8,16 @@ import com.myservicebus.SendContext
 import com.myservicebus.di.ServiceCollection
 import com.myservicebus.kotlin.ConsumeContext
 import com.myservicebus.kotlin.Consumer
+import com.myservicebus.kotlin.MessageBus
+import com.myservicebus.kotlin.PublishEndpoint
+import com.myservicebus.kotlin.PublishEndpointProvider
 import com.myservicebus.kotlin.RequestResult
+import com.myservicebus.kotlin.SendEndpointProvider
 import com.myservicebus.kotlin.SuspendHandler
 import com.myservicebus.kotlin.addServiceBus
 import com.myservicebus.kotlin.createRequestClient
 import com.myservicebus.kotlin.createMediator
 import com.myservicebus.kotlin.getRequiredService
-import com.myservicebus.kotlin.publishAwait
 import com.myservicebus.kotlin.request
 import com.myservicebus.kotlin.requestOneOf
 import java.net.URI
@@ -93,7 +95,13 @@ fun main() = runBlocking {
     services.addServiceBus()
 
     val provider = services.buildServiceProvider()
-    provider.getRequiredService<MessageBus>()
+    val bus = provider.getRequiredService<MessageBus>()
+    check(bus.publishEndpoint === bus)
+    provider.createScope().use { scope ->
+        scope.serviceProvider.getRequiredService<PublishEndpoint>()
+        scope.serviceProvider.getRequiredService<PublishEndpointProvider>().publishEndpoint
+        scope.serviceProvider.getRequiredService<SendEndpointProvider>()
+    }
 
     val mediator = ServiceCollection.create().createMediator {
         consumer<PackageSmokeConsumer>()
@@ -101,7 +109,7 @@ fun main() = runBlocking {
         handler<PackageSmokeHandler>()
     }
     val message = PackageSmokeMessage("package-smoke")
-    mediator.publishAwait(message)
+    mediator.publish(message)
     check(PackageSmokeConsumer.received == message)
     check(PackageSmokeFollowUpConsumer.received == PackageSmokeFollowUp("package-smoke"))
 

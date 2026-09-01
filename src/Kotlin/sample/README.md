@@ -25,7 +25,8 @@ Set `RABBITMQ_HOST` and `RABBITMQ_PORT` to use a different broker. The sample
 requests an order status, publishes one `SubmitOrder`, waits for its consumer
 to publish `OrderSubmitted`, and then stops the bus.
 
-The Kotlin-owned consumer context publishes its follow-up with the familiar
-suspending `publish` member. The application still uses `publishAwait` on the
-raw Java bus until that endpoint receives its own Kotlin projection.
-Cancellation and failures bridge to the shared Java runtime automatically.
+The Kotlin-owned consumer context and application bus both publish with the
+familiar suspending `publish` member. Kotlin facades also reconstruct mediator
+and scoped publish/send endpoint contracts without exposing Java future
+overloads. Cancellation and failures bridge to the shared Java runtime
+automatically.

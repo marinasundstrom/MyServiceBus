@@ -45,7 +45,7 @@ val mediator = ServiceCollection.create().createMediator {
     consumer<SubmitOrderConsumer>()
 }
 
-mediator.sendAwait(SubmitOrder(UUID.randomUUID()))`,
+mediator.send(SubmitOrder(UUID.randomUUID()))`,
 };
 
 export const resultDispatch = {

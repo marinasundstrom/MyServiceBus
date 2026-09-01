@@ -12,6 +12,7 @@ import com.myservicebus.tasks.CancellationToken
 import com.myservicebus.tasks.CancellationTokenSource
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CompletionException
+import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -68,7 +69,7 @@ class CoroutineExtensionsTest {
         }
 
         val message = CoroutineMessage("hello")
-        mediator.publishAwait(message)
+        mediator.publish(message)
 
         assertEquals(message, RecordingSuspendConsumer.consumed)
     }
@@ -82,7 +83,7 @@ class CoroutineExtensionsTest {
         }
 
         val message = InheritedMessage("inherited")
-        mediator.publishAwait(message)
+        mediator.publish(message)
 
         assertEquals(message, InheritedSuspendConsumer.consumed)
     }
@@ -94,7 +95,7 @@ class CoroutineExtensionsTest {
         }
 
         val failure = assertFailsWith<IllegalStateException> {
-            mediator.publishAwait(FailingMessage("broken"))
+            mediator.publish(FailingMessage("broken"))
         }
 
         assertEquals("broken", failure.message)
@@ -164,13 +165,24 @@ class CoroutineExtensionsTest {
     fun `consume context uses familiar suspending messaging terms`() = runBlocking {
         val endpoints = RecordingSendEndpointProvider()
         val incoming = CoroutineMessage("projected")
+        val messageId = UUID.randomUUID()
+        val correlationId = UUID.randomUUID()
+        val conversationId = UUID.randomUUID()
         val sharedContext = JvmConsumeContext(
             incoming,
             mutableMapOf<String, Any>("trace-id" to "context-projection"),
             "loopback://response",
             "loopback://fault",
+            null,
             CancellationToken.none(),
             endpoints,
+            java.net.URI.create("loopback://bus"),
+            { entityName -> "loopback://publish/$entityName" },
+            messageId,
+            null,
+            correlationId,
+            conversationId,
+            null,
         )
         val context = ConsumeContext(sharedContext)
 
@@ -195,6 +207,9 @@ class CoroutineExtensionsTest {
             listOf("publish", "send", "respond", null),
             endpoints.contexts.map { it.headers["operation"] },
         )
+        assertEquals(conversationId, endpoints.contexts[1].conversationId)
+        assertEquals(correlationId, endpoints.contexts[1].initiatorId)
+        assertEquals(messageId, endpoints.contexts[1].causationMessageId)
         assertEquals("context-projection", endpoints.contexts.last().headers["trace-id"])
     }
 
