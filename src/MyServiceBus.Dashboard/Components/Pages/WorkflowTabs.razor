@@ -1,0 +1,9 @@
+<nav class="workflow-tabs" aria-label="Workflow views">
+    <a class="@(Active == "runs" ? "active" : null)" href="/workflows">Workflow runs</a>
+    <a class="@(Active == "declared" ? "active" : null)" href="/workflows/declared">Declared workflows</a>
+</nav>
+
+@code {
+    [Parameter]
+    public string Active { get; set; } = "runs";
+}

@@ -485,6 +485,8 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector, IConsumerMetho
             duration,
             exception,
             context.CorrelationId,
-            context.ConversationId?.ToString()));
+            context.ConversationId?.ToString(),
+            messageId: context.MessageId,
+            causationMessageId: context.CausationMessageId?.ToString()));
     }
 }

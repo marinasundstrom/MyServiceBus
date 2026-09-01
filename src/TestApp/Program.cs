@@ -18,6 +18,38 @@ builder.Services.AddScoped<GeneratedConsumerAudit>();
 builder.Services.AddServiceBus(x =>
 {
     x.AddGeneratedConsumers();
+    x.AddChoreography("sample-order-submission", "1", "TestApp.CSharp", workflow => workflow
+        .Step<SubmitOrder>("csharp-submit-order", step => step
+            .OwnedBy<SubmitOrderConsumer>()
+            .Publishes<OrderSubmitted>())
+        .Step<OrderSubmitted>("csharp-order-submitted", step => step
+            .OwnedBy<OrderSubmittedConsumer>()
+            .Terminates()));
+    x.AddChoreography("sample-local-order-observation", "1", "TestApp.CSharp", workflow => workflow
+        .Step<OrderSubmitted>("observe-order-submitted", step => step
+            .OwnedBy<OrderSubmittedConsumer>()
+            .Terminates()));
+    x.AddChoreography("sample-fulfillment-handoff", "1", "TestApp.CSharp", workflow => workflow
+        .Step<FulfillmentRequested>("start-fulfillment", step => step
+            .OwnedBy<FulfillmentRequestedConsumer>()
+            .Publishes<InventoryReservationRequested>())
+        .Step<InventoryReserved>("confirm-inventory", step => step
+            .OwnedBy<InventoryReservedConsumer>()
+            .Publishes<FulfillmentCompleted>())
+        .Step<FulfillmentCompleted>("observe-fulfillment-completed", step => step
+            .OwnedBy<FulfillmentCompletedConsumer>()
+            .Terminates()));
+    x.AddChoreography("sample-parallel-order-checks", "1", "TestApp.CSharp", workflow => workflow
+        .Step<ParallelOrderChecksRequested>("start-parallel-checks", step => step
+            .OwnedBy<ParallelOrderChecksRequestedConsumer>()
+            .Publishes<PaymentCheckRequested>()
+            .Publishes<InventoryCheckRequested>())
+        .Step<PaymentCheckRequested>("check-payment", step => step
+            .OwnedBy<PaymentCheckRequestedConsumer>()
+            .Terminates())
+        .Step<InventoryCheckRequested>("check-inventory", step => step
+            .OwnedBy<InventoryCheckRequestedConsumer>()
+            .Terminates()));
     x.AddJobConsumer<DemoTrackedJobConsumer, DemoTrackedJob>(options => options
         .SetJobTypeName("sample-report")
         .SetConcurrentJobLimit(2)
@@ -151,6 +183,24 @@ app.MapGet("/publish", async (IMessageBus messageBus, ILogger<Program> logger, C
 })
 .WithName("Test_Publish")
 .WithTags("Test");
+
+app.MapPost("/workflows/fulfillment", async (IPublishEndpoint publishEndpoint, CancellationToken cancellationToken = default) =>
+{
+    var message = new FulfillmentRequested(Guid.NewGuid());
+    await publishEndpoint.Publish(message, null, cancellationToken);
+    return Results.Accepted(value: new { message.OrderId });
+})
+.WithName("Start_FulfillmentWorkflow")
+.WithTags("Workflows");
+
+app.MapPost("/workflows/parallel-checks", async (IPublishEndpoint publishEndpoint, CancellationToken cancellationToken = default) =>
+{
+    var message = new ParallelOrderChecksRequested(Guid.NewGuid());
+    await publishEndpoint.Publish(message, null, cancellationToken);
+    return Results.Accepted(value: new { message.OrderId });
+})
+.WithName("Start_ParallelOrderChecksWorkflow")
+.WithTags("Workflows");
 
 app.MapGet("/publish/fault", async (IMessageBus messageBus, ILogger<Program> logger, CancellationToken cancellationToken = default) =>
 {

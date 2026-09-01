@@ -1,0 +1,108 @@
+@implements IAsyncDisposable
+@inject IJSRuntime JavaScript
+
+<div class="workflow-run-map-shell" @ref="map">
+    <svg class="workflow-run-map-canvas" role="img" aria-label="Reconstructed workflow run graph"></svg>
+    <div class="flow-map-controls" aria-label="Workflow run graph controls">
+        <button type="button" title="Zoom in" aria-label="Zoom in" @onclick="() => ZoomAsync(1.3)">+</button>
+        <button type="button" title="Zoom out" aria-label="Zoom out" @onclick="() => ZoomAsync(1 / 1.3)">−</button>
+        <button type="button" title="Reset view" aria-label="Reset view" @onclick="ResetAsync">↺</button>
+    </div>
+</div>
+
+@code {
+    private ElementReference map;
+    private IJSObjectReference? module;
+
+    [Parameter, EditorRequired]
+    public required MonitoringChoreographyRun Run { get; set; }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        module ??= await JavaScript.InvokeAsync<IJSObjectReference>("import", "./monitoringChart.js");
+        if (firstRender)
+            await module.InvokeVoidAsync("initializeWorkflowRunMap", map);
+        var incomingSources = Run.Steps
+            .SelectMany(step => step.Outputs.SelectMany(output => output.Targets.Select(target => new
+            {
+                Source = step.StepKey,
+                Target = target.StepKey
+            })))
+            .GroupBy(edge => edge.Target, StringComparer.Ordinal)
+            .ToDictionary(
+                group => group.Key,
+                group => group.Select(edge => edge.Source).Distinct(StringComparer.Ordinal).Count(),
+                StringComparer.Ordinal);
+        var rootDeliveryCounts = Run.Steps
+            .Where(step => !incomingSources.ContainsKey(step.StepKey))
+            .GroupBy(step => step.MessageId, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.Count(), StringComparer.Ordinal);
+        await module.InvokeVoidAsync(
+            "updateWorkflowRunMap",
+            map,
+            new
+            {
+                Nodes = Run.Steps.Select(step => new
+                {
+                    Id = step.StepKey,
+                    Application = step.ApplicationName,
+                    Label = step.StepId,
+                    Contract = ContractLabel(step.TriggerMessageUrn),
+                    step.DurationMs,
+                    step.Status,
+                    step.Sequence,
+                    BranchCount = step.Outputs.SelectMany(output => output.Targets)
+                        .Select(target => target.StepKey)
+                        .Distinct(StringComparer.Ordinal)
+                        .Count(),
+                    MergeCount = incomingSources.GetValueOrDefault(step.StepKey),
+                    RootFanOutCount = incomingSources.ContainsKey(step.StepKey)
+                        ? 0
+                        : rootDeliveryCounts.GetValueOrDefault(step.MessageId)
+                }),
+                Links = Run.Steps.SelectMany(step => step.Outputs.SelectMany(output => output.Targets.Select(target => new
+                {
+                    Source = step.StepKey,
+                    Target = target.StepKey,
+                    Operation = DisplayKind(output.OperationKind),
+                    Message = string.IsNullOrWhiteSpace(output.MessageUrn) ? "Message" : ContractLabel(output.MessageUrn),
+                    target.HandoffDurationMs,
+                    output.Succeeded
+                })))
+            });
+    }
+
+    private static string ContractLabel(string value) => value.Split('.', ':').Last();
+
+    private static string DisplayKind(string value) => string.Join(
+        " ",
+        value.Split('_', StringSplitOptions.RemoveEmptyEntries)
+            .Select(part => char.ToUpperInvariant(part[0]) + part[1..]));
+
+    private async Task ZoomAsync(double factor)
+    {
+        if (module is not null)
+            await module.InvokeVoidAsync("zoomWorkflowRunMap", map, factor);
+    }
+
+    private async Task ResetAsync()
+    {
+        if (module is not null)
+            await module.InvokeVoidAsync("resetWorkflowRunMap", map);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            if (module is not null)
+            {
+                await module.InvokeVoidAsync("disposeWorkflowRunMap", map);
+                await module.DisposeAsync();
+            }
+        }
+        catch (Exception exception) when (exception is JSException or JSDisconnectedException or ObjectDisposedException)
+        {
+        }
+    }
+}

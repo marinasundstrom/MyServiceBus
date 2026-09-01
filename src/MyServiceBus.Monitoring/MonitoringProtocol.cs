@@ -1,3 +1,4 @@
+using MyServiceBus.Choreography;
 using MyServiceBus.Inspection;
 
 namespace MyServiceBus.Monitoring;
@@ -38,7 +39,9 @@ public sealed record MonitoringObservation(
     string? SpanId,
     int? RetryAttempt = null,
     int? RetryLimit = null,
-    IReadOnlyDictionary<string, string>? Properties = null);
+    IReadOnlyDictionary<string, string>? Properties = null,
+    string? MessageId = null,
+    string? CausationMessageId = null);
 
 public sealed record MonitoringOutboxDispatcherSummary(
     string ApplicationName,
@@ -225,6 +228,190 @@ public sealed record MonitoringEndpointSummary(
     DateTimeOffset? LastActivityAtUtc,
     int WindowSeconds);
 
+public sealed record MonitoringDeclaredChoreography(
+    string ChoreographyId,
+    IReadOnlyList<string> DefinitionVersions,
+    IReadOnlyList<string> ConflictKinds,
+    DateTimeOffset LastCapturedAtUtc,
+    IReadOnlyList<MonitoringDeclaredChoreographyConnection> Connections,
+    IReadOnlyList<MonitoringDeclaredChoreographyFragment> Fragments);
+
+public sealed record MonitoringDeclaredChoreographyConnection(
+    string DefinitionVersion,
+    string SourceApplication,
+    string SourceOwner,
+    string SourceStepId,
+    ChoreographyOperationKind OperationKind,
+    string MessageUrn,
+    string? Destination,
+    string TargetApplication,
+    string TargetOwner,
+    string TargetStepId,
+    string MatchKind);
+
+public sealed record MonitoringChoreographyRuntimeSnapshot(
+    int WindowSeconds,
+    DateTimeOffset WindowStartUtc,
+    DateTimeOffset WindowEndUtc,
+    long DroppedObservations,
+    bool AllParticipantsOnline,
+    bool Complete,
+    IReadOnlyList<MonitoringChoreographyReactionRuntime> Reactions);
+
+public sealed record MonitoringChoreographyReactionRuntime(
+    string ChoreographyId,
+    string DefinitionVersion,
+    string ApplicationName,
+    string Owner,
+    string StepId,
+    int OutputIndex,
+    string TriggerMessageUrn,
+    ChoreographyOperationKind OperationKind,
+    string? OutputMessageUrn,
+    string? Destination,
+    long ObservedCount,
+    DateTimeOffset? FirstObservedAtUtc,
+    DateTimeOffset? LastObservedAtUtc,
+    string EvidenceStatus);
+
+public sealed record MonitoringChoreographyRunSnapshot(
+    int WindowSeconds,
+    DateTimeOffset WindowStartUtc,
+    DateTimeOffset WindowEndUtc,
+    long DroppedObservations,
+    bool AllParticipantsOnline,
+    bool Complete,
+    IReadOnlyList<MonitoringChoreographyRun> Runs);
+
+public sealed record MonitoringWorkflowRunPage(
+    int Offset,
+    int Limit,
+    int Total,
+    DateTimeOffset CapturedAtUtc,
+    IReadOnlyList<MonitoringChoreographyRun> Runs);
+
+public sealed record MonitoringChoreographyRun(
+    string ChoreographyId,
+    string DefinitionVersion,
+    string RunId,
+    string RootMessageId,
+    DateTimeOffset StartedAtUtc,
+    DateTimeOffset LastActivityAtUtc,
+    double ObservedDurationMs,
+    string Status,
+    string Confidence,
+    bool EvidenceComplete,
+    long DroppedObservations,
+    bool AllParticipantsOnline,
+    IReadOnlyList<MonitoringChoreographyRunStep> Steps)
+{
+    public string CoordinationType => "choreography";
+    public string LifecycleAuthority => "reconstructed_evidence";
+    public IReadOnlyList<string> RootMessageIds { get; init; } = [RootMessageId];
+    public int RootCount => RootMessageIds.Count;
+    public int BranchPointCount
+    {
+        get
+        {
+            var targets = Steps.SelectMany(step => step.Outputs)
+                .SelectMany(output => output.Targets)
+                .Select(target => target.StepKey)
+                .ToHashSet(StringComparer.Ordinal);
+            var internalBranches = Steps.Count(step => step.Outputs
+                .SelectMany(output => output.Targets)
+                .Select(target => target.StepKey)
+                .Distinct(StringComparer.Ordinal)
+                .Skip(1)
+                .Any());
+            var rootDeliveryBranches = Steps
+                .Where(step => !targets.Contains(step.StepKey))
+                .GroupBy(step => step.MessageId, StringComparer.Ordinal)
+                .Count(group => group.Skip(1).Any());
+            return internalBranches + rootDeliveryBranches;
+        }
+    }
+    public int MergePointCount => Steps
+        .SelectMany(step => step.Outputs.SelectMany(output => output.Targets.Select(target => new
+        {
+            Source = step.StepKey,
+            Target = target.StepKey
+        })))
+        .GroupBy(edge => edge.Target, StringComparer.Ordinal)
+        .Count(group => group.Select(edge => edge.Source).Distinct(StringComparer.Ordinal).Skip(1).Any());
+    public string ObservedShape => (BranchPointCount > 0, MergePointCount > 0) switch
+    {
+        (true, true) => "branching_and_converging",
+        (true, false) => "branching",
+        (false, true) => "converging",
+        _ => "linear"
+    };
+    public int DiagnosticIssueCount => Steps.Sum(step => step.OutputExpectations.Count(expectation => expectation.Status is
+        "missing_expected" or "below_minimum" or "above_maximum" or "timing_exceeded" or
+        "unexpected_observed" or "output_faulted"));
+    public int IndeterminateExpectationCount => Steps.Sum(step => step.OutputExpectations.Count(expectation =>
+        expectation.Status is "awaiting_evidence" or "insufficient_evidence" or "unsupported_operation"));
+}
+
+public sealed record MonitoringChoreographyRunStep(
+    int Sequence,
+    string StepKey,
+    string ApplicationName,
+    string InstanceId,
+    string Owner,
+    string StepId,
+    string? OwnerComponent,
+    string TriggerMessageUrn,
+    string MessageId,
+    string? EndpointName,
+    DateTimeOffset StartedAtUtc,
+    DateTimeOffset CompletedAtUtc,
+    double DurationMs,
+    string Status,
+    int RetryCount,
+    string? FailureType,
+    IReadOnlyList<MonitoringChoreographyRunOutput> Outputs)
+{
+    public IReadOnlyList<MonitoringChoreographyRunOutputExpectation> OutputExpectations { get; init; } = [];
+}
+
+public sealed record MonitoringChoreographyRunOutputExpectation(
+    string OperationKind,
+    string? MessageUrn,
+    string? Destination,
+    string Requirement,
+    int? MinimumCount,
+    int? MaximumCount,
+    long? WithinMilliseconds,
+    int ObservedCount,
+    int FailedCount,
+    int LateCount,
+    string Status);
+
+public sealed record MonitoringChoreographyRunOutput(
+    string OperationKind,
+    string? MessageUrn,
+    string? MessageId,
+    string? Destination,
+    DateTimeOffset OccurredAtUtc,
+    double DurationMs,
+    bool Succeeded,
+    string? FailureType,
+    IReadOnlyList<MonitoringChoreographyRunTarget> Targets);
+
+public sealed record MonitoringChoreographyRunTarget(
+    string StepKey,
+    double HandoffDurationMs);
+
+public sealed record MonitoringDeclaredChoreographyFragment(
+    string ApplicationName,
+    string Owner,
+    int SchemaVersion,
+    string DefinitionVersion,
+    IReadOnlyList<ChoreographyStep> Steps,
+    int ReportingInstances,
+    int OnlineInstances,
+    DateTimeOffset LastCapturedAtUtc);
+
 public sealed record MonitoringHistorySummary(
     string StorageProvider,
     bool Durable,
@@ -309,7 +496,8 @@ public sealed record MonitoringFlowEdge(
     string OperationKind,
     long Count,
     DateTimeOffset FirstSeenAtUtc,
-    DateTimeOffset LastSeenAtUtc);
+    DateTimeOffset LastSeenAtUtc,
+    string MatchConfidence);
 
 public sealed record MonitoringReplicaFlowEdge(
     string SourceApplication,
@@ -324,4 +512,19 @@ public sealed record MonitoringReplicaFlowEdge(
     string OperationKind,
     long Count,
     DateTimeOffset FirstSeenAtUtc,
-    DateTimeOffset LastSeenAtUtc);
+    DateTimeOffset LastSeenAtUtc,
+    string MatchConfidence);
+
+public sealed record MonitoringCausalFlowEdge(
+    string ApplicationName,
+    string? ConsumerEndpointName,
+    string? TriggerMessageType,
+    string? TriggerMessageUrn,
+    string? OutputMessageType,
+    string? OutputMessageUrn,
+    string? DestinationAddress,
+    string OperationKind,
+    long Count,
+    DateTimeOffset FirstSeenAtUtc,
+    DateTimeOffset LastSeenAtUtc,
+    string MatchConfidence);

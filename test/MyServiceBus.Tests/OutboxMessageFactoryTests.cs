@@ -11,11 +11,13 @@ public sealed class OutboxMessageFactoryTests
     {
         var messageId = Guid.NewGuid();
         var correlationId = Guid.NewGuid();
+        var causationMessageId = Guid.NewGuid();
         var destination = new Uri("rabbitmq://localhost/order-submitted");
         var context = new SendContext([typeof(OrderSubmitted)], new EnvelopeMessageSerializer())
         {
             MessageId = messageId.ToString(),
             CorrelationId = correlationId.ToString(),
+            CausationMessageId = causationMessageId,
             DestinationAddress = destination,
             Intent = MessageIntent.Publish
         };
@@ -25,6 +27,7 @@ public sealed class OutboxMessageFactoryTests
 
         Assert.Equal(messageId, persisted.MessageId);
         Assert.Equal(correlationId, persisted.CorrelationId);
+        Assert.Equal(causationMessageId, persisted.CausationMessageId);
         Assert.Equal(destination, persisted.DestinationAddress);
         Assert.Equal(OutboxDeliveryIntent.Publish, persisted.Intent);
         Assert.Contains(MessageUrn.For(typeof(OrderSubmitted)), persisted.MessageTypes);

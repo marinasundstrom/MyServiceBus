@@ -20,10 +20,12 @@ class OutboxMessageFactoryTest {
     void createsPersistedEnvelopeFromSendContext() throws Exception {
         UUID messageId = UUID.randomUUID();
         UUID correlationId = UUID.randomUUID();
+        UUID causationMessageId = UUID.randomUUID();
         URI destination = URI.create("rabbitmq://localhost/order-submitted");
         SendContext context = new SendContext(new OrderSubmitted("A-123"));
         context.setMessageId(messageId);
         context.setCorrelationId(correlationId);
+        context.setCausationMessageId(causationMessageId);
         context.setDestinationAddress(destination);
         context.setIntent(MessageIntent.PUBLISH);
         context.getHeaders().put("tenant", 42);
@@ -33,6 +35,7 @@ class OutboxMessageFactoryTest {
 
         assertEquals(messageId, persisted.messageId());
         assertEquals(correlationId, persisted.correlationId());
+        assertEquals(causationMessageId, persisted.causationMessageId());
         assertEquals(destination, persisted.destinationAddress());
         assertEquals(OutboxDeliveryIntent.PUBLISH, persisted.intent());
         assertTrue(persisted.messageTypes().contains(MessageUrn.forClass(OrderSubmitted.class)));

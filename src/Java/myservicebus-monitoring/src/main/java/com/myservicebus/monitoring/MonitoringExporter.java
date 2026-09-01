@@ -436,7 +436,8 @@ public final class MonitoringExporter implements BusHook, ScheduledWorkObserver,
         if (busEvent instanceof BusLifecycleHookEvent lifecycle) {
             return new MonitoringProtocol.Observation(
                     sequence.incrementAndGet(), lifecycle.occurredAtUtc(), "bus_" + lifecycle.state(), true,
-                    null, null, null, lifecycle.busAddress(), null, null, null, null, null, null, null, null, null, null);
+                    null, null, null, lifecycle.busAddress(), null, null, null, null, null, null, null, null, null, null,
+                    null, null);
         }
         if (busEvent instanceof MessageOperationHookEvent operation) {
             return new MonitoringProtocol.Observation(
@@ -444,7 +445,7 @@ public final class MonitoringExporter implements BusHook, ScheduledWorkObserver,
                     operation.messageType(), operation.messageUrn(), operation.endpointName(), operation.destinationAddress(),
                     operation.durationMs(), operation.exceptionType(), operation.exceptionMessage(), operation.correlationId(),
                     operation.conversationId(), operation.traceId(), operation.spanId(), operation.retryAttempt(),
-                    operation.retryLimit(), null);
+                    operation.retryLimit(), null, operation.messageId(), operation.causationMessageId());
         }
         if (busEvent instanceof OutboxDeliveryHookEvent outbox) {
             Map<String, String> properties = new LinkedHashMap<>();
@@ -464,7 +465,7 @@ public final class MonitoringExporter implements BusHook, ScheduledWorkObserver,
             return new MonitoringProtocol.Observation(
                     sequence.incrementAndGet(), outbox.occurredAtUtc(), "outbox_dispatch_cycle", outbox.succeeded(),
                     null, null, outbox.serviceName(), null, outbox.durationMs(), outbox.failureCategory(), null,
-                    null, null, null, null, null, null, properties);
+                    null, null, null, null, null, null, properties, null, null);
         }
         return null;
     }

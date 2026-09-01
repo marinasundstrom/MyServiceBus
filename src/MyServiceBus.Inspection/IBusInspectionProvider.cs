@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using MyServiceBus.Choreography;
 
 namespace MyServiceBus.Inspection;
 
@@ -7,13 +8,34 @@ public interface IBusInspectionProvider
     BusInspectionSnapshot GetSnapshot();
 }
 
-public sealed record BusInspectionSnapshot(
-    string TransportName,
-    Uri Address,
-    DateTimeOffset CapturedAt,
-    IReadOnlyList<MessageInspection> Messages,
-    IReadOnlyList<ReceiveEndpointInspection> ReceiveEndpoints,
-    IReadOnlyList<ConsumerInspection> Consumers);
+public sealed record BusInspectionSnapshot
+{
+    public string TransportName { get; init; }
+    public Uri Address { get; init; }
+    public DateTimeOffset CapturedAt { get; init; }
+    public IReadOnlyList<MessageInspection> Messages { get; init; }
+    public IReadOnlyList<ReceiveEndpointInspection> ReceiveEndpoints { get; init; }
+    public IReadOnlyList<ConsumerInspection> Consumers { get; init; }
+    public IReadOnlyList<ChoreographyFragment> Choreographies { get; init; }
+
+    public BusInspectionSnapshot(
+        string transportName,
+        Uri address,
+        DateTimeOffset capturedAt,
+        IReadOnlyList<MessageInspection> messages,
+        IReadOnlyList<ReceiveEndpointInspection> receiveEndpoints,
+        IReadOnlyList<ConsumerInspection> consumers,
+        IReadOnlyList<ChoreographyFragment>? choreographies = null)
+    {
+        TransportName = transportName;
+        Address = address;
+        CapturedAt = capturedAt;
+        Messages = messages;
+        ReceiveEndpoints = receiveEndpoints;
+        Consumers = consumers;
+        Choreographies = choreographies ?? [];
+    }
+}
 
 public sealed record MessageInspection(
     string MessageType,

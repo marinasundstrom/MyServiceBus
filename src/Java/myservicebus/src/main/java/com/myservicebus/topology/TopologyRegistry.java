@@ -8,11 +8,13 @@ import com.myservicebus.ConsumeContext;
 import com.myservicebus.ConsumerMethodInvoker;
 import com.myservicebus.EntityNameFormatter;
 import com.myservicebus.PipeConfigurator;
+import com.myservicebus.choreography.ChoreographyFragment;
 
 public class TopologyRegistry implements BusTopology {
     private final List<MessageTopology> messages = new ArrayList<>();
     private final List<ConsumerTopology> consumers = new ArrayList<>();
     private final List<ReceiveEndpointDefinition> receiveEndpoints = new ArrayList<>();
+    private final List<ChoreographyFragment> choreographies = new ArrayList<>();
 
     @Override
     public List<MessageTopology> getMessages() {
@@ -27,6 +29,27 @@ public class TopologyRegistry implements BusTopology {
     @Override
     public List<ReceiveEndpointDefinition> getReceiveEndpoints() {
         return List.copyOf(receiveEndpoints);
+    }
+
+    @Override
+    public List<ChoreographyFragment> getChoreographies() {
+        return List.copyOf(choreographies);
+    }
+
+    public void registerChoreography(ChoreographyFragment fragment) {
+        if (fragment == null) {
+            throw new IllegalArgumentException("fragment must not be null");
+        }
+        fragment.validate();
+        boolean duplicate = choreographies.stream().anyMatch(existing ->
+                existing.choreographyId().equals(fragment.choreographyId())
+                        && existing.owner().equals(fragment.owner()));
+        if (duplicate) {
+            throw new IllegalArgumentException(
+                    "Choreography '" + fragment.choreographyId()
+                            + "' already has a fragment owned by '" + fragment.owner() + "'.");
+        }
+        choreographies.add(fragment);
     }
 
     public <T> void registerMessage(Class<T> messageType, String entityName) {

@@ -7,7 +7,7 @@ import java.util.Objects;
 import javax.sql.DataSource;
 
 public final class PostgreSqlSchema {
-    public static final int CURRENT_VERSION = 4;
+    public static final int CURRENT_VERSION = 5;
 
     private PostgreSqlSchema() {
     }
@@ -41,12 +41,12 @@ public final class PostgreSqlSchema {
             );
 
             INSERT INTO myservicebus.schema_version (singleton, version)
-            VALUES (true, 4)
+            VALUES (true, 5)
             ON CONFLICT (singleton) DO NOTHING;
 
             DO $migration$
             BEGIN
-                IF (SELECT version FROM myservicebus.schema_version WHERE singleton) NOT IN (2, 3, 4) THEN
+                IF (SELECT version FROM myservicebus.schema_version WHERE singleton) NOT IN (2, 3, 4, 5) THEN
                     RAISE EXCEPTION 'Unsupported MyServiceBus PostgreSQL schema version';
                 END IF;
             END
@@ -67,6 +67,7 @@ public final class PostgreSqlSchema {
                 correlation_id uuid NULL,
                 conversation_id uuid NULL,
                 initiator_id uuid NULL,
+                causation_message_id uuid NULL,
                 response_address text NULL,
                 fault_address text NULL,
                 state smallint NOT NULL DEFAULT 0 CHECK (state BETWEEN 0 AND 4),
@@ -82,7 +83,8 @@ public final class PostgreSqlSchema {
 
             ALTER TABLE myservicebus.outbox_message
                 ADD COLUMN IF NOT EXISTS scheduled_at_utc timestamptz NULL,
-                ADD COLUMN IF NOT EXISTS cancelled_at_utc timestamptz NULL;
+                ADD COLUMN IF NOT EXISTS cancelled_at_utc timestamptz NULL,
+                ADD COLUMN IF NOT EXISTS causation_message_id uuid NULL;
 
             ALTER TABLE myservicebus.outbox_message
                 DROP CONSTRAINT IF EXISTS outbox_message_state_check;
@@ -246,6 +248,8 @@ public final class PostgreSqlSchema {
 
             CREATE INDEX IF NOT EXISTS ix_job_attempt_history
                 ON myservicebus.job_attempt (job_id, retry_attempt DESC);
+
+            UPDATE myservicebus.schema_version SET version = 5 WHERE singleton AND version = 4;
 
             """;
 }

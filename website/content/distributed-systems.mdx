@@ -132,18 +132,43 @@ See the <Link href="/docs/transactional-outbox">transactional outbox guide</Link
   <p>Define what users see while data is catching up, how long is acceptable, and how operators detect and repair a stuck workflow.</p>
 </div>
 
-<h2 id="workflow-coordination">Choose orchestration or choreography deliberately</h2>
+<h2 id="workflow-coordination">From message reactions to explicit workflows</h2>
 
-Long-running workflows usually coordinate in one of two ways. Orchestration gives an explicit coordinator responsibility for the workflow state and next command. Sagas, state machines, durable timeouts, and compensation are common orchestration techniques. Choreography keeps that responsibility distributed: services publish facts and other services decide independently how to react.
+The first workflow-coordination challenge usually arrives as choreography, even when nobody calls it that yet. One service publishes a fact, another reacts, and that reaction produces the next message. Each consumer is understandable on its own, but the broader workflow is spread across contracts, producers, consumers, and independently deployed services.
+
+As the application grows, that implicit workflow becomes difficult to express and verify. Which reactions are intended? Which states or outcomes have no handler? Can a cycle amplify messages? Did a process stall, or is an optional participant simply quiet? The code may remain locally simple while the system-wide story becomes hard to see.
+
+MyServiceBus&apos;s choreography work begins there: make decentralized reactions explicit enough to document, compare with configured routing, and observe without moving ownership into a central engine.
+
+Some workflows reveal that their decisions should not be distributed. When one component genuinely needs to know the broader process, remember its progress, handle timeouts, and decide the next command, orchestration makes that ownership explicit. It can make the business process easier to reason about, but the runtime is more demanding: durable state, correlation, concurrency, retries, compensation, and recovery all become part of the coordinator&apos;s contract.
+
+Both are **ways services relate and coordinate through messages**. The difference is where the coordination relationship lives:
+
+1. **Choreography — a decentralized coordination relationship:** each service knows which events it reacts to and what it emits, but no participant necessarily owns or understands the whole process. Their local reactions collectively produce the broader workflow.
+2. **Orchestration — a centralized coordination relationship:** one participant—the orchestrator, often implemented as a saga or state machine—knows the process and directs or advances it through messages. It owns the workflow state and decides what should happen next.
+
+“Centralized” here means that process knowledge and decisions have one explicit owner; it does not require one deployment, database, or synchronous call chain. The distinction is the coordination relationship and ownership of workflow knowledge, not whether a broker or messages are used. Both styles communicate through produced and consumed message contracts. The orchestrator is itself a message-driven participant; choreography distributes the decisions among the participants that own each reaction.
+
+These relationships can coexist in the same distributed system. One workflow may remain a decentralized choreography, while another uses an orchestrator because its progress and decisions need one explicit owner. An orchestrated workflow can also publish events that start or contribute to choreographed reactions outside the coordinator&apos;s boundary.
+
+You can implement either style yourself using consumers, sends, publications, persistence, and application-owned state. MyServiceBus is building tools and abstractions that make those intents easier to express, verify, and operate in both C# and Java: declared local reactions and causal diagnostics for choreography, and sagas plus state-machine definitions for orchestration. Your services still own the business rules; the framework supplies the coordination vocabulary and runtime behavior. That progression—from discovering an implicit choreography to choosing whether it should remain decentralized or become an explicit orchestration—is the focus of the current work.
+
+Choreography comes first. Its declarations and Dashboard projections live above the messaging protocol as local topology and operational metadata. They do not change the application messages, MassTransit-compatible envelopes, headers, addresses, or broker conventions exchanged between services, so a MassTransit service can continue to participate in the same message flow without understanding the MyServiceBus choreography model.
+
+The Dashboard provides a common place to observe both forms. A choreography map groups reactions by service and reconstructs bounded workflow runs from declarations and exact causal message evidence, while showing where that evidence is incomplete. Selecting a run opens a D3 activity diagram with application swimlanes plus an ordered step breakdown: which application and consumer handled each message, handler and observed handoff duration, what it emitted, and where retries or failures occurred. The view updates as observations arrive but treats live activity, terminal reactions, and inactivity as evidence rather than authoritative lifecycle state. An orchestration map can later use a state-machine diagram to highlight the current state and traversed transitions and annotate pending timeouts, faults, and instance counts. The views may look related, but the Dashboard must never present a reconstructed choreographed outcome as though it were persisted workflow state.
 
 <div className="concept-comparison">
-  <section><span className="tag">ORCHESTRATION</span><h2>One explicit coordinator</h2><p>A durable process tracks progress and directs each participant.</p><strong>Watch for:</strong><p>Coordinator availability, state concurrency, compensation, and coupling to the workflow definition.</p></section>
   <section><span className="tag">CHOREOGRAPHY</span><h2>Services react to events</h2><p>Participants remain autonomous and no service owns the complete sequence.</p><strong>Watch for:</strong><p>Hidden coupling, event cycles, duplicate reactions, unclear progress, and difficult recovery.</p></section>
+  <section><span className="tag">ORCHESTRATION</span><h2>One explicit coordinator</h2><p>A durable process tracks progress and directs each participant.</p><strong>Watch for:</strong><p>Coordinator availability, state concurrency, compensation, and coupling to the workflow definition.</p></section>
+</div>
+
+<div className="flow-line" aria-label="Orchestration and choreography ownership comparison">
+  <span>Choreography: decentralized local reactions</span><b>·</b><span>Orchestration: centralized workflow decisions</span>
 </div>
 
 <div className="callout callout-accent">
   <strong>Future MyServiceBus areas</strong>
-  <p>Applications can build basic choreography from today&apos;s publish and consume primitives, but MyServiceBus does not yet provide a first-class choreography lifecycle model. Framework-owned orchestration—including saga persistence and state machines—is also future work. Use application-owned workflow state or a mature workflow product when those capabilities are required now.</p>
+  <p>Applications can implement choreography and orchestration themselves with today&apos;s messaging primitives and application-owned state. Our current work is adding first-class abstractions that express and operate those intents consistently across C# and Java. As these features mature, this guide will add one end-to-end application shown both ways: local event reactions for choreography and a coordinator-owned state machine for orchestration. Use application-owned workflow state or a mature workflow product when those higher-level capabilities are required now.</p>
 </div>
 
 <h2 id="failure">Classify failures before retrying</h2>

@@ -1,0 +1,187 @@
+@page "/workflows"
+@rendermode InteractiveServer
+@inherits MonitoringPageBase
+@inject MonitoringApiClient Api
+
+<PageTitle>Workflow Runs · MyServiceBus Monitoring</PageTitle>
+<DashboardPageHeader Eyebrow="Coordination" Title="Workflows" Description="Follow individual coordination runs reconstructed from exact message causation, including live activity, timing, and failures." />
+<WorkflowTabs Active="runs" />
+
+<section class="panel workflow-run-index">
+    <div class="section-heading">
+        <div>
+            <p class="eyebrow">Operational evidence</p>
+            <h2>Workflow runs</h2>
+        </div>
+        <span>Live as observations arrive · @(CurrentPage?.Total ?? 0) retained runs</span>
+    </div>
+
+    <div class="workflow-run-filters" aria-label="Filter workflow runs">
+        <label>
+            <span>Search</span>
+            <input type="search" placeholder="Workflow or run identity" @bind="search" @bind:event="oninput" />
+        </label>
+        <label>
+            <span>Type</span>
+            <select @bind="typeFilter">
+                <option value="all">All types</option>
+                <option value="choreography">Choreography</option>
+                <option value="orchestration">Orchestration / Saga</option>
+            </select>
+        </label>
+        <label>
+            <span>Status</span>
+            <select @bind="statusFilter">
+                <option value="all">All statuses</option>
+                <option value="live">Live activity</option>
+                <option value="terminal_observed">Terminal observed</option>
+                <option value="faulted">Failed</option>
+                <option value="no_recent_activity">No recent activity</option>
+            </select>
+        </label>
+        <button type="button" class="workflow-filter-action" @onclick="ApplyFiltersAsync" disabled="@loading">Apply filters</button>
+    </div>
+
+    @if (CurrentPage is not { } page || page.Runs.Count == 0)
+    {
+        <div class="panel-empty">No workflow runs match the current filters.</div>
+    }
+    else
+    {
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Status</th>
+                        <th>Workflow</th>
+                        <th>Type</th>
+                        <th>Activity</th>
+                        <th>Execution</th>
+                        <th>Evidence</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var run in page.Runs)
+                    {
+                        <tr class="workflow-run-row @run.Status">
+                            <td><span class="run-status @run.Status"></span><strong>@RunStatus(run.Status)</strong></td>
+                            <td><strong>@run.ChoreographyId</strong><small>Run @Abbreviate(run.RootMessageId)</small></td>
+                            <td>@CoordinationType(run.CoordinationType)</td>
+                            <td>
+                                <strong>@run.StartedAtUtc.ToLocalTime().ToString("MMM d, HH:mm:ss")</strong>
+                                <small>Last @run.LastActivityAtUtc.ToLocalTime().ToString("HH:mm:ss.fff")</small>
+                            </td>
+                            <td>
+                                <strong>@FormatDuration(run.ObservedDurationMs)</strong>
+                                <small>@run.Steps.Count observed @(run.Steps.Count == 1 ? "step" : "steps") · @ShapeLabel(run)</small>
+                            </td>
+                            <td>
+                                <strong>@(run.EvidenceComplete ? "Complete" : "Incomplete")</strong>
+                                @if (run.DiagnosticIssueCount > 0)
+                                {
+                                    <small>@run.DiagnosticIssueCount declared/observed @(run.DiagnosticIssueCount == 1 ? "finding" : "findings")</small>
+                                }
+                                else if (run.IndeterminateExpectationCount > 0)
+                                {
+                                    <small>@run.IndeterminateExpectationCount pending or unsupported</small>
+                                }
+                                else if (!run.EvidenceComplete)
+                                {
+                                    <small>@run.DroppedObservations dropped · @(run.AllParticipantsOnline ? "participants online" : "participant offline")</small>
+                                }
+                            </td>
+                            <td><a class="section-link" href="@RunHref(run)">View run →</a></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        <div class="workflow-run-pagination">
+            <span>Showing @(page.Offset + 1)–@Math.Min(page.Offset + page.Runs.Count, page.Total) of @(page.Total)</span>
+            <div>
+                <button type="button" @onclick="PreviousPageAsync" disabled="@(loading || page.Offset == 0)">← Previous</button>
+                <button type="button" @onclick="NextPageAsync" disabled="@(loading || page.Offset + page.Runs.Count >= page.Total)">Next →</button>
+            </div>
+        </div>
+    }
+</section>
+
+<div class="guidance workflow-guidance">
+    <strong>Evidence, not authority</strong>
+    <span>Runs are retained monitoring projections reconstructed from bounded exact-causation observations. A terminal observation means the declared terminal activity was seen; it does not make choreography a centralized state machine.</span>
+</div>
+
+@code {
+    private const int PageSize = 25;
+    private string search = string.Empty;
+    private string typeFilter = "all";
+    private string statusFilter = "all";
+    private MonitoringWorkflowRunPage? queriedPage;
+    private bool loading;
+
+    private MonitoringWorkflowRunPage? CurrentPage => queriedPage ?? Dashboard.WorkflowRuns;
+
+    private Task ApplyFiltersAsync() => LoadPageAsync(0);
+
+    private Task PreviousPageAsync()
+        => LoadPageAsync(Math.Max(0, (CurrentPage?.Offset ?? 0) - PageSize));
+
+    private Task NextPageAsync()
+        => LoadPageAsync((CurrentPage?.Offset ?? 0) + PageSize);
+
+    private async Task LoadPageAsync(int offset)
+    {
+        loading = true;
+        try
+        {
+            queriedPage = await Api.GetWorkflowRuns(
+                null,
+                typeFilter == "all" ? null : typeFilter,
+                statusFilter == "all" ? null : statusFilter,
+                search,
+                null,
+                null,
+                offset,
+                PageSize,
+                CancellationToken.None);
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private static string RunHref(MonitoringChoreographyRun run)
+        => $"/workflows/runs/{Uri.EscapeDataString(run.RunId)}";
+
+    private static string CoordinationType(string type) => type switch
+    {
+        "choreography" => "Choreography",
+        "orchestration" => "Orchestration / Saga",
+        _ => DisplayKind(type)
+    };
+
+    private static string RunStatus(string status) => status switch
+    {
+        "live" => "Live activity",
+        "terminal_observed" => "Terminal observed",
+        "faulted" => "Failed",
+        "no_recent_activity" => "No recent activity",
+        _ => DisplayKind(status)
+    };
+
+    private static string FormatDuration(double milliseconds)
+        => milliseconds >= 1_000 ? $"{milliseconds / 1_000:0.##} s" : $"{milliseconds:0.##} ms";
+
+    private static string ShapeLabel(MonitoringChoreographyRun run) => run.ObservedShape switch
+    {
+        "branching" => $"{run.BranchPointCount} observed fork{(run.BranchPointCount == 1 ? string.Empty : "s")}",
+        "converging" => $"{run.MergePointCount} observed convergence{(run.MergePointCount == 1 ? string.Empty : "s")}",
+        "branching_and_converging" => $"{run.BranchPointCount} forks · {run.MergePointCount} convergences",
+        _ => "linear path"
+    };
+
+    private static string Abbreviate(string value)
+        => value.Length <= 12 ? value : $"{value[..8]}…{value[^4..]}";
+}

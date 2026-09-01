@@ -15,6 +15,7 @@ public sealed class MonitoringHistoryDbContext : DbContext
     internal DbSet<MonitoringScheduledWorkEntity> ScheduledWork => Set<MonitoringScheduledWorkEntity>();
     internal DbSet<MonitoringRecurringJobEntity> RecurringJobs => Set<MonitoringRecurringJobEntity>();
     internal DbSet<MonitoringJobEntity> Jobs => Set<MonitoringJobEntity>();
+    internal DbSet<MonitoringWorkflowRunEntity> WorkflowRuns => Set<MonitoringWorkflowRunEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -55,6 +56,14 @@ public sealed class MonitoringHistoryDbContext : DbContext
         {
             entity.ToTable("job_snapshot");
             entity.HasKey(value => new { value.ApplicationName, value.InstanceId, value.BusId });
+            entity.Property(value => value.Payload).HasColumnType("jsonb");
+        });
+        modelBuilder.Entity<MonitoringWorkflowRunEntity>(entity =>
+        {
+            entity.ToTable("workflow_run");
+            entity.HasKey(value => value.RunId);
+            entity.HasIndex(value => value.LastActivityAtUtc);
+            entity.HasIndex(value => new { value.CoordinationType, value.Status });
             entity.Property(value => value.Payload).HasColumnType("jsonb");
         });
     }
@@ -116,5 +125,17 @@ internal sealed class MonitoringJobEntity
     public string BusId { get; set; } = string.Empty;
     public DateTimeOffset CapturedAtUtc { get; set; }
     public DateTimeOffset ReceivedAtUtc { get; set; }
+    public string Payload { get; set; } = string.Empty;
+}
+
+internal sealed class MonitoringWorkflowRunEntity
+{
+    public string RunId { get; set; } = string.Empty;
+    public string WorkflowId { get; set; } = string.Empty;
+    public string CoordinationType { get; set; } = string.Empty;
+    public string Status { get; set; } = string.Empty;
+    public DateTimeOffset StartedAtUtc { get; set; }
+    public DateTimeOffset LastActivityAtUtc { get; set; }
+    public DateTimeOffset UpdatedAtUtc { get; set; }
     public string Payload { get; set; } = string.Empty;
 }

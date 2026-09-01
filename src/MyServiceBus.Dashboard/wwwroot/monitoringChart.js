@@ -3,6 +3,8 @@ import * as d3 from "https://cdn.jsdelivr.net/npm/d3@7/+esm";
 const colors = ["#55d6a9", "#69a8ff", "#f2bd5c", "#d68cff", "#ff837a", "#66d7e8"];
 const flowMaps = new WeakMap();
 const replicaFlowMaps = new WeakMap();
+const workflowRunMaps = new WeakMap();
+let workflowRunMapSequence = 0;
 
 export function renderThroughputChart(element, rawPoints, compact = false) {
     const points = rawPoints.map(point => ({
@@ -669,6 +671,233 @@ class ReplicaFlowMap {
     }
 }
 
+export function initializeWorkflowRunMap(element) {
+    disposeWorkflowRunMap(element);
+    workflowRunMaps.set(element, new WorkflowRunMap(element));
+}
+
+export function updateWorkflowRunMap(element, graph) {
+    workflowRunMaps.get(element)?.update(graph);
+}
+
+export function zoomWorkflowRunMap(element, factor) {
+    workflowRunMaps.get(element)?.zoomBy(factor);
+}
+
+export function resetWorkflowRunMap(element) {
+    workflowRunMaps.get(element)?.fitToContent(true);
+}
+
+export function disposeWorkflowRunMap(element) {
+    const map = workflowRunMaps.get(element);
+    if (map) {
+        map.dispose();
+        workflowRunMaps.delete(element);
+    }
+}
+
+class WorkflowRunMap {
+    constructor(element) {
+        this.element = element;
+        this.svg = d3.select(element).select(".workflow-run-map-canvas");
+        this.stage = this.svg.append("g").attr("class", "workflow-run-map-stage");
+        this.laneGroup = this.stage.append("g").attr("class", "workflow-run-map-lanes");
+        this.linkGroup = this.stage.append("g").attr("class", "workflow-run-map-links");
+        this.labelGroup = this.stage.append("g").attr("class", "workflow-run-map-labels");
+        this.nodeGroup = this.stage.append("g").attr("class", "workflow-run-map-nodes");
+        this.markerId = `workflow-run-arrow-${++workflowRunMapSequence}`;
+
+        this.svg.append("defs")
+            .append("marker")
+            .attr("id", this.markerId)
+            .attr("viewBox", "0 -5 10 10")
+            .attr("refX", 9)
+            .attr("refY", 0)
+            .attr("markerWidth", 7)
+            .attr("markerHeight", 7)
+            .attr("markerUnits", "userSpaceOnUse")
+            .attr("orient", "auto")
+            .append("path")
+            .attr("d", "M0,-5L10,0L0,5")
+            .attr("class", "workflow-run-map-arrow");
+
+        this.zoom = d3.zoom()
+            .scaleExtent([0.45, 3])
+            .on("zoom", event => this.stage.attr("transform", event.transform));
+        this.svg.call(this.zoom);
+        this.structureKey = null;
+    }
+
+    update(graph) {
+        const nodes = (graph?.nodes || []).map(node => ({ ...node, level: 0 }));
+        const nodeById = new Map(nodes.map(node => [node.id, node]));
+        const links = (graph?.links || [])
+            .filter(link => nodeById.has(link.source) && nodeById.has(link.target))
+            .map((link, index) => ({ ...link, id: `${link.source}->${link.target}:${index}` }));
+        const incoming = new Map(nodes.map(node => [node.id, 0]));
+        const outgoing = new Map(nodes.map(node => [node.id, []]));
+        links.forEach(link => {
+            incoming.set(link.target, (incoming.get(link.target) || 0) + 1);
+            outgoing.get(link.source).push(link.target);
+        });
+        const pending = nodes.filter(node => incoming.get(node.id) === 0)
+            .sort((left, right) => d3.ascending(left.sequence, right.sequence));
+        const visited = new Set();
+        while (pending.length) {
+            const node = pending.shift();
+            if (!visited.add(node.id)) continue;
+            for (const targetId of outgoing.get(node.id)) {
+                const target = nodeById.get(targetId);
+                target.level = Math.max(target.level, node.level + 1);
+                incoming.set(targetId, incoming.get(targetId) - 1);
+                if (incoming.get(targetId) === 0) pending.push(target);
+            }
+        }
+        nodes.filter(node => !visited.has(node.id)).forEach((node, index) => {
+            node.level = Math.max(node.level, index);
+        });
+
+        const applicationGroups = d3.groups(nodes, node => node.application)
+            .sort(([, left], [, right]) => d3.ascending(d3.min(left, node => node.sequence), d3.min(right, node => node.sequence)));
+        let laneTop = 18;
+        const applications = applicationGroups.map(([application, members], index) => {
+            const maximumLevelOccupancy = d3.max(
+                d3.rollups(members, values => values.length, node => node.level),
+                ([, count]) => count) || 1;
+            const height = Math.max(136, 34 + maximumLevelOccupancy * 86 + (maximumLevelOccupancy - 1) * 22 + 16);
+            const lane = { application, index, top: laneTop, height };
+            laneTop += height + 18;
+            return lane;
+        });
+        const laneByApplication = new Map(applications.map(lane => [lane.application, lane]));
+        const width = Math.max(620, (d3.max(nodes, node => node.level) + 1) * 380 + 220);
+        const height = Math.max(300, laneTop + 9);
+        const occupied = new Map();
+        nodes.sort((left, right) => d3.ascending(left.sequence, right.sequence)).forEach(node => {
+            const lane = laneByApplication.get(node.application);
+            const positionKey = `${node.application}:${node.level}`;
+            const offset = occupied.get(positionKey) || 0;
+            occupied.set(positionKey, offset + 1);
+            node.x = 180 + node.level * 380;
+            node.y = lane.top + 77 + offset * 108;
+        });
+        links.forEach(link => {
+            link.sourceNode = nodeById.get(link.source);
+            link.targetNode = nodeById.get(link.target);
+        });
+        const structureKey = JSON.stringify({
+            nodes: nodes.map(node => node.id),
+            links: links.map(link => `${link.source}->${link.target}`),
+            applications: applications.map(lane => lane.application)
+        });
+        const structureChanged = structureKey !== this.structureKey;
+        this.structureKey = structureKey;
+
+        this.svg.attr("viewBox", `0 0 ${width} ${height}`);
+        this.element.style.minHeight = `${Math.min(520, Math.max(320, height))}px`;
+        this.renderLanes(applications, width);
+        this.renderLinks(links);
+        this.renderNodes(nodes);
+        if (structureChanged) queueMicrotask(() => this.fitToContent(false));
+    }
+
+    renderLanes(lanes, width) {
+        const selection = this.laneGroup.selectAll("g")
+            .data(lanes, lane => lane.application)
+            .join(enter => {
+                const group = enter.append("g").attr("class", "workflow-run-map-lane");
+                group.append("rect");
+                group.append("text");
+                return group;
+            });
+        selection.select("rect")
+            .attr("x", 18)
+            .attr("y", lane => lane.top)
+            .attr("width", width - 36)
+            .attr("height", lane => lane.height)
+            .attr("rx", 12);
+        selection.select("text")
+            .attr("x", 34)
+            .attr("y", lane => lane.top + 20)
+            .text(lane => lane.application);
+    }
+
+    renderLinks(links) {
+        this.linkGroup.selectAll("path")
+            .data(links, link => link.id)
+            .join("path")
+            .attr("class", link => `workflow-run-map-link${link.succeeded ? "" : " faulted"}`)
+            .attr("marker-end", `url(#${this.markerId})`)
+            .attr("d", link => {
+                const startX = link.sourceNode.x + 105;
+                const endX = link.targetNode.x - 105;
+                const middleX = (startX + endX) / 2;
+                return `M${startX},${link.sourceNode.y} C${middleX},${link.sourceNode.y} ${middleX},${link.targetNode.y} ${endX},${link.targetNode.y}`;
+            });
+        this.labelGroup.selectAll("text")
+            .data(links, link => link.id)
+            .join("text")
+            .attr("class", "workflow-run-map-link-label")
+            .attr("x", link => (link.sourceNode.x + link.targetNode.x) / 2)
+            .attr("y", link => (link.sourceNode.y + link.targetNode.y) / 2 - 8)
+            .text(link => `${link.operation} ${trimText(link.message, 14)} · ${formatMilliseconds(link.handoffDurationMs)}`);
+    }
+
+    renderNodes(nodes) {
+        const selection = this.nodeGroup.selectAll("g")
+            .data(nodes, node => node.id)
+            .join(enter => {
+                const group = enter.append("g").attr("class", "workflow-run-map-node");
+                group.append("rect").attr("x", -105).attr("y", -43).attr("width", 210).attr("height", 86).attr("rx", 11);
+                group.append("text").attr("class", "workflow-run-map-application").attr("x", -90).attr("y", -21);
+                group.append("text").attr("class", "workflow-run-map-structure").attr("x", 90).attr("y", -21);
+                group.append("text").attr("class", "workflow-run-map-step").attr("x", -90).attr("y", 2);
+                group.append("text").attr("class", "workflow-run-map-contract").attr("x", -90).attr("y", 23);
+                group.append("text").attr("class", "workflow-run-map-duration").attr("x", 90).attr("y", 23);
+                return group;
+            });
+        selection
+            .attr("class", node => `workflow-run-map-node ${node.status}`)
+            .attr("transform", node => `translate(${node.x},${node.y})`);
+        selection.select(".workflow-run-map-application").text(node => trimText(node.application, 25));
+        selection.select(".workflow-run-map-structure").text(node => {
+            const labels = [];
+            if (node.rootFanOutCount > 1) labels.push(`ROOT ×${node.rootFanOutCount}`);
+            if (node.branchCount > 1) labels.push(`FORK ×${node.branchCount}`);
+            if (node.mergeCount > 1) labels.push(`MERGE ×${node.mergeCount}`);
+            return labels.join(" · ");
+        });
+        selection.select(".workflow-run-map-step").text(node => trimText(node.label, 28));
+        selection.select(".workflow-run-map-contract").text(node => `Consumes ${trimText(node.contract, 16)}`);
+        selection.select(".workflow-run-map-duration").text(node => formatMilliseconds(node.durationMs));
+    }
+
+    fitToContent(animate) {
+        const stage = this.stage.node();
+        if (!stage) return;
+        const bounds = stage.getBBox();
+        if (bounds.width <= 0 || bounds.height <= 0) return;
+        const width = Math.max(this.element.clientWidth, 320);
+        const height = Math.max(this.element.clientHeight, 300);
+        const scale = Math.min(1.15, width / (bounds.width + 70), height / (bounds.height + 70));
+        const transform = d3.zoomIdentity
+            .translate(width / 2 - (bounds.x + bounds.width / 2) * scale, height / 2 - (bounds.y + bounds.height / 2) * scale)
+            .scale(scale);
+        const selection = animate ? this.svg.transition().duration(180) : this.svg;
+        selection.call(this.zoom.transform, transform);
+    }
+
+    zoomBy(factor) {
+        const boundedFactor = Number.isFinite(factor) && factor > 0 ? factor : 1;
+        this.svg.call(this.zoom.scaleBy, boundedFactor);
+    }
+
+    dispose() {
+        this.svg.on(".zoom", null);
+        this.svg.selectAll("*").remove();
+    }
+}
+
 function edgePath(edge) {
     if (getNodeId(edge.source) === getNodeId(edge.target)) {
         return `M${edge.source.x + 62},${edge.source.y - 28} C${edge.source.x + 150},${edge.source.y - 130} ${edge.source.x - 150},${edge.source.y - 130} ${edge.source.x - 62},${edge.source.y - 28}`;
@@ -717,4 +946,9 @@ function formatFlowRate(value) {
     if (value >= 1) return d3.format(".1f")(value);
     if (value >= 0.01) return d3.format(".2f")(value);
     return d3.format(".3f")(value);
+}
+
+function formatMilliseconds(value) {
+    const milliseconds = Number(value || 0);
+    return milliseconds >= 1000 ? `${d3.format(".2~f")(milliseconds / 1000)} s` : `${d3.format(".3~f")(milliseconds)} ms`;
 }

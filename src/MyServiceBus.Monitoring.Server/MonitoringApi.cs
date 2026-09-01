@@ -142,6 +142,44 @@ public static class MonitoringApi
             .WithSummary("Get the latest metadata for one application instance and bus")
             .Produces<MonitoringMetadata>()
             .Produces(StatusCodes.Status404NotFound);
+        query.MapGet("/choreographies", (MonitoringRepository repository) =>
+            repository.GetDeclaredChoreographies(DateTimeOffset.UtcNow))
+            .WithSummary("List merged application-declared choreography fragments and conflicts")
+            .CacheOutput(policy => policy.Expire(TimeSpan.FromSeconds(5)));
+        query.MapGet("/choreographies/runtime", (int? windowSeconds, MonitoringRepository repository) =>
+            repository.GetChoreographyRuntime(windowSeconds ?? 300, DateTimeOffset.UtcNow))
+            .WithSummary("Compare declared choreography reactions with exact causal observations");
+        query.MapGet("/choreographies/runs", (string? choreography, int? windowSeconds, int? limit, MonitoringRepository repository) =>
+            repository.GetChoreographyRuns(choreography, windowSeconds ?? 300, limit ?? 20, DateTimeOffset.UtcNow))
+            .WithSummary("Reconstruct bounded declared choreography runs from exact causal observations");
+        query.MapGet("/workflow-runs", (
+            string? workflow,
+            string? coordinationType,
+            string? status,
+            string? search,
+            DateTimeOffset? startedAfterUtc,
+            DateTimeOffset? startedBeforeUtc,
+            int? offset,
+            int? limit,
+            MonitoringRepository repository) => repository.GetWorkflowRuns(
+                workflow,
+                coordinationType,
+                status,
+                search,
+                startedAfterUtc,
+                startedBeforeUtc,
+                offset ?? 0,
+                limit ?? 50,
+                DateTimeOffset.UtcNow))
+            .WithSummary("List retained workflow runs with server-side filtering and pagination");
+        query.MapGet("/workflow-runs/{runId}", (string runId, MonitoringRepository repository) =>
+        {
+            var run = repository.GetWorkflowRun(runId, DateTimeOffset.UtcNow);
+            return run is null ? Results.NotFound() : Results.Ok(run);
+        })
+            .WithSummary("Get one retained workflow run by stable identity")
+            .Produces<MonitoringChoreographyRun>()
+            .Produces(StatusCodes.Status404NotFound);
         query.MapGet("/observations", (string? application, int? limit, MonitoringRepository repository) =>
             repository.GetRecentObservations(application, limit ?? 100))
             .WithSummary("List recent bounded monitoring observations");
@@ -157,6 +195,9 @@ public static class MonitoringApi
         query.MapGet("/flow/replicas", (string? application, int? windowSeconds, MonitoringRepository repository) =>
             repository.GetReplicaFlow(application, windowSeconds ?? 300, DateTimeOffset.UtcNow))
             .WithSummary("Query observed message-flow paths between application replicas");
+        query.MapGet("/flow/causal", (string? application, int? windowSeconds, MonitoringRepository repository) =>
+            repository.GetCausalFlow(application, windowSeconds ?? 300, DateTimeOffset.UtcNow))
+            .WithSummary("Query exact consumed-message to outgoing-operation reactions");
         query.MapGet("/outbox", (string? application, int? windowSeconds, MonitoringRepository repository) =>
             repository.GetOutboxDispatchers(application, windowSeconds ?? 60, DateTimeOffset.UtcNow))
             .WithSummary("Query outbox dispatcher state and windowed activity");

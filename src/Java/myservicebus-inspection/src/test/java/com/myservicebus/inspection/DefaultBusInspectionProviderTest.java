@@ -3,6 +3,7 @@ package com.myservicebus.inspection;
 import com.myservicebus.MessageBus;
 import com.myservicebus.MessageBusImpl;
 import com.myservicebus.di.ServiceCollection;
+import com.myservicebus.choreography.ChoreographyBuilder;
 import com.myservicebus.topology.TopologyRegistry;
 import org.junit.jupiter.api.Test;
 
@@ -25,6 +26,9 @@ class DefaultBusInspectionProviderTest {
     void createsSnapshotFromTopology() {
         TopologyRegistry topology = new TopologyRegistry();
         topology.registerConsumer(SubmitOrderConsumer.class, "submit-order", null, SubmitOrder.class);
+        topology.registerChoreography(new ChoreographyBuilder("orders", "1", "orders")
+                .step("submit", SubmitOrder.class, step -> step.terminates())
+                .build());
 
         ServiceCollection services = ServiceCollection.create();
         services.addSingleton(TopologyRegistry.class, sp -> () -> topology);
@@ -39,6 +43,8 @@ class DefaultBusInspectionProviderTest {
         assertEquals(1, snapshot.messages().size());
         assertEquals(1, snapshot.receiveEndpoints().size());
         assertEquals(1, snapshot.consumers().size());
+        assertEquals(1, snapshot.choreographies().size());
+        assertEquals("orders", snapshot.choreographies().get(0).choreographyId());
         assertEquals("submit-order", snapshot.receiveEndpoints().get(0).endpointName());
         assertEquals("queue:submit-order", snapshot.receiveEndpoints().get(0).address());
         assertNull(snapshot.receiveEndpoints().get(0).transport());

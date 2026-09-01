@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "choreographyId": "order-fulfillment",
+  "definitionVersion": "1",
+  "owner": "orders",
+  "steps": [
+    {
+      "id": "complete-order",
+      "triggerMessageUrn": "urn:message:Contracts:OrderCompleted",
+      "ownerComponent": "complete-order-consumer",
+      "outputs": [
+        {
+          "kind": "terminal",
+          "messageUrn": null,
+          "destination": null,
+          "requirement": "expected",
+          "minCount": null,
+          "maxCount": null,
+          "withinMilliseconds": null
+        }
+      ]
+    },
+    {
+      "id": "reserve-inventory",
+      "triggerMessageUrn": "urn:message:Contracts:OrderSubmitted",
+      "ownerComponent": "submit-order-consumer",
+      "outputs": [
+        {
+          "kind": "send",
+          "messageUrn": "urn:message:Contracts:ReserveInventory",
+          "destination": "queue:reserve-inventory",
+          "requirement": "expected",
+          "minCount": 1,
+          "maxCount": 1,
+          "withinMilliseconds": 5000
+        },
+        {
+          "kind": "publish",
+          "messageUrn": "urn:message:Contracts:OrderAccepted",
+          "destination": null,
+          "requirement": "optional",
+          "minCount": null,
+          "maxCount": 1,
+          "withinMilliseconds": null
+        }
+      ]
+    }
+  ]
+}

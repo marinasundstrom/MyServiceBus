@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using MyServiceBus.Choreography;
 using MyServiceBus.Topology;
 using MyServiceBus.Serialization;
 using System;
@@ -34,6 +35,11 @@ public class BusRegistrationConfigurator : IBusRegistrationConfigurator
         var telemetryFilter = new OpenTelemetrySendFilter();
         sendConfigurator.UseFilter((IFilter<SendContext>)telemetryFilter);
         publishConfigurator.UseFilter((IFilter<PublishContext>)telemetryFilter);
+    }
+
+    public void AddChoreography(ChoreographyFragment fragment)
+    {
+        _topology.RegisterChoreography(fragment);
     }
 
     [RequiresDynamicCode("Runtime job consumer discovery closes generic registrations dynamically. Use the explicit job/message overload for NativeAOT.")]

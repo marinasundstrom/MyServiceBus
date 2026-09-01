@@ -21,6 +21,12 @@ The `/dashboard/v1/*` routes expose stable JSON DTOs for dashboard experiments. 
 
 `/publish` and `/send` produce `SubmitOrder` messages. The `*/fault` variants mark the message so `SubmitOrderConsumer` intentionally throws and a `Fault<SubmitOrder>` is published to the `submit-order_fault` queue, where `SubmitOrderFaultConsumer` logs it.
 
+The sample declares workflows at several levels of complexity for the monitoring Dashboard:
+
+- `sample-local-order-observation` is a single application-owned terminal reaction.
+- `sample-order-submission` is a shared C# and Java fan-out choreography.
+- `sample-fulfillment-handoff` is a linear C# → Java → C# handoff. Start a run with `POST /workflows/fulfillment`.
+
 `/request` and `/request_multi` send a `TestRequest`. Their `*/fault` variants mark the request so `TestRequestConsumer` intentionally faults.
 
 See `/Users/robert/Projects/MyServiceBus/src/TestApp/TestApp.http` for ready-made requests.

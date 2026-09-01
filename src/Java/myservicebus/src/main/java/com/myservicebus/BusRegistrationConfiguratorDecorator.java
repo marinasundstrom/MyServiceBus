@@ -4,6 +4,7 @@ import com.myservicebus.di.ServiceCollection;
 import com.myservicebus.serialization.SerializerFactory;
 import java.util.function.Consumer;
 import com.myservicebus.BusFactoryConfigurator;
+import com.myservicebus.choreography.ChoreographyFragment;
 
 public abstract class BusRegistrationConfiguratorDecorator implements BusRegistrationConfigurator {
 
@@ -11,6 +12,11 @@ public abstract class BusRegistrationConfiguratorDecorator implements BusRegistr
 
     protected BusRegistrationConfiguratorDecorator(BusRegistrationConfigurator inner) {
         this.inner = inner;
+    }
+
+    @Override
+    public void addChoreography(ChoreographyFragment fragment) {
+        inner.addChoreography(fragment);
     }
 
     @Override

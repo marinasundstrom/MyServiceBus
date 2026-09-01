@@ -12,6 +12,16 @@ C# and Java applications
 
 Messaging does not depend on this path. If the monitoring service is unavailable or an export fails, message processing continues.
 
+## Monitoring Service Boundary
+
+The monitoring service is first a collector and owner of monitoring data. Exporters send versioned application metadata, heartbeats, observations, and provider snapshots to it; the service validates and retains those inputs using volatile memory or its configured durable provider. Query clients retrieve data from the service rather than reaching back into applications.
+
+The service is also the owner of shared monitoring projections. It constructs application and endpoint summaries, time-window metrics, observed flow, declared-workflow graphs, snapshots, diagnostics, and eventually recurring workflow-pattern candidates from retained inputs. The Dashboard owns presentation and interaction—not the semantic identification of a workflow, connection, or deviation. This keeps the HTTP API useful to other dashboards, CLIs, support tools, and integrations and prevents each client from inventing a different model.
+
+Alerting is a separate future service that consumes monitoring data. It will own rule evaluation and alert lifecycle concerns such as thresholds, deduplication, suppression, acknowledgement, recovery, notifications, and audit. It should consume supported snapshots, queries, or a future durable change feed from monitoring rather than connect to application exporters or read the monitoring database directly. The current WebSocket stream only invalidates Dashboard reads and is not a durable alert feed.
+
+A projection may be calculated on demand, incrementally maintained, or cached briefly. Those are internal optimization choices as long as the query preserves explicit capture time, window, freshness, completeness, and bounded-staleness semantics. The current summary and declared-choreography projections use a five-second HTTP output cache; ingest and retained source records are not rewritten into projected truth.
+
 ## MVP Status
 
 The proof of concept is suitable to ship as an **experimental MVP**, not as a production monitoring system. The end-to-end Aspire stack has been exercised with C# and Java clients, RabbitMQ, the collector, HTTP queries, the WebSocket invalidation stream, and the Blazor dashboard.
@@ -33,14 +43,14 @@ The MVP includes:
 - batch deduplication and reported dropped-observation counts
 - HTTP ingest and query APIs
 - WebSocket change invalidations
-- a directed, responsive Blazor dashboard with persisted light, dark, and system themes
+- a directed, responsive Blazor dashboard with persisted light, dark, and system themes plus a comfortable or compact density preference
 - application Overview, Metrics, and Flow drill-downs that progressively reveal messaging detail
 - equivalent exporter behavior for C# and Java
 - first-class outbox dispatcher operations for embedded and standalone workers, including latest backlog, oldest-undispatched age, windowed throughput, failures, lost leases, and cycle latency
 - transparent history freshness, coverage, and durability status
 - an optional Entity Framework Core PostgreSQL history provider with automatic migrations, deduplicated batches, bounded retention, and active-window restoration after restart
 
-The MVP does not yet include authentication, long-range historical query views, alerting or scaling recommendations, broker queue depth, host saturation, broker administration, or payload-byte limits. PostgreSQL adds durable collection and restart recovery, but the current metric queries and dashboard still expose only the active 15-minute read-model window. The dashboard uses WebSocket invalidations to re-query HTTP snapshots, with a 15-second polling fallback.
+The MVP does not yet include authentication, general long-range historical metric queries, alerting or scaling recommendations, broker queue depth, host saturation, broker administration, or payload-byte limits. PostgreSQL adds durable collection, restart recovery, and retained workflow-run drill-down; other metric queries still expose only the active 15-minute read-model window. The dashboard uses WebSocket invalidations to re-query HTTP snapshots, with a 15-second polling fallback.
 
 ## Dashboard Experience
 
@@ -82,6 +92,51 @@ System-wide focused views remain available when the operator needs to compare ap
 
 Graphs and maps are a continuing dashboard theme. They are implemented as distinct components rather than being embedded into individual pages, which keeps compact overview variants and full drill-down variants consistent. New domains such as sagas should follow the same shape: add only a concise health signal to the overview when it is broadly actionable, and put state distribution, transitions, faults, and correlations in a focused view.
 
+Workflows are a focused dashboard domain with separate **Workflow runs** and **Declared workflows** tabs. The runs tab is the operational entry point: it queries the monitoring-owned retained projection with server-side type, status, and identity filters plus pagination, then links directly to a stable run detail with the D3 activity diagram and ordered evidence. The declared tab is the stable catalog: its definition map groups reactions by participating application, connects consumed triggers to declared outputs and matching downstream participants, and keeps versions, definition conflicts, replica availability, capture freshness, and aggregate exact-causation evidence visible. Silence is labeled as no exact evidence, never as a missed reaction, failed workflow, or authoritative state. An orchestration view can additionally use persisted saga identity and transition evidence to show authoritative current state, transition history, pending timeouts or requests, faults, and completion. Both reuse maps, timelines, contract nodes, causal edges, and application drill-downs while preserving the distinction between reconstructed and persisted truth.
+
+Dashboard density is a local presentation preference. **Comfortable** remains the default; **Compact** tightens navigation, headings, cards, tables, filters, and workflow detail for operators who prefer more information at once or use smaller screens. It does not change query windows, retention, aggregation, or monitoring semantics.
+
+The same domain can eventually include a **Discovered patterns** view for systems that have no formal workflow definition. Repeated causal paths may be grouped into workflow-shaped candidates and shown with their time window, sample count, participating applications and contracts, confidence, and coverage. The dashboard must label these as recurring observed patterns rather than declared choreography. It may help an owner draft a declaration, but it must not create or register one automatically.
+
+After a candidate has enough support, a comparison overlay can show traffic breaking out of its usual shape: new participants or contracts, a rare branch, changed fan-out, a novel cycle, or absence of the usual continuation. That is a deviation from a selected baseline, not proof of failure. The visualization must keep the baseline window and versions visible, distinguish exact from heuristic evidence, account for incomplete or stale exporters, and open the causal records behind the deviation. Deployments, feature flags, version skew, and valid low-frequency paths should remain plausible explanations rather than being hidden by an anomaly label.
+
+The useful navigation is aggregate to instance and back: begin with workflow health and state or step distribution, select an unhealthy path, inspect the participating services and causal messages, and—only where a saga owns the lifecycle—open the corresponding persisted instance. Instance identifiers and histories remain bounded operational data subject to authentication, retention, and redaction. Visibility does not authorize retrying, compensating, forcing a transition, or terminating a workflow; those are future control-plane operations.
+
+### Workflow visualization model
+
+The focused workflow experience should combine three synchronized views instead of forcing every fact onto one graph:
+
+1. **Definition or baseline map** — the relatively stable model. A choreography map groups declared reaction steps by owning application; a discovered-pattern map shows a clearly labeled, time-bounded recurring shape; and an orchestration map renders state-machine states and event-labeled transitions, including initial, final, timeout, and fault paths.
+2. **Runtime overlay** — aggregate recorded evidence on the definition or selected baseline. State nodes can show current instance counts, fault counts, and oldest age; reaction or transition edges can show observed count, latency, and evidence confidence. Missing declaration, missing observation, or a breakout from a recurring pattern appears as a diagnostic overlay rather than silently changing the underlying map.
+3. **Instance timeline** — the ordered record for one selected causal chain or saga instance. It shows consumed events, state before and after a transition, activities, outgoing messages, schedules, retries, persistence conflicts, faults, and completion with timestamps and owning application.
+
+```mermaid
+flowchart LR
+    Model["Definition or baseline map\nstates, reactions, or recurring paths"] -->|select node or edge| Runtime["Runtime overlay\ncounts, age, latency, faults"]
+    Runtime -->|select causal chain or saga| Timeline["Instance timeline\nrecorded events and transitions"]
+    Timeline -->|locate in model| Model
+```
+
+### Workflow run analysis
+
+The first choreography drill-down now lets an operator select one bounded causal chain and inspect it as a **workflow run** in the Dashboard. This is a presentation and monitoring projection over recorded messages, not a new choreography runtime or durable business-process instance. A D3 activity diagram places consumer activities in application swimlanes and connects them with causal message handoffs. The ordered detail list remains below it so branches are visible without hiding exact timestamps and evidence or making the SVG the only accessible representation.
+
+Each displayed step maps a consumed contract to the application, receive endpoint, and declared consumer or owning component when that mapping is unambiguous. It shows consumer execution duration, start and completion time, success or fault outcome, retry evidence, outgoing send or publication operations, and the next exactly matched consumption. The connection reports observed handoff time from the start of the outgoing operation to the next consumer start; consumer execution time remains on the step itself. This is not a broker-only latency measurement, because an asynchronous consumer may start before the producer's operation has returned.
+
+Run assembly groups every declared consumption connected by exact message delivery or consume-to-outbound causation into one weakly connected component. Multiple consumers of the same message therefore remain one delivery fan-out, and paths that later become exactly connected are reconciled into one retained run rather than leaving overlapping partial runs. The retained projection records all exactly connected root message identities and removes the superseded partial rows from both memory and PostgreSQL. Its structural summary distinguishes a linear path, exact fan-out, exact convergence, or both. “Convergence” is deliberately graph language: shared exact descendants do not prove a declared business join, synchronization barrier, or completion rule.
+
+Each run step also compares its declared outputs with exact observed evidence. Send and publish comparisons report observed, faulted, and late counts against declared minimum, maximum, destination, and timing expectations; a completed terminal reaction is compared directly. Optional and informational absence are not findings, and an explicit expected minimum of zero is shown as satisfied. Undeclared observed sends or publications remain attached to the producing step. Respond and schedule comparisons are explicitly unsupported until their exact evidence model is complete.
+
+Absence is deliberately gated. An expected output remains `awaiting_evidence` while its step has been active within the last 15 seconds. It becomes missing or below-minimum only after that inactivity window and only when the run's evidence coverage is complete; dropped observations or unavailable participants instead produce `insufficient_evidence`. Positive evidence such as a failed operation, an exceeded maximum, a late observation, or an undeclared output can be reported immediately. These are declared-versus-observed operational findings, not alert evaluations and not proof that the business workflow failed.
+
+Failures should remain attached to the step or connection that produced the evidence: consumer faults and exhausted retries on a step, failed sends or publications on an outgoing operation, and missing or heuristic continuation as a separately qualified edge state. Selecting a node or edge should open the underlying safe observation details, including contract, application, endpoint, message and causation references, timestamps, duration, and failure category, while continuing to exclude payloads and arbitrary headers.
+
+For choreography, “run” means a bounded reconstruction with explicit confidence and coverage; it does not prove an authoritative start, current state, or completion. The activity diagram labels observed root fan-out, internal forks, and convergence on affected activities, while its chronological card strip avoids implying a linear causal edge between parallel observations. Formal fork/join bars and decision/merge nodes remain dependent on richer declaration semantics. Orchestration should use a state-machine diagram as its primary definition view because the saga owns explicit states and transitions, while reusing activity/timeline views for the work performed during one transition. The visual vocabulary should be shared while the evidence labels remain different.
+
+For an orchestration instance, the state-machine graph should keep the complete definition visible, emphasize the current state, mark traversed transitions, and distinguish pending timers or requests from completed work. Selecting a state or transition opens the matching records in the timeline rather than expanding the node into an unreadable diagnostic panel. The timeline is the detailed audit-like explanation; the graph remains the spatial explanation of possible and current progress.
+
+Recorded transition information should include safe workflow and definition identity, instance identity, previous and next state, triggering event contract, timestamp and duration, owning application and component, message and correlation references, emitted operation kinds and contracts, scheduled or unscheduled deadlines, attempt and repository-conflict outcome, and fault category. Payloads, arbitrary headers, exception messages, and saga data remain excluded by default. Choreography records reuse the applicable fields but replace authoritative state transitions with declared step identity, causal evidence, confidence, and coverage.
+
 Broker inspection is a separate source of information from MyServiceBus monitoring. A future dashboard provider may query RabbitMQ, Azure Service Bus, or another broker management API with separately configured credentials. Queue-management, purge, replay, reset, and similar commands are a further control-plane capability: they require explicit authorization, confirmation, audit, and recoverability boundaries and must not be implied by read-only monitoring access.
 
 This supplied dashboard is one opinionated consumer of the monitoring APIs. A future engineering-focused dashboard could organize the same data around buses, endpoints, topology, and broker objects, closer to an infrastructure console, without changing this dashboard's application-developer purpose.
@@ -116,7 +171,9 @@ dotnet run --project src/AspireApp --launch-profile http
 
 Open the Aspire dashboard URL printed by the command, then open the `monitoring-dashboard` resource. The AppHost starts RabbitMQ, the monitoring service, the Blazor dashboard, and the C# and Java sample applications. Both sample applications self-register after their buses start.
 
-Use the sample applications' `/publish`, `/send`, and `/request` routes to create message activity. The `/request/fault` route exercises message fault handling. Both C# and Java samples register a `sample-report` job consumer and create one recurring occurrence at startup. `POST /jobs` submits another job; add `delaySeconds`, `failFirstAttempt`, or `failAlways` query parameters to demonstrate scheduled, retried, and faulted states. The C# outbox sample also executes a recurring job through the durable PostgreSQL provider. Export intervals make dashboard updates asynchronous; allow a few seconds, then open **Tracked jobs** globally or under an application.
+Use the sample applications' `/publish`, `/send`, and `/request` routes to create message activity. The `/request/fault` route exercises message fault handling. The samples declare a local terminal observation, a shared order-submission fan-out, and a four-step C# → Java → C# fulfillment handoff. Start the latter with `POST /workflows/fulfillment` on the C# app. Allow metadata export a few seconds, then open **Workflows**: **Workflow runs** lists reconstructed instances and opens each diagram, while **Declared workflows** shows the merged application-owned definitions independently of traffic.
+
+Both samples also register a `sample-report` job consumer and create one recurring occurrence at startup. `POST /jobs` submits another job; add `delaySeconds`, `failFirstAttempt`, or `failAlways` query parameters to demonstrate scheduled, retried, and faulted states. The C# outbox sample executes a recurring job through the durable PostgreSQL provider. Export intervals make dashboard updates asynchronous; allow a few seconds, then open **Tracked jobs** globally or under an application.
 
 ## Enable the C# Exporter
 
@@ -191,6 +248,10 @@ The monitoring service never connects directly to application databases or mutat
 
 The prototype uses `/api/monitoring/v1` for both ingest and query operations. The monitoring service publishes a generated OpenAPI 3.1 document at `/openapi/v1.json`. This is the primary machine-readable contract for teams building another dashboard, exporter, or integration. The document separates **Monitoring ingest** operations from **Monitoring queries** and includes the current JSON schemas and HTTP response codes.
 
+Registered choreography fragments travel with the existing payload-free bus inspection snapshot in application metadata. The exporter does not place them on application messages, and the collector does not execute them. The collector merges identical replica declarations into a read-only choreography projection while retaining reporting and online instance counts plus the latest capture time. It also projects deterministic, version-scoped links from an output contract to every declared step consuming that contract. These `declared_contract` links express definition continuity only; they do not prove configured routing, broker delivery, or observed execution. The collector reports definition-version, owner, and step-ownership conflicts as configuration evidence rather than business-workflow failures.
+
+The separate `/choreographies/runtime` projection compares declared send and publish reactions with exact consume-to-outbound causal edges inside the requested bounded window. It reports count, first and last observation time, evidence status, dropped observations, participant availability, and overall completeness. `no_exact_evidence` means only that the collector found no exact causal match in that window. This aggregate projection still marks respond, schedule, and terminal outcomes as `unsupported_operation`; correlation fallback and richer aggregate diagnostics remain future work.
+
 The contract is versioned but remains preview. The `/v1` route and each ingest body's `protocolVersion` identify the current wire generation; they do not imply stable-release compatibility guarantees before MyServiceBus 1.0. Integrators should generate clients from the document they deploy with and must preserve unknown additive response fields.
 
 | Method | Route | Purpose |
@@ -207,11 +268,17 @@ The contract is versioned but remains preview. The `/v1` route and each ingest b
 | `GET` | `/instances?application=...` | Query application instances |
 | `GET` | `/endpoints?application=...&windowSeconds=60` | Query receive-endpoint topology, availability, and windowed activity |
 | `GET` | `/metadata/{application}/{instanceId}/{busId}` | Query current bus metadata |
+| `GET` | `/choreographies` | Query merged declarations, version-scoped step connections, replica freshness, and definition conflicts |
+| `GET` | `/choreographies/runtime?windowSeconds=300` | Compare declared reactions with bounded exact causal evidence and coverage |
+| `GET` | `/choreographies/runs?choreography=...&windowSeconds=300&limit=20` | Reconstruct recent exact causal runs with step timing, handoffs, retries, outputs, and faults |
+| `GET` | `/workflow-runs?coordinationType=...&status=...&search=...&offset=0&limit=25` | Query the retained workflow-run projection with server-side filters and pagination |
+| `GET` | `/workflow-runs/{runId}` | Query one retained workflow run directly by its stable monitoring identity |
 | `GET` | `/observations?application=...&limit=100` | Query recent observations |
 | `GET` | `/metrics?application=...&windowSeconds=60&byInstance=true` | Query bounded-window rates, counts, and consume latency |
 | `GET` | `/metrics/timeseries?windowSeconds=300&bucketSeconds=5` | Query bucketed rates for real-time graphs |
 | `GET` | `/flow?application=...&windowSeconds=300` | Query observed correlated application flow aggregated across replicas |
 | `GET` | `/flow/replicas?application=...&windowSeconds=300` | Query correlated source-to-target replica paths with owning application and bus identity |
+| `GET` | `/flow/causal?application=...&windowSeconds=300` | Query exact consumed-message to outgoing-operation reactions |
 | `GET` | `/outbox?application=...&windowSeconds=60` | Query dispatcher state and windowed outbox throughput |
 | `GET` | `/scheduled-work?application=...&status=...` | Query current one-time scheduled work |
 | `GET` | `/recurring-jobs?application=...&status=...` | Query current recurring definitions |
@@ -220,7 +287,7 @@ The contract is versioned but remains preview. The `/v1` route and each ingest b
 
 All routes in the table are relative to `/api/monitoring/v1`. Ingest clients must register metadata before sending observations, heartbeats, or authoritative snapshots for that application-instance-bus identity. Successful writes return `202 Accepted`; invalid protocol data returns `400`, and writes for an unregistered identity return `404` or `409` as described by OpenAPI. An accepted snapshot replaces that identity's current view: omission from a successfully accepted snapshot means “not present now,” not “unknown historically.”
 
-`/summary` is the lightweight shell read model. It reports rolling failure and retry counts, affected applications, unhealthy outbox dispatchers, faulted and running tracked jobs, monitored and stale application counts, latest monitoring and observation timestamps, and whether the selected window is complete. Its response is cached for five seconds by the monitoring service so many dashboards share one projection. `CapturedAtUtc`, `WindowStartUtc`, and `WindowSeconds` make that bounded staleness explicit.
+`/summary` is the lightweight shell read model. It reports rolling failure and retry counts, affected applications, unhealthy outbox dispatchers, faulted and running tracked jobs, monitored and stale application counts, latest monitoring and observation timestamps, and whether the selected window is complete. Its response is cached for five seconds by the monitoring service so many dashboards share one projection. The declared-choreography query uses the same short cache because merging fragments and constructing graph connections are also service-owned projections. `CapturedAtUtc`, `WindowStartUtc`, and `WindowSeconds` make bounded staleness explicit where the model is windowed.
 
 The Failures navigation badge uses only the rolling failure count. It disappears as the window clears, displays `99+` rather than expanding indefinitely, and remains a link to the focused failure view. It is neither an unread count nor an alert and therefore has no acknowledgement state. Alert evaluation, thresholds, suppression, recovery, acknowledgement, and notification belong to the future alerting service rather than raw monitoring observations.
 
@@ -260,7 +327,7 @@ The .NET monitoring service can instead use its built-in Entity Framework Core P
 }
 ```
 
-The provider applies its schema migration at startup and stores the latest metadata, heartbeat, scheduled-work, recurring-definition, and tracked-job snapshots per bus identity plus deduplicated observation batches as JSONB. On restart, it restores those latest authoritative snapshots and rebuilds the current 15-minute observation window without making restored records appear newly ingested. The seven-day retention default bounds stored observation batches for future historical queries; it does not turn latest-state snapshots into time series or make seven days available through the current dashboard.
+The provider applies its schema migration at startup and stores the latest metadata, heartbeat, scheduled-work, recurring-definition, and tracked-job snapshots per bus identity plus deduplicated observation batches and reconstructed workflow runs as JSONB. On restart, it restores those latest authoritative snapshots, rebuilds the current 15-minute observation window without making restored records appear newly ingested, and restores workflow runs retained within the configured storage period. The seven-day default bounds both observation batches and workflow-run drill-down. It does not turn the other latest-state snapshots or metric buckets into historical time series.
 
 Storage belongs entirely to the monitoring service. Exporters and the dashboard do not receive database credentials, use Entity Framework, or own retention behavior.
 
@@ -279,6 +346,8 @@ HTTP request → Checkout.Api
 ```
 
 This answers a different question from the monitoring overview. The dashboard shows the current shape and behavior of the system—applications, replicas, rates, latency, retries, failures, and observed aggregate flow. An OpenTelemetry backend shows the path and timing of one particular operation across service and messaging boundaries, including the work that caused the next message.
+
+Observed flow prefers exact envelope message identity when matching an outbound operation to its consumption and exposes `matchConfidence` as `exact_message` or `correlated`. Correlation, conversation, or trace fallback may span concurrent branches. Consumer-originated outgoing operations additionally carry `causationMessageId`; `GET /api/monitoring/v1/flow/causal` projects exact local trigger-to-output reactions with `exact_causation` confidence. This evidence is monitoring-only, survives PostgreSQL outbox dispatch, and does not add a wire header. Declared choreography, its aggregate reaction overlay, and completeness-gated per-run output comparison build on that evidence; heuristic confidence, formal joins, recurring-pattern discovery, and broader graph diagnostics in [Choreography Modeling and Diagnostics](proposals/choreography-modeling-and-diagnostics.md) remain future work.
 
 When running the repository through Aspire, open the Aspire dashboard's telemetry trace view to inspect this complete request-and-message chain. The inbound HTTP span, MyServiceBus producer and consumer spans, and any other instrumented application work appear together in the same trace, provided every participating service exports the propagated context. The MyServiceBus monitoring dashboard remains the aggregate runtime overview alongside that per-operation Aspire view.
 

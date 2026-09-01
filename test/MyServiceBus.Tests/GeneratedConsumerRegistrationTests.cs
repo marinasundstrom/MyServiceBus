@@ -21,7 +21,7 @@ public class GeneratedConsumerRegistrationTests
         var consumers = topology.Consumers.OrderBy(consumer => consumer.ConsumerType.Name).ToArray();
 
         Assert.Equal(
-            ["__MethodConsumer0", "__MethodConsumer1", "__MethodConsumer2", "__MethodConsumer3", "__MethodConsumer4", "__MethodConsumer5", "OrderSubmittedConsumer", "SubmitOrderConsumer", "SubmitOrderFaultConsumer", "TestRequestConsumer"],
+            ["__MethodConsumer0", "__MethodConsumer1", "__MethodConsumer2", "__MethodConsumer3", "__MethodConsumer4", "__MethodConsumer5", "FulfillmentCompletedConsumer", "FulfillmentRequestedConsumer", "InventoryCheckRequestedConsumer", "InventoryReservedConsumer", "OrderSubmittedConsumer", "ParallelOrderChecksRequestedConsumer", "PaymentCheckRequestedConsumer", "SubmitOrderConsumer", "SubmitOrderFaultConsumer", "TestRequestConsumer"],
             consumers.Select(consumer => consumer.ConsumerType.Name));
         Assert.All(consumers, consumer =>
         {

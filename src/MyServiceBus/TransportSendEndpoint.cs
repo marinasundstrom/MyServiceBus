@@ -18,8 +18,9 @@ internal class TransportSendEndpoint : ISendEndpoint
     readonly ILogger<TransportSendEndpoint>? _logger;
     readonly Action? _ensureStarted;
     readonly IBusHookDispatcher? _hooks;
+    readonly Guid? _causationMessageId;
 
-    public TransportSendEndpoint(ITransportFactory transportFactory, ISendPipe sendPipe, IMessageSerializer serializer, Uri address, Uri sourceAddress, ISendContextFactory contextFactory, ILogger<TransportSendEndpoint>? logger = null, Action? ensureStarted = null, IBusHookDispatcher? hooks = null)
+    public TransportSendEndpoint(ITransportFactory transportFactory, ISendPipe sendPipe, IMessageSerializer serializer, Uri address, Uri sourceAddress, ISendContextFactory contextFactory, ILogger<TransportSendEndpoint>? logger = null, Action? ensureStarted = null, IBusHookDispatcher? hooks = null, Guid? causationMessageId = null)
     {
         _transportFactory = transportFactory;
         _sendPipe = sendPipe;
@@ -30,6 +31,7 @@ internal class TransportSendEndpoint : ISendEndpoint
         _logger = logger;
         _ensureStarted = ensureStarted;
         _hooks = hooks;
+        _causationMessageId = causationMessageId;
     }
 
     public Task Send<T>(T message, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default) where T : class
@@ -45,6 +47,7 @@ internal class TransportSendEndpoint : ISendEndpoint
         context.MessageId = Guid.NewGuid().ToString();
         context.SourceAddress = _sourceAddress;
         context.DestinationAddress = _address;
+        context.CausationMessageId = _causationMessageId;
 
         contextCallback?.Invoke(context);
 
@@ -84,7 +87,9 @@ internal class TransportSendEndpoint : ISendEndpoint
                 duration,
                 exception,
                 sendContext.CorrelationId,
-                sendContext.ConversationId?.ToString()));
+                sendContext.ConversationId?.ToString(),
+                messageId: sendContext.MessageId,
+                causationMessageId: sendContext.CausationMessageId?.ToString()));
         }
     }
 }

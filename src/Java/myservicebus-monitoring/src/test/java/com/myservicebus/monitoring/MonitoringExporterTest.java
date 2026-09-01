@@ -27,6 +27,7 @@ import com.myservicebus.SchedulingPlacement;
 import com.myservicebus.ScheduledWorkSource;
 import com.myservicebus.ScheduledWorkState;
 import com.myservicebus.ScheduledWorkStatus;
+import com.myservicebus.choreography.ChoreographyBuilder;
 import com.myservicebus.di.ServiceCollection;
 import com.myservicebus.di.ServiceProvider;
 import com.myservicebus.inspection.BusInspectionProvider;
@@ -72,13 +73,17 @@ class MonitoringExporterTest {
 
         MonitoringExporter exporter = new MonitoringExporter(options);
         try {
+            var choreography = new ChoreographyBuilder("orders", "1", "orders-java")
+                    .step("observe", TestMessage.class, step -> step.terminates())
+                    .build();
             exporter.start(() -> new BusInspectionSnapshot(
                     "mediator",
                     URI.create("loopback://localhost/"),
                     Instant.now(),
                     List.of(),
                     List.of(),
-                    List.of()));
+                    List.of(),
+                    List.of(choreography)));
             exporter.handle(MessageOperationHookEvent.create(
                     "published",
                     true,
@@ -88,15 +93,22 @@ class MonitoringExporterTest {
                     System.nanoTime(),
                     null,
                     null,
-                    null));
+                    null,
+                    null,
+                    null,
+                    "message-1",
+                    "trigger-1"));
 
             assertTrue(metadataReceived.await(2, TimeUnit.SECONDS));
             assertTrue(batchReceived.await(2, TimeUnit.SECONDS));
             assertTrue(metadataJson.get().contains("\"startedAtUtc\":\""));
             assertTrue(metadataJson.get().contains("\"labels\":{\"group\":\"commerce\"}"));
+            assertTrue(metadataJson.get().contains("\"choreographyId\":\"orders\""));
             assertTrue(batchJson.get().contains("\"applicationName\":\"orders-java\""));
             assertTrue(batchJson.get().contains("\"exportedAtUtc\":\""));
             assertTrue(batchJson.get().contains("\"kind\":\"published\""));
+            assertTrue(batchJson.get().contains("\"messageId\":\"message-1\""));
+            assertTrue(batchJson.get().contains("\"causationMessageId\":\"trigger-1\""));
         } finally {
             exporter.close();
             server.stop(0);

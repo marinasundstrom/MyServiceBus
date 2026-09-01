@@ -1,5 +1,6 @@
 using MyServiceBus.Inspection;
 using MyServiceBus;
+using MyServiceBus.Choreography;
 using MyServiceBus.Monitoring;
 using MyServiceBus.Monitoring.Server;
 using Shouldly;
@@ -215,6 +216,45 @@ public class MonitoringRepositoryTests
     }
 
     [Fact]
+    public void Repository_merges_declared_choreography_replicas_and_reports_definition_conflicts()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var repository = new MonitoringRepository();
+        var orders = CreateChoreography(
+            "orders", "1", "accept-order", "urn:message:OrderSubmitted", "urn:message:OrderAccepted");
+        var inventory = CreateChoreography(
+            "inventory", "1", "reserve-inventory", "urn:message:OrderAccepted", null);
+        var billing = CreateChoreography(
+            "billing", "1", "reserve-inventory", "urn:message:OrderAccepted", null);
+        var legacyOrders = CreateChoreography(
+            "orders", "2", "accept-legacy-order", "urn:message:OrderAccepted", null);
+
+        repository.UpsertMetadata(WithChoreography(CreateMetadata("orders", "orders-1", now, "commerce"), orders));
+        repository.UpsertMetadata(WithChoreography(CreateMetadata("orders", "orders-2", now.AddMinutes(-1), "commerce"), orders));
+        repository.UpsertMetadata(WithChoreography(CreateMetadata("inventory", "inventory-1", now, "commerce"), inventory));
+        repository.UpsertMetadata(WithChoreography(CreateMetadata("billing", "billing-1", now, "commerce"), billing));
+        repository.UpsertMetadata(WithChoreography(CreateMetadata("legacy-orders", "legacy-orders-1", now, "commerce"), legacyOrders));
+
+        var choreography = repository.GetDeclaredChoreographies(now).ShouldHaveSingleItem();
+        choreography.ChoreographyId.ShouldBe("order-fulfillment");
+        choreography.DefinitionVersions.ShouldBe(["1", "2"]);
+        choreography.ConflictKinds.ShouldBe(["definition_version", "owner", "step_ownership"]);
+        choreography.LastCapturedAtUtc.ShouldBe(now);
+        choreography.Fragments.Count.ShouldBe(4);
+        choreography.Connections.Count.ShouldBe(2);
+        choreography.Connections.Select(connection => connection.TargetApplication)
+            .ShouldBe(["billing", "inventory"]);
+        choreography.Connections.ShouldAllBe(connection =>
+            connection.DefinitionVersion == "1" && connection.MatchKind == "declared_contract");
+
+        var orderFragment = choreography.Fragments.Single(fragment => fragment.ApplicationName == "orders");
+        orderFragment.Owner.ShouldBe("orders");
+        orderFragment.ReportingInstances.ShouldBe(2);
+        orderFragment.OnlineInstances.ShouldBe(1);
+        orderFragment.Steps.ShouldHaveSingleItem().Id.ShouldBe("accept-order");
+    }
+
+    [Fact]
     public void Repository_derives_windowed_instance_metrics_retries_and_observed_flow()
     {
         var now = DateTimeOffset.UtcNow;
@@ -375,6 +415,7 @@ public class MonitoringRepositoryTests
         flow.SourceApplication.ShouldBe("checkout");
         flow.TargetApplication.ShouldBe("orders");
         flow.Count.ShouldBe(2);
+        flow.MatchConfidence.ShouldBe("correlated");
 
         var replicaFlow = repository.GetReplicaFlow(null, 60, now);
         replicaFlow.Count.ShouldBe(2);
@@ -396,6 +437,60 @@ public class MonitoringRepositoryTests
         repository.GetTimeSeries("orders", 60, 5, false, now)
             .Sum(point => point.Counts.Consumed)
             .ShouldBe(2);
+    }
+
+    [Fact]
+    public void Repository_prefers_exact_message_identity_when_correlation_is_shared()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var repository = new MonitoringRepository();
+        repository.UpsertMetadata(CreateMetadata("checkout", "checkout-1", now, "commerce"));
+        repository.UpsertMetadata(CreateMetadata("checkout", "checkout-2", now, "commerce"));
+        repository.UpsertMetadata(CreateMetadata("orders", "orders-1", now, "commerce"));
+        repository.UpsertMetadata(CreateMetadata("orders", "orders-2", now, "commerce"));
+
+        repository.RecordBatch(CreateBatch(
+            "checkout",
+            "checkout-1",
+            now,
+            new MonitoringObservation(
+                1, now.AddSeconds(-4), "published", true, "OrderSubmitted", "urn:message:OrderSubmitted",
+                null, "exchange:orders", 2, null, null, "shared", "conversation", null, null,
+                MessageId: "message-1"))).ShouldBeTrue();
+        repository.RecordBatch(CreateBatch(
+            "checkout",
+            "checkout-2",
+            now,
+            new MonitoringObservation(
+                1, now.AddSeconds(-3), "published", true, "OrderSubmitted", "urn:message:OrderSubmitted",
+                null, "exchange:orders", 2, null, null, "shared", "conversation", null, null,
+                MessageId: "message-2"))).ShouldBeTrue();
+        repository.RecordBatch(CreateBatch(
+            "orders",
+            "orders-1",
+            now,
+            new MonitoringObservation(
+                1, now.AddSeconds(-2), "consumed", true, "OrderSubmitted", "urn:message:OrderSubmitted",
+                "orders", null, 10, null, null, "shared", "conversation", null, null,
+                MessageId: "message-1"))).ShouldBeTrue();
+        repository.RecordBatch(CreateBatch(
+            "orders",
+            "orders-2",
+            now,
+            new MonitoringObservation(
+                1, now.AddSeconds(-1), "consumed", true, "OrderSubmitted", "urn:message:OrderSubmitted",
+                "orders", null, 12, null, null, "shared", "conversation", null, null,
+                MessageId: "message-2"))).ShouldBeTrue();
+
+        var replicaFlow = repository.GetReplicaFlow(null, 60, now);
+        replicaFlow.Count.ShouldBe(2);
+        replicaFlow.ShouldAllBe(edge => edge.MatchConfidence == "exact_message");
+        replicaFlow.Single(edge => edge.SourceInstanceId == "checkout-1").TargetInstanceId.ShouldBe("orders-1");
+        replicaFlow.Single(edge => edge.SourceInstanceId == "checkout-2").TargetInstanceId.ShouldBe("orders-2");
+
+        var flow = repository.GetFlow(null, 60, now).ShouldHaveSingleItem();
+        flow.Count.ShouldBe(2);
+        flow.MatchConfidence.ShouldBe("exact_message");
     }
 
     [Fact]
@@ -428,6 +523,403 @@ public class MonitoringRepositoryTests
         dispatcher.WindowFailed.ShouldBe(3);
         dispatcher.WindowLostLeases.ShouldBe(1);
         dispatcher.DispatchedPerSecond.ShouldBe(13d / 60d);
+    }
+
+    [Fact]
+    public void Repository_projects_exact_consume_to_outbound_causal_reactions()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var repository = new MonitoringRepository();
+        var choreography = new ChoreographyBuilder("order-fulfillment", "1", "orders")
+            .Step("request-inventory", "urn:message:OrderSubmitted", step => step
+                .Publishes("urn:message:InventoryRequested"))
+            .Build();
+        repository.UpsertMetadata(WithChoreography(
+            CreateMetadata("orders", "orders-1", now, "commerce"), choreography));
+        repository.RecordBatch(CreateBatch(
+            "orders",
+            "orders-1",
+            now,
+            new MonitoringObservation(
+                1, now.AddSeconds(-2), "consumed", true, "OrderSubmitted", "urn:message:OrderSubmitted",
+                "orders", null, 5, null, null, null, "conversation", null, null,
+                MessageId: "incoming-1"),
+            new MonitoringObservation(
+                2, now.AddSeconds(-1), "published", true, "InventoryRequested", "urn:message:InventoryRequested",
+                null, "exchange:inventory", 2, null, null, null, "conversation", null, null,
+                MessageId: "outgoing-1", CausationMessageId: "incoming-1")));
+
+        var edge = repository.GetCausalFlow(null, 60, now).ShouldHaveSingleItem();
+        edge.ApplicationName.ShouldBe("orders");
+        edge.ConsumerEndpointName.ShouldBe("orders");
+        edge.TriggerMessageUrn.ShouldBe("urn:message:OrderSubmitted");
+        edge.OutputMessageUrn.ShouldBe("urn:message:InventoryRequested");
+        edge.OperationKind.ShouldBe("published");
+        edge.Count.ShouldBe(1);
+        edge.MatchConfidence.ShouldBe("exact_causation");
+
+        var runtime = repository.GetChoreographyRuntime(60, now);
+        runtime.WindowSeconds.ShouldBe(60);
+        runtime.Complete.ShouldBeTrue();
+        var reaction = runtime.Reactions.ShouldHaveSingleItem();
+        reaction.ChoreographyId.ShouldBe("order-fulfillment");
+        reaction.StepId.ShouldBe("request-inventory");
+        reaction.ObservedCount.ShouldBe(1);
+        reaction.EvidenceStatus.ShouldBe("exact_causation");
+
+        var run = repository.GetChoreographyRuns("order-fulfillment", 60, 20, now).Runs.ShouldHaveSingleItem();
+        run.CoordinationType.ShouldBe("choreography");
+        run.LifecycleAuthority.ShouldBe("reconstructed_evidence");
+        run.EvidenceComplete.ShouldBeTrue();
+        run.Status.ShouldBe("live");
+        run.LastActivityAtUtc.ShouldBe(now.AddSeconds(-1));
+        var runStep = run.Steps.ShouldHaveSingleItem();
+        runStep.StepId.ShouldBe("request-inventory");
+        var expectation = runStep.OutputExpectations.ShouldHaveSingleItem();
+        expectation.Status.ShouldBe("exact_observed");
+        expectation.ObservedCount.ShouldBe(1);
+        run.DiagnosticIssueCount.ShouldBe(0);
+        run.IndeterminateExpectationCount.ShouldBe(0);
+
+        repository.CaptureWorkflowRuns(now);
+        var retained = repository.GetWorkflowRuns(
+            "order-fulfillment", "choreography", "live", "incoming-1", null, null, 0, 10, now);
+        retained.Total.ShouldBe(1);
+        retained.Runs.ShouldHaveSingleItem().RunId.ShouldBe(run.RunId);
+        repository.GetWorkflowRun(run.RunId, now)!.RunId.ShouldBe(run.RunId);
+        repository.GetWorkflowRun(run.RunId, now.AddSeconds(30))!.Status.ShouldBe("no_recent_activity");
+    }
+
+    [Fact]
+    public void Repository_compares_declared_outputs_with_complete_exact_run_evidence()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var repository = new MonitoringRepository();
+        var choreography = new ChoreographyBuilder("order-diagnostics", "1", "orders")
+            .Step("check-order", "urn:message:OrderSubmitted", step => step
+                .Publishes("urn:message:InventoryRequested", output => output.AtLeast(2).Within(TimeSpan.FromSeconds(2)))
+                .Publishes("urn:message:PaymentRequested", output => output.Within(TimeSpan.FromMilliseconds(100)))
+                .Publishes("urn:message:NoOutputRequired", output => output.Exactly(0)))
+            .Build();
+        repository.UpsertMetadata(WithChoreography(
+            CreateMetadata("orders", "orders-1", now, "commerce"), choreography));
+        repository.RecordBatch(CreateBatch(
+            "orders",
+            "orders-1",
+            now,
+            new MonitoringObservation(
+                1, now.AddSeconds(-30), "consumed", true, "OrderSubmitted", "urn:message:OrderSubmitted",
+                "orders", null, 5, null, null, null, "conversation", null, null,
+                MessageId: "root-message"),
+            new MonitoringObservation(
+                2, now.AddMilliseconds(-29_500), "published", true, "InventoryRequested", "urn:message:InventoryRequested",
+                null, "exchange:inventory", 2, null, null, null, "conversation", null, null,
+                MessageId: "inventory-message", CausationMessageId: "root-message"),
+            new MonitoringObservation(
+                3, now.AddMilliseconds(-29_400), "published", true, "PaymentRequested", "urn:message:PaymentRequested",
+                null, "exchange:payment", 2, null, null, null, "conversation", null, null,
+                MessageId: "payment-message", CausationMessageId: "root-message"),
+            new MonitoringObservation(
+                4, now.AddMilliseconds(-29_300), "published", true, "AuditRecorded", "urn:message:AuditRecorded",
+                null, "exchange:audit", 2, null, null, null, "conversation", null, null,
+                MessageId: "audit-message", CausationMessageId: "root-message")));
+
+        var run = repository.GetChoreographyRuns("order-diagnostics", 60, 20, now).Runs.ShouldHaveSingleItem();
+        var expectations = run.Steps.ShouldHaveSingleItem().OutputExpectations;
+        var inventory = expectations.Single(value => value.MessageUrn == "urn:message:InventoryRequested");
+        inventory.Status.ShouldBe("below_minimum");
+        inventory.MinimumCount.ShouldBe(2);
+        inventory.ObservedCount.ShouldBe(1);
+        var payment = expectations.Single(value => value.MessageUrn == "urn:message:PaymentRequested");
+        payment.Status.ShouldBe("timing_exceeded");
+        payment.LateCount.ShouldBe(1);
+        var unexpected = expectations.Single(value => value.MessageUrn == "urn:message:AuditRecorded");
+        unexpected.Status.ShouldBe("unexpected_observed");
+        unexpected.Requirement.ShouldBe("undeclared");
+        expectations.Single(value => value.MessageUrn == "urn:message:NoOutputRequired")
+            .Status.ShouldBe("expectation_satisfied");
+        run.DiagnosticIssueCount.ShouldBe(3);
+        run.IndeterminateExpectationCount.ShouldBe(0);
+    }
+
+    [Fact]
+    public void Repository_does_not_claim_missing_outputs_when_run_evidence_is_incomplete()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var repository = new MonitoringRepository();
+        var choreography = new ChoreographyBuilder("order-diagnostics", "1", "orders")
+            .Step("check-order", "urn:message:OrderSubmitted", step => step
+                .Publishes("urn:message:InventoryRequested"))
+            .Build();
+        repository.UpsertMetadata(WithChoreography(
+            CreateMetadata("orders", "orders-1", now.AddMinutes(-1), "commerce"), choreography));
+        repository.RecordBatch(CreateBatch(
+            "orders",
+            "orders-1",
+            now,
+            new MonitoringObservation(
+                1, now.AddSeconds(-30), "consumed", true, "OrderSubmitted", "urn:message:OrderSubmitted",
+                "orders", null, 5, null, null, null, "conversation", null, null,
+                MessageId: "root-message")) with
+        { DroppedObservations = 1 });
+
+        var run = repository.GetChoreographyRuns("order-diagnostics", 60, 20, now).Runs.ShouldHaveSingleItem();
+        run.EvidenceComplete.ShouldBeFalse();
+        run.Steps.ShouldHaveSingleItem().OutputExpectations.ShouldHaveSingleItem()
+            .Status.ShouldBe("insufficient_evidence");
+        run.DiagnosticIssueCount.ShouldBe(0);
+        run.IndeterminateExpectationCount.ShouldBe(1);
+
+        var liveRepository = new MonitoringRepository();
+        liveRepository.UpsertMetadata(WithChoreography(
+            CreateMetadata("orders", "orders-1", now, "commerce"), choreography));
+        liveRepository.RecordBatch(CreateBatch(
+            "orders",
+            "orders-1",
+            now,
+            new MonitoringObservation(
+                1, now.AddSeconds(-1), "consumed", true, "OrderSubmitted", "urn:message:OrderSubmitted",
+                "orders", null, 5, null, null, null, "conversation", null, null,
+                MessageId: "live-root")));
+        var liveRun = liveRepository.GetChoreographyRuns("order-diagnostics", 60, 20, now).Runs.ShouldHaveSingleItem();
+        liveRun.Steps.ShouldHaveSingleItem().OutputExpectations.ShouldHaveSingleItem()
+            .Status.ShouldBe("awaiting_evidence");
+        liveRepository.CaptureWorkflowRuns(now);
+        liveRepository.CaptureWorkflowRuns(now.AddSeconds(30));
+        liveRepository.GetWorkflowRun(liveRun.RunId, now.AddSeconds(30))!
+            .Steps.ShouldHaveSingleItem().OutputExpectations.ShouldHaveSingleItem()
+            .Status.ShouldBe("missing_expected");
+    }
+
+    [Fact]
+    public void Repository_reconstructs_exact_declared_choreography_runs_with_step_timing_and_failures()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var repository = new MonitoringRepository();
+        var orders = new ChoreographyBuilder("order-fulfillment", "1", "orders")
+            .Step("request-inventory", "urn:message:OrderSubmitted", step => step
+                .OwnedBy("OrdersConsumer")
+                .Publishes("urn:message:InventoryRequested"))
+            .Build();
+        var inventory = new ChoreographyBuilder("order-fulfillment", "1", "inventory")
+            .Step("reserve-inventory", "urn:message:InventoryRequested", step => step
+                .OwnedBy("InventoryConsumer")
+                .Terminates())
+            .Build();
+        repository.UpsertMetadata(WithChoreography(
+            CreateMetadata("orders", "orders-1", now, "commerce"), orders));
+        repository.UpsertMetadata(WithChoreography(
+            CreateMetadata("inventory", "inventory-1", now, "commerce"), inventory));
+        repository.RecordBatch(CreateBatch(
+            "orders",
+            "orders-1",
+            now,
+            new MonitoringObservation(
+                1, now.AddMilliseconds(-8_150), "retry_attempted", false,
+                "OrderSubmitted", "urn:message:OrderSubmitted", null, null, 0,
+                typeof(InvalidOperationException).FullName, null, null, "conversation", null, null,
+                RetryAttempt: 1, RetryLimit: 3, MessageId: "root-message"),
+            new MonitoringObservation(
+                2, now.AddMilliseconds(-8_100), "published", true,
+                "InventoryRequested", "urn:message:InventoryRequested", null, "exchange:inventory", 10,
+                null, null, null, "conversation", null, null,
+                MessageId: "inventory-message", CausationMessageId: "root-message"),
+            new MonitoringObservation(
+                3, now.AddMilliseconds(-8_000), "consumed", true,
+                "OrderSubmitted", "urn:message:OrderSubmitted", "orders", null, 200,
+                null, null, null, "conversation", null, null,
+                MessageId: "root-message")));
+        repository.RecordBatch(CreateBatch(
+            "inventory",
+            "inventory-1",
+            now,
+            new MonitoringObservation(
+                1, now.AddMilliseconds(-7_000), "consume_faulted", false,
+                "InventoryRequested", "urn:message:InventoryRequested", "inventory", null, 300,
+                typeof(InvalidOperationException).FullName, null, null, "conversation", null, null,
+                MessageId: "inventory-message")));
+
+        var snapshot = repository.GetChoreographyRuns("order-fulfillment", 60, 20, now);
+
+        snapshot.Complete.ShouldBeTrue();
+        var run = snapshot.Runs.ShouldHaveSingleItem();
+        run.RootMessageId.ShouldBe("root-message");
+        run.Status.ShouldBe("faulted");
+        run.Confidence.ShouldBe("exact_causation");
+        run.Steps.Count.ShouldBe(2);
+        var first = run.Steps[0];
+        first.StepId.ShouldBe("request-inventory");
+        first.OwnerComponent.ShouldBe("OrdersConsumer");
+        first.DurationMs.ShouldBe(200);
+        first.RetryCount.ShouldBe(1);
+        var output = first.Outputs.ShouldHaveSingleItem();
+        output.OperationKind.ShouldBe("published");
+        output.Targets.ShouldHaveSingleItem().HandoffDurationMs.ShouldBe(810);
+        var second = run.Steps[1];
+        second.StepId.ShouldBe("reserve-inventory");
+        second.Status.ShouldBe("faulted");
+        second.DurationMs.ShouldBe(300);
+        second.FailureType.ShouldBe(typeof(InvalidOperationException).FullName);
+    }
+
+    [Fact]
+    public void Repository_keeps_exact_fan_out_in_one_run_and_reports_branch_structure()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var repository = new MonitoringRepository();
+        repository.UpsertMetadata(WithChoreography(
+            CreateMetadata("orders", "orders-1", now, "commerce"),
+            CreateChoreography("orders", "1", "dispatch-order", "urn:message:OrderSubmitted", "urn:message:OrderAccepted")));
+        repository.UpsertMetadata(WithChoreography(
+            CreateMetadata("inventory", "inventory-1", now, "commerce"),
+            CreateChoreography("inventory", "1", "reserve-inventory", "urn:message:OrderAccepted", null)));
+        repository.UpsertMetadata(WithChoreography(
+            CreateMetadata("billing", "billing-1", now, "commerce"),
+            CreateChoreography("billing", "1", "authorize-payment", "urn:message:OrderAccepted", null)));
+
+        repository.RecordBatch(CreateBatch(
+            "orders",
+            "orders-1",
+            now,
+            new MonitoringObservation(
+                1, now.AddSeconds(-4), "consumed", true, "OrderSubmitted", "urn:message:OrderSubmitted",
+                "orders", null, 10, null, null, null, "conversation", null, null,
+                MessageId: "root-message"),
+            new MonitoringObservation(
+                2, now.AddSeconds(-3), "published", true, "OrderAccepted", "urn:message:OrderAccepted",
+                null, "exchange:accepted", 2, null, null, null, "conversation", null, null,
+                MessageId: "fan-out-message", CausationMessageId: "root-message")));
+        repository.RecordBatch(CreateBatch(
+            "inventory",
+            "inventory-1",
+            now,
+            new MonitoringObservation(
+                1, now.AddSeconds(-2), "consumed", true, "OrderAccepted", "urn:message:OrderAccepted",
+                "inventory", null, 8, null, null, null, "conversation", null, null,
+                MessageId: "fan-out-message")));
+        repository.RecordBatch(CreateBatch(
+            "billing",
+            "billing-1",
+            now,
+            new MonitoringObservation(
+                1, now.AddSeconds(-1), "consumed", true, "OrderAccepted", "urn:message:OrderAccepted",
+                "billing", null, 7, null, null, null, "conversation", null, null,
+                MessageId: "fan-out-message")));
+
+        var run = repository.GetChoreographyRuns("order-fulfillment", 60, 20, now).Runs.ShouldHaveSingleItem();
+        run.Steps.Count.ShouldBe(3);
+        run.RootMessageIds.ShouldBe(["root-message"]);
+        run.RootCount.ShouldBe(1);
+        run.BranchPointCount.ShouldBe(1);
+        run.MergePointCount.ShouldBe(0);
+        run.ObservedShape.ShouldBe("branching");
+        run.Steps.Single(step => step.StepId == "dispatch-order")
+            .Outputs.ShouldHaveSingleItem().Targets.Count.ShouldBe(2);
+    }
+
+    [Fact]
+    public void Repository_groups_root_message_delivery_fan_out_under_one_run_identity()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var repository = new MonitoringRepository();
+        repository.UpsertMetadata(WithChoreography(
+            CreateMetadata("orders", "orders-1", now, "commerce"),
+            CreateChoreography("orders", "1", "observe-order", "urn:message:OrderSubmitted", null)));
+        repository.UpsertMetadata(WithChoreography(
+            CreateMetadata("analytics", "analytics-1", now, "commerce"),
+            CreateChoreography("analytics", "1", "measure-order", "urn:message:OrderSubmitted", null)));
+        repository.RecordBatch(CreateBatch(
+            "orders",
+            "orders-1",
+            now,
+            new MonitoringObservation(
+                1, now.AddSeconds(-2), "consumed", true, "OrderSubmitted", "urn:message:OrderSubmitted",
+                "orders", null, 10, null, null, null, "conversation", null, null,
+                MessageId: "shared-root")));
+        repository.RecordBatch(CreateBatch(
+            "analytics",
+            "analytics-1",
+            now,
+            new MonitoringObservation(
+                1, now.AddSeconds(-1), "consumed", true, "OrderSubmitted", "urn:message:OrderSubmitted",
+                "analytics", null, 8, null, null, null, "conversation", null, null,
+                MessageId: "shared-root")));
+
+        var run = repository.GetChoreographyRuns("order-fulfillment", 60, 20, now).Runs.ShouldHaveSingleItem();
+        run.Steps.Count.ShouldBe(2);
+        run.RootMessageIds.ShouldBe(["shared-root"]);
+        run.RootCount.ShouldBe(1);
+        run.BranchPointCount.ShouldBe(1);
+        run.MergePointCount.ShouldBe(0);
+        run.ObservedShape.ShouldBe("branching");
+    }
+
+    [Fact]
+    public void Repository_merges_exactly_connected_roots_instead_of_claiming_a_shared_descendant()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var repository = new MonitoringRepository();
+        repository.UpsertMetadata(WithChoreography(
+            CreateMetadata("orders", "orders-1", now, "commerce"),
+            CreateChoreography("orders", "1", "accept-order", "urn:message:OrderSubmitted", "urn:message:Ready")));
+        repository.UpsertMetadata(WithChoreography(
+            CreateMetadata("billing", "billing-1", now, "commerce"),
+            CreateChoreography("billing", "1", "accept-payment", "urn:message:PaymentSubmitted", "urn:message:Ready")));
+        repository.UpsertMetadata(WithChoreography(
+            CreateMetadata("fulfillment", "fulfillment-1", now, "commerce"),
+            CreateChoreography("fulfillment", "1", "complete-order", "urn:message:Ready", null)));
+
+        repository.RecordBatch(CreateBatch(
+            "orders",
+            "orders-1",
+            now,
+            new MonitoringObservation(
+                1, now.AddSeconds(-6), "consumed", true, "OrderSubmitted", "urn:message:OrderSubmitted",
+                "orders", null, 10, null, null, null, "conversation", null, null,
+                MessageId: "root-order"),
+            new MonitoringObservation(
+                2, now.AddSeconds(-4), "published", true, "Ready", "urn:message:Ready",
+                null, "exchange:ready", 2, null, null, null, "conversation", null, null,
+                MessageId: "shared-message", CausationMessageId: "root-order")));
+        repository.RecordBatch(CreateBatch(
+            "billing",
+            "billing-1",
+            now,
+            new MonitoringObservation(
+                1, now.AddSeconds(-5), "consumed", true, "PaymentSubmitted", "urn:message:PaymentSubmitted",
+                "billing", null, 9, null, null, null, "conversation", null, null,
+                MessageId: "root-payment"),
+            new MonitoringObservation(
+                2, now.AddSeconds(-3), "published", true, "Ready", "urn:message:Ready",
+                null, "exchange:ready", 2, null, null, null, "conversation", null, null,
+                MessageId: "shared-message", CausationMessageId: "root-payment")));
+
+        repository.CaptureWorkflowRuns(now.AddSeconds(-2.5));
+        repository.GetWorkflowRuns(
+            "order-fulfillment", null, null, null, null, null, 0, 10, now.AddSeconds(-2.5)).Total.ShouldBe(2);
+
+        repository.RecordBatch(CreateBatch(
+            "fulfillment",
+            "fulfillment-1",
+            now,
+            new MonitoringObservation(
+                1, now.AddSeconds(-2), "consumed", true, "Ready", "urn:message:Ready",
+                "fulfillment", null, 8, null, null, null, "conversation", null, null,
+                MessageId: "shared-message")));
+
+        var run = repository.GetChoreographyRuns("order-fulfillment", 60, 20, now).Runs.ShouldHaveSingleItem();
+        run.Steps.Count.ShouldBe(3);
+        run.RootMessageIds.ShouldBe(["root-order", "root-payment"]);
+        run.RootCount.ShouldBe(2);
+        run.BranchPointCount.ShouldBe(0);
+        run.MergePointCount.ShouldBe(1);
+        run.ObservedShape.ShouldBe("converging");
+
+        repository.CaptureWorkflowRuns(now);
+        var retained = repository.GetWorkflowRuns(
+            "order-fulfillment", null, null, null, null, null, 0, 10, now);
+        retained.Total.ShouldBe(1);
+        retained.Runs.ShouldHaveSingleItem().RootMessageIds.ShouldBe(["root-order", "root-payment"]);
     }
 
     [Fact]
@@ -496,6 +988,37 @@ public class MonitoringRepositoryTests
             now,
             new BusInspectionSnapshot("mediator", new Uri("loopback://localhost/"), now, [], [], []),
             new Dictionary<string, string> { ["group"] = group });
+
+    private static MonitoringMetadata WithChoreography(
+        MonitoringMetadata metadata,
+        ChoreographyFragment fragment)
+        => metadata with
+        {
+            Bus = new BusInspectionSnapshot(
+                metadata.Bus.TransportName,
+                metadata.Bus.Address,
+                metadata.Bus.CapturedAt,
+                metadata.Bus.Messages,
+                metadata.Bus.ReceiveEndpoints,
+                metadata.Bus.Consumers,
+                [fragment])
+        };
+
+    private static ChoreographyFragment CreateChoreography(
+        string owner,
+        string definitionVersion,
+        string stepId,
+        string triggerMessageUrn,
+        string? outputMessageUrn)
+        => new ChoreographyBuilder("order-fulfillment", definitionVersion, owner)
+            .Step(stepId, triggerMessageUrn, step =>
+            {
+                if (outputMessageUrn is null)
+                    step.Terminates();
+                else
+                    step.Publishes(outputMessageUrn);
+            })
+            .Build();
 
     private static MonitoringObservationBatch CreateBatch(
         string applicationName,

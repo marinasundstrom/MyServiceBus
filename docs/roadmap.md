@@ -87,7 +87,7 @@ The [Topology Model Specification](specs/topology-model-spec.md) defines the tar
 
 The [MVP Release Gate](development/mvp-release-gate.md) defines the release boundary and the remaining packaging, documentation, and release-candidate work that follows this fundamentals gate.
 
-**Status:** implemented. The normalized query APIs, version 1 canonical fixture, receive-endpoint intent, inspection consumption, synchronized snapshot-version constants, profile-neutral runtime endpoint topology, and named RabbitMQ receive-topology projection are implemented in C# and Java. Legacy transport overloads remain compatibility adapters. The [Topology Extension Model](specs/topology-extension-model.md) validates additive saga and outbox nodes plus a materially different Azure Service Bus projection without prematurely implementing those features.
+**Status:** implemented. The normalized query APIs, historical version 1 and current version 2 canonical fixtures, receive-endpoint intent, inspection consumption, synchronized snapshot-version constants, profile-neutral runtime endpoint topology, named RabbitMQ receive-topology projection, and registered choreography-fragment collection are implemented in C# and Java. Legacy transport overloads remain compatibility adapters. The [Topology Extension Model](specs/topology-extension-model.md) validates additive saga and outbox nodes plus a materially different Azure Service Bus projection without prematurely implementing those features.
 
 ## Mediator and In-Memory Stability Gate
 
@@ -227,20 +227,24 @@ Start with the portable core, canonical fixtures, and one transport profile. Map
 
 **Exit criteria:** integrations preserve their native semantics, and every mutating operational action has an explicit security and audit model.
 
-## Future Area: Orchestration and Choreography
+## Future Area: Choreography, Then Orchestration
 
 **Outcome:** applications can model and observe long-running distributed workflows without confusing message delivery with business-process ownership.
 
-This is a directional area, not a committed release phase. It contains two related but different models:
+This is a directional area, not a committed release phase. Choreography is the first product focus; orchestration follows after its declaration, causation, completeness, and workflow-visualization foundations have been exercised. The area contains two related but different models:
 
-- **Orchestration**, including sagas and state machines, introduces an explicit coordinator with durable workflow state, correlation, concurrency control, timeouts, compensation, and recovery.
 - **Choreography** keeps services autonomous and coordinates through events. The existing publish/consume primitives can be used this way today, but first-class support would add clearer relationship modeling, monitoring, diagnostics, and guidance for detecting stalled, cyclic, or unexpectedly amplified flows.
+- **Orchestration**, including sagas and state machines, introduces an explicit coordinator with durable workflow state, correlation, concurrency control, timeouts, compensation, and recovery.
+
+The first investment in this area should be the read-only [Choreography Modeling and Diagnostics](proposals/choreography-modeling-and-diagnostics.md) slice. It separates configured routes, application-declared reactions, and bounded observed flow; strengthens observations with exact message and causal identity; and gates every diagnostic on confidence, freshness, and completeness. It does not introduce a coordinator or infer business failure from message traffic alone.
+
+This first slice must remain compatible with the existing MassTransit protocol and named transport profiles. Choreography declarations, graph identities, expectations, and Dashboard projections are local topology or operations metadata; they are not application messages and must not require new envelope fields or broker conventions. A MassTransit producer or consumer can therefore remain a participant in the message flow even though it does not publish MyServiceBus choreography declarations or completeness evidence.
 
 Before either area is promoted, the project must define portable C#↔Java semantics, persistence and provider boundaries, idempotency and concurrency rules, scheduling and outbox integration, topology projection, versioning, and application-centric monitoring. The [MyServiceBus saga runtime](proposals/sagas-and-state-machines.md) should be a C# and Java reimplementation based on MassTransit's proven architecture, primitives, and observable behavior—including states, events, initial and state-specific behaviors, transitions, correlation, schedules, requests, composite events, and finalization. MyServiceBus owns the resulting runtime and independent library DSLs; it does not require a MassTransit runtime dependency or the Raven macro. Any deliberate semantic divergence must be documented and covered by shared conformance evidence. Choreography tooling must not turn decentralized event reactions into a hidden central workflow engine.
 
 After those portable saga semantics exist, an executable Raven sample should explore a compiler-backed [`saga!` DSL](proposals/raven-saga-dsl.md) as an idiomatic projection over the native MyServiceBus runtime. The experiment must lower to MyServiceBus state-machine behavior plus ordinary portable saga descriptors, message operations, topology, persistence, and monitoring rather than making Raven syntax part of the portable specification or adding Raven-specific transport behavior.
 
-**Current status:** future area. MyServiceBus has supporting messaging and monitoring primitives but no supported saga repository, saga state-machine runtime, compensation engine, workflow definition API, or choreography-specific lifecycle model.
+**Current status:** choreography MVP implemented and being validated. MyServiceBus has supporting messaging and monitoring primitives plus matching C# and Java choreography declaration, validation, registration, topology, inspection, and metadata export. The monitoring service merges those declarations across applications and replicas, reconstructs exact-causation runs with step and consumer mapping, handler and handoff timing, emitted messages, retries, localized faults, coverage, and live activity evidence, and retains a queryable workflow-run projection through PostgreSQL restarts. Exact delivery fan-out and weakly connected roots remain one run, and later connections supersede partial retained projections. Per-run comparison evaluates declared send, publish, and terminal outcomes against exact count and timing evidence, and only reports expected absence after inactivity with complete coverage. The Dashboard separates a server-filtered run index and direct D3 run detail from the declared-workflow catalog, labels linear, branching, and converging observed shapes, presents per-step findings without claiming business failure, and offers comfortable and compact density modes. The mixed Aspire environment demonstrates a local terminal reaction, a deterministic runnable three-step fork, cross-language declarations, and a runnable four-step C# → Java → C# handoff. Heuristic correlation, formal join semantics, cycle and amplification analysis, recurring-pattern discovery, and alerting remain later work; there is no supported saga repository, saga state-machine runtime, compensation engine, or choreography-specific lifecycle model.
 
 ## Candidate Backlog
 

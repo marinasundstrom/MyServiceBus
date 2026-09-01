@@ -863,6 +863,59 @@ When an application also has a broker-backed bus, publish events that represent 
 
 ## Advanced
 
+### Declaring choreography intent (preview)
+
+The first choreography API builds a portable, payload-free description of reactions owned by one application. Registering the fragment makes it part of the normalized topology and inspection metadata exported to monitoring. It does not register consumers, execute reactions, add message headers, or create a coordinator.
+
+#### C#
+
+```csharp
+builder.Services.AddServiceBus(configurator =>
+{
+    configurator.AddChoreography(
+        "order-fulfillment",
+        definitionVersion: "1",
+        owner: "orders",
+        workflow => workflow
+            .Step<OrderSubmitted>("reserve-inventory", step => step
+                .OwnedBy<SubmitOrderConsumer>()
+                .Sends<ReserveInventory>("queue:reserve-inventory", output => output
+                    .Exactly(1)
+                    .Within(TimeSpan.FromSeconds(5))))
+            .Step<OrderCompleted>("complete-order", step => step
+                .Terminates()));
+    // Register the consumers and transport normally.
+});
+```
+
+#### Java
+
+```java
+services.from(MessageBusServices.class).addServiceBus(configurator -> {
+    configurator.addChoreography(
+        "order-fulfillment",
+        "1",
+        "orders",
+        workflow -> workflow
+            .step("reserve-inventory", OrderSubmitted.class, step -> step
+                .ownedBy(SubmitOrderConsumer.class)
+                .sends(ReserveInventory.class, "queue:reserve-inventory", output -> output
+                    .exactly(1)
+                    .within(Duration.ofSeconds(5))))
+            .step("complete-order", OrderCompleted.class, step -> step
+                .terminates()));
+    // Register the consumers and transport normally.
+});
+```
+
+The fluent registration overload is convenience over `ChoreographyBuilder`; it produces and registers the same normalized `ChoreographyFragment`. Applications may instead pass an existing builder, or pass a prebuilt fragment from generated code, a fixture, reusable configuration, or another tool. Use `sends`, `publishes`, `responds`, `schedules`, or `terminates` to describe an outcome. An outcome is expected by default and may instead be informational or optional. Count and time expectations are diagnostic intent, not delivery guarantees or executable business predicates. Explicit message-URN overloads are available when cross-language contracts do not derive the same portable identity from their local type names. Registration rejects an unsupported schema, an invalid fragment, or two fragments with the same choreography and owner identity.
+
+When runtime monitoring is enabled, `GET /api/monitoring/v1/choreographies` merges the fragments reported by participating applications. Identical declarations from replicas collapse into one fragment view with reporting and online instance counts. The query supplies version-scoped `declared_contract` connections from each output to steps consuming the same contract, and the Dashboard's **Workflows** page renders those relationships by application. `GET /api/monitoring/v1/choreographies/runtime?windowSeconds=300` separately overlays exact consumed-message-to-send or consumed-message-to-publish counts for the selected window. Contract continuity is not proof that a route exists or a message was delivered, and no exact evidence is not a failure. Definition-version, owner, and step-ownership disagreement remains visible as configuration evidence; neither query executes the choreography or claims authoritative workflow state.
+
+The repository's mixed Aspire sample declares progressively richer views: `sample-local-order-observation` is one C# terminal reaction, `sample-order-submission` combines C# and Java declarations, `sample-parallel-order-checks` is a deterministic three-step C# fan-out, and `sample-fulfillment-handoff` follows a linear C# → Java → C# chain. Start the parallel sample with `POST /workflows/parallel-checks` and the handoff with `POST /workflows/fulfillment` on the C# app. Every declaration matches real consumers and emitted messages; none invents a coordinator. In the monitoring Dashboard, **Workflows → Workflow runs** queries retained runs by type, status, or identity and opens a direct, failure-aware diagram and detail URL. Exactly connected deliveries are assembled into one run; the list and detail identify linear, branching, and converging observed shapes, and the graph labels root fan-out, internal forks, and convergence without claiming business-level join semantics. Each step's **Declared output comparison** shows exact observed sends, publications, or a terminal outcome against declared count and timing intent. Expected absence is only reported after 15 seconds of inactivity with complete monitoring coverage; otherwise it remains awaiting or inconclusive. Findings are operational evidence, not an authoritative business-workflow failure. PostgreSQL-backed monitoring preserves those projections across collector restarts for the configured retention period and removes partial projections superseded by a later exact connection. **Declared workflows** separately shows the merged definitions. `Live activity`, `terminal observed`, and `no recent activity` remain evidence labels rather than authoritative choreography lifecycle states. Use the Dashboard's **Density** selector to retain the default comfortable layout or show a compact application-wide view.
+
+---
+
 ### Configuration
 
 Configure the bus by registering consumers, selecting a transport, connecting to the broker, customizing entity names, and auto-configuring endpoints with a name formatter. These examples use the fluent configuration pattern; similar options exist when using the factory pattern.
@@ -1235,6 +1288,8 @@ exporter.start(provider.getRequiredService(BusInspectionProvider.class));
 ```
 
 The proof-of-concept service accepts metadata, observation batches, and heartbeats under `/api/monitoring/v1`. Its query API exposes applications, replicas, metadata, bounded-window metrics, bucketed real-time series, recent observations, observed flow, outbox dispatcher operations, and a WebSocket invalidation stream. Replicas group automatically by application name; optional bounded labels such as `group`, `environment`, and `role` provide another display dimension. `MyServiceBus.Dashboard` is a separate Blazor application that consumes only those service APIs. OpenTelemetry collection remains separate; observations carry trace identifiers only as optional correlation references.
+
+Observed flow prefers exact envelope message identity when connecting a producer observation to consumption. Flow edges expose `matchConfidence` as `exact_message` when that identity is present on both sides or `correlated` when the collector must fall back to correlation, conversation, or trace identity. Consumer-originated outgoing operations also retain the consumed message identity, and the separate causal-flow query exposes those exact local trigger-to-output reactions as `exact_causation`. Choreography declarations and the first completeness-aware exact reaction overlay build on that evidence; broader graph comparison and diagnostics remain future work.
 
 See [Runtime Monitoring](runtime-monitoring.md) for the complete Aspire walkthrough, service API, deployment boundary, and current MVP limitations.
 

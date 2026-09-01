@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using MyServiceBus.Choreography;
 
 namespace MyServiceBus.Topology;
 
@@ -7,9 +8,10 @@ public sealed record TopologySnapshot(
     [property: JsonPropertyName("messages")] IReadOnlyList<MessageTopologySnapshot> Messages,
     [property: JsonPropertyName("receiveEndpoints")] IReadOnlyList<ReceiveEndpointTopologySnapshot> ReceiveEndpoints,
     [property: JsonPropertyName("consumers")] IReadOnlyList<ConsumerTopologySnapshot> Consumers,
-    [property: JsonPropertyName("bindings")] IReadOnlyList<MessageBindingTopologySnapshot> Bindings)
+    [property: JsonPropertyName("bindings")] IReadOnlyList<MessageBindingTopologySnapshot> Bindings,
+    [property: JsonPropertyName("choreographies")] IReadOnlyList<ChoreographyFragment> Choreographies)
 {
-    public const int CurrentVersion = 1;
+    public const int CurrentVersion = 2;
 }
 
 public sealed record MessageTopologySnapshot(
@@ -113,7 +115,19 @@ internal static class TopologySnapshotBuilder
             .OrderBy(x => x.Id, StringComparer.Ordinal)
             .ToArray();
 
-        return new TopologySnapshot(TopologySnapshot.CurrentVersion, messages, endpoints, consumers, bindings);
+        var choreographies = topology.Choreographies
+            .OrderBy(fragment => fragment.ChoreographyId, StringComparer.Ordinal)
+            .ThenBy(fragment => fragment.Owner, StringComparer.Ordinal)
+            .ThenBy(fragment => fragment.DefinitionVersion, StringComparer.Ordinal)
+            .ToArray();
+
+        return new TopologySnapshot(
+            TopologySnapshot.CurrentVersion,
+            messages,
+            endpoints,
+            consumers,
+            bindings,
+            choreographies);
     }
 
     private static string EndpointId(string endpointName) => $"endpoint:{endpointName}";

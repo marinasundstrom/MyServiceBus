@@ -27,6 +27,11 @@ public class SendContext : BasePipeContext, ISendContext
     public string? CorrelationId { get; set; }
     public Guid? ConversationId { get; set; }
     public Guid? InitiatorId { get; set; }
+    /// <summary>
+    /// Gets or sets local operational causation metadata. This value is used by
+    /// monitoring and outbox persistence and is not serialized into the wire envelope.
+    /// </summary>
+    public Guid? CausationMessageId { get; set; }
     public MessageIntent Intent { get; set; } = MessageIntent.Send;
     public Uri? ResponseAddress { get; set; }
     public Uri? FaultAddress { get; set; }

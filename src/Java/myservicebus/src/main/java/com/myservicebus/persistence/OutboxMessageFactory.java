@@ -59,7 +59,8 @@ public final class OutboxMessageFactory {
                 context.getResponseAddress(),
                 context.getFaultAddress(),
                 availableAtUtc,
-                scheduledAtUtc);
+                scheduledAtUtc,
+                context.getCausationMessageId());
     }
 
     private static OutboxDeliveryIntent mapIntent(MessageIntent intent) {

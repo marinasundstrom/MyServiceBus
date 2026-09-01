@@ -31,6 +31,7 @@ public sealed class TransportOutboxDispatcher : IOutboxTransportDispatcher
             CorrelationId = message.CorrelationId?.ToString(),
             ConversationId = message.ConversationId,
             InitiatorId = message.InitiatorId,
+            CausationMessageId = message.CausationMessageId,
             Intent = MapIntent(message.Intent),
             DestinationAddress = message.DestinationAddress,
             ResponseAddress = message.ResponseAddress,
@@ -81,7 +82,9 @@ public sealed class TransportOutboxDispatcher : IOutboxTransportDispatcher
             duration,
             exception,
             message.CorrelationId?.ToString(),
-            message.ConversationId?.ToString()));
+            message.ConversationId?.ToString(),
+            messageId: message.MessageId.ToString(),
+            causationMessageId: message.CausationMessageId?.ToString()));
     }
 
     private static string DisplayMessageType(string messageUrn)

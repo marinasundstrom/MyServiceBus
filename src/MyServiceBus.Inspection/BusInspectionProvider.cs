@@ -64,7 +64,8 @@ public sealed class BusInspectionProvider : IBusInspectionProvider
             DateTimeOffset.UtcNow,
             messages,
             endpoints,
-            consumers);
+            consumers,
+            topology.Choreographies);
     }
 
     private static IReadOnlyDictionary<string, object?> EmptyProperties()

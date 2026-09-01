@@ -483,7 +483,9 @@ public sealed class MonitoringExporter : BackgroundService, IBusHook, IScheduled
             busEvent.TraceId,
             busEvent.SpanId,
             busEvent.RetryAttempt,
-            busEvent.RetryLimit);
+            busEvent.RetryLimit,
+            MessageId: busEvent.MessageId,
+            CausationMessageId: busEvent.CausationMessageId);
 
     private MonitoringObservation CreateOutboxObservation(OutboxDeliveryHookEvent busEvent)
         => new(

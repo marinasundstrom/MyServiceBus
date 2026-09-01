@@ -89,7 +89,19 @@ final class TopologySnapshots {
                 .sorted(Comparator.comparing(TopologySnapshot.ReceiveEndpoint::id))
                 .toList();
 
-        return new TopologySnapshot(TopologySnapshot.CURRENT_VERSION, messages, endpoints, consumers, bindings);
+        var choreographies = topology.getChoreographies().stream()
+                .sorted(Comparator.comparing(com.myservicebus.choreography.ChoreographyFragment::choreographyId)
+                        .thenComparing(com.myservicebus.choreography.ChoreographyFragment::owner)
+                        .thenComparing(com.myservicebus.choreography.ChoreographyFragment::definitionVersion))
+                .toList();
+
+        return new TopologySnapshot(
+                TopologySnapshot.CURRENT_VERSION,
+                messages,
+                endpoints,
+                consumers,
+                bindings,
+                choreographies);
     }
 
     private static String endpointId(String endpointName) {

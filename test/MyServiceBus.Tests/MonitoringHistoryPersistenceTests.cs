@@ -19,9 +19,11 @@ public class MonitoringHistoryPersistenceTests
         script.ShouldContain("myservicebus_monitoring");
         script.ShouldContain("observation_batch");
         script.ShouldContain("job_snapshot");
+        script.ShouldContain("workflow_run");
         script.ShouldContain("jsonb");
         context.Database.GetMigrations().ShouldContain("20260831120000_InitialMonitoringHistory");
         context.Database.GetMigrations().ShouldContain("20260831170000_AddRecurringJobSnapshots");
+        context.Database.GetMigrations().ShouldContain("20260901123000_AddWorkflowRuns");
         context.Database.HasPendingModelChanges().ShouldBeFalse();
     }
 
@@ -45,6 +47,7 @@ public class MonitoringHistoryPersistenceTests
             [],
             [],
             [jobs],
+            [],
             now));
         var repository = new MonitoringRepository();
         var restore = new MonitoringHistoryRestoreService(store, repository);
@@ -65,7 +68,7 @@ public class MonitoringHistoryPersistenceTests
     public async Task Ingest_service_writes_accepted_monitoring_records_to_the_configured_store()
     {
         var now = DateTimeOffset.UtcNow;
-        var store = new StubHistoryStore(new MonitoringHistoryRestore([], [], [], [], [], [], null));
+        var store = new StubHistoryStore(new MonitoringHistoryRestore([], [], [], [], [], [], [], null));
         var service = new MonitoringIngestService(new MonitoringRepository(), store);
         var metadata = CreateMetadata(now);
         var batch = CreateBatch(now);
@@ -161,6 +164,7 @@ public class MonitoringHistoryPersistenceTests
         public int StoredMetadata { get; private set; }
         public int StoredBatches { get; private set; }
         public int StoredJobs { get; private set; }
+        public int StoredWorkflowRuns { get; private set; }
 
         public Task InitializeAsync(CancellationToken cancellationToken)
         {
@@ -195,6 +199,14 @@ public class MonitoringHistoryPersistenceTests
         public Task StoreJobsAsync(MonitoringJobSnapshot snapshot, CancellationToken cancellationToken)
         {
             StoredJobs++;
+            return Task.CompletedTask;
+        }
+
+        public Task StoreWorkflowRunsAsync(
+            IReadOnlyList<MonitoringChoreographyRun> runs,
+            CancellationToken cancellationToken)
+        {
+            StoredWorkflowRuns += runs.Count;
             return Task.CompletedTask;
         }
     }

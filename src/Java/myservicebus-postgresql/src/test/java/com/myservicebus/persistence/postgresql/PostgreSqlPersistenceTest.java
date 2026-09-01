@@ -121,6 +121,10 @@ class PostgreSqlPersistenceTest {
                                     SELECT 1 FROM information_schema.columns
                                     WHERE table_schema = 'myservicebus' AND table_name = 'outbox_message'
                                       AND column_name = 'cancelled_at_utc'),
+                                EXISTS (
+                                    SELECT 1 FROM information_schema.columns
+                                    WHERE table_schema = 'myservicebus' AND table_name = 'outbox_message'
+                                      AND column_name = 'causation_message_id'),
                                 to_regclass('myservicebus.recurring_job_definition') IS NOT NULL,
                                 to_regclass('myservicebus.recurring_job_occurrence') IS NOT NULL,
                                 to_regclass('myservicebus.job') IS NOT NULL,
@@ -128,13 +132,14 @@ class PostgreSqlPersistenceTest {
                             FROM myservicebus.schema_version WHERE singleton;
                             """)) {
                 assertTrue(result.next());
-                assertEquals(4, result.getInt(1));
+                assertEquals(5, result.getInt(1));
                 assertTrue(result.getBoolean(2));
                 assertTrue(result.getBoolean(3));
                 assertTrue(result.getBoolean(4));
                 assertTrue(result.getBoolean(5));
                 assertTrue(result.getBoolean(6));
                 assertTrue(result.getBoolean(7));
+                assertTrue(result.getBoolean(8));
             }
         }
     }
@@ -511,6 +516,7 @@ class PostgreSqlPersistenceTest {
             assertEquals(committed.contentType(), leases.get(0).message().contentType());
             assertEquals(committed.headers(), leases.get(0).message().headers());
             assertEquals(committed.correlationId(), leases.get(0).message().correlationId());
+            assertEquals(committed.causationMessageId(), leases.get(0).message().causationMessageId());
         }
     }
 
@@ -873,6 +879,7 @@ class PostgreSqlPersistenceTest {
         SendContext context = new SendContext(new OrderSubmitted(UUID.randomUUID()));
         context.setMessageId(UUID.randomUUID());
         context.setCorrelationId(UUID.randomUUID());
+        context.setCausationMessageId(UUID.randomUUID());
         context.setDestinationAddress(URI.create("rabbitmq://localhost/exchange/orders"));
         context.setIntent(MessageIntent.PUBLISH);
         context.setScheduledEnqueueTime(scheduledAt);

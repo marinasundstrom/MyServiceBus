@@ -1,4 +1,7 @@
 using System.Collections.Concurrent;
+using System.Text.Json;
+using Microsoft.Extensions.Options;
+using MyServiceBus.Choreography;
 using MyServiceBus.Monitoring;
 
 namespace MyServiceBus.Monitoring.Server;
@@ -16,8 +19,15 @@ public sealed class MonitoringRepository
     private readonly ConcurrentDictionary<InstanceKey, MonitoringScheduledWorkSnapshot> scheduledWork = new();
     private readonly ConcurrentDictionary<InstanceKey, MonitoringRecurringJobSnapshot> recurringJobs = new();
     private readonly ConcurrentDictionary<InstanceKey, MonitoringJobSnapshot> jobs = new();
+    private readonly ConcurrentDictionary<string, MonitoringChoreographyRun> workflowRuns = new(StringComparer.Ordinal);
+    private readonly TimeSpan workflowRunRetention;
     private readonly DateTimeOffset serviceStartedAtUtc = DateTimeOffset.UtcNow;
     private long lastIngestUtcTicks;
+
+    public MonitoringRepository(IOptions<MonitoringStorageOptions>? storageOptions = null)
+    {
+        workflowRunRetention = storageOptions?.Value.Retention ?? TimeSpan.FromDays(7);
+    }
 
     public void UpsertMetadata(MonitoringMetadata metadata)
     {
@@ -409,6 +419,490 @@ public sealed class MonitoringRepository
             ? state.Metadata
             : null;
 
+    public IReadOnlyList<MonitoringDeclaredChoreography> GetDeclaredChoreographies(DateTimeOffset now)
+    {
+        var declarations = instances.Values
+            .Select(state => (Metadata: state.Metadata, Summary: state.CreateSummary(now, LeaseTimeout)))
+            .SelectMany(source => source.Metadata.Bus.Choreographies.Select(fragment => new DeclaredFragmentSource(
+                source.Metadata.ApplicationName,
+                source.Metadata.InstanceId,
+                source.Summary.Online,
+                source.Metadata.CapturedAtUtc,
+                fragment,
+                CreateFragmentIdentity(fragment))))
+            .ToArray();
+
+        return declarations
+            .GroupBy(source => source.Fragment.ChoreographyId, StringComparer.Ordinal)
+            .Select(choreography =>
+            {
+                var fragments = choreography
+                    .GroupBy(source => new
+                    {
+                        source.ApplicationName,
+                        source.Fragment.Owner,
+                        source.Fragment.SchemaVersion,
+                        source.Fragment.DefinitionVersion,
+                        source.FragmentIdentity
+                    })
+                    .Select(group => new MonitoringDeclaredChoreographyFragment(
+                        group.Key.ApplicationName,
+                        group.Key.Owner,
+                        group.Key.SchemaVersion,
+                        group.Key.DefinitionVersion,
+                        group.First().Fragment.Steps,
+                        group.Select(source => source.InstanceId).Distinct(StringComparer.Ordinal).Count(),
+                        group.Where(source => source.Online).Select(source => source.InstanceId).Distinct(StringComparer.Ordinal).Count(),
+                        group.Max(source => source.CapturedAtUtc)))
+                    .OrderBy(fragment => fragment.ApplicationName, StringComparer.Ordinal)
+                    .ThenBy(fragment => fragment.Owner, StringComparer.Ordinal)
+                    .ThenBy(fragment => fragment.DefinitionVersion, StringComparer.Ordinal)
+                    .ToArray();
+
+                var definitionVersions = fragments
+                    .Select(fragment => fragment.DefinitionVersion)
+                    .Distinct(StringComparer.Ordinal)
+                    .OrderBy(version => version, StringComparer.Ordinal)
+                    .ToArray();
+                var conflictKinds = GetChoreographyConflictKinds(fragments, definitionVersions);
+                var connections = CreateDeclaredChoreographyConnections(fragments);
+
+                return new MonitoringDeclaredChoreography(
+                    choreography.Key,
+                    definitionVersions,
+                    conflictKinds,
+                    fragments.Max(fragment => fragment.LastCapturedAtUtc),
+                    connections,
+                    fragments);
+            })
+            .OrderBy(choreography => choreography.ChoreographyId, StringComparer.Ordinal)
+            .ToArray();
+    }
+
+    public MonitoringChoreographyRuntimeSnapshot GetChoreographyRuntime(int windowSeconds, DateTimeOffset now)
+    {
+        var boundedWindow = Math.Clamp(windowSeconds, 10, (int)MetricRetention.TotalSeconds);
+        var choreographies = GetDeclaredChoreographies(now);
+        var causalEdges = GetCausalFlow(null, boundedWindow, now);
+        var declarations = choreographies
+            .SelectMany(choreography => choreography.Fragments.SelectMany(fragment => fragment.Steps.SelectMany(step =>
+                step.Outputs.Select((output, index) => new
+                {
+                    choreography.ChoreographyId,
+                    fragment.DefinitionVersion,
+                    fragment.ApplicationName,
+                    fragment.Owner,
+                    Step = step,
+                    Output = output,
+                    OutputIndex = index
+                }))))
+            .ToArray();
+
+        var reactions = declarations.Select(declaration =>
+        {
+            var observedKind = declaration.Output.Kind switch
+            {
+                ChoreographyOperationKind.Send => "sent",
+                ChoreographyOperationKind.Publish => "published",
+                _ => null
+            };
+            var matchingDeclarations = observedKind is null ? 0 : declarations.Count(candidate =>
+                string.Equals(candidate.ChoreographyId, declaration.ChoreographyId, StringComparison.Ordinal)
+                && string.Equals(candidate.DefinitionVersion, declaration.DefinitionVersion, StringComparison.Ordinal)
+                && string.Equals(candidate.ApplicationName, declaration.ApplicationName, StringComparison.Ordinal)
+                && string.Equals(candidate.Step.TriggerMessageUrn, declaration.Step.TriggerMessageUrn, StringComparison.Ordinal)
+                && candidate.Output.Kind == declaration.Output.Kind
+                && string.Equals(candidate.Output.MessageUrn, declaration.Output.MessageUrn, StringComparison.Ordinal)
+                && string.Equals(candidate.Output.Destination, declaration.Output.Destination, StringComparison.Ordinal));
+            MonitoringCausalFlowEdge[] matches = observedKind is null || matchingDeclarations != 1
+                ? []
+                : causalEdges.Where(edge =>
+                    string.Equals(edge.ApplicationName, declaration.ApplicationName, StringComparison.Ordinal)
+                    && string.Equals(edge.TriggerMessageUrn, declaration.Step.TriggerMessageUrn, StringComparison.Ordinal)
+                    && string.Equals(edge.OutputMessageUrn, declaration.Output.MessageUrn, StringComparison.Ordinal)
+                    && (string.IsNullOrWhiteSpace(declaration.Output.Destination)
+                        || string.Equals(edge.DestinationAddress, declaration.Output.Destination, StringComparison.Ordinal))
+                    && string.Equals(edge.OperationKind, observedKind, StringComparison.Ordinal)).ToArray();
+            var status = observedKind is null
+                ? "unsupported_operation"
+                : matchingDeclarations > 1
+                    ? "ambiguous_declaration"
+                    : matches.Length == 0 ? "no_exact_evidence" : "exact_causation";
+
+            return new MonitoringChoreographyReactionRuntime(
+                declaration.ChoreographyId,
+                declaration.DefinitionVersion,
+                declaration.ApplicationName,
+                declaration.Owner,
+                declaration.Step.Id,
+                declaration.OutputIndex,
+                declaration.Step.TriggerMessageUrn,
+                declaration.Output.Kind,
+                declaration.Output.MessageUrn,
+                declaration.Output.Destination,
+                matches.Sum(edge => edge.Count),
+                matches.Length == 0 ? null : matches.Min(edge => edge.FirstSeenAtUtc),
+                matches.Length == 0 ? null : matches.Max(edge => edge.LastSeenAtUtc),
+                status);
+        }).ToArray();
+        var rates = GetRates(null, boundedWindow, false, now);
+        var dropped = rates.Sum(rate => rate.DroppedObservations);
+        var allOnline = choreographies.SelectMany(choreography => choreography.Fragments)
+            .All(fragment => fragment.OnlineInstances > 0);
+        return new MonitoringChoreographyRuntimeSnapshot(
+            boundedWindow,
+            now.AddSeconds(-boundedWindow),
+            now,
+            dropped,
+            allOnline,
+            dropped == 0 && allOnline,
+            reactions);
+    }
+
+    public MonitoringChoreographyRunSnapshot GetChoreographyRuns(
+        string? choreographyId,
+        int windowSeconds,
+        int limit,
+        DateTimeOffset now)
+    {
+        var boundedWindow = Math.Clamp(windowSeconds, 10, (int)MetricRetention.TotalSeconds);
+        var boundedLimit = Math.Clamp(limit, 1, 100);
+        var windowStart = now.AddSeconds(-boundedWindow);
+        var choreographies = GetDeclaredChoreographies(now)
+            .Where(choreography => choreographyId is null || string.Equals(
+                choreography.ChoreographyId,
+                choreographyId,
+                StringComparison.Ordinal))
+            .ToArray();
+        MonitoringObservationRecord[] records;
+        lock (observationSync)
+        {
+            records = recentObservations
+                .Where(record => record.Observation.OccurredAtUtc >= windowStart
+                    && record.Observation.OccurredAtUtc <= now)
+                .OrderBy(record => record.Observation.OccurredAtUtc)
+                .ToArray();
+        }
+
+        var rates = GetRates(null, boundedWindow, false, now);
+        var dropped = rates.Sum(rate => rate.DroppedObservations);
+        var allOnline = choreographies.SelectMany(choreography => choreography.Fragments)
+            .All(fragment => fragment.OnlineInstances > 0);
+        var complete = dropped == 0 && allOnline;
+        var runs = choreographies
+            .SelectMany(choreography => choreography.DefinitionVersions.SelectMany(version =>
+                BuildChoreographyRuns(choreography, version, records, complete, now)))
+            .OrderByDescending(run => run.LastActivityAtUtc)
+            .Take(boundedLimit)
+            .Select(run => run with
+            {
+                EvidenceComplete = complete,
+                DroppedObservations = dropped,
+                AllParticipantsOnline = allOnline
+            })
+            .ToArray();
+        return new MonitoringChoreographyRunSnapshot(
+            boundedWindow,
+            windowStart,
+            now,
+            dropped,
+            allOnline,
+            complete,
+            runs);
+    }
+
+    public IReadOnlyList<MonitoringChoreographyRun> CaptureWorkflowRuns(DateTimeOffset now)
+    {
+        var projected = GetChoreographyRuns(null, (int)MetricRetention.TotalSeconds, 100, now).Runs;
+        foreach (var run in projected)
+        {
+            workflowRuns.AddOrUpdate(
+                run.RunId,
+                run,
+                (_, current) => PreferWorkflowRun(current, run));
+            RemoveSupersededWorkflowRuns(run);
+        }
+        PruneWorkflowRuns(now - workflowRunRetention);
+        return projected;
+    }
+
+    public void RestoreWorkflowRuns(IEnumerable<MonitoringChoreographyRun> runs, DateTimeOffset now)
+    {
+        var retainedRuns = runs.Where(run => run.LastActivityAtUtc >= now - workflowRunRetention).ToArray();
+        foreach (var run in retainedRuns)
+        {
+            workflowRuns.AddOrUpdate(
+                run.RunId,
+                run,
+                (_, current) => PreferWorkflowRun(current, run));
+        }
+        foreach (var run in retainedRuns.Where(run => run.RootMessageIds.Count > 1))
+            RemoveSupersededWorkflowRuns(run);
+        PruneWorkflowRuns(now - workflowRunRetention);
+    }
+
+    public MonitoringWorkflowRunPage GetWorkflowRuns(
+        string? workflow,
+        string? coordinationType,
+        string? status,
+        string? search,
+        DateTimeOffset? startedAfterUtc,
+        DateTimeOffset? startedBeforeUtc,
+        int offset,
+        int limit,
+        DateTimeOffset now)
+    {
+        PruneWorkflowRuns(now - workflowRunRetention);
+        var boundedOffset = Math.Max(0, offset);
+        var boundedLimit = Math.Clamp(limit, 1, 100);
+        var query = workflowRuns.Values
+            .Select(run => WithCurrentStatus(run, now))
+            .Where(run => string.IsNullOrWhiteSpace(workflow)
+                || string.Equals(run.ChoreographyId, workflow, StringComparison.Ordinal))
+            .Where(run => string.IsNullOrWhiteSpace(coordinationType)
+                || string.Equals(run.CoordinationType, coordinationType, StringComparison.OrdinalIgnoreCase))
+            .Where(run => string.IsNullOrWhiteSpace(status)
+                || string.Equals(run.Status, status, StringComparison.OrdinalIgnoreCase))
+            .Where(run => !startedAfterUtc.HasValue || run.StartedAtUtc >= startedAfterUtc.Value)
+            .Where(run => !startedBeforeUtc.HasValue || run.StartedAtUtc <= startedBeforeUtc.Value)
+            .Where(run => string.IsNullOrWhiteSpace(search)
+                || run.ChoreographyId.Contains(search, StringComparison.OrdinalIgnoreCase)
+                || run.RunId.Contains(search, StringComparison.OrdinalIgnoreCase)
+                || run.RootMessageId.Contains(search, StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(run => run.LastActivityAtUtc)
+            .ThenBy(run => run.RunId, StringComparer.Ordinal)
+            .ToArray();
+        return new MonitoringWorkflowRunPage(
+            boundedOffset,
+            boundedLimit,
+            query.Length,
+            now,
+            query.Skip(boundedOffset).Take(boundedLimit).ToArray());
+    }
+
+    public MonitoringChoreographyRun? GetWorkflowRun(string runId, DateTimeOffset now)
+    {
+        PruneWorkflowRuns(now - workflowRunRetention);
+        return workflowRuns.TryGetValue(runId, out var run) ? WithCurrentStatus(run, now) : null;
+    }
+
+    private static IReadOnlyList<MonitoringChoreographyRun> BuildChoreographyRuns(
+        MonitoringDeclaredChoreography choreography,
+        string definitionVersion,
+        IReadOnlyList<MonitoringObservationRecord> records,
+        bool evidenceComplete,
+        DateTimeOffset now)
+    {
+        var declarations = choreography.Fragments
+            .Where(fragment => string.Equals(fragment.DefinitionVersion, definitionVersion, StringComparison.Ordinal))
+            .SelectMany(fragment => fragment.Steps.Select(step => new DeclaredRunStep(
+                fragment.ApplicationName,
+                fragment.Owner,
+                step.Id,
+                step.OwnerComponent,
+                step.TriggerMessageUrn,
+                step.Outputs)))
+            .ToArray();
+        var nodes = records
+            .Where(record => record.Observation.Kind is "consumed" or "consume_faulted"
+                && !string.IsNullOrWhiteSpace(record.Observation.MessageId)
+                && !string.IsNullOrWhiteSpace(record.Observation.MessageUrn))
+            .GroupBy(record => new RunConsumptionKey(
+                record.ApplicationName,
+                record.InstanceId,
+                record.BusId,
+                record.Observation.MessageId!))
+            .Select(group =>
+            {
+                var outcome = group.OrderByDescending(record => record.Observation.OccurredAtUtc).First();
+                var matches = declarations.Where(declaration =>
+                    string.Equals(declaration.ApplicationName, outcome.ApplicationName, StringComparison.Ordinal)
+                    && string.Equals(declaration.TriggerMessageUrn, outcome.Observation.MessageUrn, StringComparison.Ordinal))
+                    .ToArray();
+                return matches.Length == 1 ? new MutableChoreographyRunStep(matches[0], outcome) : null;
+            })
+            .Where(node => node is not null)
+            .Cast<MutableChoreographyRunStep>()
+            .ToArray();
+        if (nodes.Length == 0)
+            return [];
+
+        var nodesByMessageId = nodes
+            .GroupBy(node => node.MessageId, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.ToArray(), StringComparer.Ordinal);
+        var retryRecords = records
+            .Where(record => record.Observation.Kind is "retry_attempted" or "retry_exhausted"
+                && !string.IsNullOrWhiteSpace(record.Observation.MessageId))
+            .GroupBy(record => new RunConsumptionKey(
+                record.ApplicationName,
+                record.InstanceId,
+                record.BusId,
+                record.Observation.MessageId!))
+            .ToDictionary(group => group.Key, group => group.ToArray());
+        var outputRecords = records
+            .Where(record => record.Observation.Kind is
+                    "sent" or "published" or "send_faulted" or "publish_faulted" or
+                    "fault_published" or "fault_publish_faulted"
+                && !string.IsNullOrWhiteSpace(record.Observation.CausationMessageId))
+            .ToArray();
+
+        foreach (var node in nodes)
+        {
+            if (retryRecords.TryGetValue(node.Key, out var retries))
+                node.AddRetries(retries);
+            foreach (var output in outputRecords.Where(record =>
+                         string.Equals(record.ApplicationName, node.ApplicationName, StringComparison.Ordinal)
+                         && string.Equals(record.Observation.CausationMessageId, node.MessageId, StringComparison.Ordinal)))
+            {
+                var targets = string.IsNullOrWhiteSpace(output.Observation.MessageId)
+                    ? []
+                    : nodesByMessageId.GetValueOrDefault(output.Observation.MessageId) ?? [];
+                node.AddOutput(output, targets);
+                foreach (var target in targets)
+                    target.AddParent(node);
+            }
+        }
+
+        var claimed = new HashSet<MutableChoreographyRunStep>();
+        var runs = new List<MonitoringChoreographyRun>();
+        foreach (var seed in nodes
+                     .OrderBy(node => node.StartedAtUtc)
+                     .ThenBy(node => node.StepKey, StringComparer.Ordinal))
+        {
+            if (claimed.Contains(seed))
+                continue;
+            var component = TraverseRunComponent(seed, nodesByMessageId).ToArray();
+            claimed.UnionWith(component);
+            var roots = component.Where(node => node.ParentCount == 0).ToArray();
+            if (roots.Length == 0)
+                roots = [component.MinBy(node => node.StartedAtUtc)!];
+            runs.Add(CreateRun(choreography.ChoreographyId, definitionVersion, roots, component, evidenceComplete, now));
+        }
+        return runs;
+    }
+
+    private static IEnumerable<MutableChoreographyRunStep> TraverseRunComponent(
+        MutableChoreographyRunStep seed,
+        IReadOnlyDictionary<string, MutableChoreographyRunStep[]> nodesByMessageId)
+    {
+        var pending = new Queue<MutableChoreographyRunStep>([seed]);
+        var visited = new HashSet<MutableChoreographyRunStep>();
+        while (pending.TryDequeue(out var node))
+        {
+            if (!visited.Add(node))
+                continue;
+            yield return node;
+            foreach (var target in node.Targets)
+                pending.Enqueue(target);
+            foreach (var parent in node.Parents)
+                pending.Enqueue(parent);
+            foreach (var peer in nodesByMessageId.GetValueOrDefault(node.MessageId) ?? [])
+                pending.Enqueue(peer);
+        }
+    }
+
+    private static MonitoringChoreographyRun CreateRun(
+        string choreographyId,
+        string definitionVersion,
+        IReadOnlyList<MutableChoreographyRunStep> roots,
+        IReadOnlyList<MutableChoreographyRunStep> nodes,
+        bool evidenceComplete,
+        DateTimeOffset now)
+    {
+        var rootMessageIds = roots
+            .OrderBy(node => node.StartedAtUtc)
+            .ThenBy(node => node.MessageId, StringComparer.Ordinal)
+            .Select(node => node.MessageId)
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+        var rootMessageId = rootMessageIds[0];
+        var ordered = nodes
+            .OrderBy(node => node.StartedAtUtc)
+            .ThenBy(node => node.ApplicationName, StringComparer.Ordinal)
+            .ThenBy(node => node.StepId, StringComparer.Ordinal)
+            .ToArray();
+        var steps = ordered.Select((node, index) => node.ToImmutable(index + 1, evidenceComplete, now)).ToArray();
+        var startedAt = ordered.Min(node => node.StartedAtUtc);
+        var lastActivityAt = ordered.Max(node => node.LastActivityAtUtc);
+        var faulted = ordered.Any(node => node.Faulted);
+        var terminalObserved = ordered.Any(node => node.Declaration.Terminal && !node.Faulted);
+        var status = faulted
+            ? "faulted"
+            : terminalObserved
+                ? "terminal_observed"
+                : now - lastActivityAt <= TimeSpan.FromSeconds(15) ? "live" : "no_recent_activity";
+        return new MonitoringChoreographyRun(
+            choreographyId,
+            definitionVersion,
+            $"{choreographyId}:{definitionVersion}:{rootMessageId}",
+            rootMessageId,
+            startedAt,
+            lastActivityAt,
+            Math.Max(0, (lastActivityAt - startedAt).TotalMilliseconds),
+            status,
+            "exact_causation",
+            false,
+            0,
+            false,
+            steps)
+        {
+            RootMessageIds = rootMessageIds
+        };
+    }
+
+    private static MonitoringChoreographyRun PreferWorkflowRun(
+        MonitoringChoreographyRun current,
+        MonitoringChoreographyRun candidate)
+    {
+        if ((candidate.LastActivityAtUtc >= current.LastActivityAtUtc
+                && candidate.Steps.Count >= current.Steps.Count)
+            || candidate.Steps.Count > current.Steps.Count
+            || StatusPriority(candidate.Status) > StatusPriority(current.Status))
+            return candidate;
+        return current with
+        {
+            EvidenceComplete = candidate.EvidenceComplete,
+            DroppedObservations = candidate.DroppedObservations,
+            AllParticipantsOnline = candidate.AllParticipantsOnline
+        };
+    }
+
+    private static MonitoringChoreographyRun WithCurrentStatus(MonitoringChoreographyRun run, DateTimeOffset now)
+    {
+        if (run.Status is "faulted" or "terminal_observed")
+            return run;
+        var status = now - run.LastActivityAtUtc <= TimeSpan.FromSeconds(15) ? "live" : "no_recent_activity";
+        return string.Equals(run.Status, status, StringComparison.Ordinal) ? run : run with { Status = status };
+    }
+
+    private static int StatusPriority(string status) => status switch
+    {
+        "faulted" => 4,
+        "terminal_observed" => 3,
+        "live" => 2,
+        _ => 1
+    };
+
+    private void PruneWorkflowRuns(DateTimeOffset cutoff)
+    {
+        foreach (var run in workflowRuns.Where(pair => pair.Value.LastActivityAtUtc < cutoff))
+            workflowRuns.TryRemove(run.Key, out _);
+    }
+
+    private void RemoveSupersededWorkflowRuns(MonitoringChoreographyRun candidate)
+    {
+        if (candidate.RootMessageIds.Count <= 1)
+            return;
+        var roots = candidate.RootMessageIds.ToHashSet(StringComparer.Ordinal);
+        foreach (var pair in workflowRuns.Where(pair =>
+                     !string.Equals(pair.Key, candidate.RunId, StringComparison.Ordinal)
+                     && string.Equals(pair.Value.ChoreographyId, candidate.ChoreographyId, StringComparison.Ordinal)
+                     && string.Equals(pair.Value.DefinitionVersion, candidate.DefinitionVersion, StringComparison.Ordinal)
+                     && pair.Value.RootMessageIds.Count > 0
+                     && pair.Value.RootMessageIds.All(roots.Contains)))
+            workflowRuns.TryRemove(pair.Key, out _);
+    }
+
     public IReadOnlyList<MonitoringObservationRecord> GetRecentObservations(string? applicationName, int limit)
     {
         lock (observationSync)
@@ -419,6 +913,98 @@ public sealed class MonitoringRepository
                 .Take(Math.Clamp(limit, 1, RecentObservationLimit))
                 .ToArray();
         }
+    }
+
+    private static string[] GetChoreographyConflictKinds(
+        IReadOnlyList<MonitoringDeclaredChoreographyFragment> fragments,
+        IReadOnlyList<string> definitionVersions)
+    {
+        var conflicts = new List<string>();
+        if (definitionVersions.Count > 1)
+            conflicts.Add("definition_version");
+        if (fragments
+            .GroupBy(fragment => fragment.Owner, StringComparer.Ordinal)
+            .Any(group => group.Select(fragment => fragment.ApplicationName).Distinct(StringComparer.Ordinal).Count() > 1))
+        {
+            conflicts.Add("owner");
+        }
+        if (fragments
+            .SelectMany(fragment => fragment.Steps.Select(step => new
+            {
+                fragment.DefinitionVersion,
+                step.Id,
+                fragment.ApplicationName,
+                fragment.Owner
+            }))
+            .GroupBy(step => new { step.DefinitionVersion, step.Id })
+            .Any(group => group.Select(step => new { step.ApplicationName, step.Owner }).Distinct().Count() > 1))
+        {
+            conflicts.Add("step_ownership");
+        }
+        return conflicts.ToArray();
+    }
+
+    private static MonitoringDeclaredChoreographyConnection[] CreateDeclaredChoreographyConnections(
+        IReadOnlyList<MonitoringDeclaredChoreographyFragment> fragments)
+        => fragments
+            .SelectMany(sourceFragment => sourceFragment.Steps.SelectMany(sourceStep => sourceStep.Outputs
+                .Where(output => output.MessageUrn is not null)
+                .SelectMany(output => fragments
+                    .Where(targetFragment => string.Equals(
+                        targetFragment.DefinitionVersion,
+                        sourceFragment.DefinitionVersion,
+                        StringComparison.Ordinal))
+                    .SelectMany(targetFragment => targetFragment.Steps
+                        .Where(targetStep => string.Equals(
+                            targetStep.TriggerMessageUrn,
+                            output.MessageUrn,
+                            StringComparison.Ordinal))
+                        .Select(targetStep => new MonitoringDeclaredChoreographyConnection(
+                            sourceFragment.DefinitionVersion,
+                            sourceFragment.ApplicationName,
+                            sourceFragment.Owner,
+                            sourceStep.Id,
+                            output.Kind,
+                            output.MessageUrn!,
+                            output.Destination,
+                            targetFragment.ApplicationName,
+                            targetFragment.Owner,
+                            targetStep.Id,
+                            "declared_contract"))))))
+            .Distinct()
+            .OrderBy(connection => connection.DefinitionVersion, StringComparer.Ordinal)
+            .ThenBy(connection => connection.SourceApplication, StringComparer.Ordinal)
+            .ThenBy(connection => connection.SourceOwner, StringComparer.Ordinal)
+            .ThenBy(connection => connection.SourceStepId, StringComparer.Ordinal)
+            .ThenBy(connection => connection.OperationKind)
+            .ThenBy(connection => connection.MessageUrn, StringComparer.Ordinal)
+            .ThenBy(connection => connection.Destination, StringComparer.Ordinal)
+            .ThenBy(connection => connection.TargetApplication, StringComparer.Ordinal)
+            .ThenBy(connection => connection.TargetOwner, StringComparer.Ordinal)
+            .ThenBy(connection => connection.TargetStepId, StringComparer.Ordinal)
+            .ToArray();
+
+    private static string CreateFragmentIdentity(ChoreographyFragment fragment)
+    {
+        var normalized = fragment with
+        {
+            Steps = fragment.Steps
+                .OrderBy(step => step.Id, StringComparer.Ordinal)
+                .Select(step => step with
+                {
+                    Outputs = step.Outputs
+                        .OrderBy(output => output.Kind)
+                        .ThenBy(output => output.MessageUrn, StringComparer.Ordinal)
+                        .ThenBy(output => output.Destination, StringComparer.Ordinal)
+                        .ThenBy(output => output.Requirement)
+                        .ThenBy(output => output.MinCount)
+                        .ThenBy(output => output.MaxCount)
+                        .ThenBy(output => output.WithinMilliseconds)
+                        .ToArray()
+                })
+                .ToArray()
+        };
+        return JsonSerializer.Serialize(normalized);
     }
 
     public IReadOnlyList<MonitoringOutboxDispatcherSummary> GetOutboxDispatchers(
@@ -630,7 +1216,8 @@ public sealed class MonitoringRepository
                 edge.TargetApplication,
                 edge.EndpointName,
                 edge.MessageUrn,
-                edge.OperationKind))
+                edge.OperationKind,
+                edge.MatchConfidence))
             .Select(group => new MonitoringFlowEdge(
                 group.Key.SourceApplication,
                 group.Key.TargetApplication,
@@ -640,7 +1227,8 @@ public sealed class MonitoringRepository
                 group.Key.OperationKind,
                 group.Sum(edge => edge.Count),
                 group.Min(edge => edge.FirstSeenAtUtc),
-                group.Max(edge => edge.LastSeenAtUtc)))
+                group.Max(edge => edge.LastSeenAtUtc),
+                group.Key.MatchConfidence))
             .OrderByDescending(edge => edge.Count)
             .ThenBy(edge => edge.SourceApplication, StringComparer.Ordinal)
             .ThenBy(edge => edge.TargetApplication, StringComparer.Ordinal)
@@ -675,7 +1263,7 @@ public sealed class MonitoringRepository
                     record.BusId,
                     observation.Kind);
                 foreach (var correlationKey in CorrelationKeys(observation))
-                    sources[correlationKey] = outboundSource;
+                    sources[correlationKey.Key] = outboundSource with { MatchConfidence = correlationKey.MatchConfidence };
                 continue;
             }
             if (!string.Equals(observation.Kind, "consumed", StringComparison.Ordinal))
@@ -684,7 +1272,7 @@ public sealed class MonitoringRepository
             FlowSource? matchedSource = null;
             foreach (var correlationKey in CorrelationKeys(observation))
             {
-                if (sources.TryGetValue(correlationKey, out matchedSource))
+                if (sources.TryGetValue(correlationKey.Key, out matchedSource))
                     break;
             }
             if (matchedSource is null)
@@ -703,7 +1291,8 @@ public sealed class MonitoringRepository
                 record.BusId,
                 observation.EndpointName,
                 observation.MessageUrn,
-                matchedSource.OperationKind);
+                matchedSource.OperationKind,
+                matchedSource.MatchConfidence);
             if (!edges.TryGetValue(edgeKey, out var edge))
             {
                 edge = new MutableReplicaFlowEdge(
@@ -717,6 +1306,7 @@ public sealed class MonitoringRepository
                     observation.MessageType,
                     observation.MessageUrn,
                     matchedSource.OperationKind,
+                    matchedSource.MatchConfidence,
                     observation.OccurredAtUtc);
                 edges.Add(edgeKey, edge);
             }
@@ -733,6 +1323,86 @@ public sealed class MonitoringRepository
             .ToArray();
     }
 
+    public IReadOnlyList<MonitoringCausalFlowEdge> GetCausalFlow(
+        string? applicationName,
+        int windowSeconds,
+        DateTimeOffset now)
+    {
+        var boundedWindow = Math.Clamp(windowSeconds, 10, (int)MetricRetention.TotalSeconds);
+        var start = now.AddSeconds(-boundedWindow);
+        MonitoringObservationRecord[] records;
+        lock (observationSync)
+        {
+            records = recentObservations
+                .Where(record => record.Observation.OccurredAtUtc >= start
+                    && record.Observation.OccurredAtUtc <= now)
+                .OrderBy(record => record.Observation.OccurredAtUtc)
+                .ToArray();
+        }
+
+        var consumedByMessageId = records
+            .Where(record => record.Observation.Kind is "consumed" or "consume_faulted"
+                && !string.IsNullOrWhiteSpace(record.Observation.MessageId))
+            .GroupBy(record => record.Observation.MessageId!, StringComparer.Ordinal)
+            .ToDictionary(
+                group => group.Key,
+                group => group.OrderBy(record => record.Observation.OccurredAtUtc).ToArray(),
+                StringComparer.Ordinal);
+        var edges = new Dictionary<CausalFlowEdgeKey, MutableCausalFlowEdge>();
+
+        foreach (var output in records.Where(record =>
+                     record.Observation.Kind is "sent" or "published" or "fault_published"
+                     && !string.IsNullOrWhiteSpace(record.Observation.CausationMessageId)))
+        {
+            if (!consumedByMessageId.TryGetValue(output.Observation.CausationMessageId!, out var candidates))
+                continue;
+            var trigger = candidates
+                .OrderByDescending(candidate => string.Equals(
+                    candidate.ApplicationName,
+                    output.ApplicationName,
+                    StringComparison.Ordinal))
+                .ThenBy(candidate => Math.Abs(
+                    (candidate.Observation.OccurredAtUtc - output.Observation.OccurredAtUtc).Ticks))
+                .FirstOrDefault();
+            if (trigger is null)
+                continue;
+            if (applicationName is not null
+                && !string.Equals(output.ApplicationName, applicationName, StringComparison.Ordinal))
+                continue;
+
+            var key = new CausalFlowEdgeKey(
+                output.ApplicationName,
+                trigger.Observation.EndpointName,
+                trigger.Observation.MessageUrn,
+                output.Observation.MessageUrn,
+                output.Observation.DestinationAddress,
+                output.Observation.Kind);
+            if (!edges.TryGetValue(key, out var edge))
+            {
+                edge = new MutableCausalFlowEdge(
+                    output.ApplicationName,
+                    trigger.Observation.EndpointName,
+                    trigger.Observation.MessageType,
+                    trigger.Observation.MessageUrn,
+                    output.Observation.MessageType,
+                    output.Observation.MessageUrn,
+                    output.Observation.DestinationAddress,
+                    output.Observation.Kind,
+                    output.Observation.OccurredAtUtc);
+                edges.Add(key, edge);
+            }
+            edge.Record(output.Observation.OccurredAtUtc);
+        }
+
+        return edges.Values
+            .Select(edge => edge.ToImmutable())
+            .OrderByDescending(edge => edge.Count)
+            .ThenBy(edge => edge.ApplicationName, StringComparer.Ordinal)
+            .ThenBy(edge => edge.TriggerMessageUrn, StringComparer.Ordinal)
+            .ThenBy(edge => edge.OutputMessageUrn, StringComparer.Ordinal)
+            .ToArray();
+    }
+
     private void PruneMetrics(DateTimeOffset cutoff)
     {
         var cutoffKey = cutoff.ToUnixTimeSeconds();
@@ -746,14 +1416,16 @@ public sealed class MonitoringRepository
     internal void SetLastIngestAtUtc(DateTimeOffset? value)
         => Interlocked.Exchange(ref lastIngestUtcTicks, value?.UtcTicks ?? 0);
 
-    private static IEnumerable<string> CorrelationKeys(MonitoringObservation observation)
+    private static IEnumerable<FlowCorrelationKey> CorrelationKeys(MonitoringObservation observation)
     {
+        if (!string.IsNullOrWhiteSpace(observation.MessageId))
+            yield return new FlowCorrelationKey($"message:{observation.MessageId}", "exact_message");
         if (!string.IsNullOrWhiteSpace(observation.CorrelationId))
-            yield return $"correlation:{observation.CorrelationId}";
+            yield return new FlowCorrelationKey($"correlation:{observation.CorrelationId}", "correlated");
         if (!string.IsNullOrWhiteSpace(observation.ConversationId))
-            yield return $"conversation:{observation.ConversationId}";
+            yield return new FlowCorrelationKey($"conversation:{observation.ConversationId}", "correlated");
         if (!string.IsNullOrWhiteSpace(observation.TraceId))
-            yield return $"trace:{observation.TraceId}";
+            yield return new FlowCorrelationKey($"trace:{observation.TraceId}", "correlated");
     }
 
     private static IReadOnlyDictionary<string, string> CommonLabels(
@@ -827,7 +1499,8 @@ public sealed class MonitoringRepository
         string TargetApplication,
         string? EndpointName,
         string? MessageUrn,
-        string OperationKind);
+        string OperationKind,
+        string MatchConfidence);
     private readonly record struct ReplicaFlowEdgeKey(
         string SourceApplication,
         string SourceInstanceId,
@@ -837,12 +1510,22 @@ public sealed class MonitoringRepository
         string TargetBusId,
         string? EndpointName,
         string? MessageUrn,
+        string OperationKind,
+        string MatchConfidence);
+    private readonly record struct FlowCorrelationKey(string Key, string MatchConfidence);
+    private readonly record struct CausalFlowEdgeKey(
+        string ApplicationName,
+        string? ConsumerEndpointName,
+        string? TriggerMessageUrn,
+        string? OutputMessageUrn,
+        string? DestinationAddress,
         string OperationKind);
     private sealed record FlowSource(
         string ApplicationName,
         string InstanceId,
         string BusId,
-        string OperationKind);
+        string OperationKind,
+        string MatchConfidence = "correlated");
 
     private static bool TryGet(
         IReadOnlyDictionary<string, string>? properties,
@@ -893,6 +1576,7 @@ public sealed class MonitoringRepository
             string? messageType,
             string? messageUrn,
             string operationKind,
+            string matchConfidence,
             DateTimeOffset occurredAtUtc)
         {
             SourceApplication = sourceApplication;
@@ -905,6 +1589,7 @@ public sealed class MonitoringRepository
             MessageType = messageType;
             MessageUrn = messageUrn;
             OperationKind = operationKind;
+            MatchConfidence = matchConfidence;
             firstSeenAtUtc = occurredAtUtc;
             lastSeenAtUtc = occurredAtUtc;
         }
@@ -919,6 +1604,7 @@ public sealed class MonitoringRepository
         public string? MessageType { get; }
         public string? MessageUrn { get; }
         public string OperationKind { get; }
+        public string MatchConfidence { get; }
 
         public void Record(DateTimeOffset occurredAtUtc)
         {
@@ -942,7 +1628,70 @@ public sealed class MonitoringRepository
             OperationKind,
             count,
             firstSeenAtUtc,
-            lastSeenAtUtc);
+            lastSeenAtUtc,
+            MatchConfidence);
+    }
+
+    private sealed class MutableCausalFlowEdge
+    {
+        private long count;
+        private DateTimeOffset firstSeenAtUtc;
+        private DateTimeOffset lastSeenAtUtc;
+
+        public MutableCausalFlowEdge(
+            string applicationName,
+            string? consumerEndpointName,
+            string? triggerMessageType,
+            string? triggerMessageUrn,
+            string? outputMessageType,
+            string? outputMessageUrn,
+            string? destinationAddress,
+            string operationKind,
+            DateTimeOffset occurredAtUtc)
+        {
+            ApplicationName = applicationName;
+            ConsumerEndpointName = consumerEndpointName;
+            TriggerMessageType = triggerMessageType;
+            TriggerMessageUrn = triggerMessageUrn;
+            OutputMessageType = outputMessageType;
+            OutputMessageUrn = outputMessageUrn;
+            DestinationAddress = destinationAddress;
+            OperationKind = operationKind;
+            firstSeenAtUtc = occurredAtUtc;
+            lastSeenAtUtc = occurredAtUtc;
+        }
+
+        public string ApplicationName { get; }
+        public string? ConsumerEndpointName { get; }
+        public string? TriggerMessageType { get; }
+        public string? TriggerMessageUrn { get; }
+        public string? OutputMessageType { get; }
+        public string? OutputMessageUrn { get; }
+        public string? DestinationAddress { get; }
+        public string OperationKind { get; }
+
+        public void Record(DateTimeOffset occurredAtUtc)
+        {
+            count++;
+            if (occurredAtUtc < firstSeenAtUtc)
+                firstSeenAtUtc = occurredAtUtc;
+            if (occurredAtUtc > lastSeenAtUtc)
+                lastSeenAtUtc = occurredAtUtc;
+        }
+
+        public MonitoringCausalFlowEdge ToImmutable() => new(
+            ApplicationName,
+            ConsumerEndpointName,
+            TriggerMessageType,
+            TriggerMessageUrn,
+            OutputMessageType,
+            OutputMessageUrn,
+            DestinationAddress,
+            OperationKind,
+            count,
+            firstSeenAtUtc,
+            lastSeenAtUtc,
+            "exact_causation");
     }
 
     private sealed class MutableMetricSet
@@ -1145,6 +1894,272 @@ public sealed class MonitoringRepository
                     metadata.Labels);
             }
         }
+    }
+
+    private sealed record DeclaredFragmentSource(
+        string ApplicationName,
+        string InstanceId,
+        bool Online,
+        DateTimeOffset CapturedAtUtc,
+        ChoreographyFragment Fragment,
+        string FragmentIdentity);
+
+    private sealed record DeclaredRunStep(
+        string ApplicationName,
+        string Owner,
+        string StepId,
+        string? OwnerComponent,
+        string TriggerMessageUrn,
+        IReadOnlyList<ChoreographyOutput> Outputs)
+    {
+        public bool Terminal => Outputs.Any(output => output.Kind == ChoreographyOperationKind.Terminal);
+    }
+
+    private sealed record RunConsumptionKey(
+        string ApplicationName,
+        string InstanceId,
+        string BusId,
+        string MessageId);
+
+    private sealed class MutableChoreographyRunStep
+    {
+        private readonly MonitoringObservationRecord outcome;
+        private readonly List<MutableChoreographyRunOutput> outputs = new();
+        private readonly HashSet<MutableChoreographyRunStep> parents = new();
+        private int retryCount;
+        private bool retryExhausted;
+        private string? retryFailureType;
+
+        public MutableChoreographyRunStep(DeclaredRunStep declaration, MonitoringObservationRecord outcome)
+        {
+            Declaration = declaration;
+            this.outcome = outcome;
+            Key = new RunConsumptionKey(
+                outcome.ApplicationName,
+                outcome.InstanceId,
+                outcome.BusId,
+                outcome.Observation.MessageId!);
+            StepKey = $"{outcome.ApplicationName}:{outcome.InstanceId}:{outcome.BusId}:{outcome.Observation.MessageId}:{declaration.StepId}";
+        }
+
+        public DeclaredRunStep Declaration { get; }
+        public RunConsumptionKey Key { get; }
+        public string StepKey { get; }
+        public string ApplicationName => outcome.ApplicationName;
+        public string MessageId => outcome.Observation.MessageId!;
+        public string StepId => Declaration.StepId;
+        public DateTimeOffset StartedAtUtc => outcome.Observation.OccurredAtUtc
+            - TimeSpan.FromMilliseconds(Math.Max(0, outcome.Observation.DurationMs ?? 0));
+        public DateTimeOffset LastActivityAtUtc => outputs.Count == 0
+            ? outcome.Observation.OccurredAtUtc
+            : outputs.Max(output => output.Record.Observation.OccurredAtUtc) > outcome.Observation.OccurredAtUtc
+                ? outputs.Max(output => output.Record.Observation.OccurredAtUtc)
+                : outcome.Observation.OccurredAtUtc;
+        public int ParentCount => parents.Count;
+        public IEnumerable<MutableChoreographyRunStep> Parents => parents;
+        public IEnumerable<MutableChoreographyRunStep> Targets => outputs.SelectMany(output => output.Targets).Distinct();
+        public bool Faulted => outcome.Observation.Kind == "consume_faulted"
+            || retryExhausted
+            || outputs.Any(output => output.Record.Observation.Succeeded == false);
+
+        public void AddParent(MutableChoreographyRunStep parent) => parents.Add(parent);
+
+        public void AddRetries(IEnumerable<MonitoringObservationRecord> records)
+        {
+            foreach (var record in records)
+            {
+                if (record.Observation.Kind == "retry_attempted")
+                    retryCount++;
+                else if (record.Observation.Kind == "retry_exhausted")
+                {
+                    retryExhausted = true;
+                    retryFailureType ??= record.Observation.ExceptionType;
+                }
+            }
+        }
+
+        public void AddOutput(
+            MonitoringObservationRecord record,
+            IReadOnlyList<MutableChoreographyRunStep> targets)
+            => outputs.Add(new MutableChoreographyRunOutput(record, targets));
+
+        public MonitoringChoreographyRunStep ToImmutable(int sequence, bool evidenceComplete, DateTimeOffset now)
+            => new MonitoringChoreographyRunStep(
+                sequence,
+                StepKey,
+                outcome.ApplicationName,
+                outcome.InstanceId,
+                Declaration.Owner,
+                Declaration.StepId,
+                Declaration.OwnerComponent,
+                Declaration.TriggerMessageUrn,
+                MessageId,
+                outcome.Observation.EndpointName,
+                StartedAtUtc,
+                outcome.Observation.OccurredAtUtc,
+                Math.Max(0, outcome.Observation.DurationMs ?? 0),
+                Faulted ? "faulted" : "completed",
+                retryCount,
+                outcome.Observation.ExceptionType ?? retryFailureType,
+                outputs
+                    .OrderBy(output => output.Record.Observation.OccurredAtUtc)
+                    .Select(output => output.ToImmutable())
+                    .ToArray())
+            {
+                OutputExpectations = EvaluateOutputExpectations(
+                    evidenceComplete,
+                    now - LastActivityAtUtc > TimeSpan.FromSeconds(15))
+            };
+
+        private IReadOnlyList<MonitoringChoreographyRunOutputExpectation> EvaluateOutputExpectations(
+            bool evidenceComplete,
+            bool absenceConclusive)
+        {
+            var expectations = Declaration.Outputs.Select(declaration =>
+            {
+                if (declaration.Kind is ChoreographyOperationKind.Respond or ChoreographyOperationKind.Schedule)
+                    return CreateExpectation(declaration, 0, 0, 0, "unsupported_operation");
+                if (declaration.Kind == ChoreographyOperationKind.Terminal)
+                {
+                    var observed = outcome.Observation.Kind == "consumed" && !retryExhausted ? 1 : 0;
+                    var terminalMinimum = declaration.MinCount
+                        ?? (declaration.Requirement == ChoreographyRequirement.Expected ? 1 : 0);
+                    return CreateExpectation(
+                        declaration,
+                        observed,
+                        0,
+                        0,
+                        observed > 0
+                            ? "exact_observed"
+                            : observed < terminalMinimum && !evidenceComplete
+                                ? "insufficient_evidence"
+                                : observed < terminalMinimum && !absenceConclusive
+                                    ? "awaiting_evidence"
+                                    : observed < terminalMinimum
+                                        ? "missing_expected"
+                                        : SatisfiedAbsenceStatus(declaration.Requirement));
+                }
+
+                var matching = outputs.Where(output => Matches(declaration, output.Record.Observation)).ToArray();
+                var observedCount = matching.Length;
+                var failedCount = matching.Count(output => output.Record.Observation.Succeeded == false);
+                var lateCount = declaration.WithinMilliseconds is not { } within
+                    ? 0
+                    : matching.Count(output => output.Record.Observation.OccurredAtUtc - StartedAtUtc > TimeSpan.FromMilliseconds(within));
+                var minimum = declaration.MinCount
+                    ?? (declaration.Requirement == ChoreographyRequirement.Expected ? 1 : 0);
+                var status = failedCount > 0
+                    ? "output_faulted"
+                    : declaration.MaxCount is { } maximum && observedCount > maximum
+                        ? "above_maximum"
+                        : lateCount > 0
+                            ? "timing_exceeded"
+                            : observedCount < minimum
+                                ? !evidenceComplete
+                                    ? "insufficient_evidence"
+                                    : !absenceConclusive
+                                        ? "awaiting_evidence"
+                                        : observedCount == 0 ? "missing_expected" : "below_minimum"
+                                : observedCount > 0
+                                    ? "exact_observed"
+                                    : SatisfiedAbsenceStatus(declaration.Requirement);
+                return CreateExpectation(declaration, observedCount, failedCount, lateCount, status);
+            }).ToList();
+
+            var unexpected = outputs
+                .Where(output => DiagnosticOperationKind(output.Record.Observation.Kind) is not null)
+                .Where(output => !Declaration.Outputs.Any(declaration => Matches(declaration, output.Record.Observation)))
+                .GroupBy(output => new
+                {
+                    Kind = DiagnosticOperationKind(output.Record.Observation.Kind)!,
+                    output.Record.Observation.MessageUrn,
+                    output.Record.Observation.DestinationAddress
+                })
+                .Select(group => new MonitoringChoreographyRunOutputExpectation(
+                    group.Key.Kind,
+                    group.Key.MessageUrn,
+                    group.Key.DestinationAddress,
+                    "undeclared",
+                    null,
+                    null,
+                    null,
+                    group.Count(),
+                    group.Count(output => output.Record.Observation.Succeeded == false),
+                    0,
+                    "unexpected_observed"));
+            expectations.AddRange(unexpected);
+            return expectations;
+        }
+
+        private static string SatisfiedAbsenceStatus(ChoreographyRequirement requirement) => requirement switch
+        {
+            ChoreographyRequirement.Optional => "optional_not_observed",
+            ChoreographyRequirement.Informational => "informational_not_observed",
+            _ => "expectation_satisfied"
+        };
+
+        private static MonitoringChoreographyRunOutputExpectation CreateExpectation(
+            ChoreographyOutput declaration,
+            int observedCount,
+            int failedCount,
+            int lateCount,
+            string status)
+            => new(
+                OperationKind(declaration.Kind),
+                declaration.MessageUrn,
+                declaration.Destination,
+                declaration.Requirement.ToString().ToLowerInvariant(),
+                declaration.MinCount,
+                declaration.MaxCount,
+                declaration.WithinMilliseconds,
+                observedCount,
+                failedCount,
+                lateCount,
+                status);
+
+        private static bool Matches(ChoreographyOutput declaration, MonitoringObservation observation)
+            => string.Equals(OperationKind(declaration.Kind), DiagnosticOperationKind(observation.Kind), StringComparison.Ordinal)
+                && string.Equals(declaration.MessageUrn, observation.MessageUrn, StringComparison.Ordinal)
+                && (string.IsNullOrWhiteSpace(declaration.Destination)
+                    || string.Equals(declaration.Destination, observation.DestinationAddress, StringComparison.Ordinal));
+
+        private static string OperationKind(ChoreographyOperationKind kind) => kind switch
+        {
+            ChoreographyOperationKind.Send => "send",
+            ChoreographyOperationKind.Publish => "publish",
+            ChoreographyOperationKind.Respond => "respond",
+            ChoreographyOperationKind.Schedule => "schedule",
+            ChoreographyOperationKind.Terminal => "terminal",
+            _ => kind.ToString().ToLowerInvariant()
+        };
+
+        private static string? DiagnosticOperationKind(string observationKind) => observationKind switch
+        {
+            "sent" or "send_faulted" => "send",
+            "published" or "publish_faulted" => "publish",
+            _ => null
+        };
+    }
+
+    private sealed record MutableChoreographyRunOutput(
+        MonitoringObservationRecord Record,
+        IReadOnlyList<MutableChoreographyRunStep> Targets)
+    {
+        public MonitoringChoreographyRunOutput ToImmutable()
+            => new(
+                Record.Observation.Kind,
+                Record.Observation.MessageUrn,
+                Record.Observation.MessageId,
+                Record.Observation.DestinationAddress,
+                Record.Observation.OccurredAtUtc,
+                Math.Max(0, Record.Observation.DurationMs ?? 0),
+                Record.Observation.Succeeded != false,
+                Record.Observation.ExceptionType,
+                Targets.Select(target => new MonitoringChoreographyRunTarget(
+                        target.StepKey,
+                        Math.Max(0, (target.StartedAtUtc - (Record.Observation.OccurredAtUtc
+                            - TimeSpan.FromMilliseconds(Math.Max(0, Record.Observation.DurationMs ?? 0)))).TotalMilliseconds)))
+                    .ToArray());
     }
 }
 
