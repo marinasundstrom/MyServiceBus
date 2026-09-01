@@ -1,6 +1,7 @@
 package com.myservicebus.inspection;
 
 import com.myservicebus.choreography.ChoreographyFragment;
+import com.myservicebus.topology.SagaStateMachineTopology;
 import java.net.URI;
 import java.time.Instant;
 import java.util.List;
@@ -13,13 +14,15 @@ public record BusInspectionSnapshot(
         List<MessageInspection> messages,
         List<ReceiveEndpointInspection> receiveEndpoints,
         List<ConsumerInspection> consumers,
-        List<ChoreographyFragment> choreographies) {
+        List<ChoreographyFragment> choreographies,
+        List<SagaStateMachineTopology> sagaStateMachines) {
 
     public BusInspectionSnapshot {
         messages = List.copyOf(messages);
         receiveEndpoints = List.copyOf(receiveEndpoints);
         consumers = List.copyOf(consumers);
         choreographies = choreographies == null ? List.of() : List.copyOf(choreographies);
+        sagaStateMachines = sagaStateMachines == null ? List.of() : List.copyOf(sagaStateMachines);
     }
 
     public BusInspectionSnapshot(
@@ -29,7 +32,7 @@ public record BusInspectionSnapshot(
             List<MessageInspection> messages,
             List<ReceiveEndpointInspection> receiveEndpoints,
             List<ConsumerInspection> consumers) {
-        this(transportName, address, capturedAt, messages, receiveEndpoints, consumers, List.of());
+        this(transportName, address, capturedAt, messages, receiveEndpoints, consumers, List.of(), List.of());
     }
 
     public record MessageInspection(

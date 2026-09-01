@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using MyServiceBus.Choreography;
+using MyServiceBus.Topology;
 
 namespace MyServiceBus.Inspection;
 
@@ -17,6 +18,7 @@ public sealed record BusInspectionSnapshot
     public IReadOnlyList<ReceiveEndpointInspection> ReceiveEndpoints { get; init; }
     public IReadOnlyList<ConsumerInspection> Consumers { get; init; }
     public IReadOnlyList<ChoreographyFragment> Choreographies { get; init; }
+    public IReadOnlyList<SagaStateMachineTopology> SagaStateMachines { get; init; }
 
     public BusInspectionSnapshot(
         string transportName,
@@ -25,7 +27,8 @@ public sealed record BusInspectionSnapshot
         IReadOnlyList<MessageInspection> messages,
         IReadOnlyList<ReceiveEndpointInspection> receiveEndpoints,
         IReadOnlyList<ConsumerInspection> consumers,
-        IReadOnlyList<ChoreographyFragment>? choreographies = null)
+        IReadOnlyList<ChoreographyFragment>? choreographies = null,
+        IReadOnlyList<SagaStateMachineTopology>? sagaStateMachines = null)
     {
         TransportName = transportName;
         Address = address;
@@ -34,6 +37,7 @@ public sealed record BusInspectionSnapshot
         ReceiveEndpoints = receiveEndpoints;
         Consumers = consumers;
         Choreographies = choreographies ?? [];
+        SagaStateMachines = sagaStateMachines ?? [];
     }
 }
 

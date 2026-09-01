@@ -60,6 +60,8 @@ public class BusRegistrationConfigurator : IBusRegistrationConfigurator
         var runtime = stateMachine.CreateRuntime(repository);
         var queueName = endpointName ?? stateMachine.Definition.StateMachineId;
 
+        _topology.RegisterSagaStateMachine(stateMachine.Definition, queueName);
+
         Services.AddSingleton(stateMachine);
         Services.AddSingleton(repository);
         stateMachine.RegisterConsumers<TStateMachine>(this, runtime, queueName);

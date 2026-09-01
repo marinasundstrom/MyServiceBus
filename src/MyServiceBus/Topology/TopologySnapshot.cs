@@ -9,7 +9,8 @@ public sealed record TopologySnapshot(
     [property: JsonPropertyName("receiveEndpoints")] IReadOnlyList<ReceiveEndpointTopologySnapshot> ReceiveEndpoints,
     [property: JsonPropertyName("consumers")] IReadOnlyList<ConsumerTopologySnapshot> Consumers,
     [property: JsonPropertyName("bindings")] IReadOnlyList<MessageBindingTopologySnapshot> Bindings,
-    [property: JsonPropertyName("choreographies")] IReadOnlyList<ChoreographyFragment> Choreographies)
+    [property: JsonPropertyName("choreographies")] IReadOnlyList<ChoreographyFragment> Choreographies,
+    [property: JsonPropertyName("sagaStateMachines")] IReadOnlyList<SagaStateMachineTopology>? SagaStateMachines = null)
 {
     public const int CurrentVersion = 2;
 }
@@ -121,13 +122,20 @@ internal static class TopologySnapshotBuilder
             .ThenBy(fragment => fragment.DefinitionVersion, StringComparer.Ordinal)
             .ToArray();
 
+        var sagaStateMachines = topology.SagaStateMachines
+            .OrderBy(item => item.Definition.StateMachineId, StringComparer.Ordinal)
+            .ThenBy(item => item.Definition.Owner, StringComparer.Ordinal)
+            .ThenBy(item => item.Definition.DefinitionVersion, StringComparer.Ordinal)
+            .ToArray();
+
         return new TopologySnapshot(
             TopologySnapshot.CurrentVersion,
             messages,
             endpoints,
             consumers,
             bindings,
-            choreographies);
+            choreographies,
+            sagaStateMachines);
     }
 
     private static string EndpointId(string endpointName) => $"endpoint:{endpointName}";

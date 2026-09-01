@@ -79,6 +79,7 @@ public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigura
         String queueName = endpointName != null
                 ? endpointName
                 : stateMachine.definition().stateMachineId();
+        topology.registerSagaStateMachine(stateMachine.definition(), queueName);
         serviceCollection.addSingleton(stateMachineClass, () -> stateMachine);
         stateMachine.registerConsumers(this, runtime, stateMachineClass, queueName);
     }

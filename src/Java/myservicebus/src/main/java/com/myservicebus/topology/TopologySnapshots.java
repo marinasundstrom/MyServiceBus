@@ -95,13 +95,21 @@ final class TopologySnapshots {
                         .thenComparing(com.myservicebus.choreography.ChoreographyFragment::definitionVersion))
                 .toList();
 
+        var sagaStateMachines = topology.getSagaStateMachines().stream()
+                .sorted(Comparator
+                        .comparing((SagaStateMachineTopology item) -> item.definition().stateMachineId())
+                        .thenComparing(item -> item.definition().owner())
+                        .thenComparing(item -> item.definition().definitionVersion()))
+                .toList();
+
         return new TopologySnapshot(
                 TopologySnapshot.CURRENT_VERSION,
                 messages,
                 endpoints,
                 consumers,
                 bindings,
-                choreographies);
+                choreographies,
+                sagaStateMachines);
     }
 
     private static String endpointId(String endpointName) {

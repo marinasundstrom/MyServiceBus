@@ -1,5 +1,6 @@
 using MyServiceBus.Choreography;
 using MyServiceBus.Inspection;
+using MyServiceBus.Orchestration;
 
 namespace MyServiceBus.Monitoring;
 
@@ -248,6 +249,22 @@ public sealed record MonitoringDeclaredChoreographyConnection(
     string TargetOwner,
     string TargetStepId,
     string MatchKind);
+
+public sealed record MonitoringDeclaredSagaStateMachine(
+    string StateMachineId,
+    IReadOnlyList<string> DefinitionVersions,
+    IReadOnlyList<string> ConflictKinds,
+    DateTimeOffset LastCapturedAtUtc,
+    IReadOnlyList<MonitoringDeclaredSagaStateMachineDeployment> Deployments);
+
+public sealed record MonitoringDeclaredSagaStateMachineDeployment(
+    string ApplicationName,
+    string Owner,
+    string EndpointName,
+    SagaStateMachineDefinition Definition,
+    int InstanceCount,
+    int OnlineInstanceCount,
+    DateTimeOffset LastCapturedAtUtc);
 
 public sealed record MonitoringChoreographyRuntimeSnapshot(
     int WindowSeconds,

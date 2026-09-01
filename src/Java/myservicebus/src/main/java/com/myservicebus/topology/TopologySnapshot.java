@@ -9,7 +9,8 @@ public record TopologySnapshot(
         List<ReceiveEndpoint> receiveEndpoints,
         List<Consumer> consumers,
         List<Binding> bindings,
-        List<ChoreographyFragment> choreographies) {
+        List<ChoreographyFragment> choreographies,
+        List<SagaStateMachineTopology> sagaStateMachines) {
 
     public static final int CURRENT_VERSION = 2;
 
@@ -19,6 +20,17 @@ public record TopologySnapshot(
         consumers = List.copyOf(consumers);
         bindings = List.copyOf(bindings);
         choreographies = List.copyOf(choreographies);
+        sagaStateMachines = sagaStateMachines == null ? List.of() : List.copyOf(sagaStateMachines);
+    }
+
+    public TopologySnapshot(
+            int version,
+            List<Message> messages,
+            List<ReceiveEndpoint> receiveEndpoints,
+            List<Consumer> consumers,
+            List<Binding> bindings,
+            List<ChoreographyFragment> choreographies) {
+        this(version, messages, receiveEndpoints, consumers, bindings, choreographies, List.of());
     }
 
     public record Message(

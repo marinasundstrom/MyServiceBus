@@ -146,6 +146,10 @@ public static class MonitoringApi
             repository.GetDeclaredChoreographies(DateTimeOffset.UtcNow))
             .WithSummary("List merged application-declared choreography fragments and conflicts")
             .CacheOutput(policy => policy.Expire(TimeSpan.FromSeconds(5)));
+        query.MapGet("/sagas", (MonitoringRepository repository) =>
+            repository.GetDeclaredSagaStateMachines(DateTimeOffset.UtcNow))
+            .WithSummary("List registered saga state-machine definitions and deployment conflicts")
+            .CacheOutput(policy => policy.Expire(TimeSpan.FromSeconds(5)));
         query.MapGet("/choreographies/runtime", (int? windowSeconds, MonitoringRepository repository) =>
             repository.GetChoreographyRuntime(windowSeconds ?? 300, DateTimeOffset.UtcNow))
             .WithSummary("Compare declared choreography reactions with exact causal observations");

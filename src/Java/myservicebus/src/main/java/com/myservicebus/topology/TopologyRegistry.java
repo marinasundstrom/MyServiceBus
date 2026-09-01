@@ -9,12 +9,14 @@ import com.myservicebus.ConsumerMethodInvoker;
 import com.myservicebus.EntityNameFormatter;
 import com.myservicebus.PipeConfigurator;
 import com.myservicebus.choreography.ChoreographyFragment;
+import com.myservicebus.orchestration.SagaStateMachineDefinition;
 
 public class TopologyRegistry implements BusTopology {
     private final List<MessageTopology> messages = new ArrayList<>();
     private final List<ConsumerTopology> consumers = new ArrayList<>();
     private final List<ReceiveEndpointDefinition> receiveEndpoints = new ArrayList<>();
     private final List<ChoreographyFragment> choreographies = new ArrayList<>();
+    private final List<SagaStateMachineTopology> sagaStateMachines = new ArrayList<>();
 
     @Override
     public List<MessageTopology> getMessages() {
@@ -34,6 +36,30 @@ public class TopologyRegistry implements BusTopology {
     @Override
     public List<ChoreographyFragment> getChoreographies() {
         return List.copyOf(choreographies);
+    }
+
+    @Override
+    public List<SagaStateMachineTopology> getSagaStateMachines() {
+        return List.copyOf(sagaStateMachines);
+    }
+
+    public void registerSagaStateMachine(SagaStateMachineDefinition definition, String endpointName) {
+        if (definition == null) {
+            throw new IllegalArgumentException("definition must not be null");
+        }
+        if (endpointName == null || endpointName.isBlank()) {
+            throw new IllegalArgumentException("endpointName must not be blank");
+        }
+        definition.validate();
+        boolean duplicate = sagaStateMachines.stream().anyMatch(existing ->
+                existing.definition().stateMachineId().equals(definition.stateMachineId())
+                        && existing.definition().owner().equals(definition.owner()));
+        if (duplicate) {
+            throw new IllegalArgumentException(
+                    "Saga state machine '" + definition.stateMachineId()
+                            + "' is already registered by '" + definition.owner() + "'.");
+        }
+        sagaStateMachines.add(new SagaStateMachineTopology(definition, endpointName));
     }
 
     public void registerChoreography(ChoreographyFragment fragment) {

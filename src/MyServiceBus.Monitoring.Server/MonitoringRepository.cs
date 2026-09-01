@@ -3,6 +3,7 @@ using System.Text.Json;
 using Microsoft.Extensions.Options;
 using MyServiceBus.Choreography;
 using MyServiceBus.Monitoring;
+using MyServiceBus.Topology;
 
 namespace MyServiceBus.Monitoring.Server;
 
@@ -476,6 +477,76 @@ public sealed class MonitoringRepository
                     fragments);
             })
             .OrderBy(choreography => choreography.ChoreographyId, StringComparer.Ordinal)
+            .ToArray();
+    }
+
+    public IReadOnlyList<MonitoringDeclaredSagaStateMachine> GetDeclaredSagaStateMachines(DateTimeOffset now)
+    {
+        var declarations = instances.Values
+            .Select(state => (Metadata: state.Metadata, Summary: state.CreateSummary(now, LeaseTimeout)))
+            .SelectMany(source => source.Metadata.Bus.SagaStateMachines.Select(item => new DeclaredSagaSource(
+                source.Metadata.ApplicationName,
+                source.Metadata.InstanceId,
+                source.Summary.Online,
+                source.Metadata.CapturedAtUtc,
+                item,
+                JsonSerializer.Serialize(item))))
+            .ToArray();
+
+        return declarations
+            .GroupBy(source => source.Topology.Definition.StateMachineId, StringComparer.Ordinal)
+            .Select(stateMachine =>
+            {
+                var deployments = stateMachine
+                    .GroupBy(source => new
+                    {
+                        source.ApplicationName,
+                        source.Topology.Definition.Owner,
+                        source.Topology.Definition.SchemaVersion,
+                        source.Topology.Definition.DefinitionVersion,
+                        source.Topology.EndpointName,
+                        source.Identity
+                    })
+                    .Select(group => new MonitoringDeclaredSagaStateMachineDeployment(
+                        group.Key.ApplicationName,
+                        group.Key.Owner,
+                        group.Key.EndpointName,
+                        group.First().Topology.Definition,
+                        group.Select(source => source.InstanceId).Distinct(StringComparer.Ordinal).Count(),
+                        group.Where(source => source.Online).Select(source => source.InstanceId).Distinct(StringComparer.Ordinal).Count(),
+                        group.Max(source => source.CapturedAtUtc)))
+                    .OrderBy(deployment => deployment.ApplicationName, StringComparer.Ordinal)
+                    .ThenBy(deployment => deployment.Owner, StringComparer.Ordinal)
+                    .ThenBy(deployment => deployment.Definition.DefinitionVersion, StringComparer.Ordinal)
+                    .ToArray();
+                var versions = deployments
+                    .Select(deployment => deployment.Definition.DefinitionVersion)
+                    .Distinct(StringComparer.Ordinal)
+                    .OrderBy(version => version, StringComparer.Ordinal)
+                    .ToArray();
+                var conflicts = new List<string>();
+                if (versions.Length > 1)
+                    conflicts.Add("definition_version_conflict");
+                if (deployments
+                    .GroupBy(deployment => new
+                    {
+                        deployment.ApplicationName,
+                        deployment.Owner,
+                        deployment.Definition.DefinitionVersion
+                    })
+                    .Any(group => group.Skip(1).Any()))
+                {
+                    conflicts.Add("deployment_definition_conflict");
+                }
+
+                return new MonitoringDeclaredSagaStateMachine(
+                    stateMachine.Key,
+                    versions,
+                    conflicts,
+                    deployments.Max(deployment => deployment.LastCapturedAtUtc),
+                    deployments);
+            })
+            .OrderBy(stateMachine => stateMachine.StateMachineId, StringComparer.Ordinal)
             .ToArray();
     }
 
@@ -1903,6 +1974,14 @@ public sealed class MonitoringRepository
         DateTimeOffset CapturedAtUtc,
         ChoreographyFragment Fragment,
         string FragmentIdentity);
+
+    private sealed record DeclaredSagaSource(
+        string ApplicationName,
+        string InstanceId,
+        bool Online,
+        DateTimeOffset CapturedAtUtc,
+        SagaStateMachineTopology Topology,
+        string Identity);
 
     private sealed record DeclaredRunStep(
         string ApplicationName,

@@ -44,6 +44,10 @@ public class SagaStateMachineBusRegistrationTests
             .ToArray();
         Assert.Equal(2, sagaConsumers.Length);
         Assert.All(sagaConsumers, consumer => Assert.Equal("order-state-machine", consumer.QueueName));
+        var sagaTopology = Assert.Single(harness.Topology.SagaStateMachines);
+        Assert.Equal("order-state-machine", sagaTopology.Definition.StateMachineId);
+        Assert.Equal("orders", sagaTopology.Definition.Owner);
+        Assert.Equal("order-state-machine", sagaTopology.EndpointName);
         await harness.Stop();
     }
 

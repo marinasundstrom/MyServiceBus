@@ -2,7 +2,7 @@
 
 ## Status
 
-Active implementation proposal. The portable version 1 behavior is defined in the [Saga State-Machine Behavior specification](../specs/saga-state-machine-behavior.md), and matching low-level runtimes plus native C# and Java DSL foundations lower to the same canonical definition and execution sequence. Experimental registration now attaches declared events to one bus endpoint and dispatches outgoing work through the active consume context. Focused tests and a mixed C#/Java Aspire order workflow demonstrate the vertical slice. Topology, monitoring, and durable persistence remain before this is a complete saga feature.
+Active implementation proposal. The portable version 1 behavior is defined in the [Saga State-Machine Behavior specification](../specs/saga-state-machine-behavior.md), and matching low-level runtimes plus native C# and Java DSL foundations lower to the same canonical definition and execution sequence. Experimental registration now attaches declared events to one bus endpoint, dispatches outgoing work through the active consume context, and exports the normalized definition through topology and inspection. The collector exposes those declarations through a dedicated saga catalog. Focused tests and a mixed C#/Java Aspire order workflow demonstrate the vertical slice. Instance-transition monitoring, the Dashboard orchestration view, and durable persistence remain before this is a complete saga feature.
 
 ## Summary
 
@@ -233,7 +233,7 @@ Broker tests should prove that C# and Java services exchange every saga input an
 3. Define the normalized declaration, repository capabilities, topology, and monitoring contracts.
 4. Implement the smallest in-memory C# and Java runtimes with their native library DSLs. **Completed for the fundamental non-bus-integrated profile.**
 5. Complete the usable MVP vertical slice with bus registration and dispatch, ordinary retry/fault behavior, a focused sample, and one Aspire order-orchestration sample. **Completed for the experimental volatile profile.**
-6. Project declarations and instance transitions into topology, monitoring, and an initial Dashboard orchestration view.
+6. Project declarations and instance transitions into topology, monitoring, and an initial Dashboard orchestration view. **Definition topology and the separate monitoring catalog are implemented; instance transitions and Dashboard presentation remain.**
 7. Integrate transactional outbox and durable scheduling.
 8. Add one durable repository provider in each ecosystem and run restart and concurrency gates.
 9. Add requests, scheduled events, composite events, and richer activities through shared fixtures.

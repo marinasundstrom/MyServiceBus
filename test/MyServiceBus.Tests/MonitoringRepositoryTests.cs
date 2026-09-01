@@ -3,10 +3,42 @@ using MyServiceBus;
 using MyServiceBus.Choreography;
 using MyServiceBus.Monitoring;
 using MyServiceBus.Monitoring.Server;
+using MyServiceBus.Orchestration;
+using MyServiceBus.Topology;
 using Shouldly;
 
 public class MonitoringRepositoryTests
 {
+    [Fact]
+    public void Repository_keeps_saga_definitions_separate_and_reports_deployment_conflicts()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var repository = new MonitoringRepository();
+        var version1 = CreateSagaDefinition("1");
+        var version2 = CreateSagaDefinition("2");
+        repository.UpsertMetadata(WithSaga(
+            CreateMetadata("orders", "orders-1", now, "commerce"),
+            version1,
+            "order-saga"));
+        repository.UpsertMetadata(WithSaga(
+            CreateMetadata("orders", "orders-2", now, "commerce"),
+            version1,
+            "order-saga"));
+        repository.UpsertMetadata(WithSaga(
+            CreateMetadata("orders-v2", "orders-v2-1", now, "commerce"),
+            version2,
+            "order-saga-v2"));
+
+        var saga = repository.GetDeclaredSagaStateMachines(now).ShouldHaveSingleItem();
+
+        saga.StateMachineId.ShouldBe("order-state-machine");
+        saga.DefinitionVersions.ShouldBe(["1", "2"]);
+        saga.ConflictKinds.ShouldContain("definition_version_conflict");
+        saga.Deployments.Count.ShouldBe(2);
+        saga.Deployments.Single(item => item.Definition.DefinitionVersion == "1").InstanceCount.ShouldBe(2);
+        repository.GetDeclaredChoreographies(now).ShouldBeEmpty();
+    }
+
     [Fact]
     public void Dashboard_summary_is_explicit_when_no_monitoring_data_is_available()
     {
@@ -1003,6 +1035,36 @@ public class MonitoringRepositoryTests
                 metadata.Bus.Consumers,
                 [fragment])
         };
+
+    private static MonitoringMetadata WithSaga(
+        MonitoringMetadata metadata,
+        SagaStateMachineDefinition definition,
+        string endpointName)
+        => metadata with
+        {
+            Bus = new BusInspectionSnapshot(
+                metadata.Bus.TransportName,
+                metadata.Bus.Address,
+                metadata.Bus.CapturedAt,
+                metadata.Bus.Messages,
+                metadata.Bus.ReceiveEndpoints,
+                metadata.Bus.Consumers,
+                sagaStateMachines: [new SagaStateMachineTopology(definition, endpointName)])
+        };
+
+    private static SagaStateMachineDefinition CreateSagaDefinition(string definitionVersion)
+        => new SagaStateMachineDefinitionBuilder(
+                "order-state-machine",
+                definitionVersion,
+                "orders",
+                "urn:message:Contracts:OrderState",
+                "CurrentState")
+            .State("Running")
+            .Event("OrderSubmitted", "urn:message:Contracts:OrderSubmitted", @event => @event
+                .CorrelateById("CorrelationId", "OrderId")
+                .CreatesIfMissing())
+            .Initially("OrderSubmitted", behavior => behavior.TransitionTo("Running"))
+            .Build();
 
     private static ChoreographyFragment CreateChoreography(
         string owner,

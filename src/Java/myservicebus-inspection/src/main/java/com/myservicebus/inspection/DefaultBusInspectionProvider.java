@@ -72,6 +72,7 @@ public final class DefaultBusInspectionProvider implements BusInspectionProvider
                 messages,
                 endpoints,
                 consumers,
-                topology.choreographies());
+                topology.choreographies(),
+                topology.sagaStateMachines());
     }
 }

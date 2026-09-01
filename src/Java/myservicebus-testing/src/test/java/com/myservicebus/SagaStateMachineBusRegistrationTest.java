@@ -41,6 +41,11 @@ class SagaStateMachineBusRegistrationTest {
         assertEquals(orderId, orderCompleted.get(0).orderId());
         assertEquals(true, harness.wasConsumed(OrderSubmitted.class));
         assertEquals(true, harness.wasConsumed(PaymentReceived.class));
+        var sagaTopology = provider.getService(com.myservicebus.topology.TopologyRegistry.class)
+                .getSagaStateMachines().get(0);
+        assertEquals("order-state-machine", sagaTopology.definition().stateMachineId());
+        assertEquals("orders", sagaTopology.definition().owner());
+        assertEquals("order-state-machine", sagaTopology.endpointName());
         harness.stop().join();
     }
 
