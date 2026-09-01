@@ -1507,6 +1507,115 @@ public sealed class MonitoringRepository
             .ThenBy(edge => edge.TargetApplication, StringComparer.Ordinal)
             .ToArray();
 
+    public IReadOnlyList<MonitoringRequestResponseExchange> GetRequestResponseExchanges(
+        string? applicationName,
+        int windowSeconds,
+        DateTimeOffset now)
+    {
+        var boundedWindow = Math.Clamp(windowSeconds, 10, (int)MetricRetention.TotalSeconds);
+        var start = now.AddSeconds(-boundedWindow);
+        MonitoringObservationRecord[] records;
+        lock (observationSync)
+        {
+            records = recentObservations
+                .Where(record => record.Observation.OccurredAtUtc >= start
+                    && record.Observation.OccurredAtUtc <= now
+                    && !string.IsNullOrWhiteSpace(record.Observation.RequestId))
+                .OrderBy(record => record.Observation.OccurredAtUtc)
+                .ToArray();
+        }
+
+        return records
+            .GroupBy(record => record.Observation.RequestId!, StringComparer.Ordinal)
+            .Select(ProjectRequestResponseExchange)
+            .Where(exchange => exchange is not null
+                && (applicationName is null
+                    || string.Equals(exchange.RequesterApplication, applicationName, StringComparison.Ordinal)
+                    || string.Equals(exchange.ResponderApplication, applicationName, StringComparison.Ordinal)))
+            .Select(exchange => exchange!)
+            .OrderByDescending(exchange => exchange.LastActivityAtUtc)
+            .ToArray();
+    }
+
+    private static MonitoringRequestResponseExchange? ProjectRequestResponseExchange(
+        IGrouping<string, MonitoringObservationRecord> group)
+    {
+        var records = group.OrderBy(record => record.Observation.OccurredAtUtc).ToArray();
+        var outbound = records.Where(record => record.Observation.Kind is
+            "sent" or "published" or "send_faulted" or "publish_faulted").ToArray();
+        var responseSent = outbound.FirstOrDefault(record => string.Equals(
+            record.Observation.MessageIntent,
+            "Reply",
+            StringComparison.OrdinalIgnoreCase));
+        var requestSent = outbound.FirstOrDefault(record =>
+            !string.Equals(record.Observation.MessageIntent, "Reply", StringComparison.OrdinalIgnoreCase)
+            && !string.IsNullOrWhiteSpace(record.Observation.ResponseAddress))
+            ?? (responseSent is null
+                ? null
+                : outbound.FirstOrDefault(record => record.Observation.OccurredAtUtc < responseSent.Observation.OccurredAtUtc));
+        if (requestSent is null && responseSent is null)
+            return null;
+
+        requestSent ??= records[0];
+        var requestConsumed = FindConsumption(records, requestSent.Observation.MessageId, requestSent.Observation.OccurredAtUtc);
+        var responseConsumed = responseSent is null
+            ? null
+            : FindConsumption(records, responseSent.Observation.MessageId, responseSent.Observation.OccurredAtUtc)
+                ?? records.FirstOrDefault(record =>
+                    record.Observation.OccurredAtUtc >= responseSent.Observation.OccurredAtUtc
+                    && record.Observation.Kind is "consumed" or "consume_faulted"
+                    && string.Equals(record.Observation.MessageUrn, responseSent.Observation.MessageUrn, StringComparison.Ordinal));
+        var hasFailures = records.Any(record => record.Observation.Succeeded == false);
+        var status = hasFailures
+            ? "failed"
+            : responseConsumed is not null
+                ? "completed"
+                : responseSent is not null
+                    ? "response_sent"
+                    : requestConsumed is not null
+                        ? "processing"
+                        : "requested";
+        var last = records[^1].Observation.OccurredAtUtc;
+        var responder = requestConsumed ?? responseSent;
+
+        return new MonitoringRequestResponseExchange(
+            group.Key,
+            status,
+            requestSent.ApplicationName,
+            requestSent.InstanceId,
+            responder?.ApplicationName,
+            responder?.InstanceId,
+            requestSent.Observation.MessageType,
+            requestSent.Observation.MessageUrn,
+            responseSent?.Observation.MessageType,
+            responseSent?.Observation.MessageUrn,
+            requestSent.Observation.ResponseAddress,
+            requestSent.Observation.OccurredAtUtc,
+            last,
+            requestConsumed?.Observation.OccurredAtUtc,
+            responseSent?.Observation.OccurredAtUtc,
+            responseConsumed?.Observation.OccurredAtUtc,
+            Math.Max(0, (last - requestSent.Observation.OccurredAtUtc).TotalMilliseconds),
+            hasFailures,
+            responseConsumed is not null && requestConsumed is not null
+                ? "complete"
+                : "partial");
+    }
+
+    private static MonitoringObservationRecord? FindConsumption(
+        IEnumerable<MonitoringObservationRecord> records,
+        string? messageId,
+        DateTimeOffset after)
+    {
+        if (string.IsNullOrWhiteSpace(messageId))
+            return null;
+
+        return records.FirstOrDefault(record =>
+            record.Observation.OccurredAtUtc >= after
+            && record.Observation.Kind is "consumed" or "consume_faulted"
+            && string.Equals(record.Observation.MessageId, messageId, StringComparison.Ordinal));
+    }
+
     public IReadOnlyList<MonitoringReplicaFlowEdge> GetReplicaFlow(
         string? applicationName,
         int windowSeconds,

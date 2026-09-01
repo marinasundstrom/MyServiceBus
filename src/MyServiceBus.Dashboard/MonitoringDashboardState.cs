@@ -29,6 +29,7 @@ public sealed class MonitoringDashboardState : IAsyncDisposable
     public IReadOnlyList<MonitoringRateSummary> InstanceRates { get; private set; } = [];
     public IReadOnlyList<MonitoringTimeSeriesPoint> TimeSeries { get; private set; } = [];
     public IReadOnlyList<MonitoringFlowEdge> Flow { get; private set; } = [];
+    public IReadOnlyList<MonitoringRequestResponseExchange> RequestResponseExchanges { get; private set; } = [];
     public IReadOnlyList<MonitoringReplicaFlowEdge> ReplicaFlow { get; private set; } = [];
     public IReadOnlyList<MonitoringDeclaredChoreography> Choreographies { get; private set; } = [];
     public IReadOnlyList<MonitoringDeclaredSagaStateMachine> Sagas { get; private set; } = [];
@@ -125,6 +126,7 @@ public sealed class MonitoringDashboardState : IAsyncDisposable
             var applicationRates = api.GetRates(false, stopping.Token);
             var instanceRates = api.GetRates(true, stopping.Token);
             var flow = api.GetFlow(stopping.Token);
+            var requestResponseExchanges = api.GetRequestResponseExchanges(stopping.Token);
             var replicaFlow = api.GetReplicaFlow(stopping.Token);
             var choreographies = api.GetChoreographies(stopping.Token);
             var sagas = api.GetSagas(stopping.Token);
@@ -147,6 +149,7 @@ public sealed class MonitoringDashboardState : IAsyncDisposable
                 applicationRates,
                 instanceRates,
                 flow,
+                requestResponseExchanges,
                 replicaFlow,
                 choreographies,
                 sagas,
@@ -168,6 +171,7 @@ public sealed class MonitoringDashboardState : IAsyncDisposable
             ApplicationRates = applicationRates.Result;
             InstanceRates = instanceRates.Result;
             Flow = flow.Result;
+            RequestResponseExchanges = requestResponseExchanges.Result;
             ReplicaFlow = replicaFlow.Result;
             Choreographies = choreographies.Result;
             Sagas = sagas.Result;

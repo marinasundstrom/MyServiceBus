@@ -61,7 +61,10 @@ public class RabbitMqTransport {
         services.addSingleton(RequestClientTransport.class,
                 sp -> () -> new RabbitMqRequestClientTransport(sp.getService(ConnectionProvider.class)));
         services.addScoped(ScopedClientFactory.class,
-                sp -> () -> new RequestClientFactory(sp.getService(RequestClientTransport.class)));
+                sp -> () -> new RequestClientFactory(
+                        sp.getService(RequestClientTransport.class),
+                        sp.getServices(com.myservicebus.BusHook.class),
+                        sp.getService(LoggerFactory.class)));
     }
 
     public static void configure(BusRegistrationConfigurator x) {

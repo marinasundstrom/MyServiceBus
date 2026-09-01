@@ -51,6 +51,13 @@ public sealed class MonitoringApiClient
             cancellationToken).ConfigureAwait(false)
             ?? [];
 
+    public async Task<IReadOnlyList<MonitoringRequestResponseExchange>> GetRequestResponseExchanges(
+        CancellationToken cancellationToken)
+        => await httpClient.GetFromJsonAsync<MonitoringRequestResponseExchange[]>(
+            "/api/monitoring/v1/request-response?windowSeconds=300",
+            cancellationToken).ConfigureAwait(false)
+            ?? [];
+
     public async Task<IReadOnlyList<MonitoringReplicaFlowEdge>> GetReplicaFlow(CancellationToken cancellationToken)
         => await httpClient.GetFromJsonAsync<MonitoringReplicaFlowEdge[]>(
             "/api/monitoring/v1/flow/replicas?windowSeconds=300",

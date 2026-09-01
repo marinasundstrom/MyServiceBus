@@ -381,6 +381,45 @@ public class MonitoringRepositoryTests
     }
 
     [Fact]
+    public void Request_response_projection_pairs_the_explicit_round_trip()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var repository = new MonitoringRepository();
+        repository.UpsertMetadata(CreateMetadata("gateway", "gateway-1", now, "edge"));
+        repository.UpsertMetadata(CreateMetadata("pricing", "pricing-1", now, "commerce"));
+        repository.RecordBatch(CreateBatch("gateway", "gateway-1", now,
+            new MonitoringObservation(
+                1, now.AddMilliseconds(-40), "sent", true, "PriceRequest", "urn:message:PriceRequest",
+                null, "loopback://pricing", 1, null, null, null, null, null, null,
+                MessageId: "request-message", RequestId: "request-1",
+                ResponseAddress: "loopback://gateway-response", MessageIntent: "Send"),
+            new MonitoringObservation(
+                2, now, "consumed", true, "PriceResponse", "urn:message:PriceResponse",
+                "gateway-response", null, 1, null, null, null, null, null, null,
+                MessageId: "response-message", RequestId: "request-1")));
+        repository.RecordBatch(CreateBatch("pricing", "pricing-1", now,
+            new MonitoringObservation(
+                1, now.AddMilliseconds(-30), "consumed", true, "PriceRequest", "urn:message:PriceRequest",
+                "pricing", null, 5, null, null, null, null, null, null,
+                MessageId: "request-message", RequestId: "request-1"),
+            new MonitoringObservation(
+                2, now.AddMilliseconds(-10), "sent", true, "PriceResponse", "urn:message:PriceResponse",
+                null, "loopback://gateway-response", 1, null, null, null, null, null, null,
+                MessageId: "response-message", CausationMessageId: "request-message",
+                RequestId: "request-1", MessageIntent: "Reply")));
+
+        var exchange = repository.GetRequestResponseExchanges(null, 60, now).ShouldHaveSingleItem();
+        exchange.Status.ShouldBe("completed");
+        exchange.RequesterApplication.ShouldBe("gateway");
+        exchange.ResponderApplication.ShouldBe("pricing");
+        exchange.RequestMessageType.ShouldBe("PriceRequest");
+        exchange.ResponseMessageType.ShouldBe("PriceResponse");
+        exchange.DurationMs.ShouldBe(40);
+        exchange.EvidenceStatus.ShouldBe("complete");
+        repository.GetRequestResponseExchanges("unrelated", 60, now).ShouldBeEmpty();
+    }
+
+    [Fact]
     public void Repository_rejects_unbounded_resource_labels()
     {
         var now = DateTimeOffset.UtcNow;

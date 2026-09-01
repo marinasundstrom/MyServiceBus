@@ -55,7 +55,10 @@ public final class AzureServiceBusTransport {
                         provider.getService(MessageSerializer.class),
                         provider.getService(com.myservicebus.serialization.InboundMessageResolver.class)));
         services.addScoped(ScopedClientFactory.class, provider -> () ->
-                new RequestClientFactory(provider.getService(RequestClientTransport.class)));
+                new RequestClientFactory(
+                        provider.getService(RequestClientTransport.class),
+                        provider.getServices(com.myservicebus.BusHook.class),
+                        provider.getService(com.myservicebus.logging.LoggerFactory.class)));
     }
 
     public static void configure(BusRegistrationConfigurator configurator) {

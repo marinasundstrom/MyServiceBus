@@ -35,6 +35,40 @@
     }
 </section>
 
+<section class="panel request-response-panel">
+    <div class="section-heading">
+        <div><p class="eyebrow">Paired interactions</p><h2>Request / response</h2></div>
+        <span>Explicit request identity · last 5 minutes</span>
+    </div>
+    @if (Dashboard.RequestResponseExchanges.Count == 0)
+    {
+        <p class="panel-empty">No request/response exchanges were captured in this window. Detailed pairing is available when request/response metadata is enabled by the monitored service.</p>
+    }
+    else
+    {
+        <div class="request-response-list">
+            @foreach (var exchange in Dashboard.RequestResponseExchanges)
+            {
+                <article class="request-response-exchange @(exchange.HasFailures ? "failed" : exchange.Status)">
+                    <header>
+                        <div><span class="run-status @(exchange.HasFailures ? "failed" : exchange.Status)"></span><strong>@StatusLabel(exchange.Status)</strong><small class="mono">@ShortIdentity(exchange.RequestId)</small></div>
+                        <span>@FormatDuration(exchange.DurationMs)</span>
+                    </header>
+                    <div class="request-response-route">
+                        <div class="request-response-participant"><strong>@exchange.RequesterApplication</strong><small>@exchange.RequesterInstanceId</small></div>
+                        <div class="request-response-messages" aria-label="Request and response messages">
+                            <div><span>@ShortMessageType(exchange.RequestMessageType)</span><b>→</b></div>
+                            <div class="response"><b>←</b><span>@(exchange.ResponseMessageType is null ? "Awaiting response" : ShortMessageType(exchange.ResponseMessageType))</span></div>
+                        </div>
+                        <div class="request-response-participant"><strong>@(exchange.ResponderApplication ?? "Awaiting responder")</strong><small>@(exchange.ResponderInstanceId ?? "No consumer evidence")</small></div>
+                    </div>
+                    <footer><span>Requested @exchange.StartedAtUtc.LocalDateTime.ToString("HH:mm:ss.fff")</span><span>@EvidenceLabel(exchange)</span></footer>
+                </article>
+            }
+        </div>
+    }
+</section>
+
 <section class="panel flow-detail-panel">
     <div class="section-heading"><div><p class="eyebrow">Exact paths</p><h2>@(_view == FlowView.Applications ? "Observed connections" : "Observed replica connections")</h2></div><span>Last 5 minutes</span></div>
     @if ((_view == FlowView.Applications && Dashboard.Flow.Count == 0)
@@ -113,6 +147,26 @@
         .Count();
 
     private string ViewClass(FlowView view) => _view == view ? "active" : string.Empty;
+
+    private static string StatusLabel(string status) => status switch
+    {
+        "completed" => "Completed round trip",
+        "response_sent" => "Response sent",
+        "processing" => "Processing request",
+        "failed" => "Failed exchange",
+        _ => "Request sent"
+    };
+
+    private static string EvidenceLabel(MonitoringRequestResponseExchange exchange) => exchange.Status switch
+    {
+        "completed" => $"Response received {exchange.ResponseConsumedAtUtc?.LocalDateTime:HH:mm:ss.fff}",
+        "response_sent" => $"Response sent {exchange.ResponseSentAtUtc?.LocalDateTime:HH:mm:ss.fff}",
+        "processing" => $"Request consumed {exchange.RequestConsumedAtUtc?.LocalDateTime:HH:mm:ss.fff}",
+        "failed" => "Failure evidence observed",
+        _ => "Awaiting consumer evidence"
+    };
+
+    private static string ShortIdentity(string value) => value.Length <= 12 ? value : value[..8];
 
     private enum FlowView
     {

@@ -1,5 +1,6 @@
 using MyServiceBus.Serialization;
 using MyServiceBus.Topology;
+using System.Diagnostics;
 using System.Reflection;
 
 namespace MyServiceBus;
@@ -12,17 +13,30 @@ public sealed class GenericRequestClient<TRequest> : IRequestClient<TRequest>, I
     private readonly Uri? _destinationAddress;
     private readonly RequestTimeout _timeout;
     private readonly ISendContextFactory _sendContextFactory;
+    private readonly IBusHookDispatcher? _hooks;
+
+    [Microsoft.Extensions.DependencyInjection.ActivatorUtilitiesConstructor]
+    public GenericRequestClient(
+        ITransportFactory transportFactory,
+        IMessageSerializer serializer,
+        ISendContextFactory sendContextFactory,
+        IBusHookDispatcher hooks)
+        : this(transportFactory, serializer, sendContextFactory, destinationAddress: null, timeout: default, hooks: hooks)
+    {
+    }
 
     public GenericRequestClient(
         ITransportFactory transportFactory,
         IMessageSerializer serializer,
         ISendContextFactory sendContextFactory,
         Uri? destinationAddress = null,
-        RequestTimeout timeout = default)
+        RequestTimeout timeout = default,
+        IBusHookDispatcher? hooks = null)
     {
         _transportFactory = transportFactory;
         _serializer = serializer;
         _sendContextFactory = sendContextFactory;
+        _hooks = hooks;
         _destinationAddress = destinationAddress;
         _timeout = timeout.TimeSpan == default ? RequestTimeout.Default : timeout;
     }
@@ -59,6 +73,7 @@ public sealed class GenericRequestClient<TRequest> : IRequestClient<TRequest>, I
                 if (context.MessageType.Contains(MessageUrn.For(typeof(T))) &&
                     context.TryGetMessage<T>(out var responeMessage))
                 {
+                    DispatchResponseObservation<T>(context, responseExchange);
                     var response = new Response<T>(responeMessage);
                     taskCompletionSource.TrySetResult(response);
                     return;
@@ -67,6 +82,7 @@ public sealed class GenericRequestClient<TRequest> : IRequestClient<TRequest>, I
                 if (context.MessageType.Contains(MessageUrn.For(typeof(Fault<TRequest>))) &&
                     context.TryGetMessage<Fault<TRequest>>(out var fault))
                 {
+                    DispatchResponseObservation<Fault<TRequest>>(context, responseExchange);
                     taskCompletionSource.TrySetException(new RequestFaultException(typeof(TRequest).Name, fault!));
                 }
             }
@@ -94,7 +110,17 @@ public sealed class GenericRequestClient<TRequest> : IRequestClient<TRequest>, I
         requestId = sendContext.RequestId ?? requestId;
         sendContext.RequestId = requestId;
 
-        await requestSendTransport.Send(request, sendContext, cancellationToken);
+        var startedAt = Stopwatch.GetTimestamp();
+        try
+        {
+            await requestSendTransport.Send(request, sendContext, cancellationToken);
+            DispatchRequestObservation("sent", true, requestAddress, sendContext, Stopwatch.GetElapsedTime(startedAt));
+        }
+        catch (Exception exception)
+        {
+            DispatchRequestObservation("send_faulted", false, requestAddress, sendContext, Stopwatch.GetElapsedTime(startedAt), exception);
+            throw;
+        }
 
         var actualTimeout = timeout.TimeSpan == default ? _timeout.TimeSpan : timeout.TimeSpan;
 
@@ -108,6 +134,54 @@ public sealed class GenericRequestClient<TRequest> : IRequestClient<TRequest>, I
         {
             await responseReceiveTransport.Stop(CancellationToken.None);
         }
+    }
+
+    private void DispatchRequestObservation(
+        string kind,
+        bool succeeded,
+        Uri destinationAddress,
+        SendContext context,
+        TimeSpan duration,
+        Exception? exception = null)
+    {
+        if (_hooks?.IsEnabled != true)
+            return;
+
+        _hooks.Dispatch(MessageOperationHookEvent.Create(
+            kind,
+            succeeded,
+            typeof(TRequest).FullName ?? typeof(TRequest).Name,
+            MessageUrn.For(typeof(TRequest)),
+            null,
+            destinationAddress.ToString(),
+            duration,
+            exception,
+            context.CorrelationId,
+            context.ConversationId?.ToString(),
+            messageId: context.MessageId,
+            requestId: context.RequestId?.ToString(),
+            responseAddress: context.ResponseAddress?.ToString(),
+            messageIntent: context.Intent.ToString()));
+    }
+
+    private void DispatchResponseObservation<TResponse>(ReceiveContext context, string endpointName)
+        where TResponse : class
+    {
+        if (_hooks?.IsEnabled != true)
+            return;
+
+        _hooks.Dispatch(MessageOperationHookEvent.Create(
+            "consumed",
+            true,
+            typeof(TResponse).FullName ?? typeof(TResponse).Name,
+            MessageUrn.For(typeof(TResponse)),
+            endpointName,
+            null,
+            TimeSpan.Zero,
+            correlationId: context.CorrelationId?.ToString(),
+            conversationId: context.ConversationId?.ToString(),
+            messageId: context.MessageId.ToString(),
+            requestId: context.RequestId?.ToString()));
     }
 
     public async Task<Response<T1, T2>> GetResponseAsync<T1, T2>(TRequest request, Action<ISendContext>? contextCallback = null, CancellationToken cancellationToken = default, RequestTimeout timeout = default)

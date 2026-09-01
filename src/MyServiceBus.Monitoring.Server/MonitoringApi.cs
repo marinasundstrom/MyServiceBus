@@ -230,6 +230,9 @@ public static class MonitoringApi
         query.MapGet("/flow", (string? application, int? windowSeconds, MonitoringRepository repository) =>
             repository.GetFlow(application, windowSeconds ?? 300, DateTimeOffset.UtcNow))
             .WithSummary("Query observed application message-flow paths");
+        query.MapGet("/request-response", (string? application, int? windowSeconds, MonitoringRepository repository) =>
+            repository.GetRequestResponseExchanges(application, windowSeconds ?? 300, DateTimeOffset.UtcNow))
+            .WithSummary("Query request/response exchanges reconstructed from explicit request metadata");
         query.MapGet("/flow/replicas", (string? application, int? windowSeconds, MonitoringRepository repository) =>
             repository.GetReplicaFlow(application, windowSeconds ?? 300, DateTimeOffset.UtcNow))
             .WithSummary("Query observed message-flow paths between application replicas");

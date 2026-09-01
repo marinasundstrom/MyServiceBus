@@ -17,17 +17,24 @@ public class GenericRequestClient<TRequest> implements RequestClient<TRequest> {
     private final RequestClientTransport transport;
     private final URI destinationAddress;
     private final RequestTimeout timeout;
+    private final BusHookDispatcher hooks;
 
     public GenericRequestClient(Class<TRequest> requestType, RequestClientTransport transport) {
-        this(requestType, transport, null, RequestTimeout.DEFAULT);
+        this(requestType, transport, null, RequestTimeout.DEFAULT, null);
     }
 
     public GenericRequestClient(Class<TRequest> requestType, RequestClientTransport transport, URI destinationAddress,
             RequestTimeout timeout) {
+        this(requestType, transport, destinationAddress, timeout, null);
+    }
+
+    GenericRequestClient(Class<TRequest> requestType, RequestClientTransport transport, URI destinationAddress,
+            RequestTimeout timeout, BusHookDispatcher hooks) {
         this.requestType = requestType;
         this.transport = transport;
         this.destinationAddress = destinationAddress;
         this.timeout = timeout == null ? RequestTimeout.DEFAULT : timeout;
+        this.hooks = hooks;
     }
 
     @Override
@@ -36,7 +43,42 @@ public class GenericRequestClient<TRequest> implements RequestClient<TRequest> {
         if (context.getCancellationToken().isCancelled()) {
             return cancelledFuture();
         }
-        return applyRequestPolicies(transport.sendRequest(requestType, context, responseType), context);
+        CompletableFuture<TResponse> response = transport.sendRequest(requestType, context, responseType);
+        observeRequest(context);
+        response.thenAccept(value -> observeResponse(context, responseType));
+        return applyRequestPolicies(response, context);
+    }
+
+    private void observeRequest(SendContext context) {
+        if (hooks == null || !hooks.isEnabled()) {
+            return;
+        }
+        hooks.dispatch(MessageOperationHookEvent.create(
+                "sent", true, requestType, null,
+                context.getDestinationAddress() == null ? null : context.getDestinationAddress().toString(),
+                System.nanoTime(), null,
+                context.getCorrelationId() == null ? null : context.getCorrelationId().toString(),
+                context.getConversationId() == null ? null : context.getConversationId().toString(),
+                null, null,
+                context.getMessageId() == null ? null : context.getMessageId().toString(),
+                null,
+                context.getRequestId() == null ? null : context.getRequestId().toString(),
+                context.getResponseAddress() == null ? null : context.getResponseAddress().toString(),
+                context.getIntent().name()));
+    }
+
+    private void observeResponse(SendContext context, Class<?> responseType) {
+        if (hooks == null || !hooks.isEnabled()) {
+            return;
+        }
+        hooks.dispatch(MessageOperationHookEvent.create(
+                "consumed", true, responseType, "request-client-response", null,
+                System.nanoTime(), null,
+                context.getCorrelationId() == null ? null : context.getCorrelationId().toString(),
+                context.getConversationId() == null ? null : context.getConversationId().toString(),
+                null, null, null, null,
+                context.getRequestId() == null ? null : context.getRequestId().toString(),
+                null, null));
     }
 
     @Override
