@@ -931,7 +931,7 @@ services.AddServiceBus(configurator =>
 
 Pass an existing `OrderStateMachine` instance when construction needs application configuration, or pass an endpoint name to override the default state-machine ID.
 
-The overload accepting `ISagaRepository<OrderState>` selects an explicit provider. A machine can call `RepositoryRequirements(...)` during construction to require durable storage, a concurrency mode, or a transactional outbox. Registration compares those requirements with `repository.Capabilities` and throws `SagaRepositoryCapabilityException` before endpoint startup when they are incompatible. The built-in `InMemorySagaRepository<TSaga>` advertises identity correlation, single-process concurrency, volatile durability, a logical outbox boundary, and final-instance deletion.
+The overload accepting `ISagaRepository<OrderState>` selects an explicit provider. The capabilities-plus-factory overload instead resolves a repository inside each consumer scope, which is the appropriate boundary for transaction-scoped durable providers. A machine can call `RepositoryRequirements(...)` during construction to require durable storage, a concurrency mode, or a transactional outbox. Registration compares those requirements with the declared capabilities and throws `SagaRepositoryCapabilityException` before endpoint startup when they are incompatible. The built-in `InMemorySagaRepository<TSaga>` advertises identity correlation, single-process concurrency, volatile durability, a logical outbox boundary, and final-instance deletion.
 
 #### Java
 
@@ -940,7 +940,7 @@ services.from(MessageBusServices.class).addServiceBus(configurator ->
     configurator.addSagaStateMachine(OrderStateMachine.class));
 ```
 
-Java also accepts a state-machine supplier and endpoint override. Its four-argument registration overload accepts a `SagaRepository<OrderState>` provider, and `repositoryRequirements(...)` declares the same capability needs as C#. In both clients, registration binds every declared event contract to one endpoint, runs the machine through the ordinary consumer retry and fault pipeline, and sends or publishes outgoing activities through the active consume context. The only built-in repository remains volatile and the dispatch boundary is only logical: it is suitable for development and samples, not durable production workflow state or exactly-once outgoing delivery.
+Java also accepts a state-machine supplier and endpoint override. Its four-argument registration overload accepts a `SagaRepository<OrderState>` provider; the capabilities-plus-factory form resolves one from the active `ServiceProvider`. `repositoryRequirements(...)` declares the same capability needs as C#. In both clients, registration binds every declared event contract to one endpoint and runs the machine through the ordinary consumer retry and fault pipeline. Saga activities use scoped send and publish providers: without an active outbox they retain consume-context behavior, while an active outbox captures them in the provider's transaction. The only built-in repository remains volatile and the dispatch boundary is only logical: it is suitable for development and samples, not durable production workflow state or exactly-once outgoing delivery.
 
 ---
 

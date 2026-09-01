@@ -13,6 +13,8 @@ internal sealed class SagaStateMachineConsumer<TStateMachine, TSaga, TMessage> :
     private readonly SagaStateMachineDefinition definition;
     private readonly string eventId;
     private readonly Func<TMessage, Guid> correlate;
+    private readonly ISendEndpointProvider sendEndpointProvider;
+    private readonly IPublishEndpoint publishEndpoint;
     private readonly IBusHookDispatcher hooks;
 
     public SagaStateMachineConsumer(
@@ -20,12 +22,16 @@ internal sealed class SagaStateMachineConsumer<TStateMachine, TSaga, TMessage> :
         SagaStateMachineDefinition definition,
         string eventId,
         Func<TMessage, Guid> correlate,
+        ISendEndpointProvider sendEndpointProvider,
+        IPublishEndpoint publishEndpoint,
         IEnumerable<IBusHook> hooks)
     {
         this.runtime = runtime;
         this.definition = definition;
         this.eventId = eventId;
         this.correlate = correlate;
+        this.sendEndpointProvider = sendEndpointProvider;
+        this.publishEndpoint = publishEndpoint;
         this.hooks = new BusHookDispatcher(hooks);
     }
 
@@ -37,6 +43,8 @@ internal sealed class SagaStateMachineConsumer<TStateMachine, TSaga, TMessage> :
             var result = await runtime.Deliver(
                 context.Message,
                 (operation, cancellationToken) => SagaBusOutgoingDispatcher.Dispatch(
+                    sendEndpointProvider,
+                    publishEndpoint,
                     context,
                     operation,
                     cancellationToken),
@@ -107,12 +115,19 @@ internal static class SagaBusOutgoingDispatcher
         .GetMethod(nameof(CreateTypedDispatcher), BindingFlags.NonPublic | BindingFlags.Static)!;
 
     public static ValueTask Dispatch(
+        ISendEndpointProvider sendEndpointProvider,
+        IPublishEndpoint publishEndpoint,
         ConsumeContext context,
         SagaOutgoingOperation operation,
         CancellationToken cancellationToken)
     {
         var dispatcher = Dispatchers.GetOrAdd(operation.Message.GetType(), CreateDispatcher);
-        return new ValueTask(dispatcher(context, operation, cancellationToken));
+        return new ValueTask(dispatcher(
+            sendEndpointProvider,
+            publishEndpoint,
+            context,
+            operation,
+            cancellationToken));
     }
 
     private static SagaTypedOutgoingDispatcher CreateDispatcher(Type messageType)
@@ -125,6 +140,8 @@ internal static class SagaBusOutgoingDispatcher
         => DispatchTyped<TMessage>;
 
     private static Task DispatchTyped<TMessage>(
+        ISendEndpointProvider sendEndpointProvider,
+        IPublishEndpoint publishEndpoint,
         ConsumeContext context,
         SagaOutgoingOperation operation,
         CancellationToken cancellationToken)
@@ -132,19 +149,48 @@ internal static class SagaBusOutgoingDispatcher
     {
         return operation.Kind switch
         {
-            SagaActivityKind.Send => context.Send<TMessage>(
-                new Uri(operation.Destination!, UriKind.RelativeOrAbsolute),
+            SagaActivityKind.Send => Send<TMessage>(
+                sendEndpointProvider,
+                context,
+                operation,
+                cancellationToken),
+            SagaActivityKind.Publish => publishEndpoint.Publish<TMessage>(
                 operation.Message,
-                cancellationToken: cancellationToken),
-            SagaActivityKind.Publish => context.Publish<TMessage>(
-                operation.Message,
+                sendContext => ApplyConsumeMetadata(sendContext, context),
                 cancellationToken: cancellationToken),
             _ => throw new InvalidOperationException(
                 $"Saga outgoing operation '{operation.Kind}' cannot be dispatched through the bus.")
         };
     }
 
+    private static async Task Send<TMessage>(
+        ISendEndpointProvider sendEndpointProvider,
+        ConsumeContext context,
+        SagaOutgoingOperation operation,
+        CancellationToken cancellationToken)
+        where TMessage : class
+    {
+        var endpoint = await sendEndpointProvider.GetSendEndpoint(
+            new Uri(operation.Destination!, UriKind.RelativeOrAbsolute)).ConfigureAwait(false);
+        await endpoint.Send<TMessage>(
+            operation.Message,
+            sendContext => ApplyConsumeMetadata(sendContext, context),
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    private static void ApplyConsumeMetadata(ISendContext sendContext, ConsumeContext consumeContext)
+    {
+        sendContext.RequestId = consumeContext.RequestId;
+        sendContext.CorrelationId = consumeContext.CorrelationId?.ToString();
+        sendContext.ConversationId = consumeContext.ConversationId;
+        sendContext.InitiatorId = consumeContext.CorrelationId;
+        if (sendContext is SendContext concrete)
+            concrete.CausationMessageId = consumeContext.MessageId;
+    }
+
     private delegate Task SagaTypedOutgoingDispatcher(
+        ISendEndpointProvider sendEndpointProvider,
+        IPublishEndpoint publishEndpoint,
         ConsumeContext context,
         SagaOutgoingOperation operation,
         CancellationToken cancellationToken);

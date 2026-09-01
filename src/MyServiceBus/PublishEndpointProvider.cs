@@ -38,7 +38,7 @@ internal class PublishEndpointProvider : IPublishEndpointProvider
     public IPublishEndpoint GetPublishEndpoint()
     {
         var ctx = contextProvider.Context;
-        if (ctx != null)
+        if (outboxSession?.Writer is null && ctx != null)
             return ctx;
         if (outboxSession is null)
             return (IPublishEndpoint)bus;

@@ -55,8 +55,15 @@ public class BusRegistrationConfigurator : IBusRegistrationConfigurator
             return;
 
         var repository = stateMachine.CreateConfiguredInMemoryRepository();
-        if (RegisterSagaStateMachine(stateMachine, repository, endpointName))
+        if (RegisterSagaStateMachine(
+            stateMachine,
+            repository.Capabilities,
+            _ => repository,
+            endpointName))
+        {
             Services.AddSingleton(repository);
+            Services.AddSingleton<ISagaRepository<TSaga>>(repository);
+        }
     }
 
     public void AddSagaStateMachine<TStateMachine, TSaga>(
@@ -68,12 +75,34 @@ public class BusRegistrationConfigurator : IBusRegistrationConfigurator
     {
         ArgumentNullException.ThrowIfNull(stateMachine);
         ArgumentNullException.ThrowIfNull(repository);
-        RegisterSagaStateMachine(stateMachine, repository, endpointName);
+        if (RegisterSagaStateMachine(
+            stateMachine,
+            repository.Capabilities,
+            _ => repository,
+            endpointName))
+        {
+            Services.AddSingleton<ISagaRepository<TSaga>>(repository);
+        }
+    }
+
+    public void AddSagaStateMachine<TStateMachine, TSaga>(
+        TStateMachine stateMachine,
+        SagaRepositoryCapabilities capabilities,
+        Func<IServiceProvider, ISagaRepository<TSaga>> repositoryFactory,
+        string? endpointName = null)
+        where TStateMachine : SagaStateMachine<TSaga>
+        where TSaga : class
+    {
+        ArgumentNullException.ThrowIfNull(stateMachine);
+        ArgumentNullException.ThrowIfNull(capabilities);
+        ArgumentNullException.ThrowIfNull(repositoryFactory);
+        RegisterSagaStateMachine(stateMachine, capabilities, repositoryFactory, endpointName);
     }
 
     private bool RegisterSagaStateMachine<TStateMachine, TSaga>(
         TStateMachine stateMachine,
-        ISagaRepository<TSaga> repository,
+        SagaRepositoryCapabilities capabilities,
+        Func<IServiceProvider, ISagaRepository<TSaga>> repositoryFactory,
         string? endpointName)
         where TStateMachine : SagaStateMachine<TSaga>
         where TSaga : class
@@ -83,14 +112,18 @@ public class BusRegistrationConfigurator : IBusRegistrationConfigurator
         if (!sagaStateMachines.Add(typeof(TStateMachine)))
             return false;
 
-        var runtime = stateMachine.CreateRuntime(repository);
+        capabilities.EnsureSupports(
+            stateMachine.Definition.RepositoryRequirements,
+            stateMachine.Definition.CompletionPolicy);
         var queueName = endpointName ?? stateMachine.Definition.StateMachineId;
 
         _topology.RegisterSagaStateMachine(stateMachine.Definition, queueName);
 
         Services.AddSingleton(stateMachine);
-        Services.AddSingleton<ISagaRepository<TSaga>>(repository);
-        stateMachine.RegisterConsumers<TStateMachine>(this, runtime, queueName);
+        stateMachine.RegisterConsumers<TStateMachine>(
+            this,
+            serviceProvider => stateMachine.CreateRuntime(repositoryFactory(serviceProvider)),
+            queueName);
         return true;
     }
 

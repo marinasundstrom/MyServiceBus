@@ -3,8 +3,10 @@ package com.myservicebus;
 import com.myservicebus.choreography.ChoreographyBuilder;
 import com.myservicebus.choreography.ChoreographyFragment;
 import com.myservicebus.di.ServiceCollection;
+import com.myservicebus.di.ServiceProvider;
 import com.myservicebus.persistence.OutboxSession;
 import com.myservicebus.orchestration.SagaRepository;
+import com.myservicebus.orchestration.SagaRepositoryCapabilities;
 import com.myservicebus.orchestration.SagaStateMachine;
 import com.myservicebus.serialization.SerializerFactory;
 
@@ -41,6 +43,13 @@ public interface BusRegistrationConfigurator {
             Class<TStateMachine> stateMachineClass,
             java.util.function.Supplier<TStateMachine> factory,
             SagaRepository<TSaga> repository,
+            String endpointName);
+
+    <TSaga, TStateMachine extends SagaStateMachine<TSaga>> void addSagaStateMachine(
+            Class<TStateMachine> stateMachineClass,
+            java.util.function.Supplier<TStateMachine> factory,
+            SagaRepositoryCapabilities capabilities,
+            java.util.function.Function<ServiceProvider, SagaRepository<TSaga>> repositoryFactory,
             String endpointName);
 
     default void addChoreography(ChoreographyBuilder builder) {

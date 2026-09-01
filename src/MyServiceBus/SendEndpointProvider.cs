@@ -33,7 +33,7 @@ internal class SendEndpointProvider : ISendEndpointProvider
 
     public Task<ISendEndpoint> GetSendEndpoint(Uri uri)
     {
-        if (_contextProvider.Context != null)
+        if (_outboxSession?.Writer is null && _contextProvider.Context != null)
             return _contextProvider.Context.GetSendEndpoint(uri);
 
         var logger = _loggerFactory?.CreateLogger<TransportSendEndpoint>();

@@ -204,12 +204,12 @@ public abstract class SagaStateMachine<TSaga>
 
     internal void RegisterConsumers<TStateMachine>(
         BusRegistrationConfigurator configurator,
-        SagaStateMachineRuntime<TSaga> runtime,
+        Func<IServiceProvider, SagaStateMachineRuntime<TSaga>> runtimeFactory,
         string endpointName)
         where TStateMachine : SagaStateMachine<TSaga>
     {
         foreach (var @event in events)
-            @event.Register<TStateMachine>(configurator, runtime, endpointName);
+            @event.Register<TStateMachine>(configurator, runtimeFactory, endpointName);
     }
 
     private void AddBehavior<TMessage>(string sourceState, EventActivityBinder<TSaga, TMessage> activity)
@@ -401,7 +401,7 @@ internal interface IEventRegistration<TSaga>
     void Bind(SagaStateMachineRuntimeBuilder<TSaga> builder);
     void Register<TStateMachine>(
         BusRegistrationConfigurator configurator,
-        SagaStateMachineRuntime<TSaga> runtime,
+        Func<IServiceProvider, SagaStateMachineRuntime<TSaga>> runtimeFactory,
         string endpointName)
         where TStateMachine : SagaStateMachine<TSaga>;
 }
@@ -452,18 +452,24 @@ internal sealed class EventRegistration<TSaga, TMessage> : IEventRegistration<TS
 
     public void Register<TStateMachine>(
         BusRegistrationConfigurator configurator,
-        SagaStateMachineRuntime<TSaga> runtime,
+        Func<IServiceProvider, SagaStateMachineRuntime<TSaga>> runtimeFactory,
         string endpointName)
         where TStateMachine : SagaStateMachine<TSaga>
     {
         configurator.AddConsumer<SagaStateMachineConsumer<TStateMachine, TSaga, TMessage>, TMessage>(
             endpointName,
-            serviceProvider => new SagaStateMachineConsumer<TStateMachine, TSaga, TMessage>(
-                runtime,
-                runtime.Definition,
-                @event.Id,
-                correlate,
-                serviceProvider.GetServices<IBusHook>()));
+            serviceProvider =>
+            {
+                var runtime = runtimeFactory(serviceProvider);
+                return new SagaStateMachineConsumer<TStateMachine, TSaga, TMessage>(
+                    runtime,
+                    runtime.Definition,
+                    @event.Id,
+                    correlate,
+                    serviceProvider.GetRequiredService<ISendEndpointProvider>(),
+                    serviceProvider.GetRequiredService<IPublishEndpoint>(),
+                    serviceProvider.GetServices<IBusHook>());
+            });
     }
 }
 

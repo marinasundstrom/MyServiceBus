@@ -5,6 +5,9 @@ import com.myservicebus.BusRegistrationConfigurator;
 import com.myservicebus.ConsumeContext;
 import com.myservicebus.BusHook;
 import com.myservicebus.SagaStateMachineHookEvent;
+import com.myservicebus.PublishEndpointProvider;
+import com.myservicebus.SendEndpointProvider;
+import com.myservicebus.di.ServiceProvider;
 import com.myservicebus.orchestration.SagaStateMachineRuntime.ActivityContext;
 
 import java.util.ArrayList;
@@ -214,15 +217,15 @@ public abstract class SagaStateMachine<TSaga> {
     /** Registers each declared event as an ordinary bus consumer on one endpoint. */
     public final void registerConsumers(
             BusRegistrationConfigurator configurator,
-            SagaStateMachineRuntime<TSaga> runtime,
+            Function<ServiceProvider, SagaStateMachineRuntime<TSaga>> runtimeFactory,
             Class<?> stateMachineClass,
             String endpointName) {
         Objects.requireNonNull(configurator, "configurator");
-        Objects.requireNonNull(runtime, "runtime");
+        Objects.requireNonNull(runtimeFactory, "runtimeFactory");
         Objects.requireNonNull(stateMachineClass, "stateMachineClass");
         required(endpointName, "endpointName");
         for (EventRegistration<?> event : events) {
-            event.register(configurator, runtime, stateMachineClass, endpointName);
+            event.register(configurator, runtimeFactory, stateMachineClass, endpointName);
         }
     }
 
@@ -419,7 +422,7 @@ public abstract class SagaStateMachine<TSaga> {
 
         private void register(
                 BusRegistrationConfigurator configurator,
-                SagaStateMachineRuntime<TSaga> runtime,
+                Function<ServiceProvider, SagaStateMachineRuntime<TSaga>> runtimeFactory,
                 Class<?> stateMachineClass,
                 String endpointName) {
             configurator.addConsumerMethod(
@@ -429,10 +432,11 @@ public abstract class SagaStateMachine<TSaga> {
                     true,
                     null,
                     (serviceProvider, context) -> {
+                        SagaStateMachineRuntime<TSaga> runtime = runtimeFactory.apply(serviceProvider);
                         long startedAt = System.nanoTime();
                         return runtime.deliver(
                                 context.getMessage(),
-                                operation -> dispatchOutgoing(context, operation))
+                                operation -> dispatchOutgoing(serviceProvider, context, operation))
                                 .handle((result, failure) -> {
                                     Throwable exception = unwrap(failure);
                                     UUID failedCorrelationId = result == null
@@ -499,20 +503,36 @@ public abstract class SagaStateMachine<TSaga> {
     }
 
     private static CompletableFuture<Void> dispatchOutgoing(
+            ServiceProvider serviceProvider,
             ConsumeContext<?> context,
             SagaStateMachineRuntime.OutgoingOperation operation) {
         return switch (operation.kind()) {
-            case SEND -> context.send(
-                    operation.destination(),
-                    operation.message(),
-                    context.getCancellationToken());
-            case PUBLISH -> context.publish(
-                    operation.message(),
-                    context.getCancellationToken());
+            case SEND -> serviceProvider.getRequiredService(SendEndpointProvider.class)
+                    .getSendEndpoint(operation.destination())
+                    .send(
+                            operation.message(),
+                            outgoing -> applyConsumeMetadata(outgoing, context),
+                            context.getCancellationToken());
+            case PUBLISH -> serviceProvider.getRequiredService(PublishEndpointProvider.class)
+                    .getPublishEndpoint()
+                    .publish(
+                            operation.message(),
+                            outgoing -> applyConsumeMetadata(outgoing, context),
+                            context.getCancellationToken());
             default -> CompletableFuture.failedFuture(new IllegalStateException(
                     "Saga outgoing operation '" + operation.kind()
                             + "' cannot be dispatched through the bus."));
         };
+    }
+
+    private static void applyConsumeMetadata(
+            com.myservicebus.SendContext outgoing,
+            ConsumeContext<?> consumed) {
+        outgoing.setRequestId(consumed.getRequestId());
+        outgoing.setCorrelationId(consumed.getCorrelationId());
+        outgoing.setConversationId(consumed.getConversationId());
+        outgoing.setInitiatorId(consumed.getCorrelationId());
+        outgoing.setCausationMessageId(consumed.getMessageId());
     }
 
     private final class BehaviorRegistration<TMessage> {

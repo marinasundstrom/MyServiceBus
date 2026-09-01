@@ -6,6 +6,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.myservicebus.MessageBus;
 import com.myservicebus.MessageBusServices;
+import com.myservicebus.ConsumeContext;
+import com.myservicebus.ConsumeContextProvider;
 import com.myservicebus.PublishEndpoint;
 import com.myservicebus.SendEndpoint;
 import com.myservicebus.SendEndpointProvider;
@@ -21,6 +23,7 @@ import java.time.Instant;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.Test;
@@ -71,6 +74,37 @@ class BusOutboxTest {
                     IllegalStateException.class,
                     () -> session.begin(new RecordingOutboxWriter()));
             assertTrue(failure.getMessage().contains("already active"));
+        }
+    }
+
+    @Test
+    void activeOutboxTakesPrecedenceOverCurrentConsumeContext() throws Exception {
+        ServiceCollection services = configuredServices();
+        ServiceProvider provider = services.buildServiceProvider();
+        MessageBus bus = provider.getRequiredService(MessageBus.class);
+        bus.start();
+
+        try (ServiceScope scope = provider.createScope()) {
+            ServiceProvider scoped = scope.getServiceProvider();
+            scoped.getRequiredService(ConsumeContextProvider.class).setContext(
+                    new ConsumeContext<>(
+                            new DirectBusMessage(UUID.randomUUID()),
+                            Map.of(),
+                            uri -> {
+                                throw new IllegalStateException("The consume context must be bypassed by the outbox.");
+                            }));
+            RecordingOutboxWriter writer = new RecordingOutboxWriter();
+            try (OutboxSession.Registration ignored = scoped.getRequiredService(OutboxSession.class).begin(writer)) {
+                scoped.getRequiredService(PublishEndpoint.class)
+                        .publish(new OrderSubmitted(UUID.randomUUID())).join();
+                scoped.getRequiredService(SendEndpointProvider.class)
+                        .getSendEndpoint("loopback://localhost/orders")
+                        .send(new SubmitOrder(UUID.randomUUID())).join();
+            }
+
+            assertEquals(2, writer.messages.size());
+        } finally {
+            bus.stop();
         }
     }
 

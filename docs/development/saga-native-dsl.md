@@ -220,7 +220,7 @@ The same machine object supplies:
 - its immutable normalized `SagaStateMachineDefinition` for inspection and topology; and
 - a runtime factory accepting `ISagaRepository<TSaga>` or `SagaRepository<TSaga>`, which binds the stored native callbacks to the low-level executor.
 
-The DSL does not own a singleton repository. Registration chooses repository lifetime and provider, validates its declared correlation, concurrency, durability, outbox, and final-deletion capabilities against the definition, and creates the consumer adapter. `InMemorySagaRepository` implements this same contract rather than using a private runtime path.
+The DSL does not own a singleton repository. Registration chooses repository lifetime and provider, validates its declared correlation, concurrency, durability, outbox, and final-deletion capabilities against the definition, and creates the consumer adapter. Provider factories resolve inside the active consumer scope so a durable repository can share its connection, transaction, and `OutboxSession` with saga activities. `InMemorySagaRepository` implements this same contract rather than using a private runtime path.
 
 ## Deliberate Initial Deviations
 

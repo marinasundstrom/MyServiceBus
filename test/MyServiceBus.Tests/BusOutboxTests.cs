@@ -67,6 +67,36 @@ public sealed class BusOutboxTests
     }
 
     [Fact]
+    public async Task Active_outbox_takes_precedence_over_the_current_consume_context()
+    {
+        var services = new ServiceCollection();
+        services.AddServiceBus(configurator =>
+        {
+            configurator.UseBusOutbox();
+            configurator.UsingMediator();
+        });
+
+        await using var provider = services.BuildServiceProvider();
+        var bus = provider.GetRequiredService<IMessageBus>();
+        await bus.StartAsync(CancellationToken.None);
+        await using var scope = provider.CreateAsyncScope();
+        var scoped = scope.ServiceProvider;
+        scoped.GetRequiredService<ConsumeContextProvider>().Context =
+            new DefaultConsumeContext<DirectBusMessage>(new DirectBusMessage(Guid.NewGuid()));
+        var writer = new RecordingOutboxWriter();
+        using var registration = scoped.GetRequiredService<OutboxSession>().Begin(writer);
+
+        await scoped.GetRequiredService<IPublishEndpoint>()
+            .Publish(new OrderSubmitted(Guid.NewGuid()));
+        var sendEndpoint = await scoped.GetRequiredService<ISendEndpointProvider>()
+            .GetSendEndpoint(new Uri("loopback://localhost/orders"));
+        await sendEndpoint.Send(new SubmitOrder(Guid.NewGuid()));
+
+        Assert.Equal(2, writer.Messages.Count);
+        await bus.StopAsync(CancellationToken.None);
+    }
+
+    [Fact]
     public async Task Scheduled_messages_are_captured_with_their_due_time()
     {
         var services = new ServiceCollection();
