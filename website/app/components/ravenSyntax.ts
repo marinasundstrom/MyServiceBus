@@ -40,7 +40,8 @@ function tokenType(scopes: string[]) {
 }
 
 async function installRavenTokens(monaco: Monaco) {
-  const response = await fetch('/syntaxes/onig.wasm');
+  const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? '';
+  const response = await fetch(`${basePath}/syntaxes/onig.wasm`);
   if (!response.ok) {
     throw new Error(`Unable to load the Oniguruma runtime (${response.status}).`);
   }
