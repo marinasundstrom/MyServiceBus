@@ -74,6 +74,41 @@ class SagaStateMachineRuntimeTest {
     }
 
     @Test
+    void dispatchesOutgoingWorkBeforeCommittingTheInstance() {
+        InMemorySagaRepository<OrderState> repository = new InMemorySagaRepository<>(OrderState::copy);
+        SagaStateMachineRuntime<OrderState> runtime = createRuntime(repository, false);
+        List<SagaStateMachineRuntime.OutgoingOperation> dispatched = new java.util.ArrayList<>();
+
+        SagaStateMachineRuntime.DeliveryResult result = runtime.deliver(
+                new OrderSubmitted(ORDER_ID),
+                operation -> {
+                    assertEquals(0, repository.count());
+                    dispatched.add(operation);
+                    return CompletableFuture.completedFuture(null);
+                }).toCompletableFuture().join();
+
+        assertEquals(1, dispatched.size());
+        assertEquals(result.outgoing().get(0), dispatched.get(0));
+        assertEquals(1, repository.count());
+    }
+
+    @Test
+    void rollsBackTheInstanceWhenOutgoingDispatchFails() {
+        InMemorySagaRepository<OrderState> repository = new InMemorySagaRepository<>(OrderState::copy);
+        SagaStateMachineRuntime<OrderState> runtime = createRuntime(repository, false);
+
+        CompletionException exception = assertThrows(CompletionException.class, () ->
+                runtime.deliver(
+                        new OrderSubmitted(ORDER_ID),
+                        operation -> CompletableFuture.failedFuture(
+                                new IllegalStateException("dispatch failed")))
+                        .toCompletableFuture().join());
+
+        assertInstanceOf(IllegalStateException.class, exception.getCause());
+        assertEquals(0, repository.count());
+    }
+
+    @Test
     void faultsWhenAnExistingOnlyEventHasNoInstance() {
         InMemorySagaRepository<OrderState> repository = new InMemorySagaRepository<>(OrderState::copy);
         SagaStateMachineRuntime<OrderState> runtime = createRuntime(repository, false);

@@ -41,9 +41,24 @@ public final class SagaStateMachineRuntime<TSaga> {
     }
 
     public <TMessage> CompletionStage<DeliveryResult> deliver(TMessage message) {
+        return deliver(message, operation -> CompletableFuture.completedFuture(null));
+    }
+
+    /**
+     * Delivers a message and dispatches outgoing operations before committing the saga instance.
+     * A dispatch failure rolls back the volatile repository transaction so receive retry can replay
+     * the event. Durable exactly-once coordination still requires a transactional repository/outbox.
+     */
+    public <TMessage> CompletionStage<DeliveryResult> deliver(
+            TMessage message,
+            OutgoingOperationDispatcher dispatcher) {
         if (message == null) {
             return CompletableFuture.failedFuture(
                     new IllegalArgumentException("message cannot be null"));
+        }
+        if (dispatcher == null) {
+            return CompletableFuture.failedFuture(
+                    new IllegalArgumentException("dispatcher cannot be null"));
         }
         EventRuntimeBinding<TSaga> eventBinding = events.get(message.getClass());
         if (eventBinding == null) {
@@ -129,6 +144,8 @@ public final class SagaStateMachineRuntime<TSaga> {
                         outgoing));
             }
 
+            execution = execution.thenCompose(ignored -> dispatchOutgoing(outgoing, dispatcher));
+
             return execution.thenApply(ignored -> {
                 String endState = normalizeState(getState.apply(instance));
                 boolean completed = endState.equals(SagaStateMachineDefinition.FINAL_STATE);
@@ -149,6 +166,16 @@ public final class SagaStateMachineRuntime<TSaga> {
                         : InMemorySagaRepository.Transaction.upsert(instance, result);
             });
         });
+    }
+
+    private static CompletionStage<Void> dispatchOutgoing(
+            List<OutgoingOperation> outgoing,
+            OutgoingOperationDispatcher dispatcher) {
+        CompletionStage<Void> dispatch = CompletableFuture.completedFuture(null);
+        for (OutgoingOperation operation : outgoing) {
+            dispatch = dispatch.thenCompose(ignored -> dispatcher.dispatch(operation));
+        }
+        return dispatch;
     }
 
     private CompletionStage<Void> executeActivity(
@@ -240,6 +267,11 @@ public final class SagaStateMachineRuntime<TSaga> {
             String messageUrn,
             String destination,
             @JsonIgnore Object message) {
+    }
+
+    @FunctionalInterface
+    public interface OutgoingOperationDispatcher {
+        CompletionStage<Void> dispatch(OutgoingOperation operation);
     }
 
     public enum DeliveryStatus {

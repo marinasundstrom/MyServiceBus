@@ -242,6 +242,7 @@ Before the fundamental DSL is complete, C# and Java tests must prove that:
 5. `DuringAny` does not apply to `Initial` or `Final`;
 6. ignored, unhandled, missing-discard, and missing-fault outcomes remain distinct;
 7. activity failure rolls back the working instance and outgoing capture; and
-8. the DSL uses the existing low-level runtime rather than a parallel executor.
+8. outgoing dispatch failure prevents the volatile instance from committing in both clients; and
+9. the DSL uses the existing low-level runtime rather than a parallel executor.
 
 Bus registration and dispatch plus the focused and Aspire samples are part of the usable MVP gate. Topology publication and minimal lifecycle monitoring should follow immediately so the sample is operationally legible. Durable repositories and richer Dashboard analysis remain later gates over the same machine definition.

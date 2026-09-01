@@ -60,6 +60,41 @@ public class SagaStateMachineRuntimeTests
     }
 
     [Fact]
+    public async Task Dispatches_outgoing_work_before_committing_the_instance()
+    {
+        var repository = new InMemorySagaRepository<OrderState>(state => state.Copy());
+        var runtime = CreateRuntime(repository);
+        var dispatched = new List<SagaOutgoingOperation>();
+
+        var result = await runtime.Deliver(
+            new OrderSubmitted(OrderId),
+            (operation, _) =>
+            {
+                Assert.Equal(0, repository.Count);
+                dispatched.Add(operation);
+                return ValueTask.CompletedTask;
+            });
+
+        Assert.Single(dispatched);
+        Assert.Same(result.Outgoing[0], dispatched[0]);
+        Assert.Equal(1, repository.Count);
+    }
+
+    [Fact]
+    public async Task Rolls_back_the_instance_when_outgoing_dispatch_fails()
+    {
+        var repository = new InMemorySagaRepository<OrderState>(state => state.Copy());
+        var runtime = CreateRuntime(repository);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+            await runtime.Deliver(
+                new OrderSubmitted(OrderId),
+                (_, _) => ValueTask.FromException(new InvalidOperationException("dispatch failed"))));
+
+        Assert.Equal(0, repository.Count);
+    }
+
+    [Fact]
     public async Task Faults_when_an_existing_only_event_has_no_instance()
     {
         var repository = new InMemorySagaRepository<OrderState>(state => state.Copy());

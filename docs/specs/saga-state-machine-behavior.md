@@ -39,9 +39,9 @@ The planned Automatonymous-shaped native DSL is a primitive-completeness gate. E
 
 ## Current Implementation Boundary
 
-The first matching C# and Java low-level runtimes now execute the version 1 subset against volatile in-memory repositories. Native callbacks bind message types, correlation selectors, saga factories and cloning, state accessors, mutations, and outgoing message factories to a validated normalized definition. The runtimes serialize work per correlation identity, execute activities in order against a cloned working instance, commit only after the behavior succeeds, and return logically captured send or publish operations with the transition result.
+The first matching C# and Java low-level runtimes now execute the version 1 subset against volatile in-memory repositories. Native callbacks bind message types, correlation selectors, saga factories and cloning, state accessors, mutations, and outgoing message factories to a validated normalized definition. The runtimes serialize work per correlation identity, execute activities in order against a cloned working instance, and return logically captured send or publish operations with the transition result. An optional dispatcher runs those operations before the volatile instance commits; a dispatch failure therefore rolls back the state change so ordinary receive retry can replay the event.
 
-This is execution-foundation evidence, not yet a supported bus-integrated saga feature. No receive endpoint is registered automatically, captured outgoing work is not dispatched to a broker, and the in-memory logical capture is not a durable transactional outbox. Process loss discards all instances. The low-level activity-index binding is intended for adapters, generators, and the future native DSL implementations rather than ordinary application authoring.
+This is execution-foundation evidence, not yet a supported bus-integrated saga feature. No receive endpoint is registered automatically. The dispatch hook is a logical commit boundary, not a durable transactional outbox: process loss discards all instances, and an earlier outgoing operation can be delivered again if a later operation fails and the incoming event is retried. The low-level activity-index binding is intended for adapters and generators rather than ordinary application authoring.
 
 ## Definitions
 
@@ -108,9 +108,10 @@ For each recognized event delivery, both runtimes perform these observable stage
 5. Determine the effective current state (`Initial` for a new or unset instance).
 6. Select the behavior for that state and event, considering ordinary state behavior before `DuringAny`.
 7. Execute its activities once, sequentially, in declaration order.
-8. Persist the insert, update, completion, and captured outgoing work at the provider's declared durability boundary.
-9. Acknowledge the incoming delivery only after that boundary succeeds.
-10. Emit bounded transition or fault observations without saga or message payloads by default.
+8. Dispatch or transactionally capture outgoing work according to the provider's declared outbox capability.
+9. Persist the insert, update, and completion at the provider's declared durability boundary.
+10. Acknowledge the incoming delivery only after that boundary succeeds.
+11. Emit bounded transition or fault observations without saga or message payloads by default.
 
 An implementation may organize its internal pipeline differently, but it must not reorder these externally meaningful effects.
 
@@ -170,7 +171,7 @@ The first profile defines:
 
 `transition` and `finalize` terminate the activity list in version 1. A definition cannot rely on effects declared after either operation.
 
-If an activity fails, later activities do not run. The incoming delivery fails. Durable profiles must roll back the instance mutation and withhold all captured outgoing messages from that attempt. An in-memory implementation must provide the same logical outcome within its process even though it cannot provide crash durability.
+If an activity fails, later activities do not run. The incoming delivery fails. Durable profiles must roll back the instance mutation and withhold all captured outgoing messages from that attempt. The volatile profile rolls back its cloned instance and captured operations when activity execution fails. When its optional logical dispatcher fails, it also rolls back the instance, but operations already accepted by an external transport can be duplicated on retry; only a transactional outbox can close that gap.
 
 On retry, the runtime reloads the authoritative instance and reevaluates behavior. It does not resume in the middle of the failed activity list.
 

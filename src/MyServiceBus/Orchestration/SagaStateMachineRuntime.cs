@@ -40,11 +40,30 @@ public sealed class SagaStateMachineRuntime<TSaga>
         TMessage message,
         CancellationToken cancellationToken = default)
         where TMessage : class
-        => Deliver(message, typeof(TMessage), cancellationToken);
+        => Deliver(message, typeof(TMessage), dispatch: null, cancellationToken);
+
+    /// <summary>
+    /// Delivers a message and dispatches its outgoing operations before committing the saga instance.
+    /// </summary>
+    /// <remarks>
+    /// A dispatch failure prevents the in-memory repository transaction from committing so ordinary
+    /// receive retry can execute the state-machine event again. This provides logical, not durable,
+    /// outbox behavior; durable exactly-once coordination requires a transactional repository/outbox.
+    /// </remarks>
+    public ValueTask<SagaDeliveryResult> Deliver<TMessage>(
+        TMessage message,
+        SagaOutgoingOperationDispatcher dispatch,
+        CancellationToken cancellationToken = default)
+        where TMessage : class
+    {
+        ArgumentNullException.ThrowIfNull(dispatch);
+        return Deliver(message, typeof(TMessage), dispatch, cancellationToken);
+    }
 
     private async ValueTask<SagaDeliveryResult> Deliver(
         object message,
         Type messageType,
+        SagaOutgoingOperationDispatcher? dispatch,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(message);
@@ -147,6 +166,15 @@ public sealed class SagaStateMachineRuntime<TSaga>
                     }
                 }
 
+                if (dispatch is not null)
+                {
+                    foreach (var operation in outgoing)
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        await dispatch(operation, cancellationToken).ConfigureAwait(false);
+                    }
+                }
+
                 var endState = NormalizeState(getState(instance));
                 var completed = endState == SagaStateMachineDefinition.FinalState;
                 var delete = completed && definition.CompletionPolicy == SagaCompletionPolicy.DeleteWhenFinalized;
@@ -202,6 +230,10 @@ public sealed class SagaStateMachineRuntime<TSaga>
     private static string NormalizeState(string? state)
         => string.IsNullOrWhiteSpace(state) ? SagaStateMachineDefinition.InitialState : state;
 }
+
+public delegate ValueTask SagaOutgoingOperationDispatcher(
+    SagaOutgoingOperation operation,
+    CancellationToken cancellationToken);
 
 public sealed class SagaStateMachineRuntimeBuilder<TSaga>
     where TSaga : class
