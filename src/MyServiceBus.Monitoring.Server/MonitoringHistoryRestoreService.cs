@@ -30,8 +30,12 @@ public sealed class MonitoringHistoryRestoreService : IHostedService
         foreach (var snapshot in restored.Jobs)
             repository.UpsertJobs(snapshot);
         repository.RestoreWorkflowRuns(restored.WorkflowRuns, DateTimeOffset.UtcNow);
+        repository.RestoreSagaInstances(restored.SagaInstances, DateTimeOffset.UtcNow);
         await store.StoreWorkflowRunsAsync(
             repository.CaptureWorkflowRuns(DateTimeOffset.UtcNow),
+            cancellationToken);
+        await store.StoreSagaInstancesAsync(
+            repository.CaptureSagaInstances(DateTimeOffset.UtcNow),
             cancellationToken);
         repository.SetLastIngestAtUtc(restored.LastIngestAtUtc);
     }

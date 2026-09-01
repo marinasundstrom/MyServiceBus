@@ -80,6 +80,97 @@ public class MonitoringRepositoryTests
     }
 
     [Fact]
+    public void Repository_merges_restored_and_new_saga_transitions()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var firstRepository = new MonitoringRepository();
+        firstRepository.UpsertMetadata(CreateMetadata("orders", "orders-1", now, "commerce"));
+        firstRepository.RecordBatch(CreateBatch(
+            "orders",
+            "orders-1",
+            now,
+            CreateSagaObservation(1, now.AddMinutes(-1), "OrderSubmitted", "consumed", "Initial", "AwaitingPayment", true, false)))
+            .ShouldBeTrue();
+        var retained = firstRepository.CaptureSagaInstances(now).ShouldHaveSingleItem();
+
+        var restoredRepository = new MonitoringRepository();
+        restoredRepository.RestoreSagaInstances([retained], now);
+        restoredRepository.UpsertMetadata(CreateMetadata("orders", "orders-1", now, "commerce"));
+        restoredRepository.RecordBatch(CreateBatch(
+            "orders",
+            "orders-1",
+            now,
+            CreateSagaObservation(2, now, "PaymentReceived", "consumed", "AwaitingPayment", "Final", false, true)))
+            .ShouldBeTrue();
+
+        var merged = restoredRepository.GetSagaInstances("order-state-machine", "completed").ShouldHaveSingleItem();
+        merged.StartedAtUtc.ShouldBe(now.AddMinutes(-1));
+        merged.LastActivityAtUtc.ShouldBe(now);
+        merged.Transitions.Select(transition => transition.EventId)
+            .ShouldBe(["OrderSubmitted", "PaymentReceived"]);
+        merged.CurrentState.ShouldBe("Final");
+    }
+
+    [Fact]
+    public void Repository_preserves_restored_committed_state_across_failure_and_recovery_attempts()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var firstRepository = new MonitoringRepository();
+        firstRepository.UpsertMetadata(CreateMetadata("orders", "orders-1", now, "commerce"));
+        firstRepository.RecordBatch(CreateBatch(
+            "orders",
+            "orders-1",
+            now,
+            CreateSagaObservation(
+                1,
+                now.AddMinutes(-1),
+                "OrderSubmitted",
+                "consumed",
+                "Initial",
+                "AwaitingPayment",
+                true,
+                false)))
+            .ShouldBeTrue();
+
+        var restoredRepository = new MonitoringRepository();
+        restoredRepository.RestoreSagaInstances([firstRepository.CaptureSagaInstances(now).ShouldHaveSingleItem()], now);
+        restoredRepository.UpsertMetadata(CreateMetadata("orders", "orders-1", now, "commerce"));
+        restoredRepository.RecordBatch(CreateBatch(
+            "orders",
+            "orders-1",
+            now,
+            CreateSagaFailureObservation(2, now.AddSeconds(-1), "PaymentReceived")))
+            .ShouldBeTrue();
+
+        var failed = restoredRepository.GetSagaInstances("order-state-machine", "active").ShouldHaveSingleItem();
+        failed.CurrentState.ShouldBe("AwaitingPayment");
+        failed.InstancePresent.ShouldBeTrue();
+        failed.LastDeliverySucceeded.ShouldBeFalse();
+        failed.Transitions.Count.ShouldBe(2);
+
+        restoredRepository.RecordBatch(CreateBatch(
+            "orders",
+            "orders-1",
+            now,
+            CreateSagaObservation(
+                3,
+                now,
+                "PaymentReceived",
+                "consumed",
+                "AwaitingPayment",
+                "Processing",
+                false,
+                false)))
+            .ShouldBeTrue();
+
+        var recovered = restoredRepository.GetSagaInstances("order-state-machine", "active").ShouldHaveSingleItem();
+        recovered.CurrentState.ShouldBe("Processing");
+        recovered.InstancePresent.ShouldBeTrue();
+        recovered.LastDeliverySucceeded.ShouldBeTrue();
+        recovered.Transitions.Select(transition => transition.Succeeded).ShouldBe([true, false, true]);
+    }
+
+    [Fact]
     public void Dashboard_summary_is_explicit_when_no_monitoring_data_is_available()
     {
         var summary = new MonitoringRepository().GetDashboardSummary(60, DateTimeOffset.UtcNow);
@@ -1268,6 +1359,39 @@ public class MonitoringRepositoryTests
                 ["created"] = created.ToString(),
                 ["completed"] = completed.ToString(),
                 ["instance_present"] = (!completed).ToString()
+            },
+            MessageId: $"message-{sequence}");
+
+    private static MonitoringObservation CreateSagaFailureObservation(
+        long sequence,
+        DateTimeOffset occurredAtUtc,
+        string eventId)
+        => new(
+            sequence,
+            occurredAtUtc,
+            "saga_delivery",
+            false,
+            null,
+            null,
+            null,
+            null,
+            7,
+            "System.InvalidOperationException",
+            "The delivery failed.",
+            "00000000-0000-0000-0000-000000000123",
+            null,
+            null,
+            null,
+            Properties: new Dictionary<string, string>
+            {
+                ["state_machine_id"] = "order-state-machine",
+                ["definition_version"] = "1",
+                ["owner"] = "orders",
+                ["event_id"] = eventId,
+                ["status"] = "faulted",
+                ["created"] = false.ToString(),
+                ["completed"] = false.ToString(),
+                ["instance_present"] = false.ToString()
             },
             MessageId: $"message-{sequence}");
 

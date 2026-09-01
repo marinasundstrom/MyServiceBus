@@ -87,6 +87,23 @@ public sealed class MonitoringHistoryDbContextModelSnapshot : ModelSnapshot
             entity.ToTable("scheduled_work_snapshot", "myservicebus_monitoring");
         });
 
+        modelBuilder.Entity("MyServiceBus.Monitoring.Server.MonitoringSagaInstanceEntity", entity =>
+        {
+            entity.Property<string>("StateMachineId").HasColumnType("text");
+            entity.Property<string>("ApplicationName").HasColumnType("text");
+            entity.Property<string>("CorrelationId").HasColumnType("text");
+            entity.Property<string>("DefinitionVersion").IsRequired().HasColumnType("text");
+            entity.Property<DateTimeOffset>("LastActivityAtUtc").HasColumnType("timestamp with time zone");
+            entity.Property<string>("Payload").IsRequired().HasColumnType("jsonb");
+            entity.Property<DateTimeOffset>("StartedAtUtc").HasColumnType("timestamp with time zone");
+            entity.Property<string>("Status").IsRequired().HasColumnType("text");
+            entity.Property<DateTimeOffset>("UpdatedAtUtc").HasColumnType("timestamp with time zone");
+            entity.HasKey("StateMachineId", "ApplicationName", "CorrelationId");
+            entity.HasIndex("LastActivityAtUtc");
+            entity.HasIndex("StateMachineId", "Status");
+            entity.ToTable("saga_instance", "myservicebus_monitoring");
+        });
+
         modelBuilder.Entity("MyServiceBus.Monitoring.Server.MonitoringWorkflowRunEntity", entity =>
         {
             entity.Property<string>("RunId").HasColumnType("text");

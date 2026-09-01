@@ -16,6 +16,7 @@ public sealed class MonitoringHistoryDbContext : DbContext
     internal DbSet<MonitoringRecurringJobEntity> RecurringJobs => Set<MonitoringRecurringJobEntity>();
     internal DbSet<MonitoringJobEntity> Jobs => Set<MonitoringJobEntity>();
     internal DbSet<MonitoringWorkflowRunEntity> WorkflowRuns => Set<MonitoringWorkflowRunEntity>();
+    internal DbSet<MonitoringSagaInstanceEntity> SagaInstances => Set<MonitoringSagaInstanceEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -64,6 +65,14 @@ public sealed class MonitoringHistoryDbContext : DbContext
             entity.HasKey(value => value.RunId);
             entity.HasIndex(value => value.LastActivityAtUtc);
             entity.HasIndex(value => new { value.CoordinationType, value.Status });
+            entity.Property(value => value.Payload).HasColumnType("jsonb");
+        });
+        modelBuilder.Entity<MonitoringSagaInstanceEntity>(entity =>
+        {
+            entity.ToTable("saga_instance");
+            entity.HasKey(value => new { value.StateMachineId, value.ApplicationName, value.CorrelationId });
+            entity.HasIndex(value => value.LastActivityAtUtc);
+            entity.HasIndex(value => new { value.StateMachineId, value.Status });
             entity.Property(value => value.Payload).HasColumnType("jsonb");
         });
     }
@@ -133,6 +142,19 @@ internal sealed class MonitoringWorkflowRunEntity
     public string RunId { get; set; } = string.Empty;
     public string WorkflowId { get; set; } = string.Empty;
     public string CoordinationType { get; set; } = string.Empty;
+    public string Status { get; set; } = string.Empty;
+    public DateTimeOffset StartedAtUtc { get; set; }
+    public DateTimeOffset LastActivityAtUtc { get; set; }
+    public DateTimeOffset UpdatedAtUtc { get; set; }
+    public string Payload { get; set; } = string.Empty;
+}
+
+internal sealed class MonitoringSagaInstanceEntity
+{
+    public string StateMachineId { get; set; } = string.Empty;
+    public string ApplicationName { get; set; } = string.Empty;
+    public string CorrelationId { get; set; } = string.Empty;
+    public string DefinitionVersion { get; set; } = string.Empty;
     public string Status { get; set; } = string.Empty;
     public DateTimeOffset StartedAtUtc { get; set; }
     public DateTimeOffset LastActivityAtUtc { get; set; }

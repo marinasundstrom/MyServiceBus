@@ -68,6 +68,10 @@ public sealed class PostgreSqlMonitoringHistoryStore : IMonitoringHistoryStore
             .Where(value => value.LastActivityAtUtc >= workflowCutoff)
             .OrderBy(value => value.LastActivityAtUtc)
             .ToArrayAsync(cancellationToken);
+        var sagaInstanceRows = await context.SagaInstances.AsNoTracking()
+            .Where(value => value.LastActivityAtUtc >= workflowCutoff)
+            .OrderBy(value => value.LastActivityAtUtc)
+            .ToArrayAsync(cancellationToken);
 
         var lastIngest = metadataRows.Select(value => (DateTimeOffset?)value.ReceivedAtUtc)
             .Concat(batchRows.Select(value => (DateTimeOffset?)value.ReceivedAtUtc))
@@ -76,6 +80,7 @@ public sealed class PostgreSqlMonitoringHistoryStore : IMonitoringHistoryStore
             .Concat(recurringJobRows.Select(value => (DateTimeOffset?)value.ReceivedAtUtc))
             .Concat(jobRows.Select(value => (DateTimeOffset?)value.ReceivedAtUtc))
             .Concat(workflowRunRows.Select(value => (DateTimeOffset?)value.UpdatedAtUtc))
+            .Concat(sagaInstanceRows.Select(value => (DateTimeOffset?)value.UpdatedAtUtc))
             .Max();
 
         return new MonitoringHistoryRestore(
@@ -86,6 +91,7 @@ public sealed class PostgreSqlMonitoringHistoryStore : IMonitoringHistoryStore
             recurringJobRows.Select(value => Deserialize<MonitoringRecurringJobSnapshot>(value.Payload)).ToArray(),
             jobRows.Select(value => Deserialize<MonitoringJobSnapshot>(value.Payload)).ToArray(),
             workflowRunRows.Select(value => Deserialize<MonitoringChoreographyRun>(value.Payload)).ToArray(),
+            sagaInstanceRows.Select(value => Deserialize<MonitoringSagaInstance>(value.Payload)).ToArray(),
             lastIngest);
     }
 
@@ -321,6 +327,44 @@ public sealed class PostgreSqlMonitoringHistoryStore : IMonitoringHistoryStore
         SetEarlierHistoryBoundary(runs.Min(run => run.StartedAtUtc));
     }
 
+    public async Task StoreSagaInstancesAsync(
+        IReadOnlyList<MonitoringSagaInstance> instances,
+        CancellationToken cancellationToken)
+    {
+        if (instances.Count == 0)
+            return;
+
+        var updatedAt = DateTimeOffset.UtcNow;
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        foreach (var instance in instances)
+        {
+            var entity = await context.SagaInstances.FindAsync(
+                [instance.StateMachineId, instance.ApplicationName, instance.CorrelationId],
+                cancellationToken);
+            if (entity is null)
+            {
+                entity = new MonitoringSagaInstanceEntity
+                {
+                    StateMachineId = instance.StateMachineId,
+                    ApplicationName = instance.ApplicationName,
+                    CorrelationId = instance.CorrelationId
+                };
+                context.SagaInstances.Add(entity);
+            }
+            entity.DefinitionVersion = instance.DefinitionVersion;
+            entity.Status = instance.Status;
+            entity.StartedAtUtc = instance.StartedAtUtc;
+            entity.LastActivityAtUtc = instance.LastActivityAtUtc;
+            entity.UpdatedAtUtc = updatedAt;
+            entity.Payload = JsonSerializer.Serialize(instance, JsonOptions);
+        }
+        await context.SaveChangesAsync(cancellationToken);
+        await context.SagaInstances
+            .Where(value => value.LastActivityAtUtc < updatedAt - options.Retention)
+            .ExecuteDeleteAsync(cancellationToken);
+        SetEarlierHistoryBoundary(instances.Min(instance => instance.StartedAtUtc));
+    }
+
     private async Task RefreshHistoryBoundaryAsync(
         MonitoringHistoryDbContext context,
         CancellationToken cancellationToken)
@@ -332,7 +376,8 @@ public sealed class PostgreSqlMonitoringHistoryStore : IMonitoringHistoryStore
         var recurringJobs = await context.RecurringJobs.Select(value => (DateTimeOffset?)value.ReceivedAtUtc).MinAsync(cancellationToken);
         var jobs = await context.Jobs.Select(value => (DateTimeOffset?)value.ReceivedAtUtc).MinAsync(cancellationToken);
         var workflowRuns = await context.WorkflowRuns.Select(value => (DateTimeOffset?)value.StartedAtUtc).MinAsync(cancellationToken);
-        var earliest = new[] { metadata, batches, heartbeat, scheduledWork, recurringJobs, jobs, workflowRuns }
+        var sagaInstances = await context.SagaInstances.Select(value => (DateTimeOffset?)value.StartedAtUtc).MinAsync(cancellationToken);
+        var earliest = new[] { metadata, batches, heartbeat, scheduledWork, recurringJobs, jobs, workflowRuns, sagaInstances }
             .Where(value => value.HasValue).Min();
         if (earliest.HasValue)
             Interlocked.Exchange(ref historyAvailableFromUtcTicks, earliest.Value.UtcTicks);

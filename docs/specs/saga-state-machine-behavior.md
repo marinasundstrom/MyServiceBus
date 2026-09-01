@@ -19,10 +19,10 @@ The first executable profile is intentionally smaller than the complete feature:
 - existing-instance delivery for subsequent events;
 - `Initially`, `During`, `DuringAny`, `When`, and `Ignore` behavior;
 - ordered mutation, send, publish, transition, and finalize activities;
-- an in-memory repository with explicit volatile durability; and
+- volatile in-memory and durable PostgreSQL repository profiles with explicit capabilities; and
 - normalized declarations and matching C# and Java fixtures.
 
-Query correlation, durable repositories, conflict retries, transactional outbox integration, schedules, requests, responses, composite events, exception activities, and multiple named final outcomes are specified as later profiles. Their place in the model is reserved, but the first runtime must not claim those capabilities.
+The PostgreSQL profile supports identity correlation, pessimistic correlation-scoped concurrency, durable instance storage, transactional outbox capture, and final-instance deletion. Query correlation, optimistic conflict retries, schedules, requests, responses, composite events, exception activities, and multiple named final outcomes remain later profiles. Their place in the model is reserved, but the runtime must not claim those capabilities.
 
 ## Abstraction Layers
 
@@ -39,9 +39,9 @@ The planned Automatonymous-shaped native DSL is a primitive-completeness gate. E
 
 ## Current Implementation Boundary
 
-The first matching C# and Java low-level runtimes now execute the version 1 subset through public provider-neutral repository contracts. A repository exposes correlation-scoped transaction execution plus explicit correlation, concurrency, durability, outbox, and final-deletion capabilities. Registration and runtime creation reject definitions whose requirements exceed those capabilities. The only built-in provider remains the volatile in-memory repository. Native callbacks bind message types, correlation selectors, saga factories and cloning, state accessors, mutations, and outgoing message factories to a validated normalized definition. The in-memory provider serializes work per correlation identity, executes activities against a cloned working instance, and commits the returned no-change, upsert, or delete decision. An optional dispatcher runs outgoing operations before that volatile commit; a dispatch failure therefore rolls back the state change so ordinary receive retry can replay the event.
+The matching C# and Java low-level runtimes execute the version 1 subset through public provider-neutral repository contracts. A repository exposes correlation-scoped transaction execution plus explicit correlation, concurrency, durability, outbox, and final-deletion capabilities. Registration and runtime creation reject definitions whose requirements exceed those capabilities. Native callbacks bind message types, correlation selectors, saga factories and cloning, state accessors, mutations, and outgoing message factories to a validated normalized definition. The in-memory provider serializes work per correlation identity, executes activities against a cloned working instance, and commits the returned no-change, upsert, or delete decision. The PostgreSQL provider uses a transaction-scoped advisory lock for the saga identity, reloads the authoritative JSON instance under that lock, and atomically commits its insert, update, or deletion with outgoing envelopes captured by the scoped PostgreSQL outbox.
 
-This remains an experimental execution foundation rather than a supported complete saga feature. C# and Java registration adapters attach every declared event to one receive endpoint, execute through the ordinary consumer pipeline, and connect the dispatch hook to the active consume context. The hook is a logical commit boundary, not a durable transactional outbox: process loss discards all instances, and an earlier outgoing operation can be delivered again if a later operation fails and the incoming event is retried. The low-level activity-index binding is intended for adapters and generators rather than ordinary application authoring.
+This remains an experimental execution foundation rather than a supported complete saga feature. C# and Java registration adapters attach every declared event to one receive endpoint, execute through the ordinary consumer pipeline, and connect the dispatch hook to the active consume context. With the in-memory provider, that hook is only a logical commit boundary: process loss discards instances, and an earlier outgoing operation can be delivered again if a later operation fails and the incoming event is retried. With the PostgreSQL provider and scoped bus outbox, the same hook stages outgoing envelopes inside the repository-owned transaction. Matching recovery gates prove that failed attempts expose neither their state nor staged envelopes, committed instances resume through newly constructed runtimes, competing deliveries for one identity serialize without losing mutation, and completed-instance deletion survives restart. The low-level activity-index binding is intended for adapters and generators rather than ordinary application authoring.
 
 ## Definitions
 
@@ -184,22 +184,22 @@ A transition updates the current state as part of the same unit of work as its o
 - `retain`: persist the instance in `Final`; or
 - `delete-when-finalized`: remove it at the successful durability boundary.
 
-This separation follows the MassTransit distinction between reaching `Final` and configuring completed-instance removal. The first in-memory profile supports both policies.
+This separation follows the MassTransit distinction between reaching `Final` and configuring completed-instance removal. Both current repository profiles support the two completion policies.
 
 The Raven exploration's `final Completed` and `final Cancelled` syntax represents a deliberate future extension for named terminal outcomes. Before implementation, it must define whether those outcomes are retained terminal states or labels carried into the single runtime `Final` state. Version 1 does not silently choose between those meanings.
 
 ## Concurrency, Retry, and Outbox Requirements
 
-The in-memory repository is suitable for deterministic tests and development only. A durable provider cannot be promoted until it declares and proves:
+The in-memory repository is suitable for deterministic tests and development only. A durable provider must declare and prove:
 
 - unique saga identity;
 - optimistic or pessimistic concurrency behavior;
-- conflict detection and bounded retry;
+- conflict handling appropriate to its concurrency model, including bounded retry for optimistic providers;
 - atomic instance insert, update, or delete;
 - atomic capture of outgoing work through the transactional outbox; and
 - restart behavior for committed and uncommitted transitions.
 
-A concurrency retry reloads current state and reevaluates correlation, behavior, and activities. Application callbacks may therefore run more than once. Outgoing messages from losing or failed attempts must not escape. Exactly-once application side effects are not implied; side effects outside the repository/outbox transaction remain application responsibilities.
+The PostgreSQL profile prevents same-identity conflicts by holding a transaction-scoped pessimistic lock, then loading and evaluating the current instance. A future optimistic provider must reload current state and reevaluate correlation, behavior, and activities on bounded conflict retry. Application callbacks may therefore run more than once under retrying providers. Outgoing messages from losing or failed attempts must not escape. Exactly-once application side effects are not implied; side effects outside the repository/outbox transaction remain application responsibilities.
 
 ## Later Profiles
 
@@ -212,9 +212,8 @@ These capabilities extend the same delivery algorithm rather than forming separa
 - response activities preserving request correlation;
 - composite events or another deterministic durable join;
 - typed exception activities and retry blocks;
-- multiple terminal outcomes;
-- durable repository providers and schema evolution; and
-- retained transition history and live instance monitoring.
+- multiple terminal outcomes; and
+- additional durable repository providers and schema evolution beyond PostgreSQL.
 
 For request/response monitoring, the request and correlated return remain one paired interaction. The saga state shows the authoritative pending request, while fault and timeout are alternative returns rather than choreography forks.
 

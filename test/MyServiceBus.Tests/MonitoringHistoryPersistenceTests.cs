@@ -20,10 +20,12 @@ public class MonitoringHistoryPersistenceTests
         script.ShouldContain("observation_batch");
         script.ShouldContain("job_snapshot");
         script.ShouldContain("workflow_run");
+        script.ShouldContain("saga_instance");
         script.ShouldContain("jsonb");
         context.Database.GetMigrations().ShouldContain("20260831120000_InitialMonitoringHistory");
         context.Database.GetMigrations().ShouldContain("20260831170000_AddRecurringJobSnapshots");
         context.Database.GetMigrations().ShouldContain("20260901123000_AddWorkflowRuns");
+        context.Database.GetMigrations().ShouldContain("20260901194500_AddSagaInstances");
         context.Database.HasPendingModelChanges().ShouldBeFalse();
     }
 
@@ -48,6 +50,7 @@ public class MonitoringHistoryPersistenceTests
             [],
             [jobs],
             [],
+            [CreateSagaInstance(now)],
             now));
         var repository = new MonitoringRepository();
         var restore = new MonitoringHistoryRestoreService(store, repository);
@@ -57,6 +60,8 @@ public class MonitoringHistoryPersistenceTests
         repository.GetApplications(now).ShouldHaveSingleItem().Totals.Consumed.ShouldBe(1);
         repository.GetJobs("orders", "running", now).ShouldHaveSingleItem()
             .Job.JobType.ShouldBe("invoice-export");
+        repository.GetSagaInstance("order-state-machine", "saga-1").ShouldNotBeNull()
+            .CurrentState.ShouldBe("AwaitingPayment");
         var history = new MonitoringIngestService(repository, store).GetHistory(now);
         history.StorageProvider.ShouldBe("PostgreSql");
         history.Durable.ShouldBeTrue();
@@ -68,19 +73,22 @@ public class MonitoringHistoryPersistenceTests
     public async Task Ingest_service_writes_accepted_monitoring_records_to_the_configured_store()
     {
         var now = DateTimeOffset.UtcNow;
-        var store = new StubHistoryStore(new MonitoringHistoryRestore([], [], [], [], [], [], [], null));
+        var store = new StubHistoryStore(new MonitoringHistoryRestore([], [], [], [], [], [], [], [], null));
         var service = new MonitoringIngestService(new MonitoringRepository(), store);
         var metadata = CreateMetadata(now);
         var batch = CreateBatch(now);
+        var sagaBatch = CreateSagaBatch(now);
         var jobs = CreateJobs(now);
 
         await service.UpsertMetadataAsync(metadata, CancellationToken.None);
         (await service.RecordBatchAsync(batch, CancellationToken.None)).ShouldBeTrue();
+        (await service.RecordBatchAsync(sagaBatch, CancellationToken.None)).ShouldBeTrue();
         (await service.StoreJobsAsync(jobs, CancellationToken.None)).ShouldBeTrue();
 
         store.StoredMetadata.ShouldBe(1);
-        store.StoredBatches.ShouldBe(1);
+        store.StoredBatches.ShouldBe(2);
         store.StoredJobs.ShouldBe(1);
+        store.StoredSagaInstances.ShouldBe(1);
     }
 
     private static MonitoringMetadata CreateMetadata(DateTimeOffset now)
@@ -124,6 +132,75 @@ public class MonitoringHistoryPersistenceTests
                 null,
                 null)]);
 
+    private static MonitoringObservationBatch CreateSagaBatch(DateTimeOffset now)
+        => new(
+            MonitoringProtocol.Version,
+            "orders",
+            "orders-1",
+            "bus",
+            "batch-saga",
+            2,
+            2,
+            0,
+            now,
+            [new MonitoringObservation(
+                2,
+                now,
+                "saga_delivery",
+                true,
+                null,
+                null,
+                null,
+                null,
+                5,
+                null,
+                null,
+                "saga-1",
+                null,
+                null,
+                null,
+                Properties: new Dictionary<string, string>
+                {
+                    ["state_machine_id"] = "order-state-machine",
+                    ["definition_version"] = "1",
+                    ["event_id"] = "OrderSubmitted",
+                    ["status"] = "consumed",
+                    ["begin_state"] = "Initial",
+                    ["end_state"] = "AwaitingPayment",
+                    ["created"] = "true",
+                    ["completed"] = "false",
+                    ["instance_present"] = "true"
+                },
+                MessageId: "message-1")]);
+
+    private static MonitoringSagaInstance CreateSagaInstance(DateTimeOffset now)
+        => new(
+            "order-state-machine",
+            "1",
+            "orders",
+            "saga-1",
+            "active",
+            "AwaitingPayment",
+            true,
+            true,
+            now,
+            now,
+            null,
+            [new MonitoringSagaTransition(
+                now,
+                "OrderSubmitted",
+                "consumed",
+                "Initial",
+                "AwaitingPayment",
+                true,
+                true,
+                false,
+                true,
+                5,
+                null,
+                null,
+                "message-1")]);
+
     private static MonitoringJobSnapshot CreateJobs(DateTimeOffset now)
         => new(
             MonitoringProtocol.Version,
@@ -165,6 +242,7 @@ public class MonitoringHistoryPersistenceTests
         public int StoredBatches { get; private set; }
         public int StoredJobs { get; private set; }
         public int StoredWorkflowRuns { get; private set; }
+        public int StoredSagaInstances { get; private set; }
 
         public Task InitializeAsync(CancellationToken cancellationToken)
         {
@@ -207,6 +285,14 @@ public class MonitoringHistoryPersistenceTests
             CancellationToken cancellationToken)
         {
             StoredWorkflowRuns += runs.Count;
+            return Task.CompletedTask;
+        }
+
+        public Task StoreSagaInstancesAsync(
+            IReadOnlyList<MonitoringSagaInstance> instances,
+            CancellationToken cancellationToken)
+        {
+            StoredSagaInstances += instances.Count;
             return Task.CompletedTask;
         }
     }
