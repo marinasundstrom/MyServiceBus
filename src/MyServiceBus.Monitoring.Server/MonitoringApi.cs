@@ -218,9 +218,13 @@ public static class MonitoringApi
             .WithSummary("Get one retained workflow run by stable identity")
             .Produces<MonitoringChoreographyRun>()
             .Produces(StatusCodes.Status404NotFound);
-        query.MapGet("/observations", (string? application, int? limit, MonitoringRepository repository) =>
-            repository.GetRecentObservations(application, limit ?? 100))
-            .WithSummary("List recent bounded monitoring observations");
+        query.MapGet("/observations", (
+            string? application,
+            int? limit,
+            MonitoringRepository repository,
+            MonitoringDisclosurePolicy disclosure) =>
+            disclosure.Apply(repository.GetRecentObservations(application, limit ?? 100)))
+            .WithSummary("List recent bounded monitoring observations under the configured disclosure policy");
         query.MapGet("/metrics", (string? application, int? windowSeconds, bool? byInstance, MonitoringRepository repository) =>
             repository.GetRates(application, windowSeconds ?? 60, byInstance ?? false, DateTimeOffset.UtcNow))
             .WithSummary("Query rates, counts, latency, retries, and failures for a time window");

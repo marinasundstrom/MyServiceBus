@@ -58,7 +58,22 @@ The monitored bus process is the first privacy boundary. Its exporter decides wh
 
 Message-body capture is a separate opt-in and remains disabled even under the `Development` profile. When enabled, the exporter can select message types, redact serialized JSON inside the application process, and truncate the result to a configured UTF-8 byte limit before transmission. Observations identify captured, truncated, and serialization-failed bodies and include the redacted serialized byte count before truncation when available. A truncated body is debugging text and is not guaranteed to remain valid JSON. Arbitrary headers remain excluded. Production enablement must be an affirmative service-owner decision; never depend on the collector to remove a secret that should not leave the service.
 
-The monitoring service is a second, independent boundary. It owns storage retention and purging for facts it was intentionally given. It may also apply a disclosure policy when serving retained data—for example, returning aggregates to most callers while revealing identifiers or payloads only to an authorized debugging role. Disclosure redaction does not replace exporter-side minimization, and storage retention does not grant a dashboard permission to see everything retained. Authentication, caller-specific disclosure profiles, and audit remain production work.
+The monitoring service is a second, independent boundary. It owns storage retention and purging for facts it was intentionally given. Its global `Monitoring:Disclosure:MessageBodies` query policy defaults to `Omit`; `Redact` replaces the complete retained body with `Monitoring:Disclosure:MessageBodyRedactionText`, while `Full` returns the retained body. The policy is applied to response copies and does not rewrite stored observations. This preview-wide setting is not a substitute for authorization: authentication, caller-specific disclosure profiles, and audit remain production work. Disclosure redaction does not replace exporter-side minimization, and storage retention does not grant a dashboard permission to see everything retained.
+
+For example, a controlled debugging deployment can return a visible placeholder while retaining selected exporter-redacted bodies for a later authorized workflow:
+
+```json
+{
+  "Monitoring": {
+    "Disclosure": {
+      "MessageBodies": "Redact",
+      "MessageBodyRedactionText": "[retained body hidden]"
+    }
+  }
+}
+```
+
+Use `Monitoring__Disclosure__MessageBodies` and `Monitoring__Disclosure__MessageBodyRedactionText` for environment-variable configuration. Until caller authorization exists, prefer `Omit` or `Redact`; `Full` is an explicit trusted-environment debugging choice.
 
 ## Dashboard Experience
 
