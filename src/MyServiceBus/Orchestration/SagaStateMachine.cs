@@ -381,6 +381,13 @@ public sealed class EventActivityBinder<TSaga, TMessage>
     public EventActivityBinder<TSaga, TMessage> Finalize()
         => Add(new FinalizeActivityRegistration<TSaga, TMessage>());
 
+    /// <summary>
+    /// Finalizes the saga. This explicit alias is useful in languages where
+    /// <c>Finalize</c> has special meaning.
+    /// </summary>
+    public EventActivityBinder<TSaga, TMessage> FinalizeSaga()
+        => Finalize();
+
     internal EventActivityBinder<TSaga, TMessage> Ignore()
         => Add(new IgnoreActivityRegistration<TSaga, TMessage>());
 

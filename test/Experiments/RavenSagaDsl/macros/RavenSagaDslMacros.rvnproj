@@ -1,0 +1,11 @@
+<Project Sdk="Raven.Sdk/0.1.6">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>MyServiceBus.RavenSagaDslMacros</AssemblyName>
+    <OutputType>Library</OutputType>
+    <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Raven.CodeAnalysis" Version="0.1.6" />
+  </ItemGroup>
+</Project>

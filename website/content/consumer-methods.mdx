@@ -187,8 +187,8 @@ MyServiceBus has two discovery and registration paths. Reflection inspects decla
 </div>
 
 <div className="callout">
-  <strong>External Raven consideration</strong>
-  <p>Raven is outside MyServiceBus. If it consumes this descriptor model through a separate integration, its namespace-level functions should be considered before classes rather than importing a C# declaration convention.</p>
+  <strong>Express this as a Raven function</strong>
+  <p>Raven can project the same method-consumer descriptor as an attributed namespace-level function, avoiding a container type that carries no domain meaning. This remains part of the preview Raven integration; see <Link href="/docs/raven">Raven and MyServiceBus</Link> for the current evidence and maturity boundaries.</p>
 </div>
 
 <div className="next-card">

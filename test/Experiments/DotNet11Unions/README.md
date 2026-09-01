@@ -28,7 +28,7 @@ The prototype verifies that:
 - the existing C# `Response<T1, T2>` shape can implement the .NET union ABI; and
 - `System.Text.Json` writes only the selected response case.
 
-The Raven consumer declares `SubmitOrder | CancelOrder`, which Raven lowers to Raven.Core's standard `System.Union<SubmitOrder, CancelOrder>`. This verifies that discovery is based on the shared CLR ABI rather than the C# compiler or a C# named-union type.
+The Raven consumer is an attributed namespace-level function that accepts the named parenthesized union `union OrderCommand(SubmitOrder | CancelOrder)`. Raven emits the standard .NET union ABI for that declaration. This verifies both that consumer-method discovery recognizes Raven's compiler-generated CLR method and that union discovery is based on the shared CLR ABI rather than the C# compiler or a C# named-union type.
 
 This is a C# convenience over ordinary MyServiceBus contracts. Java and older .NET applications continue to publish and consume `SubmitOrder`, `CancelOrder`, and response contracts normally. They do not need the C# carrier or union language support.
 

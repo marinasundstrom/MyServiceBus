@@ -1,0 +1,222 @@
+import Link from 'next/link';
+import CodeViewer from '../app/components/CodeViewer';
+
+export const ravenRabbitMq = `namespace Orders
+
+import Microsoft.Extensions.DependencyInjection.*
+import Microsoft.Extensions.Hosting.*
+import MyServiceBus.*
+
+record SubmitOrder(OrderId: Guid)
+record OrderSubmitted(OrderId: Guid)
+
+[Consumer("submit-order")]
+async func Consume(
+    message: SubmitOrder,
+    context: ConsumeContext<SubmitOrder>
+) {
+    let (orderId) = message
+    await context.Publish(OrderSubmitted(orderId))
+}
+
+async func Main(args: string[]) -> Task {
+    let builder = Host.CreateApplicationBuilder(args)
+
+    builder.Services.AddServiceBus(func (bus) => {
+        bus.AddConsumers(typeof(SubmitOrder).Assembly)
+        bus.UsingRabbitMq(func (context, rabbit) => {
+            rabbit.Host("localhost")
+            rabbit.ConfigureEndpoints(context)
+        })
+    })
+
+    use app = builder.Build()
+    await app.RunAsync()
+}`;
+
+export const ravenConsumerFunction = `record SubmitOrder(OrderId: Guid)
+
+[Consumer("orders")]
+async func SubmitOrderConsumer(
+    message: SubmitOrder,
+    orders: IOrderService
+) {
+    let (orderId) = message
+    await orders.Submit(orderId)
+}`;
+
+export const ravenUnionConsumerFunction = `record SubmitOrder(OrderId: Guid)
+record CancelOrder(OrderId: Guid)
+
+union OrderCommand(SubmitOrder | CancelOrder)
+
+[Consumer("orders")]
+func Consume(message: OrderCommand) {
+    match message {
+        SubmitOrder(let orderId) => Console.WriteLine("Submit $orderId")
+        CancelOrder(let orderId) => Console.WriteLine("Cancel $orderId")
+    }
+}`;
+
+export const ravenDiscovery = `services.AddServiceBus(func (bus) => {
+    bus.UsingMediator()
+    bus.AddConsumers(typeof(SubmitOrder).Assembly)
+})`;
+
+export const ravenSaga = `record OrderSubmitted(OrderId: Guid)
+record InventoryReserved(OrderId: Guid)
+record PaymentReceived(OrderId: Guid)
+
+saga! OrderSaga {
+    data {
+        OrderId: Guid
+        InventoryReserved: bool
+        PaymentReceived: bool
+    }
+
+    correlate OrderSubmitted by OrderId
+    correlate InventoryReserved by OrderId
+    correlate PaymentReceived by OrderId
+
+    state AwaitingInventory
+    state AwaitingPayment
+
+    initially {
+        on OrderSubmitted message {
+            send ReserveInventory(message.OrderId)
+            transition AwaitingInventory
+        }
+    }
+
+    in AwaitingInventory {
+        on InventoryReserved message {
+            set InventoryReserved = true
+            send CapturePayment(message.OrderId)
+            transition AwaitingPayment
+        }
+    }
+
+    in AwaitingPayment {
+        on PaymentReceived message {
+            set PaymentReceived = true
+            publish OrderCompleted(message.OrderId)
+            finalize
+        }
+    }
+}`;
+
+<p className="docs-kicker">Raven integration · Preview</p>
+
+# Raven and MyServiceBus.
+
+<p className="docs-summary">MyServiceBus integrates naturally with Raven as a .NET language. Raven applications can consume the same runtime and contracts while using more expressive forms where the language has stronger primitives—from namespace-level consumer functions and unions to an experimental compiler-backed saga DSL.</p>
+
+<div className="callout callout-accent">
+  <strong>Preview integration with experimental features</strong>
+  <p>Raven and MyServiceBus are both evolving. Ordinary CLR integration is the foundation, while consumer-function projection, .NET 11 unions, generated registration, and the <code>saga!</code> macro have capability-specific preview or experimental boundaries. Do not treat this page as a stable 1.0 API commitment.</p>
+</div>
+
+## Start MyServiceBus with RabbitMQ
+
+Reference the preview <code>Sundstrom.MyServiceBus.RabbitMq</code> package from a Raven project, start a local RabbitMQ broker, and configure the bus through the same .NET hosting and dependency-injection APIs used by C#. The complete minimal application below discovers its attributed consumer function, creates the <code>submit-order</code> receive endpoint, and starts the bus as a hosted service.
+
+<CodeViewer code={ravenRabbitMq} label="Minimal Raven application with RabbitMQ" language="raven" />
+
+The consumer publishes <code>OrderSubmitted</code> through its active consume context, so correlation, retry, fault, and settlement behavior remain attached to the delivery. Replace <code>localhost</code> or add credentials through the normal RabbitMQ configurator when the broker is remote.
+
+Use the <Link href="/docs/getting-started">getting-started guide</Link> for the tested Docker command and current package version. Raven project files use ordinary NuGet <code>PackageReference</code> entries.
+
+## Express the same messaging concepts in Raven
+
+MyServiceBus does not require Raven to imitate C# source structure. A consumer is fundamentally a callable declaration with a message, optional consume context, application services, and an endpoint mapping. Raven can express that naturally as an attributed namespace-level function rather than adding a class only to contain one method.
+
+<CodeViewer code={ravenConsumerFunction} label="Raven consumer function" language="raven" />
+
+The function shape remains local to the application. MyServiceBus binds it to the ordinary consumer pipeline, where endpoint topology, scoped services, retries, faults, telemetry, and message settlement retain their normal meaning. On the wire, <code>SubmitOrder</code> is the same contract a C# or Java service sees.
+
+### How a consumer function binds
+
+Raven compiles a namespace-level function into an attributed CLR method. Preview reflection discovery scans the supplied assembly and builds the same method-consumer descriptor it would build for an attributed C# method; the compiler-generated containing type is not part of the consumer model.
+
+<CodeViewer code={ravenDiscovery} label="Discover Raven consumer functions" language="raven" />
+
+<div className="docs-feature-grid">
+  <div><span>01</span><h3>Endpoint</h3><p><code>[Consumer(&quot;orders&quot;)]</code> gives the function an explicit receive endpoint. Functions using the same endpoint contribute bindings to that endpoint.</p></div>
+  <div><span>02</span><h3>Message</h3><p>The first ordinary parameter identifies the consumed contract. The function name is organizational and does not select the message.</p></div>
+  <div><span>03</span><h3>Context</h3><p>Add <code>ConsumeContext&lt;T&gt;</code> or a cancellation token only when the handler needs receive metadata or cancellation.</p></div>
+  <div><span>04</span><h3>Services</h3><p>Additional ordinary parameters resolve from the dependency-injection scope created for that delivery.</p></div>
+</div>
+
+One-way functions may complete synchronously or asynchronously. A request consumer can return its response asynchronously, and MyServiceBus sends it through the active consume context with the original request correlation. Exceptions still enter the configured retry and fault pipeline.
+
+Today this Raven path uses assembly reflection. The C# source generator cannot see Raven source, so a trimmed or NativeAOT Raven application will eventually need a Raven-generated consumer catalog or another shared descriptor manifest. That is a tooling boundary, not a different runtime or wire model.
+
+Raven&apos;s union syntax provides another expressive projection. For a one-off handler, the message parameter can use the ad hoc type <code>SubmitOrder | CancelOrder</code> directly. When that closed protocol has a durable domain meaning or appears in more than one place, give it a name with a parenthesized union declaration: <code>union OrderCommand(SubmitOrder | CancelOrder)</code>.
+
+<CodeViewer code={ravenUnionConsumerFunction} label="Union-shaped Raven consumer function" language="raven" />
+
+The named union makes the accepted command family visible and reusable without adding an artificial base message class. The packaged smoke test executes this namespace-level function for both concrete messages, verifies that they share one endpoint, and confirms that <code>OrderCommand</code> never enters message topology. MyServiceBus registers and transports <code>SubmitOrder</code> and <code>CancelOrder</code> independently. See the <Link href="/docs/dotnet-11-unions">.NET 11 union experiment</Link> for the current ABI and AOT boundaries.
+
+### Deconstruct records and match unions
+
+Raven records participate directly in deconstruction. For one known message type, <code>let (orderId) = message</code> binds its positional record value without repeating the property access. Named elements can be used when position would be unclear.
+
+For a union-shaped consumer, <code>match</code> performs both operations at once. The <code>SubmitOrder(let orderId)</code> arm proves which concrete message arrived and deconstructs that record&apos;s payload. Because <code>OrderCommand</code> is closed, Raven can check that the function handles every alternative. Adding another union member therefore makes the missing consumer behavior visible at compile time instead of silently falling through a base-type handler.
+
+This is where the Raven projection becomes more than shorter punctuation: message alternatives, exhaustive handling, and payload binding are expressed directly in the function&apos;s type and patterns, while MyServiceBus continues to route the concrete contracts.
+
+<div className="docs-feature-grid">
+  <div><span>01</span><h3>Use .NET directly</h3><p>Reference MyServiceBus assemblies and ordinary CLR message contracts from Raven.</p></div>
+  <div><span>02</span><h3>Prefer functions</h3><p>Declare concise namespace-level consumers where a container type adds no meaning.</p></div>
+  <div><span>03</span><h3>Use language types</h3><p>Express alternatives with Raven unions while preserving concrete portable message identities.</p></div>
+  <div><span>04</span><h3>Build domain DSLs</h3><p>Use Raven macros to add precise workflow syntax over the existing MyServiceBus runtime.</p></div>
+</div>
+
+## Describe a saga as a state machine
+
+The macro generates an ordinary saga-data type and a native <code>SagaStateMachine&lt;TSaga&gt;</code>. The resulting definition executes through the same MyServiceBus correlation, repository, activity, transition, finalization, topology, and monitoring boundaries used by a C# state machine.
+
+That separation matters. Raven is a higher-level authoring projection, not another orchestration engine. Java services do not need Raven, and messages exchanged with Java or MassTransit do not acquire Raven-specific envelopes, headers, addresses, or contract identities.
+
+<div className="flow-line" aria-label="Raven saga lowering">
+  <span>Raven saga declaration</span><b>→</b><span>native MyServiceBus definition</span><b>→</b><span>ordinary saga runtime</span>
+</div>
+
+<CodeViewer code={ravenSaga} label="Experimental Raven saga" language="raven" />
+
+The executable sample creates an order saga, correlates three messages, sends inventory and payment commands, publishes completion, transitions through two states, and finalizes the instance. Assertions run against the real in-memory MyServiceBus saga repository and runtime.
+
+<div className="callout">
+  <strong>The saga DSL is currently a repository prototype</strong>
+  <p>It lives under <code>test/Experiments/RavenSagaDsl</code>, uses Raven 0.1.6, and references the MyServiceBus source project. It is executable evidence for the integration design, not yet a supported package or stable syntax.</p>
+</div>
+
+## Make every position mean one thing
+
+The macro body is a precise domain language, not an unrestricted Raven block. Each authored position has a category:
+
+<ul className="check-list">
+  <li><code>on</code> accepts and completes correlated message declarations.</li>
+  <li><code>in</code> and <code>transition</code> accept and complete states declared by the saga.</li>
+  <li><code>set</code> accepts and completes persisted saga-data members.</li>
+  <li>A behavior accepts only supported activities such as <code>set</code>, <code>send</code>, <code>publish</code>, <code>transition</code>, and <code>finalize</code>.</li>
+  <li>Correlation positions distinguish a message type from the saga member used as its identity.</li>
+</ul>
+
+Raven language fragments begin only where the DSL explicitly asks for a value. The right-hand side of <code>set</code> and the outgoing message expression after <code>send</code> or <code>publish</code> use ordinary Raven parsing and language services. The handler alias—<code>message</code> above—is introduced with its correlated message type, enabling member completion, hover, navigation, and diagnostics inside those expressions.
+
+The DSL still owns the surrounding intent. A valid Raven expression cannot invent an undeclared state, use an uncorrelated event, or add an unsupported saga activity.
+
+## Understand the current boundary
+
+The prototype covers generated data, identity correlation, initial and state-specific behavior, mutation, send, publish, transition, and finalization. It deliberately diagnoses semantics that the current portable saga profile has not settled rather than approximating them.
+
+Named final outcomes, guarded transitions, durable <code>after</code> scheduling, requests, composite events, durable sample persistence, and generated package integration remain future work. The sample&apos;s convention-based <code>queue:MessageType</code> send destination is also temporary; a product DSL needs an explicit or topology-resolved destination model.
+
+## One integration, explicit maturity
+
+The design principle is stable even where an individual feature is not: MyServiceBus owns messaging behavior and portable contracts; Raven supplies an idiomatic source projection. C# and Java remain complete alternatives, and no service needs Raven merely because another participant uses it.
+
+Consumer functions, unions, and saga declarations can mature independently. Each feature should state whether it uses reflection, generated descriptors, a preview ABI, or a repository-only macro so teams can evaluate it without mistaking the overall integration story for a single support level.
+
+Continue with <Link href="/docs/distributed-systems#workflow-coordination">workflow coordination fundamentals</Link> or see how declared workflows and saga runs appear in <Link href="/docs/runtime-monitoring">runtime monitoring</Link>. Raven itself is documented on the <a href="https://marinasundstrom.github.io/raven/">Raven website</a>.

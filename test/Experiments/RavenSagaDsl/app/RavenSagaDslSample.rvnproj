@@ -1,0 +1,12 @@
+<Project Sdk="Raven.Sdk/0.1.6">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>MyServiceBus.RavenSagaDslSample</AssemblyName>
+    <OutputType>Exe</OutputType>
+    <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../macros/RavenSagaDslMacros.rvnproj" />
+    <ProjectReference Include="../../../../src/MyServiceBus/MyServiceBus.csproj" />
+  </ItemGroup>
+</Project>

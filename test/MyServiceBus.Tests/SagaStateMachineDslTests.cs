@@ -106,7 +106,7 @@ public class SagaStateMachineDslTests
                     .Publish(
                         "urn:message:Contracts:OrderCompleted",
                         context => new OrderCompleted(context.Message.OrderId))
-                    .Finalize());
+                    .FinalizeSaga());
             DeleteWhenFinalized();
         }
 
