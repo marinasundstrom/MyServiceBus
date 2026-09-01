@@ -1,5 +1,6 @@
 using MyServiceBus.Inspection;
 using MyServiceBus;
+using MyServiceBus.Choreography;
 using MyServiceBus.Monitoring;
 using MyServiceBus.Monitoring.Server;
 using Shouldly;
@@ -212,6 +213,36 @@ public class MonitoringRepositoryTests
         history.OldestObservationAtUtc.ShouldBe(now);
         history.LatestObservationAtUtc.ShouldBe(now);
         history.Complete.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Repository_merges_declared_choreography_replicas_and_reports_definition_conflicts()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var repository = new MonitoringRepository();
+        var orders = CreateChoreography("orders", "1", "accept-order");
+        var inventory = CreateChoreography("inventory", "1", "reserve-inventory");
+        var billing = CreateChoreography("billing", "1", "reserve-inventory");
+        var legacyOrders = CreateChoreography("orders", "2", "accept-legacy-order");
+
+        repository.UpsertMetadata(WithChoreography(CreateMetadata("orders", "orders-1", now, "commerce"), orders));
+        repository.UpsertMetadata(WithChoreography(CreateMetadata("orders", "orders-2", now.AddMinutes(-1), "commerce"), orders));
+        repository.UpsertMetadata(WithChoreography(CreateMetadata("inventory", "inventory-1", now, "commerce"), inventory));
+        repository.UpsertMetadata(WithChoreography(CreateMetadata("billing", "billing-1", now, "commerce"), billing));
+        repository.UpsertMetadata(WithChoreography(CreateMetadata("legacy-orders", "legacy-orders-1", now, "commerce"), legacyOrders));
+
+        var choreography = repository.GetDeclaredChoreographies(now).ShouldHaveSingleItem();
+        choreography.ChoreographyId.ShouldBe("order-fulfillment");
+        choreography.DefinitionVersions.ShouldBe(["1", "2"]);
+        choreography.ConflictKinds.ShouldBe(["definition_version", "owner", "step_ownership"]);
+        choreography.LastCapturedAtUtc.ShouldBe(now);
+        choreography.Fragments.Count.ShouldBe(4);
+
+        var orderFragment = choreography.Fragments.Single(fragment => fragment.ApplicationName == "orders");
+        orderFragment.Owner.ShouldBe("orders");
+        orderFragment.ReportingInstances.ShouldBe(2);
+        orderFragment.OnlineInstances.ShouldBe(1);
+        orderFragment.Steps.ShouldHaveSingleItem().Id.ShouldBe("accept-order");
     }
 
     [Fact]
@@ -580,6 +611,27 @@ public class MonitoringRepositoryTests
             now,
             new BusInspectionSnapshot("mediator", new Uri("loopback://localhost/"), now, [], [], []),
             new Dictionary<string, string> { ["group"] = group });
+
+    private static MonitoringMetadata WithChoreography(
+        MonitoringMetadata metadata,
+        ChoreographyFragment fragment)
+        => metadata with
+        {
+            Bus = new BusInspectionSnapshot(
+                metadata.Bus.TransportName,
+                metadata.Bus.Address,
+                metadata.Bus.CapturedAt,
+                metadata.Bus.Messages,
+                metadata.Bus.ReceiveEndpoints,
+                metadata.Bus.Consumers,
+                [fragment])
+        };
+
+    private static ChoreographyFragment CreateChoreography(string owner, string definitionVersion, string stepId)
+        => new ChoreographyBuilder("order-fulfillment", definitionVersion, owner)
+            .Step(stepId, "urn:message:OrderSubmitted", step => step
+                .Publishes("urn:message:OrderAccepted"))
+            .Build();
 
     private static MonitoringObservationBatch CreateBatch(
         string applicationName,

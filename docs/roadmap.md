@@ -244,7 +244,7 @@ Before either area is promoted, the project must define portable C#↔Java seman
 
 After those portable saga semantics exist, an executable Raven sample should explore a compiler-backed [`saga!` DSL](proposals/raven-saga-dsl.md) as an idiomatic projection over the native MyServiceBus runtime. The experiment must lower to MyServiceBus state-machine behavior plus ordinary portable saga descriptors, message operations, topology, persistence, and monitoring rather than making Raven syntax part of the portable specification or adding Raven-specific transport behavior.
 
-**Current status:** foundation in progress. MyServiceBus has supporting messaging and monitoring primitives plus matching C# and Java choreography declaration, validation, registration, topology, inspection, and metadata export. Cross-application graph merging and choreography diagnostics remain future work, and there is no supported saga repository, saga state-machine runtime, compensation engine, or choreography-specific lifecycle model.
+**Current status:** foundation in progress. MyServiceBus has supporting messaging and monitoring primitives plus matching C# and Java choreography declaration, validation, registration, topology, inspection, and metadata export. The monitoring service merges those declarations across applications and replicas into a read-only query with freshness and definition-conflict evidence. Declared-versus-observed graph comparison, behavioral diagnostics, and Dashboard visualization remain future work, and there is no supported saga repository, saga state-machine runtime, compensation engine, or choreography-specific lifecycle model.
 
 ## Candidate Backlog
 

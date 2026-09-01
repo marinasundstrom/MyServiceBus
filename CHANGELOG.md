@@ -4,6 +4,7 @@ This changelog summarizes the bigger themes in the repository history rather tha
 
 ## Unreleased
 
+- Added a read-only declared-choreography monitoring query that merges registered fragments across applications, collapses identical replica declarations, retains freshness and availability, and reports definition-version, owner, and step-ownership conflicts without changing message delivery or inferring workflow failure.
 - Added explicit choreography-fragment registration to the C# and Java bus configurators. Normalized topology version 2, inspection, and monitoring metadata now carry validated, deterministically ordered declarations while leaving message delivery and the MassTransit-compatible wire protocol unchanged.
 - Added matching C# and Java choreography declaration builders and a versioned canonical fixture. Applications can describe locally owned trigger-to-output reactions—including send, publish, respond, schedule, terminal outcomes, multiplicity, and timing expectations—as deterministic monitoring metadata without changing message envelopes or executing a coordinator.
 - Added cross-language consume-to-outbound causal monitoring for choreography diagnostics. Consumer-originated sends, publications, responses, and faults now retain the consumed message identity through direct delivery and PostgreSQL outbox dispatch, and the monitoring service exposes exact local reactions separately from aggregate delivery flow.

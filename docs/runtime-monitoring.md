@@ -214,7 +214,7 @@ The monitoring service never connects directly to application databases or mutat
 
 The prototype uses `/api/monitoring/v1` for both ingest and query operations. The monitoring service publishes a generated OpenAPI 3.1 document at `/openapi/v1.json`. This is the primary machine-readable contract for teams building another dashboard, exporter, or integration. The document separates **Monitoring ingest** operations from **Monitoring queries** and includes the current JSON schemas and HTTP response codes.
 
-Registered choreography fragments travel with the existing payload-free bus inspection snapshot in application metadata. The exporter does not place them on application messages, and the collector does not execute them. They are the declared-graph input for future merging, comparison, diagnostics, and Dashboard workflow maps.
+Registered choreography fragments travel with the existing payload-free bus inspection snapshot in application metadata. The exporter does not place them on application messages, and the collector does not execute them. The collector merges identical replica declarations into a read-only choreography projection while retaining reporting and online instance counts plus the latest capture time. It reports definition-version, owner, and step-ownership conflicts as configuration evidence; it does not treat them as business-workflow failures. Observed-graph comparison, behavioral diagnostics, and Dashboard workflow maps remain future work.
 
 The contract is versioned but remains preview. The `/v1` route and each ingest body's `protocolVersion` identify the current wire generation; they do not imply stable-release compatibility guarantees before MyServiceBus 1.0. Integrators should generate clients from the document they deploy with and must preserve unknown additive response fields.
 
@@ -232,11 +232,13 @@ The contract is versioned but remains preview. The `/v1` route and each ingest b
 | `GET` | `/instances?application=...` | Query application instances |
 | `GET` | `/endpoints?application=...&windowSeconds=60` | Query receive-endpoint topology, availability, and windowed activity |
 | `GET` | `/metadata/{application}/{instanceId}/{busId}` | Query current bus metadata |
+| `GET` | `/choreographies` | Query merged application-declared choreography fragments, replica freshness, and definition conflicts |
 | `GET` | `/observations?application=...&limit=100` | Query recent observations |
 | `GET` | `/metrics?application=...&windowSeconds=60&byInstance=true` | Query bounded-window rates, counts, and consume latency |
 | `GET` | `/metrics/timeseries?windowSeconds=300&bucketSeconds=5` | Query bucketed rates for real-time graphs |
 | `GET` | `/flow?application=...&windowSeconds=300` | Query observed correlated application flow aggregated across replicas |
 | `GET` | `/flow/replicas?application=...&windowSeconds=300` | Query correlated source-to-target replica paths with owning application and bus identity |
+| `GET` | `/flow/causal?application=...&windowSeconds=300` | Query exact consumed-message to outgoing-operation reactions |
 | `GET` | `/outbox?application=...&windowSeconds=60` | Query dispatcher state and windowed outbox throughput |
 | `GET` | `/scheduled-work?application=...&status=...` | Query current one-time scheduled work |
 | `GET` | `/recurring-jobs?application=...&status=...` | Query current recurring definitions |

@@ -142,6 +142,9 @@ public static class MonitoringApi
             .WithSummary("Get the latest metadata for one application instance and bus")
             .Produces<MonitoringMetadata>()
             .Produces(StatusCodes.Status404NotFound);
+        query.MapGet("/choreographies", (MonitoringRepository repository) =>
+            repository.GetDeclaredChoreographies(DateTimeOffset.UtcNow))
+            .WithSummary("List merged application-declared choreography fragments and conflicts");
         query.MapGet("/observations", (string? application, int? limit, MonitoringRepository repository) =>
             repository.GetRecentObservations(application, limit ?? 100))
             .WithSummary("List recent bounded monitoring observations");

@@ -1,3 +1,4 @@
+using MyServiceBus.Choreography;
 using MyServiceBus.Inspection;
 
 namespace MyServiceBus.Monitoring;
@@ -226,6 +227,23 @@ public sealed record MonitoringEndpointSummary(
     double ConsumedPerSecond,
     DateTimeOffset? LastActivityAtUtc,
     int WindowSeconds);
+
+public sealed record MonitoringDeclaredChoreography(
+    string ChoreographyId,
+    IReadOnlyList<string> DefinitionVersions,
+    IReadOnlyList<string> ConflictKinds,
+    DateTimeOffset LastCapturedAtUtc,
+    IReadOnlyList<MonitoringDeclaredChoreographyFragment> Fragments);
+
+public sealed record MonitoringDeclaredChoreographyFragment(
+    string ApplicationName,
+    string Owner,
+    int SchemaVersion,
+    string DefinitionVersion,
+    IReadOnlyList<ChoreographyStep> Steps,
+    int ReportingInstances,
+    int OnlineInstances,
+    DateTimeOffset LastCapturedAtUtc);
 
 public sealed record MonitoringHistorySummary(
     string StorageProvider,

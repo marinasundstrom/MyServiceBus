@@ -2,7 +2,7 @@
 
 ## Status
 
-Future product-area proposal with its first foundation slices implemented. Message-operation observations carry message identity and consume-to-outbound causal identity in C# and Java. The collector prefers exact envelope matches for deliveries, reports correlation fallback explicitly, and exposes exact local reactions separately. Matching C# and Java builders produce the same versioned, deterministic choreography fragment from a shared fixture. Applications can register validated fragments, and topology version 2 plus inspection and monitoring metadata expose them without changing delivery. Cross-application fragment merging, graph comparison, diagnostics, and the focused Dashboard view remain future work. This document is not a supported lifecycle API, alerting service, or workflow runtime commitment.
+Future product-area proposal with its first foundation slices implemented. Message-operation observations carry message identity and consume-to-outbound causal identity in C# and Java. The collector prefers exact envelope matches for deliveries, reports correlation fallback explicitly, and exposes exact local reactions separately. Matching C# and Java builders produce the same versioned, deterministic choreography fragment from a shared fixture. Applications can register validated fragments, and topology version 2 plus inspection and monitoring metadata expose them without changing delivery. The monitoring service now merges cross-application fragments, collapses identical replica declarations, retains freshness, and reports definition conflicts through a read-only query. Declared-versus-observed graph comparison, behavioral diagnostics, and the focused Dashboard view remain future work. This document is not a supported lifecycle API, alerting service, or workflow runtime commitment.
 
 ## Summary
 
@@ -114,7 +114,7 @@ Applications may publish versioned, payload-free fragments describing their owne
 
 Declarations are metadata. They do not execute reactions, evaluate business predicates, or guarantee that the declared output occurs. A conditional reaction may be declared as optional or may use an application-owned condition identity; the monitoring service does not receive or run the condition.
 
-Fragments should merge by stable identities without requiring one service to own the entire choreography definition. Version disagreement, duplicate step ownership, incompatible contract identity, and contradictory expectations become configuration diagnostics.
+Fragments merge by stable identities without requiring one service to own the entire choreography definition. The first read model collapses identical replica declarations and reports definition-version, owner, and step-ownership disagreement while preserving online and reporting replica counts and the latest capture time. These are configuration conflicts, not evidence that a business workflow failed. Incompatible contract identity and contradictory expectation analysis remain later comparison work.
 
 ### Observed flow graph
 

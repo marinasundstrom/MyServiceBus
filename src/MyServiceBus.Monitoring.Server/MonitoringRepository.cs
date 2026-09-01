@@ -1,4 +1,6 @@
 using System.Collections.Concurrent;
+using System.Text.Json;
+using MyServiceBus.Choreography;
 using MyServiceBus.Monitoring;
 
 namespace MyServiceBus.Monitoring.Server;
@@ -409,6 +411,64 @@ public sealed class MonitoringRepository
             ? state.Metadata
             : null;
 
+    public IReadOnlyList<MonitoringDeclaredChoreography> GetDeclaredChoreographies(DateTimeOffset now)
+    {
+        var declarations = instances.Values
+            .Select(state => (Metadata: state.Metadata, Summary: state.CreateSummary(now, LeaseTimeout)))
+            .SelectMany(source => source.Metadata.Bus.Choreographies.Select(fragment => new DeclaredFragmentSource(
+                source.Metadata.ApplicationName,
+                source.Metadata.InstanceId,
+                source.Summary.Online,
+                source.Metadata.CapturedAtUtc,
+                fragment,
+                CreateFragmentIdentity(fragment))))
+            .ToArray();
+
+        return declarations
+            .GroupBy(source => source.Fragment.ChoreographyId, StringComparer.Ordinal)
+            .Select(choreography =>
+            {
+                var fragments = choreography
+                    .GroupBy(source => new
+                    {
+                        source.ApplicationName,
+                        source.Fragment.Owner,
+                        source.Fragment.SchemaVersion,
+                        source.Fragment.DefinitionVersion,
+                        source.FragmentIdentity
+                    })
+                    .Select(group => new MonitoringDeclaredChoreographyFragment(
+                        group.Key.ApplicationName,
+                        group.Key.Owner,
+                        group.Key.SchemaVersion,
+                        group.Key.DefinitionVersion,
+                        group.First().Fragment.Steps,
+                        group.Select(source => source.InstanceId).Distinct(StringComparer.Ordinal).Count(),
+                        group.Where(source => source.Online).Select(source => source.InstanceId).Distinct(StringComparer.Ordinal).Count(),
+                        group.Max(source => source.CapturedAtUtc)))
+                    .OrderBy(fragment => fragment.ApplicationName, StringComparer.Ordinal)
+                    .ThenBy(fragment => fragment.Owner, StringComparer.Ordinal)
+                    .ThenBy(fragment => fragment.DefinitionVersion, StringComparer.Ordinal)
+                    .ToArray();
+
+                var definitionVersions = fragments
+                    .Select(fragment => fragment.DefinitionVersion)
+                    .Distinct(StringComparer.Ordinal)
+                    .OrderBy(version => version, StringComparer.Ordinal)
+                    .ToArray();
+                var conflictKinds = GetChoreographyConflictKinds(fragments, definitionVersions);
+
+                return new MonitoringDeclaredChoreography(
+                    choreography.Key,
+                    definitionVersions,
+                    conflictKinds,
+                    fragments.Max(fragment => fragment.LastCapturedAtUtc),
+                    fragments);
+            })
+            .OrderBy(choreography => choreography.ChoreographyId, StringComparer.Ordinal)
+            .ToArray();
+    }
+
     public IReadOnlyList<MonitoringObservationRecord> GetRecentObservations(string? applicationName, int limit)
     {
         lock (observationSync)
@@ -419,6 +479,58 @@ public sealed class MonitoringRepository
                 .Take(Math.Clamp(limit, 1, RecentObservationLimit))
                 .ToArray();
         }
+    }
+
+    private static string[] GetChoreographyConflictKinds(
+        IReadOnlyList<MonitoringDeclaredChoreographyFragment> fragments,
+        IReadOnlyList<string> definitionVersions)
+    {
+        var conflicts = new List<string>();
+        if (definitionVersions.Count > 1)
+            conflicts.Add("definition_version");
+        if (fragments
+            .GroupBy(fragment => fragment.Owner, StringComparer.Ordinal)
+            .Any(group => group.Select(fragment => fragment.ApplicationName).Distinct(StringComparer.Ordinal).Count() > 1))
+        {
+            conflicts.Add("owner");
+        }
+        if (fragments
+            .SelectMany(fragment => fragment.Steps.Select(step => new
+            {
+                fragment.DefinitionVersion,
+                step.Id,
+                fragment.ApplicationName,
+                fragment.Owner
+            }))
+            .GroupBy(step => new { step.DefinitionVersion, step.Id })
+            .Any(group => group.Select(step => new { step.ApplicationName, step.Owner }).Distinct().Count() > 1))
+        {
+            conflicts.Add("step_ownership");
+        }
+        return conflicts.ToArray();
+    }
+
+    private static string CreateFragmentIdentity(ChoreographyFragment fragment)
+    {
+        var normalized = fragment with
+        {
+            Steps = fragment.Steps
+                .OrderBy(step => step.Id, StringComparer.Ordinal)
+                .Select(step => step with
+                {
+                    Outputs = step.Outputs
+                        .OrderBy(output => output.Kind)
+                        .ThenBy(output => output.MessageUrn, StringComparer.Ordinal)
+                        .ThenBy(output => output.Destination, StringComparer.Ordinal)
+                        .ThenBy(output => output.Requirement)
+                        .ThenBy(output => output.MinCount)
+                        .ThenBy(output => output.MaxCount)
+                        .ThenBy(output => output.WithinMilliseconds)
+                        .ToArray()
+                })
+                .ToArray()
+        };
+        return JsonSerializer.Serialize(normalized);
     }
 
     public IReadOnlyList<MonitoringOutboxDispatcherSummary> GetOutboxDispatchers(
@@ -1309,6 +1421,14 @@ public sealed class MonitoringRepository
             }
         }
     }
+
+    private sealed record DeclaredFragmentSource(
+        string ApplicationName,
+        string InstanceId,
+        bool Online,
+        DateTimeOffset CapturedAtUtc,
+        ChoreographyFragment Fragment,
+        string FragmentIdentity);
 }
 
 public sealed class UnsupportedMonitoringProtocolException : Exception
