@@ -863,6 +863,48 @@ When an application also has a broker-backed bus, publish events that represent 
 
 ## Advanced
 
+### Declaring choreography intent (preview)
+
+The first choreography API builds a portable, payload-free description of reactions owned by one application. It does not register consumers, execute reactions, add message headers, or create a coordinator. The C# and Java builders below produce the same normalized fragment; a later slice will attach fragments to topology and monitoring.
+
+#### C#
+
+```csharp
+ChoreographyFragment fragment = new ChoreographyBuilder(
+        "order-fulfillment",
+        definitionVersion: "1",
+        owner: "orders")
+    .Step<OrderSubmitted>("reserve-inventory", step => step
+        .OwnedBy<SubmitOrderConsumer>()
+        .Sends<ReserveInventory>("queue:reserve-inventory", output => output
+            .Exactly(1)
+            .Within(TimeSpan.FromSeconds(5))))
+    .Step<OrderCompleted>("complete-order", step => step
+        .Terminates())
+    .Build();
+```
+
+#### Java
+
+```java
+ChoreographyFragment fragment = new ChoreographyBuilder(
+        "order-fulfillment",
+        "1",
+        "orders")
+    .step("reserve-inventory", OrderSubmitted.class, step -> step
+        .ownedBy(SubmitOrderConsumer.class)
+        .sends(ReserveInventory.class, "queue:reserve-inventory", output -> output
+            .exactly(1)
+            .within(Duration.ofSeconds(5))))
+    .step("complete-order", OrderCompleted.class, step -> step
+        .terminates())
+    .build();
+```
+
+Use `sends`, `publishes`, `responds`, `schedules`, or `terminates` to describe an outcome. An outcome is expected by default and may instead be informational or optional. Count and time expectations are diagnostic intent, not delivery guarantees or executable business predicates. Explicit message-URN overloads are available when cross-language contracts do not derive the same portable identity from their local type names.
+
+---
+
 ### Configuration
 
 Configure the bus by registering consumers, selecting a transport, connecting to the broker, customizing entity names, and auto-configuring endpoints with a name formatter. These examples use the fluent configuration pattern; similar options exist when using the factory pattern.

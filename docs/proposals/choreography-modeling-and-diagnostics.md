@@ -2,7 +2,7 @@
 
 ## Status
 
-Future product-area proposal with the first observed-flow precision slices implemented. Message-operation observations carry message identity and consume-to-outbound causal identity in C# and Java. The collector prefers exact envelope matches for deliveries, reports correlation fallback explicitly, and exposes exact local reactions separately. Declarations, graph comparison, and choreography diagnostics remain future work. This document is not a supported lifecycle API, alerting service, or workflow runtime commitment.
+Future product-area proposal with its first foundation slices implemented. Message-operation observations carry message identity and consume-to-outbound causal identity in C# and Java. The collector prefers exact envelope matches for deliveries, reports correlation fallback explicitly, and exposes exact local reactions separately. Matching C# and Java builders now produce the same versioned, deterministic choreography fragment from a shared fixture. Registration, topology publication, fragment merging, graph comparison, diagnostics, and the focused Dashboard view remain future work. This document is not a supported lifecycle API, alerting service, or workflow runtime commitment.
 
 ## Summary
 
@@ -148,35 +148,51 @@ Identifiers remain payload-free operational metadata. Exporters still batch thro
 
 ## Native Declaration APIs
 
-C# and Java should provide corresponding descriptor or builder APIs. The exact syntax may be idiomatic, but both must produce the same normalized fragment.
+C# and Java provide corresponding descriptor and builder APIs that produce the same normalized fragment. The current builders are deliberately standalone: they establish the portable declaration before it is attached to bus registration, topology export, or monitoring.
 
-An exploratory C# shape may resemble:
+The C# shape is:
 
 ```csharp
-services.AddChoreography("order-fulfillment", flow => flow
+ChoreographyFragment fragment = new ChoreographyBuilder(
+        "order-fulfillment",
+        definitionVersion: "1",
+        owner: "orders")
     .Step<OrderSubmitted>("reserve-inventory", step => step
-        .OwnedByConsumer<SubmitOrderConsumer>()
-        .Sends<ReserveInventory>(expect => expect
+        .OwnedBy<SubmitOrderConsumer>()
+        .Sends<ReserveInventory>("queue:reserve-inventory", expect => expect
             .Within(TimeSpan.FromSeconds(5))
-            .AtMost(1)))
+            .Exactly(1)))
     .Step<InventoryReserved>("request-payment", step => step
-        .Publishes<PaymentRequested>()));
+        .Publishes<PaymentRequested>())
+    .Build();
 ```
 
-An exploratory Java shape may resemble:
+The Java shape is:
 
 ```java
-services.addChoreography("order-fulfillment", flow -> flow
+ChoreographyFragment fragment = new ChoreographyBuilder(
+        "order-fulfillment",
+        "1",
+        "orders")
     .step("reserve-inventory", OrderSubmitted.class, step -> step
-        .ownedByConsumer(SubmitOrderConsumer.class)
-        .sends(ReserveInventory.class, expect -> expect
+        .ownedBy(SubmitOrderConsumer.class)
+        .sends(ReserveInventory.class, "queue:reserve-inventory", expect -> expect
             .within(Duration.ofSeconds(5))
-            .atMost(1)))
+            .exactly(1)))
     .step("request-payment", InventoryReserved.class, step -> step
-        .publishes(PaymentRequested.class)));
+        .publishes(PaymentRequested.class))
+    .build();
 ```
 
-These shapes are illustrative. A declaration attached directly to consumer registration may be more discoverable than a separate global builder. Source generators and annotation processors may emit fragments when declarations are explicit in source, but they must not attempt whole-program analysis or become the only registration path.
+The normalized schema records the choreography and definition identities, owning application, stable step identity, trigger message URN, optional owning component, and ordered outputs. Outputs support `send`, `publish`, `respond`, `schedule`, and an explicit terminal outcome plus informational, optional, or expected requirements, bounded multiplicity, and a millisecond timing expectation. Explicit URN overloads support canonical cross-language definitions when language type names differ.
+
+A declaration attached directly to consumer registration may ultimately be more discoverable than a separate global builder. Source generators and annotation processors may emit fragments when declarations are explicit in source, but they must not attempt whole-program analysis or become the only registration path.
+
+### Future Raven projection
+
+Raven may later provide a concise choreography DSL over this same declaration model. That projection could make trigger-to-output relationships, optional branches, timing expectations, and terminal reactions read more like a workflow description while lowering into an ordinary `ChoreographyFragment` and the same registration and monitoring path.
+
+The Raven DSL must remain optional. It does not define the portable semantics, replace the complete C# and Java builders, introduce executable coordination, or add Raven-specific message headers or broker behavior. Raven syntax and compiler artifacts remain outside normalized fragment identity, persisted monitoring data, and the MassTransit-compatible wire protocol.
 
 ## Diagnostics
 
@@ -265,10 +281,10 @@ The executable sample should use at least one C# and one Java service and demons
 ## Recommended Delivery Sequence
 
 1. Specify configured, declared, observed, and causal relationships plus their confidence levels.
-2. Add canonical declaration and diagnostic fixtures before choosing final C# or Java APIs.
+2. Add canonical declaration fixtures and matching C# and Java builders (**implemented first slice**); add diagnostic fixtures before choosing their final APIs.
 3. Extend the monitoring observation contract with message, initiator, causation, operation, and parent-span identities; message and causal identity are implemented.
 4. Extend exact producer-to-consumer matching into explicit consume-to-outbound causation (**implemented first slice**).
-5. Add matching C# and Java declaration builders and normalized topology relationships.
+5. Attach the implemented declaration builders to registration and add normalized topology relationships.
 6. Implement graph comparison and diagnostics in the monitoring service with completeness gates.
 7. Add the focused dashboard view and cross-language sample.
 8. Evaluate demand for an explicit per-conversation lifecycle model only after the bounded diagnostic model has production evidence.
