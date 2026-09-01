@@ -12,6 +12,8 @@ Start with:
 - [Design Goals](design-goals.md)
 - [Future Runtime and Language Modernization](future-runtime-modernization.md)
 - [Union-Typed Consumers Proposal](../proposals/union-typed-consumers.md)
+- [Sagas and State Machines Proposal](../proposals/sagas-and-state-machines.md)
+- [Raven Saga DSL Exploration](../proposals/raven-saga-dsl.md)
 - [Minimum Viable Client for Another Language](minimum-viable-language-client.md)
 - [MyServiceBus Architecture](../myservicebus-architecture.md)
 - [Compatibility Policy](../compatibility.md)

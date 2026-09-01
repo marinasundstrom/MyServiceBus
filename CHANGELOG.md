@@ -4,6 +4,7 @@ This changelog summarizes the bigger themes in the repository history rather tha
 
 ## Unreleased
 
+- Defined the future saga and state-machine feature as matching MyServiceBus-owned C# and Java reimplementations based on MassTransit's architecture and behavior, with independent native library DSLs, shared conformance evidence, and no MassTransit runtime dependency. Recorded the fuller Raven `saga!` macro syntax as an optional compiler projection and future executable sample rather than the foundation of the feature.
 - Reframed MyServiceBus as a living, language-neutral specification evolved alongside its C# and Java reference implementations. The top-level specification now leads with concepts, relationships, portable operations, and observable behavior; client-specific documents are implementation notes rather than required interface definitions.
 - Fixed observed message flow for the C# and Java transactional outbox by emitting the outbound operation only when a persisted envelope is actually dispatched to the broker. Application-level flow and throughput continue to aggregate cleanly across producer and consumer replicas.
 - Added a replica-preserving monitoring flow projection with explicit source and target application, instance, and bus identities, while retaining the compact application-aggregated projection for overview dashboards.
