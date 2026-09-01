@@ -1,6 +1,10 @@
 package com.myservicebus.kotlin
 
 import com.myservicebus.ConsumeContext
+import com.myservicebus.MediatorResponseTypeException
+import com.myservicebus.RequestClient
+import com.myservicebus.Response2
+import com.myservicebus.SendContext
 import com.myservicebus.SendEndpointProvider
 import com.myservicebus.di.ServiceCollection
 import com.myservicebus.tasks.CancellationToken
@@ -95,6 +99,50 @@ class CoroutineExtensionsTest {
     }
 
     @Test
+    fun `suspend handler returns typed mediator response`() = runBlocking {
+        val mediator = ServiceCollection.create().createMediator {
+            handler<LookupOrderHandler>()
+        }
+
+        val response: OrderStatus = mediator.request(LookupOrder("A-42"))
+
+        assertEquals(OrderStatus("A-42", "ready"), response)
+        assertFailsWith<MediatorResponseTypeException> {
+            mediator.request<CoroutineMessage>(LookupOrder("wrong-type"))
+        }
+    }
+
+    @Test
+    fun `cancelling mediator request cancels suspend handler`() = runBlocking {
+        CancellableHandler.started = CompletableDeferred()
+        CancellableHandler.stopped = CompletableDeferred()
+        val mediator = ServiceCollection.create().createMediator {
+            handler<CancellableHandler>()
+        }
+        val request = launch {
+            val ignored: CancellableResponse = mediator.request(CancellableRequest("cancel"))
+        }
+
+        CancellableHandler.started.await()
+        request.cancelAndJoin()
+        CancellableHandler.stopped.await()
+
+        assertTrue(request.isCancelled)
+    }
+
+    @Test
+    fun `request client projects typed response and Kotlin context configuration`() = runBlocking {
+        val client = CapturingRequestClient()
+
+        val response: OrderStatus = client.request(LookupOrder("B-17")) {
+            headers["trace-id"] = "kotlin-request"
+        }
+
+        assertEquals(OrderStatus("B-17", "remote"), response)
+        assertEquals("kotlin-request", client.context.headers["trace-id"])
+    }
+
+    @Test
     fun `message cancellation cancels suspend consumer`() = runBlocking {
         val started = CompletableDeferred<Unit>()
         val stopped = CompletableDeferred<Unit>()
@@ -177,4 +225,56 @@ class FailingSuspendConsumer : SuspendConsumer<FailingMessage> {
     override suspend fun consume(context: ConsumeContext<FailingMessage>) {
         throw IllegalStateException(context.message.value)
     }
+}
+
+data class LookupOrder(val orderId: String)
+
+data class OrderStatus(val orderId: String, val status: String)
+
+class LookupOrderHandler : SuspendHandler<LookupOrder, OrderStatus> {
+    override suspend fun execute(request: LookupOrder): OrderStatus {
+        delay(1)
+        return OrderStatus(request.orderId, "ready")
+    }
+}
+
+data class CancellableRequest(val value: String)
+
+data class CancellableResponse(val value: String)
+
+class CancellableHandler : SuspendHandler<CancellableRequest, CancellableResponse> {
+    override suspend fun execute(request: CancellableRequest): CancellableResponse {
+        started.complete(Unit)
+        try {
+            awaitCancellation()
+        } finally {
+            stopped.complete(Unit)
+        }
+    }
+
+    companion object {
+        internal var started = CompletableDeferred<Unit>()
+        internal var stopped = CompletableDeferred<Unit>()
+    }
+}
+
+private class CapturingRequestClient : RequestClient<LookupOrder> {
+    lateinit var context: SendContext
+
+    override fun <TResponse : Any?> getResponse(
+        context: SendContext,
+        responseType: Class<TResponse>,
+    ): CompletableFuture<TResponse> {
+        this.context = context
+        @Suppress("UNCHECKED_CAST")
+        val response = OrderStatus((context.message as LookupOrder).orderId, "remote") as TResponse
+        return CompletableFuture.completedFuture(response)
+    }
+
+    override fun <T1 : Any?, T2 : Any?> getResponse(
+        context: SendContext,
+        responseType1: Class<T1>,
+        responseType2: Class<T2>,
+    ): CompletableFuture<Response2<T1, T2>> =
+        throw UnsupportedOperationException("Multiple responses are not used by this test.")
 }

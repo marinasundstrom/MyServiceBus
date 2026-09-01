@@ -1,3 +1,40 @@
+import LanguageTabs from '../../app/components/LanguageTabs';
+
+export const requestClient = {
+  csharp: `Response<OrderStatus> response = await client.GetResponseAsync<OrderStatus>(
+    new CheckOrderStatus(orderId));`,
+  java: `OrderStatus response = client
+    .getResponse(new CheckOrderStatus(orderId), OrderStatus.class)
+    .join();`,
+  kotlin: `val response: OrderStatus = client.request(
+    CheckOrderStatus(orderId)
+)`,
+};
+
+export const responseHandler = {
+  csharp: `public sealed class CheckOrderStatusHandler
+    : Handler<CheckOrderStatus, OrderStatus>
+{
+    public override Task<OrderStatus> Handle(
+        CheckOrderStatus request,
+        CancellationToken cancellationToken = default) =>
+        lookup(request.OrderId, cancellationToken);
+}`,
+  java: `public final class CheckOrderStatusHandler
+        implements HandlerWithResult<CheckOrderStatus, OrderStatus> {
+    public CompletableFuture<OrderStatus> handle(
+            CheckOrderStatus request,
+            CancellationToken cancellationToken) {
+        return lookup(request.orderId(), cancellationToken);
+    }
+}`,
+  kotlin: `class CheckOrderStatusHandler
+    : SuspendHandler<CheckOrderStatus, OrderStatus> {
+    override suspend fun execute(request: CheckOrderStatus): OrderStatus =
+        lookup(request.orderId)
+}`,
+};
+
 <p className="docs-kicker">Concepts · Requests</p>
 
 # Request-response is messaging with a return route.
@@ -14,20 +51,13 @@ The request client:
 4. Waits for one of the declared response types or `Fault<TRequest>`.
 5. Matches concurrent replies by request identifier.
 
-```csharp
-Response<OrderStatus> response = await client.GetResponseAsync<OrderStatus>(
-    new CheckOrderStatus(orderId));
-```
-
-```java
-OrderStatus response = client
-    .getResponse(new CheckOrderStatus(orderId), OrderStatus.class)
-    .join();
-```
+<LanguageTabs csharp={requestClient.csharp} java={requestClient.java} kotlin={requestClient.kotlin} />
 
 ## Consumers respond through the context
 
-An interface consumer can call `RespondAsync` or `respond`. A consumer method can instead return `Task<TResponse>` or `ValueTask<TResponse>` in C#, and `CompletableFuture<TResponse>` or `CompletionStage<TResponse>` in Java. MyServiceBus awaits that value and sends it through the same consume-context response path.
+An interface consumer can call `RespondAsync`, `respond`, or Kotlin `respondAwait`. A handler can instead return its response asynchronously as C# `Task<TResponse>` / `ValueTask<TResponse>`, Java `CompletableFuture<TResponse>` / `CompletionStage<TResponse>`, or directly from a Kotlin suspending function. MyServiceBus awaits that value and sends it through the same consume-context response path.
+
+<LanguageTabs csharp={responseHandler.csharp} java={responseHandler.java} kotlin={responseHandler.kotlin} />
 
 Returning a value does not require a context parameter. Add `ConsumeContext<TRequest>` when the handler needs headers or other receive metadata. A response-bearing method without an incoming response address fails consumption rather than silently discarding the result.
 

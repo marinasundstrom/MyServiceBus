@@ -4,7 +4,8 @@ This project is the evolving executable sample and compatibility check for the
 Kotlin API. It currently demonstrates Kotlin-native service registration,
 reified consumer and transport selection, Kotlin data-class messages, RabbitMQ
 configuration, a suspending consumer, and coroutine-native publishing through
-the shared JVM runtime.
+the shared JVM runtime. It also demonstrates a typed suspending request handler
+through the in-memory mediator.
 
 Start RabbitMQ from the repository root:
 

@@ -70,7 +70,7 @@ consumers. MyServiceBus waits for the suspended handler before acknowledging
 the message, propagates failures into retry and fault handling, and cancels the
 coroutine when message delivery is cancelled.
 
-Use `publishAwait`, `sendAwait`, `respondAwait`, and `getResponseAwait` from
+Use `publishAwait`, `sendAwait`, `respondAwait`, and `RequestClient.request` from
 suspending application code. Matching mediator extensions are available as
 well. Cancelling the calling coroutine cancels both the MyServiceBus operation
 token and its underlying Java future.
@@ -82,6 +82,31 @@ val mediator = services.createMediator {
     consumer<SubmitOrderConsumer>()
 }
 ```
+
+## Suspending request handlers
+
+A Kotlin handler returns its response directly. Registration and dispatch still
+use the shared scoped handler and correlated response pipeline:
+
+```kotlin
+data class LookupOrder(val orderId: UUID)
+data class OrderStatus(val orderId: UUID, val status: String)
+
+class LookupOrderHandler : SuspendHandler<LookupOrder, OrderStatus> {
+    override suspend fun execute(request: LookupOrder): OrderStatus =
+        OrderStatus(request.orderId, "Pending")
+}
+
+val mediator = services.createMediator {
+    handler<LookupOrderHandler>()
+}
+
+val status: OrderStatus = mediator.request(LookupOrder(orderId))
+```
+
+The explicit result type on `status` lets Kotlin infer the reified response
+type. Cancelling the calling coroutine cancels the mediator operation and the
+suspending handler.
 
 ## Run the sample
 

@@ -35,6 +35,11 @@ class ServiceBusConfigurator internal constructor(
         delegate.addConsumer(TConsumer::class.java)
     }
 
+    /** Registers a suspending request handler with an inferred response type. */
+    inline fun <reified THandler : SuspendHandler<*, *>> handler() {
+        delegate.addConsumer(THandler::class.java)
+    }
+
     /** Registers a suspending Kotlin consumer and infers its message type. */
     inline fun <reified TConsumer : SuspendConsumer<*>> consumer(
         endpointName: String? = null,

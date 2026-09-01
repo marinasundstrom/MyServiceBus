@@ -19,11 +19,24 @@ Language projections should own source-level experience:
 - Java can expose fluent configuration, class literals, functional interfaces,
   and `CompletableFuture`;
 - Kotlin can expose receiver DSLs, reified types, suspending consumers,
-  coroutine cancellation, and Kotlin-friendly nullability and defaults.
+coroutine cancellation, and Kotlin-friendly nullability and defaults.
 
 Both projections must enter the same topology and pipeline stages. A Kotlin
 consumer is not a parallel runtime path: its coroutine is adapted to the shared
 consumer completion contract at the projection boundary.
+
+Language projections also act as design tests for the shared implementation.
+For example, a Kotlin suspend-handler interface adds an intermediate generic
+contract; supporting it requires the mediator to resolve inherited response
+types correctly instead of assuming every Java handler implements the result
+interface directly.
+
+The current `SuspendHandler` also demonstrates where a physical split may help:
+Java's inherited `handle(request): CompletableFuture<Response>` overload
+prevents the Kotlin projection from declaring the same source-level name as
+`suspend fun handle(request): Response`. The preview Kotlin interface uses
+`execute` while the shared behavior remains correct; this name can be revisited
+if the public projections later depend on a narrower implementation contract.
 
 ## Current transition
 

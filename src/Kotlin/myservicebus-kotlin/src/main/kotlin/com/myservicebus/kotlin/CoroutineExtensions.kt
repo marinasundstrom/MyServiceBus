@@ -6,6 +6,7 @@ import com.myservicebus.BusRegistrationConfigurator
 import com.myservicebus.ConsumeContext
 import com.myservicebus.ConsumerMethodInvoker
 import com.myservicebus.DefaultEndpointNameFormatter
+import com.myservicebus.HandlerWithResult
 import com.myservicebus.MessageConsumer
 import com.myservicebus.PublishContext
 import com.myservicebus.PublishEndpoint
@@ -26,6 +27,7 @@ import kotlin.coroutines.resumeWithException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
@@ -34,6 +36,18 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 /** A consumer whose message handler can call suspending Kotlin APIs directly. */
 fun interface SuspendConsumer<TMessage : Any> {
     suspend fun consume(context: ConsumeContext<TMessage>)
+}
+
+/** A request handler that returns its response from suspending Kotlin code. */
+fun interface SuspendHandler<TRequest : Any, TResponse : Any> : HandlerWithResult<TRequest, TResponse> {
+    suspend fun execute(request: TRequest): TResponse
+
+    override fun handle(
+        message: TRequest,
+        cancellationToken: CancellationToken,
+    ): CompletableFuture<TResponse> = coroutineFuture(cancellationToken, Dispatchers.Default) {
+        execute(message)
+    }
 }
 
 @PublishedApi
@@ -146,11 +160,24 @@ suspend fun <TMessage : Any> ConsumeContext<*>.respondAwait(message: TMessage) {
     awaitOperation { cancellationToken -> respond(message, cancellationToken) }
 }
 
-/** Sends a request and suspends until its typed response or fault is received. */
-suspend inline fun <TRequest, reified TResponse : Any> RequestClient<TRequest>.getResponseAwait(
+/** Sends a request and returns its typed response or fault. */
+suspend inline fun <TRequest, reified TResponse : Any> RequestClient<TRequest>.request(
     request: TRequest,
 ): TResponse = awaitOperation { cancellationToken ->
     getResponse(request, TResponse::class.java, cancellationToken)
+}
+
+/** Sends a configured request and returns its typed response or fault. */
+suspend inline fun <TRequest, reified TResponse : Any> RequestClient<TRequest>.request(
+    request: TRequest,
+    noinline configure: SendContext.() -> Unit,
+): TResponse = awaitOperation { cancellationToken ->
+    getResponse(
+        request,
+        TResponse::class.java,
+        { context -> context.configure() },
+        cancellationToken,
+    )
 }
 
 /** Publishes through the in-memory mediator and awaits every matching handler. */
@@ -164,8 +191,7 @@ suspend fun Mediator.sendAwait(message: Any) {
 }
 
 /** Sends a mediator request and returns its typed response. */
-@JvmName("sendAwaitResponse")
-suspend inline fun <reified TResponse : Any> Mediator.sendAwait(message: Any): TResponse =
+suspend inline fun <reified TResponse : Any> Mediator.request(message: Any): TResponse =
     awaitOperation { cancellationToken ->
         send(message, TResponse::class.java, cancellationToken)
     }
@@ -206,22 +232,36 @@ internal fun unwrapCompletionFailure(failure: Throwable): Throwable =
 internal fun <TMessage : Any> SuspendConsumer<TMessage>.consumeAsync(
     context: ConsumeContext<TMessage>,
     dispatcher: CoroutineDispatcher,
-): CompletableFuture<Void> {
+): CompletableFuture<Void> = coroutineFuture(context.cancellationToken, dispatcher) {
+    consume(context)
+}.asVoidFuture()
+
+private fun <T> coroutineFuture(
+    cancellationToken: CancellationToken,
+    dispatcher: CoroutineDispatcher,
+    operation: suspend () -> T,
+): CompletableFuture<T> {
     val parent = SupervisorJob()
-    val future = CompletableFuture<Void>()
+    val future = CompletableFuture<T>()
     var job: Job? = null
-    val cancellationRegistration = context.cancellationToken.onCancel {
-        val cancellation = CancellationException("Message consumption was cancelled.")
+    val cancellationRegistration = cancellationToken.onCancel {
+        val cancellation = CancellationException("MyServiceBus operation was cancelled.")
         job?.cancel(cancellation) ?: parent.cancel(cancellation)
     }
     job = CoroutineScope(dispatcher + parent).launch {
-        consume(context)
+        try {
+            future.complete(operation())
+        } catch (failure: CancellationException) {
+            throw failure
+        } catch (failure: Throwable) {
+            future.completeExceptionally(failure)
+        }
     }
     job.invokeOnCompletion { failure ->
         cancellationRegistration.close()
         when (failure) {
-            null -> future.complete(null)
             is CancellationException -> future.cancel(false)
+            null -> Unit
             else -> future.completeExceptionally(failure)
         }
         parent.cancel()
@@ -232,4 +272,21 @@ internal fun <TMessage : Any> SuspendConsumer<TMessage>.consumeAsync(
         }
     }
     return future
+}
+
+private fun CompletableFuture<*>.asVoidFuture(): CompletableFuture<Void> {
+    val result = CompletableFuture<Void>()
+    whenComplete { _, failure ->
+        when {
+            isCancelled -> result.cancel(false)
+            failure != null -> result.completeExceptionally(unwrapCompletionFailure(failure))
+            else -> result.complete(null)
+        }
+    }
+    result.whenComplete { _, _ ->
+        if (result.isCancelled && !isDone) {
+            cancel(true)
+        }
+    }
+    return result
 }

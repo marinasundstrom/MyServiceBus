@@ -101,7 +101,7 @@ See the [Kotlin guide](docs/kotlin/how-to-use.md) and the evolving
 | Artifact | Purpose |
 | --- | --- |
 | [`io.github.marinasundstrom.myservicebus:myservicebus`](https://central.sonatype.com/artifact/io.github.marinasundstrom.myservicebus/myservicebus) | Core messaging runtime and in-memory mediator |
-| `io.github.marinasundstrom.myservicebus:myservicebus-kotlin` | Kotlin-native configuration, coroutines, suspend consumers, and dependency-injection extensions over the JVM runtime |
+| `io.github.marinasundstrom.myservicebus:myservicebus-kotlin` | Kotlin-native configuration, coroutines, suspend consumers and request handlers, and dependency-injection extensions over the JVM runtime |
 | `io.github.marinasundstrom.myservicebus:myservicebus-processor` | Optional JSR 269 processor for generated consumer catalogs and direct method invokers |
 | `io.github.marinasundstrom.myservicebus:myservicebus-serialization-bson` | Optional MassTransit-compatible BSON envelope serialization |
 | `io.github.marinasundstrom.myservicebus:myservicebus-postgresql` | PostgreSQL transactional outbox and inbox persistence |
