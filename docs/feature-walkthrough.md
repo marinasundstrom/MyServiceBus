@@ -865,7 +865,7 @@ When an application also has a broker-backed bus, publish events that represent 
 
 ### Declaring choreography intent (preview)
 
-The first choreography API builds a portable, payload-free description of reactions owned by one application. Registering the fragment makes it part of the normalized topology and inspection metadata exported to monitoring. It does not register consumers, execute reactions, add message headers, or create a coordinator.
+The first choreography API builds a portable, payload-free description of reactions owned by one application. It is the current low-level descriptor and registration surface, not a commitment that every future C#, Java, or Raven authoring DSL must reproduce this builder syntax. Registering the fragment makes it part of the normalized topology and inspection metadata exported to monitoring. It does not register consumers, execute reactions, add message headers, or create a coordinator.
 
 #### C#
 

@@ -28,6 +28,15 @@ Choreography is decentralized workflow coordination and has no central coordinat
 
 Applications can implement these reactions directly with the existing publish, send, and consume APIs. The proposed feature adds a clearer portable way to express that intent and diagnose its observed behavior in C# and Java; it does not claim ownership of the underlying business workflow.
 
+The normalized fragment is the common semantic and operations model, not a requirement that every language expose the same builder surface. Choreography should have several abstraction levels:
+
+1. portable declaration, causal-evidence, validation, and monitoring contracts;
+2. low-level descriptor and registration APIs for generated definitions, integrations, and tooling;
+3. idiomatic C# and Java authoring APIs that project local consumer reactions into those descriptors; and
+4. optional higher-level projections, including a future Raven macro DSL.
+
+The authoring layers may improve upon the current builder without changing the portable model. MyServiceBus can draw from established event-driven, workflow, statechart, and language-native API designs without inheriting another library's historical overloads, inheritance constraints, or source-compatibility burden. C# may use fluent expressions, attributes, generated declarations, or consumer-attached configuration where those fit naturally; Java may use builders, annotations, processors, or other JVM conventions. Equivalent semantics and normalized output matter more than textual symmetry.
+
 The first feature should include:
 
 - portable declarations of trigger-to-output relationships;
@@ -37,7 +46,7 @@ The first feature should include:
 - bounded diagnostics for missing routes, undeclared observations, cycles, and unexpected amplification;
 - opt-in timing and multiplicity expectations;
 - explicit confidence, freshness, coverage, and dropped-observation reporting;
-- matching C# and Java descriptor APIs and canonical fixtures;
+- matching C# and Java normalized descriptors and canonical fixtures, with idiomatic authoring projections above them;
 - monitoring-service query models and application-oriented dashboard views; and
 - one cross-language executable sample.
 
@@ -158,7 +167,9 @@ Identifiers remain payload-free operational metadata. Exporters still batch thro
 
 ## Native Declaration APIs
 
-C# and Java provide corresponding descriptor and builder APIs that produce the same normalized fragment. The preferred application API configures the builder through `AddChoreography` or `addChoreography`; overloads also accept an existing builder or a prebuilt fragment for generated definitions, fixtures, reuse, and tooling. Every path validates and includes the same fragment in normalized topology, inspection, and monitoring metadata.
+C# and Java currently provide corresponding descriptor and builder APIs that produce the same normalized fragment. The current convenience API configures the builder through `AddChoreography` or `addChoreography`; overloads also accept an existing builder or a prebuilt fragment for generated definitions, fixtures, reuse, and tooling. Every path validates and includes the same fragment in normalized topology, inspection, and monitoring metadata.
+
+These builders establish the low-level portable declaration boundary; they do not freeze the eventual preferred authoring DSL. Higher-level APIs may attach declarations directly to consumer registration, infer safe local identities from typed code, reduce repeated message and owner declarations, or express branches and expectations more clearly. Such conveniences must remain inspectable, must lower deterministically into `ChoreographyFragment`, and must never infer executable business rules that the application did not declare.
 
 The C# shape is:
 
@@ -196,7 +207,7 @@ configurator.addChoreography(
 
 The normalized schema records the choreography and definition identities, owning application, stable step identity, trigger message URN, optional owning component, and ordered outputs. Outputs support `send`, `publish`, `respond`, `schedule`, and an explicit terminal outcome plus informational, optional, or expected requirements, bounded multiplicity, and a millisecond timing expectation. Explicit URN overloads support canonical cross-language definitions when language type names differ.
 
-A declaration attached directly to consumer registration may ultimately be more discoverable than a separate global builder. Source generators and annotation processors may emit fragments when declarations are explicit in source, but they must not attempt whole-program analysis or become the only registration path.
+A declaration attached directly to consumer registration may ultimately be more discoverable than a separate global builder. Source generators and annotation processors may emit fragments when declarations are explicit in source, but they must not attempt whole-program analysis or become the only registration path. C# and Java projections need equivalent expressive power and validation outcomes, not identical spelling or framework machinery.
 
 ### Future Raven projection
 
