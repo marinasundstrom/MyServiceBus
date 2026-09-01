@@ -4,6 +4,8 @@ This changelog summarizes the bigger themes in the repository history rather tha
 
 ## Unreleased
 
+- Clarified monitoring terminology around messages, bodies, and transport envelopes, and defined request/response as a relationship projection with exporter-first header minimization and independent collector disclosure.
+
 - Added a monitoring-owned individual-message projection that merges exact producer and consumer evidence, caused operations, request-response observations, participant applications, outcomes, and disclosure-safe body state. A compact Dashboard message index and detail timeline consume that projection. Dashboard feature policy now keeps message inspection development-only by default and allows optional workflow and message domains to be hidden and skipped without making fundamental operations views configurable.
 - Added a separate monitoring-service disclosure boundary for retained message bodies. Recent-observation queries omit bodies by default and can globally return a whole-body redaction placeholder or the retained exporter-redacted body; disclosure operates on response copies without rewriting storage, while caller-specific authorization and audit remain future work.
 - Added explicit bounded message-body capture to the C# and Java monitoring exporters. Capture stays off in every environment profile until enabled, can select message types and redact serialized JSON before transmission, enforces a UTF-8 byte limit, and reports capture or truncation status without extending capture to arbitrary headers, scheduled work, jobs, or outbox records.
