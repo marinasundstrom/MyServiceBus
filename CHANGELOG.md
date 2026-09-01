@@ -4,6 +4,7 @@ This changelog summarizes the bigger themes in the repository history rather tha
 
 ## Unreleased
 
+- Documented future workflow-pattern discovery for monitoring: recurring causal paths may be presented as explicitly inferred coordination candidates, while new branches, participants, contracts, cycles, or fan-out can be visualized as baseline deviations without claiming a formal workflow or automatic failure.
 - Added a read-only declared-choreography monitoring query that merges registered fragments across applications, collapses identical replica declarations, retains freshness and availability, and reports definition-version, owner, and step-ownership conflicts without changing message delivery or inferring workflow failure.
 - Added explicit choreography-fragment registration to the C# and Java bus configurators. Normalized topology version 2, inspection, and monitoring metadata now carry validated, deterministically ordered declarations while leaving message delivery and the MassTransit-compatible wire protocol unchanged.
 - Added matching C# and Java choreography declaration builders and a versioned canonical fixture. Applications can describe locally owned trigger-to-output reactions—including send, publish, respond, schedule, terminal outcomes, multiplicity, and timing expectations—as deterministic monitoring metadata without changing message envelopes or executing a coordinator.

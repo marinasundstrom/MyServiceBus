@@ -84,21 +84,25 @@ Graphs and maps are a continuing dashboard theme. They are implemented as distin
 
 Workflows should eventually become a focused dashboard domain spanning both coordination styles. A choreography view reconstructs decentralized progress from declared reactions and bounded causal message evidence; it shows branches, cycles, missing expected observations, confidence, freshness, and coverage, but cannot claim an authoritative current state merely from silence or correlation. An orchestration view can additionally use persisted saga identity and transition evidence to show the authoritative current state, transition history, pending timeouts or requests, faults, and completion. Both should reuse maps, timelines, contract nodes, causal edges, and application drill-downs so an operator can follow one business process without losing the distinction between inferred and persisted truth.
 
+The same domain can eventually include a **Discovered patterns** view for systems that have no formal workflow definition. Repeated causal paths may be grouped into workflow-shaped candidates and shown with their time window, sample count, participating applications and contracts, confidence, and coverage. The dashboard must label these as recurring observed patterns rather than declared choreography. It may help an owner draft a declaration, but it must not create or register one automatically.
+
+After a candidate has enough support, a comparison overlay can show traffic breaking out of its usual shape: new participants or contracts, a rare branch, changed fan-out, a novel cycle, or absence of the usual continuation. That is a deviation from a selected baseline, not proof of failure. The visualization must keep the baseline window and versions visible, distinguish exact from heuristic evidence, account for incomplete or stale exporters, and open the causal records behind the deviation. Deployments, feature flags, version skew, and valid low-frequency paths should remain plausible explanations rather than being hidden by an anomaly label.
+
 The useful navigation is aggregate to instance and back: begin with workflow health and state or step distribution, select an unhealthy path, inspect the participating services and causal messages, and—only where a saga owns the lifecycle—open the corresponding persisted instance. Instance identifiers and histories remain bounded operational data subject to authentication, retention, and redaction. Visibility does not authorize retrying, compensating, forcing a transition, or terminating a workflow; those are future control-plane operations.
 
 ### Workflow visualization model
 
 The focused workflow experience should combine three synchronized views instead of forcing every fact onto one graph:
 
-1. **Definition map** — the relatively stable model. A choreography map groups reaction steps by owning application and connects trigger and output contracts. An orchestration map renders state-machine states and event-labeled transitions, including initial, final, timeout, and fault paths.
-2. **Runtime overlay** — aggregate recorded evidence on the definition. State nodes can show current instance counts, fault counts, and oldest age; reaction or transition edges can show observed count, latency, and evidence confidence. Missing declaration or observation appears as a diagnostic overlay rather than silently changing the definition.
+1. **Definition or baseline map** — the relatively stable model. A choreography map groups declared reaction steps by owning application; a discovered-pattern map shows a clearly labeled, time-bounded recurring shape; and an orchestration map renders state-machine states and event-labeled transitions, including initial, final, timeout, and fault paths.
+2. **Runtime overlay** — aggregate recorded evidence on the definition or selected baseline. State nodes can show current instance counts, fault counts, and oldest age; reaction or transition edges can show observed count, latency, and evidence confidence. Missing declaration, missing observation, or a breakout from a recurring pattern appears as a diagnostic overlay rather than silently changing the underlying map.
 3. **Instance timeline** — the ordered record for one selected causal chain or saga instance. It shows consumed events, state before and after a transition, activities, outgoing messages, schedules, retries, persistence conflicts, faults, and completion with timestamps and owning application.
 
 ```mermaid
 flowchart LR
-    Definition["Definition map\nstates or reaction steps"] -->|select node or edge| Runtime["Runtime overlay\ncounts, age, latency, faults"]
+    Model["Definition or baseline map\nstates, reactions, or recurring paths"] -->|select node or edge| Runtime["Runtime overlay\ncounts, age, latency, faults"]
     Runtime -->|select causal chain or saga| Timeline["Instance timeline\nrecorded events and transitions"]
-    Timeline -->|locate in model| Definition
+    Timeline -->|locate in model| Model
 ```
 
 For an orchestration instance, the state-machine graph should keep the complete definition visible, emphasize the current state, mark traversed transitions, and distinguish pending timers or requests from completed work. Selecting a state or transition opens the matching records in the timeline rather than expanding the node into an unreadable diagnostic panel. The timeline is the detailed audit-like explanation; the graph remains the spatial explanation of possible and current progress.

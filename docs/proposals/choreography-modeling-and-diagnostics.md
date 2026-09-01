@@ -14,6 +14,8 @@ The first feature should answer three different questions without conflating the
 2. **Declared choreography:** which reactions does an application say it may or should perform?
 3. **Observed flow:** which deliveries and reactions were actually observed within a bounded, explicitly incomplete time window?
 
+A later discovery view may ask a fourth question: **which recurring coordination patterns appear workflow-shaped even though nobody formally declared a workflow?** This is a derived interpretation of repeated observed flow, not a new source of runtime truth. It can help a developer recognize an implicit workflow that has emerged from contracts, producers, and consumers spread across services.
+
 This work should precede the saga runtime because it builds on capabilities that exist today, improves operations without owning business state, and establishes causation, completeness, and flow-monitoring semantics that saga monitoring can later reuse.
 
 ## Priority Decision
@@ -130,6 +132,14 @@ Observed flow is built from immutable, payload-free operation evidence within a 
 
 Queries and dashboards must retain this confidence instead of flattening every edge into the same visual claim.
 
+### Discovered coordination patterns
+
+Repeated bounded causal chains may reveal a stable sequence, branch, cycle, or participant set that looks like an implicit workflow. The monitoring service may eventually group that evidence into a **discovered coordination pattern** and show its supporting sample count, observation window, first and last occurrence, participating applications and contracts, edge confidence, and coverage. A useful first implementation can be statistical and deterministic; it does not require opaque machine-learning classification.
+
+The label must remain epistemically modest. Recurrence does not prove shared business intent, define a beginning or terminal outcome, or create a workflow instance. The dashboard should say **candidate pattern** or **recurring message pattern**, not silently promote the result to a choreography definition. A developer may use the pattern as the starting point for an explicit declaration, but generated declarations remain drafts until an application owner reviews and registers them.
+
+The inverse view is also useful. Once a pattern has enough bounded support, the dashboard can highlight a causal edge or participant that breaks out of it: a new contract, unexpected consumer, rare branch, changed cycle, missing usual continuation, or materially different fan-out. Such a breakout is a **deviation from the selected baseline**, not automatically a defect. Deployments, version skew, feature flags, low-frequency valid paths, incomplete telemetry, and changing traffic mix can all explain it. The view must therefore expose the baseline window and sample size, compare like application and definition versions where possible, retain observation confidence, and allow the user to inspect the underlying causal chains.
+
 ## Observation Contract Extension
 
 A monitoring protocol extension should add the minimum identifiers required for exact reconstruction. The first item is implemented additively; the rest remain future work:
@@ -218,6 +228,7 @@ Diagnostics should compare the three graphs and state the evidence behind every 
 - A conversation repeatedly traverses a declared cycle beyond an explicit bound.
 - Fan-out or repeated reaction grows materially beyond its declared or learned baseline.
 - A message is consumed by an application or handler that the declared graph did not identify.
+- A sufficiently supported recurring pattern gains a new participant, contract, branch, cycle, or fan-out shape relative to its selected baseline.
 
 Terms such as **unobserved**, **overdue observation**, or **expectation not evidenced** are preferable to **workflow failed**. A diagnostic may become actionable only when its declaration is explicit and the relevant observation window is complete enough to support the claim.
 
@@ -252,10 +263,11 @@ The monitoring service should expose separate query models for:
 - declared choreography;
 - observed application and replica flow;
 - bounded causal chains where exact evidence exists;
+- recurring coordination-pattern candidates and deviations from an explicit bounded baseline;
 - graph differences; and
 - diagnostics with confidence and completeness.
 
-The dashboard should visually distinguish possible, declared, exact-observed, and heuristic-observed edges. Cycles and amplification should appear in a focused choreography view before any concise signal is promoted to the overview.
+The dashboard should visually distinguish possible, declared, exact-observed, heuristic-observed, and pattern-derived edges. A discovered pattern should have a different visual treatment from a declared workflow, while breakouts should appear as overlays against the selected baseline rather than rewriting it. Cycles and amplification should appear in a focused choreography view before any concise signal is promoted to the overview.
 
 This becomes one half of a shared workflow-observation experience. For choreography, the dashboard reconstructs a bounded story from independently owned declarations and message evidence: which participants reacted, where the flow branched, which expected reaction has not yet been evidenced, and how confident the reconstruction is. It must not invent an authoritative workflow instance, current state, or terminal business outcome when no participant owns one.
 
@@ -291,7 +303,8 @@ The executable choreography sample should first reuse the mixed C# and Java moni
 5. Attach the implemented declaration builders to registration and add normalized topology relationships (**implemented first slice**).
 6. Implement graph comparison and diagnostics in the monitoring service with completeness gates.
 7. Add the focused dashboard view and cross-language sample.
-8. Evaluate demand for an explicit per-conversation lifecycle model only after the bounded diagnostic model has production evidence.
+8. Explore bounded recurring-pattern discovery and breakout visualization only after exact causal chains and comparison evidence are trustworthy.
+9. Evaluate demand for an explicit per-conversation lifecycle model only after the bounded diagnostic model has production evidence.
 
 ## Relationship to Sagas
 
@@ -306,6 +319,7 @@ The [Sagas and State Machines Proposal](sagas-and-state-machines.md) defines orc
 5. Which cycle and amplification thresholds are portable declarations versus dashboard policy?
 6. When is an undeclared observed edge a useful discovery signal rather than configuration drift?
 7. What retention is sufficient for causal drill-down without creating an unbounded workflow-history product?
+8. What recurrence, sample size, version segmentation, and stability thresholds make a candidate pattern useful without overstating intent?
 
 ## References
 
