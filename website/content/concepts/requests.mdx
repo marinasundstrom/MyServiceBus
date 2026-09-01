@@ -79,7 +79,7 @@ The request client:
 
 ## Consumers respond through the context
 
-An interface consumer can call `RespondAsync`, `respond`, or Kotlin `respondAwait`. A handler can instead return its response asynchronously as C# `Task<TResponse>` / `ValueTask<TResponse>`, Java `CompletableFuture<TResponse>` / `CompletionStage<TResponse>`, or directly from a Kotlin suspending function. MyServiceBus awaits that value and sends it through the same consume-context response path.
+An interface consumer can call C# `RespondAsync`, Java `respond`, or Kotlin&apos;s suspending `respond`. A handler can instead return its response asynchronously as C# `Task<TResponse>` / `ValueTask<TResponse>`, Java `CompletableFuture<TResponse>` / `CompletionStage<TResponse>`, or directly from a Kotlin suspending function. MyServiceBus awaits that value and sends it through the same consume-context response path.
 
 <LanguageTabs csharp={responseHandler.csharp} java={responseHandler.java} kotlin={responseHandler.kotlin} />
 

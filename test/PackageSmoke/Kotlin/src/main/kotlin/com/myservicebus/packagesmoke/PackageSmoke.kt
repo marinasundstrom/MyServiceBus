@@ -1,6 +1,5 @@
 package com.myservicebus.packagesmoke
 
-import com.myservicebus.ConsumeContext
 import com.myservicebus.MessageBus
 import com.myservicebus.RequestClient
 import com.myservicebus.RequestTimeout
@@ -8,8 +7,9 @@ import com.myservicebus.Response2
 import com.myservicebus.ScopedClientFactory
 import com.myservicebus.SendContext
 import com.myservicebus.di.ServiceCollection
+import com.myservicebus.kotlin.ConsumeContext
+import com.myservicebus.kotlin.Consumer
 import com.myservicebus.kotlin.RequestResult
-import com.myservicebus.kotlin.SuspendConsumer
 import com.myservicebus.kotlin.SuspendHandler
 import com.myservicebus.kotlin.addServiceBus
 import com.myservicebus.kotlin.createRequestClient
@@ -24,13 +24,26 @@ import kotlinx.coroutines.runBlocking
 
 data class PackageSmokeMessage(val value: String)
 
-class PackageSmokeConsumer : SuspendConsumer<PackageSmokeMessage> {
+class PackageSmokeConsumer : Consumer<PackageSmokeMessage> {
     override suspend fun consume(context: ConsumeContext<PackageSmokeMessage>) {
         received = context.message
+        context.publish(PackageSmokeFollowUp(context.message.value))
     }
 
     companion object {
         internal var received: PackageSmokeMessage? = null
+    }
+}
+
+data class PackageSmokeFollowUp(val value: String)
+
+class PackageSmokeFollowUpConsumer : Consumer<PackageSmokeFollowUp> {
+    override suspend fun consume(context: ConsumeContext<PackageSmokeFollowUp>) {
+        received = context.message
+    }
+
+    companion object {
+        internal var received: PackageSmokeFollowUp? = null
     }
 }
 
@@ -84,11 +97,13 @@ fun main() = runBlocking {
 
     val mediator = ServiceCollection.create().createMediator {
         consumer<PackageSmokeConsumer>()
+        consumer<PackageSmokeFollowUpConsumer>()
         handler<PackageSmokeHandler>()
     }
     val message = PackageSmokeMessage("package-smoke")
     mediator.publishAwait(message)
     check(PackageSmokeConsumer.received == message)
+    check(PackageSmokeFollowUpConsumer.received == PackageSmokeFollowUp("package-smoke"))
 
     val response: PackageSmokeResponse = mediator.request(PackageSmokeRequest("request-smoke"))
     check(response.value == "request-smoke")

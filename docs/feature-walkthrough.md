@@ -405,7 +405,7 @@ Use `cfg.addConsumerMethods(OrderConsumers.class)` for reflection discovery, or 
 
 #### Kotlin
 
-Kotlin uses native extension functions over the same service collection and
+Kotlin uses native projection types and extension functions over the same service collection and
 runtime rather than emulating extension methods with a decorator call:
 
 ```kotlin
@@ -428,9 +428,9 @@ Kotlin consumers can suspend directly while retaining the shared scoped
 consumer pipeline and delivery semantics:
 
 ```kotlin
-class SubmitOrderConsumer : SuspendConsumer<SubmitOrder> {
+class SubmitOrderConsumer : Consumer<SubmitOrder> {
     override suspend fun consume(context: ConsumeContext<SubmitOrder>) {
-        context.publishAwait(OrderSubmitted(context.message.orderId))
+        context.publish(OrderSubmitted(context.message.orderId))
     }
 }
 
@@ -441,7 +441,9 @@ runBlocking {
 
 MyServiceBus waits for the coroutine before acknowledging delivery. Failures
 continue through retry and fault handling, while cancellation flows in both
-directions between Kotlin coroutines and the JVM runtime.
+directions between Kotlin coroutines and the JVM runtime. Kotlin owns this
+`Consumer` and `ConsumeContext` surface, so its suspending methods keep familiar
+messaging names without colliding with Java future-returning members.
 
 #### Azure Service Bus preview
 

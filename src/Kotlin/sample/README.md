@@ -25,6 +25,7 @@ Set `RABBITMQ_HOST` and `RABBITMQ_PORT` to use a different broker. The sample
 requests an order status, publishes one `SubmitOrder`, waits for its consumer
 to publish `OrderSubmitted`, and then stops the bus.
 
-The consumer publishes its follow-up message with `publishAwait`, and the
-application uses the same suspending extension to publish the initial command.
+The Kotlin-owned consumer context publishes its follow-up with the familiar
+suspending `publish` member. The application still uses `publishAwait` on the
+raw Java bus until that endpoint receives its own Kotlin projection.
 Cancellation and failures bridge to the shared Java runtime automatically.

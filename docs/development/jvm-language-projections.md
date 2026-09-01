@@ -32,6 +32,16 @@ an exhaustive `when`, reified response discovery, and coroutine cancellation.
 The branch discriminator belongs below both projections because runtime type
 inspection cannot distinguish identical or assignable alternatives reliably.
 
+The same rule applies to operations. Kotlin extensions cannot reliably replace
+Java members with the same name because member resolution wins before extension
+resolution, and Java overload sets may be invalid or ambiguous from Kotlin.
+When that happens, the Kotlin projection should own a small composition type
+with the familiar domain name and adapt to the Java implementation internally.
+`Consumer<T>` and `ConsumeContext<T>` are the first proof: Kotlin callers use
+suspending `publish`, `send`, and `respond` members while the shared pipeline
+continues to execute the Java context underneath. Suffixes such as `Await` are
+transitional for raw Java types, not the target Kotlin vocabulary.
+
 Language projections also act as design tests for the shared implementation.
 For example, a Kotlin suspend-handler interface adds an intermediate generic
 contract; supporting it requires the mediator to resolve inherited response

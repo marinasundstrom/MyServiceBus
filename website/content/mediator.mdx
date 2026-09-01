@@ -35,7 +35,7 @@ Mediator mediator = MediatorBus.configure(services, cfg -> {
 });
 
 mediator.send(new SubmitOrder(UUID.randomUUID())).join();`,
-  kotlin: `class SubmitOrderConsumer : SuspendConsumer<SubmitOrder> {
+  kotlin: `class SubmitOrderConsumer : Consumer<SubmitOrder> {
     override suspend fun consume(context: ConsumeContext<SubmitOrder>) {
         submit(context.message)
     }

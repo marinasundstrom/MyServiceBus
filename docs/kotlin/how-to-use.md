@@ -2,8 +2,8 @@
 
 MyServiceBus for Kotlin is a thin, idiomatic facade over the shared JVM
 runtime. The transport, topology, serialization, and delivery behavior are the
-same as Java; Kotlin extensions remove decorator and class-literal ceremony
-from ordinary configuration.
+same as Java; Kotlin-owned projection types and extensions remove Java overload,
+future, decorator, and class-literal ceremony from ordinary application code.
 
 ## Dependencies
 
@@ -58,22 +58,28 @@ see [JVM language projections](../development/jvm-language-projections.md).
 data class SubmitOrder(val orderId: UUID)
 data class OrderSubmitted(val orderId: UUID)
 
-class SubmitOrderConsumer : SuspendConsumer<SubmitOrder> {
+class SubmitOrderConsumer : Consumer<SubmitOrder> {
     override suspend fun consume(context: ConsumeContext<SubmitOrder>) {
-        context.publishAwait(OrderSubmitted(context.message.orderId))
+        context.publish(OrderSubmitted(context.message.orderId))
     }
 }
 ```
 
-`SuspendConsumer` runs through the same scoped consumer pipeline as Java
-consumers. MyServiceBus waits for the suspended handler before acknowledging
-the message, propagates failures into retry and fault handling, and cancels the
-coroutine when message delivery is cancelled.
+Kotlin owns both `Consumer` and `ConsumeContext`; they are projections rather
+than aliases for the Java types with the same familiar names. The projected
+context has real suspending `publish`, `send`, `respond`, `forward`, and
+`respondFault` members, avoiding collisions with Java's future-returning
+overloads. MyServiceBus still runs the consumer through the shared scoped
+pipeline, waits before acknowledging the message, propagates failures into
+retry and fault handling, and cancels the coroutine when delivery is cancelled.
 
-Use `publishAwait`, `sendAwait`, `respondAwait`, and `RequestClient.request` from
-suspending application code. Matching mediator extensions are available as
-well. Cancelling the calling coroutine cancels both the MyServiceBus operation
-token and its underlying Java future.
+The `jvm { ... }` escape hatch on `ConsumeContext` exposes capabilities that do
+not yet have a Kotlin projection. Raw Java `PublishEndpoint`, `SendEndpoint`,
+and `Mediator` values still use transitional `publishAwait` and `sendAwait`
+extensions until Kotlin-owned endpoint projections replace their colliding Java
+members. `RequestClient.request` is already collision-free. Cancelling the
+calling coroutine cancels both the MyServiceBus operation token and its
+underlying Java future.
 
 The same consumer syntax configures local dispatch:
 

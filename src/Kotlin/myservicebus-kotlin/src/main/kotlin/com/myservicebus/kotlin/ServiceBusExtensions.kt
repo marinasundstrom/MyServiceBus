@@ -5,7 +5,7 @@ package com.myservicebus.kotlin
 import com.myservicebus.BusFactoryConfigurator
 import com.myservicebus.BusRegistrationConfigurator
 import com.myservicebus.BusRegistrationContext
-import com.myservicebus.Consumer
+import com.myservicebus.Consumer as JvmConsumer
 import com.myservicebus.MessageBusServices
 import com.myservicebus.RequestClient
 import com.myservicebus.ScopedClientFactory
@@ -33,7 +33,7 @@ class ServiceBusConfigurator internal constructor(
     internal val registeredKotlinConsumers = mutableSetOf<Class<*>>()
 
     /** Registers a Java-style consumer without a class literal. */
-    inline fun <reified TConsumer : Consumer<*>> consumer() {
+    inline fun <reified TConsumer : JvmConsumer<*>> consumer() {
         delegate.addConsumer(TConsumer::class.java)
     }
 
@@ -49,13 +49,13 @@ class ServiceBusConfigurator internal constructor(
     }
 
     /** Registers a suspending Kotlin consumer and infers its message type. */
-    inline fun <reified TConsumer : SuspendConsumer<*>> consumer(
+    inline fun <reified TConsumer : Consumer<*>> consumer(
         endpointName: String? = null,
         dispatcher: CoroutineDispatcher = Dispatchers.Default,
     ) {
         val consumerType = TConsumer::class.java
         if (registeredKotlinConsumers.add(consumerType)) {
-            delegate.registerSuspendConsumer(consumerType, endpointName, dispatcher)
+            delegate.registerKotlinConsumer(consumerType, endpointName, dispatcher)
         }
     }
 

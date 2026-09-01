@@ -3,7 +3,7 @@
 package com.myservicebus.kotlin
 
 import com.myservicebus.BusRegistrationConfigurator
-import com.myservicebus.ConsumeContext
+import com.myservicebus.ConsumeContext as JvmConsumeContext
 import com.myservicebus.ConsumerMethodInvoker
 import com.myservicebus.DefaultEndpointNameFormatter
 import com.myservicebus.MessageConsumer
@@ -32,10 +32,13 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 
-/** A consumer whose message handler can call suspending Kotlin APIs directly. */
-fun interface SuspendConsumer<TMessage : Any> {
+/** A Kotlin consumer whose message handler can call suspending APIs directly. */
+fun interface Consumer<TMessage : Any> {
     suspend fun consume(context: ConsumeContext<TMessage>)
 }
+
+@Deprecated("Use Consumer", ReplaceWith("Consumer<TMessage>"))
+typealias SuspendConsumer<TMessage> = Consumer<TMessage>
 
 /** A request handler that returns its response from suspending Kotlin code. */
 fun interface SuspendHandler<TRequest : Any, TResponse : Any> : ResultHandler<TRequest, TResponse> {
@@ -43,12 +46,12 @@ fun interface SuspendHandler<TRequest : Any, TResponse : Any> : ResultHandler<TR
 }
 
 @PublishedApi
-internal fun BusRegistrationConfigurator.registerSuspendConsumer(
-    consumerType: Class<out SuspendConsumer<*>>,
+internal fun BusRegistrationConfigurator.registerKotlinConsumer(
+    consumerType: Class<out Consumer<*>>,
     endpointName: String?,
     dispatcher: CoroutineDispatcher,
 ) {
-    val messageType = contractTypeArguments(consumerType, SuspendConsumer::class.java).single()
+    val messageType = contractTypeArguments(consumerType, Consumer::class.java).single()
     val annotationEndpoint = consumerType.getAnnotation(MessageConsumer::class.java)
         ?.value
         ?.takeIf(String::isNotBlank)
@@ -71,7 +74,7 @@ internal fun BusRegistrationConfigurator.registerSuspendConsumer(
         if (endpointNameExplicit) null else consumerType,
         ConsumerMethodInvoker { provider, context ->
             @Suppress("UNCHECKED_CAST")
-            val consumer = provider.getRequiredService(concreteConsumerType) as SuspendConsumer<Any>
+            val consumer = provider.getRequiredService(concreteConsumerType) as Consumer<Any>
             consumer.consumeAsync(context, dispatcher)
         },
     )
@@ -189,7 +192,8 @@ suspend fun <TMessage : Any> SendEndpoint.sendAwait(
 }
 
 /** Responds to the current request and suspends until delivery completes. */
-suspend fun <TMessage : Any> ConsumeContext<*>.respondAwait(message: TMessage) {
+@Deprecated("Use Kotlin ConsumeContext.respond")
+suspend fun <TMessage : Any> JvmConsumeContext<*>.respondAwait(message: TMessage) {
     awaitOperation { cancellationToken -> respond(message, cancellationToken) }
 }
 
@@ -290,18 +294,18 @@ internal fun unwrapCompletionFailure(failure: Throwable): Throwable =
     }
 
 @PublishedApi
-internal fun <TMessage : Any> SuspendConsumer<TMessage>.consumeAsync(
-    context: ConsumeContext<TMessage>,
+internal fun <TMessage : Any> Consumer<TMessage>.consumeAsync(
+    context: JvmConsumeContext<TMessage>,
     dispatcher: CoroutineDispatcher,
 ): CompletableFuture<Void> = coroutineFuture(context.cancellationToken, dispatcher) {
-    consume(context)
+    consume(ConsumeContext(context))
 }.asVoidFuture()
 
 private fun SuspendHandler<Any, Any>.handleAsync(
-    context: ConsumeContext<Any>,
+    context: JvmConsumeContext<Any>,
     dispatcher: CoroutineDispatcher,
 ): CompletableFuture<Void> = coroutineFuture(context.cancellationToken, dispatcher) {
-    context.respondAwait(handle(context.message))
+    ConsumeContext(context).respond(handle(context.message))
 }.asVoidFuture()
 
 private fun <T> coroutineFuture(

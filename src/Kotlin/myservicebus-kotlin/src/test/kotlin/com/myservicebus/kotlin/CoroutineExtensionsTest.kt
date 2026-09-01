@@ -1,10 +1,11 @@
 package com.myservicebus.kotlin
 
-import com.myservicebus.ConsumeContext
+import com.myservicebus.ConsumeContext as JvmConsumeContext
 import com.myservicebus.MediatorResponseTypeException
 import com.myservicebus.RequestClient
 import com.myservicebus.Response2
 import com.myservicebus.SendContext
+import com.myservicebus.SendEndpoint
 import com.myservicebus.SendEndpointProvider
 import com.myservicebus.di.ServiceCollection
 import com.myservicebus.tasks.CancellationToken
@@ -14,6 +15,7 @@ import java.util.concurrent.CompletionException
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
@@ -159,11 +161,49 @@ class CoroutineExtensionsTest {
     }
 
     @Test
+    fun `consume context uses familiar suspending messaging terms`() = runBlocking {
+        val endpoints = RecordingSendEndpointProvider()
+        val incoming = CoroutineMessage("projected")
+        val sharedContext = JvmConsumeContext(
+            incoming,
+            mutableMapOf<String, Any>("trace-id" to "context-projection"),
+            "loopback://response",
+            "loopback://fault",
+            CancellationToken.none(),
+            endpoints,
+        )
+        val context = ConsumeContext(sharedContext)
+
+        context.publish(ProjectedEvent("published")) { headers["operation"] = "publish" }
+        context.send("loopback://commands", ProjectedCommand("sent")) { headers["operation"] = "send" }
+        context.respond(ProjectedResponse("responded")) { headers["operation"] = "respond" }
+        context.forward("loopback://audit", ProjectedEvent("forwarded"))
+
+        assertSame(incoming, context.message)
+        assertEquals("context-projection", context.headers["trace-id"])
+        assertSame(sharedContext, context.jvm { this })
+        assertEquals(
+            listOf<Any?>(
+                ProjectedEvent("published"),
+                ProjectedCommand("sent"),
+                ProjectedResponse("responded"),
+                ProjectedEvent("forwarded"),
+            ),
+            endpoints.messages,
+        )
+        assertEquals(
+            listOf("publish", "send", "respond", null),
+            endpoints.contexts.map { it.headers["operation"] },
+        )
+        assertEquals("context-projection", endpoints.contexts.last().headers["trace-id"])
+    }
+
+    @Test
     fun `message cancellation cancels suspend consumer`() = runBlocking {
         val started = CompletableDeferred<Unit>()
         val stopped = CompletableDeferred<Unit>()
         val cancellation = CancellationTokenSource()
-        val context = ConsumeContext(
+        val context = JvmConsumeContext(
             CoroutineMessage("cancel"),
             emptyMap(),
             null,
@@ -171,7 +211,7 @@ class CoroutineExtensionsTest {
             cancellation.token(),
             SendEndpointProvider { error("No endpoint expected") },
         )
-        val consumer = SuspendConsumer<CoroutineMessage> {
+        val consumer = Consumer<CoroutineMessage> {
             started.complete(Unit)
             try {
                 awaitCancellation()
@@ -192,7 +232,7 @@ class CoroutineExtensionsTest {
     @Test
     fun `already cancelled message returns a cancelled consumer future`() {
         val cancellation = CancellationTokenSource().apply { cancel() }
-        val context = ConsumeContext(
+        val context = JvmConsumeContext(
             CoroutineMessage("already-cancelled"),
             emptyMap(),
             null,
@@ -201,7 +241,7 @@ class CoroutineExtensionsTest {
             SendEndpointProvider { error("No endpoint expected") },
         )
 
-        val future = SuspendConsumer<CoroutineMessage> { error("Consumer must not run") }
+        val future = Consumer<CoroutineMessage> { error("Consumer must not run") }
             .consumeAsync(context, Dispatchers.Unconfined)
 
         assertTrue(future.isCancelled)
@@ -210,7 +250,13 @@ class CoroutineExtensionsTest {
 
 data class CoroutineMessage(val value: String)
 
-class RecordingSuspendConsumer : SuspendConsumer<CoroutineMessage> {
+data class ProjectedEvent(val value: String)
+
+data class ProjectedCommand(val value: String)
+
+data class ProjectedResponse(val value: String)
+
+class RecordingSuspendConsumer : Consumer<CoroutineMessage> {
     override suspend fun consume(context: ConsumeContext<CoroutineMessage>) {
         delay(1)
         consumed = context.message
@@ -223,7 +269,7 @@ class RecordingSuspendConsumer : SuspendConsumer<CoroutineMessage> {
 
 data class InheritedMessage(val value: String)
 
-abstract class BaseSuspendConsumer<TMessage : Any> : SuspendConsumer<TMessage>
+abstract class BaseSuspendConsumer<TMessage : Any> : Consumer<TMessage>
 
 class InheritedSuspendConsumer : BaseSuspendConsumer<InheritedMessage>() {
     override suspend fun consume(context: ConsumeContext<InheritedMessage>) {
@@ -237,7 +283,7 @@ class InheritedSuspendConsumer : BaseSuspendConsumer<InheritedMessage>() {
 
 data class FailingMessage(val value: String)
 
-class FailingSuspendConsumer : SuspendConsumer<FailingMessage> {
+class FailingSuspendConsumer : Consumer<FailingMessage> {
     override suspend fun consume(context: ConsumeContext<FailingMessage>) {
         throw IllegalStateException(context.message.value)
     }
@@ -299,5 +345,25 @@ private class CapturingRequestClient : RequestClient<LookupOrder> {
             Response2.fromT2("rejected:${(context.message as LookupOrder).orderId}")
         @Suppress("UNCHECKED_CAST")
         return CompletableFuture.completedFuture(response as Response2<T1, T2>)
+    }
+}
+
+private class RecordingSendEndpointProvider : SendEndpointProvider {
+    val messages = mutableListOf<Any?>()
+    val contexts = mutableListOf<SendContext>()
+
+    override fun getSendEndpoint(uri: String): SendEndpoint = object : SendEndpoint {
+        override fun send(context: SendContext): CompletableFuture<Void> {
+            contexts += context
+            return send(context.message, context.cancellationToken)
+        }
+
+        override fun <T : Any?> send(
+            message: T,
+            cancellationToken: CancellationToken,
+        ): CompletableFuture<Void> {
+            messages += message
+            return CompletableFuture.completedFuture(null)
+        }
     }
 }

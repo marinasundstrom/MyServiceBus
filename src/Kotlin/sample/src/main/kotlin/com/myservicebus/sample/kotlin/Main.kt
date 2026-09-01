@@ -1,12 +1,12 @@
 package com.myservicebus.sample.kotlin
 
-import com.myservicebus.ConsumeContext
 import com.myservicebus.MessageBus
 import com.myservicebus.ScopedClientFactory
 import com.myservicebus.di.ServiceCollection
 import com.myservicebus.di.ServiceProvider
+import com.myservicebus.kotlin.ConsumeContext
+import com.myservicebus.kotlin.Consumer
 import com.myservicebus.kotlin.RequestResult
-import com.myservicebus.kotlin.SuspendConsumer
 import com.myservicebus.kotlin.SuspendHandler
 import com.myservicebus.kotlin.addServiceBus
 import com.myservicebus.kotlin.createRequestClient
@@ -15,7 +15,6 @@ import com.myservicebus.kotlin.getRequiredService
 import com.myservicebus.kotlin.publishAwait
 import com.myservicebus.kotlin.request
 import com.myservicebus.kotlin.requestOneOf
-import com.myservicebus.kotlin.respondAwait
 import com.myservicebus.rabbitmq.RabbitMqFactoryConfigurator
 import java.util.UUID
 import kotlinx.coroutines.CompletableDeferred
@@ -32,11 +31,11 @@ data class OrderStatus(val orderId: UUID, val status: String)
 
 data class OrderNotFound(val orderId: UUID)
 
-class SubmitOrderConsumer : SuspendConsumer<SubmitOrder> {
+class SubmitOrderConsumer : Consumer<SubmitOrder> {
     override suspend fun consume(context: ConsumeContext<SubmitOrder>) {
         val orderId = context.message.orderId
         println("Received SubmitOrder $orderId")
-        context.publishAwait(OrderSubmitted(orderId))
+        context.publish(OrderSubmitted(orderId))
         println("Published OrderSubmitted $orderId")
         received.complete(orderId)
     }
@@ -51,9 +50,9 @@ class LookupOrderHandler : SuspendHandler<LookupOrder, OrderStatus> {
         OrderStatus(request.orderId, "Pending")
 }
 
-class LookupOrderConsumer : SuspendConsumer<LookupOrder> {
+class LookupOrderConsumer : Consumer<LookupOrder> {
     override suspend fun consume(context: ConsumeContext<LookupOrder>) {
-        context.respondAwait(OrderStatus(context.message.orderId, "Pending"))
+        context.respond(OrderStatus(context.message.orderId, "Pending"))
     }
 }
 

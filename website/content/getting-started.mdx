@@ -92,9 +92,9 @@ public class SubmitOrderConsumer implements Consumer<SubmitOrder> {
   kotlin: `data class SubmitOrder(val orderId: UUID)
 data class OrderSubmitted(val orderId: UUID)
 
-class SubmitOrderConsumer : SuspendConsumer<SubmitOrder> {
+class SubmitOrderConsumer : Consumer<SubmitOrder> {
     override suspend fun consume(context: ConsumeContext<SubmitOrder>) {
-        context.publishAwait(OrderSubmitted(context.message.orderId))
+        context.publish(OrderSubmitted(context.message.orderId))
     }
 }`,
 };
