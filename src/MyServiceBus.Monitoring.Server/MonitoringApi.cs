@@ -220,11 +220,16 @@ public static class MonitoringApi
             .Produces(StatusCodes.Status404NotFound);
         query.MapGet("/observations", (
             string? application,
+            bool? attentionOnly,
+            int? offset,
             int? limit,
             MonitoringRepository repository,
             MonitoringDisclosurePolicy disclosure) =>
-            disclosure.Apply(repository.GetRecentObservations(application, limit ?? 100)))
-            .WithSummary("List recent bounded monitoring observations under the configured disclosure policy");
+        {
+            var page = repository.GetObservationIndex(application, attentionOnly ?? false, offset ?? 0, limit ?? 50);
+            return page with { Observations = disclosure.Apply(page.Observations) };
+        })
+            .WithSummary("List a filtered page of retained monitoring observations under the configured disclosure policy");
         query.MapGet("/messages/{messageId}/observations", (
             string messageId,
             MonitoringRepository repository,
@@ -235,11 +240,15 @@ public static class MonitoringApi
             string? application,
             string? status,
             string? search,
+            int? offset,
             int? limit,
             MonitoringRepository repository,
             MonitoringDisclosurePolicy disclosure) =>
-            repository.GetMessages(application, status, search, limit ?? 100).Select(disclosure.Apply).ToArray())
-            .WithSummary("Query monitoring-owned message summaries merged across producer and consumer observations");
+        {
+            var page = repository.GetMessageIndex(application, status, search, offset ?? 0, limit ?? 50);
+            return page with { Messages = page.Messages.Select(disclosure.Apply).ToArray() };
+        })
+            .WithSummary("Query a filtered page of monitoring-owned message summaries merged across producer and consumer observations");
         query.MapGet("/metrics", (string? application, int? windowSeconds, bool? byInstance, MonitoringRepository repository) =>
             repository.GetRates(application, windowSeconds ?? 60, byInstance ?? false, DateTimeOffset.UtcNow))
             .WithSummary("Query rates, counts, latency, retries, and failures for a time window");

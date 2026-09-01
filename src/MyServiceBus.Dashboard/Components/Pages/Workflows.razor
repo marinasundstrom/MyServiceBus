@@ -17,11 +17,11 @@
     <div class="workflow-catalog-filters" aria-label="Filter declared workflows">
         <label>
             <span>Search</span>
-            <input type="search" placeholder="Workflow or owner" @bind="search" @bind:event="oninput" />
+            <input type="search" placeholder="Workflow or owner" @bind="search" @bind:event="oninput" @bind:after="ResetPage" />
         </label>
         <label>
             <span>Type</span>
-            <select @bind="kindFilter">
+            <select @bind="kindFilter" @bind:after="ResetPage">
                 <option value="all">All types</option>
                 <option value="choreography">Choreography</option>
                 <option value="saga">Saga / orchestration</option>
@@ -43,7 +43,7 @@
     else
     {
         <div class="workflow-declaration-list" role="list">
-            @foreach (var workflow in FilteredWorkflows)
+            @foreach (var workflow in PageWorkflows)
             {
                 <a class="workflow-declaration-list-item" href="@DefinitionHref(workflow)" role="listitem">
                     <div class="workflow-declaration-identity">
@@ -68,6 +68,7 @@
                 </a>
             }
         </div>
+        <ListPagination Offset="pagination.Offset(FilteredWorkflows)" PageSize="PageSize" ItemCount="PageWorkflows.Count" Total="pagination.Total(FilteredWorkflows)" Live="true" UpdatesAvailable="pagination.UpdatesAvailable(FilteredWorkflows)" ShowLatest="ShowLatestAsync" PageChanged="ChangePageAsync" />
     }
 </section>
 
@@ -77,8 +78,12 @@
 </div>
 
 @code {
+    private const int PageSize = 25;
     private string search = string.Empty;
     private string kindFilter = "all";
+    private readonly LivePaginationState<MonitoringWorkflowCatalogItem> pagination = new(
+        PageSize,
+        workflow => $"{workflow.WorkflowId}\u001f{workflow.Kind}\u001f{workflow.LastCapturedAtUtc:O}\u001f{workflow.OnlineInstanceCount}\u001f{workflow.ObservedRunCount}");
 
     private IReadOnlyList<MonitoringWorkflowCatalogItem> FilteredWorkflows
         => Dashboard.WorkflowCatalog
@@ -89,12 +94,29 @@
             .OrderBy(workflow => workflow.WorkflowId, StringComparer.Ordinal)
             .ToArray();
 
+    private IReadOnlyList<MonitoringWorkflowCatalogItem> PageWorkflows => pagination.Page(FilteredWorkflows);
+
     private bool FiltersApplied => kindFilter != "all" || !string.IsNullOrWhiteSpace(search);
 
     private void ClearFilters()
     {
         search = string.Empty;
         kindFilter = "all";
+        pagination.ShowLatest();
+    }
+
+    private void ResetPage() => pagination.ShowLatest();
+
+    private Task ChangePageAsync(int value)
+    {
+        pagination.MoveTo(value, FilteredWorkflows);
+        return Task.CompletedTask;
+    }
+
+    private Task ShowLatestAsync()
+    {
+        pagination.ShowLatest();
+        return Task.CompletedTask;
     }
 
     private static string KindLabel(string kind) => kind == "saga" ? "Saga / orchestration" : "Choreography";

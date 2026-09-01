@@ -51,14 +51,14 @@
             {
                 <article class="request-response-exchange @(exchange.HasFailures ? "failed" : exchange.Status)">
                     <header>
-                        <div><span class="run-status @(exchange.HasFailures ? "failed" : exchange.Status)"></span><strong>@StatusLabel(exchange.Status)</strong><small class="mono">@ShortIdentity(exchange.RequestId)</small></div>
+                        <div><span class="run-status @(exchange.HasFailures ? "faulted" : exchange.Status)"></span><strong>@StatusLabel(exchange.Status)</strong><small class="mono">@ShortIdentity(exchange.RequestId)</small></div>
                         <span>@FormatDuration(exchange.DurationMs)</span>
                     </header>
                     <div class="request-response-route">
                         <div class="request-response-participant"><strong>@exchange.RequesterApplication</strong><small>@exchange.RequesterInstanceId</small></div>
                         <div class="request-response-messages" aria-label="Request and response messages">
                             <div><span>@ShortMessageType(exchange.RequestMessageType)</span><b>→</b></div>
-                            <div class="response"><b>←</b><span>@(exchange.ResponseMessageType is null ? "Awaiting response" : ShortMessageType(exchange.ResponseMessageType))</span></div>
+                            <div class="response"><b>←</b><span>@ResponseLabel(exchange)</span></div>
                         </div>
                         <div class="request-response-participant"><strong>@(exchange.ResponderApplication ?? "Awaiting responder")</strong><small>@(exchange.ResponderInstanceId ?? "No consumer evidence")</small></div>
                     </div>
@@ -165,6 +165,11 @@
         "failed" => "Failure evidence observed",
         _ => "Awaiting consumer evidence"
     };
+
+    private static string ResponseLabel(MonitoringRequestResponseExchange exchange)
+        => exchange.ResponseMessageType is not null
+            ? ShortMessageType(exchange.ResponseMessageType)
+            : exchange.HasFailures ? "Fault response" : "Awaiting response";
 
     private static string ShortIdentity(string value) => value.Length <= 12 ? value : value[..8];
 

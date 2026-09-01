@@ -74,6 +74,7 @@ body { margin: 0; min-height: 100vh; background: radial-gradient(circle at 15% 0
 .topbar-status > div { display: flex; min-width: 0; flex-direction: column; }
 .topbar-status .status-dot { flex: 0 0 auto; }
 .topbar-status strong { font-size: .82rem; }
+.topbar-status-title-short { display: none; }
 .topbar span { color: var(--text-dim); font-size: .78rem; letter-spacing: .05em; text-transform: uppercase; }
 .topbar-status > div span { overflow: hidden; font-size: .67rem; letter-spacing: .035em; text-overflow: ellipsis; white-space: nowrap; }
 .brand-mark { width: 38px; height: 38px; display: grid; place-items: center; border-radius: 11px; background: var(--accent); color: var(--accent-ink); font-weight: 900; font-size: .78rem; }
@@ -179,7 +180,7 @@ td small { display: block; margin-top: 4px; color: var(--text-dim); font-size: .
 .table-note { margin: 0; padding: 0 24px 20px; }
 .mono { max-width: 260px; overflow: hidden; text-overflow: ellipsis; font-family: "SFMono-Regular", Consolas, monospace; color: var(--text-muted); }
 .message-index { overflow: hidden; }
-.message-filters { display: grid; grid-template-columns: minmax(240px, 1fr) minmax(150px, .3fr); gap: 12px; padding: 16px 20px; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); background: var(--surface-deep); }
+.message-filters { display: grid; grid-template-columns: minmax(240px, 1fr) minmax(150px, .3fr) auto auto; gap: 12px; align-items: end; padding: 16px 20px; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); background: var(--surface-deep); }
 .message-filters label { display: grid; gap: 6px; }
 .message-filters label > span { color: var(--text-dim); font-size: .62rem; font-weight: 750; letter-spacing: .06em; text-transform: uppercase; }
 .message-filters input, .message-filters select { min-width: 0; padding: 9px 11px; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--surface-solid); color: var(--text); font: inherit; font-size: .75rem; }
@@ -302,8 +303,9 @@ td small { display: block; margin-top: 4px; color: var(--text-dim); font-size: .
 .flow-relationship-paths span { color: var(--text-dim); font-size: .58rem; text-transform: capitalize; }
 .flow-relationship-paths small { color: var(--text-soft); font-size: .61rem; font-weight: 700; }
 .request-response-list { display: grid; gap: 12px; padding: 16px 20px 20px; background: var(--surface-deep); }
+.request-response-panel { margin-top: 18px; overflow: hidden; }
 .request-response-exchange { padding: 13px 14px; border: 1px solid var(--border); border-radius: 11px; background: var(--surface-solid); }
-.request-response-exchange.failed { border-color: color-mix(in srgb, var(--danger) 45%, var(--border)); }
+.request-response-exchange.failed { border-color: color-mix(in srgb, var(--danger) 45%, var(--border)); background: color-mix(in srgb, var(--danger-surface) 55%, var(--surface-solid)); }
 .request-response-exchange > header, .request-response-exchange > header > div, .request-response-exchange > footer { display: flex; gap: 8px; align-items: center; }
 .request-response-exchange > header, .request-response-exchange > footer { justify-content: space-between; }
 .request-response-exchange > header { font-size: .7rem; }
@@ -373,13 +375,21 @@ td small { display: block; margin-top: 4px; color: var(--text-dim); font-size: .
 .workflow-run-filters label > span { color: var(--text-dim); font-size: .65rem; font-weight: 750; letter-spacing: .06em; text-transform: uppercase; }
 .workflow-run-filters input, .workflow-run-filters select { min-width: 0; padding: 10px 11px; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--surface-solid); color: var(--text); font: inherit; font-size: .76rem; }
 .workflow-run-filters input:focus, .workflow-run-filters select:focus { outline: 2px solid color-mix(in srgb, var(--accent) 40%, transparent); border-color: var(--accent); }
-.workflow-filter-action, .workflow-run-pagination button { padding: 10px 13px; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--surface-raised); color: var(--text); font: inherit; font-size: .72rem; font-weight: 750; cursor: pointer; }
-.workflow-filter-action:hover, .workflow-run-pagination button:hover { border-color: var(--accent); }
-.workflow-filter-action:disabled, .workflow-run-pagination button:disabled { opacity: .45; cursor: default; }
+.workflow-filter-action, .workflow-run-pagination button, .list-pagination button { padding: 10px 13px; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--surface-raised); color: var(--text); font: inherit; font-size: .72rem; font-weight: 750; cursor: pointer; }
+.workflow-filter-action:hover, .workflow-run-pagination button:hover, .list-pagination button:hover { border-color: var(--accent); }
+.workflow-filter-action:disabled, .workflow-run-pagination button:disabled, .list-pagination button:disabled { opacity: .45; cursor: default; }
 .workflow-filter-reset { padding: 10px 11px; border: 1px solid var(--border); border-radius: 8px; background: transparent; color: var(--text-dim); font: inherit; font-size: .68rem; font-weight: 750; cursor: pointer; }
 .workflow-filter-reset:hover, .workflow-filter-reset:focus-visible { border-color: var(--border-strong); color: var(--text); }
 .workflow-run-pagination { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 14px 20px; border-top: 1px solid var(--border); color: var(--text-dim); font-size: .7rem; }
 .workflow-run-pagination > div { display: flex; gap: 8px; }
+.list-pagination { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 14px 20px; border-top: 1px solid var(--border); color: var(--text-dim); font-size: .7rem; }
+.list-pagination > div { display: flex; gap: 8px; }
+.list-pagination > span { display: flex; align-items: center; gap: 10px; }
+.list-live-status { display: inline-flex; align-items: center; gap: 5px; color: var(--accent); font-style: normal; font-weight: 750; }
+.list-live-status .status-dot { width: 7px; height: 7px; margin: 0; }
+.list-update-notice { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 11px 20px; border-top: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border)); background: color-mix(in srgb, var(--accent) 8%, var(--surface-deep)); color: var(--text-soft); font-size: .72rem; }
+.list-update-notice button { padding: 7px 10px; border: 1px solid var(--accent); border-radius: 8px; background: var(--accent); color: var(--accent-ink); font: inherit; font-size: .68rem; font-weight: 800; cursor: pointer; white-space: nowrap; }
+.list-update-notice button:disabled { opacity: .45; cursor: default; }
 .workflow-run-list { display: grid; }
 .workflow-run-list-item { display: grid; grid-template-columns: minmax(130px, .72fr) minmax(210px, 1.35fr) minmax(120px, .72fr) minmax(125px, .72fr) minmax(190px, 1fr) auto; gap: 14px; align-items: center; min-width: 0; padding: 14px 18px; border-top: 1px solid var(--border-subtle); color: inherit; text-decoration: none; transition: background 120ms ease; }
 .workflow-run-list-item:first-child { border-top: 0; }
@@ -603,8 +613,8 @@ td small { display: block; margin-top: 4px; color: var(--text-dim); font-size: .
 :root[data-density="compact"] .workflow-run-filters input,
 :root[data-density="compact"] .workflow-run-filters select,
 :root[data-density="compact"] .workflow-filter-action,
-:root[data-density="compact"] .workflow-run-pagination button { padding-block: 7px; }
-:root[data-density="compact"] .workflow-run-pagination { padding: 9px 14px; }
+:root[data-density="compact"] .workflow-run-pagination button, :root[data-density="compact"] .list-pagination button { padding-block: 7px; }
+:root[data-density="compact"] .workflow-run-pagination, :root[data-density="compact"] .list-pagination { padding: 9px 14px; }
 :root[data-density="compact"] .workflow-run-list-item { gap: 11px; padding: 10px 14px; }
 :root[data-density="compact"] .workflow-catalog-filters { gap: 8px; padding: 10px 14px; }
 :root[data-density="compact"] .workflow-declaration-list-item { gap: 11px; padding: 10px 14px; }
@@ -625,6 +635,7 @@ td small { display: block; margin-top: 4px; color: var(--text-dim); font-size: .
 :root[data-density="compact"] .replica-flow-map-canvas { min-height: 540px; }
 :root[data-density="compact"] .flow-relationship-list { gap: 9px; padding: 11px 14px 14px; }
 :root[data-density="compact"] .message-filters { padding: 10px 14px; }
+:root[data-density="compact"] .request-response-panel { margin-top: 12px; }
 :root[data-density="compact"] .message-list-item { gap: 10px; padding: 9px 14px; }
 :root[data-density="compact"] .message-detail-heading { padding: 16px 18px; }
 :root[data-density="compact"] .message-timeline-item { padding: 9px 14px; }
@@ -690,7 +701,7 @@ td small { display: block; margin-top: 4px; color: var(--text-dim); font-size: .
 @media (max-width: 900px) {
     .app-shell { display: block; }
     .sidebar { position: static; width: 100%; height: auto; padding: 14px 4vw; border-right: 0; border-bottom: 1px solid var(--border); }
-    .sidebar nav { flex-direction: row; gap: 4px; margin-top: 14px; padding-bottom: 5px; overflow-x: auto; scroll-snap-type: x proximity; }
+    .sidebar nav { flex-direction: row; gap: 4px; margin-top: 14px; padding: 0 30px 5px 0; overflow-x: auto; scroll-snap-type: x proximity; -webkit-mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 34px), transparent 100%); mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 34px), transparent 100%); }
     .sidebar nav a { white-space: nowrap; }
     .sidebar nav a { scroll-snap-align: start; }
     .nav-label, .sidebar-note { display: none; }
@@ -698,10 +709,13 @@ td small { display: block; margin-top: 4px; color: var(--text-dim); font-size: .
 }
 
 @media (max-width: 520px) {
-    .topbar { gap: 8px; }
+    .topbar { gap: 7px; padding-inline: 10px; }
     .topbar-status > div span { display: none; }
-    .topbar-status strong { max-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .theme-selector select, .density-selector select { max-width: 92px; padding-right: 24px; }
+    .topbar-status-title-full { display: none; }
+    .topbar-status-title-short { display: block; }
+    .topbar-status strong { white-space: nowrap; }
+    .theme-selector select { width: 96px; padding-right: 24px; }
+    .density-selector select { width: 136px; padding-right: 24px; }
     .overview-grid, .drilldown-grid { grid-template-columns: 1fr; }
     .overview-grid .metric { min-height: 92px; }
     .section-heading { align-items: start; flex-direction: column; }

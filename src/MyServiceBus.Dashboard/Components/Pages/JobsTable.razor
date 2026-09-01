@@ -1,5 +1,5 @@
 <section class="panel instances scheduled-work-panel">
-    <div class="section-heading"><div><p class="eyebrow">Current lifecycle</p><h2>Tracked jobs</h2></div><span>Progress, outcomes, and bounded attempts</span></div>
+    <div class="section-heading"><div><p class="eyebrow">Current lifecycle</p><h2>Tracked jobs</h2></div><span>@Items.Count tracked · progress, outcomes, and bounded attempts</span></div>
     @if (Items.Count == 0)
     {
         <p class="panel-empty">No tracked jobs have been reported. The application may not use job consumers, may be offline, or its configured provider may not expose job state yet.</p>
@@ -9,7 +9,7 @@
         <div class="table-wrap"><table>
             <thead><tr><th>Status</th><th>Application</th><th>Job</th><th>Progress</th><th>Timing</th><th>Attempts</th><th>Provider</th><th>Reported by</th></tr></thead>
             <tbody>
-                @foreach (var item in Items)
+                @foreach (var item in PageItems)
                 {
                     <tr>
                         <td><span class="status-dot @StatusClass(item.Job.Status)"></span><strong>@item.Job.Status</strong><small>Updated @item.Job.UpdatedAtUtc.LocalDateTime.ToString("HH:mm:ss")</small></td>
@@ -38,12 +38,32 @@
                 }
             </tbody>
         </table></div>
+        <ListPagination Offset="pagination.Offset(Items)" PageSize="PageSize" ItemCount="PageItems.Count" Total="pagination.Total(Items)" Live="true" UpdatesAvailable="pagination.UpdatesAvailable(Items)" ShowLatest="ShowLatestAsync" PageChanged="ChangePageAsync" />
     }
 </section>
 
 @code {
+    private const int PageSize = 25;
+
     [Parameter, EditorRequired]
     public required IReadOnlyList<MonitoringJobSummary> Items { get; set; }
+
+    private readonly LivePaginationState<MonitoringJobSummary> pagination = new(
+        PageSize,
+        item => $"{item.ApplicationName}\u001f{item.Job.JobId}\u001f{item.Job.Status}\u001f{item.Job.UpdatedAtUtc:O}");
+    private IReadOnlyList<MonitoringJobSummary> PageItems => pagination.Page(Items);
+
+    private Task ChangePageAsync(int value)
+    {
+        pagination.MoveTo(value, Items);
+        return Task.CompletedTask;
+    }
+
+    private Task ShowLatestAsync()
+    {
+        pagination.ShowLatest();
+        return Task.CompletedTask;
+    }
 
     private static string StatusClass(string status) => status switch
     {

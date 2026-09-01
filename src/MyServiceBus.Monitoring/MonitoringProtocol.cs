@@ -575,6 +575,12 @@ public sealed record MonitoringObservationRecord(
     string BusId,
     MonitoringObservation Observation);
 
+public sealed record MonitoringObservationIndexPage(
+    int Offset,
+    int Limit,
+    int Total,
+    IReadOnlyList<MonitoringObservationRecord> Observations);
+
 public sealed record MonitoringMessageSummary(
     string MessageId,
     string? MessageType,
@@ -591,6 +597,12 @@ public sealed record MonitoringMessageSummary(
     string? RequestId,
     string? CausationMessageId,
     string? MessageBodyStatus);
+
+public sealed record MonitoringMessageIndexPage(
+    int Offset,
+    int Limit,
+    int Total,
+    IReadOnlyList<MonitoringMessageSummary> Messages);
 
 public sealed record MonitoringFlowEdge(
     string SourceApplication,

@@ -238,6 +238,12 @@ public class MonitoringRepositoryTests
         active.LatestObservationAtUtc.ShouldBe(now.AddSeconds(-3));
         active.Complete.ShouldBeTrue();
 
+        var attentionPage = repository.GetObservationIndex("orders", true, 1, 1);
+        attentionPage.Offset.ShouldBe(1);
+        attentionPage.Limit.ShouldBe(1);
+        attentionPage.Total.ShouldBe(2);
+        attentionPage.Observations.Single().Observation.Kind.ShouldBe("consume_faulted");
+
         var recovered = repository.GetDashboardSummary(60, now.AddSeconds(61));
         recovered.FailureCount.ShouldBe(0);
         recovered.RetryCount.ShouldBe(0);
@@ -1221,6 +1227,16 @@ public class MonitoringRepositoryTests
         message.ParticipantApplications.ShouldBe(["orders", "payments"]);
         message.ObservationCount.ShouldBe(2);
         message.MessageBodyStatus.ShouldBe("captured");
+
+        var secondPage = repository.GetMessageIndex(null, null, null, 1, 1);
+        secondPage.Offset.ShouldBe(1);
+        secondPage.Limit.ShouldBe(1);
+        secondPage.Total.ShouldBe(2);
+        secondPage.Messages.Select(item => item.MessageId).ShouldBe(["message-1"]);
+
+        var filteredPage = repository.GetMessageIndex("payments", "handled", "SubmitOrder", 0, 25);
+        filteredPage.Total.ShouldBe(1);
+        filteredPage.Messages.Single().MessageId.ShouldBe("message-1");
 
         var timeline = repository.GetMessageObservations("message-1");
         timeline.Select(record => record.Observation.MessageId).ShouldBe(["message-1", "message-1", "message-2"]);

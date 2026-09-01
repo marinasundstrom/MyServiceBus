@@ -1,0 +1,58 @@
+@if (Total > 0)
+{
+    @if (UpdatesAvailable)
+    {
+        <div class="list-update-notice" role="status">
+            <span>Live data changed while this page was held stable.</span>
+            <button type="button" @onclick="ShowLatest" disabled="@Disabled">Show latest</button>
+        </div>
+    }
+    <nav class="list-pagination" aria-label="List pages">
+        <span>
+            Showing @(Offset + 1)–@Math.Min(Offset + ItemCount, Total) of @Total
+            @if (Live && Offset == 0)
+            {
+                <em class="list-live-status"><span class="status-dot online"></span>Live</em>
+            }
+        </span>
+        <div>
+            <button type="button" @onclick="PreviousPageAsync" disabled="@(Disabled || Offset == 0)">← Previous</button>
+            <button type="button" @onclick="NextPageAsync" disabled="@(Disabled || Offset + ItemCount >= Total)">Next →</button>
+        </div>
+    </nav>
+}
+
+@code {
+    [Parameter]
+    public int Offset { get; set; }
+
+    [Parameter]
+    public int PageSize { get; set; }
+
+    [Parameter]
+    public int ItemCount { get; set; }
+
+    [Parameter]
+    public int Total { get; set; }
+
+    [Parameter]
+    public bool Disabled { get; set; }
+
+    [Parameter]
+    public bool Live { get; set; }
+
+    [Parameter]
+    public bool UpdatesAvailable { get; set; }
+
+    [Parameter]
+    public EventCallback<int> PageChanged { get; set; }
+
+    [Parameter]
+    public EventCallback ShowLatest { get; set; }
+
+    private Task PreviousPageAsync()
+        => PageChanged.InvokeAsync(Math.Max(0, Offset - PageSize));
+
+    private Task NextPageAsync()
+        => PageChanged.InvokeAsync(Offset + PageSize);
+}

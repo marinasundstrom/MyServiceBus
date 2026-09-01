@@ -2,6 +2,8 @@
 @implements IDisposable
 @inject MonitoringDashboardState Dashboard
 @inject Microsoft.Extensions.Options.IOptions<DashboardOptions> Options
+@inject NavigationManager Navigation
+@inject IJSRuntime JavaScript
 
 <div class="app-shell">
     <a class="skip-link" href="#main-content">Skip to dashboard content</a>
@@ -57,8 +59,9 @@
         <header class="topbar">
             <div class="topbar-status">
                 <span class="status-dot @ConnectionClass"></span>
-                <div>
-                    <strong role="status" aria-live="polite">@ConnectionTitle</strong>
+                <div role="status" aria-live="polite">
+                    <strong class="topbar-status-title-full">@ConnectionTitle</strong>
+                    <strong class="topbar-status-title-short">@ConnectionShortTitle</strong>
                     <span>@ConnectionDetail</span>
                 </div>
             </div>
@@ -74,6 +77,7 @@
 
 @code {
     private long FailureCount => Dashboard.Summary?.FailureCount ?? 0;
+    private bool revealActiveNavigation = true;
     private string FailureBadgeText => FailureCount > 99 ? "99+" : FailureCount.ToString();
     private int WorkflowFailureCount => Dashboard.WorkflowRunIndex?.Runs.Count(run => run.Status == "faulted") ?? 0;
     private string WorkflowsHref => WorkflowFailureCount > 0 ? "/workflows?status=faulted" : "/workflows";
@@ -83,6 +87,9 @@
     private string ConnectionTitle => Dashboard.Error is not null
         ? "Monitoring unavailable"
         : Dashboard.LiveConnected ? "Live monitoring" : "Monitoring by polling";
+    private string ConnectionShortTitle => Dashboard.Error is not null
+        ? "Unavailable"
+        : Dashboard.LiveConnected ? "Live" : "Polling";
     private string ConnectionDetail => Dashboard.Error is not null
         ? $"Last data {Dashboard.UpdatedAt.ToLocalTime():HH:mm:ss}"
         : Dashboard.LiveConnected
@@ -102,9 +109,32 @@
         }
     }
 
-    protected override void OnInitialized() => Dashboard.Changed += OnDashboardChanged;
+    protected override void OnInitialized()
+    {
+        Dashboard.Changed += OnDashboardChanged;
+        Navigation.LocationChanged += OnLocationChanged;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!revealActiveNavigation)
+            return;
+
+        revealActiveNavigation = false;
+        await JavaScript.InvokeVoidAsync("dashboardNavigation.revealActive");
+    }
+
+    private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs args)
+    {
+        revealActiveNavigation = true;
+        _ = InvokeAsync(StateHasChanged);
+    }
 
     private void OnDashboardChanged() => _ = InvokeAsync(StateHasChanged);
 
-    public void Dispose() => Dashboard.Changed -= OnDashboardChanged;
+    public void Dispose()
+    {
+        Dashboard.Changed -= OnDashboardChanged;
+        Navigation.LocationChanged -= OnLocationChanged;
+    }
 }

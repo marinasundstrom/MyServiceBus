@@ -1,5 +1,5 @@
 <section class="panel instances scheduled-work-panel">
-    <div class="section-heading"><div><p class="eyebrow">Definitions</p><h2>Recurring jobs</h2></div><span>Cadence and next planned occurrence</span></div>
+    <div class="section-heading"><div><p class="eyebrow">Definitions</p><h2>Recurring jobs</h2></div><span>@Items.Count defined · cadence and next planned occurrence</span></div>
     @if (Items.Count == 0)
     {
         <p class="panel-empty">No recurring jobs have been reported. The application may not use recurring work, may be offline, or its configured provider may not expose definitions yet.</p>
@@ -9,7 +9,7 @@
         <div class="table-wrap"><table>
             <thead><tr><th>Status</th><th>Application</th><th>Job</th><th>Cadence</th><th>Next run</th><th>Provider</th><th>Reported by</th></tr></thead>
             <tbody>
-                @foreach (var item in Items)
+                @foreach (var item in PageItems)
                 {
                     <tr>
                         <td><span class="status-dot @StatusClass(item.Job.Status)"></span><strong>@item.Job.Status</strong><small>Revision @item.Job.Revision</small></td>
@@ -23,12 +23,32 @@
                 }
             </tbody>
         </table></div>
+        <ListPagination Offset="pagination.Offset(Items)" PageSize="PageSize" ItemCount="PageItems.Count" Total="pagination.Total(Items)" Live="true" UpdatesAvailable="pagination.UpdatesAvailable(Items)" ShowLatest="ShowLatestAsync" PageChanged="ChangePageAsync" />
     }
 </section>
 
 @code {
+    private const int PageSize = 25;
+
     [Parameter, EditorRequired]
     public required IReadOnlyList<MonitoringRecurringJobSummary> Items { get; set; }
+
+    private readonly LivePaginationState<MonitoringRecurringJobSummary> pagination = new(
+        PageSize,
+        item => $"{item.ApplicationName}\u001f{item.Job.DefinitionId}\u001f{item.Job.Revision}\u001f{item.Job.Status}\u001f{item.Job.UpdatedAtUtc:O}");
+    private IReadOnlyList<MonitoringRecurringJobSummary> PageItems => pagination.Page(Items);
+
+    private Task ChangePageAsync(int value)
+    {
+        pagination.MoveTo(value, Items);
+        return Task.CompletedTask;
+    }
+
+    private Task ShowLatestAsync()
+    {
+        pagination.ShowLatest();
+        return Task.CompletedTask;
+    }
 
     private static string StatusClass(string status) => status switch
     {

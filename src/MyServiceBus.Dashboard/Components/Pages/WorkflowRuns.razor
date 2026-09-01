@@ -81,19 +81,21 @@
                 </a>
             }
         </div>
-        <div class="workflow-run-pagination">
-            <span>Showing @(page.Offset + 1)–@Math.Min(page.Offset + page.Runs.Count, page.Total) of @(page.Total)</span>
-            <div>
-                <button type="button" @onclick="PreviousPageAsync" disabled="@(loading || page.Offset == 0)">← Previous</button>
-                <button type="button" @onclick="NextPageAsync" disabled="@(loading || page.Offset + page.Runs.Count >= page.Total)">Next →</button>
-            </div>
-        </div>
+        <ListPagination Offset="page.Offset"
+                        PageSize="page.Limit"
+                        ItemCount="page.Runs.Count"
+                        Total="page.Total"
+                        Disabled="loading"
+                        Live="true"
+                        UpdatesAvailable="updatesAvailable"
+                        ShowLatest="ShowLatestAsync"
+                        PageChanged="LoadPageAsync" />
     }
 </section>
 
 <div class="guidance workflow-guidance">
     <strong>One index, two kinds of truth</strong>
-    <span>Choreography runs are reconstructed from bounded causal evidence. Saga runs reflect committed repository transitions, although this first transition history is still retained only in the bounded monitoring window. Open a run to see its kind-specific detail.</span>
+    <span>Choreography runs are reconstructed from bounded causal evidence. Saga runs reflect committed repository transitions retained according to the monitoring service's history policy. Open a run to see its kind-specific detail.</span>
 </div>
 
 @code {
@@ -117,7 +119,9 @@
     private string statusFilter = "all";
     private MonitoringWorkflowRunIndexPage? queriedPage;
     private bool loading;
+    private bool updatesAvailable;
     private string? appliedQueryKey;
+    private string? historicalHeadSignature;
 
     private MonitoringWorkflowRunIndexPage? CurrentPage => queriedPage ?? Dashboard.WorkflowRunIndex;
     private bool FiltersApplied => typeFilter != "all" || statusFilter != "all" || !string.IsNullOrWhiteSpace(search);
@@ -179,14 +183,16 @@
         Navigation.NavigateTo(parameters.Count == 0 ? "/workflows" : $"/workflows?{string.Join("&", parameters)}", replace: true);
     }
 
-    private Task PreviousPageAsync()
-        => LoadPageAsync(Math.Max(0, (CurrentPage?.Offset ?? 0) - PageSize));
-
-    private Task NextPageAsync()
-        => LoadPageAsync((CurrentPage?.Offset ?? 0) + PageSize);
-
     private async Task LoadPageAsync(int offset)
     {
+        if (offset == 0 && !FiltersApplied)
+        {
+            queriedPage = null;
+            updatesAvailable = false;
+            historicalHeadSignature = null;
+            return;
+        }
+
         loading = true;
         try
         {
@@ -198,11 +204,34 @@
                 offset,
                 PageSize,
                 CancellationToken.None);
+            updatesAvailable = false;
+            historicalHeadSignature = offset > 0 ? DashboardHeadSignature() : null;
         }
         finally
         {
             loading = false;
         }
+    }
+
+    protected override void OnDashboardStateChanged()
+    {
+        if (CurrentPage?.Offset > 0)
+        {
+            updatesAvailable |= !string.Equals(historicalHeadSignature, DashboardHeadSignature(), StringComparison.Ordinal);
+            return;
+        }
+
+        if (FiltersApplied && !loading)
+            _ = InvokeAsync(() => LoadPageAsync(0));
+    }
+
+    private Task ShowLatestAsync() => LoadPageAsync(0);
+
+    private string DashboardHeadSignature()
+    {
+        var page = Dashboard.WorkflowRunIndex;
+        var first = page?.Runs.FirstOrDefault();
+        return $"{page?.Total ?? 0}\u001f{first?.WorkflowId}\u001f{first?.RunId}\u001f{first?.LastActivityAtUtc:O}\u001f{first?.Status}\u001f{first?.EvidenceCount}";
     }
 
     private static string RunHref(MonitoringWorkflowRunSummary run)

@@ -15,10 +15,36 @@
     <div class="table-wrap"><table>
         <thead><tr><th>Application</th><th>Sent / sec</th><th>Published / sec</th><th>Handled / sec</th><th>Faulted / sec</th><th>Retried / sec</th><th>Average time</th><th>p95 time</th><th>Coverage</th></tr></thead>
         <tbody>
-            @foreach (var rate in Dashboard.ApplicationRates.OrderByDescending(rate => rate.Rates.ConsumedPerSecond))
+            @foreach (var rate in PageRates)
             {
                 <tr><td><strong>@rate.ApplicationName</strong></td><td>@FormatRate(rate.Rates.SentPerSecond)</td><td>@FormatRate(rate.Rates.PublishedPerSecond)</td><td>@FormatRate(rate.Rates.ConsumedPerSecond)</td><td class="@(rate.Rates.FaultedPerSecond > 0 ? "fault" : null)">@FormatRate(rate.Rates.FaultedPerSecond)</td><td>@FormatRate(rate.Rates.RetriedPerSecond)</td><td>@FormatDuration(rate.AverageConsumeDurationMs)</td><td>@FormatDuration(rate.P95ConsumeDurationMs)</td><td>@(rate.Complete ? "Complete" : "Incomplete")</td></tr>
             }
         </tbody>
     </table></div>
+    <ListPagination Offset="pagination.Offset(OrderedRates)" PageSize="PageSize" ItemCount="PageRates.Count" Total="pagination.Total(OrderedRates)" Live="true" UpdatesAvailable="pagination.UpdatesAvailable(OrderedRates)" ShowLatest="ShowLatestAsync" PageChanged="ChangePageAsync" />
 </section>
+
+@code {
+    private const int PageSize = 25;
+    private readonly LivePaginationState<MonitoringRateSummary> pagination = new(
+        PageSize,
+        rate => $"{rate.ApplicationName}\u001f{rate.Counts.Consumed}\u001f{rate.Counts.ConsumeFaulted}\u001f{rate.AverageConsumeDurationMs}\u001f{rate.P95ConsumeDurationMs}");
+
+    private IReadOnlyList<MonitoringRateSummary> OrderedRates => Dashboard.ApplicationRates
+        .OrderByDescending(rate => rate.Rates.ConsumedPerSecond)
+        .ThenBy(rate => rate.ApplicationName, StringComparer.Ordinal)
+        .ToArray();
+    private IReadOnlyList<MonitoringRateSummary> PageRates => pagination.Page(OrderedRates);
+
+    private Task ChangePageAsync(int value)
+    {
+        pagination.MoveTo(value, OrderedRates);
+        return Task.CompletedTask;
+    }
+
+    private Task ShowLatestAsync()
+    {
+        pagination.ShowLatest();
+        return Task.CompletedTask;
+    }
+}
