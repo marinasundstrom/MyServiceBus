@@ -33,11 +33,11 @@ public sealed class PostgreSqlOutboxWriter : IOutboxWriter
         const string sql = """
             INSERT INTO myservicebus.outbox_message (
                 record_id, service_name, message_id, intent, destination_address, message_types, body, content_type, headers,
-                created_at_utc, request_id, correlation_id, conversation_id, initiator_id, response_address,
+                created_at_utc, request_id, correlation_id, conversation_id, initiator_id, causation_message_id, response_address,
                 fault_address, scheduled_at_utc, state, next_attempt_at_utc)
             VALUES (
                 @record_id, @service_name, @message_id, @intent, @destination_address, @message_types, @body, @content_type,
-                @headers, @created_at_utc, @request_id, @correlation_id, @conversation_id, @initiator_id,
+                @headers, @created_at_utc, @request_id, @correlation_id, @conversation_id, @initiator_id, @causation_message_id,
                 @response_address, @fault_address, @scheduled_at_utc, 0, @available_at_utc);
             """;
 
@@ -57,6 +57,7 @@ public sealed class PostgreSqlOutboxWriter : IOutboxWriter
         AddNullableUuid(command, "correlation_id", message.CorrelationId);
         AddNullableUuid(command, "conversation_id", message.ConversationId);
         AddNullableUuid(command, "initiator_id", message.InitiatorId);
+        AddNullableUuid(command, "causation_message_id", message.CausationMessageId);
         command.Parameters.AddWithValue("response_address", NpgsqlDbType.Text, (object?)message.ResponseAddress?.ToString() ?? DBNull.Value);
         command.Parameters.AddWithValue("fault_address", NpgsqlDbType.Text, (object?)message.FaultAddress?.ToString() ?? DBNull.Value);
         command.Parameters.AddWithValue("scheduled_at_utc", NpgsqlDbType.TimestampTz, (object?)message.ScheduledAtUtc ?? DBNull.Value);

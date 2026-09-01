@@ -53,7 +53,16 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
     public Task<ISendEndpoint> GetSendEndpoint(Uri uri)
     {
         var logger = _loggerFactory?.CreateLogger<TransportSendEndpoint>();
-        ISendEndpoint endpoint = new TransportSendEndpoint(_transportFactory, _sendPipe, _messageSerializer, uri, _address, _sendContextFactory, logger, hooks: _hooks);
+        ISendEndpoint endpoint = new TransportSendEndpoint(
+            _transportFactory,
+            _sendPipe,
+            _messageSerializer,
+            uri,
+            _address,
+            _sendContextFactory,
+            logger,
+            hooks: _hooks,
+            causationMessageId: MessageId);
         return Task.FromResult(endpoint);
     }
 
@@ -76,6 +85,7 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
         context.MessageId = Guid.NewGuid().ToString();
         context.ConversationId = receiveContext.ConversationId;
         context.InitiatorId = receiveContext.CorrelationId;
+        context.CausationMessageId = MessageId;
         context.SourceAddress = _address;
         context.DestinationAddress = uri;
         context.RoutingKey = exchangeName;
@@ -115,6 +125,7 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
         context.RequestId = receiveContext.RequestId;
         context.ConversationId = receiveContext.ConversationId;
         context.InitiatorId = receiveContext.CorrelationId;
+        context.CausationMessageId = MessageId;
         context.SourceAddress = _address;
         context.DestinationAddress = address;
 
@@ -156,6 +167,7 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
         context.RequestId = receiveContext.RequestId;
         context.ConversationId = receiveContext.ConversationId;
         context.InitiatorId = receiveContext.CorrelationId;
+        context.CausationMessageId = MessageId;
         context.SourceAddress = _address;
         context.DestinationAddress = address;
 
@@ -235,7 +247,9 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
             Stopwatch.GetElapsedTime(startedAt),
             exception,
             context.CorrelationId,
-            context.ConversationId?.ToString()));
+            context.ConversationId?.ToString(),
+            messageId: context.MessageId,
+            causationMessageId: context.CausationMessageId?.ToString()));
     }
 
 }

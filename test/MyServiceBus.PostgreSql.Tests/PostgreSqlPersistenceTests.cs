@@ -61,6 +61,10 @@ public sealed class PostgreSqlPersistenceTests : IAsyncLifetime
                     SELECT 1 FROM information_schema.columns
                     WHERE table_schema = 'myservicebus' AND table_name = 'outbox_message'
                       AND column_name = 'cancelled_at_utc'),
+                EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_schema = 'myservicebus' AND table_name = 'outbox_message'
+                      AND column_name = 'causation_message_id'),
                 to_regclass('myservicebus.recurring_job_definition') IS NOT NULL,
                 to_regclass('myservicebus.recurring_job_occurrence') IS NOT NULL,
                 to_regclass('myservicebus.job') IS NOT NULL,
@@ -69,13 +73,14 @@ public sealed class PostgreSqlPersistenceTests : IAsyncLifetime
             """);
         await using var reader = await verification.ExecuteReaderAsync();
         Assert.True(await reader.ReadAsync());
-        Assert.Equal(4, reader.GetInt32(0));
+        Assert.Equal(5, reader.GetInt32(0));
         Assert.True(reader.GetBoolean(1));
         Assert.True(reader.GetBoolean(2));
         Assert.True(reader.GetBoolean(3));
         Assert.True(reader.GetBoolean(4));
         Assert.True(reader.GetBoolean(5));
         Assert.True(reader.GetBoolean(6));
+        Assert.True(reader.GetBoolean(7));
     }
 
     [Fact]
@@ -110,6 +115,7 @@ public sealed class PostgreSqlPersistenceTests : IAsyncLifetime
         Assert.Equal(committed.ContentType, lease.Message.ContentType);
         Assert.Equal(committed.Headers, lease.Message.Headers);
         Assert.Equal(committed.CorrelationId, lease.Message.CorrelationId);
+        Assert.Equal(committed.CausationMessageId, lease.Message.CausationMessageId);
     }
 
     [Fact]
@@ -951,6 +957,7 @@ public sealed class PostgreSqlPersistenceTests : IAsyncLifetime
         {
             MessageId = Guid.NewGuid().ToString(),
             CorrelationId = Guid.NewGuid().ToString(),
+            CausationMessageId = Guid.NewGuid(),
             DestinationAddress = new Uri("rabbitmq://localhost/exchange/orders"),
             Intent = MessageIntent.Publish
         };

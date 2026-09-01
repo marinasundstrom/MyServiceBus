@@ -38,7 +38,9 @@ public sealed record MonitoringObservation(
     string? SpanId,
     int? RetryAttempt = null,
     int? RetryLimit = null,
-    IReadOnlyDictionary<string, string>? Properties = null);
+    IReadOnlyDictionary<string, string>? Properties = null,
+    string? MessageId = null,
+    string? CausationMessageId = null);
 
 public sealed record MonitoringOutboxDispatcherSummary(
     string ApplicationName,
@@ -309,7 +311,8 @@ public sealed record MonitoringFlowEdge(
     string OperationKind,
     long Count,
     DateTimeOffset FirstSeenAtUtc,
-    DateTimeOffset LastSeenAtUtc);
+    DateTimeOffset LastSeenAtUtc,
+    string MatchConfidence);
 
 public sealed record MonitoringReplicaFlowEdge(
     string SourceApplication,
@@ -324,4 +327,19 @@ public sealed record MonitoringReplicaFlowEdge(
     string OperationKind,
     long Count,
     DateTimeOffset FirstSeenAtUtc,
-    DateTimeOffset LastSeenAtUtc);
+    DateTimeOffset LastSeenAtUtc,
+    string MatchConfidence);
+
+public sealed record MonitoringCausalFlowEdge(
+    string ApplicationName,
+    string? ConsumerEndpointName,
+    string? TriggerMessageType,
+    string? TriggerMessageUrn,
+    string? OutputMessageType,
+    string? OutputMessageUrn,
+    string? DestinationAddress,
+    string OperationKind,
+    long Count,
+    DateTimeOffset FirstSeenAtUtc,
+    DateTimeOffset LastSeenAtUtc,
+    string MatchConfidence);

@@ -35,6 +35,12 @@ public class BusHookTests
             .ShouldContain("published");
         hook.Events.OfType<MessageOperationHookEvent>().Select(busEvent => busEvent.Kind)
             .ShouldContain("consumed");
+        var published = hook.Events.OfType<MessageOperationHookEvent>()
+            .Single(busEvent => busEvent.Kind == "published");
+        var consumed = hook.Events.OfType<MessageOperationHookEvent>()
+            .Single(busEvent => busEvent.Kind == "consumed");
+        published.MessageId.ShouldNotBeNullOrWhiteSpace();
+        consumed.MessageId.ShouldBe(published.MessageId);
     }
 
     [Fact]
@@ -53,6 +59,34 @@ public class BusHookTests
         await hostedService.StartAsync(CancellationToken.None);
 
         await provider.GetRequiredService<IMessageBus>().Publish(new TestMessage("hello"));
+        await hostedService.StopAsync(CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task Consumer_outgoing_operations_report_the_consumed_message_as_their_cause()
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddServiceBus(configurator =>
+        {
+            configurator.UsingMediator();
+            configurator.AddHook<RecordingHook>();
+            configurator.AddConsumer<ReactingConsumer>();
+        });
+
+        await using var provider = services.BuildServiceProvider();
+        var hostedService = provider.GetRequiredService<IHostedService>();
+        await hostedService.StartAsync(CancellationToken.None);
+        await provider.GetRequiredService<IMessageBus>().Publish(new TestMessage("react"));
+
+        var operations = provider.GetServices<IBusHook>().OfType<RecordingHook>().Single()
+            .Events.OfType<MessageOperationHookEvent>().ToArray();
+        var consumed = operations.Single(operation =>
+            operation.Kind == "consumed" && operation.MessageType == typeof(TestMessage).FullName);
+        var reaction = operations.Single(operation =>
+            operation.Kind == "published" && operation.MessageType == typeof(ReactionMessage).FullName);
+        reaction.CausationMessageId.ShouldBe(consumed.MessageId);
+
         await hostedService.StopAsync(CancellationToken.None);
     }
 
@@ -143,10 +177,14 @@ public class BusHookTests
             MessageUrn.For(typeof(TestMessage)),
             null,
             "loopback://test-message",
-            TimeSpan.Zero));
+            TimeSpan.Zero,
+            messageId: "message-1",
+            causationMessageId: "trigger-1"));
 
         var batchJson = await handler.BatchReceived.Task.WaitAsync(TimeSpan.FromSeconds(2));
         batchJson.ShouldContain("\"kind\":\"published\"");
+        batchJson.ShouldContain("\"messageId\":\"message-1\"");
+        batchJson.ShouldContain("\"causationMessageId\":\"trigger-1\"");
         await exporter.StopAsync(CancellationToken.None);
     }
 
@@ -306,10 +344,17 @@ public class BusHookTests
     }
 
     public sealed record TestMessage(string Value);
+    public sealed record ReactionMessage(string Value);
 
     public sealed class TestConsumer : IConsumer<TestMessage>
     {
         public Task Consume(ConsumeContext<TestMessage> context) => Task.CompletedTask;
+    }
+
+    public sealed class ReactingConsumer : IConsumer<TestMessage>
+    {
+        public Task Consume(ConsumeContext<TestMessage> context) =>
+            context.Publish(new ReactionMessage(context.Message.Value));
     }
 
     public sealed class RetryingConsumer : IConsumer<TestMessage>

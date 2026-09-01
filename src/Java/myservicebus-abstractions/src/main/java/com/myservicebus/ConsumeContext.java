@@ -166,6 +166,7 @@ public class ConsumeContext<T>
         if (context.getInitiatorId() == null) {
             context.setInitiatorId(correlationId);
         }
+        context.setCausationMessageId(messageId);
         String exchange = EntityNameFormatter.format(context.getMessage().getClass());
         URI dest = URI.create(publishAddressProvider.getPublishAddress(exchange));
         context.setSourceAddress(busAddress);
@@ -252,6 +253,7 @@ public class ConsumeContext<T>
             context.setConversationId(conversationId);
         }
         context.setInitiatorId(correlationId);
+        context.setCausationMessageId(messageId);
         SendEndpoint endpoint = getSendEndpoint(responseAddress);
         return endpoint.send(context);
     }
@@ -313,12 +315,16 @@ public class ConsumeContext<T>
             context.setConversationId(conversationId);
         }
         context.setInitiatorId(correlationId);
+        context.setCausationMessageId(messageId);
     }
 
 
     public <TMessage> CompletableFuture<Void> forward(String destination, TMessage message, CancellationToken cancellationToken) {
         SendEndpoint endpoint = getSendEndpoint(destination);
-        return endpoint.send(message, ctx -> ctx.getHeaders().putAll(headers), cancellationToken);
+        return endpoint.send(message, ctx -> {
+            ctx.getHeaders().putAll(headers);
+            ctx.setCausationMessageId(messageId);
+        }, cancellationToken);
     }
 
     public <TMessage> CompletableFuture<Void> forward(String destination, TMessage message) {
@@ -358,6 +364,7 @@ public class ConsumeContext<T>
                         context.setConversationId(conversationId);
                     }
                     context.setInitiatorId(correlationId);
+                    context.setCausationMessageId(messageId);
                 },
                 cancellationToken);
     }

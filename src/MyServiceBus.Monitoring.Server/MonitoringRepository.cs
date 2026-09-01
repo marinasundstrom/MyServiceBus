@@ -630,7 +630,8 @@ public sealed class MonitoringRepository
                 edge.TargetApplication,
                 edge.EndpointName,
                 edge.MessageUrn,
-                edge.OperationKind))
+                edge.OperationKind,
+                edge.MatchConfidence))
             .Select(group => new MonitoringFlowEdge(
                 group.Key.SourceApplication,
                 group.Key.TargetApplication,
@@ -640,7 +641,8 @@ public sealed class MonitoringRepository
                 group.Key.OperationKind,
                 group.Sum(edge => edge.Count),
                 group.Min(edge => edge.FirstSeenAtUtc),
-                group.Max(edge => edge.LastSeenAtUtc)))
+                group.Max(edge => edge.LastSeenAtUtc),
+                group.Key.MatchConfidence))
             .OrderByDescending(edge => edge.Count)
             .ThenBy(edge => edge.SourceApplication, StringComparer.Ordinal)
             .ThenBy(edge => edge.TargetApplication, StringComparer.Ordinal)
@@ -675,7 +677,7 @@ public sealed class MonitoringRepository
                     record.BusId,
                     observation.Kind);
                 foreach (var correlationKey in CorrelationKeys(observation))
-                    sources[correlationKey] = outboundSource;
+                    sources[correlationKey.Key] = outboundSource with { MatchConfidence = correlationKey.MatchConfidence };
                 continue;
             }
             if (!string.Equals(observation.Kind, "consumed", StringComparison.Ordinal))
@@ -684,7 +686,7 @@ public sealed class MonitoringRepository
             FlowSource? matchedSource = null;
             foreach (var correlationKey in CorrelationKeys(observation))
             {
-                if (sources.TryGetValue(correlationKey, out matchedSource))
+                if (sources.TryGetValue(correlationKey.Key, out matchedSource))
                     break;
             }
             if (matchedSource is null)
@@ -703,7 +705,8 @@ public sealed class MonitoringRepository
                 record.BusId,
                 observation.EndpointName,
                 observation.MessageUrn,
-                matchedSource.OperationKind);
+                matchedSource.OperationKind,
+                matchedSource.MatchConfidence);
             if (!edges.TryGetValue(edgeKey, out var edge))
             {
                 edge = new MutableReplicaFlowEdge(
@@ -717,6 +720,7 @@ public sealed class MonitoringRepository
                     observation.MessageType,
                     observation.MessageUrn,
                     matchedSource.OperationKind,
+                    matchedSource.MatchConfidence,
                     observation.OccurredAtUtc);
                 edges.Add(edgeKey, edge);
             }
@@ -733,6 +737,86 @@ public sealed class MonitoringRepository
             .ToArray();
     }
 
+    public IReadOnlyList<MonitoringCausalFlowEdge> GetCausalFlow(
+        string? applicationName,
+        int windowSeconds,
+        DateTimeOffset now)
+    {
+        var boundedWindow = Math.Clamp(windowSeconds, 10, (int)MetricRetention.TotalSeconds);
+        var start = now.AddSeconds(-boundedWindow);
+        MonitoringObservationRecord[] records;
+        lock (observationSync)
+        {
+            records = recentObservations
+                .Where(record => record.Observation.OccurredAtUtc >= start
+                    && record.Observation.OccurredAtUtc <= now)
+                .OrderBy(record => record.Observation.OccurredAtUtc)
+                .ToArray();
+        }
+
+        var consumedByMessageId = records
+            .Where(record => record.Observation.Kind is "consumed" or "consume_faulted"
+                && !string.IsNullOrWhiteSpace(record.Observation.MessageId))
+            .GroupBy(record => record.Observation.MessageId!, StringComparer.Ordinal)
+            .ToDictionary(
+                group => group.Key,
+                group => group.OrderBy(record => record.Observation.OccurredAtUtc).ToArray(),
+                StringComparer.Ordinal);
+        var edges = new Dictionary<CausalFlowEdgeKey, MutableCausalFlowEdge>();
+
+        foreach (var output in records.Where(record =>
+                     record.Observation.Kind is "sent" or "published" or "fault_published"
+                     && !string.IsNullOrWhiteSpace(record.Observation.CausationMessageId)))
+        {
+            if (!consumedByMessageId.TryGetValue(output.Observation.CausationMessageId!, out var candidates))
+                continue;
+            var trigger = candidates
+                .OrderByDescending(candidate => string.Equals(
+                    candidate.ApplicationName,
+                    output.ApplicationName,
+                    StringComparison.Ordinal))
+                .ThenBy(candidate => Math.Abs(
+                    (candidate.Observation.OccurredAtUtc - output.Observation.OccurredAtUtc).Ticks))
+                .FirstOrDefault();
+            if (trigger is null)
+                continue;
+            if (applicationName is not null
+                && !string.Equals(output.ApplicationName, applicationName, StringComparison.Ordinal))
+                continue;
+
+            var key = new CausalFlowEdgeKey(
+                output.ApplicationName,
+                trigger.Observation.EndpointName,
+                trigger.Observation.MessageUrn,
+                output.Observation.MessageUrn,
+                output.Observation.DestinationAddress,
+                output.Observation.Kind);
+            if (!edges.TryGetValue(key, out var edge))
+            {
+                edge = new MutableCausalFlowEdge(
+                    output.ApplicationName,
+                    trigger.Observation.EndpointName,
+                    trigger.Observation.MessageType,
+                    trigger.Observation.MessageUrn,
+                    output.Observation.MessageType,
+                    output.Observation.MessageUrn,
+                    output.Observation.DestinationAddress,
+                    output.Observation.Kind,
+                    output.Observation.OccurredAtUtc);
+                edges.Add(key, edge);
+            }
+            edge.Record(output.Observation.OccurredAtUtc);
+        }
+
+        return edges.Values
+            .Select(edge => edge.ToImmutable())
+            .OrderByDescending(edge => edge.Count)
+            .ThenBy(edge => edge.ApplicationName, StringComparer.Ordinal)
+            .ThenBy(edge => edge.TriggerMessageUrn, StringComparer.Ordinal)
+            .ThenBy(edge => edge.OutputMessageUrn, StringComparer.Ordinal)
+            .ToArray();
+    }
+
     private void PruneMetrics(DateTimeOffset cutoff)
     {
         var cutoffKey = cutoff.ToUnixTimeSeconds();
@@ -746,14 +830,16 @@ public sealed class MonitoringRepository
     internal void SetLastIngestAtUtc(DateTimeOffset? value)
         => Interlocked.Exchange(ref lastIngestUtcTicks, value?.UtcTicks ?? 0);
 
-    private static IEnumerable<string> CorrelationKeys(MonitoringObservation observation)
+    private static IEnumerable<FlowCorrelationKey> CorrelationKeys(MonitoringObservation observation)
     {
+        if (!string.IsNullOrWhiteSpace(observation.MessageId))
+            yield return new FlowCorrelationKey($"message:{observation.MessageId}", "exact_message");
         if (!string.IsNullOrWhiteSpace(observation.CorrelationId))
-            yield return $"correlation:{observation.CorrelationId}";
+            yield return new FlowCorrelationKey($"correlation:{observation.CorrelationId}", "correlated");
         if (!string.IsNullOrWhiteSpace(observation.ConversationId))
-            yield return $"conversation:{observation.ConversationId}";
+            yield return new FlowCorrelationKey($"conversation:{observation.ConversationId}", "correlated");
         if (!string.IsNullOrWhiteSpace(observation.TraceId))
-            yield return $"trace:{observation.TraceId}";
+            yield return new FlowCorrelationKey($"trace:{observation.TraceId}", "correlated");
     }
 
     private static IReadOnlyDictionary<string, string> CommonLabels(
@@ -827,7 +913,8 @@ public sealed class MonitoringRepository
         string TargetApplication,
         string? EndpointName,
         string? MessageUrn,
-        string OperationKind);
+        string OperationKind,
+        string MatchConfidence);
     private readonly record struct ReplicaFlowEdgeKey(
         string SourceApplication,
         string SourceInstanceId,
@@ -837,12 +924,22 @@ public sealed class MonitoringRepository
         string TargetBusId,
         string? EndpointName,
         string? MessageUrn,
+        string OperationKind,
+        string MatchConfidence);
+    private readonly record struct FlowCorrelationKey(string Key, string MatchConfidence);
+    private readonly record struct CausalFlowEdgeKey(
+        string ApplicationName,
+        string? ConsumerEndpointName,
+        string? TriggerMessageUrn,
+        string? OutputMessageUrn,
+        string? DestinationAddress,
         string OperationKind);
     private sealed record FlowSource(
         string ApplicationName,
         string InstanceId,
         string BusId,
-        string OperationKind);
+        string OperationKind,
+        string MatchConfidence = "correlated");
 
     private static bool TryGet(
         IReadOnlyDictionary<string, string>? properties,
@@ -893,6 +990,7 @@ public sealed class MonitoringRepository
             string? messageType,
             string? messageUrn,
             string operationKind,
+            string matchConfidence,
             DateTimeOffset occurredAtUtc)
         {
             SourceApplication = sourceApplication;
@@ -905,6 +1003,7 @@ public sealed class MonitoringRepository
             MessageType = messageType;
             MessageUrn = messageUrn;
             OperationKind = operationKind;
+            MatchConfidence = matchConfidence;
             firstSeenAtUtc = occurredAtUtc;
             lastSeenAtUtc = occurredAtUtc;
         }
@@ -919,6 +1018,7 @@ public sealed class MonitoringRepository
         public string? MessageType { get; }
         public string? MessageUrn { get; }
         public string OperationKind { get; }
+        public string MatchConfidence { get; }
 
         public void Record(DateTimeOffset occurredAtUtc)
         {
@@ -942,7 +1042,70 @@ public sealed class MonitoringRepository
             OperationKind,
             count,
             firstSeenAtUtc,
-            lastSeenAtUtc);
+            lastSeenAtUtc,
+            MatchConfidence);
+    }
+
+    private sealed class MutableCausalFlowEdge
+    {
+        private long count;
+        private DateTimeOffset firstSeenAtUtc;
+        private DateTimeOffset lastSeenAtUtc;
+
+        public MutableCausalFlowEdge(
+            string applicationName,
+            string? consumerEndpointName,
+            string? triggerMessageType,
+            string? triggerMessageUrn,
+            string? outputMessageType,
+            string? outputMessageUrn,
+            string? destinationAddress,
+            string operationKind,
+            DateTimeOffset occurredAtUtc)
+        {
+            ApplicationName = applicationName;
+            ConsumerEndpointName = consumerEndpointName;
+            TriggerMessageType = triggerMessageType;
+            TriggerMessageUrn = triggerMessageUrn;
+            OutputMessageType = outputMessageType;
+            OutputMessageUrn = outputMessageUrn;
+            DestinationAddress = destinationAddress;
+            OperationKind = operationKind;
+            firstSeenAtUtc = occurredAtUtc;
+            lastSeenAtUtc = occurredAtUtc;
+        }
+
+        public string ApplicationName { get; }
+        public string? ConsumerEndpointName { get; }
+        public string? TriggerMessageType { get; }
+        public string? TriggerMessageUrn { get; }
+        public string? OutputMessageType { get; }
+        public string? OutputMessageUrn { get; }
+        public string? DestinationAddress { get; }
+        public string OperationKind { get; }
+
+        public void Record(DateTimeOffset occurredAtUtc)
+        {
+            count++;
+            if (occurredAtUtc < firstSeenAtUtc)
+                firstSeenAtUtc = occurredAtUtc;
+            if (occurredAtUtc > lastSeenAtUtc)
+                lastSeenAtUtc = occurredAtUtc;
+        }
+
+        public MonitoringCausalFlowEdge ToImmutable() => new(
+            ApplicationName,
+            ConsumerEndpointName,
+            TriggerMessageType,
+            TriggerMessageUrn,
+            OutputMessageType,
+            OutputMessageUrn,
+            DestinationAddress,
+            OperationKind,
+            count,
+            firstSeenAtUtc,
+            lastSeenAtUtc,
+            "exact_causation");
     }
 
     private sealed class MutableMetricSet

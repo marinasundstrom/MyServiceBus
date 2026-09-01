@@ -578,7 +578,10 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
                             startedAt,
                             failure,
                             context.getCorrelationId() == null ? null : context.getCorrelationId().toString(),
-                            context.getConversationId() == null ? null : context.getConversationId().toString()));
+                            context.getConversationId() == null ? null : context.getConversationId().toString(),
+                            null,
+                            null,
+                            context.getMessageId() == null ? null : context.getMessageId().toString()));
                 });
     }
 

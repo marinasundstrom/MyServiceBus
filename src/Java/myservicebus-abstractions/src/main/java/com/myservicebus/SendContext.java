@@ -29,6 +29,7 @@ public class SendContext implements PipeContext, ScheduledMessage {
     private UUID correlationId;
     private UUID conversationId = UUID.randomUUID();
     private UUID initiatorId;
+    private UUID causationMessageId;
     private MessageIntent intent = MessageIntent.SEND;
     private List<String> messageTypes;
 
@@ -123,6 +124,21 @@ public class SendContext implements PipeContext, ScheduledMessage {
 
     public void setInitiatorId(UUID initiatorId) {
         this.initiatorId = initiatorId;
+    }
+
+    /**
+     * Returns local operational causation metadata. This value is exported for
+     * monitoring and outbox persistence but is not serialized as a message header.
+     */
+    public UUID getCausationMessageId() {
+        return causationMessageId;
+    }
+
+    /**
+     * Sets local operational causation metadata without changing the wire envelope.
+     */
+    public void setCausationMessageId(UUID causationMessageId) {
+        this.causationMessageId = causationMessageId;
     }
 
     public MessageIntent getIntent() {

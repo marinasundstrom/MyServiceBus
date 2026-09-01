@@ -45,9 +45,9 @@ public final class PostgreSqlOutboxWriter implements OutboxWriter {
         String sql = """
                 INSERT INTO myservicebus.outbox_message (
                     record_id, service_name, message_id, intent, destination_address, message_types, body, content_type, headers,
-                    created_at_utc, request_id, correlation_id, conversation_id, initiator_id, response_address,
+                    created_at_utc, request_id, correlation_id, conversation_id, initiator_id, causation_message_id, response_address,
                     fault_address, scheduled_at_utc, state, next_attempt_at_utc)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?);
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?);
                 """;
         try (PreparedStatement statement = connection.prepareStatement(sql)) {
             statement.setObject(1, message.recordId());
@@ -65,10 +65,11 @@ public final class PostgreSqlOutboxWriter implements OutboxWriter {
             setNullable(statement, 12, message.correlationId(), Types.OTHER);
             setNullable(statement, 13, message.conversationId(), Types.OTHER);
             setNullable(statement, 14, message.initiatorId(), Types.OTHER);
-            setNullable(statement, 15, message.responseAddress(), Types.VARCHAR);
-            setNullable(statement, 16, message.faultAddress(), Types.VARCHAR);
-            setInstant(statement, 17, message.scheduledAtUtc());
-            statement.setObject(18, message.availableAtUtc().atOffset(ZoneOffset.UTC));
+            setNullable(statement, 15, message.causationMessageId(), Types.OTHER);
+            setNullable(statement, 16, message.responseAddress(), Types.VARCHAR);
+            setNullable(statement, 17, message.faultAddress(), Types.VARCHAR);
+            setInstant(statement, 18, message.scheduledAtUtc());
+            statement.setObject(19, message.availableAtUtc().atOffset(ZoneOffset.UTC));
             statement.executeUpdate();
         }
     }

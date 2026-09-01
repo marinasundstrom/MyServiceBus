@@ -38,7 +38,9 @@ public sealed record MessageOperationHookEvent(
     string? TraceId,
     string? SpanId,
     int? RetryAttempt,
-    int? RetryLimit) : BusHookEvent(OccurredAtUtc)
+    int? RetryLimit,
+    string? MessageId,
+    string? CausationMessageId = null) : BusHookEvent(OccurredAtUtc)
 {
     public static MessageOperationHookEvent Create(
         string kind,
@@ -52,7 +54,9 @@ public sealed record MessageOperationHookEvent(
         string? correlationId = null,
         string? conversationId = null,
         int? retryAttempt = null,
-        int? retryLimit = null)
+        int? retryLimit = null,
+        string? messageId = null,
+        string? causationMessageId = null)
     {
         var activity = Activity.Current;
         return new MessageOperationHookEvent(
@@ -71,7 +75,9 @@ public sealed record MessageOperationHookEvent(
             activity?.TraceId.ToString(),
             activity?.SpanId.ToString(),
             retryAttempt,
-            retryLimit);
+            retryLimit,
+            messageId,
+            causationMessageId);
     }
 }
 
@@ -125,7 +131,8 @@ internal sealed class BusHookRetryObserver : IRetryObserver
             context.CorrelationId?.ToString(),
             context.ConversationId?.ToString(),
             retryEvent.Attempt,
-            retryEvent.RetryLimit));
+            retryEvent.RetryLimit,
+            context.MessageId?.ToString()));
     }
 }
 
@@ -202,7 +209,8 @@ internal sealed class BusHookConsumeFilter<TMessage> : IFilter<ConsumeContext<TM
                 Stopwatch.GetElapsedTime(startedAt),
                 exception,
                 context.CorrelationId?.ToString(),
-                context.ConversationId?.ToString()));
+                context.ConversationId?.ToString(),
+                messageId: context.MessageId?.ToString()));
         }
     }
 }

@@ -24,7 +24,31 @@ public record OutboxMessage(
         URI responseAddress,
         URI faultAddress,
         Instant availableAtUtc,
-        Instant scheduledAtUtc) {
+        Instant scheduledAtUtc,
+        UUID causationMessageId) {
+
+    public OutboxMessage(
+            UUID recordId,
+            UUID messageId,
+            OutboxDeliveryIntent intent,
+            URI destinationAddress,
+            List<String> messageTypes,
+            byte[] body,
+            String contentType,
+            Map<String, String> headers,
+            Instant createdAtUtc,
+            UUID requestId,
+            UUID correlationId,
+            UUID conversationId,
+            UUID initiatorId,
+            URI responseAddress,
+            URI faultAddress,
+            Instant availableAtUtc,
+            Instant scheduledAtUtc) {
+        this(recordId, messageId, intent, destinationAddress, messageTypes, body, contentType, headers,
+                createdAtUtc, requestId, correlationId, conversationId, initiatorId, responseAddress, faultAddress,
+                availableAtUtc, scheduledAtUtc, null);
+    }
 
     public OutboxMessage(
             UUID recordId,
@@ -44,7 +68,7 @@ public record OutboxMessage(
             URI faultAddress) {
         this(recordId, messageId, intent, destinationAddress, messageTypes, body, contentType, headers,
                 createdAtUtc, requestId, correlationId, conversationId, initiatorId, responseAddress, faultAddress,
-                createdAtUtc, null);
+                createdAtUtc, null, null);
     }
 
     public OutboxMessage {

@@ -44,7 +44,9 @@ public final class MonitoringProtocol {
             String spanId,
             Integer retryAttempt,
             Integer retryLimit,
-            Map<String, String> properties) {
+            Map<String, String> properties,
+            String messageId,
+            String causationMessageId) {
     }
 
     public record ObservationBatch(

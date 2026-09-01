@@ -47,7 +47,8 @@ public static class OutboxMessageFactory
             context.ResponseAddress,
             context.FaultAddress,
             availableAtUtc,
-            scheduledAtUtc);
+            scheduledAtUtc,
+            context.CausationMessageId);
     }
 
     private static OutboxDeliveryIntent MapIntent(Serialization.MessageIntent intent) => intent switch

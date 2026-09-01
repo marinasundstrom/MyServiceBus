@@ -375,6 +375,7 @@ public class MonitoringRepositoryTests
         flow.SourceApplication.ShouldBe("checkout");
         flow.TargetApplication.ShouldBe("orders");
         flow.Count.ShouldBe(2);
+        flow.MatchConfidence.ShouldBe("correlated");
 
         var replicaFlow = repository.GetReplicaFlow(null, 60, now);
         replicaFlow.Count.ShouldBe(2);
@@ -396,6 +397,60 @@ public class MonitoringRepositoryTests
         repository.GetTimeSeries("orders", 60, 5, false, now)
             .Sum(point => point.Counts.Consumed)
             .ShouldBe(2);
+    }
+
+    [Fact]
+    public void Repository_prefers_exact_message_identity_when_correlation_is_shared()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var repository = new MonitoringRepository();
+        repository.UpsertMetadata(CreateMetadata("checkout", "checkout-1", now, "commerce"));
+        repository.UpsertMetadata(CreateMetadata("checkout", "checkout-2", now, "commerce"));
+        repository.UpsertMetadata(CreateMetadata("orders", "orders-1", now, "commerce"));
+        repository.UpsertMetadata(CreateMetadata("orders", "orders-2", now, "commerce"));
+
+        repository.RecordBatch(CreateBatch(
+            "checkout",
+            "checkout-1",
+            now,
+            new MonitoringObservation(
+                1, now.AddSeconds(-4), "published", true, "OrderSubmitted", "urn:message:OrderSubmitted",
+                null, "exchange:orders", 2, null, null, "shared", "conversation", null, null,
+                MessageId: "message-1"))).ShouldBeTrue();
+        repository.RecordBatch(CreateBatch(
+            "checkout",
+            "checkout-2",
+            now,
+            new MonitoringObservation(
+                1, now.AddSeconds(-3), "published", true, "OrderSubmitted", "urn:message:OrderSubmitted",
+                null, "exchange:orders", 2, null, null, "shared", "conversation", null, null,
+                MessageId: "message-2"))).ShouldBeTrue();
+        repository.RecordBatch(CreateBatch(
+            "orders",
+            "orders-1",
+            now,
+            new MonitoringObservation(
+                1, now.AddSeconds(-2), "consumed", true, "OrderSubmitted", "urn:message:OrderSubmitted",
+                "orders", null, 10, null, null, "shared", "conversation", null, null,
+                MessageId: "message-1"))).ShouldBeTrue();
+        repository.RecordBatch(CreateBatch(
+            "orders",
+            "orders-2",
+            now,
+            new MonitoringObservation(
+                1, now.AddSeconds(-1), "consumed", true, "OrderSubmitted", "urn:message:OrderSubmitted",
+                "orders", null, 12, null, null, "shared", "conversation", null, null,
+                MessageId: "message-2"))).ShouldBeTrue();
+
+        var replicaFlow = repository.GetReplicaFlow(null, 60, now);
+        replicaFlow.Count.ShouldBe(2);
+        replicaFlow.ShouldAllBe(edge => edge.MatchConfidence == "exact_message");
+        replicaFlow.Single(edge => edge.SourceInstanceId == "checkout-1").TargetInstanceId.ShouldBe("orders-1");
+        replicaFlow.Single(edge => edge.SourceInstanceId == "checkout-2").TargetInstanceId.ShouldBe("orders-2");
+
+        var flow = repository.GetFlow(null, 60, now).ShouldHaveSingleItem();
+        flow.Count.ShouldBe(2);
+        flow.MatchConfidence.ShouldBe("exact_message");
     }
 
     [Fact]
@@ -428,6 +483,35 @@ public class MonitoringRepositoryTests
         dispatcher.WindowFailed.ShouldBe(3);
         dispatcher.WindowLostLeases.ShouldBe(1);
         dispatcher.DispatchedPerSecond.ShouldBe(13d / 60d);
+    }
+
+    [Fact]
+    public void Repository_projects_exact_consume_to_outbound_causal_reactions()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var repository = new MonitoringRepository();
+        repository.UpsertMetadata(CreateMetadata("orders", "orders-1", now, "commerce"));
+        repository.RecordBatch(CreateBatch(
+            "orders",
+            "orders-1",
+            now,
+            new MonitoringObservation(
+                1, now.AddSeconds(-2), "consumed", true, "OrderSubmitted", "urn:message:OrderSubmitted",
+                "orders", null, 5, null, null, null, "conversation", null, null,
+                MessageId: "incoming-1"),
+            new MonitoringObservation(
+                2, now.AddSeconds(-1), "published", true, "InventoryRequested", "urn:message:InventoryRequested",
+                null, "exchange:inventory", 2, null, null, null, "conversation", null, null,
+                MessageId: "outgoing-1", CausationMessageId: "incoming-1")));
+
+        var edge = repository.GetCausalFlow(null, 60, now).ShouldHaveSingleItem();
+        edge.ApplicationName.ShouldBe("orders");
+        edge.ConsumerEndpointName.ShouldBe("orders");
+        edge.TriggerMessageUrn.ShouldBe("urn:message:OrderSubmitted");
+        edge.OutputMessageUrn.ShouldBe("urn:message:InventoryRequested");
+        edge.OperationKind.ShouldBe("published");
+        edge.Count.ShouldBe(1);
+        edge.MatchConfidence.ShouldBe("exact_causation");
     }
 
     [Fact]

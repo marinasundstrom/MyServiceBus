@@ -1,10 +1,14 @@
 package com.myservicebus;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 import java.net.URI;
 import java.util.concurrent.CopyOnWriteArrayList;
 
@@ -13,9 +17,13 @@ import org.junit.jupiter.api.Test;
 import com.myservicebus.di.ServiceCollection;
 import com.myservicebus.mediator.MediatorBus;
 import com.myservicebus.mediator.MediatorTransport;
+import com.myservicebus.tasks.CancellationToken;
 
 class BusHookTest {
     public record TestMessage(String value) {
+    }
+
+    public record ReactionMessage(String value) {
     }
 
     public static final class RecordingHook implements BusHook {
@@ -65,6 +73,13 @@ class BusHookTest {
                 .anyMatch(event -> event instanceof BusLifecycleHookEvent lifecycle && lifecycle.state().equals("stopped")));
         assertTrue(RecordingHook.EVENTS.stream()
                 .anyMatch(event -> event instanceof MessageOperationHookEvent operation && operation.kind().equals("published")));
+        MessageOperationHookEvent published = RecordingHook.EVENTS.stream()
+                .filter(MessageOperationHookEvent.class::isInstance)
+                .map(MessageOperationHookEvent.class::cast)
+                .filter(operation -> operation.kind().equals("published"))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError(RecordingHook.EVENTS.toString()));
+        assertNotNull(published.messageId());
     }
 
     @Test
@@ -79,6 +94,52 @@ class BusHookTest {
         bus.start();
         assertDoesNotThrow(() -> bus.publish(new TestMessage("hello")).join());
         bus.stop();
+    }
+
+    @Test
+    void consumerOutgoingOperationsReportTheConsumedMessageAsTheirCause() throws Exception {
+        RecordingHook.EVENTS.clear();
+        UUID triggerMessageId = UUID.randomUUID();
+        BusHookDispatcher dispatcher = new BusHookDispatcher(Set.of(new RecordingHook()), null);
+        SendEndpoint transport = new SendEndpoint() {
+            @Override
+            public <T> java.util.concurrent.CompletableFuture<Void> send(
+                    T message,
+                    CancellationToken cancellationToken) {
+                return java.util.concurrent.CompletableFuture.completedFuture(null);
+            }
+        };
+        SendEndpointProvider endpoints = uri -> new HookSendEndpoint(
+                transport,
+                URI.create(uri),
+                dispatcher,
+                true);
+        ConsumeContext<TestMessage> context = new ConsumeContext<>(
+                new TestMessage("react"),
+                Map.of(),
+                null,
+                null,
+                null,
+                CancellationToken.none(),
+                endpoints,
+                URI.create("loopback://localhost/"),
+                entityName -> "loopback://" + entityName,
+                triggerMessageId,
+                null,
+                null,
+                null,
+                null);
+
+        context.publish(new ReactionMessage("react")).join();
+
+        MessageOperationHookEvent reaction = RecordingHook.EVENTS.stream()
+                .filter(MessageOperationHookEvent.class::isInstance)
+                .map(MessageOperationHookEvent.class::cast)
+                .filter(operation -> operation.kind().equals("published")
+                        && operation.messageType().equals(ReactionMessage.class.getName()))
+                .findFirst()
+                .orElseThrow();
+        assertEquals(triggerMessageId.toString(), reaction.causationMessageId());
     }
 
     @Test

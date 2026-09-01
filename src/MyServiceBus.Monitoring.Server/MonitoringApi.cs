@@ -157,6 +157,9 @@ public static class MonitoringApi
         query.MapGet("/flow/replicas", (string? application, int? windowSeconds, MonitoringRepository repository) =>
             repository.GetReplicaFlow(application, windowSeconds ?? 300, DateTimeOffset.UtcNow))
             .WithSummary("Query observed message-flow paths between application replicas");
+        query.MapGet("/flow/causal", (string? application, int? windowSeconds, MonitoringRepository repository) =>
+            repository.GetCausalFlow(application, windowSeconds ?? 300, DateTimeOffset.UtcNow))
+            .WithSummary("Query exact consumed-message to outgoing-operation reactions");
         query.MapGet("/outbox", (string? application, int? windowSeconds, MonitoringRepository repository) =>
             repository.GetOutboxDispatchers(application, windowSeconds ?? 60, DateTimeOffset.UtcNow))
             .WithSummary("Query outbox dispatcher state and windowed activity");

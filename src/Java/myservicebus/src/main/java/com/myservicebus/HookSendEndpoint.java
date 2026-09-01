@@ -26,11 +26,26 @@ final class HookSendEndpoint implements SendEndpoint {
     @Override
     public <T> CompletableFuture<Void> send(T message, CancellationToken cancellationToken) {
         long startedAt = System.nanoTime();
-        Object body = message instanceof SendContext context ? context.getMessage() : message;
-        boolean publish = message instanceof PublishContext;
-        CompletableFuture<Void> operation = message instanceof SendContext context
-                ? inner.send(context)
+        SendContext sendContext = message instanceof SendContext context ? context : null;
+        Object body = sendContext != null ? sendContext.getMessage() : message;
+        CompletableFuture<Void> operation = sendContext != null
+                ? inner.send(sendContext)
                 : inner.send(message, cancellationToken);
+        return observe(body, sendContext, operation, startedAt);
+    }
+
+    @Override
+    public CompletableFuture<Void> send(SendContext context) {
+        long startedAt = System.nanoTime();
+        return observe(context.getMessage(), context, inner.send(context), startedAt);
+    }
+
+    private CompletableFuture<Void> observe(
+            Object body,
+            SendContext sendContext,
+            CompletableFuture<Void> operation,
+            long startedAt) {
+        boolean publish = sendContext instanceof PublishContext;
         return operation.whenComplete((ignored, throwable) -> {
             if (publish && !observePublish) {
                 return;
@@ -46,8 +61,20 @@ final class HookSendEndpoint implements SendEndpoint {
                     destinationAddress.toString(),
                     startedAt,
                     failure,
+                    sendContext == null || sendContext.getCorrelationId() == null
+                            ? null
+                            : sendContext.getCorrelationId().toString(),
+                    sendContext == null || sendContext.getConversationId() == null
+                            ? null
+                            : sendContext.getConversationId().toString(),
                     null,
-                    null));
+                    null,
+                    sendContext == null || sendContext.getMessageId() == null
+                            ? null
+                            : sendContext.getMessageId().toString(),
+                    sendContext == null || sendContext.getCausationMessageId() == null
+                            ? null
+                            : sendContext.getCausationMessageId().toString()));
         });
     }
 

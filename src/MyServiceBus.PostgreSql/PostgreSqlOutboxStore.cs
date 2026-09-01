@@ -44,7 +44,7 @@ public sealed class PostgreSqlOutboxStore : IOutboxStore
                 message.message_types, message.body, message.content_type, message.headers::text,
                 message.created_at_utc, message.request_id, message.correlation_id, message.conversation_id,
                 message.initiator_id, message.response_address, message.fault_address,
-                message.next_attempt_at_utc, message.scheduled_at_utc,
+                message.next_attempt_at_utc, message.scheduled_at_utc, message.causation_message_id,
                 message.lease_expires_at_utc, message.attempt_count - 1;
             """;
 
@@ -79,12 +79,13 @@ public sealed class PostgreSqlOutboxStore : IOutboxStore
                     GetNullableUri(reader, 13),
                     GetNullableUri(reader, 14),
                     reader.GetFieldValue<DateTimeOffset>(15),
-                    reader.IsDBNull(16) ? null : reader.GetFieldValue<DateTimeOffset>(16));
+                    reader.IsDBNull(16) ? null : reader.GetFieldValue<DateTimeOffset>(16),
+                    GetNullableGuid(reader, 17));
                 leases.Add(new OutboxLease(
                     message,
                     request.OwnerId,
-                    reader.GetFieldValue<DateTimeOffset>(17),
-                    reader.GetInt32(18)));
+                    reader.GetFieldValue<DateTimeOffset>(18),
+                    reader.GetInt32(19)));
             }
         }
 

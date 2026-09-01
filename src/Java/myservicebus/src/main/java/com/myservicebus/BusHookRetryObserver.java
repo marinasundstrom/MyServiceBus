@@ -31,6 +31,7 @@ public final class BusHookRetryObserver implements RetryObserver {
                 context.getCorrelationId() == null ? null : context.getCorrelationId().toString(),
                 context.getConversationId() == null ? null : context.getConversationId().toString(),
                 retryEvent.attempt(),
-                retryEvent.retryLimit()));
+                retryEvent.retryLimit(),
+                context.getMessageId() == null ? null : context.getMessageId().toString()));
     }
 }

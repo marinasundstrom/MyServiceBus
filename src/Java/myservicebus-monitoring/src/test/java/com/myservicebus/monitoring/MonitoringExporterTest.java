@@ -88,7 +88,11 @@ class MonitoringExporterTest {
                     System.nanoTime(),
                     null,
                     null,
-                    null));
+                    null,
+                    null,
+                    null,
+                    "message-1",
+                    "trigger-1"));
 
             assertTrue(metadataReceived.await(2, TimeUnit.SECONDS));
             assertTrue(batchReceived.await(2, TimeUnit.SECONDS));
@@ -97,6 +101,8 @@ class MonitoringExporterTest {
             assertTrue(batchJson.get().contains("\"applicationName\":\"orders-java\""));
             assertTrue(batchJson.get().contains("\"exportedAtUtc\":\""));
             assertTrue(batchJson.get().contains("\"kind\":\"published\""));
+            assertTrue(batchJson.get().contains("\"messageId\":\"message-1\""));
+            assertTrue(batchJson.get().contains("\"causationMessageId\":\"trigger-1\""));
         } finally {
             exporter.close();
             server.stop(0);
