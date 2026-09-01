@@ -5,7 +5,9 @@ Kotlin API. It currently demonstrates Kotlin-native service registration,
 reified consumer and transport selection, Kotlin data-class messages, RabbitMQ
 configuration, a suspending consumer, and coroutine-native publishing through
 the shared JVM runtime. It also demonstrates a typed suspending request handler
-through the in-memory mediator.
+through the in-memory mediator. Its broker-backed request example creates a
+typed client without a class literal and handles two declared outcomes with an
+exhaustive Kotlin `when`.
 
 Start RabbitMQ from the repository root:
 
@@ -20,8 +22,8 @@ gradle :kotlin-sample:run
 ```
 
 Set `RABBITMQ_HOST` and `RABBITMQ_PORT` to use a different broker. The sample
-publishes one `SubmitOrder`, waits for its consumer to publish
-`OrderSubmitted`, and then stops the bus.
+requests an order status, publishes one `SubmitOrder`, waits for its consumer
+to publish `OrderSubmitted`, and then stops the bus.
 
 The consumer publishes its follow-up message with `publishAwait`, and the
 application uses the same suspending extension to publish the initial command.

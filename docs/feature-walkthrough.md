@@ -799,23 +799,23 @@ correlation metadata.
 
 The C# client provides the analogous `IRequestClientFactory` for creating `IRequestClient<T>` instances when you need to specify a destination address or default timeout. Kotlin can use the JVM `RequestClientFactory` and call the suspending `client.request(...)` projection for broker-backed requests.
 
-If the consumer responds with a `Fault<CheckOrderStatus>` but the client only requests `OrderStatus`, `GetResponseAsync` throws `RequestFaultException`. Include `Fault<CheckOrderStatus>` as a second response type to observe fault details.
+If the consumer faults while the client waits for `OrderStatus`, the request completes with `RequestFaultException`. A client can also declare a second business response, such as `OrderNotFound`.
 
 #### Handling Multiple Response Types
 
-Clients can await more than one possible response (e.g., success or fault). Inspect the typed result to branch accordingly and surface rich fault details when something fails.
+Clients can await more than one possible business response. Each language projection preserves which declared case arrived, even when the response types overlap.
 
 ##### C#
 
 ```csharp
 var client = serviceProvider.GetRequiredService<IRequestClient<CheckOrderStatus>>();
-Response<OrderStatus, Fault<CheckOrderStatus>> response =
-    await client.GetResponseAsync<OrderStatus, Fault<CheckOrderStatus>>(new CheckOrderStatus { OrderId = Guid.NewGuid() });
+Response<OrderStatus, OrderNotFound> response =
+    await client.GetResponseAsync<OrderStatus, OrderNotFound>(new CheckOrderStatus { OrderId = Guid.NewGuid() });
 
 if (response.Is(out Response<OrderStatus> status))
     Console.WriteLine(status.Message.Status);
-else if (response.Is(out Response<Fault<CheckOrderStatus>> fault))
-    Console.WriteLine(fault.Message.Exceptions[0].Message);
+else if (response.Is(out Response<OrderNotFound> notFound))
+    Console.WriteLine(notFound.Message.OrderId);
 ```
 
 ##### Java
@@ -823,14 +823,27 @@ else if (response.Is(out Response<Fault<CheckOrderStatus>> fault))
 ```java
 RequestClientFactory factory = serviceProvider.getService(RequestClientFactory.class);
 RequestClient<CheckOrderStatus> client = factory.create(CheckOrderStatus.class);
-Response2<OrderStatus, Fault<?>> response =
+Response2<OrderStatus, OrderNotFound> response =
     client.getResponse(new CheckOrderStatus(UUID.randomUUID()),
-        OrderStatus.class, Fault.class).join();
+        OrderStatus.class, OrderNotFound.class).join();
 
-response.as(OrderStatus.class)
-    .ifPresent(r -> System.out.println(r.getMessage().getStatus()));
-response.as(Fault.class)
-    .ifPresent(r -> System.out.println(r.getMessage().getExceptions().get(0).getMessage()));
+String description = response.match(
+    status -> "Status: " + status.getStatus(),
+    notFound -> "Not found: " + notFound.getOrderId());
+System.out.println(description);
+```
+
+##### Kotlin
+
+```kotlin
+val client = factory.createRequestClient<CheckOrderStatus>()
+val response: RequestResult<OrderStatus, OrderNotFound> =
+    client.requestOneOf(CheckOrderStatus(UUID.randomUUID()))
+
+when (response) {
+    is RequestResult.First -> println("Status: ${response.message.status}")
+    is RequestResult.Second -> println("Not found: ${response.message.orderId}")
+}
 ```
 
 ---

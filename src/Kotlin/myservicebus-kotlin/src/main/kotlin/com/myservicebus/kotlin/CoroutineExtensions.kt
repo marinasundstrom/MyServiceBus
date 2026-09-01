@@ -213,6 +213,34 @@ suspend inline fun <TRequest, reified TResponse : Any> RequestClient<TRequest>.r
     )
 }
 
+/** Sends a request that can return either of two response types. */
+suspend inline fun <TRequest, reified TFirst : Any, reified TSecond : Any>
+    RequestClient<TRequest>.requestOneOf(request: TRequest): RequestResult<TFirst, TSecond> =
+    awaitOperation { cancellationToken ->
+        getResponse(request, TFirst::class.java, TSecond::class.java, cancellationToken)
+    }.match(
+        { message -> RequestResult.First(message) },
+        { message -> RequestResult.Second(message) },
+    )
+
+/** Sends a configured request that can return either of two response types. */
+suspend inline fun <TRequest, reified TFirst : Any, reified TSecond : Any>
+    RequestClient<TRequest>.requestOneOf(
+        request: TRequest,
+        noinline configure: SendContext.() -> Unit,
+    ): RequestResult<TFirst, TSecond> = awaitOperation { cancellationToken ->
+        getResponse(
+            request,
+            TFirst::class.java,
+            TSecond::class.java,
+            { context -> context.configure() },
+            cancellationToken,
+        )
+    }.match(
+        { message -> RequestResult.First(message) },
+        { message -> RequestResult.Second(message) },
+    )
+
 /** Publishes through the in-memory mediator and awaits every matching handler. */
 suspend fun Mediator.publishAwait(message: Any) {
     awaitOperation { cancellationToken -> publish(message, cancellationToken) }

@@ -25,6 +25,13 @@ Both projections must enter the same topology and pipeline stages. A Kotlin
 consumer is not a parallel runtime path: its coroutine is adapted to the shared
 consumer completion contract at the projection boundary.
 
+Shared behavior does not require shared result syntax. Multiple-response
+requests use a Java 17 sealed interface with nominal record cases in the Java
+projection. Kotlin maps those cases to a covariant sealed result so callers get
+an exhaustive `when`, reified response discovery, and coroutine cancellation.
+The branch discriminator belongs below both projections because runtime type
+inspection cannot distinguish identical or assignable alternatives reliably.
+
 Language projections also act as design tests for the shared implementation.
 For example, a Kotlin suspend-handler interface adds an intermediate generic
 contract; supporting it requires the mediator to resolve inherited response

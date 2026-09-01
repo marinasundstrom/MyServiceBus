@@ -408,11 +408,11 @@ The `net11.0` abstractions asset should make the existing C# `Response<T>` and `
 - retain a discriminator assigned when the request client selects the response;
 - expose `Value`;
 - expose `HasValue` and `TryGetValue(out TCase)`; and
-- retain `Message`, `FromT1`, `FromT2`, `Is`, and baseline-neutral `Match` members for compatibility.
+- retain the existing `FromT1`, `FromT2`, and `Is` members for compatibility.
 
 This lets C# use transparent exhaustive switches and Raven use ordinary `match` over the C#-implemented response class. It does not add response topology: the request client already declares every expected response contract and its fault handling.
 
-Generic alternatives that are identical or assignable require an explicit rule. The recommended portable behavior is to reject overlapping alternatives when the request is created and from every public union construction path. A discriminator cannot make transparent type matching unambiguous when the case types overlap.
+Generic alternatives that are identical or assignable require the active discriminator to participate in `TryGetValue` and switch behavior. Runtime assignability alone is insufficient, but the stored case identity keeps construction and matching unambiguous.
 
 ## Serialization and outbound union values
 
@@ -540,7 +540,7 @@ Java, older .NET clients, and MassTransit peers exchange the concrete cases. The
 
 Prefer multi-targeting the existing MyServiceBus packages rather than creating a new union package unless build evidence requires a separate asset. A possible transition is:
 
-- `net10.0`: existing APIs plus baseline-neutral `Match`; no direct runtime union ABI dependency;
+- `net10.0`: existing preview APIs with no direct runtime union ABI dependency;
 - `net11.0`: union-aware discovery and C# response classes implementing the standard ABI.
 
 Raven.Core compatibility-carrier recognition on .NET 10 can be an experiment. It should not distort the stable .NET 11 design or introduce duplicate `System.Runtime.CompilerServices` contract definitions into MyServiceBus.

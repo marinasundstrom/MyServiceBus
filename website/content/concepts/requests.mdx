@@ -35,6 +35,30 @@ export const responseHandler = {
 }`,
 };
 
+export const multipleResponses = {
+  csharp: `Response<OrderStatus, OrderNotFound> result =
+    await client.GetResponseAsync<OrderStatus, OrderNotFound>(request);
+
+if (result.Is(out Response<OrderStatus> status))
+    Console.WriteLine(status.Message.Status);
+else if (result.Is(out Response<OrderNotFound> missing))
+    Console.WriteLine(missing.Message.OrderId);`,
+  java: `Response2<OrderStatus, OrderNotFound> result = client
+    .getResponse(request, OrderStatus.class, OrderNotFound.class)
+    .join();
+
+String text = result.match(
+    status -> "Status: " + status.status(),
+    missing -> "Not found: " + missing.orderId());`,
+  kotlin: `val result: RequestResult<OrderStatus, OrderNotFound> =
+    client.requestOneOf(request)
+
+when (result) {
+    is RequestResult.First -> println(result.message.status)
+    is RequestResult.Second -> println("Not found: \${result.message.orderId}")
+}`,
+};
+
 <p className="docs-kicker">Concepts · Requests</p>
 
 # Request-response is messaging with a return route.
@@ -60,6 +84,12 @@ An interface consumer can call `RespondAsync`, `respond`, or Kotlin `respondAwai
 <LanguageTabs csharp={responseHandler.csharp} java={responseHandler.java} kotlin={responseHandler.kotlin} />
 
 Returning a value does not require a context parameter. Add `ConsumeContext<TRequest>` when the handler needs headers or other receive metadata. A response-bearing method without an incoming response address fails consumption rather than silently discarding the result.
+
+## Multiple business responses retain their case
+
+A request may declare two successful protocol outcomes, such as an order status or an order-not-found message. Java exposes nominal records through its sealed `Response2`; Kotlin projects those cases as a covariant sealed `RequestResult` so `when` is exhaustive. Both preserve the declared branch even when response types overlap.
+
+<LanguageTabs csharp={multipleResponses.csharp} java={multipleResponses.java} kotlin={multipleResponses.kotlin} />
 
 ## Correlation has distinct identifiers
 

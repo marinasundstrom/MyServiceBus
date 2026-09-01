@@ -110,6 +110,29 @@ suspending handler. `SuspendHandler` supplies Kotlin's native `suspend fun
 handle(...)` shape over the async-shape-neutral JVM `ResultHandler` metadata
 contract; it does not inherit Java's `CompletableFuture` handler methods.
 
+## Multiple response types
+
+For requests with two valid business outcomes, Kotlin projects the shared JVM
+response as a covariant sealed result:
+
+```kotlin
+val factory = scopedProvider.getRequiredService<ScopedClientFactory>()
+val client = factory.createRequestClient<LookupOrder>()
+val result: RequestResult<OrderStatus, OrderNotFound> =
+    client.requestOneOf(LookupOrder(orderId))
+
+when (result) {
+    is RequestResult.First -> println(result.message.status)
+    is RequestResult.Second -> println("Missing ${result.message.orderId}")
+}
+```
+
+The declared result type lets Kotlin infer both reified response classes. The
+sealed branches make `when` exhaustive and retain branch identity even if the
+two response types are assignable. Java sees the same behavior through its own
+sealed `Response2.First` and `Response2.Second` records and `match` operation;
+Kotlin does not expose that Java-oriented shape as its application API.
+
 ## Run the sample
 
 The project at `src/Kotlin/sample` is both an executable introduction and the

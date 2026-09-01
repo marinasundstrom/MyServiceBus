@@ -143,6 +143,22 @@ class CoroutineExtensionsTest {
     }
 
     @Test
+    fun `request client projects multiple responses as exhaustive Kotlin result`() = runBlocking {
+        val client = CapturingRequestClient()
+
+        val result: RequestResult<Any, String> = client.requestOneOf(LookupOrder("B-18")) {
+            headers["trace-id"] = "kotlin-one-of"
+        }
+
+        val description = when (result) {
+            is RequestResult.First -> "first:${result.message}"
+            is RequestResult.Second -> "second:${result.message}"
+        }
+        assertEquals("second:rejected:B-18", description)
+        assertEquals("kotlin-one-of", client.context.headers["trace-id"])
+    }
+
+    @Test
     fun `message cancellation cancels suspend consumer`() = runBlocking {
         val started = CompletableDeferred<Unit>()
         val stopped = CompletableDeferred<Unit>()
@@ -277,6 +293,11 @@ private class CapturingRequestClient : RequestClient<LookupOrder> {
         context: SendContext,
         responseType1: Class<T1>,
         responseType2: Class<T2>,
-    ): CompletableFuture<Response2<T1, T2>> =
-        throw UnsupportedOperationException("Multiple responses are not used by this test.")
+    ): CompletableFuture<Response2<T1, T2>> {
+        this.context = context
+        val response: Response2<Any, String> =
+            Response2.fromT2("rejected:${(context.message as LookupOrder).orderId}")
+        @Suppress("UNCHECKED_CAST")
+        return CompletableFuture.completedFuture(response as Response2<T1, T2>)
+    }
 }

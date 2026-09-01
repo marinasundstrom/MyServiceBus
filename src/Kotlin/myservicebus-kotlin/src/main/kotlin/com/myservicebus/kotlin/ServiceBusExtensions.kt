@@ -7,6 +7,8 @@ import com.myservicebus.BusRegistrationConfigurator
 import com.myservicebus.BusRegistrationContext
 import com.myservicebus.Consumer
 import com.myservicebus.MessageBusServices
+import com.myservicebus.RequestClient
+import com.myservicebus.ScopedClientFactory
 import com.myservicebus.di.ServiceCollection
 import com.myservicebus.di.ServiceProvider
 import com.myservicebus.mediator.Mediator
@@ -109,3 +111,7 @@ inline fun <reified T : Any> ServiceProvider.getService(): T? = getService(T::cl
 
 /** Resolves a required service without requiring a Java class literal. */
 inline fun <reified T : Any> ServiceProvider.getRequiredService(): T = getRequiredService(T::class.java)
+
+/** Creates a typed request client without exposing a Java class literal. */
+inline fun <reified TRequest : Any> ScopedClientFactory.createRequestClient(): RequestClient<TRequest> =
+    create(TRequest::class.java)
