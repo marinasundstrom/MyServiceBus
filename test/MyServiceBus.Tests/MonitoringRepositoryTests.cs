@@ -566,6 +566,82 @@ public class MonitoringRepositoryTests
         reaction.StepId.ShouldBe("request-inventory");
         reaction.ObservedCount.ShouldBe(1);
         reaction.EvidenceStatus.ShouldBe("exact_causation");
+
+        var run = repository.GetChoreographyRuns("order-fulfillment", 60, 20, now).Runs.ShouldHaveSingleItem();
+        run.Status.ShouldBe("live");
+        run.LastActivityAtUtc.ShouldBe(now.AddSeconds(-1));
+        run.Steps.ShouldHaveSingleItem().StepId.ShouldBe("request-inventory");
+    }
+
+    [Fact]
+    public void Repository_reconstructs_exact_declared_choreography_runs_with_step_timing_and_failures()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var repository = new MonitoringRepository();
+        var orders = new ChoreographyBuilder("order-fulfillment", "1", "orders")
+            .Step("request-inventory", "urn:message:OrderSubmitted", step => step
+                .OwnedBy("OrdersConsumer")
+                .Publishes("urn:message:InventoryRequested"))
+            .Build();
+        var inventory = new ChoreographyBuilder("order-fulfillment", "1", "inventory")
+            .Step("reserve-inventory", "urn:message:InventoryRequested", step => step
+                .OwnedBy("InventoryConsumer")
+                .Terminates())
+            .Build();
+        repository.UpsertMetadata(WithChoreography(
+            CreateMetadata("orders", "orders-1", now, "commerce"), orders));
+        repository.UpsertMetadata(WithChoreography(
+            CreateMetadata("inventory", "inventory-1", now, "commerce"), inventory));
+        repository.RecordBatch(CreateBatch(
+            "orders",
+            "orders-1",
+            now,
+            new MonitoringObservation(
+                1, now.AddMilliseconds(-8_150), "retry_attempted", false,
+                "OrderSubmitted", "urn:message:OrderSubmitted", null, null, 0,
+                typeof(InvalidOperationException).FullName, null, null, "conversation", null, null,
+                RetryAttempt: 1, RetryLimit: 3, MessageId: "root-message"),
+            new MonitoringObservation(
+                2, now.AddMilliseconds(-8_100), "published", true,
+                "InventoryRequested", "urn:message:InventoryRequested", null, "exchange:inventory", 10,
+                null, null, null, "conversation", null, null,
+                MessageId: "inventory-message", CausationMessageId: "root-message"),
+            new MonitoringObservation(
+                3, now.AddMilliseconds(-8_000), "consumed", true,
+                "OrderSubmitted", "urn:message:OrderSubmitted", "orders", null, 200,
+                null, null, null, "conversation", null, null,
+                MessageId: "root-message")));
+        repository.RecordBatch(CreateBatch(
+            "inventory",
+            "inventory-1",
+            now,
+            new MonitoringObservation(
+                1, now.AddMilliseconds(-7_000), "consume_faulted", false,
+                "InventoryRequested", "urn:message:InventoryRequested", "inventory", null, 300,
+                typeof(InvalidOperationException).FullName, null, null, "conversation", null, null,
+                MessageId: "inventory-message")));
+
+        var snapshot = repository.GetChoreographyRuns("order-fulfillment", 60, 20, now);
+
+        snapshot.Complete.ShouldBeTrue();
+        var run = snapshot.Runs.ShouldHaveSingleItem();
+        run.RootMessageId.ShouldBe("root-message");
+        run.Status.ShouldBe("faulted");
+        run.Confidence.ShouldBe("exact_causation");
+        run.Steps.Count.ShouldBe(2);
+        var first = run.Steps[0];
+        first.StepId.ShouldBe("request-inventory");
+        first.OwnerComponent.ShouldBe("OrdersConsumer");
+        first.DurationMs.ShouldBe(200);
+        first.RetryCount.ShouldBe(1);
+        var output = first.Outputs.ShouldHaveSingleItem();
+        output.OperationKind.ShouldBe("published");
+        output.Targets.ShouldHaveSingleItem().HandoffDurationMs.ShouldBe(810);
+        var second = run.Steps[1];
+        second.StepId.ShouldBe("reserve-inventory");
+        second.Status.ShouldBe("faulted");
+        second.DurationMs.ShouldBe(300);
+        second.FailureType.ShouldBe(typeof(InvalidOperationException).FullName);
     }
 
     [Fact]

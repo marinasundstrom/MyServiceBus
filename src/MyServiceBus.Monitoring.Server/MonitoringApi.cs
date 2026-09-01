@@ -149,6 +149,9 @@ public static class MonitoringApi
         query.MapGet("/choreographies/runtime", (int? windowSeconds, MonitoringRepository repository) =>
             repository.GetChoreographyRuntime(windowSeconds ?? 300, DateTimeOffset.UtcNow))
             .WithSummary("Compare declared choreography reactions with exact causal observations");
+        query.MapGet("/choreographies/runs", (string? choreography, int? windowSeconds, int? limit, MonitoringRepository repository) =>
+            repository.GetChoreographyRuns(choreography, windowSeconds ?? 300, limit ?? 20, DateTimeOffset.UtcNow))
+            .WithSummary("Reconstruct bounded declared choreography runs from exact causal observations");
         query.MapGet("/observations", (string? application, int? limit, MonitoringRepository repository) =>
             repository.GetRecentObservations(application, limit ?? 100))
             .WithSummary("List recent bounded monitoring observations");

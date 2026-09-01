@@ -1,0 +1,73 @@
+@implements IAsyncDisposable
+@inject IJSRuntime JavaScript
+
+<div class="workflow-run-map-shell" @ref="map">
+    <svg class="workflow-run-map-canvas" role="img" aria-label="Reconstructed workflow run graph"></svg>
+    <div class="flow-map-controls" aria-label="Workflow run graph controls">
+        <button type="button" data-workflow-run-action="zoom-in" title="Zoom in" aria-label="Zoom in">+</button>
+        <button type="button" data-workflow-run-action="zoom-out" title="Zoom out" aria-label="Zoom out">−</button>
+        <button type="button" data-workflow-run-action="reset" title="Reset view" aria-label="Reset view">↺</button>
+    </div>
+</div>
+
+@code {
+    private ElementReference map;
+    private IJSObjectReference? module;
+
+    [Parameter, EditorRequired]
+    public required MonitoringChoreographyRun Run { get; set; }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        module ??= await JavaScript.InvokeAsync<IJSObjectReference>("import", "./monitoringChart.js");
+        if (firstRender)
+            await module.InvokeVoidAsync("initializeWorkflowRunMap", map);
+        await module.InvokeVoidAsync(
+            "updateWorkflowRunMap",
+            map,
+            new
+            {
+                Nodes = Run.Steps.Select(step => new
+                {
+                    Id = step.StepKey,
+                    Application = step.ApplicationName,
+                    Label = step.StepId,
+                    Contract = ContractLabel(step.TriggerMessageUrn),
+                    step.DurationMs,
+                    step.Status,
+                    step.Sequence
+                }),
+                Links = Run.Steps.SelectMany(step => step.Outputs.SelectMany(output => output.Targets.Select(target => new
+                {
+                    Source = step.StepKey,
+                    Target = target.StepKey,
+                    Operation = DisplayKind(output.OperationKind),
+                    Message = string.IsNullOrWhiteSpace(output.MessageUrn) ? "Message" : ContractLabel(output.MessageUrn),
+                    target.HandoffDurationMs,
+                    output.Succeeded
+                })))
+            });
+    }
+
+    private static string ContractLabel(string value) => value.Split('.', ':').Last();
+
+    private static string DisplayKind(string value) => string.Join(
+        " ",
+        value.Split('_', StringSplitOptions.RemoveEmptyEntries)
+            .Select(part => char.ToUpperInvariant(part[0]) + part[1..]));
+
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            if (module is not null)
+            {
+                await module.InvokeVoidAsync("disposeWorkflowRunMap", map);
+                await module.DisposeAsync();
+            }
+        }
+        catch (Exception exception) when (exception is JSException or JSDisconnectedException or ObjectDisposedException)
+        {
+        }
+    }
+}

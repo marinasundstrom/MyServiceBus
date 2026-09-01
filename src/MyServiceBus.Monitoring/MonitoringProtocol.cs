@@ -274,6 +274,61 @@ public sealed record MonitoringChoreographyReactionRuntime(
     DateTimeOffset? LastObservedAtUtc,
     string EvidenceStatus);
 
+public sealed record MonitoringChoreographyRunSnapshot(
+    int WindowSeconds,
+    DateTimeOffset WindowStartUtc,
+    DateTimeOffset WindowEndUtc,
+    long DroppedObservations,
+    bool AllParticipantsOnline,
+    bool Complete,
+    IReadOnlyList<MonitoringChoreographyRun> Runs);
+
+public sealed record MonitoringChoreographyRun(
+    string ChoreographyId,
+    string DefinitionVersion,
+    string RunId,
+    string RootMessageId,
+    DateTimeOffset StartedAtUtc,
+    DateTimeOffset LastActivityAtUtc,
+    double ObservedDurationMs,
+    string Status,
+    string Confidence,
+    IReadOnlyList<MonitoringChoreographyRunStep> Steps);
+
+public sealed record MonitoringChoreographyRunStep(
+    int Sequence,
+    string StepKey,
+    string ApplicationName,
+    string InstanceId,
+    string Owner,
+    string StepId,
+    string? OwnerComponent,
+    string TriggerMessageUrn,
+    string MessageId,
+    string? EndpointName,
+    DateTimeOffset StartedAtUtc,
+    DateTimeOffset CompletedAtUtc,
+    double DurationMs,
+    string Status,
+    int RetryCount,
+    string? FailureType,
+    IReadOnlyList<MonitoringChoreographyRunOutput> Outputs);
+
+public sealed record MonitoringChoreographyRunOutput(
+    string OperationKind,
+    string? MessageUrn,
+    string? MessageId,
+    string? Destination,
+    DateTimeOffset OccurredAtUtc,
+    double DurationMs,
+    bool Succeeded,
+    string? FailureType,
+    IReadOnlyList<MonitoringChoreographyRunTarget> Targets);
+
+public sealed record MonitoringChoreographyRunTarget(
+    string StepKey,
+    double HandoffDurationMs);
+
 public sealed record MonitoringDeclaredChoreographyFragment(
     string ApplicationName,
     string Owner,

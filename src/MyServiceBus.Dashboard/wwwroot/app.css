@@ -279,6 +279,63 @@ td small { display: block; margin-top: 4px; color: var(--text-dim); font-size: .
 .workflow-evidence { margin-top: 8px !important; padding-top: 7px; border-top: 1px solid var(--border-subtle); }
 .workflow-evidence.observed { color: var(--accent); font-weight: 700; }
 .workflow-participant > footer { padding: 10px 17px; border-top: 1px solid var(--border); color: var(--text-dim); font-size: .63rem; }
+.workflow-runs { border-top: 1px solid var(--border-strong); background: var(--surface-deep); }
+.workflow-run-heading, .workflow-run-summary { display: flex; justify-content: space-between; align-items: center; gap: 18px; padding: 18px 20px; }
+.workflow-run-heading h3 { margin: 2px 0 0; font-size: 1rem; }
+.workflow-run-heading > span, .workflow-run-summary > span { color: var(--text-dim); font-size: .68rem; }
+.workflow-run-selector { display: flex; gap: 8px; overflow-x: auto; padding: 0 20px 16px; }
+.workflow-run-selector button { display: grid; grid-template-columns: 9px auto; gap: 2px 8px; min-width: 145px; padding: 9px 11px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface-solid); color: var(--text); text-align: left; cursor: pointer; }
+.workflow-run-selector button.selected { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--surface-solid)); }
+.workflow-run-selector button strong { font-size: .7rem; }
+.workflow-run-selector button small { grid-column: 2; color: var(--text-dim); font-size: .61rem; }
+.run-status { display: inline-block; width: 8px; height: 8px; border-radius: 999px; background: var(--text-dim); }
+.run-status.live { background: var(--success); box-shadow: 0 0 0 4px color-mix(in srgb, var(--success) 16%, transparent); animation: workflow-live-pulse 1.8s ease-in-out infinite; }
+.run-status.terminal_observed { background: var(--accent); }
+.run-status.faulted { background: var(--danger); }
+.workflow-run-summary { border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); background: color-mix(in srgb, var(--surface-raised) 68%, transparent); }
+.workflow-run-summary > div { display: flex; align-items: center; gap: 8px; }
+.workflow-run-summary strong { font-size: .78rem; }
+.workflow-run-summary small { color: var(--text-dim); font-size: .62rem; }
+.workflow-run-map-shell { position: relative; min-height: 320px; overflow: hidden; border-bottom: 1px solid var(--border); background: var(--surface-deep); }
+.workflow-run-map-canvas { display: block; width: 100%; height: 100%; min-height: inherit; cursor: grab; }
+.workflow-run-map-canvas:active { cursor: grabbing; }
+.workflow-run-map-lane rect { fill: color-mix(in srgb, var(--surface-solid) 72%, transparent); stroke: var(--border-subtle); stroke-width: 1; }
+.workflow-run-map-lane text { fill: var(--text-dim); font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.workflow-run-map-link { fill: none; stroke: color-mix(in srgb, var(--accent) 72%, var(--border)); stroke-width: 2; }
+.workflow-run-map-link.faulted { stroke: var(--danger); }
+.workflow-run-map-arrow { fill: var(--accent); }
+.workflow-run-map-link-label { fill: var(--text-dim); font-size: 9px; text-anchor: middle; paint-order: stroke; stroke: var(--surface-deep); stroke-width: 5px; stroke-linejoin: round; }
+.workflow-run-map-node rect { fill: color-mix(in srgb, var(--surface-raised) 92%, var(--accent) 8%); stroke: color-mix(in srgb, var(--accent) 52%, var(--border-strong)); stroke-width: 1.4; }
+.workflow-run-map-node.faulted rect { fill: color-mix(in srgb, var(--surface-raised) 91%, var(--danger) 9%); stroke: var(--danger); }
+.workflow-run-map-application { fill: var(--accent); font-size: 9px; font-weight: 800; text-transform: uppercase; }
+.workflow-run-map-step { fill: var(--text); font-size: 13px; font-weight: 800; }
+.workflow-run-map-contract { fill: var(--text-dim); font-size: 9px; }
+.workflow-run-map-duration { fill: var(--text-soft); font-size: 9px; font-weight: 750; text-anchor: end; }
+.workflow-run-flow { display: flex; align-items: stretch; gap: 10px; overflow-x: auto; padding: 22px 20px; background: linear-gradient(var(--border-subtle) 1px, transparent 1px), linear-gradient(90deg, var(--border-subtle) 1px, transparent 1px); background-size: 42px 42px; }
+.workflow-run-connector { display: grid; flex: 0 0 24px; place-items: center; color: var(--accent); font-size: 1.25rem; }
+.workflow-run-step { flex: 0 0 265px; overflow: hidden; border: 1px solid var(--border-strong); border-radius: 12px; background: color-mix(in srgb, var(--surface-solid) 96%, transparent); box-shadow: 0 10px 24px rgb(0 0 0 / 14%); }
+.workflow-run-step.faulted { border-color: color-mix(in srgb, var(--danger) 62%, var(--border)); }
+.workflow-run-step > header { display: grid; grid-template-columns: auto 1fr; gap: 3px 8px; align-items: center; padding: 11px 13px; border-bottom: 1px solid var(--border); background: var(--surface-raised); }
+.workflow-run-step > header span { color: var(--accent); font-size: .59rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.workflow-run-step > header strong { overflow: hidden; font-size: .74rem; text-align: right; text-overflow: ellipsis; white-space: nowrap; }
+.workflow-run-step > header small { grid-column: 1 / -1; color: var(--text-dim); font-size: .58rem; text-align: right; }
+.workflow-run-step-body { padding: 13px; }
+.workflow-run-contract { color: var(--text-dim); font-size: .61rem; }
+.workflow-run-contract strong { color: var(--text-soft); }
+.workflow-run-step-body h4 { margin: 8px 0 3px; font-size: .88rem; }
+.workflow-run-step-body > p { margin: 0; color: var(--text-dim); font-size: .63rem; }
+.workflow-run-step dl { display: flex; flex-wrap: wrap; gap: 7px; margin: 12px 0; }
+.workflow-run-step dl div { min-width: 68px; padding: 7px 8px; border: 1px solid var(--border-subtle); border-radius: 7px; background: var(--surface-deep); }
+.workflow-run-step dt { color: var(--text-dim); font-size: .55rem; text-transform: uppercase; }
+.workflow-run-step dd { margin: 3px 0 0; color: var(--text-soft); font-size: .68rem; font-weight: 750; }
+.workflow-run-failure { margin: 8px 0; padding: 7px 8px; border-radius: 7px; background: var(--danger-surface); color: var(--danger); font-size: .62rem; overflow-wrap: anywhere; }
+.workflow-run-output { display: grid; grid-template-columns: 1fr auto; gap: 3px 8px; margin-top: 8px; padding: 9px; border-left: 2px solid var(--accent); border-radius: 0 7px 7px 0; background: var(--surface-deep); }
+.workflow-run-output.faulted { border-color: var(--danger); }
+.workflow-run-output span { color: var(--accent); font-size: .55rem; font-weight: 800; text-transform: uppercase; }
+.workflow-run-output strong { overflow: hidden; font-size: .65rem; text-align: right; text-overflow: ellipsis; white-space: nowrap; }
+.workflow-run-output small, .workflow-run-output em { grid-column: 1 / -1; color: var(--text-dim); font-size: .58rem; font-style: normal; }
+.workflow-runs > footer { padding: 11px 20px; border-top: 1px solid var(--border); color: var(--text-dim); font-size: .62rem; }
+@keyframes workflow-live-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
 
 @media (max-width: 760px) {
     .theme-selector span { display: none; }
