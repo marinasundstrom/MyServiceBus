@@ -19,10 +19,10 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v6
         with:
           dotnet-version: '10.0.100'
 
@@ -54,7 +54,7 @@ jobs:
         run: dotnet test --no-build --configuration Release --verbosity normal
 
       - name: Setup .NET 11 preview
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v6
         with:
           dotnet-version: '11.0.100-preview.7.26381.103'
 
