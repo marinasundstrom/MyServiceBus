@@ -457,12 +457,14 @@ public sealed class MonitoringRepository
                     .OrderBy(version => version, StringComparer.Ordinal)
                     .ToArray();
                 var conflictKinds = GetChoreographyConflictKinds(fragments, definitionVersions);
+                var connections = CreateDeclaredChoreographyConnections(fragments);
 
                 return new MonitoringDeclaredChoreography(
                     choreography.Key,
                     definitionVersions,
                     conflictKinds,
                     fragments.Max(fragment => fragment.LastCapturedAtUtc),
+                    connections,
                     fragments);
             })
             .OrderBy(choreography => choreography.ChoreographyId, StringComparer.Ordinal)
@@ -509,6 +511,46 @@ public sealed class MonitoringRepository
         }
         return conflicts.ToArray();
     }
+
+    private static MonitoringDeclaredChoreographyConnection[] CreateDeclaredChoreographyConnections(
+        IReadOnlyList<MonitoringDeclaredChoreographyFragment> fragments)
+        => fragments
+            .SelectMany(sourceFragment => sourceFragment.Steps.SelectMany(sourceStep => sourceStep.Outputs
+                .Where(output => output.MessageUrn is not null)
+                .SelectMany(output => fragments
+                    .Where(targetFragment => string.Equals(
+                        targetFragment.DefinitionVersion,
+                        sourceFragment.DefinitionVersion,
+                        StringComparison.Ordinal))
+                    .SelectMany(targetFragment => targetFragment.Steps
+                        .Where(targetStep => string.Equals(
+                            targetStep.TriggerMessageUrn,
+                            output.MessageUrn,
+                            StringComparison.Ordinal))
+                        .Select(targetStep => new MonitoringDeclaredChoreographyConnection(
+                            sourceFragment.DefinitionVersion,
+                            sourceFragment.ApplicationName,
+                            sourceFragment.Owner,
+                            sourceStep.Id,
+                            output.Kind,
+                            output.MessageUrn!,
+                            output.Destination,
+                            targetFragment.ApplicationName,
+                            targetFragment.Owner,
+                            targetStep.Id,
+                            "declared_contract"))))))
+            .Distinct()
+            .OrderBy(connection => connection.DefinitionVersion, StringComparer.Ordinal)
+            .ThenBy(connection => connection.SourceApplication, StringComparer.Ordinal)
+            .ThenBy(connection => connection.SourceOwner, StringComparer.Ordinal)
+            .ThenBy(connection => connection.SourceStepId, StringComparer.Ordinal)
+            .ThenBy(connection => connection.OperationKind)
+            .ThenBy(connection => connection.MessageUrn, StringComparer.Ordinal)
+            .ThenBy(connection => connection.Destination, StringComparer.Ordinal)
+            .ThenBy(connection => connection.TargetApplication, StringComparer.Ordinal)
+            .ThenBy(connection => connection.TargetOwner, StringComparer.Ordinal)
+            .ThenBy(connection => connection.TargetStepId, StringComparer.Ordinal)
+            .ToArray();
 
     private static string CreateFragmentIdentity(ChoreographyFragment fragment)
     {

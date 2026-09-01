@@ -220,10 +220,14 @@ public class MonitoringRepositoryTests
     {
         var now = DateTimeOffset.UtcNow;
         var repository = new MonitoringRepository();
-        var orders = CreateChoreography("orders", "1", "accept-order");
-        var inventory = CreateChoreography("inventory", "1", "reserve-inventory");
-        var billing = CreateChoreography("billing", "1", "reserve-inventory");
-        var legacyOrders = CreateChoreography("orders", "2", "accept-legacy-order");
+        var orders = CreateChoreography(
+            "orders", "1", "accept-order", "urn:message:OrderSubmitted", "urn:message:OrderAccepted");
+        var inventory = CreateChoreography(
+            "inventory", "1", "reserve-inventory", "urn:message:OrderAccepted", null);
+        var billing = CreateChoreography(
+            "billing", "1", "reserve-inventory", "urn:message:OrderAccepted", null);
+        var legacyOrders = CreateChoreography(
+            "orders", "2", "accept-legacy-order", "urn:message:OrderAccepted", null);
 
         repository.UpsertMetadata(WithChoreography(CreateMetadata("orders", "orders-1", now, "commerce"), orders));
         repository.UpsertMetadata(WithChoreography(CreateMetadata("orders", "orders-2", now.AddMinutes(-1), "commerce"), orders));
@@ -237,6 +241,11 @@ public class MonitoringRepositoryTests
         choreography.ConflictKinds.ShouldBe(["definition_version", "owner", "step_ownership"]);
         choreography.LastCapturedAtUtc.ShouldBe(now);
         choreography.Fragments.Count.ShouldBe(4);
+        choreography.Connections.Count.ShouldBe(2);
+        choreography.Connections.Select(connection => connection.TargetApplication)
+            .ShouldBe(["billing", "inventory"]);
+        choreography.Connections.ShouldAllBe(connection =>
+            connection.DefinitionVersion == "1" && connection.MatchKind == "declared_contract");
 
         var orderFragment = choreography.Fragments.Single(fragment => fragment.ApplicationName == "orders");
         orderFragment.Owner.ShouldBe("orders");
@@ -627,10 +636,20 @@ public class MonitoringRepositoryTests
                 [fragment])
         };
 
-    private static ChoreographyFragment CreateChoreography(string owner, string definitionVersion, string stepId)
+    private static ChoreographyFragment CreateChoreography(
+        string owner,
+        string definitionVersion,
+        string stepId,
+        string triggerMessageUrn,
+        string? outputMessageUrn)
         => new ChoreographyBuilder("order-fulfillment", definitionVersion, owner)
-            .Step(stepId, "urn:message:OrderSubmitted", step => step
-                .Publishes("urn:message:OrderAccepted"))
+            .Step(stepId, triggerMessageUrn, step =>
+            {
+                if (outputMessageUrn is null)
+                    step.Terminates();
+                else
+                    step.Publishes(outputMessageUrn);
+            })
             .Build();
 
     private static MonitoringObservationBatch CreateBatch(

@@ -76,7 +76,7 @@ else
                                             <div class="workflow-output">
                                                 <small>@output.Kind.ToString()</small>
                                                 <strong>@OutputLabel(output.MessageUrn)</strong>
-                                                <span>@OutputDetail(choreography, output)</span>
+                                                <span>@OutputDetail(choreography, fragment, step, output)</span>
                                             </div>
                                         }
                                     </div>
@@ -108,20 +108,28 @@ else
 
     private static string OutputDetail(
         MonitoringDeclaredChoreography choreography,
+        MonitoringDeclaredChoreographyFragment sourceFragment,
+        MyServiceBus.Choreography.ChoreographyStep sourceStep,
         MyServiceBus.Choreography.ChoreographyOutput output)
     {
         var details = new List<string>();
         if (!string.IsNullOrWhiteSpace(output.Destination))
             details.Add(output.Destination);
 
-        var targets = choreography.Fragments
-            .Where(fragment => fragment.Steps.Any(step => string.Equals(step.TriggerMessageUrn, output.MessageUrn, StringComparison.Ordinal)))
-            .Select(fragment => fragment.ApplicationName)
+        var targets = choreography.Connections
+            .Where(connection => string.Equals(connection.DefinitionVersion, sourceFragment.DefinitionVersion, StringComparison.Ordinal)
+                && string.Equals(connection.SourceApplication, sourceFragment.ApplicationName, StringComparison.Ordinal)
+                && string.Equals(connection.SourceOwner, sourceFragment.Owner, StringComparison.Ordinal)
+                && string.Equals(connection.SourceStepId, sourceStep.Id, StringComparison.Ordinal)
+                && connection.OperationKind == output.Kind
+                && string.Equals(connection.MessageUrn, output.MessageUrn, StringComparison.Ordinal)
+                && string.Equals(connection.Destination, output.Destination, StringComparison.Ordinal))
+            .Select(connection => connection.TargetApplication)
             .Distinct(StringComparer.Ordinal)
             .OrderBy(application => application, StringComparer.Ordinal)
             .ToArray();
         if (targets.Length > 0)
-            details.Add($"next: {string.Join(", ", targets)}");
+            details.Add($"declared next: {string.Join(", ", targets)}");
 
         details.Add(output.Requirement.ToString().ToLowerInvariant());
         if (output.MinCount == output.MaxCount && output.MinCount.HasValue)

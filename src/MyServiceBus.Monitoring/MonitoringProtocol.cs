@@ -233,7 +233,21 @@ public sealed record MonitoringDeclaredChoreography(
     IReadOnlyList<string> DefinitionVersions,
     IReadOnlyList<string> ConflictKinds,
     DateTimeOffset LastCapturedAtUtc,
+    IReadOnlyList<MonitoringDeclaredChoreographyConnection> Connections,
     IReadOnlyList<MonitoringDeclaredChoreographyFragment> Fragments);
+
+public sealed record MonitoringDeclaredChoreographyConnection(
+    string DefinitionVersion,
+    string SourceApplication,
+    string SourceOwner,
+    string SourceStepId,
+    ChoreographyOperationKind OperationKind,
+    string MessageUrn,
+    string? Destination,
+    string TargetApplication,
+    string TargetOwner,
+    string TargetStepId,
+    string MatchKind);
 
 public sealed record MonitoringDeclaredChoreographyFragment(
     string ApplicationName,

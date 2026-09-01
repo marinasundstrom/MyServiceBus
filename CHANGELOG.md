@@ -4,6 +4,7 @@ This changelog summarizes the bigger themes in the repository history rather tha
 
 ## Unreleased
 
+- Added explicit version-scoped connections to the declared-choreography monitoring read model. The collector now links output contracts to matching declared trigger steps, and the Workflows page consumes those shared relationships instead of independently inferring downstream participants; the links remain declaration evidence rather than routing or delivery claims.
 - Added matching C# and Java fluent choreography-registration overloads so applications can declare workflow steps directly inside bus configuration while preserving overloads for an existing builder or prebuilt fragment from generated definitions, fixtures, reuse, and tooling.
 - Added an executable cross-language choreography sample to the existing Aspire environment. The C# and Java applications declare separately owned `SubmitOrder` to `OrderSubmitted` reactions under one definition, allowing the monitoring service and Workflows page to demonstrate merged decentralized intent over real sample consumers.
 - Added the first declared-workflow Dashboard view. It groups choreography reactions by application, connects triggers to outputs and matching downstream participants, and exposes definition versions, conflicts, replica availability, and freshness without presenting declarations as observed execution or authoritative workflow state.
