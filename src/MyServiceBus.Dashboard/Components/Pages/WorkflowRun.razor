@@ -36,6 +36,8 @@ else
                 <div><dt>Run</dt><dd>@Abbreviate(run.RootMessageId)</dd></div>
                 <div><dt>Observed span</dt><dd>@FormatDuration(run.ObservedDurationMs)</dd></div>
                 <div><dt>Steps</dt><dd>@run.Steps.Count</dd></div>
+                <div><dt>Observed shape</dt><dd>@ShapeLabel(run)</dd></div>
+                <div><dt>Exact roots</dt><dd>@run.RootCount</dd></div>
             </dl>
         </div>
 
@@ -43,7 +45,7 @@ else
             <div>
                 <span class="run-status @run.Status"></span>
                 <strong>@RunStatus(run.Status)</strong>
-                <small>Reconstructed · @run.Confidence.Replace('_', ' ')</small>
+                <small>Reconstructed · @run.Confidence.Replace('_', ' ') · @ShapeLabel(run)</small>
             </div>
             <span>Started @run.StartedAtUtc.ToLocalTime().ToString("MMM d, HH:mm:ss.fff") · last activity @run.LastActivityAtUtc.ToLocalTime().ToString("HH:mm:ss.fff")</span>
         </div>
@@ -55,15 +57,22 @@ else
             </div>
         }
 
+        @if (run.ObservedShape != "linear")
+        {
+            <div class="workflow-run-structure-note">
+                The graph contains @StructureDescription(run). The cards below remain chronological; exact handoff labels and graph edges define causation. Observed convergence does not by itself prove a declared business join.
+            </div>
+        }
+
         <WorkflowRunMap @key="run.RunId" Run="run" />
 
-        <div class="workflow-run-flow" aria-label="Ordered workflow run step evidence">
+        <div class="workflow-run-flow" aria-label="Chronological workflow run step evidence">
             @for (var stepIndex = 0; stepIndex < run.Steps.Count; stepIndex++)
             {
                 var step = run.Steps[stepIndex];
                 @if (stepIndex > 0)
                 {
-                    <div class="workflow-run-connector" aria-hidden="true">→</div>
+                    <div class="workflow-run-connector" aria-hidden="true">@(run.ObservedShape == "linear" ? "→" : "⋯")</div>
                 }
                 <article class="workflow-run-step @step.Status">
                     <header>
@@ -107,7 +116,7 @@ else
                 </article>
             }
         </div>
-        <footer>Run identity @run.RootMessageId · this is a bounded reconstruction, not authoritative workflow state.</footer>
+        <footer>Run identity @run.RootMessageId@if (run.RootCount > 1) {<text> · @run.RootCount exactly connected roots</text>} · this is a bounded reconstruction, not authoritative workflow state.</footer>
     </section>
 }
 
@@ -182,6 +191,24 @@ else
 
     private static string FormatDuration(double milliseconds)
         => milliseconds >= 1_000 ? $"{milliseconds / 1_000:0.##} s" : $"{milliseconds:0.##} ms";
+
+    private static string ShapeLabel(MonitoringChoreographyRun run) => run.ObservedShape switch
+    {
+        "branching" => "Branching",
+        "converging" => "Converging",
+        "branching_and_converging" => "Branching + converging",
+        _ => "Linear"
+    };
+
+    private static string StructureDescription(MonitoringChoreographyRun run)
+    {
+        var parts = new List<string>();
+        if (run.BranchPointCount > 0)
+            parts.Add($"{run.BranchPointCount} exact fan-out point{(run.BranchPointCount == 1 ? string.Empty : "s")}");
+        if (run.MergePointCount > 0)
+            parts.Add($"{run.MergePointCount} exact convergence point{(run.MergePointCount == 1 ? string.Empty : "s")}");
+        return string.Join(" and ", parts);
+    }
 
     private static string TargetLabel(MonitoringChoreographyRun run, string stepKey)
     {

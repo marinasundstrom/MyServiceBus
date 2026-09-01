@@ -74,7 +74,7 @@
                             </td>
                             <td>
                                 <strong>@FormatDuration(run.ObservedDurationMs)</strong>
-                                <small>@run.Steps.Count observed @(run.Steps.Count == 1 ? "step" : "steps")</small>
+                                <small>@run.Steps.Count observed @(run.Steps.Count == 1 ? "step" : "steps") · @ShapeLabel(run)</small>
                             </td>
                             <td>
                                 <strong>@(run.EvidenceComplete ? "Complete" : "Incomplete")</strong>
@@ -165,6 +165,14 @@
 
     private static string FormatDuration(double milliseconds)
         => milliseconds >= 1_000 ? $"{milliseconds / 1_000:0.##} s" : $"{milliseconds:0.##} ms";
+
+    private static string ShapeLabel(MonitoringChoreographyRun run) => run.ObservedShape switch
+    {
+        "branching" => $"{run.BranchPointCount} observed fork{(run.BranchPointCount == 1 ? string.Empty : "s")}",
+        "converging" => $"{run.MergePointCount} observed convergence{(run.MergePointCount == 1 ? string.Empty : "s")}",
+        "branching_and_converging" => $"{run.BranchPointCount} forks · {run.MergePointCount} convergences",
+        _ => "linear path"
+    };
 
     private static string Abbreviate(string value)
         => value.Length <= 12 ? value : $"{value[..8]}…{value[^4..]}";

@@ -4,6 +4,8 @@ This changelog summarizes the bigger themes in the repository history rather tha
 
 ## Unreleased
 
+- Reconciled exact-evidence workflow runs as connected graphs. Same-message delivery fan-out remains one run, later exact convergence replaces superseded partial roots in memory and PostgreSQL, and retained runs report root, branch, merge, and observed-shape metadata.
+- Extended workflow-run presentation with linear, branching, and converging shape summaries plus D3 activity labels for root fan-out, internal forks, and observed convergence. Chronological evidence cards no longer imply linear causation for non-linear runs, and the UI explicitly avoids treating convergence as a declared business join.
 - Added a monitoring-owned retained workflow-run projection with PostgreSQL restart durability, stable direct lookup, server-side type/status/identity filters, pagination, explicit reconstructed-evidence authority, and completeness metadata.
 - Added a persisted Dashboard density setting. Comfortable remains the default, while Compact tightens the application shell, navigation, cards, tables, filters, and workflow detail for higher-information and small-screen views.
 - Split the Dashboard's Workflows domain into a default filterable run index and a separate declared-workflow catalog. Run rows expose coordination type, status, timing, and step count and open a dedicated failure-aware D3 activity detail whose pan, zoom, and reset state survives live data refreshes.

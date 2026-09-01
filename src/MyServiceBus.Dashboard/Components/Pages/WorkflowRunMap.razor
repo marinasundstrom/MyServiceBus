@@ -22,6 +22,21 @@
         module ??= await JavaScript.InvokeAsync<IJSObjectReference>("import", "./monitoringChart.js");
         if (firstRender)
             await module.InvokeVoidAsync("initializeWorkflowRunMap", map);
+        var incomingSources = Run.Steps
+            .SelectMany(step => step.Outputs.SelectMany(output => output.Targets.Select(target => new
+            {
+                Source = step.StepKey,
+                Target = target.StepKey
+            })))
+            .GroupBy(edge => edge.Target, StringComparer.Ordinal)
+            .ToDictionary(
+                group => group.Key,
+                group => group.Select(edge => edge.Source).Distinct(StringComparer.Ordinal).Count(),
+                StringComparer.Ordinal);
+        var rootDeliveryCounts = Run.Steps
+            .Where(step => !incomingSources.ContainsKey(step.StepKey))
+            .GroupBy(step => step.MessageId, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.Count(), StringComparer.Ordinal);
         await module.InvokeVoidAsync(
             "updateWorkflowRunMap",
             map,
@@ -35,7 +50,15 @@
                     Contract = ContractLabel(step.TriggerMessageUrn),
                     step.DurationMs,
                     step.Status,
-                    step.Sequence
+                    step.Sequence,
+                    BranchCount = step.Outputs.SelectMany(output => output.Targets)
+                        .Select(target => target.StepKey)
+                        .Distinct(StringComparer.Ordinal)
+                        .Count(),
+                    MergeCount = incomingSources.GetValueOrDefault(step.StepKey),
+                    RootFanOutCount = incomingSources.ContainsKey(step.StepKey)
+                        ? 0
+                        : rootDeliveryCounts.GetValueOrDefault(step.MessageId)
                 }),
                 Links = Run.Steps.SelectMany(step => step.Outputs.SelectMany(output => output.Targets.Select(target => new
                 {

@@ -841,6 +841,7 @@ class WorkflowRunMap {
                 const group = enter.append("g").attr("class", "workflow-run-map-node");
                 group.append("rect").attr("x", -105).attr("y", -43).attr("width", 210).attr("height", 86).attr("rx", 11);
                 group.append("text").attr("class", "workflow-run-map-application").attr("x", -90).attr("y", -21);
+                group.append("text").attr("class", "workflow-run-map-structure").attr("x", 90).attr("y", -21);
                 group.append("text").attr("class", "workflow-run-map-step").attr("x", -90).attr("y", 2);
                 group.append("text").attr("class", "workflow-run-map-contract").attr("x", -90).attr("y", 23);
                 group.append("text").attr("class", "workflow-run-map-duration").attr("x", 90).attr("y", 23);
@@ -850,6 +851,13 @@ class WorkflowRunMap {
             .attr("class", node => `workflow-run-map-node ${node.status}`)
             .attr("transform", node => `translate(${node.x},${node.y})`);
         selection.select(".workflow-run-map-application").text(node => trimText(node.application, 25));
+        selection.select(".workflow-run-map-structure").text(node => {
+            const labels = [];
+            if (node.rootFanOutCount > 1) labels.push(`ROOT ×${node.rootFanOutCount}`);
+            if (node.branchCount > 1) labels.push(`FORK ×${node.branchCount}`);
+            if (node.mergeCount > 1) labels.push(`MERGE ×${node.mergeCount}`);
+            return labels.join(" · ");
+        });
         selection.select(".workflow-run-map-step").text(node => trimText(node.label, 28));
         selection.select(".workflow-run-map-contract").text(node => `Consumes ${trimText(node.contract, 22)}`);
         selection.select(".workflow-run-map-duration").text(node => formatMilliseconds(node.durationMs));

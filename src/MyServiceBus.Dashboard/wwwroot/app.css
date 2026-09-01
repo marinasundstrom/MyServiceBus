@@ -290,6 +290,7 @@ td small { display: block; margin-top: 4px; color: var(--text-dim); font-size: .
 .workflow-run-outcome dt { color: var(--text-dim); font-size: .58rem; text-transform: uppercase; }
 .workflow-run-outcome dd { margin: 4px 0 0; overflow: hidden; font-size: .72rem; font-weight: 750; text-overflow: ellipsis; white-space: nowrap; }
 .workflow-run-coverage-warning { padding: 12px 20px; border-bottom: 1px solid color-mix(in srgb, #f1b861 45%, var(--border)); background: color-mix(in srgb, #f1b861 10%, var(--surface-deep)); color: var(--text-muted); font-size: .7rem; }
+.workflow-run-structure-note { padding: 10px 20px; border-bottom: 1px solid var(--border); background: color-mix(in srgb, var(--accent) 6%, var(--surface-deep)); color: var(--text-muted); font-size: .7rem; line-height: 1.45; }
 .workflow-map { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 16px; padding: 20px; background: linear-gradient(var(--border-subtle) 1px, transparent 1px), linear-gradient(90deg, var(--border-subtle) 1px, transparent 1px), var(--surface-deep); background-size: 42px 42px; }
 .workflow-participant { min-width: 0; overflow: hidden; border: 1px solid var(--border-strong); border-radius: 14px; background: color-mix(in srgb, var(--surface-solid) 96%, transparent); box-shadow: 0 12px 30px rgb(0 0 0 / 15%); }
 .workflow-participant > header { display: flex; justify-content: space-between; align-items: center; gap: 15px; padding: 15px 17px; border-bottom: 1px solid var(--border); background: color-mix(in srgb, var(--surface-raised) 70%, transparent); }
@@ -340,6 +341,7 @@ td small { display: block; margin-top: 4px; color: var(--text-dim); font-size: .
 .workflow-run-map-node rect { fill: color-mix(in srgb, var(--surface-raised) 92%, var(--accent) 8%); stroke: color-mix(in srgb, var(--accent) 52%, var(--border-strong)); stroke-width: 1.4; }
 .workflow-run-map-node.faulted rect { fill: color-mix(in srgb, var(--surface-raised) 91%, var(--danger) 9%); stroke: var(--danger); }
 .workflow-run-map-application { fill: var(--accent); font-size: 9px; font-weight: 800; text-transform: uppercase; }
+.workflow-run-map-structure { fill: var(--accent); font-size: 8px; font-weight: 850; text-anchor: end; }
 .workflow-run-map-step { fill: var(--text); font-size: 13px; font-weight: 800; }
 .workflow-run-map-contract { fill: var(--text-dim); font-size: 9px; }
 .workflow-run-map-duration { fill: var(--text-soft); font-size: 9px; font-weight: 750; text-anchor: end; }
