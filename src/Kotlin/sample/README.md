@@ -7,7 +7,9 @@ configuration, a suspending consumer, and coroutine-native publishing through
 the shared JVM runtime. It also demonstrates a typed suspending request handler
 through the in-memory mediator. Its broker-backed request example creates a
 typed client without a class literal and handles two declared outcomes with an
-exhaustive Kotlin `when`.
+exhaustive Kotlin `when`. The scoped Kotlin `RequestClientFactory` accepts Kotlin
+durations and keeps Java class tokens, timeout wrappers, and futures behind the
+projection.
 
 Start RabbitMQ from the repository root:
 

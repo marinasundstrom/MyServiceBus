@@ -1,28 +1,29 @@
 package com.myservicebus.packagesmoke
 
-import com.myservicebus.RequestClient
+import com.myservicebus.RequestClient as JvmRequestClient
 import com.myservicebus.RequestTimeout
 import com.myservicebus.Response2
-import com.myservicebus.ScopedClientFactory
+import com.myservicebus.ScopedClientFactory as JvmScopedClientFactory
 import com.myservicebus.SendContext as JvmSendContext
 import com.myservicebus.di.ServiceCollection
+import com.myservicebus.di.ServiceProviderBasedProvider
 import com.myservicebus.kotlin.ConsumeContext
 import com.myservicebus.kotlin.Consumer
 import com.myservicebus.kotlin.MessageBus
 import com.myservicebus.kotlin.PublishEndpoint
 import com.myservicebus.kotlin.PublishEndpointProvider
+import com.myservicebus.kotlin.RequestClientFactory
 import com.myservicebus.kotlin.RequestResult
 import com.myservicebus.kotlin.SendEndpointProvider
 import com.myservicebus.kotlin.SuspendHandler
 import com.myservicebus.kotlin.addServiceBus
-import com.myservicebus.kotlin.createRequestClient
 import com.myservicebus.kotlin.createMediator
 import com.myservicebus.kotlin.getRequiredService
-import com.myservicebus.kotlin.request
-import com.myservicebus.kotlin.requestOneOf
 import java.net.URI
 import java.util.concurrent.CompletableFuture
 import java.util.UUID
+import java.util.function.Supplier
+import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.runBlocking
 
 data class PackageSmokeMessage(val value: String)
@@ -61,7 +62,7 @@ class PackageSmokeHandler : SuspendHandler<PackageSmokeRequest, PackageSmokeResp
         PackageSmokeResponse(request.value)
 }
 
-private class PackageSmokeRequestClient : RequestClient<PackageSmokeRequest> {
+private class PackageSmokeRequestClient : JvmRequestClient<PackageSmokeRequest> {
     lateinit var context: JvmSendContext
 
     override fun <TResponse : Any?> getResponse(
@@ -82,20 +83,32 @@ private class PackageSmokeRequestClient : RequestClient<PackageSmokeRequest> {
     }
 }
 
-private class PackageSmokeClientFactory : ScopedClientFactory {
+private class PackageSmokeClientFactory : JvmScopedClientFactory {
     override fun <TRequest : Any?> create(
         requestType: Class<TRequest>,
         destinationAddress: URI?,
         timeout: RequestTimeout,
-    ): RequestClient<TRequest> {
+    ): JvmRequestClient<TRequest> {
         check(requestType == PackageSmokeRequest::class.java)
+        lastDestination = destinationAddress
+        lastTimeout = timeout
         @Suppress("UNCHECKED_CAST")
-        return PackageSmokeRequestClient() as RequestClient<TRequest>
+        return PackageSmokeRequestClient().also { lastClient = it } as JvmRequestClient<TRequest>
+    }
+
+    companion object {
+        lateinit var lastClient: PackageSmokeRequestClient
+        var lastDestination: URI? = null
+        lateinit var lastTimeout: RequestTimeout
     }
 }
 
 fun main() = runBlocking {
     val services = ServiceCollection.create()
+    services.addScoped(
+        JvmScopedClientFactory::class.java,
+        ServiceProviderBasedProvider { Supplier { PackageSmokeClientFactory() } },
+    )
     services.addServiceBus()
 
     val provider = services.buildServiceProvider()
@@ -121,17 +134,24 @@ fun main() = runBlocking {
     check(response.value == "request-smoke")
 
     val correlationId = UUID.randomUUID()
-    val requestClient = PackageSmokeClientFactory()
-        .createRequestClient<PackageSmokeRequest>() as PackageSmokeRequestClient
-    val result: RequestResult<PackageSmokeResponse, PackageSmokeRejection> =
+    val result: RequestResult<PackageSmokeResponse, PackageSmokeRejection> = provider.createScope().use { scope ->
+        val requestClient = scope.serviceProvider
+            .getRequiredService<RequestClientFactory>()
+            .create<PackageSmokeRequest>(
+                destination = "loopback://requests",
+                timeout = 12.seconds,
+            )
         requestClient.requestOneOf(PackageSmokeRequest("one-of-smoke")) {
             headers["projection"] = "kotlin"
             this.correlationId = correlationId
             check(jvm { this.correlationId } == correlationId)
         }
+    }
     check(result is RequestResult.Second && result.message.value == "rejected")
-    check(requestClient.context.headers["projection"] == "kotlin")
-    check(requestClient.context.correlationId == correlationId)
+    check(PackageSmokeClientFactory.lastClient.context.headers["projection"] == "kotlin")
+    check(PackageSmokeClientFactory.lastClient.context.correlationId == correlationId)
+    check(PackageSmokeClientFactory.lastDestination == URI.create("loopback://requests"))
+    check(PackageSmokeClientFactory.lastTimeout.duration == java.time.Duration.ofSeconds(12))
 
     println("Verified the staged MyServiceBus Kotlin Maven package from a consumer project.")
 }

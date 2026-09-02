@@ -1,0 +1,123 @@
+import Link from 'next/link';
+import CodeViewer from '../app/components/CodeViewer';
+
+export const installKotlin = `plugins {
+    kotlin("jvm") version "2.2.20"
+}
+
+dependencies {
+    implementation("io.github.marinasundstrom.myservicebus:myservicebus-kotlin:VERSION")
+    implementation("io.github.marinasundstrom.myservicebus:myservicebus-rabbitmq:VERSION")
+    implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.17.2")
+}`;
+
+export const kotlinConsumer = `data class SubmitOrder(val orderId: UUID)
+data class OrderSubmitted(val orderId: UUID)
+
+class SubmitOrderConsumer : Consumer<SubmitOrder> {
+    override suspend fun consume(context: ConsumeContext<SubmitOrder>) {
+        context.publish(OrderSubmitted(context.message.orderId))
+    }
+}`;
+
+export const configureAndPublish = `val services = ServiceCollection.create()
+
+services.addServiceBus {
+    consumer<SubmitOrderConsumer>()
+    transport<RabbitMqFactoryConfigurator> { context ->
+        host("localhost")
+        configureEndpoints(context)
+    }
+}
+
+val provider = services.buildServiceProvider()
+val bus = provider.getRequiredService<MessageBus>()
+bus.start()
+
+runBlocking {
+    val order = SubmitOrder(UUID.randomUUID())
+    bus.publish(order) {
+        correlationId = order.orderId
+        headers["tenant"] = "north"
+    }
+}`;
+
+export const requestClient = `provider.createScope().use { scope ->
+    val factory = scope.serviceProvider
+        .getRequiredService<RequestClientFactory>()
+    val client = factory.create<LookupOrder>(timeout = 10.seconds)
+
+    val result: RequestResult<OrderStatus, OrderNotFound> =
+        client.requestOneOf(LookupOrder(orderId))
+
+    when (result) {
+        is RequestResult.First -> println(result.message.status)
+        is RequestResult.Second -> println("Missing \${result.message.orderId}")
+    }
+}`;
+
+export const mediator = `class LookupOrderHandler : SuspendHandler<LookupOrder, OrderStatus> {
+    override suspend fun handle(request: LookupOrder): OrderStatus =
+        findOrder(request.orderId)
+}
+
+val mediator = ServiceCollection.create().createMediator {
+    handler<LookupOrderHandler>()
+}
+
+val status: OrderStatus = mediator.request(LookupOrder(orderId))`;
+
+<p className="docs-kicker">Guide · Kotlin experiment</p>
+
+# Kotlin is a first-class JVM target.
+
+<p className="docs-summary">The Kotlin projection rebuilds MyServiceBus around coroutines, receiver DSLs, reified types, Kotlin durations, and exhaustive results. It shares the Java transport and delivery runtime without inheriting Java futures or overload-heavy API shapes.</p>
+
+<div className="callout callout-accent">
+  <strong>Experimental until the MVP gate is complete</strong>
+  <p>This projection is being developed on its own feature branch and is not yet an announced stable surface. Breaking changes are expected while broker flows, scope behavior, cancellation, the runnable sample, and staged-package verification converge.</p>
+</div>
+
+## Install the projection
+
+The Kotlin artifact sits above the shared JVM runtime. Add the Kotlin Jackson module when messages use data-class primary constructors. Replace <code>VERSION</code> with the preview version that first includes the Kotlin MVP.
+
+<CodeViewer code={installKotlin} label="Gradle Kotlin DSL" language="kotlin" />
+
+## Consume with suspending code
+
+Kotlin owns both <code>Consumer&lt;T&gt;</code> and <code>ConsumeContext&lt;T&gt;</code>. The handler can call suspending messaging operations directly; MyServiceBus waits for the coroutine before acknowledging the delivery and propagates cancellation and failure into the shared receive pipeline.
+
+<CodeViewer code={kotlinConsumer} label="Suspending Kotlin consumer" language="kotlin" />
+
+## Configure and publish without Java ceremony
+
+The registration DSL infers consumer and transport classes. The projected bus publishes with the familiar name instead of an <code>Await</code> suffix, while configured operations receive Kotlin-owned metadata contexts.
+
+<CodeViewer code={configureAndPublish} label="Configure and publish" language="kotlin" />
+
+<div className="docs-feature-grid">
+  <div><span>01</span><h3>Coroutines</h3><p>Bus, endpoint, mediator, request, response, and consumer operations suspend and participate in bidirectional cancellation.</p></div>
+  <div><span>02</span><h3>Native facades</h3><p>Kotlin owns the application-facing bus, mediator, endpoint, context, consumer, handler, and request-client types.</p></div>
+  <div><span>03</span><h3>Shared behavior</h3><p>Transports, topology, serialization, scopes, retry, fault, outbox, and settlement remain in the common JVM runtime.</p></div>
+  <div><span>04</span><h3>Explicit escape</h3><p><code>{'jvm { ... }'}</code> exposes unprojected runtime capabilities without making Java syntax the default.</p></div>
+</div>
+
+## Request with reified response types
+
+The scoped factory accepts Kotlin <code>Duration</code> and creates a suspending client without class literals. Multiple business outcomes become a sealed result, so <code>when</code> remains exhaustive and retains branch identity.
+
+<CodeViewer code={requestClient} label="Scoped request client" language="kotlin" />
+
+## Dispatch locally with the same handler model
+
+The mediator uses the shared scoped consumer pipeline but stays entirely in process. A suspending handler returns its response directly.
+
+<CodeViewer code={mediator} label="Kotlin mediator" language="kotlin" />
+
+<div className="callout">
+  <strong>One runtime, language-specific projections</strong>
+  <p>Java and Kotlin are not required to expose identical source APIs. The goal is equivalent topology, delivery, metadata, failure, and wire behavior through shapes that feel native in each language. See the <Link href="/docs/platform-parity">platform parity guide</Link> for the broader contract.</p>
+</div>
+
+<div className="next-card"><div><span>Next</span><strong>Build the complete broker sample</strong></div><Link href="/docs/getting-started">Getting started →</Link></div>

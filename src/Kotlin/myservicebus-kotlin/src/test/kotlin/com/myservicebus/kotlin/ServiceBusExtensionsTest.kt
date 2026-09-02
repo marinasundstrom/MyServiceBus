@@ -4,6 +4,7 @@ import com.myservicebus.BusRegistrationContext
 import com.myservicebus.ConsumeContext
 import com.myservicebus.Consumer
 import com.myservicebus.MessageBus as JvmMessageBus
+import com.myservicebus.ScopedClientFactory as JvmScopedClientFactory
 import com.myservicebus.di.ServiceCollection
 import com.myservicebus.rabbitmq.RabbitMqFactoryConfigurator
 import java.util.concurrent.CompletableFuture
@@ -43,6 +44,9 @@ class ServiceBusExtensionsTest {
             assertNotNull(scopedProvider.getRequiredService<PublishEndpoint>())
             assertNotNull(scopedProvider.getRequiredService<PublishEndpointProvider>().publishEndpoint)
             assertNotNull(scopedProvider.getRequiredService<SendEndpointProvider>())
+            val requestFactory = scopedProvider.getRequiredService<RequestClientFactory>()
+            val jvmRequestFactory = scopedProvider.getRequiredService<JvmScopedClientFactory>()
+            assertTrue(requestFactory.jvm { this } === jvmRequestFactory)
         }
         assertTrue(transportConfigured)
         assertTrue(jvmConfiguratorReached)

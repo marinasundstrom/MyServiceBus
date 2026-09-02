@@ -1,19 +1,16 @@
 package com.myservicebus.sample.kotlin
 
-import com.myservicebus.ScopedClientFactory
 import com.myservicebus.di.ServiceCollection
 import com.myservicebus.di.ServiceProvider
 import com.myservicebus.kotlin.ConsumeContext
 import com.myservicebus.kotlin.Consumer
 import com.myservicebus.kotlin.MessageBus
+import com.myservicebus.kotlin.RequestClientFactory
 import com.myservicebus.kotlin.RequestResult
 import com.myservicebus.kotlin.SuspendHandler
 import com.myservicebus.kotlin.addServiceBus
-import com.myservicebus.kotlin.createRequestClient
 import com.myservicebus.kotlin.createMediator
 import com.myservicebus.kotlin.getRequiredService
-import com.myservicebus.kotlin.request
-import com.myservicebus.kotlin.requestOneOf
 import com.myservicebus.rabbitmq.RabbitMqFactoryConfigurator
 import java.util.UUID
 import kotlinx.coroutines.CompletableDeferred
@@ -88,8 +85,8 @@ fun main() = runBlocking {
 
         provider.createScope().use { scope ->
             val client = scope.serviceProvider
-                .getRequiredService<ScopedClientFactory>()
-                .createRequestClient<LookupOrder>()
+                .getRequiredService<RequestClientFactory>()
+                .create<LookupOrder>()
             val result: RequestResult<OrderStatus, OrderNotFound> =
                 client.requestOneOf(LookupOrder(order.orderId))
             when (result) {

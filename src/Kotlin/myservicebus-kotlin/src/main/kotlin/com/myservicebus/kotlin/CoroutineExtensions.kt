@@ -8,7 +8,7 @@ import com.myservicebus.ConsumerMethodInvoker
 import com.myservicebus.DefaultEndpointNameFormatter
 import com.myservicebus.MessageConsumer
 import com.myservicebus.PublishEndpoint as JvmPublishEndpoint
-import com.myservicebus.RequestClient
+import com.myservicebus.RequestClient as JvmRequestClient
 import com.myservicebus.ResultHandler
 import com.myservicebus.SendEndpoint as JvmSendEndpoint
 import com.myservicebus.mediator.Mediator as JvmMediator
@@ -196,14 +196,14 @@ suspend fun <TMessage : Any> JvmConsumeContext<*>.respondAwait(message: TMessage
 }
 
 /** Sends a request and returns its typed response or fault. */
-suspend inline fun <TRequest, reified TResponse : Any> RequestClient<TRequest>.request(
+suspend inline fun <TRequest, reified TResponse : Any> JvmRequestClient<TRequest>.request(
     request: TRequest,
 ): TResponse = awaitOperation { cancellationToken ->
     getResponse(request, TResponse::class.java, cancellationToken)
 }
 
 /** Sends a configured request and returns its typed response or fault. */
-suspend inline fun <TRequest, reified TResponse : Any> RequestClient<TRequest>.request(
+suspend inline fun <TRequest, reified TResponse : Any> JvmRequestClient<TRequest>.request(
     request: TRequest,
     noinline configure: SendContext.() -> Unit,
 ): TResponse = awaitOperation { cancellationToken ->
@@ -217,17 +217,14 @@ suspend inline fun <TRequest, reified TResponse : Any> RequestClient<TRequest>.r
 
 /** Sends a request that can return either of two response types. */
 suspend inline fun <TRequest, reified TFirst : Any, reified TSecond : Any>
-    RequestClient<TRequest>.requestOneOf(request: TRequest): RequestResult<TFirst, TSecond> =
+    JvmRequestClient<TRequest>.requestOneOf(request: TRequest): RequestResult<TFirst, TSecond> =
     awaitOperation { cancellationToken ->
         getResponse(request, TFirst::class.java, TSecond::class.java, cancellationToken)
-    }.match(
-        { message -> RequestResult.First(message) },
-        { message -> RequestResult.Second(message) },
-    )
+    }.toRequestResult()
 
 /** Sends a configured request that can return either of two response types. */
 suspend inline fun <TRequest, reified TFirst : Any, reified TSecond : Any>
-    RequestClient<TRequest>.requestOneOf(
+    JvmRequestClient<TRequest>.requestOneOf(
         request: TRequest,
         noinline configure: SendContext.() -> Unit,
     ): RequestResult<TFirst, TSecond> = awaitOperation { cancellationToken ->
@@ -238,10 +235,7 @@ suspend inline fun <TRequest, reified TFirst : Any, reified TSecond : Any>
             { context -> SendContext(context).configure() },
             cancellationToken,
         )
-    }.match(
-        { message -> RequestResult.First(message) },
-        { message -> RequestResult.Second(message) },
-    )
+    }.toRequestResult()
 
 /** Publishes through the in-memory mediator and awaits every matching handler. */
 suspend fun JvmMediator.publishAwait(message: Any) {

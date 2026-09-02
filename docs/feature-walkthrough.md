@@ -841,7 +841,8 @@ System.out.println(description);
 ##### Kotlin
 
 ```kotlin
-val client = factory.createRequestClient<CheckOrderStatus>()
+val factory = scopedProvider.getRequiredService<RequestClientFactory>()
+val client = factory.create<CheckOrderStatus>()
 val response: RequestResult<OrderStatus, OrderNotFound> =
     client.requestOneOf(CheckOrderStatus(UUID.randomUUID()))
 

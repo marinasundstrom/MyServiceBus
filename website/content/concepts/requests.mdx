@@ -6,7 +6,11 @@ export const requestClient = {
   java: `OrderStatus response = client
     .getResponse(new CheckOrderStatus(orderId), OrderStatus.class)
     .join();`,
-  kotlin: `val response: OrderStatus = client.request(
+  kotlin: `val client = scopedProvider
+    .getRequiredService<RequestClientFactory>()
+    .create<CheckOrderStatus>(timeout = 10.seconds)
+
+val response: OrderStatus = client.request(
     CheckOrderStatus(orderId)
 )`,
 };

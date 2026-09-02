@@ -3,7 +3,9 @@ package com.myservicebus.kotlin
 import com.myservicebus.ConsumeContext as JvmConsumeContext
 import com.myservicebus.MediatorResponseTypeException
 import com.myservicebus.RequestClient
+import com.myservicebus.RequestTimeout
 import com.myservicebus.Response2
+import com.myservicebus.ScopedClientFactory
 import com.myservicebus.SendContext as JvmSendContext
 import com.myservicebus.SendEndpoint
 import com.myservicebus.SendEndpointProvider
@@ -25,6 +27,8 @@ import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 class CoroutineExtensionsTest {
     @Test
@@ -135,7 +139,8 @@ class CoroutineExtensionsTest {
 
     @Test
     fun `request client projects typed response and Kotlin context configuration`() = runBlocking {
-        val client = CapturingRequestClient()
+        val jvmClient = CapturingRequestClient()
+        val client = RequestClient(jvmClient)
         val correlationId = UUID.randomUUID()
         var jvmContextReached = false
 
@@ -146,14 +151,16 @@ class CoroutineExtensionsTest {
         }
 
         assertEquals(OrderStatus("B-17", "remote"), response)
-        assertEquals("kotlin-request", client.context.headers["trace-id"])
-        assertEquals(correlationId, client.context.correlationId)
+        assertEquals("kotlin-request", jvmClient.context.headers["trace-id"])
+        assertEquals(correlationId, jvmClient.context.correlationId)
         assertTrue(jvmContextReached)
+        assertSame(jvmClient, client.jvm { this })
     }
 
     @Test
     fun `request client projects multiple responses as exhaustive Kotlin result`() = runBlocking {
-        val client = CapturingRequestClient()
+        val jvmClient = CapturingRequestClient()
+        val client = RequestClient(jvmClient)
 
         val result: RequestResult<Any, String> = client.requestOneOf(LookupOrder("B-18")) {
             headers["trace-id"] = "kotlin-one-of"
@@ -164,7 +171,28 @@ class CoroutineExtensionsTest {
             is RequestResult.Second -> "second:${result.message}"
         }
         assertEquals("second:rejected:B-18", description)
-        assertEquals("kotlin-one-of", client.context.headers["trace-id"])
+        assertEquals("kotlin-one-of", jvmClient.context.headers["trace-id"])
+    }
+
+    @Test
+    fun `request client factory projects destination and Kotlin timeout`() {
+        val jvmFactory = CapturingScopedClientFactory()
+        val factory = RequestClientFactory(jvmFactory)
+
+        val client = factory.create<LookupOrder>(
+            destination = "loopback://orders",
+            timeout = 5.seconds,
+        )
+
+        assertEquals(java.net.URI.create("loopback://orders"), jvmFactory.destination)
+        assertEquals(java.time.Duration.ofSeconds(5), jvmFactory.timeout.duration)
+        assertSame(jvmFactory.client, client.jvm { this })
+
+        factory.create<LookupOrder>(timeout = Duration.INFINITE)
+        assertSame(RequestTimeout.NONE, jvmFactory.timeout)
+        assertFailsWith<IllegalArgumentException> {
+            factory.create<LookupOrder>(timeout = (-1).seconds)
+        }
     }
 
     @Test
@@ -374,6 +402,24 @@ private class CapturingRequestClient : RequestClient<LookupOrder> {
             Response2.fromT2("rejected:${(context.message as LookupOrder).orderId}")
         @Suppress("UNCHECKED_CAST")
         return CompletableFuture.completedFuture(response as Response2<T1, T2>)
+    }
+}
+
+private class CapturingScopedClientFactory : ScopedClientFactory {
+    val client = CapturingRequestClient()
+    var destination: java.net.URI? = null
+    lateinit var timeout: RequestTimeout
+
+    override fun <TRequest : Any?> create(
+        requestType: Class<TRequest>,
+        destinationAddress: java.net.URI?,
+        timeout: RequestTimeout,
+    ): RequestClient<TRequest> {
+        check(requestType == LookupOrder::class.java)
+        destination = destinationAddress
+        this.timeout = timeout
+        @Suppress("UNCHECKED_CAST")
+        return client as RequestClient<TRequest>
     }
 }
 

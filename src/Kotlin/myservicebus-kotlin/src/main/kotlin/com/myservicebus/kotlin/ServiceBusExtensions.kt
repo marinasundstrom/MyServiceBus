@@ -10,8 +10,7 @@ import com.myservicebus.MessageBus as JvmMessageBus
 import com.myservicebus.MessageBusServices
 import com.myservicebus.PublishEndpoint as JvmPublishEndpoint
 import com.myservicebus.PublishEndpointProvider as JvmPublishEndpointProvider
-import com.myservicebus.RequestClient
-import com.myservicebus.ScopedClientFactory
+import com.myservicebus.ScopedClientFactory as JvmScopedClientFactory
 import com.myservicebus.SendEndpointProvider as JvmSendEndpointProvider
 import com.myservicebus.di.ServiceCollection
 import com.myservicebus.di.ServiceProvider
@@ -124,6 +123,14 @@ fun ServiceCollection.addServiceBus(
             }
         },
     )
+    services.tryAddScoped(
+        RequestClientFactory::class.java,
+        ServiceProviderBasedProvider { provider ->
+            Supplier {
+                RequestClientFactory(provider.getRequiredService(JvmScopedClientFactory::class.java))
+            }
+        },
+    )
     return services
 }
 
@@ -151,7 +158,3 @@ inline fun <reified T : Any> ServiceProvider.getService(): T? = getService(T::cl
 
 /** Resolves a required service without requiring a Java class literal. */
 inline fun <reified T : Any> ServiceProvider.getRequiredService(): T = getRequiredService(T::class.java)
-
-/** Creates a typed request client without exposing a Java class literal. */
-inline fun <reified TRequest : Any> ScopedClientFactory.createRequestClient(): RequestClient<TRequest> =
-    create(TRequest::class.java)

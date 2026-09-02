@@ -11,6 +11,7 @@ const sections = [
       ['Mediator pattern', '/docs/mediator'],
       ['Migrate from MassTransit', '/docs/migrate-from-masstransit'],
       ['Migrate from MediatR', '/docs/migrate-from-mediatr'],
+      ['Kotlin (experimental)', '/docs/kotlin'],
       ['Java adoption', '/docs/java-adoption'],
     ],
   },

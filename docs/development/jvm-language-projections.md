@@ -60,6 +60,13 @@ adapt the completed configuration back into the exact Java context instance.
 This keeps configuration source independent from Java accessor conventions
 without copying state or creating a second outbound-message model.
 
+Request/response follows the full-facade rule even though extension methods
+could technically hide some class-token ceremony. Kotlin owns
+`RequestClientFactory` and `RequestClient`, accepts Kotlin `Duration`, discovers
+request and response classes through reified type parameters, and projects
+multiple outcomes as `RequestResult`. The Java factory, client, timeout wrapper,
+future overloads, and `Response2` stay behind that boundary.
+
 Language projections also act as design tests for the shared implementation.
 For example, a Kotlin suspend-handler interface adds an intermediate generic
 contract; supporting it requires the mediator to resolve inherited response

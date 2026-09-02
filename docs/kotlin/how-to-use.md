@@ -101,9 +101,9 @@ The Kotlin `MessageBus`, `Mediator`, `ConsumeContext`, `PublishContext`, and
 runtime capabilities that have not been projected. Transitional `publishAwait`
 and `sendAwait` extensions remain only for code that deliberately works with a
 raw Java endpoint.
-`RequestClient.request` is already collision-free. Cancelling the calling
-coroutine cancels both the MyServiceBus operation token and its underlying Java
-future.
+`RequestClient` and `RequestClientFactory` are Kotlin-owned as well. Cancelling
+the calling coroutine cancels both the MyServiceBus operation token and its
+underlying Java future.
 
 The same consumer syntax configures local dispatch:
 
@@ -148,8 +148,8 @@ For requests with two valid business outcomes, Kotlin projects the shared JVM
 response as a covariant sealed result:
 
 ```kotlin
-val factory = scopedProvider.getRequiredService<ScopedClientFactory>()
-val client = factory.createRequestClient<LookupOrder>()
+val factory = scopedProvider.getRequiredService<RequestClientFactory>()
+val client = factory.create<LookupOrder>(timeout = 10.seconds)
 val result: RequestResult<OrderStatus, OrderNotFound> =
     client.requestOneOf(LookupOrder(orderId))
 
@@ -164,6 +164,11 @@ sealed branches make `when` exhaustive and retain branch identity even if the
 two response types are assignable. Java sees the same behavior through its own
 sealed `Response2.First` and `Response2.Second` records and `match` operation;
 Kotlin does not expose that Java-oriented shape as its application API.
+
+The factory accepts a string destination and Kotlin `Duration`. Its default is
+30 seconds; `Duration.INFINITE` selects the shared no-timeout behavior. Resolve
+the factory and use the client within the same service scope so consume context
+and outbox behavior remain available.
 
 ## Run the sample
 
