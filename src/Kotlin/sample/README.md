@@ -32,3 +32,7 @@ familiar suspending `publish` member. Kotlin facades also reconstruct mediator
 and scoped publish/send endpoint contracts without exposing Java future
 overloads. Cancellation and failures bridge to the shared Java runtime
 automatically.
+
+For the corresponding server integration, see the sibling
+[`ktor-sample`](../ktor-sample), where a Ktor application plugin owns the bus
+lifecycle and real RabbitMQ tests exercise HTTP-to-message flows.

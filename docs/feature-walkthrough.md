@@ -3,7 +3,7 @@
 This guide compares basic usage of MyServiceBus in C# and Java. It is split into basics and advanced sections so newcomers can focus on fundamental messaging patterns before exploring configuration and other features.
 
 For an explanation of why the C# and Java examples differ, see the [design decisions](development/design-decisions.md).  
-For Java build and run instructions, including JDK 17 setup and how to run the test app, see [`src/Java/README.md`](../src/Java/README.md). Kotlin uses the same JVM runtime through native extensions; see the [Kotlin guide](kotlin/how-to-use.md) and [executable sample](../src/Kotlin/sample).
+For Java build and run instructions, including JDK 17 setup and how to run the test app, see [`src/Java/README.md`](../src/Java/README.md). Kotlin uses the same JVM runtime through a native projection; see the [Kotlin guide](kotlin/how-to-use.md), [executable introduction](../src/Kotlin/sample), and [Ktor server sample](../src/Kotlin/ktor-sample).
 
 ## Contents
 
@@ -447,6 +447,12 @@ messaging names without colliding with Java future-returning members. The same
 projection owns `MessageBus`, `Mediator`, and scoped publish/send endpoint
 contracts, so ordinary Kotlin application code uses `publish`, `send`, and
 `request` throughout.
+
+The Ktor sample exercises that projection as a server integration rather than
+as an isolated language demo. Its application plugin starts and drains the bus
+with Ktor's lifecycle, exposes readiness to health routes, and lets suspending
+routes publish, send, and request directly. A broker-backed test verifies the
+routes and their consumers through RabbitMQ.
 
 #### Azure Service Bus preview
 

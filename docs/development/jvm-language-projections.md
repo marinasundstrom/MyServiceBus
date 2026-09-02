@@ -21,6 +21,13 @@ Language projections should own source-level experience:
 - Kotlin can expose receiver DSLs, reified types, suspending consumers,
 coroutine cancellation, and Kotlin-friendly nullability and defaults.
 
+Framework integration belongs at this projection boundary too. A Kotlin server
+adapter should use the framework's lifecycle, configuration, dependency, and
+coroutine conventions instead of exposing a Java bootstrap API through Kotlin.
+The Ktor sample is the first proof: an application plugin owns bus startup and
+shutdown and presents a Kotlin runtime to suspending routes, while transport and
+delivery remain in the shared JVM implementation.
+
 Both projections must enter the same topology and pipeline stages. A Kotlin
 consumer is not a parallel runtime path: its coroutine is adapted to the shared
 consumer completion contract at the projection boundary.
@@ -116,4 +123,6 @@ Every projection should verify the same observable behavior—topology,
 delivery, failure, cancellation, scope lifetime, and wire representation—while
 also testing its language-specific API contract. Kotlin tests therefore cover
 both coroutine behavior and entry into the existing mediator and consumer
-pipelines.
+pipelines. Framework samples add an end-to-end gate over real lifecycle and
+broker behavior; the Ktor gate covers health readiness, publish, directed send,
+request/response, consumer completion, and graceful shutdown through RabbitMQ.

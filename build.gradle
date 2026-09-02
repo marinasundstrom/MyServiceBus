@@ -42,6 +42,7 @@ ext {
     javalinVersion = '6.7.0'
     opentelemetryVersion = '1.43.0'
     testcontainersVersion = '2.0.5'
+    ktorVersion = '3.5.2'
     postgresqlJdbcVersion = '42.7.13'
 }
 

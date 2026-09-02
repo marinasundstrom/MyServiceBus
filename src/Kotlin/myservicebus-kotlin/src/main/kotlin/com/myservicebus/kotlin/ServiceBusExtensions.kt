@@ -153,6 +153,11 @@ inline fun <reified T : Any> ServiceCollection.addSingleton() {
     addSingleton(T::class.java, T::class.java)
 }
 
+/** Registers an existing singleton instance without exposing the Java provider factory shape. */
+inline fun <reified T : Any> ServiceCollection.addSingleton(instance: T) {
+    addSingleton(T::class.java, Supplier { instance })
+}
+
 /** Resolves an optional service without requiring a Java class literal. */
 inline fun <reified T : Any> ServiceProvider.getService(): T? = getService(T::class.java)
 

@@ -55,8 +55,10 @@ class ServiceBusExtensionsTest {
     @Test
     fun `DI extensions register and resolve JVM types`() {
         val services = ServiceCollection.create()
+        val instance = ExistingSingleton("configured")
         services.addScoped<ExampleService>()
         services.addSingleton<SingletonService>()
+        services.addSingleton(instance)
 
         val provider = services.buildServiceProvider()
 
@@ -64,6 +66,7 @@ class ServiceBusExtensionsTest {
             assertNotNull(scope.serviceProvider.getRequiredService<ExampleService>())
         }
         assertNotNull(provider.getService<SingletonService>())
+        assertSame(instance, provider.getRequiredService<ExistingSingleton>())
     }
 }
 
@@ -77,3 +80,5 @@ class TestConsumer : Consumer<TestMessage> {
 class ExampleService
 
 class SingletonService
+
+data class ExistingSingleton(val value: String)

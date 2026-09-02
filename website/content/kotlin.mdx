@@ -67,6 +67,44 @@ val mediator = ServiceCollection.create().createMediator {
 
 val status: OrderStatus = mediator.request(LookupOrder(orderId))`;
 
+export const ktorIntegration = `class MyServiceBusPluginConfiguration {
+    lateinit var runtime: MessagingRuntime
+}
+
+private val runtimeKey = AttributeKey<MessagingRuntime>("MyServiceBusRuntime")
+
+val MyServiceBusPlugin = createApplicationPlugin(
+    name = "MyServiceBus",
+    createConfiguration = ::MyServiceBusPluginConfiguration,
+) {
+    val runtime = pluginConfig.runtime
+    application.attributes.put(runtimeKey, runtime)
+    application.monitor.subscribe(ApplicationStarted) { runtime.start() }
+    application.monitor.subscribe(ApplicationStopping) { runtime.stop() }
+}
+
+val Application.messagingRuntime: MessagingRuntime
+    get() = attributes[runtimeKey]
+
+fun Application.messagingModule(runtime: MessagingRuntime) {
+    install(MyServiceBusPlugin) {
+        this.runtime = runtime
+    }
+
+    routing {
+        post("/orders/{orderId}/publish") {
+            val orderId = UUID.fromString(call.parameters["orderId"])
+            call.application.messagingRuntime.publish(orderId)
+            call.respond(HttpStatusCode.Accepted)
+        }
+
+        get("/orders/{orderId}") {
+            val orderId = UUID.fromString(call.parameters["orderId"])
+            call.respond(call.application.messagingRuntime.lookup(orderId))
+        }
+    }
+}`;
+
 <p className="docs-kicker">Guide · Kotlin experiment</p>
 
 # Kotlin is a first-class JVM target.
@@ -115,9 +153,15 @@ The mediator uses the shared scoped consumer pipeline but stays entirely in proc
 
 <CodeViewer code={mediator} label="Kotlin mediator" language="kotlin" />
 
+## Host it natively in Ktor
+
+The server sample integrates through a Ktor application plugin instead of a Java-shaped bootstrap wrapper. Ktor owns bus startup and graceful shutdown, health readiness follows the bus lifecycle, and suspending routes use the projected runtime directly. Its integration test runs publish, directed send, and correlated request/response through an isolated RabbitMQ broker and waits for the consumers to complete.
+
+<CodeViewer code={ktorIntegration} label="Ktor application integration" language="kotlin" />
+
 <div className="callout">
   <strong>One runtime, language-specific projections</strong>
   <p>Java and Kotlin are not required to expose identical source APIs. The goal is equivalent topology, delivery, metadata, failure, and wire behavior through shapes that feel native in each language. See the <Link href="/docs/platform-parity">platform parity guide</Link> for the broader contract.</p>
 </div>
 
-<div className="next-card"><div><span>Next</span><strong>Build the complete broker sample</strong></div><Link href="/docs/getting-started">Getting started →</Link></div>
+<div className="next-card"><div><span>Next</span><strong>Compare the shared runtime across languages</strong></div><Link href="/docs/platform-parity">Platform parity →</Link></div>

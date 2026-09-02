@@ -11,6 +11,9 @@ project(':myservicebus-kotlin').projectDir = file('src/Kotlin/myservicebus-kotli
 include 'kotlin-sample'
 project(':kotlin-sample').projectDir = file('src/Kotlin/sample')
 
+include 'kotlin-ktor-sample'
+project(':kotlin-ktor-sample').projectDir = file('src/Kotlin/ktor-sample')
+
 include 'myservicebus-serialization-bson'
 project(':myservicebus-serialization-bson').projectDir = file("${javaDir}/myservicebus-serialization-bson")
 

@@ -170,7 +170,7 @@ The factory accepts a string destination and Kotlin `Duration`. Its default is
 the factory and use the client within the same service scope so consume context
 and outbox behavior remain available.
 
-## Run the sample
+## Run the samples
 
 The project at `src/Kotlin/sample` is both an executable introduction and the
 compatibility target that will evolve with the Kotlin API:
@@ -179,3 +179,33 @@ compatibility target that will evolve with the Kotlin API:
 docker compose up -d rabbitmq
 gradle :kotlin-sample:run
 ```
+
+The server-side sample at `src/Kotlin/ktor-sample` puts the same projection
+behind Ktor routes. A Ktor application plugin owns the bus lifecycle and makes
+the messaging runtime available as `application.messagingRuntime`:
+
+```kotlin
+fun Application.messagingModule(runtime: MessagingRuntime) {
+    install(MyServiceBusPlugin) {
+        this.runtime = runtime
+    }
+
+    routing {
+        post("/orders/{orderId}/publish") {
+            call.application.messagingRuntime.publish(orderId)
+            call.respond(HttpStatusCode.Accepted)
+        }
+    }
+}
+```
+
+Run it against the repository RabbitMQ instance:
+
+```bash
+docker compose up -d rabbitmq
+gradle :kotlin-ktor-sample:run
+```
+
+Its integration test starts an isolated RabbitMQ container and verifies that
+Ktor startup and shutdown own the bus lifecycle, published and directed
+messages reach their consumers, and a request receives its correlated response.
