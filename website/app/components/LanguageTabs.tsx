@@ -49,6 +49,7 @@ export default function LanguageTabs({
         code={code}
         label={`${language === 'csharp' ? csharpLabel : javaLabel} example`}
         language={editorLanguage}
+        showLanguageLabel={false}
       />
     </div>
   );

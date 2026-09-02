@@ -112,12 +112,14 @@ export default function Home() {
                 height={72}
                 label={`${example.label} install command`}
                 language={language === 'csharp' ? 'shell' : 'groovy'}
+                showLanguageLabel={false}
               />
               <CodeViewer
                 code={example.code}
                 height={278}
                 label={`${example.label} quick start`}
                 language={language}
+                showLanguageLabel={false}
               />
               <Link className="continue-link" href="/docs/getting-started">
                 Continue the {example.label} guide <span aria-hidden="true">→</span>

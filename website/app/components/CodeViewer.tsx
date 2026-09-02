@@ -13,6 +13,7 @@ type CodeViewerProps = {
   language: string;
   label: string;
   height?: number;
+  showLanguageLabel?: boolean;
 };
 
 function defineCodeTheme(monaco: Monaco) {
@@ -35,11 +36,27 @@ function defineCodeTheme(monaco: Monaco) {
   });
 }
 
-export default function CodeViewer({ code, language, label, height }: CodeViewerProps) {
+const languageNames: Record<string, string> = {
+  csharp: 'C#',
+  groovy: 'Gradle',
+  java: 'Java',
+  json: 'JSON',
+  kotlin: 'Kotlin',
+  plaintext: 'Text',
+  raven: 'Raven',
+  shell: 'Shell',
+};
+
+export default function CodeViewer({
+  code,
+  language,
+  label,
+  height,
+  showLanguageLabel = true,
+}: CodeViewerProps) {
   const editorHeight = height ?? Math.min(420, Math.max(96, code.split('\n').length * 20 + 36));
   const isRaven = language === 'raven';
-
-  return (
+  const editor = (
     <div className="monaco-viewer" style={{ height: editorHeight }}>
       <MonacoEditor
         beforeMount={(monaco) => {
@@ -95,5 +112,18 @@ export default function CodeViewer({ code, language, label, height }: CodeViewer
         value={code}
       />
     </div>
+  );
+
+  if (!showLanguageLabel) {
+    return editor;
+  }
+
+  return (
+    <figure className="code-sample">
+      <figcaption className="code-sample-language">
+        {languageNames[language.toLowerCase()] ?? language}
+      </figcaption>
+      {editor}
+    </figure>
   );
 }
