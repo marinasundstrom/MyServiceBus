@@ -95,7 +95,7 @@ services.AddServiceBus(x =>
 Add the corresponding Java module and use the same registration shape:
 
 ```groovy
-implementation "io.github.marinasundstrom.myservicebus:myservicebus-serialization-bson:0.1.0-preview.10"
+implementation "io.github.marinasundstrom.myservicebus:myservicebus-serialization-bson:0.1.0-preview.11"
 ```
 
 ```java

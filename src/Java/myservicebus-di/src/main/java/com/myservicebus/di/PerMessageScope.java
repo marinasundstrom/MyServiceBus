@@ -13,12 +13,16 @@ final class PerMessageScope implements Scope {
     private final ThreadLocal<Deque<Map<Key<?>, Object>>> scopeContext = new ThreadLocal<>();
 
     public void enter() {
+        enter(new HashMap<>());
+    }
+
+    void enter(Map<Key<?>, Object> instances) {
         Deque<Map<Key<?>, Object>> deque = scopeContext.get();
         if (deque == null) {
             deque = new ArrayDeque<>();
             scopeContext.set(deque);
         }
-        deque.push(new HashMap<>());
+        deque.push(instances);
     }
 
     public Map<Key<?>, Object> exit() {

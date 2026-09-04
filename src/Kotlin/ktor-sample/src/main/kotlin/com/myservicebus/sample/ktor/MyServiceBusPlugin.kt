@@ -91,8 +91,10 @@ class KtorMyServiceBus internal constructor(
 
     suspend fun <T> withScope(block: suspend ServiceProvider.() -> T): T {
         val scope = serviceProvider.createScope()
+        val scopedProvider = scope.serviceProvider
+        scope.detach()
         return try {
-            scope.serviceProvider.block()
+            scopedProvider.block()
         } finally {
             scope.close()
         }

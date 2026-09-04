@@ -31,13 +31,13 @@ The currently verified MassTransit interoperability peer is 8.5.1; that technica
 Install the RabbitMQ transport for a broker-backed application. It brings in the core runtime and abstractions transitively:
 
 ```bash
-dotnet add package Sundstrom.MyServiceBus.RabbitMq --version 0.1.0-preview.10
+dotnet add package Sundstrom.MyServiceBus.RabbitMq --version 0.1.0-preview.11
 ```
 
 For an application that only needs the core runtime and its in-memory mediator, install the main package directly:
 
 ```bash
-dotnet add package Sundstrom.MyServiceBus --version 0.1.0-preview.10
+dotnet add package Sundstrom.MyServiceBus --version 0.1.0-preview.11
 ```
 
 Continue with the [.NET quick start](#c) to register the bus, configure RabbitMQ, add a consumer, and publish a message. The [feature walkthrough](docs/feature-walkthrough.md) covers the complete C# and Java APIs.
@@ -68,7 +68,7 @@ Add the RabbitMQ module to a Gradle application. It brings in the Java runtime a
 
 ```groovy
 dependencies {
-    implementation 'io.github.marinasundstrom.myservicebus:myservicebus-rabbitmq:0.1.0-preview.10'
+    implementation 'io.github.marinasundstrom.myservicebus:myservicebus-rabbitmq:0.1.0-preview.11'
 }
 ```
 
@@ -78,7 +78,7 @@ For Maven applications:
 <dependency>
   <groupId>io.github.marinasundstrom.myservicebus</groupId>
   <artifactId>myservicebus-rabbitmq</artifactId>
-  <version>0.1.0-preview.10</version>
+  <version>0.1.0-preview.11</version>
 </dependency>
 ```
 
@@ -92,8 +92,8 @@ plugins {
 }
 
 dependencies {
-    implementation("io.github.marinasundstrom.myservicebus:myservicebus-kotlin:0.1.0-preview.10")
-    implementation("io.github.marinasundstrom.myservicebus:myservicebus-rabbitmq:0.1.0-preview.10")
+    implementation("io.github.marinasundstrom.myservicebus:myservicebus-kotlin:0.1.0-preview.11")
+    implementation("io.github.marinasundstrom.myservicebus:myservicebus-rabbitmq:0.1.0-preview.11")
 }
 ```
 
@@ -132,8 +132,8 @@ All JVM artifacts use the same version as the corresponding NuGet release.
 The optional inspection and exporter APIs are client libraries in the package tables above. The collector and Blazor dashboard are separate deployable applications, published as versioned Linux container images:
 
 ```text
-ghcr.io/marinasundstrom/myservicebus-monitoring-collector:0.1.0-preview.10
-ghcr.io/marinasundstrom/myservicebus-monitoring-dashboard:0.1.0-preview.10
+ghcr.io/marinasundstrom/myservicebus-monitoring-collector:0.1.0-preview.11
+ghcr.io/marinasundstrom/myservicebus-monitoring-dashboard:0.1.0-preview.11
 ```
 
 See the [runtime monitoring guide](docs/runtime-monitoring.md) for configuration, the live dashboard model, OpenTelemetry boundaries, and the experimental security scope.

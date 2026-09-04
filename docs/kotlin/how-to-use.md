@@ -18,8 +18,8 @@ plugins {
 }
 
 dependencies {
-    implementation("io.github.marinasundstrom.myservicebus:myservicebus-kotlin:0.1.0-preview.10")
-    implementation("io.github.marinasundstrom.myservicebus:myservicebus-rabbitmq:0.1.0-preview.10")
+    implementation("io.github.marinasundstrom.myservicebus:myservicebus-kotlin:0.1.0-preview.11")
+    implementation("io.github.marinasundstrom.myservicebus:myservicebus-rabbitmq:0.1.0-preview.11")
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.17.2")
 }
 ```
@@ -163,7 +163,7 @@ plugins {
 }
 
 dependencies {
-    ksp("io.github.marinasundstrom.myservicebus:myservicebus-kotlin-processor:0.1.0-preview.10")
+    ksp("io.github.marinasundstrom.myservicebus:myservicebus-kotlin-processor:0.1.0-preview.11")
 }
 
 ksp {

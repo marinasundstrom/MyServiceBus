@@ -48,7 +48,7 @@ public class ServiceScope implements Closeable {
         if (directProvider != null) {
             return directProvider;
         }
-        return new ServiceProviderImpl(injector, scope);
+        return new ServiceProviderImpl(injector, scope, this);
     }
 
     /**
@@ -64,6 +64,26 @@ public class ServiceScope implements Closeable {
         if (!detached) {
             instances = scope.exit();
             detached = true;
+        }
+    }
+
+    <T> T resolve(java.util.function.Supplier<T> resolve) {
+        if (!detached) {
+            return resolve.get();
+        }
+        if (closed) {
+            throw new IllegalStateException("The service scope is closed.");
+        }
+        synchronized (instances) {
+            scope.enter(instances);
+            try {
+                return resolve.get();
+            } finally {
+                Map<Key<?>, Object> active = scope.exit();
+                if (active != instances) {
+                    throw new IllegalStateException("The detached service scope became unbalanced.");
+                }
+            }
         }
     }
 

@@ -3,7 +3,7 @@
         <UseArtifactsOutput>true</UseArtifactsOutput>
         <IsPackable>false</IsPackable>
         <VersionPrefix>0.1.0</VersionPrefix>
-        <VersionSuffix>preview.10</VersionSuffix>
+        <VersionSuffix>preview.11</VersionSuffix>
         <Authors>Marina Sundström</Authors>
         <Company>MyServiceBus</Company>
         <Copyright>Copyright © Marina Sundström 2025</Copyright>

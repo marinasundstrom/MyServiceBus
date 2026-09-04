@@ -6,6 +6,8 @@ import com.myservicebus.di.ServiceScope;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import java.util.concurrent.CompletableFuture;
+
 public class PerMessageScopeTest {
     @Test
     void scopedServiceReturnsSameInstanceWithinScope() {
@@ -48,6 +50,24 @@ public class PerMessageScopeTest {
 
             ProcessorImpl afterInner = outerSp.getService(ProcessorImpl.class);
             assertSame(outerInstance, afterInner);
+        }
+    }
+
+    @Test
+    void detachedScopeCanResolveOwnedServicesFromAnotherThread() {
+        ServiceCollection sc = ServiceCollection.create();
+        sc.addScoped(ProcessorImpl.class);
+        ServiceProvider sp = sc.buildServiceProvider();
+
+        try (ServiceScope scope = sp.createScope()) {
+            ServiceProvider scoped = scope.getServiceProvider();
+            ProcessorImpl first = scoped.getRequiredService(ProcessorImpl.class);
+            scope.detach();
+
+            ProcessorImpl resumed = CompletableFuture.supplyAsync(
+                    () -> scoped.getRequiredService(ProcessorImpl.class)).join();
+
+            assertSame(first, resumed);
         }
     }
 }

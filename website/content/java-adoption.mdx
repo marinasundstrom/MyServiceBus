@@ -2,7 +2,7 @@
 
 # Integrate MyServiceBus with an existing Java container.
 
-<p className="docs-summary">Use the MyServiceBus service collection when you want its complete composition model. When an existing Java application already owns a container, use the bus factory and connect container-managed application code at the receive endpoint.</p>
+<p className="docs-summary">Choose the integration depth that fits the host: use MyServiceBus&apos;s small DI and logging abstractions with their included implementations, materialize those contracts through an adapter, or keep application objects in an existing Java container and connect them at the consumer boundary.</p>
 
 <div className="concept-comparison">
   <section>
@@ -43,6 +43,50 @@ bus.start();
   <strong>Guice is not an application requirement</strong>
   <p><code>ServiceCollection.create()</code> currently uses Guice as its included implementation. The bus-factory path does not connect Spring, CDI, Dagger, or an application container to that Guice instance. The application container remains the owner of its objects and scopes.</p>
 </aside>
+
+## Small Java-platform abstractions for DI and logging
+
+MyServiceBus publishes <code>myservicebus-di</code> and <code>myservicebus-logging</code> as separate foundational artifacts. The DI contracts—<code>ServiceCollection</code>, <code>ServiceProvider</code>, <code>ServiceScope</code>, descriptors, and lifetimes—give the Java client one stable composition vocabulary corresponding to the .NET client. <code>ServiceCollection.create()</code> supplies the included Guice-backed implementation, while <code>createAot()</code> selects a factory-only implementation without reflective constructor activation. These are MyServiceBus integration contracts, not an attempt to replace Spring, CDI, Dagger, Guice, or another application container.
+
+The logging contracts are similarly narrow: <code>Logger</code> and <code>LoggerFactory</code> isolate the bus runtime from a particular logging backend and are designed to participate in dependency injection. No logging setup is required: console logging is the fallback when an application does not register a factory. Optionally, applications using the common Java logging ecosystem can select the included SLF4J adapter and retain their existing backend and configuration.
+
+### Optional: select the logging provider
+
+```java
+ServiceCollection services = ServiceCollection.create();
+
+services.from(Logging.class)
+    .addLogging(logging -> logging.addSlf4j());
+
+services.from(MessageBusServices.class)
+    .addServiceBus(bus -> {
+        // Consumers and transport configuration
+    });
+```
+
+### Optional: inject the abstraction into application code
+
+MyServiceBus services receive the selected factory through constructor injection and create a logger for their own type. Application services can do the same when using the MyServiceBus DI container, although this is not required:
+
+```java
+final class OrderProjection {
+    private final Logger logger;
+
+    OrderProjection(LoggerFactory loggerFactory) {
+        logger = loggerFactory.create(OrderProjection.class);
+    }
+
+    void project(OrderSubmitted message) {
+        logger.info("Projecting order {}", message.orderId());
+    }
+}
+
+services.addSingleton(OrderProjection.class);
+```
+
+The logging abstraction is primarily an internal portability boundary for MyServiceBus. Application code does not have to use it: keep using SLF4J, Log4j, JUL, or the logging API supplied by the host framework unless sharing this abstraction is useful. Hook into it when bus diagnostics should use the application&apos;s provider, or replace <code>LoggerFactory</code> when a different backend or policy is required.
+
+The bus-factory path can instead accept a <code>LoggerFactory</code> directly. A container adapter may implement the DI contracts, or application-managed consumers can stay entirely in the host container through <code>ConsumerFactory</code>. In both cases the abstractions keep MyServiceBus infrastructure portable without claiming that Java&apos;s wider DI and logging ecosystems are interchangeable.
 
 ## Existing application: bus factory
 

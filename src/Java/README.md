@@ -63,8 +63,8 @@ Java applications can register consumers explicitly or use the optional, framewo
 
 ```groovy
 dependencies {
-    implementation 'io.github.marinasundstrom.myservicebus:myservicebus:0.1.0-preview.10'
-    annotationProcessor 'io.github.marinasundstrom.myservicebus:myservicebus-processor:0.1.0-preview.10'
+    implementation 'io.github.marinasundstrom.myservicebus:myservicebus:0.1.0-preview.11'
+    annotationProcessor 'io.github.marinasundstrom.myservicebus:myservicebus-processor:0.1.0-preview.11'
 }
 ```
 
