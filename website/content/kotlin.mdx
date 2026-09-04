@@ -6,8 +6,8 @@ export const installKotlin = `plugins {
 }
 
 dependencies {
-    implementation("io.github.marinasundstrom.myservicebus:myservicebus-kotlin:VERSION")
-    implementation("io.github.marinasundstrom.myservicebus:myservicebus-rabbitmq:VERSION")
+    implementation("io.github.marinasundstrom.myservicebus:myservicebus-kotlin:0.1.0-preview.9")
+    implementation("io.github.marinasundstrom.myservicebus:myservicebus-rabbitmq:0.1.0-preview.9")
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.17.2")
 }`;
 
@@ -102,13 +102,13 @@ export const ktorIntegration = `fun Application.messagingModule() {
 <p className="docs-summary">The Kotlin projection rebuilds MyServiceBus around coroutines, receiver DSLs, reified types, Kotlin durations, and exhaustive results. It shares the Java transport and delivery runtime without inheriting Java futures or overload-heavy API shapes.</p>
 
 <div className="callout callout-accent">
-  <strong>Experimental until the MVP gate is complete</strong>
-  <p>This projection is being developed on its own feature branch and is not yet an announced stable surface. Breaking changes are expected while broker flows, scope behavior, cancellation, the runnable sample, and staged-package verification converge.</p>
+  <strong>Experimental Kotlin API</strong>
+  <p>The shared JVM runtime and Java projection are the stable reference surfaces for this preview. The Kotlin projection passes the same delivery and staged-package gates, but its source API may evolve between previews as Kotlin and framework conventions are refined.</p>
 </div>
 
 ## Install the projection
 
-The Kotlin artifact sits above the shared JVM runtime. Add the Kotlin Jackson module when messages use data-class primary constructors. Replace <code>VERSION</code> with the preview version that first includes the Kotlin MVP.
+The Kotlin artifact sits above the shared JVM runtime. Add the Kotlin Jackson module when messages use data-class primary constructors.
 
 <CodeViewer code={installKotlin} label="Gradle Kotlin DSL" language="kotlin" />
 

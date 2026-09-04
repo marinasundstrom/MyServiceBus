@@ -93,6 +93,10 @@ dependencies {
 }
 ```
 
+The shared JVM runtime and Java projection are the stable reference surfaces
+for this preview. The Kotlin projection is experimental and may evolve between
+previews while its behavior continues to use the same runtime and release gates.
+
 See the [Kotlin guide](docs/kotlin/how-to-use.md) and the evolving
 [executable Kotlin sample](src/Kotlin/sample).
 

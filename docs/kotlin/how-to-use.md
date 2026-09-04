@@ -5,6 +5,11 @@ runtime. The transport, topology, serialization, and delivery behavior are the
 same as Java; Kotlin-owned projection types and extensions remove Java overload,
 future, decorator, and class-literal ceremony from ordinary application code.
 
+> [!IMPORTANT]
+> The shared JVM runtime and Java projection are the stable reference surfaces
+> for this preview. The Kotlin projection is experimental and its source API
+> may evolve between previews while preserving the same delivery behavior.
+
 ## Dependencies
 
 ```kotlin
