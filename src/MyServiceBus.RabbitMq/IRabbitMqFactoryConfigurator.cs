@@ -127,7 +127,8 @@ public class ReceiveEndpointConfigurator
                 binding.EntityName = entity;
         }
 
-        consumer.PrefetchCount = _prefetchCount;
+        if (_prefetchCount is not null)
+            consumer.PrefetchCount = _prefetchCount;
         if (_concurrentMessageLimit is not null)
             consumer.ConcurrentMessageLimit = _concurrentMessageLimit;
         consumer.QueueArguments = _queueArguments;

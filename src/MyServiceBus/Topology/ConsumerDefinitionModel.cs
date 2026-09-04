@@ -7,23 +7,12 @@ public sealed record ConsumerDefinitionModel
 {
     public ConsumerDefinitionModel(
         Type consumerType,
-        string endpointName,
-        bool endpointNameIsExplicit,
-        Type? endpointNameFormatterType,
-        IEnumerable<Type> messageTypes,
-        int? concurrentMessageLimit)
+        EndpointDefinitionModel endpoint,
+        IEnumerable<Type> messageTypes)
     {
         ArgumentNullException.ThrowIfNull(consumerType);
-        ArgumentException.ThrowIfNullOrWhiteSpace(endpointName);
+        ArgumentNullException.ThrowIfNull(endpoint);
         ArgumentNullException.ThrowIfNull(messageTypes);
-        if (concurrentMessageLimit is <= 0)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(concurrentMessageLimit),
-                concurrentMessageLimit,
-                "The concurrent message limit must be greater than zero.");
-        }
-
         var capturedMessageTypes = messageTypes.Distinct().ToArray();
         if (capturedMessageTypes.Length == 0)
             throw new ArgumentException("At least one consumed message type is required.", nameof(messageTypes));
@@ -31,22 +20,23 @@ public sealed record ConsumerDefinitionModel
             throw new ArgumentException("Consumed message types must not contain null.", nameof(messageTypes));
 
         ConsumerType = consumerType;
-        EndpointName = endpointName;
-        EndpointNameIsExplicit = endpointNameIsExplicit;
-        EndpointNameFormatterType = endpointNameFormatterType;
+        Endpoint = endpoint;
         MessageTypes = capturedMessageTypes;
-        ConcurrentMessageLimit = concurrentMessageLimit;
     }
 
     public Type ConsumerType { get; }
 
-    public string EndpointName { get; }
+    public EndpointDefinitionModel Endpoint { get; }
 
-    public bool EndpointNameIsExplicit { get; }
+    public string EndpointName => Endpoint.Name;
 
-    public Type? EndpointNameFormatterType { get; }
+    public bool EndpointNameIsExplicit => Endpoint.NameIsExplicit;
+
+    public Type? EndpointNameFormatterType => Endpoint.NameFormatterType;
 
     public IReadOnlyList<Type> MessageTypes { get; }
 
-    public int? ConcurrentMessageLimit { get; }
+    public int? ConcurrentMessageLimit => Endpoint.ConcurrentMessageLimit;
+
+    public ushort? PrefetchCount => Endpoint.PrefetchCount;
 }

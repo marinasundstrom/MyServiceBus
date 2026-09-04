@@ -36,7 +36,14 @@ The first slice supports two transport-neutral policies:
 - an explicit endpoint name;
 - a concurrent message limit.
 
-Each normalized definition also captures the consumer or handler identity,
+Each consumer definition composes an endpoint definition instead of owning a
+second copy of endpoint policy. The initial endpoint model captures its resolved
+name and naming metadata, concurrent message limit, and prefetch count. It can
+be shared by multiple consumer definitions and is snapshotted during
+registration. The existing `ReceiveEndpointDefinition` remains the realized
+broker-provisioning description; it is not the language-facing policy object.
+
+Each normalized consumer definition also captures the consumer or handler identity,
 every consumed message type, the resolved endpoint name, whether that name was
 explicit, and the formatter type that supplied a conventional name. This
 structural metadata is captured for interface consumers, typed registrations,
@@ -53,7 +60,7 @@ definition model while the runtime is migrated away from projection-specific
 registration shapes.
 
 The model will grow from this boundary. Consumer pipeline configuration,
-endpoint definitions, retry and outbox policy, serializer selection,
+durability and temporary endpoint intent, retry and outbox policy, serializer selection,
 transport-specific endpoint options, dependency-injected definition classes,
 reflection discovery, and generated registration remain later slices. Those
 features should extend the definition stage rather than add more state directly

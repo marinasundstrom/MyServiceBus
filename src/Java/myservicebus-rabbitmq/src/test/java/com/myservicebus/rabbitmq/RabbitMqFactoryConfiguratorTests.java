@@ -136,10 +136,12 @@ public class RabbitMqFactoryConfiguratorTests {
     }
 
     @Test
-    public void receiveEndpointPreservesDefinitionConcurrencyUnlessExplicitlyOverridden() {
+    public void receiveEndpointPreservesDefinitionPolicyUnlessExplicitlyOverridden() {
         ServiceCollection services = ServiceCollection.create();
         BusRegistrationConfiguratorImpl cfg = new BusRegistrationConfiguratorImpl(services);
-        cfg.addConsumer(MyConsumer.class, definition -> definition.concurrentMessageLimit(7));
+        cfg.addConsumer(MyConsumer.class, definition -> definition
+                .concurrentMessageLimit(7)
+                .prefetchCount(11));
 
         RabbitMqTransport.configure(cfg);
         cfg.complete();
@@ -153,12 +155,15 @@ public class RabbitMqFactoryConfiguratorTests {
                 "defined-queue",
                 endpoint -> endpoint.configureConsumer(context, MyConsumer.class));
         assertEquals(7, definition.getConcurrentMessageLimit());
+        assertEquals(11, definition.getPrefetchCount());
 
         factoryConfigurator.receiveEndpoint("explicit-queue", endpoint -> {
             endpoint.concurrentMessageLimit(3);
+            endpoint.prefetchCount(4);
             endpoint.configureConsumer(context, MyConsumer.class);
         });
         assertEquals(3, definition.getConcurrentMessageLimit());
+        assertEquals(4, definition.getPrefetchCount());
     }
 
     static class StaticFormatter<T> implements MessageEntityNameFormatterSpecific<T> {

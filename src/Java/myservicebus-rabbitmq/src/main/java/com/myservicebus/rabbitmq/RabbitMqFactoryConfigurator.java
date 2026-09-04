@@ -325,7 +325,9 @@ public class RabbitMqFactoryConfigurator implements BusFactoryConfigurator {
                     });
                 }
 
-                def.setPrefetchCount(prefetchCount);
+                if (prefetchCount != null) {
+                    def.setPrefetchCount(prefetchCount);
+                }
                 if (concurrentMessageLimit != null) {
                     def.setConcurrentMessageLimit(concurrentMessageLimit);
                 }

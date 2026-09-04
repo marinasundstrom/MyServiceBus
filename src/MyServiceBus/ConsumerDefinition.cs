@@ -7,6 +7,8 @@ public interface IConsumerDefinition
 {
     Type ConsumerType { get; }
 
+    EndpointDefinition Endpoint { get; }
+
     string? EndpointName { get; }
 
     int? ConcurrentMessageLimit { get; }
@@ -19,33 +21,37 @@ public interface IConsumerDefinition
 public class ConsumerDefinition<TConsumer> : IConsumerDefinition, IConsumerConfigurator<TConsumer>
     where TConsumer : class, IConsumer
 {
-    private string? endpointName;
-    private int? concurrentMessageLimit;
+    public ConsumerDefinition()
+        : this(new EndpointDefinition())
+    {
+    }
+
+    public ConsumerDefinition(EndpointDefinition endpoint)
+    {
+        ArgumentNullException.ThrowIfNull(endpoint);
+        Endpoint = endpoint;
+    }
 
     public Type ConsumerType => typeof(TConsumer);
 
+    public EndpointDefinition Endpoint { get; }
+
     public string? EndpointName
     {
-        get => endpointName;
-        set
-        {
-            if (value is not null)
-                ArgumentException.ThrowIfNullOrWhiteSpace(value);
-
-            endpointName = value;
-        }
+        get => Endpoint.Name;
+        set => Endpoint.Name = value;
     }
 
     public int? ConcurrentMessageLimit
     {
-        get => concurrentMessageLimit;
-        set
-        {
-            if (value is <= 0)
-                throw new ArgumentOutOfRangeException(nameof(value), value, "The concurrent message limit must be greater than zero.");
+        get => Endpoint.ConcurrentMessageLimit;
+        set => Endpoint.ConcurrentMessageLimit = value;
+    }
 
-            concurrentMessageLimit = value;
-        }
+    public ushort? PrefetchCount
+    {
+        get => Endpoint.PrefetchCount;
+        set => Endpoint.PrefetchCount = value;
     }
 }
 

@@ -81,7 +81,9 @@ public final class AzureServiceBusReceiveEndpointConfigurator {
         for (MessageBinding binding : definition.getBindings()) {
             binding.setEntityName(entityNameResolver.apply(binding.getMessageType()));
         }
-        definition.setPrefetchCount(prefetchCount);
+        if (prefetchCount != null) {
+            definition.setPrefetchCount(prefetchCount);
+        }
         if (concurrentMessageLimit != null) {
             definition.setConcurrentMessageLimit(concurrentMessageLimit);
         }

@@ -14,6 +14,7 @@ public class ConsumerDefinitionTests
             configurator.AddConsumer<DefinedConsumer>(definition));
         definition.EndpointName = "changed-after-registration";
         definition.ConcurrentMessageLimit = 9;
+        definition.PrefetchCount = 10;
 
         using var provider = services.BuildServiceProvider();
         var registry = provider.GetRequiredService<TopologyRegistry>();
@@ -22,6 +23,7 @@ public class ConsumerDefinitionTests
         Assert.Equal("defined-orders", consumer.QueueName);
         Assert.True(consumer.EndpointNameIsExplicit);
         Assert.Equal(7, consumer.ConcurrentMessageLimit);
+        Assert.Equal((ushort)11, consumer.PrefetchCount);
         var model = Assert.Single(registry.ConsumerDefinitions);
         Assert.Equal(typeof(DefinedConsumer), model.ConsumerType);
         Assert.Equal("defined-orders", model.EndpointName);
@@ -29,6 +31,7 @@ public class ConsumerDefinitionTests
         Assert.Equal(typeof(DefinedConsumer), model.EndpointNameFormatterType);
         Assert.Equal([typeof(SubmitOrder)], model.MessageTypes);
         Assert.Equal(7, model.ConcurrentMessageLimit);
+        Assert.Equal((ushort)11, model.Endpoint.PrefetchCount);
         Assert.Same(model, consumer.Definition);
     }
 
@@ -39,6 +42,7 @@ public class ConsumerDefinitionTests
 
         Assert.Throws<ArgumentException>(() => definition.EndpointName = " ");
         Assert.Throws<ArgumentOutOfRangeException>(() => definition.ConcurrentMessageLimit = 0);
+        Assert.Throws<ArgumentOutOfRangeException>(() => definition.PrefetchCount = 0);
     }
 
     [Fact]
@@ -64,6 +68,29 @@ public class ConsumerDefinitionTests
         Assert.Equal("inline-orders", model.EndpointName);
         Assert.Equal(3, model.ConcurrentMessageLimit);
         Assert.Equal(model, Assert.IsType<ConsumerDefinitionModel>(registration?.Definition));
+    }
+
+    [Fact]
+    public void Composed_endpoint_definition_is_snapshotted_at_registration()
+    {
+        var endpoint = new EndpointDefinition
+        {
+            Name = "shared-orders",
+            ConcurrentMessageLimit = 5,
+            PrefetchCount = 13
+        };
+        var definition = new ConsumerDefinition<InlineConsumer>(endpoint);
+        var services = new ServiceCollection();
+        services.AddServiceBusTestHarness(configurator => configurator.AddConsumer(definition));
+        endpoint.Name = "changed";
+        endpoint.PrefetchCount = 21;
+
+        using var provider = services.BuildServiceProvider();
+        var model = Assert.Single(provider.GetRequiredService<TopologyRegistry>().ConsumerDefinitions);
+
+        Assert.Equal("shared-orders", model.Endpoint.Name);
+        Assert.Equal(5, model.Endpoint.ConcurrentMessageLimit);
+        Assert.Equal((ushort)13, model.Endpoint.PrefetchCount);
     }
 
     [Fact]
@@ -129,6 +156,7 @@ public class ConsumerDefinitionTests
         {
             EndpointName = "defined-orders";
             ConcurrentMessageLimit = 7;
+            PrefetchCount = 11;
         }
     }
 }

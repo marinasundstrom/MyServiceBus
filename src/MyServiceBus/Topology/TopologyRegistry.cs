@@ -196,11 +196,13 @@ public class TopologyRegistry : IBusTopology
     {
         var model = new ConsumerDefinitionModel(
             consumerType,
-            queueName,
-            endpointNameIsExplicit,
-            endpointNameFormatterType,
-            messageTypes,
-            definition?.ConcurrentMessageLimit);
+            new EndpointDefinitionModel(
+                queueName,
+                endpointNameIsExplicit,
+                endpointNameFormatterType,
+                definition?.Endpoint.ConcurrentMessageLimit,
+                definition?.Endpoint.PrefetchCount),
+            messageTypes);
         consumerDefinitions.Add(model);
         return model;
     }
@@ -228,7 +230,8 @@ public class TopologyRegistry : IBusTopology
             Bindings = bindings,
             ConfigurePipe = configurePipe,
             Registration = registration,
-            ConcurrentMessageLimit = model.ConcurrentMessageLimit
+            ConcurrentMessageLimit = model.ConcurrentMessageLimit,
+            PrefetchCount = model.PrefetchCount
         });
     }
 

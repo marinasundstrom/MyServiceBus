@@ -22,7 +22,7 @@ class ConsumerDefinitionTest {
         DefinedConsumerDefinition definition = new DefinedConsumerDefinition();
 
         configurator.addConsumer(DefinedConsumer.class, definition);
-        definition.endpointName("changed-after-registration").concurrentMessageLimit(9);
+        definition.endpointName("changed-after-registration").concurrentMessageLimit(9).prefetchCount(10);
         configurator.complete();
         ServiceProvider provider = services.buildServiceProvider();
         TopologyRegistry registry = provider.getRequiredService(TopologyRegistry.class);
@@ -31,6 +31,7 @@ class ConsumerDefinitionTest {
         assertEquals("defined-orders", consumer.getQueueName());
         assertTrue(consumer.isEndpointNameExplicit());
         assertEquals(7, consumer.getConcurrentMessageLimit());
+        assertEquals(11, consumer.getPrefetchCount());
         ConsumerDefinitionModel model = registry.getConsumerDefinitions().get(0);
         assertEquals(DefinedConsumer.class, model.consumerType());
         assertEquals("defined-orders", model.endpointName());
@@ -38,6 +39,7 @@ class ConsumerDefinitionTest {
         assertEquals(DefinedConsumer.class, model.endpointNameFormatterType());
         assertEquals(java.util.List.of(SubmitOrder.class), model.messageTypes());
         assertEquals(7, model.concurrentMessageLimit());
+        assertEquals(11, model.endpoint().prefetchCount());
         assertEquals(model, consumer.getDefinition());
     }
 
@@ -47,6 +49,7 @@ class ConsumerDefinitionTest {
 
         assertThrows(IllegalArgumentException.class, () -> definition.endpointName(" "));
         assertThrows(IllegalArgumentException.class, () -> definition.concurrentMessageLimit(0));
+        assertThrows(IllegalArgumentException.class, () -> definition.prefetchCount(0));
     }
 
     @Test
@@ -67,6 +70,29 @@ class ConsumerDefinitionTest {
         assertEquals(InlineConsumer.class, model.consumerType());
         assertEquals("inline-orders", model.endpointName());
         assertEquals(3, model.concurrentMessageLimit());
+    }
+
+    @Test
+    void composedEndpointDefinitionIsSnapshottedAtRegistration() {
+        EndpointDefinition endpoint = new EndpointDefinition()
+                .name("shared-orders")
+                .concurrentMessageLimit(5)
+                .prefetchCount(13);
+        ConsumerDefinition<InlineConsumer> definition = new ConsumerDefinition<>(endpoint);
+        ServiceCollection services = ServiceCollection.create();
+        BusRegistrationConfiguratorImpl configurator = new BusRegistrationConfiguratorImpl(services);
+        configurator.addConsumer(InlineConsumer.class, definition);
+        endpoint.name("changed").prefetchCount(21);
+        configurator.complete();
+
+        ConsumerDefinitionModel model = services.buildServiceProvider()
+                .getRequiredService(TopologyRegistry.class)
+                .getConsumerDefinitions()
+                .get(0);
+
+        assertEquals("shared-orders", model.endpoint().name());
+        assertEquals(5, model.endpoint().concurrentMessageLimit());
+        assertEquals(13, model.endpoint().prefetchCount());
     }
 
     @Test
@@ -136,6 +162,7 @@ class ConsumerDefinitionTest {
         DefinedConsumerDefinition() {
             endpointName("defined-orders");
             concurrentMessageLimit(7);
+            prefetchCount(11);
         }
     }
 }

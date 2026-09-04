@@ -4,7 +4,7 @@ This changelog summarizes the bigger themes in the repository history rather tha
 
 ## Unreleased
 
-- Added the first cross-platform consumer-definition layer for .NET and the Java platform. Reusable or inline definitions can assign endpoint identity and consumer concurrency before topology materialization, while normalized definitions retain the resolved consumer, message, endpoint-naming, and concurrency intent for tooling and language projections. Explicit endpoint configuration takes precedence and transport defaults remain the fallback. Definitions establish the shared policy boundary for future pipeline, endpoint, transport-option, generated-registration, and Kotlin projection work.
+- Added the first cross-platform consumer- and endpoint-definition layer for .NET and the Java platform. Reusable or inline definitions can assign endpoint identity, consumer concurrency, and prefetch policy before topology materialization, while normalized definitions retain the resolved consumer, message, and endpoint intent for tooling and language projections. Explicit endpoint configuration takes precedence and transport defaults remain the fallback. Definitions establish the shared policy boundary for future pipeline, durability, transport-option, generated-registration, and Kotlin projection work.
 
 ## 0.1.0-preview.9 - 2026-09-01
 

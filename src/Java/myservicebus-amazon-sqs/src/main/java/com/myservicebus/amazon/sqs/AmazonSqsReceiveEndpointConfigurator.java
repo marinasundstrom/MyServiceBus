@@ -72,7 +72,9 @@ public final class AmazonSqsReceiveEndpointConfigurator {
         for (MessageBinding binding : definition.getBindings()) {
             binding.setEntityName(entityNameResolver.apply(binding.getMessageType()));
         }
-        definition.setPrefetchCount(prefetchCount);
+        if (prefetchCount != null) {
+            definition.setPrefetchCount(prefetchCount);
+        }
         if (concurrentMessageLimit != null) {
             definition.setConcurrentMessageLimit(concurrentMessageLimit);
         }

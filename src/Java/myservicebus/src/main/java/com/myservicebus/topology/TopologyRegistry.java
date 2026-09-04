@@ -149,11 +149,13 @@ public class TopologyRegistry implements BusTopology {
             Class<?>... messageTypes) {
         ConsumerDefinitionModel model = new ConsumerDefinitionModel(
                 consumerType,
-                queueName,
-                endpointNameExplicit,
-                endpointNameFormatterType,
-                java.util.Arrays.asList(messageTypes),
-                definition != null ? definition.getConcurrentMessageLimit() : null);
+                new EndpointDefinitionModel(
+                        queueName,
+                        endpointNameExplicit,
+                        endpointNameFormatterType,
+                        definition != null ? definition.getEndpoint().getConcurrentMessageLimit() : null,
+                        definition != null ? definition.getEndpoint().getPrefetchCount() : null),
+                java.util.Arrays.asList(messageTypes));
         consumerDefinitions.add(model);
         ensureReceiveEndpoint(queueName);
         List<MessageBinding> bindings = new ArrayList<>();
@@ -177,6 +179,7 @@ public class TopologyRegistry implements BusTopology {
         consumer.setConfigure(configure);
         if (definition != null) {
             consumer.setConcurrentMessageLimit(definition.getConcurrentMessageLimit());
+            consumer.setPrefetchCount(definition.getPrefetchCount());
         }
         consumers.add(consumer);
         return model;
