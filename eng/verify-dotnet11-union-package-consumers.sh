@@ -3,7 +3,7 @@ set -euo pipefail
 
 repository_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 package_directory="${1:-$repository_root/artifacts/packages}"
-package_version="${2:-0.1.0-preview.9}"
+package_version="${2:-0.1.0-preview.10}"
 consumer_directory="$repository_root/test/Experiments/DotNet11Unions"
 package_cache="$(mktemp -d "${TMPDIR:-/tmp}/myservicebus-net11-consumer.XXXXXX")"
 

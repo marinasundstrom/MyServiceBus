@@ -217,7 +217,7 @@ Both samples also register a `sample-report` job consumer and create one recurri
 Install the optional exporter package, then register the addon after the bus:
 
 ```bash
-dotnet add package Sundstrom.MyServiceBus.Monitoring --version 0.1.0-preview.9
+dotnet add package Sundstrom.MyServiceBus.Monitoring --version 0.1.0-preview.10
 ```
 
 ```csharp
@@ -251,7 +251,7 @@ The exporter is registered as both an `IBusHook` and a hosted background service
 Reference `myservicebus-monitoring`, add monitoring before building the service provider, and start the exporter after the bus:
 
 ```groovy
-implementation 'io.github.marinasundstrom.myservicebus:myservicebus-monitoring:0.1.0-preview.9'
+implementation 'io.github.marinasundstrom.myservicebus:myservicebus-monitoring:0.1.0-preview.10'
 ```
 
 ```java
@@ -411,8 +411,8 @@ The failed-message Dashboard currently does not disclose captured bodies, and ar
 The collector and dashboard are independently deployable applications, not client-library packages. Versioned Linux images for AMD64 and ARM64 are published separately:
 
 ```text
-ghcr.io/marinasundstrom/myservicebus-monitoring-collector:0.1.0-preview.9
-ghcr.io/marinasundstrom/myservicebus-monitoring-dashboard:0.1.0-preview.9
+ghcr.io/marinasundstrom/myservicebus-monitoring-collector:0.1.0-preview.10
+ghcr.io/marinasundstrom/myservicebus-monitoring-dashboard:0.1.0-preview.10
 ```
 
 The collector listens on port `8080`. The dashboard also listens on port `8080` and reads its collector base address from `Dashboard:MonitoringServiceAddress` (for example, `Dashboard__MonitoringServiceAddress`). The default in-memory collector is intended for local development and controlled evaluation; PostgreSQL provides restart durability but does not make the unauthenticated preview a production monitoring system. Before exposing either deployment outside a trusted network, add host-level authentication and authorization, request and payload limits, TLS, an explicit retention policy, and a disclosure policy. Never export credentials or broker-management data. Keep payload capture explicit, selected, redacted before export, and bounded.

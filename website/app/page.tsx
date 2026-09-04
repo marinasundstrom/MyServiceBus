@@ -24,7 +24,7 @@ await bus.Publish(new SubmitOrder(Guid.NewGuid()));`,
   java: {
     label: 'Java',
     install:
-      "implementation 'io.github.marinasundstrom.myservicebus:myservicebus-rabbitmq:0.1.0-preview.9'",
+      "implementation 'io.github.marinasundstrom.myservicebus:myservicebus-rabbitmq:0.1.0-preview.10'",
     installLanguage: 'groovy',
     guide: '/docs/getting-started',
     code: `ServiceCollection services = ServiceCollection.create();
@@ -43,8 +43,8 @@ bus.publish(new SubmitOrder(UUID.randomUUID()));`,
   },
   kotlin: {
     label: 'Kotlin',
-    install: `implementation("io.github.marinasundstrom.myservicebus:myservicebus-kotlin:0.1.0-preview.9")
-implementation("io.github.marinasundstrom.myservicebus:myservicebus-rabbitmq:0.1.0-preview.9")`,
+    install: `implementation("io.github.marinasundstrom.myservicebus:myservicebus-kotlin:0.1.0-preview.10")
+implementation("io.github.marinasundstrom.myservicebus:myservicebus-rabbitmq:0.1.0-preview.10")`,
     installLanguage: 'kotlin',
     guide: '/docs/kotlin',
     code: `val services = ServiceCollection.create()

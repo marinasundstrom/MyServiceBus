@@ -10,17 +10,17 @@ export const startRabbitMq = `docker run --rm --detach \\
 
 export const install = {
   csharp: `dotnet add package Sundstrom.MyServiceBus.RabbitMq \\
-  --version 0.1.0-preview.9`,
+  --version 0.1.0-preview.10`,
   java: `dependencies {
-    implementation 'io.github.marinasundstrom.myservicebus:myservicebus-rabbitmq:0.1.0-preview.9'
+    implementation 'io.github.marinasundstrom.myservicebus:myservicebus-rabbitmq:0.1.0-preview.10'
 }`,
   kotlin: `plugins {
     kotlin("jvm") version "2.2.20"
 }
 
 dependencies {
-    implementation("io.github.marinasundstrom.myservicebus:myservicebus-kotlin:0.1.0-preview.9")
-    implementation("io.github.marinasundstrom.myservicebus:myservicebus-rabbitmq:0.1.0-preview.9")
+    implementation("io.github.marinasundstrom.myservicebus:myservicebus-kotlin:0.1.0-preview.10")
+    implementation("io.github.marinasundstrom.myservicebus:myservicebus-rabbitmq:0.1.0-preview.10")
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.17.2")
 }`,
 };

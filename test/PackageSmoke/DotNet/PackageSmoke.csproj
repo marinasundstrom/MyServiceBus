@@ -8,16 +8,16 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Sundstrom.MyServiceBus.Abstractions" Version="0.1.0-preview.9" />
-    <PackageReference Include="Sundstrom.MyServiceBus" Version="0.1.0-preview.9" />
-    <PackageReference Include="Sundstrom.MyServiceBus.Generators" Version="0.1.0-preview.9" PrivateAssets="all" />
-    <PackageReference Include="Sundstrom.MyServiceBus.Serialization.Bson" Version="0.1.0-preview.9" />
-    <PackageReference Include="Sundstrom.MyServiceBus.PostgreSql" Version="0.1.0-preview.9" />
-    <PackageReference Include="Sundstrom.MyServiceBus.Inspection" Version="0.1.0-preview.9" />
-    <PackageReference Include="Sundstrom.MyServiceBus.Monitoring" Version="0.1.0-preview.9" />
-    <PackageReference Include="Sundstrom.MyServiceBus.RabbitMq" Version="0.1.0-preview.9" />
-    <PackageReference Include="Sundstrom.MyServiceBus.AzureServiceBus" Version="0.1.0-preview.9" />
-    <PackageReference Include="Sundstrom.MyServiceBus.AmazonSqs" Version="0.1.0-preview.9" />
-    <PackageReference Include="Sundstrom.MyServiceBus.Testing" Version="0.1.0-preview.9" />
+    <PackageReference Include="Sundstrom.MyServiceBus.Abstractions" Version="0.1.0-preview.10" />
+    <PackageReference Include="Sundstrom.MyServiceBus" Version="0.1.0-preview.10" />
+    <PackageReference Include="Sundstrom.MyServiceBus.Generators" Version="0.1.0-preview.10" PrivateAssets="all" />
+    <PackageReference Include="Sundstrom.MyServiceBus.Serialization.Bson" Version="0.1.0-preview.10" />
+    <PackageReference Include="Sundstrom.MyServiceBus.PostgreSql" Version="0.1.0-preview.10" />
+    <PackageReference Include="Sundstrom.MyServiceBus.Inspection" Version="0.1.0-preview.10" />
+    <PackageReference Include="Sundstrom.MyServiceBus.Monitoring" Version="0.1.0-preview.10" />
+    <PackageReference Include="Sundstrom.MyServiceBus.RabbitMq" Version="0.1.0-preview.10" />
+    <PackageReference Include="Sundstrom.MyServiceBus.AzureServiceBus" Version="0.1.0-preview.10" />
+    <PackageReference Include="Sundstrom.MyServiceBus.AmazonSqs" Version="0.1.0-preview.10" />
+    <PackageReference Include="Sundstrom.MyServiceBus.Testing" Version="0.1.0-preview.10" />
   </ItemGroup>
 </Project>
