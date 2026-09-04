@@ -20,6 +20,9 @@ import com.myservicebus.di.ServiceCollection
 import com.myservicebus.di.ServiceProvider
 import com.myservicebus.di.ServiceProviderBasedProvider
 import com.myservicebus.mediator.MediatorBus
+import com.myservicebus.kotlin.orchestration.SagaStateMachine
+import com.myservicebus.orchestration.SagaRepository
+import com.myservicebus.orchestration.SagaRepositoryCapabilities
 import java.util.function.Supplier
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -50,6 +53,33 @@ class ServiceBusConfigurator internal constructor(
 
     @PublishedApi
     internal val registeredKotlinFunctions = mutableSetOf<String>()
+
+    /** Registers a Kotlin saga state machine with an existing repository instance. */
+    fun <TSaga : Any> sagaStateMachine(
+        stateMachine: SagaStateMachine<TSaga>,
+        repository: SagaRepository<TSaga> = stateMachine.createInMemoryRepository(),
+        endpointName: String? = null,
+    ) {
+        sagaStateMachine(
+            stateMachine,
+            repository.capabilities(),
+            { repository },
+            endpointName,
+        )
+    }
+
+    /** Registers a Kotlin saga state machine with a dependency-injected repository factory. */
+    fun <TSaga : Any> sagaStateMachine(
+        stateMachine: SagaStateMachine<TSaga>,
+        repositoryCapabilities: SagaRepositoryCapabilities,
+        repositoryFactory: (ServiceProvider) -> SagaRepository<TSaga>,
+        endpointName: String? = null,
+    ) {
+        delegate.addSagaStateMachine(
+            stateMachine.registration(repositoryCapabilities, repositoryFactory),
+            endpointName,
+        )
+    }
 
     /** Registers a compiler-generated adapter for a Kotlin consumer class. */
     fun <TMessage : Any, TConsumer : Consumer<TMessage>> registerConsumerClass(

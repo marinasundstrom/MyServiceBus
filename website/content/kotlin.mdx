@@ -95,6 +95,54 @@ val mediator = ServiceCollection.create().createMediator {
 
 val status: OrderStatus = mediator.request(LookupOrder(orderId))`;
 
+export const kotlinSaga = `class OrderStateMachine : SagaStateMachine<OrderState>(
+    id = "order-state-machine",
+    version = "1",
+    owner = "orders",
+    sagaDataUrn = "urn:message:Contracts:OrderState",
+) {
+    val awaitingPayment by state()
+
+    val orderSubmitted by event<OrderSubmitted> {
+        correlateById(OrderState::correlationId, OrderSubmitted::orderId)
+        createsIfMissing()
+    }
+
+    val paymentReceived by event<PaymentReceived> {
+        correlateById(OrderState::correlationId, PaymentReceived::orderId)
+        discardIfMissing()
+    }
+
+    init {
+        instanceState(OrderState::currentState)
+        instanceFactory(::OrderState)
+        cloneInstance(OrderState::copy)
+
+        initially {
+            on(orderSubmitted) {
+                then { saga.orderId = message.orderId }
+                send("queue:reserve-inventory") {
+                    ReserveInventory(saga.orderId)
+                }
+                transitionTo(awaitingPayment)
+            }
+        }
+
+        during(awaitingPayment) {
+            on(paymentReceived) {
+                publish { OrderReady(message.orderId) }
+                finalizeSaga()
+            }
+        }
+
+        deleteWhenFinalized()
+    }
+}
+
+services.addServiceBus {
+    sagaStateMachine(OrderStateMachine())
+}`;
+
 export const ktorIntegration = `fun Application.messagingModule() {
     install(MyServiceBus) {
         bus {
@@ -185,6 +233,17 @@ The scoped factory accepts Kotlin <code>Duration</code> and creates a suspending
 The mediator uses the shared scoped consumer pipeline but stays entirely in process. A suspending handler returns its response directly.
 
 <CodeViewer code={mediator} label="Kotlin mediator" language="kotlin" />
+
+## Coordinate a workflow with a Kotlin state machine
+
+The experimental saga DSL keeps the recognizable C#/Java state-machine structure but uses Kotlin declarations and activity blocks. Delegated properties infer state and event identities, property references describe correlation and state storage, outgoing message types are reified, and <code>then</code>, <code>send</code>, and <code>publish</code> factories may suspend. The Java language projection remains deliberately closer to the C# declarative DSL; both JVM projections lower into the same definition, repository, topology, delivery, outgoing-message, and monitoring infrastructure.
+
+<CodeViewer code={kotlinSaga} label="Experimental Kotlin saga state machine" language="kotlin" />
+
+<div className="callout">
+  <strong>Start with the in-memory repository, then select durability deliberately</strong>
+  <p>The concise registration above creates a volatile process-local repository for development and tests. Production applications can provide repository capabilities and a scoped repository factory to the same <code>sagaStateMachine</code> registration. The Kotlin source shape is experimental even though its execution uses the existing shared JVM saga runtime.</p>
+</div>
 
 ## Host it natively in Ktor
 

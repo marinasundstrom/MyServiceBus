@@ -1,12 +1,13 @@
 package com.myservicebus;
 
-import com.myservicebus.di.ServiceCollection;
-import com.myservicebus.serialization.SerializerFactory;
-import java.util.function.Consumer;
-import com.myservicebus.BusFactoryConfigurator;
 import com.myservicebus.choreography.ChoreographyFragment;
+import com.myservicebus.di.ServiceCollection;
+import com.myservicebus.orchestration.SagaStateMachineRegistration;
+import com.myservicebus.serialization.SerializerFactory;
 import com.myservicebus.topology.ConsumerDefinitionModel;
 import com.myservicebus.topology.ConsumerRegistration;
+
+import java.util.function.Consumer;
 
 public abstract class BusRegistrationConfiguratorDecorator implements BusRegistrationConfigurator {
 
@@ -14,6 +15,11 @@ public abstract class BusRegistrationConfiguratorDecorator implements BusRegistr
 
     protected BusRegistrationConfiguratorDecorator(BusRegistrationConfigurator inner) {
         this.inner = inner;
+    }
+
+    @Override
+    public void addSagaStateMachine(SagaStateMachineRegistration<?> registration, String endpointName) {
+        inner.addSagaStateMachine(registration, endpointName);
     }
 
     @Override

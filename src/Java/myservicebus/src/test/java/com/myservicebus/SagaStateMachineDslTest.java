@@ -11,6 +11,8 @@ import com.myservicebus.orchestration.SagaRepositoryCapabilityException;
 import com.myservicebus.orchestration.SagaRepositoryRequirements;
 import com.myservicebus.orchestration.SagaStateMachine;
 import com.myservicebus.orchestration.SagaStateMachineRuntime;
+import com.myservicebus.di.ServiceCollection;
+import com.myservicebus.topology.TopologyRegistry;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -25,6 +27,25 @@ class SagaStateMachineDslTest {
             "11111111-1111-1111-1111-111111111111");
 
     private final ObjectMapper objectMapper = new ObjectMapper();
+
+    @Test
+    void javaDslRetainsItsDeclarativeRegistrationSurface() {
+        ServiceCollection services = ServiceCollection.create();
+        BusRegistrationConfiguratorImpl configurator = new BusRegistrationConfiguratorImpl(services);
+        OrderStateMachine machine = new OrderStateMachine();
+
+        configurator.addSagaStateMachine(
+                OrderStateMachine.class,
+                () -> machine,
+                machine.createRepository(),
+                "java-orders");
+        configurator.complete();
+        TopologyRegistry topology = services.buildServiceProvider()
+                .getRequiredService(TopologyRegistry.class);
+
+        assertEquals("java-orders", topology.getSagaStateMachines().get(0).endpointName());
+        assertEquals(3, topology.getConsumerDefinitions().size());
+    }
 
     @Test
     void lowersAndExecutesTheCanonicalMachine() throws Exception {

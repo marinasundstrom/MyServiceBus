@@ -28,6 +28,7 @@ import com.myservicebus.topology.ConsumerRegistration;
 import com.myservicebus.orchestration.SagaStateMachine;
 import com.myservicebus.orchestration.SagaRepository;
 import com.myservicebus.orchestration.SagaRepositoryCapabilities;
+import com.myservicebus.orchestration.SagaStateMachineRegistration;
 
 public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigurator {
 
@@ -76,10 +77,6 @@ public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigura
         if (endpointName != null && endpointName.isBlank()) {
             throw new IllegalArgumentException("endpointName must not be blank");
         }
-        if (!sagaStateMachineTypes.add(stateMachineClass)) {
-            return;
-        }
-
         TStateMachine stateMachine = factory.get();
         SagaRepository<TSaga> selectedRepository = repository != null
                 ? repository
@@ -105,9 +102,6 @@ public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigura
         if (endpointName != null && endpointName.isBlank()) {
             throw new IllegalArgumentException("endpointName must not be blank");
         }
-        if (!sagaStateMachineTypes.add(stateMachineClass)) {
-            return;
-        }
         registerSagaStateMachine(stateMachineClass, factory.get(), capabilities, repositoryFactory, endpointName);
     }
 
@@ -117,19 +111,34 @@ public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigura
             SagaRepositoryCapabilities capabilities,
             Function<ServiceProvider, SagaRepository<TSaga>> repositoryFactory,
             String endpointName) {
-        capabilities.ensureSupports(
-                stateMachine.definition().repositoryRequirements(),
-                stateMachine.definition().completionPolicy());
+        addSagaStateMachine(
+                stateMachine.registration(capabilities, repositoryFactory),
+                endpointName);
+    }
+
+    @Override
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    public void addSagaStateMachine(SagaStateMachineRegistration<?> registration, String endpointName) {
+        if (registration == null) {
+            throw new IllegalArgumentException("registration must not be null");
+        }
+        if (endpointName != null && endpointName.isBlank()) {
+            throw new IllegalArgumentException("endpointName must not be blank");
+        }
+        if (!sagaStateMachineTypes.add(registration.stateMachineClass())) {
+            return;
+        }
+        registration.repositoryCapabilities().ensureSupports(
+                registration.definition().repositoryRequirements(),
+                registration.definition().completionPolicy());
         String queueName = endpointName != null
                 ? endpointName
-                : stateMachine.definition().stateMachineId();
-        topology.registerSagaStateMachine(stateMachine.definition(), queueName);
-        serviceCollection.addSingleton(stateMachineClass, () -> stateMachine);
-        stateMachine.registerConsumers(
-                this,
-                provider -> stateMachine.createRuntime(repositoryFactory.apply(provider)),
-                stateMachineClass,
-                queueName);
+                : registration.definition().stateMachineId();
+        topology.registerSagaStateMachine(registration.definition(), queueName);
+        serviceCollection.addSingleton(
+                (Class) registration.stateMachineClass(),
+                () -> registration.stateMachine());
+        registration.registerConsumers(this, queueName);
     }
 
     @Override

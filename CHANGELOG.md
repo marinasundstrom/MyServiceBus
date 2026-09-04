@@ -4,6 +4,7 @@ This changelog summarizes the bigger themes in the repository history rather tha
 
 ## Unreleased
 
+- Added an experimental Kotlin saga state-machine DSL that combines the explicit C#/Java state-machine structure with Kotlin property delegates, receivers, property references, reified message types, and suspending activities. Java retains its C#-shaped canonical JVM DSL. Both JVM frontends now lower through a shared saga registration model for repository-capability validation, topology registration, event consumers, outgoing dispatch, and monitoring.
 - Added Kotlin consumer functions with direct message binding, optional scoped dependency and consume-context injection, suspending execution, and automatic responses. Explicit function-reference reflection remains a compatibility path, while a new KSP processor generates direct registration for Kotlin consumer classes, request handlers, and annotated consumer functions through the same normalized definition and invocation seam.
 
 ## 0.1.0-preview.10 - 2026-09-04

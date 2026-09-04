@@ -1,12 +1,7 @@
 package com.myservicebus.orchestration;
 
-import com.myservicebus.MessageUrn;
 import com.myservicebus.BusRegistrationConfigurator;
-import com.myservicebus.ConsumeContext;
-import com.myservicebus.BusHook;
-import com.myservicebus.SagaStateMachineHookEvent;
-import com.myservicebus.PublishEndpointProvider;
-import com.myservicebus.SendEndpointProvider;
+import com.myservicebus.MessageUrn;
 import com.myservicebus.di.ServiceProvider;
 import com.myservicebus.orchestration.SagaStateMachineRuntime.ActivityContext;
 
@@ -16,7 +11,6 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
-import java.util.concurrent.CompletionException;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -212,6 +206,23 @@ public abstract class SagaStateMachine<TSaga> {
         frozen = true;
         validateRuntimeConfiguration();
         return new InMemorySagaRepository<>(cloneInstance::apply);
+    }
+
+    /** Creates the shared registration consumed by Java or other JVM frontends. */
+    public final SagaStateMachineRegistration<TSaga> registration(
+            SagaRepositoryCapabilities capabilities,
+            Function<ServiceProvider, SagaRepository<TSaga>> repositoryFactory) {
+        SagaStateMachineRegistration<TSaga> registration = new SagaStateMachineRegistration<>(
+                this,
+                getClass(),
+                definition(),
+                capabilities,
+                repositoryFactory,
+                this::createRuntime);
+        for (EventRegistration<?> event : events) {
+            event.addTo(registration);
+        }
+        return registration;
     }
 
     /** Registers each declared event as an ordinary bus consumer on one endpoint. */
@@ -420,119 +431,25 @@ public abstract class SagaStateMachine<TSaga> {
             builder.event(event.id(), event.messageType(), correlation.correlate);
         }
 
+        private void addTo(SagaStateMachineRegistration<TSaga> registration) {
+            registration.event(event.id(), event.messageType(), correlation.correlate);
+        }
+
         private void register(
                 BusRegistrationConfigurator configurator,
                 Function<ServiceProvider, SagaStateMachineRuntime<TSaga>> runtimeFactory,
                 Class<?> stateMachineClass,
                 String endpointName) {
-            configurator.addConsumerMethod(
+            SagaStateMachineConsumerRegistration.register(
+                    configurator,
+                    runtimeFactory,
                     stateMachineClass,
-                    event.messageType(),
                     endpointName,
-                    true,
-                    null,
-                    (serviceProvider, context) -> {
-                        SagaStateMachineRuntime<TSaga> runtime = runtimeFactory.apply(serviceProvider);
-                        long startedAt = System.nanoTime();
-                        return runtime.deliver(
-                                context.getMessage(),
-                                operation -> dispatchOutgoing(serviceProvider, context, operation))
-                                .handle((result, failure) -> {
-                                    Throwable exception = unwrap(failure);
-                                    UUID failedCorrelationId = result == null
-                                            ? tryCorrelate(correlation.correlate, context.getMessage())
-                                            : null;
-                                    SagaStateMachineHookEvent hookEvent = new SagaStateMachineHookEvent(
-                                            java.time.Instant.now(),
-                                            exception == null,
-                                            (System.nanoTime() - startedAt) / 1_000_000d,
-                                            definition().stateMachineId(),
-                                            definition().definitionVersion(),
-                                            definition().owner(),
-                                            event.id(),
-                                            result == null ? "faulted" : result.status().value(),
-                                            result == null ? failedCorrelationId : result.correlationId(),
-                                            result == null ? null : result.beginState(),
-                                            result == null ? null : result.endState(),
-                                            result != null && result.created(),
-                                            result != null && result.completed(),
-                                            result != null && result.instancePresent(),
-                                            exception == null ? null : exception.getClass().getName(),
-                                            exception == null ? null : exception.getMessage(),
-                                            context.getMessageId() == null ? null : context.getMessageId().toString());
-                                    dispatchHooks(serviceProvider.getServices(BusHook.class), hookEvent);
-                                    if (exception != null) {
-                                        throw new CompletionException(exception);
-                                    }
-                                    return (Void) null;
-                                })
-                                .toCompletableFuture();
-                    });
+                    definition(),
+                    event.id(),
+                    event.messageType(),
+                    correlation.correlate);
         }
-    }
-
-    private static Throwable unwrap(Throwable failure) {
-        if (failure instanceof java.util.concurrent.CompletionException completion
-                && completion.getCause() != null) {
-            return completion.getCause();
-        }
-        return failure;
-    }
-
-    private static <TMessage> UUID tryCorrelate(
-            Function<TMessage, UUID> correlate,
-            TMessage message) {
-        try {
-            UUID correlationId = correlate.apply(message);
-            return correlationId == null || correlationId.equals(new UUID(0, 0)) ? null : correlationId;
-        } catch (RuntimeException ignored) {
-            return null;
-        }
-    }
-
-    private static void dispatchHooks(
-            Iterable<BusHook> hooks,
-            SagaStateMachineHookEvent event) {
-        for (BusHook hook : hooks) {
-            try {
-                hook.handle(event);
-            } catch (RuntimeException ignored) {
-                // Monitoring hooks cannot alter saga delivery outcomes.
-            }
-        }
-    }
-
-    private static CompletableFuture<Void> dispatchOutgoing(
-            ServiceProvider serviceProvider,
-            ConsumeContext<?> context,
-            SagaStateMachineRuntime.OutgoingOperation operation) {
-        return switch (operation.kind()) {
-            case SEND -> serviceProvider.getRequiredService(SendEndpointProvider.class)
-                    .getSendEndpoint(operation.destination())
-                    .send(
-                            operation.message(),
-                            outgoing -> applyConsumeMetadata(outgoing, context),
-                            context.getCancellationToken());
-            case PUBLISH -> serviceProvider.getRequiredService(PublishEndpointProvider.class)
-                    .getPublishEndpoint()
-                    .publish(
-                            operation.message(),
-                            outgoing -> applyConsumeMetadata(outgoing, context),
-                            context.getCancellationToken());
-            default -> CompletableFuture.failedFuture(new IllegalStateException(
-                    "Saga outgoing operation '" + operation.kind()
-                            + "' cannot be dispatched through the bus."));
-        };
-    }
-
-    private static void applyConsumeMetadata(
-            com.myservicebus.SendContext outgoing,
-            ConsumeContext<?> consumed) {
-        outgoing.setRequestId(consumed.getRequestId());
-        outgoing.setCorrelationId(consumed.getCorrelationId());
-        outgoing.setConversationId(consumed.getConversationId());
-        outgoing.setInitiatorId(consumed.getCorrelationId());
-        outgoing.setCausationMessageId(consumed.getMessageId());
     }
 
     private final class BehaviorRegistration<TMessage> {

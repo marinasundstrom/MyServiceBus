@@ -2,11 +2,11 @@
 
 ## Status
 
-Design and acceptance contract for the first C# and Java authoring DSLs. The fundamental APIs illustrated here now lower to the shared normalized definition and provider-neutral repository runtime in both clients. An in-memory provider supports local development, while the matching PostgreSQL providers persist saga JSON, serialize correlation-scoped execution, delete finalized instances, and commit state with outgoing messages through the transactional outbox. Experimental registration attaches every declared event to one receive endpoint. Matching focused tests and a mixed C#/Java Aspire order workflow demonstrate the vertical slice; Aspire selects the durable C# repository while Java performs one participant step, and the inverse acceptance path proves Java saga ownership against a C# participant. Definition topology, committed-transition monitoring, an initial Dashboard instance view, and bounded PostgreSQL retention of monitoring-owned saga-instance projections are implemented; broader failure/recovery validation remains before the feature is production-capable.
+Design and acceptance contract for the C#, Java, and experimental Kotlin authoring DSLs. The fundamental APIs illustrated here lower to shared normalized definitions and provider-neutral repository runtimes. An in-memory provider supports local development, while the matching PostgreSQL providers persist saga JSON, serialize correlation-scoped execution, delete finalized instances, and commit state with outgoing messages through the transactional outbox. Experimental registration attaches every declared event to one receive endpoint. Matching focused tests and a mixed C#/Java Aspire order workflow demonstrate the vertical slice; Aspire selects the durable C# repository while Java performs one participant step, and the inverse acceptance path proves Java saga ownership against a C# participant. Definition topology, committed-transition monitoring, an initial Dashboard instance view, and bounded PostgreSQL retention of monitoring-owned saga-instance projections are implemented; broader failure/recovery validation remains before the feature is production-capable.
 
 ## Design Goal
 
-The native DSLs should make the common saga path read like an Automatonymous state machine while remaining ordinary host-language libraries. C# preserves substantial familiarity with MassTransit's current state-machine model. Java preserves the same ordering and concepts through JVM naming, functional interfaces, and `CompletionStage` rather than reproducing C# syntax.
+The native DSLs should make the common saga path read like an Automatonymous state machine while remaining ordinary host-language libraries. C# preserves substantial familiarity with MassTransit's current state-machine model. Java is the canonical JVM projection and deliberately stays close to that declarative structure through JVM naming, functional interfaces, and `CompletionStage`. Kotlin is a sibling projection over the JVM core: it keeps the recognizable state-machine structure while using property delegates, receivers, property references, reified message types, and suspending activities. Kotlin must not force the Java surface to become less familiar to Java developers.
 
 Compatibility targets concepts and observable behavior. It does not require the MassTransit inheritance hierarchy, every historical overload, source compatibility, or a dependency on MassTransit. MyServiceBus may improve validation, identity, generation, AOT behavior, monitoring, and separation between authoring and runtime APIs.
 
@@ -184,6 +184,55 @@ public final class OrderStateMachine extends SagaStateMachine<OrderState> {
     }
 }
 ```
+
+The experimental Kotlin projection is intentionally halfway between the explicit C# structure and Raven's declaration-aware concision:
+
+```kotlin
+class OrderStateMachine : SagaStateMachine<OrderState>(
+    id = "order-state-machine",
+    version = "1",
+    owner = "orders",
+    sagaDataUrn = "urn:message:Contracts:OrderState",
+) {
+    val awaitingPayment by state()
+    val processing by state()
+
+    val orderSubmitted by event<OrderSubmitted>("urn:message:Contracts:OrderSubmitted") {
+        correlateById(OrderState::correlationId, OrderSubmitted::orderId)
+        createsIfMissing()
+    }
+
+    val paymentReceived by event<PaymentReceived>("urn:message:Contracts:PaymentReceived") {
+        correlateById(OrderState::correlationId, PaymentReceived::orderId)
+        discardIfMissing()
+    }
+
+    init {
+        instanceState(OrderState::currentState)
+        instanceFactory(::OrderState)
+        cloneInstance(OrderState::copy)
+
+        initially {
+            on(orderSubmitted) {
+                then { saga.orderId = message.orderId }
+                send("queue:reserve-inventory") { ReserveInventory(saga.orderId) }
+                transitionTo(awaitingPayment)
+            }
+        }
+
+        during(awaitingPayment) {
+            on(paymentReceived) {
+                then { saga.paymentReceived = true }
+                transitionTo(processing)
+            }
+        }
+
+        deleteWhenFinalized()
+    }
+}
+```
+
+Property declarations infer stable PascalCase state and event identities for the normalized definition. Contract URNs can remain explicit for cross-platform contracts, while local-only message URNs may be inferred from reified message types. Activity lambdas are suspending. This Kotlin frontend and the Java frontend both produce `SagaStateMachineRegistration`; shared JVM configuration owns capability validation, topology registration, event-consumer adaptation, outgoing dispatch, and monitoring hooks.
 
 Sync conveniences may wrap the native asynchronous activity form. The executable core remains `ValueTask`-based in C# and `CompletionStage`-based in Java so asynchronous application work is not hidden behind blocking calls.
 

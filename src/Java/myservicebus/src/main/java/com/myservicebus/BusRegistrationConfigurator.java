@@ -10,6 +10,7 @@ import com.myservicebus.persistence.OutboxSession;
 import com.myservicebus.orchestration.SagaRepository;
 import com.myservicebus.orchestration.SagaRepositoryCapabilities;
 import com.myservicebus.orchestration.SagaStateMachine;
+import com.myservicebus.orchestration.SagaStateMachineRegistration;
 import com.myservicebus.serialization.SerializerFactory;
 import com.myservicebus.topology.ConsumerDefinitionModel;
 
@@ -47,6 +48,9 @@ public interface BusRegistrationConfigurator extends ConsumerRegistrationConfigu
             java.util.function.Supplier<TStateMachine> factory,
             SagaRepository<TSaga> repository,
             String endpointName);
+
+    /** Registers a saga state machine supplied by any JVM language projection. */
+    void addSagaStateMachine(SagaStateMachineRegistration<?> registration, String endpointName);
 
     <TSaga, TStateMachine extends SagaStateMachine<TSaga>> void addSagaStateMachine(
             Class<TStateMachine> stateMachineClass,
