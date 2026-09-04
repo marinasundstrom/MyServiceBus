@@ -12,6 +12,8 @@ import com.myservicebus.di.ServiceCollection;
 import com.myservicebus.di.ServiceProvider;
 import com.myservicebus.topology.ConsumerTopology;
 import com.myservicebus.topology.ConsumerDefinitionModel;
+import com.myservicebus.topology.ConsumerRegistration;
+import com.myservicebus.topology.EndpointDefinitionModel;
 import com.myservicebus.topology.TopologyRegistry;
 
 class ConsumerDefinitionTest {
@@ -129,6 +131,30 @@ class ConsumerDefinitionTest {
                 .getDefinition());
     }
 
+    @Test
+    void materializesAConsumerRegistrationWithoutDependingOnAJavaConsumerShape() {
+        ServiceCollection services = ServiceCollection.create();
+        BusRegistrationConfiguratorImpl configurator = new BusRegistrationConfiguratorImpl(services);
+        ConsumerDefinitionModel definition = new ConsumerDefinitionModel(
+                ProjectionConsumer.class,
+                new EndpointDefinitionModel("projected-orders", true, null, 3, 7),
+                java.util.List.of(SubmitOrder.class));
+        ConsumerInvoker<SubmitOrder> invoker = (provider, context) -> CompletableFuture.completedFuture(null);
+
+        ConsumerDefinitionModel registered = configurator.addConsumerRegistration(
+                new ConsumerRegistration<>(definition, SubmitOrder.class, invoker));
+        configurator.complete();
+        TopologyRegistry registry = services.buildServiceProvider().getRequiredService(TopologyRegistry.class);
+        ConsumerTopology topology = registry.getConsumers().get(0);
+
+        assertEquals(definition, registered);
+        assertEquals(definition, topology.getDefinition());
+        assertEquals(ProjectionConsumer.class, topology.getConsumerType());
+        assertEquals(invoker, topology.getInvoker());
+        assertEquals(3, topology.getConcurrentMessageLimit());
+        assertEquals(7, topology.getPrefetchCount());
+    }
+
     private record SubmitOrder(String orderId) {
     }
 
@@ -148,6 +174,11 @@ class ConsumerDefinitionTest {
 
     static final class ConsumerFunctions {
         private ConsumerFunctions() {
+        }
+    }
+
+    static final class ProjectionConsumer {
+        private ProjectionConsumer() {
         }
     }
 

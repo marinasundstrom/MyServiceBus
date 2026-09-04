@@ -1,6 +1,8 @@
 package com.myservicebus.kotlin
 
+import com.myservicebus.BusRegistrationConfiguratorImpl
 import com.myservicebus.ConsumeContext as JvmConsumeContext
+import com.myservicebus.ConsumerRegistrationConfigurator
 import com.myservicebus.MediatorResponseTypeException
 import com.myservicebus.RequestClient
 import com.myservicebus.RequestTimeout
@@ -12,12 +14,16 @@ import com.myservicebus.SendEndpointProvider
 import com.myservicebus.di.ServiceCollection
 import com.myservicebus.tasks.CancellationToken
 import com.myservicebus.tasks.CancellationTokenSource
+import com.myservicebus.topology.ConsumerDefinitionModel
+import com.myservicebus.topology.ConsumerRegistration
+import com.myservicebus.topology.TopologyRegistry
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CompletionException
 import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 import kotlinx.coroutines.CompletableDeferred
@@ -31,6 +37,44 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
 class CoroutineExtensionsTest {
+    @Test
+    fun `Kotlin consumer registration only requires the shared core sink`() {
+        val configurator = CapturingConsumerRegistrationConfigurator()
+
+        configurator.registerKotlinConsumer(
+            RecordingSuspendConsumer::class.java,
+            "core-orders",
+            Dispatchers.Unconfined,
+        )
+
+        assertEquals(RecordingSuspendConsumer::class.java, configurator.registration.definition().consumerType())
+        assertEquals(CoroutineMessage::class.java, configurator.registration.messageType())
+    }
+
+    @Test
+    fun `Kotlin consumer lowers to a definition and shared invoker without implementing Java consumer`() {
+        val services = ServiceCollection.create()
+        val configurator = BusRegistrationConfiguratorImpl(services)
+
+        configurator.registerKotlinConsumer(
+            RecordingSuspendConsumer::class.java,
+            "kotlin-orders",
+            Dispatchers.Unconfined,
+        )
+        configurator.complete()
+        val topology = services.buildServiceProvider()
+            .getRequiredService(TopologyRegistry::class.java)
+            .consumers
+            .single()
+
+        assertFalse(com.myservicebus.Consumer::class.java.isAssignableFrom(RecordingSuspendConsumer::class.java))
+        assertEquals(RecordingSuspendConsumer::class.java, topology.definition.consumerType())
+        assertEquals(listOf(CoroutineMessage::class.java), topology.definition.messageTypes())
+        assertEquals("kotlin-orders", topology.definition.endpointName())
+        assertTrue(topology.invoker != null)
+        assertFalse(com.myservicebus.ResultHandler::class.java.isAssignableFrom(LookupOrderHandler::class.java))
+    }
+
     @Test
     fun `await operation returns result and unwraps Java completion failures`() = runBlocking {
         assertEquals("done", awaitOperation { CompletableFuture.completedFuture("done") })
@@ -305,6 +349,18 @@ class CoroutineExtensionsTest {
     }
 }
 
+private class CapturingConsumerRegistrationConfigurator : ConsumerRegistrationConfigurator {
+    private val services = ServiceCollection.create()
+    lateinit var registration: ConsumerRegistration<*>
+
+    override fun addConsumerRegistration(registration: ConsumerRegistration<*>): ConsumerDefinitionModel {
+        this.registration = registration
+        return registration.definition()
+    }
+
+    override fun getServiceCollection(): ServiceCollection = services
+}
+
 data class CoroutineMessage(val value: String)
 
 data class ProjectedEvent(val value: String)
@@ -350,12 +406,12 @@ data class LookupOrder(val orderId: String)
 
 data class OrderStatus(val orderId: String, val status: String)
 
-abstract class BaseSuspendHandler<TRequest : Any, TResponse : Any> : SuspendHandler<TRequest, TResponse>
+abstract class BaseSuspendHandler<TRequest : Any, TResponse : Any> : Handler<TRequest, TResponse>
 
 class LookupOrderHandler : BaseSuspendHandler<LookupOrder, OrderStatus>() {
-    override suspend fun handle(request: LookupOrder): OrderStatus {
+    override suspend fun handle(context: ConsumeContext<LookupOrder>): OrderStatus {
         delay(1)
-        return OrderStatus(request.orderId, "ready")
+        return OrderStatus(context.message.orderId, "ready")
     }
 }
 
@@ -363,8 +419,8 @@ data class CancellableRequest(val value: String)
 
 data class CancellableResponse(val value: String)
 
-class CancellableHandler : SuspendHandler<CancellableRequest, CancellableResponse> {
-    override suspend fun handle(request: CancellableRequest): CancellableResponse {
+class CancellableHandler : Handler<CancellableRequest, CancellableResponse> {
+    override suspend fun handle(context: ConsumeContext<CancellableRequest>): CancellableResponse {
         started.complete(Unit)
         try {
             awaitCancellation()

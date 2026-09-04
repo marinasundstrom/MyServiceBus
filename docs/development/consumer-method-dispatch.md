@@ -183,4 +183,4 @@ public final class OrderConsumers {
 }
 ```
 
-Applications may register the same declaration reflectively with `addConsumerMethods(OrderConsumers.class)`, register a typed `ConsumerMethodInvoker<Order>` by hand, or add `myservicebus-processor` to the standard `annotationProcessor` configuration and call `GeneratedConsumerCatalog.INSTANCE.register(configurator)`. Generated Java calls the method directly and does not require Spring, Quarkus, Micronaut, or another application framework.
+Applications may register the same declaration reflectively with `addConsumerMethods(OrderConsumers.class)`, register a normalized `ConsumerRegistration<Order>` with a typed `ConsumerInvoker<Order>`, or add `myservicebus-processor` to the standard `annotationProcessor` configuration and call `GeneratedConsumerCatalog.INSTANCE.register(configurator)`. The registration and invoker are shared JVM primitives rather than Java-method contracts, so Kotlin suspend consumers enter the same topology and scoped pipeline. Generated Java calls the method directly and does not require Spring, Quarkus, Micronaut, or another application framework.

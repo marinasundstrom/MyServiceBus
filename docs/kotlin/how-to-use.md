@@ -124,9 +124,9 @@ use the shared scoped handler and correlated response pipeline:
 data class LookupOrder(val orderId: UUID)
 data class OrderStatus(val orderId: UUID, val status: String)
 
-class LookupOrderHandler : SuspendHandler<LookupOrder, OrderStatus> {
-    override suspend fun handle(request: LookupOrder): OrderStatus =
-        OrderStatus(request.orderId, "Pending")
+class LookupOrderHandler : Handler<LookupOrder, OrderStatus> {
+    override suspend fun handle(context: ConsumeContext<LookupOrder>): OrderStatus =
+        OrderStatus(context.message.orderId, "Pending")
 }
 
 val mediator = services.createMediator {
@@ -138,9 +138,10 @@ val status: OrderStatus = mediator.request(LookupOrder(orderId))
 
 The explicit result type on `status` lets Kotlin infer the reified response
 type. Cancelling the calling coroutine cancels the mediator operation and the
-suspending handler. `SuspendHandler` supplies Kotlin's native `suspend fun
-handle(...)` shape over the async-shape-neutral JVM `ResultHandler` metadata
-contract; it does not inherit Java's `CompletableFuture` handler methods.
+suspending handler. `Handler` and its `ConsumeContext` are Kotlin-owned
+contracts. Registration captures their identity, message type, and endpoint
+policy as a shared definition and adapts execution through the JVM consumer
+invoker; it does not inherit Java's `CompletableFuture` handler methods.
 
 ## Multiple response types
 

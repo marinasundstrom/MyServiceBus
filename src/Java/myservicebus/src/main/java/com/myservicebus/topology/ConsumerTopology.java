@@ -6,7 +6,7 @@ import java.util.Map;
 import java.util.function.Consumer;
 
 import com.myservicebus.ConsumeContext;
-import com.myservicebus.ConsumerMethodInvoker;
+import com.myservicebus.ConsumerInvoker;
 import com.myservicebus.EndpointNameFormatter;
 import com.myservicebus.PipeConfigurator;
 import com.myservicebus.serialization.MessageSerializer;
@@ -23,7 +23,7 @@ public class ConsumerTopology {
     private Integer concurrentMessageLimit;
     private Map<String, Object> queueArguments;
     private Class<? extends MessageSerializer> serializerClass;
-    private ConsumerMethodInvoker<?> methodInvoker;
+    private ConsumerInvoker<?> invoker;
 
     public ConsumerDefinitionModel getDefinition() {
         return definition;
@@ -119,11 +119,11 @@ public class ConsumerTopology {
         this.serializerClass = serializerClass;
     }
 
-    public ConsumerMethodInvoker<?> getMethodInvoker() {
-        return methodInvoker;
+    public ConsumerInvoker<?> getInvoker() {
+        return invoker;
     }
 
-    public void setMethodInvoker(ConsumerMethodInvoker<?> methodInvoker) {
-        this.methodInvoker = methodInvoker;
+    public void setInvoker(ConsumerInvoker<?> invoker) {
+        this.invoker = invoker;
     }
 }

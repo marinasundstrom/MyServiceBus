@@ -13,9 +13,9 @@ import com.myservicebus.tasks.CancellationToken;
  */
 public class ConsumerFaultFilter<T> implements Filter<ConsumeContext<T>> {
     private final ServiceProvider provider;
-    private final Class<? extends Consumer<T>> consumerType;
+    private final Class<?> consumerType;
 
-    public ConsumerFaultFilter(ServiceProvider provider, Class<? extends Consumer<T>> consumerType) {
+    public ConsumerFaultFilter(ServiceProvider provider, Class<?> consumerType) {
         this.provider = provider;
         this.consumerType = consumerType;
     }

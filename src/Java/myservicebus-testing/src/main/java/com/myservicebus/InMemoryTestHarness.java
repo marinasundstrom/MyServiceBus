@@ -167,10 +167,10 @@ public class InMemoryTestHarness implements RequestClientTransport, TransportSen
                         ctxProvider.setContext(consumeContext);
                         CompletableFuture<Void> result;
                         try {
-                            if (ct.getMethodInvoker() != null) {
+                            if (ct.getInvoker() != null) {
                                 @SuppressWarnings("unchecked")
-                                ConsumerMethodInvoker<Object> invoker =
-                                        (ConsumerMethodInvoker<Object>) ct.getMethodInvoker();
+                                ConsumerInvoker<Object> invoker =
+                                        (ConsumerInvoker<Object>) ct.getInvoker();
                                 result = invoker.invoke(scoped, consumeContext)
                                         .thenRun(() -> recordConsumed(message));
                             } else {

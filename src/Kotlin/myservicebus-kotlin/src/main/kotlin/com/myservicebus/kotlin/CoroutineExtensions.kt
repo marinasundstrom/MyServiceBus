@@ -2,18 +2,20 @@
 
 package com.myservicebus.kotlin
 
-import com.myservicebus.BusRegistrationConfigurator
 import com.myservicebus.ConsumeContext as JvmConsumeContext
-import com.myservicebus.ConsumerMethodInvoker
+import com.myservicebus.ConsumerInvoker
+import com.myservicebus.ConsumerRegistrationConfigurator
 import com.myservicebus.DefaultEndpointNameFormatter
 import com.myservicebus.MessageConsumer
 import com.myservicebus.PublishEndpoint as JvmPublishEndpoint
 import com.myservicebus.RequestClient as JvmRequestClient
-import com.myservicebus.ResultHandler
 import com.myservicebus.SendEndpoint as JvmSendEndpoint
 import com.myservicebus.mediator.Mediator as JvmMediator
 import com.myservicebus.tasks.CancellationToken
 import com.myservicebus.tasks.CancellationTokenSource
+import com.myservicebus.topology.ConsumerDefinitionModel
+import com.myservicebus.topology.ConsumerRegistration
+import com.myservicebus.topology.EndpointDefinitionModel
 import java.lang.reflect.ParameterizedType
 import java.lang.reflect.Type
 import java.lang.reflect.TypeVariable
@@ -38,13 +40,16 @@ fun interface Consumer<TMessage : Any> {
 @Deprecated("Use Consumer", ReplaceWith("Consumer<TMessage>"))
 typealias SuspendConsumer<TMessage> = Consumer<TMessage>
 
-/** A request handler that returns its response from suspending Kotlin code. */
-fun interface SuspendHandler<TRequest : Any, TResponse : Any> : ResultHandler<TRequest, TResponse> {
-    suspend fun handle(request: TRequest): TResponse
+/** A Kotlin request handler that returns its response from suspending code. */
+fun interface Handler<TRequest : Any, TResponse : Any> {
+    suspend fun handle(context: ConsumeContext<TRequest>): TResponse
 }
 
+@Deprecated("Use Handler", ReplaceWith("Handler<TRequest, TResponse>"))
+typealias SuspendHandler<TRequest, TResponse> = Handler<TRequest, TResponse>
+
 @PublishedApi
-internal fun BusRegistrationConfigurator.registerKotlinConsumer(
+internal fun ConsumerRegistrationConfigurator.registerKotlinConsumer(
     consumerType: Class<out Consumer<*>>,
     endpointName: String?,
     dispatcher: CoroutineDispatcher,
@@ -64,27 +69,37 @@ internal fun BusRegistrationConfigurator.registerKotlinConsumer(
     val concreteMessageType = messageType as Class<Any>
 
     serviceCollection.addScoped(concreteConsumerType, concreteConsumerType)
-    addConsumerMethod(
+    val definition = ConsumerDefinitionModel(
         consumerType,
-        concreteMessageType,
-        resolvedEndpoint,
-        endpointNameExplicit,
-        if (endpointNameExplicit) null else consumerType,
-        ConsumerMethodInvoker { provider, context ->
-            @Suppress("UNCHECKED_CAST")
-            val consumer = provider.getRequiredService(concreteConsumerType) as Consumer<Any>
-            consumer.consumeAsync(context, dispatcher)
-        },
+        EndpointDefinitionModel(
+            resolvedEndpoint,
+            endpointNameExplicit,
+            if (endpointNameExplicit) null else consumerType,
+            null,
+            null,
+        ),
+        listOf(concreteMessageType),
+    )
+    addConsumerRegistration(
+        ConsumerRegistration(
+            definition,
+            concreteMessageType,
+            ConsumerInvoker { provider, context ->
+                @Suppress("UNCHECKED_CAST")
+                val consumer = provider.getRequiredService(concreteConsumerType) as Consumer<Any>
+                consumer.consumeAsync(context, dispatcher)
+            },
+        ),
     )
 }
 
 @PublishedApi
-internal fun BusRegistrationConfigurator.registerSuspendHandler(
-    handlerType: Class<out SuspendHandler<*, *>>,
+internal fun ConsumerRegistrationConfigurator.registerKotlinHandler(
+    handlerType: Class<out Handler<*, *>>,
     endpointName: String?,
     dispatcher: CoroutineDispatcher,
 ) {
-    val (requestType, _) = contractTypeArguments(handlerType, SuspendHandler::class.java)
+    val (requestType, _) = contractTypeArguments(handlerType, Handler::class.java)
     val annotationEndpoint = handlerType.getAnnotation(MessageConsumer::class.java)
         ?.value
         ?.takeIf(String::isNotBlank)
@@ -99,17 +114,27 @@ internal fun BusRegistrationConfigurator.registerSuspendHandler(
     val concreteRequestType = requestType as Class<Any>
 
     serviceCollection.addScoped(concreteHandlerType, concreteHandlerType)
-    addConsumerMethod(
+    val definition = ConsumerDefinitionModel(
         handlerType,
-        concreteRequestType,
-        resolvedEndpoint,
-        endpointNameExplicit,
-        if (endpointNameExplicit) null else handlerType,
-        ConsumerMethodInvoker { provider, context ->
-            @Suppress("UNCHECKED_CAST")
-            val handler = provider.getRequiredService(concreteHandlerType) as SuspendHandler<Any, Any>
-            handler.handleAsync(context, dispatcher)
-        },
+        EndpointDefinitionModel(
+            resolvedEndpoint,
+            endpointNameExplicit,
+            if (endpointNameExplicit) null else handlerType,
+            null,
+            null,
+        ),
+        listOf(concreteRequestType),
+    )
+    addConsumerRegistration(
+        ConsumerRegistration(
+            definition,
+            concreteRequestType,
+            ConsumerInvoker { provider, context ->
+                @Suppress("UNCHECKED_CAST")
+                val handler = provider.getRequiredService(concreteHandlerType) as Handler<Any, Any>
+                handler.handleAsync(context, dispatcher)
+            },
+        ),
     )
 }
 
@@ -293,11 +318,12 @@ internal fun <TMessage : Any> Consumer<TMessage>.consumeAsync(
     consume(ConsumeContext(context))
 }.asVoidFuture()
 
-private fun SuspendHandler<Any, Any>.handleAsync(
+private fun Handler<Any, Any>.handleAsync(
     context: JvmConsumeContext<Any>,
     dispatcher: CoroutineDispatcher,
 ): CompletableFuture<Void> = coroutineFuture(context.cancellationToken, dispatcher) {
-    ConsumeContext(context).respond(handle(context.message))
+    val kotlinContext = ConsumeContext(context)
+    kotlinContext.respond(handle(kotlinContext))
 }.asVoidFuture()
 
 private fun <T> coroutineFuture(

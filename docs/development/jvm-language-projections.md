@@ -19,7 +19,22 @@ Language projections should own source-level experience:
 - Java can expose fluent configuration, class literals, functional interfaces,
   and `CompletableFuture`;
 - Kotlin can expose receiver DSLs, reified types, suspending consumers,
-coroutine cancellation, and Kotlin-friendly nullability and defaults.
+  coroutine cancellation, and Kotlin-friendly nullability and defaults.
+
+The public concept map should stay directly translatable across C#, Java, and
+Kotlin: consumer, consume context, send context, publish context, definition,
+endpoint, handler, request client, and bus should retain the same meaning and
+observable behavior. Equivalent concepts do not require equivalent inheritance
+or method signatures.
+
+Java and Kotlin may share the `com.myservicebus` package root, but frontend
+classes that can coexist cannot use the same fully qualified JVM name. Separate
+artifacts do not change that classloader constraint. The current Java
+`com.myservicebus` and Kotlin `com.myservicebus.kotlin` packages therefore let
+both projections coexist and explicitly bridge consumers authored against the
+other frontend. A future physical core split must preserve that coexistence;
+using identical fully qualified names would instead make the projections
+mutually exclusive.
 
 Framework integration belongs at this projection boundary too. A Kotlin server
 adapter should use the framework's lifecycle, configuration, dependency, and
@@ -85,12 +100,16 @@ contract; supporting it requires the mediator to resolve inherited response
 types correctly instead of assuming every Java handler implements the result
 interface directly.
 
-The first `SuspendHandler` experiment exposed that inheriting Java's
+The first handler experiment exposed that inheriting Java's
 `handle(request): CompletableFuture<Response>` overload prevents Kotlin from
-declaring the natural `suspend fun handle(request): Response` signature. The
-shared JVM layer now carries only a `ResultHandler<Request, Response>` metadata
-contract at that boundary. Java's `HandlerWithResult` and Kotlin's
-`SuspendHandler` project their own execution shapes onto it.
+declaring a natural suspending contract. Kotlin therefore owns
+`Handler<Request, Response>` and receives its Kotlin `ConsumeContext<Request>`.
+Both Kotlin consumers and handlers normalize their identity, message contract,
+and endpoint policy into `ConsumerDefinitionModel`, then adapt their execution
+to the shared `ConsumerInvoker`. The runtime neither discovers nor invokes a
+Kotlin method directly. Java interface consumers and Java consumer methods can
+lower to the same registration primitive without becoming the superclass of
+the Kotlin frontend.
 
 ## Current transition
 
@@ -103,19 +122,32 @@ onto the existing JVM pipeline. The DSL and top-level facades provide `jvm {
 Kotlin-native projection.
 
 This keeps ordinary Kotlin code independent from Java overloads while the
-shared implementation still resides in the Java modules.
+shared implementation still resides in the Java modules. Java-authored
+consumers remain available through the deliberately named `javaConsumer<T>()`
+bridge; `consumer<T>()` is reserved for the Kotlin contract so overload
+resolution cannot accidentally select the other frontend.
 
 Lifecycle values are part of the projection as well. The Kotlin bus accepts
 Kotlin `Duration` for bounded stop, treats `Duration.INFINITE` as the untimed
 shared stop, and implements `AutoCloseable`; Java's `java.time.Duration` remains
 behind the facade.
 
-## Possible future module shape
+## Emerging module shape
 
-If the projections grow independently, the JVM artifacts may be reorganized
-around an implementation-focused shared core with separate Java and Kotlin
-public projections. That decision should be driven by concrete pressure rather
-than package symmetry. Useful triggers include:
+The JVM implementation should evolve toward an implementation-focused shared
+core with separate Java and Kotlin public projections. The normalized
+`ConsumerRegistration` and `ConsumerDefinitionModel`, `ConsumerInvoker`, and
+narrow `ConsumerRegistrationConfigurator` are the first executable logical
+seam. Frontend-specific consumer and handler shapes become definitions and an
+invocation adapter before topology is materialized, and Kotlin registration
+depends on the narrow sink rather than Java's full bus configurator.
+
+These types deliberately remain in the current implementation package during
+the POC. We should establish the context, configuration, transport, and runtime
+dependency boundaries through working projections before assigning classes to
+new Maven artifacts or final JVM packages.
+
+Pressure that determines the next extraction boundary includes:
 
 - Java API compatibility preventing an idiomatic Kotlin operation;
 - Kotlin types or coroutine dependencies leaking into shared transport code;

@@ -168,18 +168,18 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
         Filter<ConsumeContext<Object>> errorFilter = new ErrorTransportFilter(serviceProvider);
         configurator.useFilter(errorFilter);
         @SuppressWarnings({ "unchecked", "rawtypes" })
-        Filter<ConsumeContext<Object>> faultFilter = consumerDef.getMethodInvoker() != null
-                ? new HandlerFaultFilter(serviceProvider)
-                : new ConsumerFaultFilter(serviceProvider, consumerDef.getConsumerType());
+        Filter<ConsumeContext<Object>> faultFilter = new ConsumerFaultFilter(
+                serviceProvider,
+                consumerDef.getConsumerType());
         configurator.useFilter(faultFilter);
         if (consumerDef.getConfigure() != null)
             consumerDef.getConfigure().accept(configurator);
         Filter<ConsumeContext<Object>> consumerFilter;
-        if (consumerDef.getMethodInvoker() != null) {
+        if (consumerDef.getInvoker() != null) {
             @SuppressWarnings({ "unchecked", "rawtypes" })
-            Filter<ConsumeContext<Object>> methodFilter = new ConsumerMethodMessageFilter(
+            Filter<ConsumeContext<Object>> methodFilter = new ConsumerInvocationFilter(
                     serviceProvider,
-                    consumerDef.getMethodInvoker());
+                    consumerDef.getInvoker());
             consumerFilter = methodFilter;
         } else {
             ConsumerFactory factory = consumerFactoryFactory.apply(consumerDef.getConsumerType());
@@ -223,7 +223,7 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
                     }
                 }
 
-                Type messageType = consumerDef.getMethodInvoker() != null
+                Type messageType = consumerDef.getInvoker() != null
                         ? binding.getMessageType()
                         : resolveMessageType(consumerDef.getConsumerType(), binding.getMessageType());
                 Object message = inboundMessage.getMessage(messageType);

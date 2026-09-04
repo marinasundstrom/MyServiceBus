@@ -197,7 +197,7 @@ final class ReflectionConsumerMethodDiscovery {
             String endpointName,
             boolean endpointNameExplicit,
             Class<?> endpointNameFormatterType,
-            ConsumerMethodInvoker<TMessage> invoker,
+            ConsumerInvoker<TMessage> invoker,
             boolean requiresInstance) {
     }
 

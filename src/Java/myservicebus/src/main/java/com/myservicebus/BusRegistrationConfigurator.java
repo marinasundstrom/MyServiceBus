@@ -11,7 +11,7 @@ import com.myservicebus.orchestration.SagaStateMachine;
 import com.myservicebus.serialization.SerializerFactory;
 import com.myservicebus.topology.ConsumerDefinitionModel;
 
-public interface BusRegistrationConfigurator {
+public interface BusRegistrationConfigurator extends ConsumerRegistrationConfigurator {
     void addChoreography(ChoreographyFragment fragment);
 
     default <TSaga, TStateMachine extends SagaStateMachine<TSaga>> void addSagaStateMachine(
@@ -125,7 +125,7 @@ public interface BusRegistrationConfigurator {
             Class<?> declaringType,
             Class<TMessage> messageClass,
             String endpointName,
-            ConsumerMethodInvoker<TMessage> invoker) {
+            ConsumerInvoker<TMessage> invoker) {
         addConsumerMethod(declaringType, messageClass, endpointName, true, null, invoker);
     }
 
@@ -135,7 +135,7 @@ public interface BusRegistrationConfigurator {
             String endpointName,
             boolean endpointNameExplicit,
             Class<?> endpointNameFormatterType,
-            ConsumerMethodInvoker<TMessage> invoker);
+            ConsumerInvoker<TMessage> invoker);
 
     default <TMessage, TConsumer extends com.myservicebus.Consumer<TMessage>> void addConsumer(
             Class<TConsumer> consumerClass,

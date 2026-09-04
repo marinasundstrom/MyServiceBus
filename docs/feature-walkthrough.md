@@ -795,9 +795,9 @@ System.out.println(response.getStatus());
 #### Kotlin
 
 ```kotlin
-class CheckOrderStatusHandler : SuspendHandler<CheckOrderStatus, OrderStatus> {
-    override suspend fun handle(request: CheckOrderStatus): OrderStatus =
-        OrderStatus(request.orderId, "Pending")
+class CheckOrderStatusHandler : Handler<CheckOrderStatus, OrderStatus> {
+    override suspend fun handle(context: ConsumeContext<CheckOrderStatus>): OrderStatus =
+        OrderStatus(context.message.orderId, "Pending")
 }
 
 val mediator = services.createMediator {
@@ -808,8 +808,8 @@ val response: OrderStatus = mediator.request(CheckOrderStatus(UUID.randomUUID())
 println(response.status)
 ```
 
-`SuspendHandler` projects onto the async-shape-neutral JVM `ResultHandler`
-metadata contract. Its Kotlin adapter enters the same scoped pipeline, delivers
+`Handler` is a Kotlin-owned contract. Its normalized definition and invocation
+adapter enter the shared scoped JVM pipeline, deliver
 the returned value through the request's response address, and preserves its
 correlation metadata.
 

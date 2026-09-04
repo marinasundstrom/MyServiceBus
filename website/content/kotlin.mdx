@@ -56,9 +56,9 @@ export const requestClient = `provider.createScope().use { scope ->
     }
 }`;
 
-export const mediator = `class LookupOrderHandler : SuspendHandler<LookupOrder, OrderStatus> {
-    override suspend fun handle(request: LookupOrder): OrderStatus =
-        findOrder(request.orderId)
+export const mediator = `class LookupOrderHandler : Handler<LookupOrder, OrderStatus> {
+    override suspend fun handle(context: ConsumeContext<LookupOrder>): OrderStatus =
+        findOrder(context.message.orderId)
 }
 
 val mediator = ServiceCollection.create().createMediator {

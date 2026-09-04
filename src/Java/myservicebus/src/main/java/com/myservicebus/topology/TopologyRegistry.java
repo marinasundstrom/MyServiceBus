@@ -6,7 +6,7 @@ import java.util.function.Consumer;
 
 import com.myservicebus.ConsumeContext;
 import com.myservicebus.ConsumerDefinition;
-import com.myservicebus.ConsumerMethodInvoker;
+import com.myservicebus.ConsumerInvoker;
 import com.myservicebus.EntityNameFormatter;
 import com.myservicebus.PipeConfigurator;
 import com.myservicebus.choreography.ChoreographyFragment;
@@ -156,7 +156,25 @@ public class TopologyRegistry implements BusTopology {
                         definition != null ? definition.getEndpoint().getConcurrentMessageLimit() : null,
                         definition != null ? definition.getEndpoint().getPrefetchCount() : null),
                 java.util.Arrays.asList(messageTypes));
-        consumerDefinitions.add(model);
+        materializeConsumer(model, model.messageTypes(), configure, null);
+        return model;
+    }
+
+    public <TMessage> ConsumerDefinitionModel registerConsumer(ConsumerRegistration<TMessage> registration) {
+        ConsumerDefinitionModel model = registration.definition();
+        materializeConsumer(model, List.of(registration.messageType()), null, registration.invoker());
+        return model;
+    }
+
+    private void materializeConsumer(
+            ConsumerDefinitionModel model,
+            List<Class<?>> messageTypes,
+            Consumer<PipeConfigurator<ConsumeContext<Object>>> configure,
+            ConsumerInvoker<?> invoker) {
+        if (!consumerDefinitions.contains(model)) {
+            consumerDefinitions.add(model);
+        }
+        String queueName = model.endpointName();
         ensureReceiveEndpoint(queueName);
         List<MessageBinding> bindings = new ArrayList<>();
         for (Class<?> mt : messageTypes) {
@@ -171,25 +189,23 @@ public class TopologyRegistry implements BusTopology {
         }
         ConsumerTopology consumer = new ConsumerTopology();
         consumer.setDefinition(model);
-        consumer.setConsumerType(consumerType);
+        consumer.setConsumerType(model.consumerType());
         consumer.setQueueName(queueName);
-        consumer.setEndpointNameExplicit(endpointNameExplicit);
-        consumer.setEndpointNameFormatterType(endpointNameFormatterType);
+        consumer.setEndpointNameExplicit(model.endpointNameExplicit());
+        consumer.setEndpointNameFormatterType(model.endpointNameFormatterType());
         consumer.setBindings(bindings);
         consumer.setConfigure(configure);
-        if (definition != null) {
-            consumer.setConcurrentMessageLimit(definition.getConcurrentMessageLimit());
-            consumer.setPrefetchCount(definition.getPrefetchCount());
-        }
+        consumer.setConcurrentMessageLimit(model.concurrentMessageLimit());
+        consumer.setPrefetchCount(model.prefetchCount());
+        consumer.setInvoker(invoker);
         consumers.add(consumer);
-        return model;
     }
 
     public <TMessage> void registerConsumerMethod(
             Class<?> declaringType,
             Class<TMessage> messageType,
             String queueName,
-            ConsumerMethodInvoker<TMessage> invoker) {
+            ConsumerInvoker<TMessage> invoker) {
         registerConsumerMethod(declaringType, messageType, queueName, true, null, invoker);
     }
 
@@ -199,16 +215,12 @@ public class TopologyRegistry implements BusTopology {
             String queueName,
             boolean endpointNameExplicit,
             Class<?> endpointNameFormatterType,
-            ConsumerMethodInvoker<TMessage> invoker) {
-        registerConsumerCore(
+            ConsumerInvoker<TMessage> invoker) {
+        ConsumerDefinitionModel model = new ConsumerDefinitionModel(
                 declaringType,
-                queueName,
-                endpointNameExplicit,
-                endpointNameFormatterType,
-                null,
-                null,
-                messageType);
-        consumers.get(consumers.size() - 1).setMethodInvoker(invoker);
+                new EndpointDefinitionModel(queueName, endpointNameExplicit, endpointNameFormatterType, null, null),
+                List.of(messageType));
+        registerConsumer(new ConsumerRegistration<>(model, messageType, invoker));
     }
 
     public void moveConsumerToEndpoint(ConsumerTopology consumer, String endpointName) {

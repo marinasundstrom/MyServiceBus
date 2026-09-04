@@ -9,13 +9,13 @@ import com.myservicebus.di.ServiceCollection
 import com.myservicebus.di.ServiceProviderBasedProvider
 import com.myservicebus.kotlin.ConsumeContext
 import com.myservicebus.kotlin.Consumer
+import com.myservicebus.kotlin.Handler
 import com.myservicebus.kotlin.MessageBus
 import com.myservicebus.kotlin.PublishEndpoint
 import com.myservicebus.kotlin.PublishEndpointProvider
 import com.myservicebus.kotlin.RequestClientFactory
 import com.myservicebus.kotlin.RequestResult
 import com.myservicebus.kotlin.SendEndpointProvider
-import com.myservicebus.kotlin.SuspendHandler
 import com.myservicebus.kotlin.addServiceBus
 import com.myservicebus.kotlin.createMediator
 import com.myservicebus.kotlin.getRequiredService
@@ -57,9 +57,9 @@ data class PackageSmokeResponse(val value: String)
 
 data class PackageSmokeRejection(val value: String)
 
-class PackageSmokeHandler : SuspendHandler<PackageSmokeRequest, PackageSmokeResponse> {
-    override suspend fun handle(request: PackageSmokeRequest): PackageSmokeResponse =
-        PackageSmokeResponse(request.value)
+class PackageSmokeHandler : Handler<PackageSmokeRequest, PackageSmokeResponse> {
+    override suspend fun handle(context: ConsumeContext<PackageSmokeRequest>): PackageSmokeResponse =
+        PackageSmokeResponse(context.message.value)
 }
 
 private class PackageSmokeRequestClient : JvmRequestClient<PackageSmokeRequest> {

@@ -21,7 +21,7 @@ class ServiceBusExtensionsTest {
         var jvmConfiguratorReached = false
 
         services.addServiceBus {
-            consumer<TestConsumer>()
+            javaConsumer<TestConsumer>()
             transport<RabbitMqFactoryConfigurator> { context: BusRegistrationContext ->
                 host("localhost")
                 configureEndpoints(context)

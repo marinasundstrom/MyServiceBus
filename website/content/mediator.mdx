@@ -69,9 +69,9 @@ var response = await client.GetResponseAsync<OrderView>(
 
 OrderView order = mediator.send(
     new GetOrder(orderId)).join();`,
-  kotlin: `class GetOrderHandler : SuspendHandler<GetOrder, OrderView> {
-    override suspend fun handle(request: GetOrder): OrderView =
-        findOrder(request.orderId)
+  kotlin: `class GetOrderHandler : Handler<GetOrder, OrderView> {
+    override suspend fun handle(context: ConsumeContext<GetOrder>): OrderView =
+        findOrder(context.message.orderId)
 }
 
 val mediator = ServiceCollection.create().createMediator {
@@ -123,7 +123,7 @@ The hosted C# bus is started by the application host. Java&apos;s standalone{' '
 
 <div className="callout">
   <strong>Handlers can return results</strong>
-  <p>Use C# <code>IHandler&lt;TMessage, TResult&gt;</code> / <code>Handler&lt;TMessage, TResult&gt;</code>, Java <code>HandlerWithResult&lt;TMessage, TResult&gt;</code>, or Kotlin <code>SuspendHandler&lt;TMessage, TResult&gt;</code> for mediator requests. The returned value is sent through the correlated response pipeline.</p>
+  <p>Use C# <code>IHandler&lt;TMessage, TResult&gt;</code> / <code>Handler&lt;TMessage, TResult&gt;</code>, Java <code>HandlerWithResult&lt;TMessage, TResult&gt;</code>, or Kotlin <code>Handler&lt;TMessage, TResult&gt;</code> for mediator requests. The returned value is sent through the correlated response pipeline.</p>
 </div>
 
 <h2 id="consumer-shapes">One runtime, three consumer shapes</h2>

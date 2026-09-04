@@ -33,9 +33,9 @@ export const responseHandler = {
     }
 }`,
   kotlin: `class CheckOrderStatusHandler
-    : SuspendHandler<CheckOrderStatus, OrderStatus> {
-    override suspend fun handle(request: CheckOrderStatus): OrderStatus =
-        lookup(request.orderId)
+    : Handler<CheckOrderStatus, OrderStatus> {
+    override suspend fun handle(context: ConsumeContext<CheckOrderStatus>): OrderStatus =
+        lookup(context.message.orderId)
 }`,
 };
 

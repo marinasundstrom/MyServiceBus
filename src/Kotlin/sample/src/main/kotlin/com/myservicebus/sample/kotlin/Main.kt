@@ -7,7 +7,7 @@ import com.myservicebus.kotlin.Consumer
 import com.myservicebus.kotlin.MessageBus
 import com.myservicebus.kotlin.RequestClientFactory
 import com.myservicebus.kotlin.RequestResult
-import com.myservicebus.kotlin.SuspendHandler
+import com.myservicebus.kotlin.Handler
 import com.myservicebus.kotlin.addServiceBus
 import com.myservicebus.kotlin.createMediator
 import com.myservicebus.kotlin.getRequiredService
@@ -41,9 +41,9 @@ class SubmitOrderConsumer : Consumer<SubmitOrder> {
     }
 }
 
-class LookupOrderHandler : SuspendHandler<LookupOrder, OrderStatus> {
-    override suspend fun handle(request: LookupOrder): OrderStatus =
-        OrderStatus(request.orderId, "Pending")
+class LookupOrderHandler : Handler<LookupOrder, OrderStatus> {
+    override suspend fun handle(context: ConsumeContext<LookupOrder>): OrderStatus =
+        OrderStatus(context.message.orderId, "Pending")
 }
 
 class LookupOrderConsumer : Consumer<LookupOrder> {

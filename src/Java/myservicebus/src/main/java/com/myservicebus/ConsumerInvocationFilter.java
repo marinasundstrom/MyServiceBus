@@ -5,11 +5,12 @@ import java.util.concurrent.CompletableFuture;
 import com.myservicebus.di.ServiceProvider;
 import com.myservicebus.di.ServiceScope;
 
-public final class ConsumerMethodMessageFilter<T> implements Filter<ConsumeContext<T>> {
+/** Runs a source-language-neutral consumer invocation in the active message scope. */
+public class ConsumerInvocationFilter<T> implements Filter<ConsumeContext<T>> {
     private final ServiceProvider provider;
-    private final ConsumerMethodInvoker<T> invoker;
+    private final ConsumerInvoker<T> invoker;
 
-    public ConsumerMethodMessageFilter(ServiceProvider provider, ConsumerMethodInvoker<T> invoker) {
+    public ConsumerInvocationFilter(ServiceProvider provider, ConsumerInvoker<T> invoker) {
         this.provider = provider;
         this.invoker = invoker;
     }

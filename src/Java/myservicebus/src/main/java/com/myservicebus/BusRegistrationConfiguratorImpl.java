@@ -24,6 +24,7 @@ import com.myservicebus.serialization.RawJsonSerializerFactory;
 import com.myservicebus.serialization.SerializerFactory;
 import com.myservicebus.topology.TopologyRegistry;
 import com.myservicebus.topology.ConsumerDefinitionModel;
+import com.myservicebus.topology.ConsumerRegistration;
 import com.myservicebus.orchestration.SagaStateMachine;
 import com.myservicebus.orchestration.SagaRepository;
 import com.myservicebus.orchestration.SagaRepositoryCapabilities;
@@ -229,6 +230,28 @@ public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigura
     }
 
     @Override
+    public ConsumerDefinitionModel addConsumerRegistration(ConsumerRegistration<?> registration) {
+        if (registration == null) {
+            throw new IllegalArgumentException("registration must not be null");
+        }
+        Class<?> consumerType = registration.definition().consumerType();
+        boolean alreadyRegistered = topology.getConsumers().stream()
+                .filter(existing -> existing.getConsumerType().equals(consumerType))
+                .flatMap(existing -> existing.getBindings().stream())
+                .anyMatch(binding -> binding.getMessageType().equals(registration.messageType()));
+        if (alreadyRegistered) {
+            logger.debug(
+                    "Consumer '{}' is already registered for '{}', skipping",
+                    consumerType.getSimpleName(),
+                    registration.messageType().getSimpleName());
+            return registration.definition();
+        }
+
+        topology.registerConsumer(registration);
+        return registration.definition();
+    }
+
+    @Override
     public void addConsumerMethods(Class<?>... declaringTypes) {
         if (declaringTypes == null) {
             throw new IllegalArgumentException("declaringTypes must not be null");
@@ -270,7 +293,7 @@ public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigura
                 endpointOverride != null ? endpointOverride : definition.endpointName(),
                 endpointOverride != null || definition.endpointNameExplicit(),
                 endpointOverride != null ? null : definition.endpointNameFormatterType(),
-                (ConsumerMethodInvoker) definition.invoker());
+                (ConsumerInvoker) definition.invoker());
     }
 
     @Override
@@ -280,7 +303,7 @@ public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigura
             String endpointName,
             boolean endpointNameExplicit,
             Class<?> endpointNameFormatterType,
-            ConsumerMethodInvoker<TMessage> invoker) {
+            ConsumerInvoker<TMessage> invoker) {
         if (endpointName == null || endpointName.isBlank()) {
             throw new IllegalArgumentException("endpointName must not be blank");
         }
