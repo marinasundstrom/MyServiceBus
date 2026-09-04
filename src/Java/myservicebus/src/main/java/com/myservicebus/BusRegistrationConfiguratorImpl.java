@@ -293,7 +293,7 @@ public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigura
                 endpointOverride != null ? endpointOverride : definition.endpointName(),
                 endpointOverride != null || definition.endpointNameExplicit(),
                 endpointOverride != null ? null : definition.endpointNameFormatterType(),
-                (ConsumerInvoker) definition.invoker());
+                (ConsumerMethodInvoker) definition.invoker());
     }
 
     @Override
@@ -303,7 +303,7 @@ public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigura
             String endpointName,
             boolean endpointNameExplicit,
             Class<?> endpointNameFormatterType,
-            ConsumerInvoker<TMessage> invoker) {
+            ConsumerMethodInvoker<TMessage> invoker) {
         if (endpointName == null || endpointName.isBlank()) {
             throw new IllegalArgumentException("endpointName must not be blank");
         }

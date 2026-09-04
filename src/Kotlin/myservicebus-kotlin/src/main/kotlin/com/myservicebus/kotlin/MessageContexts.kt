@@ -1,6 +1,6 @@
 package com.myservicebus.kotlin
 
-import com.myservicebus.PublishContext as JvmPublishContext
+import com.myservicebus.OutgoingMessageContext as JvmOutgoingMessageContext
 import com.myservicebus.SendContext as JvmSendContext
 import com.myservicebus.serialization.MessageIntent
 import com.myservicebus.tasks.CancellationToken
@@ -10,7 +10,7 @@ import java.util.UUID
 
 /** Kotlin's mutable metadata context for one outgoing message. */
 open class SendContext @PublishedApi internal constructor(
-    @PublishedApi internal val delegate: JvmSendContext,
+    @PublishedApi internal val delegate: JvmOutgoingMessageContext,
 ) {
     var message: Any
         get() = delegate.message
@@ -103,10 +103,14 @@ open class SendContext @PublishedApi internal constructor(
         }
 
     /** Accesses shared JVM context capabilities that do not have a Kotlin projection. */
-    fun <TResult> jvm(block: JvmSendContext.() -> TResult): TResult = delegate.block()
+    fun <TResult> jvm(block: JvmSendContext.() -> TResult): TResult {
+        val javaContext = delegate as? JvmSendContext
+            ?: error("This outgoing context is not backed by the Java projection.")
+        return javaContext.block()
+    }
 }
 
 /** Kotlin's mutable metadata context for one published message. */
 class PublishContext @PublishedApi internal constructor(
-    delegate: JvmPublishContext,
+    delegate: JvmOutgoingMessageContext,
 ) : SendContext(delegate)

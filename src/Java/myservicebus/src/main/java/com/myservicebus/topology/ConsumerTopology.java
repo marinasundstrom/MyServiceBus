@@ -7,6 +7,7 @@ import java.util.function.Consumer;
 
 import com.myservicebus.ConsumeContext;
 import com.myservicebus.ConsumerInvoker;
+import com.myservicebus.ConsumerMethodInvoker;
 import com.myservicebus.EndpointNameFormatter;
 import com.myservicebus.PipeConfigurator;
 import com.myservicebus.serialization.MessageSerializer;
@@ -24,6 +25,7 @@ public class ConsumerTopology {
     private Map<String, Object> queueArguments;
     private Class<? extends MessageSerializer> serializerClass;
     private ConsumerInvoker<?> invoker;
+    private ConsumerMethodInvoker<?> methodInvoker;
 
     public ConsumerDefinitionModel getDefinition() {
         return definition;
@@ -125,5 +127,15 @@ public class ConsumerTopology {
 
     public void setInvoker(ConsumerInvoker<?> invoker) {
         this.invoker = invoker;
+    }
+
+    /** Returns the Java consumer-method adapter, or {@code null} for another projection. */
+    public ConsumerMethodInvoker<?> getMethodInvoker() {
+        return methodInvoker;
+    }
+
+    public void setMethodInvoker(ConsumerMethodInvoker<?> methodInvoker) {
+        this.methodInvoker = methodInvoker;
+        this.invoker = methodInvoker;
     }
 }

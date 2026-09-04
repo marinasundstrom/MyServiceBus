@@ -125,7 +125,7 @@ public interface BusRegistrationConfigurator extends ConsumerRegistrationConfigu
             Class<?> declaringType,
             Class<TMessage> messageClass,
             String endpointName,
-            ConsumerInvoker<TMessage> invoker) {
+            ConsumerMethodInvoker<TMessage> invoker) {
         addConsumerMethod(declaringType, messageClass, endpointName, true, null, invoker);
     }
 
@@ -135,7 +135,7 @@ public interface BusRegistrationConfigurator extends ConsumerRegistrationConfigu
             String endpointName,
             boolean endpointNameExplicit,
             Class<?> endpointNameFormatterType,
-            ConsumerInvoker<TMessage> invoker);
+            ConsumerMethodInvoker<TMessage> invoker);
 
     default <TMessage, TConsumer extends com.myservicebus.Consumer<TMessage>> void addConsumer(
             Class<TConsumer> consumerClass,

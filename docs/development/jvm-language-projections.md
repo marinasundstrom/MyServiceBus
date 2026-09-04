@@ -21,6 +21,16 @@ Language projections should own source-level experience:
 - Kotlin can expose receiver DSLs, reified types, suspending consumers,
   coroutine cancellation, and Kotlin-friendly nullability and defaults.
 
+During the POC, Java is the stable reference projection. Kotlin may change its
+contracts and syntax independently while the native shape is discovered, but
+those experiments should lower through adapters rather than forcing breaking
+changes into Java's consumer and configuration APIs.
+
+The MVP release has two stability levels: the common JVM core and Java
+projection are stabilized release surfaces, while the Kotlin projection is
+explicitly experimental. Kotlin can evolve independently, but it must continue
+to prove the same observable core behavior.
+
 The public concept map should stay directly translatable across C#, Java, and
 Kotlin: consumer, consume context, send context, publish context, definition,
 endpoint, handler, request client, and bus should retain the same meaning and
@@ -85,7 +95,11 @@ Configuration callbacks follow the same boundary. Kotlin-owned `PublishContext`
 and `SendContext` receivers expose the shared mutable metadata as properties and
 adapt the completed configuration back into the exact Java context instance.
 This keeps configuration source independent from Java accessor conventions
-without copying state or creating a second outbound-message model.
+without copying state or creating a second outbound-message model. The first
+extracted context capability is `OutgoingMessageContext`: the runtime
+`SendContext` implements it, while the Kotlin send and publish contexts compose
+over the capability instead of requiring that concrete Java class for their
+ordinary properties.
 
 Request/response follows the full-facade rule even though extension methods
 could technically hide some class-token ceremony. Kotlin owns
@@ -145,7 +159,8 @@ depends on the narrow sink rather than Java's full bus configurator.
 These types deliberately remain in the current implementation package during
 the POC. We should establish the context, configuration, transport, and runtime
 dependency boundaries through working projections before assigning classes to
-new Maven artifacts or final JVM packages.
+new Maven artifacts or final JVM packages. The final Java/core/Kotlin package
+and artifact graph must be settled before the Kotlin work is released.
 
 Pressure that determines the next extraction boundary includes:
 

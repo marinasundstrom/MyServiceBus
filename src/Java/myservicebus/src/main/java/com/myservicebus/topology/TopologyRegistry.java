@@ -7,6 +7,7 @@ import java.util.function.Consumer;
 import com.myservicebus.ConsumeContext;
 import com.myservicebus.ConsumerDefinition;
 import com.myservicebus.ConsumerInvoker;
+import com.myservicebus.ConsumerMethodInvoker;
 import com.myservicebus.EntityNameFormatter;
 import com.myservicebus.PipeConfigurator;
 import com.myservicebus.choreography.ChoreographyFragment;
@@ -205,7 +206,7 @@ public class TopologyRegistry implements BusTopology {
             Class<?> declaringType,
             Class<TMessage> messageType,
             String queueName,
-            ConsumerInvoker<TMessage> invoker) {
+            ConsumerMethodInvoker<TMessage> invoker) {
         registerConsumerMethod(declaringType, messageType, queueName, true, null, invoker);
     }
 
@@ -215,12 +216,13 @@ public class TopologyRegistry implements BusTopology {
             String queueName,
             boolean endpointNameExplicit,
             Class<?> endpointNameFormatterType,
-            ConsumerInvoker<TMessage> invoker) {
+            ConsumerMethodInvoker<TMessage> invoker) {
         ConsumerDefinitionModel model = new ConsumerDefinitionModel(
                 declaringType,
                 new EndpointDefinitionModel(queueName, endpointNameExplicit, endpointNameFormatterType, null, null),
                 List.of(messageType));
         registerConsumer(new ConsumerRegistration<>(model, messageType, invoker));
+        consumers.get(consumers.size() - 1).setMethodInvoker(invoker);
     }
 
     public void moveConsumerToEndpoint(ConsumerTopology consumer, String endpointName) {

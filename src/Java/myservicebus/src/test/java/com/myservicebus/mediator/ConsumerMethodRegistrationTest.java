@@ -10,7 +10,7 @@ import org.junit.jupiter.api.Test;
 import com.myservicebus.BusRegistrationConfiguratorImpl;
 import com.myservicebus.ConsumeContext;
 import com.myservicebus.Consumer;
-import com.myservicebus.ConsumerInvoker;
+import com.myservicebus.ConsumerMethodInvoker;
 import com.myservicebus.MessageConsumer;
 import com.myservicebus.SendEndpoint;
 import com.myservicebus.di.ServiceCollection;
@@ -123,7 +123,7 @@ public class ConsumerMethodRegistrationTest {
                 .getRequiredService(com.myservicebus.topology.TopologyRegistry.class);
 
         Assertions.assertEquals("interface-orders", topology.getConsumers().get(0).getQueueName());
-        Assertions.assertNull(topology.getConsumers().get(0).getInvoker());
+        Assertions.assertNull(topology.getConsumers().get(0).getMethodInvoker());
     }
 
     @Test
@@ -157,8 +157,8 @@ public class ConsumerMethodRegistrationTest {
         var provider = services.buildServiceProvider();
         var topology = provider.getRequiredService(com.myservicebus.topology.TopologyRegistry.class);
         var consumer = topology.getConsumers().get(0);
-        ConsumerInvoker<ResponseRequest> invoker =
-                (ConsumerInvoker<ResponseRequest>) consumer.getInvoker();
+        ConsumerMethodInvoker<ResponseRequest> invoker =
+                (ConsumerMethodInvoker<ResponseRequest>) consumer.getMethodInvoker();
         CapturingSendEndpoint endpoint = new CapturingSendEndpoint();
         ConsumeContext<ResponseRequest> context = new ConsumeContext<>(
                 new ResponseRequest("reflection"),

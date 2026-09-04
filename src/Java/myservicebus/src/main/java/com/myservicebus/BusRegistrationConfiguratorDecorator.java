@@ -51,7 +51,7 @@ public abstract class BusRegistrationConfiguratorDecorator implements BusRegistr
             Class<?> declaringType,
             Class<TMessage> messageClass,
             String endpointName,
-            ConsumerInvoker<TMessage> invoker) {
+            ConsumerMethodInvoker<TMessage> invoker) {
         inner.addConsumerMethod(declaringType, messageClass, endpointName, invoker);
     }
 
@@ -62,7 +62,7 @@ public abstract class BusRegistrationConfiguratorDecorator implements BusRegistr
             String endpointName,
             boolean endpointNameExplicit,
             Class<?> endpointNameFormatterType,
-            ConsumerInvoker<TMessage> invoker) {
+            ConsumerMethodInvoker<TMessage> invoker) {
         inner.addConsumerMethod(
                 declaringType,
                 messageClass,

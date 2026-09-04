@@ -8,7 +8,7 @@ import org.junit.jupiter.api.Test;
 
 import com.myservicebus.BusRegistrationConfiguratorImpl;
 import com.myservicebus.ConsumeContext;
-import com.myservicebus.ConsumerInvoker;
+import com.myservicebus.ConsumerMethodInvoker;
 import com.myservicebus.SendEndpoint;
 import com.myservicebus.di.ServiceCollection;
 import com.myservicebus.generated.GeneratedConsumerCatalog;
@@ -86,8 +86,8 @@ public class GeneratedConsumerCatalogTest {
                         .equals(GeneratedResponseRequest.class))
                 .findFirst()
                 .orElseThrow();
-        ConsumerInvoker<GeneratedResponseRequest> invoker =
-                (ConsumerInvoker<GeneratedResponseRequest>) consumer.getInvoker();
+        ConsumerMethodInvoker<GeneratedResponseRequest> invoker =
+                (ConsumerMethodInvoker<GeneratedResponseRequest>) consumer.getMethodInvoker();
         CapturingSendEndpoint endpoint = new CapturingSendEndpoint();
         ConsumeContext<GeneratedResponseRequest> context = new ConsumeContext<>(
                 new GeneratedResponseRequest("generated"),
