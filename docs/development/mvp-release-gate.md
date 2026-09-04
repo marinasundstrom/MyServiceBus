@@ -4,7 +4,7 @@
 
 This gate records the foundation that later previews continue to protect. The C# and Java clients provide the stable ordinary RabbitMQ application path documented in the [MVP API Surface](mvp-api-surface.md) and make only the scoped compatibility claims in the [Compatibility Policy](../compatibility.md). Kotlin selects a separate, experimental projection over the same JVM runtime and release evidence.
 
-Preview releases after the foundation MVP also contain explicitly versioned inspection, monitoring, Azure Service Bus, mediator, scheduling, and PostgreSQL outbox surfaces. Their readiness is reported separately in the [API and Readiness Matrix](../api-readiness.md), [Enterprise Production Readiness](../enterprise-readiness.md), and feature-specific documentation. Including them in the same package line does not promote every surface to production-ready status.
+Preview releases after the foundation MVP also contain explicitly versioned inspection, monitoring, Azure Service Bus, mediator, scheduling, and PostgreSQL outbox surfaces. Their readiness is reported in [Enterprise Production Readiness](../enterprise-readiness.md), the [website Platform Parity matrix](../../website/content/platform-parity.mdx), and feature-specific documentation. Including them in the same package line does not promote every surface to production-ready status.
 
 ## Completed product gates
 

@@ -1,12 +1,12 @@
 # Why Choose MyServiceBus?
 
-MyServiceBus is for teams that want a focused messaging runtime across C# and Java. Its strongest fit is not “every feature for every system”; it is a documented common model for the messaging fundamentals that both clients and the selected transport profile support.
+MyServiceBus is for teams that want a focused messaging runtime across C#, Java, and Kotlin. C# and Java are the stable reference projections for the current preview; Kotlin is an experimental sibling projection over the same JVM runtime. Its strongest fit is not “every feature for every system”; it is a documented common model for the messaging fundamentals that the reference clients and selected transport profile support.
 
 ## The Motivation
 
 MyServiceBus starts from the parts of MassTransit that have proven useful—its messaging vocabulary, envelope conventions, consumer model, and operational semantics—and develops them in a direction suited to this project:
 
-- first-class C# and Java implementations with matching behavior
+- first-class C# and Java implementations with matching behavior, plus an experimental idiomatic Kotlin projection
 - generated consumer registration and direct invocation in both ecosystems
 - a smaller portable core with explicit transport capabilities and delivery guarantees
 - wire interoperability that supports coexistence rather than requiring an all-at-once migration
@@ -25,9 +25,9 @@ This path is a good fit when the integration uses the documented fundamentals: s
 
 The currently verified MassTransit peer is pinned to version 8.5.1. That pin is an interoperability test boundary, not a licensing recommendation or a promise of compatibility with every MassTransit release.
 
-### Start a New C# and/or Java System
+### Start a New C#, Java, and/or Kotlin System
 
-A greenfield system can choose MyServiceBus from the beginning and use the same concepts across both platforms. A team can select C# or Java per service without creating two unrelated messaging architectures, while each client remains idiomatic to its language.
+A greenfield system can choose MyServiceBus from the beginning and use the same concepts across .NET and the JVM. A team can select C# or Java per service without creating two unrelated messaging architectures. Kotlin services can select the experimental coroutine-native frontend while sharing Java's underlying JVM runtime and transports.
 
 This path is strongest when the system needs a deliberately small service-bus model: typed contracts, consumers, send and publish intent, requests, retries, faults, testing, telemetry, and an explicit transport boundary. The application still owns service boundaries, idempotency, business recovery, security, and broker operations.
 

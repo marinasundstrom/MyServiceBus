@@ -19,11 +19,16 @@ export const apiRows = [
 
 # What can I use today, and what could change in the future?
 
-<p className="docs-summary">Start with the developer capability, then compare the C# and Java entry points, the alignment choice, the evidence behind it, and the remaining compatibility risk. Similar means recognizable contract and behavior—not an unversioned promise of source or database compatibility.</p>
+<p className="docs-summary">Start with the developer capability, then compare the stable C# and Java reference entry points, the alignment choice, the evidence behind it, and the remaining compatibility risk. Kotlin is a separate experimental projection over the same JVM behavior. Similar means recognizable contract and behavior—not an unversioned promise of source or database compatibility.</p>
 
 <div className="callout callout-accent">
   <strong>Everything is still pre-1.0</strong>
   <p>Verified preview means the capability exists in both clients and has focused automated evidence. MVP preview is usable for evaluation but has named production gates left. Experimental means the design or operational contract can still change materially. None of these labels means a long-term stable API yet.</p>
+</div>
+
+<div className="callout callout-accent">
+  <strong>Kotlin is a sibling projection, not Java syntax with helpers</strong>
+  <p>Kotlin applications select <code>myservicebus-kotlin</code> for suspending consumers, endpoints, requests, and mediator operations; receiver DSLs; reified types; Kotlin durations; and sealed results. The Java and Kotlin frontends have their own endpoint and context contracts while sharing the JVM transport, topology, serialization, retry, settlement, and wire implementation. The Kotlin source API remains experimental for this preview; the Java projection is the stable JVM reference. See the <Link href="/docs/kotlin">Kotlin guide</Link> for the current surface and Ktor integration.</p>
 </div>
 
 <div className="callout">
@@ -72,7 +77,7 @@ For the exact wire boundary, transport versions, and exclusions, use the{' '} <L
 
 ## Equivalent experience does not mean identical syntax
 
-C# deliberately keeps the MassTransit-familiar shape where it helps existing teams. Java expresses the equivalent responsibility through Java naming, futures, class tokens, explicit lifecycle, and composition idioms. Generated registration exists in both ecosystems, but its compiler mechanics belong in the{' '} <Link href="/docs/native-aot">AOT and generation guide</Link>, not in this adoption table.
+C# deliberately keeps the MassTransit-familiar shape where it helps existing teams. Java expresses the equivalent responsibility through Java naming, futures, class tokens, explicit lifecycle, and composition idioms. Kotlin projects that responsibility into coroutines, reified types, and Kotlin-owned contexts without changing the shared JVM behavior. Generated registration exists in both stable ecosystems, but its compiler mechanics belong in the{' '} <Link href="/docs/native-aot">AOT and generation guide</Link>, not in this adoption table.
 
 <div className="next-card">
   <div><span>Next</span><strong>Inspect the verified wire boundary</strong></div>

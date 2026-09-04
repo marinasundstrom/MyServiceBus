@@ -89,7 +89,9 @@ For C#, the public API should remain recognizably MassTransit-like where that im
 
 This is not a source-compatibility promise. Applications are not expected to replace a package reference and compile unchanged.
 
-For Java and future languages, concept familiarity is the target. APIs should preserve the same behavior while following the host language's conventions for builders, dependency injection, concurrency, cancellation, and errors.
+For the JVM, concept familiarity is the target and language projections are allowed to differ. The Java projection is the stable reference surface. The experimental Kotlin projection expresses the same concepts with suspending functions, reified generics, receiver DSLs, Kotlin durations, and sealed results instead of inheriting Java futures and overload shapes. Both projections use the same JVM runtime, transport implementations, topology, settlement, and wire contracts.
+
+Applications choose a frontend projection per integration boundary. Kotlin applications may call the Java API explicitly when an ecosystem integration requires it, but Java types are not the default contract of the Kotlin projection.
 
 ### Level 5: Cross-Language Parity
 
@@ -115,8 +117,8 @@ The target consists of:
 1. **Level 1 wire compatibility** between MyServiceBus C#, MyServiceBus Java, and supported MassTransit versions.
 2. **Level 2 semantic compatibility** for the portable core: send, publish, consume, request/response, correlation, retry, faults, skipped messages, and error handling.
 3. **Level 3 RabbitMQ and Azure Service Bus transport-profile interoperability** in both directions between MyServiceBus and MassTransit.
-4. **Level 4 API familiarity** for C# and concept familiarity with idiomatic APIs for Java.
-5. **Level 5 C#↔Java parity** for the portable core and both broker profiles.
+4. **Level 4 API familiarity** for C#, idiomatic APIs for the stable Java projection, and an experimental idiomatic Kotlin projection over the same JVM behavior.
+5. **Level 5 C#↔Java parity** for the portable core and both broker profiles, with Kotlin projection tests proving that Kotlin reaches that JVM behavior without inheriting the Java frontend contracts.
 
 This verified RabbitMQ baseline establishes the rule for every broker-backed
 transport that MyServiceBus promotes to supported status. Its C# and Java

@@ -14,6 +14,11 @@ export const sameModel = {
             new OrderSubmitted(context.getMessage().orderId()));
     }
 }`,
+  kotlin: `class SubmitOrderConsumer : Consumer<SubmitOrder> {
+    override suspend fun consume(context: ConsumeContext<SubmitOrder>) {
+        context.publish(OrderSubmitted(context.message.orderId))
+    }
+}`,
 };
 
 export const chooseTransport = {
@@ -50,6 +55,20 @@ export const chooseTransport = {
                 bus.configureEndpoints(context);
             });
 });`,
+  kotlin: `services.addServiceBus {
+    consumer<SubmitOrderConsumer>()
+
+    if (environment.isDevelopment())
+        transport<RabbitMqFactoryConfigurator> { context ->
+            host("localhost")
+            configureEndpoints(context)
+        }
+    else
+        transport<AzureServiceBusFactoryConfigurator> { context ->
+            host(connectionString)
+            configureEndpoints(context)
+        }
+}`,
 };
 
 <p className="docs-kicker">Why MyServiceBus?</p>
@@ -59,7 +78,7 @@ export const chooseTransport = {
 <p className="docs-summary">Evaluate MyServiceBus against the system you need to operate: language mix, messaging scope, broker requirements, support model, and tolerance for a pre-1.0 dependency.</p>
 
 <div className="docs-feature-grid">
-  <div><span>GOOD FIT</span><h3>Cross-language alignment</h3><p>You need C# and Java services to share message intent, envelopes, requests, retries, and failure semantics.</p></div>
+  <div><span>GOOD FIT</span><h3>Cross-language alignment</h3><p>You need C#, Java, or Kotlin services to share message intent, envelopes, requests, retries, and failure semantics.</p></div>
   <div><span>GOOD FIT</span><h3>Local mediator dispatch</h3><p>You want generated commands, queries, notifications, and handlers without adopting a broker.</p></div>
   <div><span>REVIEW</span><h3>Preview adoption</h3><p>You can evaluate and pin a pre-1.0 dependency while APIs, operational evidence, and production gates continue to mature.</p></div>
   <div><span>ALTERNATIVE</span><h3>Mature .NET platform</h3><p>Choose MassTransit when its broader feature set, established operations, and commercial support are requirements.</p></div>
@@ -67,7 +86,7 @@ export const chooseTransport = {
 
 <div className="callout callout-accent">
   <strong>Design target</strong>
-  <p>C# and Java code remains idiomatic while contracts, consumers, commands, events, requests, retries, and faults retain corresponding meaning. The goal is shared behavior, not identical source code.</p>
+  <p>C# and Java are stable reference projections, while experimental Kotlin support provides a coroutine-native sibling over the Java platform runtime. Contracts, consumers, commands, events, requests, retries, and faults retain corresponding meaning. The goal is shared behavior, not identical source code.</p>
 </div>
 
 <div className="callout">
@@ -107,10 +126,10 @@ For an API-by-API adoption view, including readiness and likely pre-1.0 change, 
 
 <h2 id="shared-vocabulary">Carry the same vocabulary between ecosystems</h2>
 
-MyServiceBus deliberately preserves MassTransit&apos;s most useful structural and behavioral ideas. Developers can move between .NET and Java services without relearning what publish, send, consume, request, retry, or fault means. The APIs remain idiomatic to each language, but the responsibilities, message flow, and failure model stay recognizable. Existing MassTransit knowledge therefore accelerates adoption, but it supports the main cross-platform goal rather than replacing it.
+MyServiceBus deliberately preserves MassTransit&apos;s most useful structural and behavioral ideas. Developers can move between .NET, Java, and Kotlin services without relearning what publish, send, consume, request, retry, or fault means. The APIs remain idiomatic to each language, but the responsibilities, message flow, and failure model stay recognizable. Existing MassTransit knowledge therefore accelerates adoption, but it supports the main cross-platform goal rather than replacing it.
 
 <div className="flow-line" aria-label="Knowledge transfer across messaging platforms">
-  <span>MassTransit knowledge</span><b>→</b><span>Shared messaging concepts</span><b>→</b><span>MyServiceBus for C# · Java</span>
+  <span>MassTransit knowledge</span><b>→</b><span>Shared messaging concepts</span><b>→</b><span>MyServiceBus for C# · Java · Kotlin</span>
 </div>
 
 Compatibility is intentional where it supports familiarity and wire-level interoperability. Complete source compatibility and feature parity are not the goal; advanced features may be absent, and each platform keeps its natural dependency-injection, type-system, and asynchronous programming style.
@@ -137,7 +156,7 @@ The in-memory mediator and testing harness provide a fast place to exercise the 
 
 <h2 id="direct-api">What direct broker APIs leave to the application</h2>
 
-A native client is deliberately close to its broker. That is ideal when you need maximum control, but a production application must then choose and keep conventions for serialization, message identity, type naming, topology, acknowledgement, retries, dead-lettering, request correlation, dependency injection, tracing, and tests. Those choices multiply when .NET and Java services must interoperate.
+A native client is deliberately close to its broker. That is ideal when you need maximum control, but a production application must then choose and keep conventions for serialization, message identity, type naming, topology, acknowledgement, retries, dead-lettering, request correlation, dependency injection, tracing, and tests. Those choices multiply when .NET and JVM services must interoperate.
 
 <div className="concept-comparison">
   <section><span className="tag">BROKER SDK</span><h2>Delivery primitives</h2><p>Channels or clients, native messages, entity declarations, settlement, and every broker-specific feature.</p><strong>Your responsibility:</strong><p>Build and govern the application-level messaging conventions.</p></section>
@@ -147,7 +166,7 @@ A native client is deliberately close to its broker. That is ideal when you need
 <h2 id="what-you-get">Capability snapshot</h2>
 
 <div className="docs-feature-grid">
-  <div><span>01</span><h3>One mental model</h3><p>Send commands, publish events, consume messages, and request responses through aligned C# and Java concepts.</p></div>
+  <div><span>01</span><h3>One mental model</h3><p>Send commands, publish events, consume messages, and request responses through aligned C#, Java, and Kotlin concepts.</p></div>
   <div><span>02</span><h3>Portable wire contracts</h3><p>Use shared envelopes, message type URNs, identifiers, headers, and MassTransit-aware conventions across languages.</p></div>
   <div><span>03</span><h3>Managed failure paths</h3><p>Configure retry pipelines and use consistent fault, error, and skipped-message destinations.</p></div>
   <div><span>04</span><h3>Low-ceremony setup</h3><p>Register consumers, choose a transport, configure endpoints, and let the hosted bus manage their lifecycle.</p></div>
@@ -178,19 +197,19 @@ A basic application defines a message contract, implements a typed consumer, reg
   </section>
 </div>
 
-The <Link href="/docs/java-adoption">Java adoption guide</Link> shows concrete Spring, Jakarta CDI, Dagger, and application-owned factory integrations.
+The <Link href="/docs/java-adoption">Java adoption guide</Link> shows concrete Spring, Jakarta CDI, Dagger, and application-owned factory integrations. Kotlin applications can instead select the <Link href="/docs/kotlin">experimental Kotlin projection</Link>, including its Ktor integration pattern.
 
-Use the in-memory mediator for deliberately local flows and fast tests, or run RabbitMQ locally for a realistic broker-backed development loop. The same consumer model can then move into the deployed environment. The <Link href="/docs/getting-started">getting-started guide</Link> walks through the complete first flow in both C# and Java.
+Use the in-memory mediator for deliberately local flows and fast tests, or run RabbitMQ locally for a realistic broker-backed development loop. The same consumer model can then move into the deployed environment. The <Link href="/docs/getting-started">getting-started guide</Link> walks through the complete first flow in C#, Java, and Kotlin.
 
-<h2 id="cross-language">How C# and Java align</h2>
+<h2 id="cross-language">How C#, Java, and Kotlin align</h2>
 
-The APIs are idiomatic rather than textually identical. A consumer has the same responsibilities and wire behavior in both languages, while each client follows its platform&apos;s dependency-injection and asynchronous programming style.
+The APIs are idiomatic rather than textually identical. A consumer has the same responsibilities and wire behavior in every projection, while each frontend follows its language&apos;s dependency-injection and asynchronous programming style. Kotlin shares the JVM runtime with Java but owns its application-facing coroutine contracts.
 
-<LanguageTabs csharp={sameModel.csharp} java={sameModel.java} />
+<LanguageTabs csharp={sameModel.csharp} java={sameModel.java} kotlin={sameModel.kotlin} />
 
 <h2 id="community">Project scope and ownership</h2>
 
-MyServiceBus starts from MassTransit&apos;s messaging vocabulary, envelope conventions, consumer model, and operational semantics. Development then concentrates on C# and Java parity, generated registration and dispatch, explicit compatibility and delivery evidence, and a smaller portable core.
+MyServiceBus starts from MassTransit&apos;s messaging vocabulary, envelope conventions, consumer model, and operational semantics. Development then concentrates on stable C# and Java parity, an experimental Kotlin projection, generated registration and dispatch, explicit compatibility and delivery evidence, and a smaller portable core.
 
 It is intentionally not a feature-for-feature reimplementation of MassTransit. “Improve upon” means advancing those owned boundaries, not claiming universal superiority. MassTransit remains the more mature and capable choice for many .NET systems. MyServiceBus commits to keeping its core runtime permissively open source while it evolves through production evidence and community contributions.
 
@@ -202,7 +221,7 @@ The transport is selected at the application boundary. A team can run RabbitMQ l
   <span>Development</span><b>→</b><span>RabbitMQ</span><b>· same application model ·</b><span>Azure Service Bus</span><b>←</b><span>Azure</span>
 </div>
 
-<LanguageTabs csharp={chooseTransport.csharp} java={chooseTransport.java} />
+<LanguageTabs csharp={chooseTransport.csharp} java={chooseTransport.java} kotlin={chooseTransport.kotlin} />
 
 RabbitMQ is the verified default profile, and Azure Service Bus is available as a verified preview with documented limitations. Each transport package owns its native connection and topology projection. Broker-specific settings—such as RabbitMQ queue arguments or Azure topology ownership—remain on the relevant configurator instead of leaking into message handlers.
 
@@ -231,7 +250,7 @@ RabbitMQ is the verified default profile, and Azure Service Bus is available as 
 
 <h2 id="decision">A practical decision test</h2>
 
-If you need to add Java to a MassTransit-based .NET estate—or want to start a C# and Java system on one focused model—MyServiceBus may be worth evaluating. Its permissive license can fit an earlier-stage or deliberately smaller system, provided the preview maturity, support, and feature boundaries are acceptable. Choose MassTransit when its mature .NET ecosystem, broader features, and commercial support matter. If the problem is only one native queue with unusual broker requirements, start with the broker API and add abstraction only when the application-level conventions become real.
+If you need to add a Java service to a MassTransit-based .NET estate—or want to evaluate experimental Kotlin support over the same JVM runtime—MyServiceBus may be worth evaluating. Its permissive license can fit an earlier-stage or deliberately smaller system, provided the preview maturity, support, and feature boundaries are acceptable. Choose MassTransit when its mature .NET ecosystem, broader features, and commercial support matter. If the problem is only one native queue with unusual broker requirements, start with the broker API and add abstraction only when the application-level conventions become real.
 
 <div className="next-card">
   <div><span>Next</span><strong>Decide whether messaging fits the system</strong></div>
