@@ -23,6 +23,8 @@ import com.myservicebus.serialization.NServiceBusJsonSerializerFactory;
 import com.myservicebus.serialization.RawJsonSerializerFactory;
 import com.myservicebus.serialization.SerializerFactory;
 import com.myservicebus.topology.TopologyRegistry;
+import com.myservicebus.topology.ConsumerDefinitionModel;
+import com.myservicebus.topology.ConsumerRegistration;
 import com.myservicebus.orchestration.SagaStateMachine;
 import com.myservicebus.orchestration.SagaRepository;
 import com.myservicebus.orchestration.SagaRepositoryCapabilities;
@@ -167,9 +169,23 @@ public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigura
 
     @Override
     public <T> void addConsumer(Class<T> consumerClass) {
+        addConsumer(consumerClass, new ConsumerDefinition<>());
+    }
+
+    @Override
+    public <T> ConsumerDefinitionModel addConsumer(Class<T> consumerClass, ConsumerDefinition<T> definition) {
+        if (consumerClass == null) {
+            throw new IllegalArgumentException("consumerClass must not be null");
+        }
+        if (definition == null) {
+            throw new IllegalArgumentException("definition must not be null");
+        }
         if (consumerTypes.contains(consumerClass)) {
             logger.debug("Consumer '{}' already registered, skipping", consumerClass.getSimpleName());
-            return;
+            return topology.getConsumerDefinitions().stream()
+                    .filter(existing -> existing.consumerType().equals(consumerClass))
+                    .findFirst()
+                    .orElseThrow(() -> new IllegalStateException("Registered consumer definition is missing."));
         }
 
         serviceCollection.addScoped(consumerClass);
@@ -177,27 +193,62 @@ public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigura
         String attributeEndpointName = annotation != null && !annotation.value().isBlank()
                 ? annotation.value()
                 : null;
-        String endpointName = attributeEndpointName != null
+        String endpointName = definition.getEndpointName() != null
+                ? definition.getEndpointName()
+                : attributeEndpointName != null
                 ? attributeEndpointName
                 : DefaultEndpointNameFormatter.INSTANCE.format(consumerClass);
 
+        java.util.List<Class<?>> messageTypes = new java.util.ArrayList<>();
         for (Type iface : consumerClass.getGenericInterfaces()) {
             if (iface instanceof ParameterizedType pt) {
                 Type raw = pt.getRawType();
                 if (raw instanceof Class<?> rawClass && com.myservicebus.Consumer.class.isAssignableFrom(rawClass)) {
                     Type actualType = pt.getActualTypeArguments()[0];
                     Class<?> messageType = getClassFromType(actualType);
-                    topology.registerConsumer(consumerClass,
-                            endpointName,
-                            attributeEndpointName != null,
-                            consumerClass,
-                            null,
-                            messageType);
+                    messageTypes.add(messageType);
                 }
             }
         }
 
+        if (messageTypes.isEmpty()) {
+            throw new IllegalArgumentException(
+                    "Consumer type must implement at least one Consumer<TMessage> interface."
+                            + " Use addConsumerMethods for consumer functions.");
+        }
+
+        ConsumerDefinitionModel model = topology.registerConsumerDefinition(consumerClass,
+                endpointName,
+                definition.getEndpointName() != null || attributeEndpointName != null,
+                consumerClass,
+                null,
+                definition,
+                messageTypes.toArray(Class<?>[]::new));
+
         consumerTypes.add(consumerClass);
+        return model;
+    }
+
+    @Override
+    public ConsumerDefinitionModel addConsumerRegistration(ConsumerRegistration<?> registration) {
+        if (registration == null) {
+            throw new IllegalArgumentException("registration must not be null");
+        }
+        Class<?> consumerType = registration.definition().consumerType();
+        boolean alreadyRegistered = topology.getConsumers().stream()
+                .filter(existing -> existing.getConsumerType().equals(consumerType))
+                .flatMap(existing -> existing.getBindings().stream())
+                .anyMatch(binding -> binding.getMessageType().equals(registration.messageType()));
+        if (alreadyRegistered) {
+            logger.debug(
+                    "Consumer '{}' is already registered for '{}', skipping",
+                    consumerType.getSimpleName(),
+                    registration.messageType().getSimpleName());
+            return registration.definition();
+        }
+
+        topology.registerConsumer(registration);
+        return registration.definition();
     }
 
     @Override

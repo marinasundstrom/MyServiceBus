@@ -1,0 +1,22 @@
+plugins {
+    id 'org.jetbrains.kotlin.jvm'
+    id 'application'
+}
+
+group = 'com.myservicebus.kotlin.sample'
+
+dependencies {
+    implementation project(':myservicebus-kotlin')
+    implementation project(':myservicebus-rabbitmq')
+    implementation "com.fasterxml.jackson.module:jackson-module-kotlin:${jacksonVersion}"
+    runtimeOnly "org.slf4j:slf4j-simple:${slf4jVersion}"
+    testImplementation "org.jetbrains.kotlin:kotlin-test-junit5:2.2.20"
+}
+
+kotlin {
+    jvmToolchain(17)
+}
+
+application {
+    mainClass = 'com.myservicebus.sample.kotlin.MainKt'
+}

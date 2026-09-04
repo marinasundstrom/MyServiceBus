@@ -1,6 +1,10 @@
 
+plugins {
+    id 'org.jetbrains.kotlin.jvm' version '2.2.20' apply false
+}
+
 group = 'io.github.marinasundstrom.myservicebus'
-version = '0.1.0-preview.9'
+version = '0.1.0-preview.10'
 
 def publishedProjectDescriptions = [
     'myservicebus-abstractions': 'Portable messaging contracts and abstractions for MyServiceBus.',
@@ -8,6 +12,7 @@ def publishedProjectDescriptions = [
     'myservicebus-logging'      : 'Logging abstractions and adapters for MyServiceBus.',
     'myservicebus-tasks'        : 'Asynchronous task abstractions for MyServiceBus.',
     'myservicebus'              : 'Idiomatic Java messaging runtime with MassTransit-compatible concepts and wire conventions.',
+    'myservicebus-kotlin'       : 'Experimental idiomatic Kotlin projection for the shared MyServiceBus JVM runtime.',
     'myservicebus-serialization-bson': 'Optional MassTransit-compatible BSON envelope serialization for MyServiceBus.',
     'myservicebus-postgresql'    : 'PostgreSQL transactional outbox and inbox persistence for MyServiceBus.',
     'myservicebus-processor'    : 'Optional Java annotation processor for generated MyServiceBus consumer catalogs.',
@@ -20,6 +25,7 @@ def publishedProjectDescriptions = [
 ]
 
 ext {
+    kotlinCoroutinesVersion = '1.11.0'
     lombokVersion = '1.18.34'
     jacksonVersion = '2.17.2'
     bson4jacksonVersion = '2.15.1'
@@ -36,6 +42,7 @@ ext {
     javalinVersion = '6.7.0'
     opentelemetryVersion = '1.43.0'
     testcontainersVersion = '2.0.5'
+    ktorVersion = '3.5.2'
     postgresqlJdbcVersion = '42.7.13'
 }
 

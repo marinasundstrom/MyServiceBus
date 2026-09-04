@@ -126,7 +126,7 @@ The repository currently has these relevant characteristics:
 - The abstractions and core runtime packages publish an experimental `net11.0` asset alongside `net10.0`. A .NET 11 NativeAOT smoke rebuilds those projects with `runtime-async=on` and verifies generated mediator dispatch for both an interface consumer and a C# named-union method consumer.
 - Java publishes Java 17-compatible APIs and bytecode. The build uses a Java 17 toolchain even when Gradle itself runs on a newer JDK.
 - C# exposes `Response<T>` and `Response<T1, T2>`. Multiple results are inspected with `Is(out Response<T>)`.
-- Java returns `T` for one expected response, exposes `Response2<T1, T2>` for the request client, and also contains unused or not-yet-integrated `Response3` through `Response8` wrappers. These wrappers repeat the same object-and-runtime-type implementation.
+- Java returns `T` for one expected response and exposes a sealed `Response2<T1, T2>` with nominal record cases and `match`. It also contains unused or not-yet-integrated `Response3` through `Response8` wrappers that retain the older object-and-runtime-type implementation.
 - Multiple-response selection is ordered in the transports: the first declared response type whose message identity matches wins.
 - Raven lowers an ad-hoc type union such as `Message1 | Message2` to the standard `System.Union<Message1, Message2>` carrier supplied by Raven.Core. That carrier is a struct marked with `System.Runtime.CompilerServices.UnionAttribute`, implements `IUnion`, and exposes a constructor and `TryGetValue(out T)` for each variant.
 
@@ -168,11 +168,11 @@ The result contract should guarantee:
 
 Tests must include `T1 == T2`, a `T2` assignable to `T1`, shared interfaces, null constructor arguments, and a declared fault alternative. If identical or overlapping alternatives are intentionally unsupported, reject them when the request is created with a clear exception instead of allowing order-dependent inspection.
 
-The recommended portable rule is to reject identical or assignable response alternatives. C# unions distinguish cases by payload type, so two overlapping payload types cannot provide reliable, order-independent transparent matching. Java's nominal `First` and `Second` cases could preserve the distinction, but accepting it only in Java would create a behavioral mismatch. Rejection also makes the existing first-match transport behavior explicit instead of surprising.
+Case-aware results can retain identical or assignable response alternatives once the transport has selected a branch. Java's nominal records and Kotlin's projected sealed result preserve that identity today; the .NET 11 union asset carries its own discriminator. Request matching remains ordered when a single incoming message advertises more than one declared contract.
 
 ### Implement on the current baselines
 
-Add an explicit discriminator to multiple-response wrappers and use it for exhaustive `Match`/`match` operations on C#/.NET 10 and Java 17. Keep `Is`/`as` temporarily for compatibility, but move new examples toward the case-preserving operations.
+Java 17 uses a sealed `Response2` with nominal record cases and `match`, while Kotlin projects it to a covariant sealed `RequestResult` with exhaustive `when`. Keep Java `as` temporarily for compatibility. C# retains its preview `Is` surface on .NET 10 and relies on the .NET 11 custom-union semantics for the release-facing exhaustive API rather than adding a temporary `Match` method.
 
 Both clients must select branches from the stored case identity rather than repeating runtime assignability checks. This work supplies the portable fallback before .NET 11 union syntax is available and does not require a newer Java baseline.
 
@@ -182,7 +182,7 @@ Do not extend public request-client overloads to three through eight alternative
 
 Keep the implementation in the existing MyServiceBus C# response classes. A `net11.0` asset can add `UnionAttribute`, `IUnion`, variant construction members, `Value`, `HasValue`, and typed `TryGetValue` members while retaining the existing factories and inspection APIs.
 
-This enables transparent exhaustive matching from C# and ordinary `match` from Raven without introducing a Raven-specific response wrapper or changing the wire protocol. Continue to expose baseline-neutral `Match` on `net10.0` and Java 17.
+This enables transparent exhaustive matching from C# and ordinary `match` from Raven without introducing a Raven-specific response wrapper or changing the wire protocol. Java and Kotlin use their own sealed projections on the Java 17 baseline.
 
 The direct-constructor and typed-access shape is continuously compiled with .NET SDK `11.0.100-preview.7`. Staged C# and Raven package consumers verify the public package ABI, while a generated C# input-union consumer runs under NativeAOT. Allocation, overlapping-case, nullability, response-union NativeAOT, broker, and broader API-compatibility proofs remain required, and all preview evidence must be repeated against the release SDK.
 
@@ -192,7 +192,7 @@ The normative ABI shape and validation plan are maintained in the [Union-Typed C
 
 Java has no transparent union over unrelated types. The idiomatic closed representation is a sealed interface with nominal record cases. Sealed types are available on Java 17, but exhaustive pattern matching with record patterns is stable from Java 21.
 
-An illustrative Java 21 shape is:
+The Java 17 projection now uses this shape, with a `match` operation so callers do not need Java 21 pattern switches:
 
 ```java
 public sealed interface Response2<T1, T2>
@@ -201,11 +201,11 @@ public sealed interface Response2<T1, T2>
     record First<T1, T2>(T1 message) implements Response2<T1, T2> {}
     record Second<T1, T2>(T2 message) implements Response2<T1, T2> {}
 
-    static <T1, T2> Response2<T1, T2> first(T1 message) {
+    static <T1, T2> Response2<T1, T2> fromT1(T1 message) {
         return new First<>(message);
     }
 
-    static <T1, T2> Response2<T1, T2> second(T2 message) {
+    static <T1, T2> Response2<T1, T2> fromT2(T2 message) {
         return new Second<>(message);
     }
 }
@@ -221,17 +221,9 @@ String text = switch (response) {
 };
 ```
 
-This shape was compiled locally using `javac --release 21`. It retains the alternative identity even if case payload types overlap.
+This shape retains the alternative identity even if case payload types overlap. The preview deliberately accepted the binary and source break from the former concrete class so Java receives a native Java 17 representation before the API stabilizes. `match` remains the portable Java 17 consumption surface; Java 21 callers may additionally use an exhaustive pattern switch.
 
-Changing today's concrete `Response2` class into an interface is a binary and source break. Options are:
-
-1. Make the change only at a declared breaking release.
-2. Introduce a newly named sealed result type and deprecate `Response2`.
-3. Keep `Response2` as a compatibility facade and expose `match` permanently, foregoing switch syntax on the old type.
-
-Option 3 is the lowest-risk default. Do not raise the Java baseline solely for response switch syntax; combine it with the broader runtime and ecosystem case for the baseline move.
-
-Do not use a multi-release JAR to publish two incompatible public `Response2` shapes. Multi-release JARs are appropriate for runtime-specific implementations behind a stable public API, not for changing a class into an interface or making compile-time language features appear conditionally. Keep `match` as the stable Java 17 surface, introduce a new type if an additive path is acceptable, or reserve the sealed hierarchy for a breaking baseline release.
+Do not use a multi-release JAR to publish two incompatible public `Response2` shapes. Multi-release JARs are appropriate for runtime-specific implementations behind a stable public API, not for changing a class into an interface or making compile-time language features appear conditionally. Any migration from a previously published concrete-class shape must therefore happen at a declared breaking version boundary.
 
 ## Features available on current baselines
 

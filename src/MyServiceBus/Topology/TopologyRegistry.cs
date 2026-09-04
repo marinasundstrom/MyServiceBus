@@ -12,11 +12,13 @@ public class TopologyRegistry : IBusTopology
 {
     public List<MessageTopology> Messages { get; } = new();
     public List<ConsumerTopology> Consumers { get; } = new();
+    private readonly List<ConsumerDefinitionModel> consumerDefinitions = new();
     private readonly List<ReceiveEndpointDefinition> _receiveEndpoints = new();
     private readonly List<ChoreographyFragment> choreographies = new();
     private readonly List<SagaStateMachineTopology> sagaStateMachines = new();
 
     public IReadOnlyList<ReceiveEndpointDefinition> ReceiveEndpoints => _receiveEndpoints;
+    public IReadOnlyList<ConsumerDefinitionModel> ConsumerDefinitions => consumerDefinitions.AsReadOnly();
     public IReadOnlyList<ChoreographyFragment> Choreographies => choreographies;
     public IReadOnlyList<SagaStateMachineTopology> SagaStateMachines => sagaStateMachines;
 
@@ -83,23 +85,35 @@ public class TopologyRegistry : IBusTopology
             configurePipe,
             endpointNameIsExplicit: false,
             endpointNameFormatterType: typeof(TConsumer),
-            messageTypes);
+            definition: null,
+            messageTypes: messageTypes);
 
-    internal void RegisterConsumerWithEndpointMetadata<TConsumer>(
+    internal ConsumerDefinitionModel RegisterConsumerWithEndpointMetadata<TConsumer>(
         string queueName,
         Delegate? configurePipe,
         bool endpointNameIsExplicit,
         Type? endpointNameFormatterType,
+        IConsumerDefinition? definition = null,
         params Type[] messageTypes)
     {
-        RegisterConsumer(
+        var model = CreateConsumerDefinition(
             typeof(TConsumer),
             queueName,
-            configurePipe,
-            ReflectionConsumerRegistrationDescriptorFactory.Create(typeof(TConsumer), messageTypes.First()),
             endpointNameIsExplicit,
             endpointNameFormatterType,
-            messageTypes: messageTypes);
+            definition,
+            messageTypes);
+
+        foreach (var messageType in model.MessageTypes)
+        {
+            MaterializeConsumer(
+                model,
+                configurePipe,
+                ReflectionConsumerRegistrationDescriptorFactory.Create(typeof(TConsumer), messageType),
+                [messageType]);
+        }
+
+        return model;
     }
 
     public void RegisterConsumer<TConsumer, TMessage>(
@@ -117,7 +131,7 @@ public class TopologyRegistry : IBusTopology
             endpointNameFormatterType ?? typeof(TConsumer));
     }
 
-    internal void RegisterConsumerWithEndpointMetadata<TConsumer, TMessage>(
+    internal ConsumerDefinitionModel RegisterConsumerWithEndpointMetadata<TConsumer, TMessage>(
         string queueName,
         Action<PipeConfigurator<ConsumeContext<TMessage>>>? configurePipe,
         bool endpointNameIsExplicit,
@@ -125,13 +139,14 @@ public class TopologyRegistry : IBusTopology
         where TConsumer : class, IConsumer<TMessage>
         where TMessage : class
     {
-        RegisterConsumer(
+        return RegisterConsumer(
             typeof(TConsumer),
             queueName,
             configurePipe,
             new ConsumerRegistrationDescriptor<TConsumer, TMessage>(),
             endpointNameIsExplicit,
             endpointNameFormatterType,
+            definition: null,
             typeof(TMessage));
     }
 
@@ -146,19 +161,59 @@ public class TopologyRegistry : IBusTopology
             ReflectionConsumerMethodRegistrationDescriptorFactory.Create(definition),
             endpointNameIsExplicit: endpointName is not null || definition.EndpointNameIsExplicit,
             endpointNameFormatterType: endpointName is not null ? null : definition.EndpointNameFormatterType,
+            definition: null,
             messageTypes: [definition.MessageType]);
     }
 
-    private void RegisterConsumer(
+    private ConsumerDefinitionModel RegisterConsumer(
         Type consumerType,
         string queueName,
         Delegate? configurePipe,
         IConsumerRegistrationDescriptor? registration,
         bool endpointNameIsExplicit,
         Type? endpointNameFormatterType,
+        IConsumerDefinition? definition,
         params Type[] messageTypes)
     {
-        EnsureReceiveEndpoint(queueName);
+        var model = CreateConsumerDefinition(
+            consumerType,
+            queueName,
+            endpointNameIsExplicit,
+            endpointNameFormatterType,
+            definition,
+            messageTypes);
+        MaterializeConsumer(model, configurePipe, registration, model.MessageTypes);
+        return model;
+    }
+
+    private ConsumerDefinitionModel CreateConsumerDefinition(
+        Type consumerType,
+        string queueName,
+        bool endpointNameIsExplicit,
+        Type? endpointNameFormatterType,
+        IConsumerDefinition? definition,
+        IEnumerable<Type> messageTypes)
+    {
+        var model = new ConsumerDefinitionModel(
+            consumerType,
+            new EndpointDefinitionModel(
+                queueName,
+                endpointNameIsExplicit,
+                endpointNameFormatterType,
+                definition?.Endpoint.ConcurrentMessageLimit,
+                definition?.Endpoint.PrefetchCount),
+            messageTypes);
+        consumerDefinitions.Add(model);
+        return model;
+    }
+
+    private void MaterializeConsumer(
+        ConsumerDefinitionModel model,
+        Delegate? configurePipe,
+        IConsumerRegistrationDescriptor? registration,
+        IEnumerable<Type> messageTypes)
+    {
+        EnsureReceiveEndpoint(model.EndpointName);
         var bindings = messageTypes.Select(mt =>
         {
             var msg = Messages.FirstOrDefault(m => m.MessageType == mt) ?? RegisterMessage(mt);
@@ -167,13 +222,16 @@ public class TopologyRegistry : IBusTopology
 
         Consumers.Add(new ConsumerTopology
         {
-            ConsumerType = consumerType,
-            QueueName = queueName,
-            EndpointNameIsExplicit = endpointNameIsExplicit,
-            EndpointNameFormatterType = endpointNameFormatterType,
+            Definition = model,
+            ConsumerType = model.ConsumerType,
+            QueueName = model.EndpointName,
+            EndpointNameIsExplicit = model.EndpointNameIsExplicit,
+            EndpointNameFormatterType = model.EndpointNameFormatterType,
             Bindings = bindings,
             ConfigurePipe = configurePipe,
-            Registration = registration
+            Registration = registration,
+            ConcurrentMessageLimit = model.ConcurrentMessageLimit,
+            PrefetchCount = model.PrefetchCount
         });
     }
 

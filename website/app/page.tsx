@@ -10,6 +10,8 @@ const examples = {
   csharp: {
     label: 'C#',
     install: 'dotnet add package Sundstrom.MyServiceBus.RabbitMq',
+    installLanguage: 'shell',
+    guide: '/docs/getting-started',
     code: `builder.Services.AddServiceBus(x =>
 {
     x.AddConsumer<SubmitOrderConsumer>();
@@ -22,7 +24,9 @@ await bus.Publish(new SubmitOrder(Guid.NewGuid()));`,
   java: {
     label: 'Java',
     install:
-      "implementation 'io.github.marinasundstrom.myservicebus:myservicebus-rabbitmq:0.1.0-preview.9'",
+      "implementation 'io.github.marinasundstrom.myservicebus:myservicebus-rabbitmq:0.1.0-preview.10'",
+    installLanguage: 'groovy',
+    guide: '/docs/getting-started',
     code: `ServiceCollection services = ServiceCollection.create();
 
 services.from(MessageBusServices.class)
@@ -36,6 +40,29 @@ services.from(MessageBusServices.class)
 MessageBus bus = services.buildServiceProvider()
     .getRequiredService(MessageBus.class);
 bus.publish(new SubmitOrder(UUID.randomUUID()));`,
+  },
+  kotlin: {
+    label: 'Kotlin',
+    install: `implementation("io.github.marinasundstrom.myservicebus:myservicebus-kotlin:0.1.0-preview.10")
+implementation("io.github.marinasundstrom.myservicebus:myservicebus-rabbitmq:0.1.0-preview.10")`,
+    installLanguage: 'kotlin',
+    guide: '/docs/kotlin',
+    code: `val services = ServiceCollection.create()
+
+services.addServiceBus {
+    consumer<SubmitOrderConsumer>()
+    transport<RabbitMqFactoryConfigurator> { context ->
+        configureEndpoints(context)
+    }
+}
+
+val bus = services.buildServiceProvider()
+    .getRequiredService<MessageBus>()
+bus.start()
+
+runBlocking {
+    bus.publish(SubmitOrder(UUID.randomUUID()))
+}`,
   },
 };
 
@@ -66,11 +93,11 @@ export default function Home() {
       <main id="top">
         <section className="hero">
           <div className="hero-copy">
-            <p className="eyebrow">Asynchronous messaging for .NET and Java</p>
+            <p className="eyebrow">Asynchronous messaging for .NET and the JVM</p>
             <h1>One messaging model for distributed services.</h1>
             <p className="lede">
               Model commands, events, requests, and consumers consistently across
-              C# and Java. RabbitMQ is the verified broker baseline; Azure Service
+              C#, Java, and Kotlin. RabbitMQ is the verified broker baseline; Azure Service
               Bus and Amazon SQS/SNS are preview transports. A local mediator covers
               deliberately in-process dispatch without requiring a broker.
             </p>
@@ -109,9 +136,9 @@ export default function Home() {
               </div>
               <CodeViewer
                 code={example.install}
-                height={72}
+                height={language === 'kotlin' ? 92 : 72}
                 label={`${example.label} install command`}
-                language={language === 'csharp' ? 'shell' : 'groovy'}
+                language={example.installLanguage}
                 showLanguageLabel={false}
               />
               <CodeViewer
@@ -121,7 +148,7 @@ export default function Home() {
                 language={language}
                 showLanguageLabel={false}
               />
-              <Link className="continue-link" href="/docs/getting-started">
+              <Link className="continue-link" href={example.guide}>
                 Continue the {example.label} guide <span aria-hidden="true">→</span>
               </Link>
             </div>
@@ -147,7 +174,7 @@ export default function Home() {
             <article>
               <span className="concept-number">03</span>
               <h3>Start cross-platform</h3>
-              <p>Choose C# or Java per service while keeping one permissively licensed messaging core.</p>
+              <p>Choose C#, Java, or Kotlin per service while keeping one permissively licensed messaging core.</p>
             </article>
           </div>
         </section>
@@ -184,7 +211,7 @@ export default function Home() {
           </div>
           <div className="explore-grid">
             <Link href="/docs/why-myservicebus"><span>Decision guide</span><h3>Evaluate the fit</h3><p>Compare use cases, preview maturity, support expectations, alternatives, and adoption risk.</p><b>Review the trade-offs →</b></Link>
-            <Link href="/docs/getting-started"><span>4 steps</span><h3>Getting started</h3><p>Install, configure, consume, and publish in C# or Java.</p><b>Open guide →</b></Link>
+            <Link href="/docs/getting-started"><span>4 steps</span><h3>Getting started</h3><p>Install, configure, consume, and publish in C#, Java, or Kotlin.</p><b>Open guide →</b></Link>
             <Link href="/docs/concepts"><span>Core model</span><h3>Messaging concepts</h3><p>Choose between publish, send, consume, and request.</p><b>Learn concepts →</b></Link>
             <Link href="/docs/rabbitmq"><span>Transport</span><h3>RabbitMQ</h3><p>Understand recovery, failure queues, topology, and tuning.</p><b>Configure transport →</b></Link>
             <Link href="/docs/azure-service-bus"><span>Preview transport</span><h3>Azure Service Bus</h3><p>Provision Azure, configure either client, and understand the verified interoperability boundary.</p><b>Configure the transport →</b></Link>

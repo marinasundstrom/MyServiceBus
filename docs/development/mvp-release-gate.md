@@ -2,9 +2,9 @@
 
 ## Release outcome
 
-This gate records the foundation that later previews continue to protect. The C# and Java clients provide the ordinary RabbitMQ application path documented in the [MVP API Surface](mvp-api-surface.md) and make only the scoped compatibility claims in the [Compatibility Policy](../compatibility.md).
+This gate records the foundation that later previews continue to protect. The C# and Java clients provide the stable ordinary RabbitMQ application path documented in the [MVP API Surface](mvp-api-surface.md) and make only the scoped compatibility claims in the [Compatibility Policy](../compatibility.md). Kotlin selects a separate, experimental projection over the same JVM runtime and release evidence.
 
-Preview releases after the foundation MVP also contain explicitly versioned inspection, monitoring, Azure Service Bus, mediator, scheduling, and PostgreSQL outbox surfaces. Their readiness is reported separately in the [API and Readiness Matrix](../api-readiness.md), [Enterprise Production Readiness](../enterprise-readiness.md), and feature-specific documentation. Including them in the same package line does not promote every surface to production-ready status.
+Preview releases after the foundation MVP also contain explicitly versioned inspection, monitoring, Azure Service Bus, mediator, scheduling, and PostgreSQL outbox surfaces. Their readiness is reported in [Enterprise Production Readiness](../enterprise-readiness.md), the [website Platform Parity matrix](../../website/content/platform-parity.mdx), and feature-specific documentation. Including them in the same package line does not promote every surface to production-ready status.
 
 ## Completed product gates
 
@@ -16,9 +16,9 @@ Preview releases after the foundation MVP also contain explicitly versioned insp
 - The profile-neutral receive-endpoint topology is the supported transport extension API; legacy overloads are deprecated adapters.
 - The resolved .NET dependency graph has no known NuGet advisories, and CI rejects advisory-bearing restores.
 - All intended preview NuGet and Maven artifacts build locally with required identity, licensing, repository, source, symbol, and Javadoc metadata; CI validates the exact artifact sets.
-- Clean external-style C# and Java smoke projects restore, compile, and run against only the staged NuGet and Maven publications.
-- The supported .NET, Java, RabbitMQ, MassTransit, and client-library baselines and the preview servicing window are explicit and checked against CI configuration.
-- The public quick starts, walkthrough, two-service sample, Aspire workflow, Java helper script, and local documentation links have been audited from clean source state; preview inspection endpoints are labeled as unstable.
+- Clean external-style C#, Java, and Kotlin smoke projects restore, compile, and run against only the staged NuGet and Maven publications.
+- The supported .NET, Java, experimental Kotlin, RabbitMQ, MassTransit, and client-library baselines and the preview servicing window are explicit and checked against CI configuration.
+- The public quick starts, walkthrough, Kotlin and Ktor samples, two-service sample, Aspire workflow, Java helper script, and local documentation links have been audited from clean source state; preview inspection endpoints are labeled as unstable.
 
 ## Per-preview release gate
 
@@ -28,4 +28,4 @@ Preview releases after the foundation MVP also contain explicitly versioned insp
 
 Each preview can be tagged when the release-candidate gate is complete and the candidate commit passes CI. A failure in an experimental addon blocks the coordinated preview when that addon is one of its published artifacts, but its successful build does not upgrade the addon's documented readiness.
 
-The current release work follows the [Enterprise Production Readiness](../enterprise-readiness.md) plan. Preview `0.1.0-preview.9` adds cross-language choreography declarations, native saga state machines with PostgreSQL persistence and transactional outbox integration, workflow and message projections in monitoring, request/response inspection, configurable capture and disclosure policies, a denser live Dashboard, and an experimental Raven saga macro. These additions retain their documented experimental boundaries and do not expand the foundation MVP's production-readiness claim.
+The current release work follows the [Enterprise Production Readiness](../enterprise-readiness.md) plan. Preview `0.1.0-preview.10` adds the cross-platform definition layer and experimental Kotlin projection, alongside cross-language choreography declarations, native saga state machines with PostgreSQL persistence and transactional outbox integration, workflow and message projections in monitoring, request/response inspection, configurable capture and disclosure policies, a denser live Dashboard, and an experimental Raven saga macro. These additions retain their documented experimental boundaries and do not expand the foundation MVP's production-readiness claim.

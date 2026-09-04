@@ -2,7 +2,7 @@
 
 ## Product Direction
 
-MyServiceBus is intended for enterprises that run business-critical, broker-backed messaging across .NET and Java services. The goal is not to reproduce every feature of a large enterprise service bus. The goal is to provide a focused runtime whose supported capabilities have explicit guarantees, operational evidence, secure deployment guidance, and a predictable lifecycle.
+MyServiceBus is intended for enterprises that run business-critical, broker-backed messaging across .NET and JVM services. C# and Java are the stable reference projections for the current preview; Kotlin is an experimental sibling projection over the same JVM runtime. The goal is not to reproduce every feature of a large enterprise service bus. The goal is to provide a focused runtime whose supported capabilities have explicit guarantees, operational evidence, secure deployment guidance, and a predictable lifecycle.
 
 Enterprise readiness is a release standard, not a feature count. A capability is production-ready only when its behavior is specified, implemented in both reference clients where portable behavior is involved, exercised under failure, observable in operation, and covered by upgrade and support guidance.
 
@@ -13,6 +13,7 @@ The repository has a strong interoperability and conformance foundation, but the
 | Area | Current evidence | Readiness | Required next step |
 | --- | --- | --- | --- |
 | Cross-language contracts | Versioned protocol and topology fixtures; C# and Java parity rules | Strong foundation | Add mixed-version rolling-upgrade tests for every supported release pair |
+| JVM language projections | Stable Java reference API; separately packaged Kotlin coroutine API; shared runtime and staged-consumer tests | Kotlin experimental | Continue Kotlin API iteration without changing Java contracts or duplicating transport behavior |
 | Broker interoperability | Bidirectional C#/Java/MassTransit matrices for RabbitMQ and Azure Service Bus within pinned versions | Strong foundation | Define the stable support matrix and repeat it for each release candidate |
 | Delivery failures | Retries, faults, `_error` and `_skipped` destinations, lock renewal, and explicit Azure at-least-once boundary | Partial | Document every acknowledgement and crash window; add failure-injection coverage |
 | Transactional consistency | Matching PostgreSQL Bus Outbox capture, delivery composition, health, recovery evidence, and cross-platform Aspire showcase | MVP preview | Complete process-level O01–O06 promotion, Consumer Outbox middleware, and cleanup |

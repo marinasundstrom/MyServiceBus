@@ -171,6 +171,35 @@ public class RabbitMqFactoryConfiguratorTests
         Assert.Equal("custom-exchange", def.Bindings[0].EntityName);
     }
 
+    [Fact]
+    public void ReceiveEndpoint_preserves_definition_policy_unless_explicitly_overridden()
+    {
+        var registry = new TopologyRegistry();
+        registry.RegisterConsumer<MyConsumer>("original-queue", null, typeof(MyMessage));
+        registry.Consumers.Single().ConcurrentMessageLimit = 7;
+        registry.Consumers.Single().PrefetchCount = 11;
+
+        var services = new ServiceCollection();
+        services.AddSingleton(registry);
+        services.AddSingleton<IMessageBus, TestMessageBus>();
+        var provider = services.BuildServiceProvider();
+        var context = new TestBusRegistrationContext(provider);
+        var configurator = new TestRabbitMqFactoryConfigurator();
+
+        configurator.ReceiveEndpoint("defined-queue", endpoint => endpoint.ConfigureConsumer<MyConsumer>(context));
+        Assert.Equal(7, registry.Consumers.Single().ConcurrentMessageLimit);
+        Assert.Equal((ushort)11, registry.Consumers.Single().PrefetchCount);
+
+        configurator.ReceiveEndpoint("explicit-queue", endpoint =>
+        {
+            endpoint.ConcurrentMessageLimit(3);
+            endpoint.PrefetchCount(4);
+            endpoint.ConfigureConsumer<MyConsumer>(context);
+        });
+        Assert.Equal(3, registry.Consumers.Single().ConcurrentMessageLimit);
+        Assert.Equal((ushort)4, registry.Consumers.Single().PrefetchCount);
+    }
+
     class StaticEntityFormatter<T> : IMessageEntityNameFormatter<T>
     {
         public string FormatEntityName() => $"formatted-{typeof(T).Name.ToLowerInvariant()}";

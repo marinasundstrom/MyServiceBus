@@ -5,6 +5,7 @@ namespace MyServiceBus.Topology;
 
 public class ConsumerTopology
 {
+    public ConsumerDefinitionModel Definition { get; set; } = null!;
     public Type ConsumerType { get; set; }
     public string QueueName { get; set; }
     public bool EndpointNameIsExplicit { get; set; }

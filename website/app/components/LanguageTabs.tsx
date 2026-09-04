@@ -6,49 +6,60 @@ import CodeViewer from './CodeViewer';
 type LanguageTabsProps = {
   csharp: string;
   java: string;
+  kotlin?: string;
   csharpLabel?: string;
   javaLabel?: string;
+  kotlinLabel?: string;
   csharpLanguage?: string;
   javaLanguage?: string;
+  kotlinLanguage?: string;
 };
+
+type Language = 'csharp' | 'java' | 'kotlin';
 
 export default function LanguageTabs({
   csharp,
   java,
+  kotlin,
   csharpLabel = 'C#',
   javaLabel = 'Java',
+  kotlinLabel = 'Kotlin',
   csharpLanguage = 'csharp',
   javaLanguage = 'java',
+  kotlinLanguage = 'kotlin',
 }: LanguageTabsProps) {
-  const [language, setLanguage] = useState<'csharp' | 'java'>('csharp');
-  const code = language === 'csharp' ? csharp : java;
-  const editorLanguage = language === 'csharp' ? csharpLanguage : javaLanguage;
+  const [language, setLanguage] = useState<Language>('csharp');
+  const options = [
+    { id: 'csharp' as const, code: csharp, label: csharpLabel, editorLanguage: csharpLanguage },
+    { id: 'java' as const, code: java, label: javaLabel, editorLanguage: javaLanguage },
+    ...(kotlin
+      ? [{ id: 'kotlin' as const, code: kotlin, label: kotlinLabel, editorLanguage: kotlinLanguage }]
+      : []),
+  ];
+  const selected = options.find((option) => option.id === language) ?? options[0];
 
   return (
     <div className="docs-code-block">
       <div className="docs-code-toolbar">
         <div className="language-toggle" aria-label="Code language">
-          <button
-            className={language === 'csharp' ? 'active' : ''}
-            onClick={() => setLanguage('csharp')}
-            type="button"
-          >
-            {csharpLabel}
-          </button>
-          <button
-            className={language === 'java' ? 'active' : ''}
-            onClick={() => setLanguage('java')}
-            type="button"
-          >
-            {javaLabel}
-          </button>
+          {options.map((option) => (
+            <button
+              aria-pressed={language === option.id}
+              className={language === option.id ? 'active' : ''}
+              key={option.id}
+              onClick={() => setLanguage(option.id)}
+              type="button"
+            >
+              {option.label}
+            </button>
+          ))}
         </div>
-        <span>{language === 'csharp' ? 'C#' : 'JAVA'}</span>
+        <span>{selected.label.toUpperCase()}</span>
       </div>
       <CodeViewer
-        code={code}
-        label={`${language === 'csharp' ? csharpLabel : javaLabel} example`}
-        language={editorLanguage}
+        code={selected.code}
+        label={`${selected.label} example`}
+        language={selected.editorLanguage}
         showLanguageLabel={false}
       />
     </div>

@@ -3,7 +3,7 @@ package com.myservicebus.mediator;
 import com.myservicebus.BusRegistrationConfigurator;
 import com.myservicebus.BusRegistrationConfiguratorImpl;
 import com.myservicebus.EntityNameFormatter;
-import com.myservicebus.HandlerWithResult;
+import com.myservicebus.ResultHandler;
 import com.myservicebus.MediatorHandlerCardinalityException;
 import com.myservicebus.MediatorHandlerNotFoundException;
 import com.myservicebus.MediatorResponseTypeException;
@@ -16,8 +16,11 @@ import com.myservicebus.topology.ConsumerTopology;
 import com.myservicebus.topology.TopologyRegistry;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
+import java.lang.reflect.TypeVariable;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
@@ -156,26 +159,76 @@ public class MediatorBus implements Mediator {
 
     private static List<Class<?>> findResultTypes(Class<?> handlerType) {
         List<Class<?>> resultTypes = new ArrayList<>();
-        collectResultTypes(handlerType, resultTypes);
+        collectResultTypes(handlerType, Map.of(), resultTypes);
         return resultTypes;
     }
 
-    private static void collectResultTypes(Class<?> type, List<Class<?>> resultTypes) {
+    private static void collectResultTypes(
+            Type type,
+            Map<TypeVariable<?>, Type> bindings,
+            List<Class<?>> resultTypes) {
         if (type == null || type == Object.class) {
             return;
         }
-        for (Type contract : type.getGenericInterfaces()) {
-            if (contract instanceof ParameterizedType parameterized
-                    && parameterized.getRawType() == HandlerWithResult.class) {
-                Type resultType = parameterized.getActualTypeArguments()[1];
-                if (resultType instanceof Class<?> resultClass) {
-                    resultTypes.add(resultClass);
+
+        if (type instanceof ParameterizedType parameterized) {
+            if (!(parameterized.getRawType() instanceof Class<?> rawType)) {
+                return;
+            }
+
+            Type[] arguments = parameterized.getActualTypeArguments();
+            TypeVariable<?>[] parameters = rawType.getTypeParameters();
+            Map<TypeVariable<?>, Type> nestedBindings = new HashMap<>(bindings);
+            for (int i = 0; i < parameters.length; i++) {
+                nestedBindings.put(parameters[i], resolveType(arguments[i], bindings));
+            }
+
+            if (rawType == ResultHandler.class) {
+                Class<?> resultType = classFromType(resolveType(arguments[1], bindings));
+                if (resultType != null) {
+                    resultTypes.add(resultType);
                 }
             }
-            if (contract instanceof Class<?> contractClass) {
-                collectResultTypes(contractClass, resultTypes);
-            }
+
+            collectResultContracts(rawType, nestedBindings, resultTypes);
+            return;
         }
-        collectResultTypes(type.getSuperclass(), resultTypes);
+
+        if (type instanceof Class<?> typeClass) {
+            collectResultContracts(typeClass, bindings, resultTypes);
+        }
+    }
+
+    private static void collectResultContracts(
+            Class<?> type,
+            Map<TypeVariable<?>, Type> bindings,
+            List<Class<?>> resultTypes) {
+        for (Type contract : type.getGenericInterfaces()) {
+            collectResultTypes(contract, bindings, resultTypes);
+        }
+        collectResultTypes(type.getGenericSuperclass(), bindings, resultTypes);
+    }
+
+    private static Type resolveType(Type type, Map<TypeVariable<?>, Type> bindings) {
+        Type resolved = type;
+        while (resolved instanceof TypeVariable<?> variable && bindings.containsKey(variable)) {
+            Type next = bindings.get(variable);
+            if (next == resolved) {
+                break;
+            }
+            resolved = next;
+        }
+        return resolved;
+    }
+
+    private static Class<?> classFromType(Type type) {
+        if (type instanceof Class<?> typeClass) {
+            return typeClass;
+        }
+        if (type instanceof ParameterizedType parameterized
+                && parameterized.getRawType() instanceof Class<?> rawType) {
+            return rawType;
+        }
+        return null;
     }
 }

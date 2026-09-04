@@ -18,13 +18,20 @@ public class SubmitOrderConsumer implements Consumer<SubmitOrder> {
         return CompletableFuture.completedFuture(null);
     }
 }`,
+  kotlin: `data class SubmitOrder(val orderId: UUID)
+
+class SubmitOrderConsumer : Consumer<SubmitOrder> {
+    override suspend fun consume(context: ConsumeContext<SubmitOrder>) {
+        println("Order \${context.message.orderId}")
+    }
+}`,
 };
 
 <p className="docs-kicker">Introduction</p>
 
 # MyServiceBus at a glance.
 
-<p className="docs-summary">MyServiceBus is a pre-1.0 asynchronous messaging runtime with aligned C# and Java APIs. It provides RabbitMQ-backed messaging, preview Azure Service Bus and Amazon SQS/SNS transports, and an in-process mediator built around MassTransit-familiar concepts.</p>
+<p className="docs-summary">MyServiceBus is a pre-1.0 asynchronous messaging runtime with aligned C# and Java APIs and an experimental native Kotlin projection. It provides RabbitMQ-backed messaging, preview Azure Service Bus and Amazon SQS/SNS transports, and an in-process mediator built around MassTransit-familiar concepts.</p>
 
 <div className="callout callout-accent">
   <strong>Current scope</strong>
@@ -34,7 +41,7 @@ public class SubmitOrderConsumer implements Consumer<SubmitOrder> {
 <h2 id="why">Decision snapshot</h2>
 
 <div className="docs-feature-grid">
-  <div><span>01</span><h3>Primary fit</h3><p>C# and Java services that need corresponding message contracts, consumer semantics, and failure behavior.</p></div>
+  <div><span>01</span><h3>Primary fit</h3><p>C#, Java, and Kotlin services that need corresponding message contracts, consumer semantics, and failure behavior.</p></div>
   <div><span>02</span><h3>Broker baseline</h3><p>RabbitMQ is the most established profile; Azure Service Bus and Amazon SQS/SNS retain preview boundaries.</p></div>
   <div><span>03</span><h3>Local dispatch</h3><p>The mediator supports commands, queries, notifications, handlers, and generated dispatch without a broker.</p></div>
   <div><span>04</span><h3>Compatibility</h3><p>MassTransit interoperability is pinned to named versions, transports, and tested message flows.</p></div>
@@ -46,7 +53,12 @@ public class SubmitOrderConsumer implements Consumer<SubmitOrder> {
 
 The APIs do not try to look identical. They preserve the same behavior while following each platform’s conventions for dependency injection, asynchronous work, and type systems.
 
-<LanguageTabs csharp={helloWorld.csharp} java={helloWorld.java} />
+<LanguageTabs csharp={helloWorld.csharp} java={helloWorld.java} kotlin={helloWorld.kotlin} />
+
+<div className="callout callout-accent">
+  <strong>Following the Kotlin experiment?</strong>
+  <p>The <Link href="/docs/kotlin">dedicated Kotlin guide</Link> tracks the coroutine-native facade, its shared JVM boundary, and the MVP gate before announcement.</p>
+</div>
 
 <div className="callout">
   <strong>Adding MyServiceBus to an existing Java application?</strong>

@@ -6,6 +6,10 @@ import java.util.List;
 public interface BusTopology {
     List<MessageTopology> getMessages();
     List<ConsumerTopology> getConsumers();
+
+    default List<ConsumerDefinitionModel> getConsumerDefinitions() {
+        return List.of();
+    }
     List<ReceiveEndpointDefinition> getReceiveEndpoints();
     List<ChoreographyFragment> getChoreographies();
     default List<SagaStateMachineTopology> getSagaStateMachines() {

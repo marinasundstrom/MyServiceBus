@@ -2,7 +2,7 @@
 
 ## MVP baseline
 
-MyServiceBus `0.1.0-preview.9` is built and tested against the following baseline:
+MyServiceBus `0.1.0-preview.10` is built and tested against the following baseline:
 
 The baseline distinguishes language/API compatibility from the build and runtime used to verify a release. C# packages target `net10.0`, which selects the ordinary supported .NET reference assemblies and BCL surface. The abstractions and core runtime packages additionally contain experimental `net11.0` assets for union semantics; this preview target is not the general transport-package baseline. Java publishes Java 17-compatible bytecode and APIs; the implementation should use modern Java 17 language features and JDK types where useful without requiring a newer bytecode level. Running on a newer JDK is an expected compatibility path, not the same as moving the published Java target.
 
@@ -10,6 +10,7 @@ The baseline distinguishes language/API compatibility from the build and runtime
 | --- | --- | --- | --- |
 | .NET | .NET 10; experimental .NET 11 core assets | .NET SDK `10.0.100`, with latest-patch roll-forward; .NET 11 Preview 7 union and Runtime Async gates | All C# packages target `net10.0`. The abstractions and core runtime packages also contain experimental `net11.0` assets. |
 | Java | Java 17 or newer | Temurin Java 17 | Published bytecode and APIs target Java 17. Newer Java releases are expected to work but are not release-gating environments. |
+| Kotlin | Kotlin 2.2, experimental projection | Kotlin `2.2.20` and kotlinx.coroutines `1.11.0` on Temurin Java 17 | The Kotlin facade and samples target the shared Java 17-compatible runtime. Its source API may evolve between previews. |
 | Gradle | Gradle 9.0 | Gradle `9.0.0` | Build and Maven publication tooling; not an application runtime dependency. |
 | PostgreSQL | PostgreSQL 17 | Docker image `postgres:17.6-alpine` | Transactional outbox/inbox persistence baseline. The provider is not production-promoted until the remaining integration and O01–O06 gates pass. |
 | .NET PostgreSQL client | Npgsql 10.0 | `10.0.3` | Implementation and public transaction boundary of the C# PostgreSQL provider. |
@@ -36,7 +37,7 @@ has been tested.
 
 Before `1.0`, only the newest published MyServiceBus preview is actively supported. A new preview replaces the previous preview's support window. Fixes are delivered in a newer preview; the project does not promise servicing releases for older previews.
 
-The runtime lines above remain the baseline for the lifetime of `0.1.0-preview.9`. Security and servicing patches within .NET 10 and Java 17 are supported and recommended. Changing the target framework, Java bytecode level, RabbitMQ minor line, or MassTransit interoperability peer requires an explicit update to this document and a passing release gate.
+The runtime lines above remain the baseline for the lifetime of `0.1.0-preview.10`. Security and servicing patches within .NET 10 and Java 17 are supported and recommended. Changing the target framework, Java bytecode level, RabbitMQ minor line, or MassTransit interoperability peer requires an explicit update to this document and a passing release gate.
 
 ## Compatibility boundaries
 

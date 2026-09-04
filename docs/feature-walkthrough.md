@@ -3,7 +3,7 @@
 This guide compares basic usage of MyServiceBus in C# and Java. It is split into basics and advanced sections so newcomers can focus on fundamental messaging patterns before exploring configuration and other features.
 
 For an explanation of why the C# and Java examples differ, see the [design decisions](development/design-decisions.md).  
-For Java build and run instructions, including JDK 17 setup and how to run the test app, see [`src/Java/README.md`](../src/Java/README.md).
+For Java build and run instructions, including JDK 17 setup and how to run the test app, see [`src/Java/README.md`](../src/Java/README.md). Kotlin uses the same JVM runtime through a native projection; see the [Kotlin guide](kotlin/how-to-use.md), [executable introduction](../src/Kotlin/sample), and [Ktor server sample](../src/Kotlin/ktor-sample).
 
 ## Contents
 
@@ -66,6 +66,36 @@ await app.StartAsync();
 
 var bus = app.Services.GetRequiredService<IMessageBus>();
 ```
+
+Consumer-specific policy can be kept with the consumer in a reusable definition
+instead of being repeated in transport configuration:
+
+```csharp
+public sealed class SubmitOrderConsumerDefinition
+    : ConsumerDefinition<SubmitOrderConsumer>
+{
+    public SubmitOrderConsumerDefinition()
+    {
+        EndpointName = "submit-order";
+        ConcurrentMessageLimit = 8;
+    }
+}
+
+x.AddConsumer<SubmitOrderConsumer>(new SubmitOrderConsumerDefinition());
+```
+
+For local configuration, the same definition model is available inline:
+
+```csharp
+x.AddConsumer<SubmitOrderConsumer>(definition =>
+{
+    definition.EndpointName = "submit-order";
+    definition.ConcurrentMessageLimit = 8;
+});
+```
+
+An explicitly configured receive endpoint overrides the definition; otherwise
+the definition overrides transport defaults.
 
 For .NET NativeAOT and trimmed applications, reference the `Sundstrom.MyServiceBus.Generators` analyzer and replace reflection-based assembly scanning with the generated catalog:
 
@@ -178,6 +208,21 @@ dependencies {
 ```java
 GeneratedConsumerCatalog.INSTANCE.register(cfg);
 ```
+
+Java uses the same definition semantics with its native fluent shape:
+
+```java
+cfg.addConsumer(SubmitOrderConsumer.class, definition -> definition
+        .endpointName("submit-order")
+        .concurrentMessageLimit(8));
+```
+
+Reusable Java definitions can extend `ConsumerDefinition<TConsumer>` and be
+passed to the same registration overload. Definitions are retained separately
+from realized topology so future Java and Kotlin projections can share policy
+without sharing source-level API shapes. See
+[Consumer definitions](development/consumer-definitions.md) for the current
+boundary and planned additions.
 
 See [NativeAOT](development/native-aot.md) for the current support boundary.
 
@@ -321,7 +366,7 @@ services.from(MessageBusServices.class)
 
 ServiceProvider serviceProvider = services.buildServiceProvider();
 MessageBus bus = serviceProvider.getService(MessageBus.class);
-bus.start().join();
+bus.start();
 ```
 
 `addServiceBus` activates consumers using `ScopeConsumerFactory`, so they can resolve dependencies from the `ServiceProvider`.
@@ -357,6 +402,62 @@ public final class OrderConsumers {
 ```
 
 Use `cfg.addConsumerMethods(OrderConsumers.class)` for reflection discovery, or add `myservicebus-processor` to the build's `annotationProcessor` configuration and register `GeneratedConsumerCatalog.INSTANCE`. The processor is JSR 269 tooling and does not lock the application to Spring, Quarkus, Micronaut, or another framework.
+
+#### Kotlin
+
+Kotlin uses native projection types and extension functions over the same service collection and
+runtime rather than emulating extension methods with a decorator call:
+
+```kotlin
+val services = ServiceCollection.create()
+
+services.addServiceBus {
+    consumer<SubmitOrderConsumer>()
+    transport<RabbitMqFactoryConfigurator> { context ->
+        host("localhost")
+        configureEndpoints(context)
+    }
+}
+
+val provider = services.buildServiceProvider()
+val bus = provider.getRequiredService<MessageBus>()
+bus.start()
+```
+
+Kotlin consumers can suspend directly while retaining the shared scoped
+consumer pipeline and delivery semantics:
+
+```kotlin
+class SubmitOrderConsumer : Consumer<SubmitOrder> {
+    override suspend fun consume(context: ConsumeContext<SubmitOrder>) {
+        context.publish(OrderSubmitted(context.message.orderId))
+    }
+}
+
+runBlocking {
+    bus.publish(SubmitOrder(UUID.randomUUID()))
+}
+```
+
+MyServiceBus waits for the coroutine before acknowledging delivery. Failures
+continue through retry and fault handling, while cancellation flows in both
+directions between Kotlin coroutines and the JVM runtime. Kotlin owns this
+`Consumer` and `ConsumeContext` surface, so its suspending methods keep familiar
+messaging names without colliding with Java future-returning members. The same
+projection owns `MessageBus`, `Mediator`, and scoped publish/send endpoint
+contracts, so ordinary Kotlin application code uses `publish`, `send`, and
+`request` throughout.
+
+The Ktor sample exercises that projection as a server integration rather than
+as an isolated language demo. Its generic application plugin builds and owns
+the shared service provider from concise `services` and `bus` blocks, then
+starts and drains the bus with Ktor's lifecycle using Kotlin `Duration`, exposes
+readiness to health routes, and provides scoped services to suspending routes.
+Routes get direct suspending `publish`, `send`, and `request` operations, with
+an explicit scoped block only for less common services. A broker-backed test
+verifies publish, directed send, request/response, and consumer completion
+through RabbitMQ. The adapter remains in the sample until this framework-facing
+shape is mature enough to publish.
 
 #### Azure Service Bus preview
 
@@ -691,25 +792,46 @@ OrderStatus response = client.getResponse(new CheckOrderStatus(UUID.randomUUID()
 System.out.println(response.getStatus());
 ```
 
-The C# client provides the analogous `IRequestClientFactory` for creating `IRequestClient<T>` instances when you need to specify a destination address or default timeout.
+#### Kotlin
 
-If the consumer responds with a `Fault<CheckOrderStatus>` but the client only requests `OrderStatus`, `GetResponseAsync` throws `RequestFaultException`. Include `Fault<CheckOrderStatus>` as a second response type to observe fault details.
+```kotlin
+class CheckOrderStatusHandler : Handler<CheckOrderStatus, OrderStatus> {
+    override suspend fun handle(context: ConsumeContext<CheckOrderStatus>): OrderStatus =
+        OrderStatus(context.message.orderId, "Pending")
+}
+
+val mediator = services.createMediator {
+    handler<CheckOrderStatusHandler>()
+}
+
+val response: OrderStatus = mediator.request(CheckOrderStatus(UUID.randomUUID()))
+println(response.status)
+```
+
+`Handler` is a Kotlin-owned contract. Its normalized definition and invocation
+adapter enter the shared scoped JVM pipeline, deliver
+the returned value through the request's response address, and preserves its
+correlation metadata.
+
+The C# client provides the analogous `IRequestClientFactory` for creating `IRequestClient<T>` instances when you need to specify a destination address or default timeout. Kotlin can use the JVM `RequestClientFactory` and call the suspending `client.request(...)` projection for broker-backed requests.
+
+If the consumer faults while the client waits for `OrderStatus`, the request completes with `RequestFaultException`. A client can also declare a second business response, such as `OrderNotFound`.
 
 #### Handling Multiple Response Types
 
-Clients can await more than one possible response (e.g., success or fault). Inspect the typed result to branch accordingly and surface rich fault details when something fails.
+Clients can await more than one possible business response. Each language projection preserves which declared case arrived, even when the response types overlap.
 
 ##### C#
 
 ```csharp
 var client = serviceProvider.GetRequiredService<IRequestClient<CheckOrderStatus>>();
-Response<OrderStatus, Fault<CheckOrderStatus>> response =
-    await client.GetResponseAsync<OrderStatus, Fault<CheckOrderStatus>>(new CheckOrderStatus { OrderId = Guid.NewGuid() });
+Response<OrderStatus, OrderNotFound> response =
+    await client.GetResponseAsync<OrderStatus, OrderNotFound>(new CheckOrderStatus { OrderId = Guid.NewGuid() });
 
 if (response.Is(out Response<OrderStatus> status))
     Console.WriteLine(status.Message.Status);
-else if (response.Is(out Response<Fault<CheckOrderStatus>> fault))
-    Console.WriteLine(fault.Message.Exceptions[0].Message);
+else if (response.Is(out Response<OrderNotFound> notFound))
+    Console.WriteLine(notFound.Message.OrderId);
 ```
 
 ##### Java
@@ -717,14 +839,28 @@ else if (response.Is(out Response<Fault<CheckOrderStatus>> fault))
 ```java
 RequestClientFactory factory = serviceProvider.getService(RequestClientFactory.class);
 RequestClient<CheckOrderStatus> client = factory.create(CheckOrderStatus.class);
-Response2<OrderStatus, Fault<?>> response =
+Response2<OrderStatus, OrderNotFound> response =
     client.getResponse(new CheckOrderStatus(UUID.randomUUID()),
-        OrderStatus.class, Fault.class).join();
+        OrderStatus.class, OrderNotFound.class).join();
 
-response.as(OrderStatus.class)
-    .ifPresent(r -> System.out.println(r.getMessage().getStatus()));
-response.as(Fault.class)
-    .ifPresent(r -> System.out.println(r.getMessage().getExceptions().get(0).getMessage()));
+String description = response.match(
+    status -> "Status: " + status.getStatus(),
+    notFound -> "Not found: " + notFound.getOrderId());
+System.out.println(description);
+```
+
+##### Kotlin
+
+```kotlin
+val factory = scopedProvider.getRequiredService<RequestClientFactory>()
+val client = factory.create<CheckOrderStatus>()
+val response: RequestResult<OrderStatus, OrderNotFound> =
+    client.requestOneOf(CheckOrderStatus(UUID.randomUUID()))
+
+when (response) {
+    is RequestResult.First -> println("Status: ${response.message.status}")
+    is RequestResult.Second -> println("Not found: ${response.message.orderId}")
+}
 ```
 
 ---

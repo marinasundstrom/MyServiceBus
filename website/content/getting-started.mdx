@@ -10,9 +10,18 @@ export const startRabbitMq = `docker run --rm --detach \\
 
 export const install = {
   csharp: `dotnet add package Sundstrom.MyServiceBus.RabbitMq \\
-  --version 0.1.0-preview.9`,
+  --version 0.1.0-preview.10`,
   java: `dependencies {
-    implementation 'io.github.marinasundstrom.myservicebus:myservicebus-rabbitmq:0.1.0-preview.9'
+    implementation 'io.github.marinasundstrom.myservicebus:myservicebus-rabbitmq:0.1.0-preview.10'
+}`,
+  kotlin: `plugins {
+    kotlin("jvm") version "2.2.20"
+}
+
+dependencies {
+    implementation("io.github.marinasundstrom.myservicebus:myservicebus-kotlin:0.1.0-preview.10")
+    implementation("io.github.marinasundstrom.myservicebus:myservicebus-rabbitmq:0.1.0-preview.10")
+    implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.17.2")
 }`,
 };
 
@@ -47,6 +56,19 @@ services.from(MessageBusServices.class)
 ServiceProvider provider = services.buildServiceProvider();
 MessageBus bus = provider.getRequiredService(MessageBus.class);
 bus.start();`,
+  kotlin: `val services = ServiceCollection.create()
+
+services.addServiceBus {
+    consumer<SubmitOrderConsumer>()
+    transport<RabbitMqFactoryConfigurator> { context ->
+        host("localhost")
+        configureEndpoints(context)
+    }
+}
+
+val provider = services.buildServiceProvider()
+val bus = provider.getRequiredService<MessageBus>()
+bus.start()`,
 };
 
 export const messages = {
@@ -67,19 +89,30 @@ public class SubmitOrderConsumer implements Consumer<SubmitOrder> {
             new OrderSubmitted(context.getMessage().orderId()));
     }
 }`,
+  kotlin: `data class SubmitOrder(val orderId: UUID)
+data class OrderSubmitted(val orderId: UUID)
+
+class SubmitOrderConsumer : Consumer<SubmitOrder> {
+    override suspend fun consume(context: ConsumeContext<SubmitOrder>) {
+        context.publish(OrderSubmitted(context.message.orderId))
+    }
+}`,
 };
 
 export const publish = {
   csharp: `var bus = app.Services.GetRequiredService<IMessageBus>();
 await bus.Publish(new SubmitOrder(Guid.NewGuid()));`,
   java: `bus.publish(new SubmitOrder(UUID.randomUUID())).join();`,
+  kotlin: `runBlocking {
+    bus.publish(SubmitOrder(UUID.randomUUID()))
+}`,
 };
 
 <p className="docs-kicker">Getting started</p>
 
 # Publish your first message.
 
-<p className="docs-summary">In five short steps, start RabbitMQ, register a consumer, and publish an event. Choose your language at each step.</p>
+<p className="docs-summary">In five short steps, start RabbitMQ, register a consumer, and publish an event. Choose C#, Java, or Kotlin at each step.</p>
 
 <div className="callout">
   <strong>A concrete transport for the first run</strong>
@@ -87,8 +120,8 @@ await bus.Publish(new SubmitOrder(Guid.NewGuid()));`,
 </div>
 
 <div className="callout callout-accent">
-  <strong>Two Java adoption paths</strong>
-  <p>This quick start uses the recommended MyServiceBus-first decorator style for a new Java project. It lets <code>ServiceCollection.from(...)</code> structure a MyServiceBus-managed service graph in a form similar to the C# setup. When adding MyServiceBus to an existing Spring, CDI, Dagger, Guice, or application-owned environment, use the bus factory as the default integration boundary instead. See the{' '} <Link href="/docs/java-adoption">Spring, CDI, Dagger, and application-factory examples</Link>.</p>
+  <strong>Native composition for each JVM language</strong>
+  <p>Java uses the MyServiceBus-first decorator style for a managed service graph. Kotlin uses native extensions over the same JVM runtime, removing the decorator and class-literal ceremony. Applications with an existing Spring, CDI, Dagger, Guice, or application-owned environment can still use the bus factory as their integration boundary. See the{' '} <Link href="/docs/java-adoption">container and application-factory examples</Link>.</p>
 </div>
 
 <ol className="step-list">
@@ -99,20 +132,20 @@ await bus.Publish(new SubmitOrder(Guid.NewGuid()));`,
   </li>
   <li>
     <div className="step-heading"><span>02</span><div><h2>Install the RabbitMQ transport</h2><p>The transport brings in the core runtime and abstractions.</p></div></div>
-    <LanguageTabs csharp={install.csharp} java={install.java} csharpLabel=".NET CLI" javaLabel="Gradle" csharpLanguage="shell" javaLanguage="groovy" />
+    <LanguageTabs csharp={install.csharp} java={install.java} kotlin={install.kotlin} csharpLabel=".NET CLI" javaLabel="Gradle" kotlinLabel="Gradle Kotlin DSL" csharpLanguage="shell" javaLanguage="groovy" />
     <p className="small-note">Using Maven? Add the same group, artifact, and version as a standard dependency.</p>
   </li>
   <li>
     <div className="step-heading"><span>03</span><div><h2>Configure the bus</h2><p>Register the consumer and let MyServiceBus create its receive endpoint.</p></div></div>
-    <LanguageTabs csharp={configure.csharp} java={configure.java} />
+    <LanguageTabs csharp={configure.csharp} java={configure.java} kotlin={configure.kotlin} />
   </li>
   <li>
     <div className="step-heading"><span>04</span><div><h2>Define messages and a consumer</h2><p>A consumer handles one message type through a consume context.</p></div></div>
-    <LanguageTabs csharp={messages.csharp} java={messages.java} />
+    <LanguageTabs csharp={messages.csharp} java={messages.java} kotlin={messages.kotlin} />
   </li>
   <li>
     <div className="step-heading"><span>05</span><div><h2>Publish</h2><p>Publishing fans the event out to every interested receive endpoint.</p></div></div>
-    <LanguageTabs csharp={publish.csharp} java={publish.java} />
+    <LanguageTabs csharp={publish.csharp} java={publish.java} kotlin={publish.kotlin} />
   </li>
 </ol>
 

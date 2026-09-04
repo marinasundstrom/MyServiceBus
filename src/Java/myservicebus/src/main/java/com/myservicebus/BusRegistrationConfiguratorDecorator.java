@@ -5,6 +5,8 @@ import com.myservicebus.serialization.SerializerFactory;
 import java.util.function.Consumer;
 import com.myservicebus.BusFactoryConfigurator;
 import com.myservicebus.choreography.ChoreographyFragment;
+import com.myservicebus.topology.ConsumerDefinitionModel;
+import com.myservicebus.topology.ConsumerRegistration;
 
 public abstract class BusRegistrationConfiguratorDecorator implements BusRegistrationConfigurator {
 
@@ -25,6 +27,16 @@ public abstract class BusRegistrationConfiguratorDecorator implements BusRegistr
     }
 
     @Override
+    public <T> ConsumerDefinitionModel addConsumer(Class<T> consumerClass, ConsumerDefinition<T> definition) {
+        return inner.addConsumer(consumerClass, definition);
+    }
+
+    @Override
+    public ConsumerDefinitionModel addConsumerRegistration(ConsumerRegistration<?> registration) {
+        return inner.addConsumerRegistration(registration);
+    }
+
+    @Override
     public void addConsumerMethods(Class<?>... declaringTypes) {
         inner.addConsumerMethods(declaringTypes);
     }
@@ -41,6 +53,23 @@ public abstract class BusRegistrationConfiguratorDecorator implements BusRegistr
             String endpointName,
             ConsumerMethodInvoker<TMessage> invoker) {
         inner.addConsumerMethod(declaringType, messageClass, endpointName, invoker);
+    }
+
+    @Override
+    public <TMessage> void addConsumerMethod(
+            Class<?> declaringType,
+            Class<TMessage> messageClass,
+            String endpointName,
+            boolean endpointNameExplicit,
+            Class<?> endpointNameFormatterType,
+            ConsumerMethodInvoker<TMessage> invoker) {
+        inner.addConsumerMethod(
+                declaringType,
+                messageClass,
+                endpointName,
+                endpointNameExplicit,
+                endpointNameFormatterType,
+                invoker);
     }
 
     @Override

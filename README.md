@@ -31,13 +31,13 @@ The currently verified MassTransit interoperability peer is 8.5.1; that technica
 Install the RabbitMQ transport for a broker-backed application. It brings in the core runtime and abstractions transitively:
 
 ```bash
-dotnet add package Sundstrom.MyServiceBus.RabbitMq --version 0.1.0-preview.9
+dotnet add package Sundstrom.MyServiceBus.RabbitMq --version 0.1.0-preview.10
 ```
 
 For an application that only needs the core runtime and its in-memory mediator, install the main package directly:
 
 ```bash
-dotnet add package Sundstrom.MyServiceBus --version 0.1.0-preview.9
+dotnet add package Sundstrom.MyServiceBus --version 0.1.0-preview.10
 ```
 
 Continue with the [.NET quick start](#c) to register the bus, configure RabbitMQ, add a consumer, and publish a message. The [feature walkthrough](docs/feature-walkthrough.md) covers the complete C# and Java APIs.
@@ -68,7 +68,7 @@ Add the RabbitMQ module to a Gradle application. It brings in the Java runtime a
 
 ```groovy
 dependencies {
-    implementation 'io.github.marinasundstrom.myservicebus:myservicebus-rabbitmq:0.1.0-preview.9'
+    implementation 'io.github.marinasundstrom.myservicebus:myservicebus-rabbitmq:0.1.0-preview.10'
 }
 ```
 
@@ -78,17 +78,34 @@ For Maven applications:
 <dependency>
   <groupId>io.github.marinasundstrom.myservicebus</groupId>
   <artifactId>myservicebus-rabbitmq</artifactId>
-  <version>0.1.0-preview.9</version>
+  <version>0.1.0-preview.10</version>
 </dependency>
 ```
 
 Continue with the [Java quick start](#java) or the detailed [Java guide](src/Java/README.md).
+
+Kotlin applications can add the Kotlin facade alongside their selected transport:
+
+```kotlin
+dependencies {
+    implementation("io.github.marinasundstrom.myservicebus:myservicebus-kotlin:0.1.0-preview.10")
+    implementation("io.github.marinasundstrom.myservicebus:myservicebus-rabbitmq:0.1.0-preview.10")
+}
+```
+
+The shared JVM runtime and Java projection are the stable reference surfaces
+for this preview. The Kotlin projection is experimental and may evolve between
+previews while its behavior continues to use the same runtime and release gates.
+
+See the [Kotlin guide](docs/kotlin/how-to-use.md) and the evolving
+[executable Kotlin sample](src/Kotlin/sample).
 
 ### Maven Central artifacts
 
 | Artifact | Purpose |
 | --- | --- |
 | [`io.github.marinasundstrom.myservicebus:myservicebus`](https://central.sonatype.com/artifact/io.github.marinasundstrom.myservicebus/myservicebus) | Core messaging runtime and in-memory mediator |
+| `io.github.marinasundstrom.myservicebus:myservicebus-kotlin` | Experimental Kotlin-native projection with configuration DSLs, coroutines, suspend consumers and request handlers, and dependency-injection extensions over the shared JVM runtime |
 | `io.github.marinasundstrom.myservicebus:myservicebus-processor` | Optional JSR 269 processor for generated consumer catalogs and direct method invokers |
 | `io.github.marinasundstrom.myservicebus:myservicebus-serialization-bson` | Optional MassTransit-compatible BSON envelope serialization |
 | `io.github.marinasundstrom.myservicebus:myservicebus-postgresql` | PostgreSQL transactional outbox and inbox persistence |
@@ -103,15 +120,15 @@ Continue with the [Java quick start](#java) or the detailed [Java guide](src/Jav
 | `io.github.marinasundstrom.myservicebus:myservicebus-amazon-sqs` | Amazon SQS queues and SNS publish/subscribe transport |
 | [`io.github.marinasundstrom.myservicebus:myservicebus-testing`](https://central.sonatype.com/artifact/io.github.marinasundstrom.myservicebus/myservicebus-testing) | In-memory test harness and testing utilities |
 
-All Java artifacts use the same version as the corresponding NuGet release.
+All JVM artifacts use the same version as the corresponding NuGet release.
 
 ### Runtime monitoring deployment
 
 The optional inspection and exporter APIs are client libraries in the package tables above. The collector and Blazor dashboard are separate deployable applications, published as versioned Linux container images:
 
 ```text
-ghcr.io/marinasundstrom/myservicebus-monitoring-collector:0.1.0-preview.9
-ghcr.io/marinasundstrom/myservicebus-monitoring-dashboard:0.1.0-preview.9
+ghcr.io/marinasundstrom/myservicebus-monitoring-collector:0.1.0-preview.10
+ghcr.io/marinasundstrom/myservicebus-monitoring-dashboard:0.1.0-preview.10
 ```
 
 See the [runtime monitoring guide](docs/runtime-monitoring.md) for configuration, the live dashboard model, OpenTelemetry boundaries, and the experimental security scope.

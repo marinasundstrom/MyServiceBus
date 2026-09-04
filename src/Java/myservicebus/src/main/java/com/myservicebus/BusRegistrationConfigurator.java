@@ -1,5 +1,7 @@
 package com.myservicebus;
 
+import com.myservicebus.core.ConsumerRegistrationConfigurator;
+
 import com.myservicebus.choreography.ChoreographyBuilder;
 import com.myservicebus.choreography.ChoreographyFragment;
 import com.myservicebus.di.ServiceCollection;
@@ -9,8 +11,9 @@ import com.myservicebus.orchestration.SagaRepository;
 import com.myservicebus.orchestration.SagaRepositoryCapabilities;
 import com.myservicebus.orchestration.SagaStateMachine;
 import com.myservicebus.serialization.SerializerFactory;
+import com.myservicebus.topology.ConsumerDefinitionModel;
 
-public interface BusRegistrationConfigurator {
+public interface BusRegistrationConfigurator extends ConsumerRegistrationConfigurator {
     void addChoreography(ChoreographyFragment fragment);
 
     default <TSaga, TStateMachine extends SagaStateMachine<TSaga>> void addSagaStateMachine(
@@ -82,6 +85,19 @@ public interface BusRegistrationConfigurator {
             java.util.function.Consumer<JobConsumerOptions> configure);
 
     <T> void addConsumer(Class<T> consumerClass);
+
+    <T> ConsumerDefinitionModel addConsumer(Class<T> consumerClass, ConsumerDefinition<T> definition);
+
+    default <T> ConsumerDefinitionModel addConsumer(
+            Class<T> consumerClass,
+            java.util.function.Consumer<ConsumerDefinition<T>> configureDefinition) {
+        if (configureDefinition == null) {
+            throw new IllegalArgumentException("configureDefinition must not be null");
+        }
+        ConsumerDefinition<T> definition = new ConsumerDefinition<>();
+        configureDefinition.accept(definition);
+        return addConsumer(consumerClass, definition);
+    }
 
     default <THandler extends MediatorHandler> void addHandler(Class<THandler> handlerClass) {
         addConsumer(handlerClass);

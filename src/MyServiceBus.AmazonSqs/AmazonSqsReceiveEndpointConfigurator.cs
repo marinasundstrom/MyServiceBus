@@ -70,8 +70,10 @@ public sealed class AmazonSqsReceiveEndpointConfigurator
         foreach (var binding in consumer.Bindings)
             binding.EntityName = _entityNameResolver(binding.MessageType);
 
-        consumer.PrefetchCount = _prefetchCount is null ? null : checked((ushort)_prefetchCount.Value);
-        consumer.ConcurrentMessageLimit = _concurrentMessageLimit;
+        if (_prefetchCount is not null)
+            consumer.PrefetchCount = checked((ushort)_prefetchCount.Value);
+        if (_concurrentMessageLimit is not null)
+            consumer.ConcurrentMessageLimit = _concurrentMessageLimit;
         consumer.SerializerType = _serializerType;
         if (_retryCount.HasValue)
         {

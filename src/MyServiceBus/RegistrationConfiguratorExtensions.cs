@@ -3,9 +3,12 @@ namespace MyServiceBus;
 public static class RegistrationConfiguratorExtensions
 {
     public static IConsumerRegistrationConfigurator<T> AddConsumer<T>(this IRegistrationConfigurator configurator,
-        Action<IConsumerConfigurator<T>> configure = null)
+        Action<IConsumerConfigurator<T>>? configure = null)
         where T : class, IConsumer
     {
-        return null!;
+        ArgumentNullException.ThrowIfNull(configurator);
+        var definition = new ConsumerDefinition<T>();
+        configure?.Invoke(definition);
+        return configurator.AddConsumer(definition);
     }
 }

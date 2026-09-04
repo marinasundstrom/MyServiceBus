@@ -21,22 +21,22 @@ const siteUrl = isGitHubPages
   : 'http://localhost:3000';
 
 export const metadata: Metadata = {
-  title: 'MyServiceBus — Messaging for .NET and Java',
+  title: 'MyServiceBus — Messaging for .NET and the JVM',
   description:
-    'A pre-1.0 messaging runtime for .NET and Java with scoped MassTransit interoperability, broker transports, and in-process mediator dispatch.',
+    'A pre-1.0 messaging runtime for .NET and the JVM, with stable C# and Java projections, experimental Kotlin support, broker transports, and scoped MassTransit interoperability.',
   openGraph: {
-    title: 'MyServiceBus — Messaging for .NET and Java',
+    title: 'MyServiceBus — Messaging for .NET and the JVM',
     description:
-      'Evaluate a pre-1.0 C# and Java messaging runtime with explicit transport, interoperability, maturity, and support boundaries.',
+      'Evaluate stable C# and Java projections and experimental Kotlin support with explicit transport, interoperability, maturity, and support boundaries.',
     type: 'website',
     url: siteUrl,
-    images: [{ url: `${siteUrl}/og.png`, width: 1730, height: 909, alt: 'MyServiceBus — Messaging for .NET and Java' }],
+    images: [{ url: `${siteUrl}/og.png`, width: 1730, height: 909, alt: 'MyServiceBus — Messaging for .NET and the JVM' }],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'MyServiceBus — Messaging for .NET and Java',
+    title: 'MyServiceBus — Messaging for .NET and the JVM',
     description:
-      'Evaluate a pre-1.0 C# and Java messaging runtime with explicit transport, interoperability, maturity, and support boundaries.',
+      'Evaluate stable C# and Java projections and experimental Kotlin support with explicit transport, interoperability, maturity, and support boundaries.',
     images: [`${siteUrl}/og.png`],
   },
 };

@@ -22,6 +22,10 @@ public interface IRegistrationConfigurator
     [RequiresUnreferencedCode("Runtime consumer discovery cannot guarantee that consumer metadata is preserved. Use AddGeneratedConsumers for trimmed applications.")]
     void AddConsumer<T>() where T : class, IConsumer;
 
+    [RequiresDynamicCode("Runtime consumer discovery closes generic registrations dynamically. Use AddGeneratedConsumers for NativeAOT.")]
+    [RequiresUnreferencedCode("Runtime consumer discovery cannot guarantee that consumer metadata is preserved. Use AddGeneratedConsumers for trimmed applications.")]
+    IConsumerRegistrationConfigurator<T> AddConsumer<T>(ConsumerDefinition<T> definition) where T : class, IConsumer;
+
     [RequiresDynamicCode("Runtime consumer method discovery closes generic registrations dynamically. Use AddGeneratedConsumers for NativeAOT.")]
     [RequiresUnreferencedCode("Runtime consumer method discovery requires method and parameter metadata. Use AddGeneratedConsumers for trimmed applications.")]
     void AddConsumerMethods<TConsumer>(string? endpointName = null) where TConsumer : class;
@@ -82,12 +86,4 @@ public interface IRegistrationConfigurator
 
     void RequireTransportCapability(string capability, bool requireNative = false);
 
-    /*
-    IConsumerRegistrationConfigurator<T> AddConsumer<T>(Action<IRegistrationContext, IConsumerConfigurator<T>> configure = null)
-            where T : class, IConsumer;
-
-IConsumerRegistrationConfigurator<T> AddConsumer<T>(Type consumerDefinitionType,
-    Action<IRegistrationContext, IConsumerConfigurator<T>> configure = null)
-    where T : class, IConsumer;
-    */
 }

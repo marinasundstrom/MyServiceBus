@@ -7,7 +7,7 @@ import com.myservicebus.tasks.CancellationToken;
 /**
  * Handler that produces a response message.
  */
-public interface HandlerWithResult<T, R> extends MediatorHandler, Consumer<T> {
+public interface HandlerWithResult<T, R> extends ResultHandler<T, R>, Consumer<T> {
     /**
      * Handle the incoming message and produce a response.
      *

@@ -11,6 +11,7 @@ const sections = [
       ['Mediator pattern', '/docs/mediator'],
       ['Migrate from MassTransit', '/docs/migrate-from-masstransit'],
       ['Migrate from MediatR', '/docs/migrate-from-mediatr'],
+      ['Kotlin (experimental)', '/docs/kotlin'],
       ['Java adoption', '/docs/java-adoption'],
     ],
   },
@@ -69,7 +70,7 @@ export default function DocumentationLayout({ children }: { children: React.Reac
           ))}
           <div className="sidebar-note">
             <span className="pulse" aria-hidden="true" />
-            <div><strong>0.1.0-preview.9</strong><br />Latest preview</div>
+            <div><strong>0.1.0-preview.10</strong><br />Latest preview</div>
           </div>
         </aside>
         <main className="docs-main">{children}</main>

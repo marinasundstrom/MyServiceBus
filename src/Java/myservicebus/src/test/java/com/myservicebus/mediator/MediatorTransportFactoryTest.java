@@ -203,6 +203,21 @@ public class MediatorTransportFactoryTest {
         }
     }
 
+    public interface ProjectedResultHandler<TRequest, TResponse>
+            extends HandlerWithResult<TRequest, TResponse> {
+    }
+
+    public static class IndirectResultHandler
+            implements ProjectedResultHandler<RequestMessage, ResponseMessage> {
+        @Override
+        public CompletableFuture<ResponseMessage> handle(
+                RequestMessage message,
+                CancellationToken cancellationToken) {
+            return CompletableFuture.completedFuture(
+                    new ResponseMessage(message.getValue() + "-indirect-response"));
+        }
+    }
+
     static class CapturingSendEndpoint implements SendEndpoint {
         static CompletableFuture<Object> sent = new CompletableFuture<>();
 
@@ -444,6 +459,20 @@ public class MediatorTransportFactoryTest {
         Assertions.assertEquals("query-response", response.getValue());
         ResponseMessage inferredResponse = bus.send(new RequestMessage("inferred")).join();
         Assertions.assertEquals("inferred-response", inferredResponse.getValue());
+        Assertions.assertThrows(
+                com.myservicebus.MediatorResponseTypeException.class,
+                () -> bus.send(new RequestMessage("wrong"), TestMessage.class));
+    }
+
+    @Test
+    public void sendDiscoversResultTypeThroughGenericProjectionInterface() {
+        ServiceCollection services = ServiceCollection.create();
+        MediatorBus bus = MediatorBus.configure(services, cfg ->
+                cfg.addHandler(IndirectResultHandler.class, RequestMessage.class, ResponseMessage.class));
+
+        ResponseMessage response = bus.send(new RequestMessage("query")).join();
+
+        Assertions.assertEquals("query-indirect-response", response.getValue());
         Assertions.assertThrows(
                 com.myservicebus.MediatorResponseTypeException.class,
                 () -> bus.send(new RequestMessage("wrong"), TestMessage.class));
