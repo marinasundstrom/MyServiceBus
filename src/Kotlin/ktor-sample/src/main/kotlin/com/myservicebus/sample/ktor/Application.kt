@@ -1,16 +1,9 @@
 package com.myservicebus.sample.ktor
 
 import com.fasterxml.jackson.databind.SerializationFeature
-import com.myservicebus.di.ServiceCollection
-import com.myservicebus.di.ServiceProvider
 import com.myservicebus.kotlin.ConsumeContext
 import com.myservicebus.kotlin.Consumer
-import com.myservicebus.kotlin.MessageBus
-import com.myservicebus.kotlin.RequestClientFactory
-import com.myservicebus.kotlin.SendEndpointProvider
-import com.myservicebus.kotlin.addServiceBus
 import com.myservicebus.kotlin.addSingleton
-import com.myservicebus.kotlin.getRequiredService
 import com.myservicebus.rabbitmq.RabbitMqFactoryConfigurator
 import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.jackson.jackson
@@ -24,9 +17,7 @@ import io.ktor.server.response.respond
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import io.ktor.server.routing.routing
-import java.time.Duration
 import java.util.UUID
-import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 import kotlin.time.Duration.Companion.seconds
 
@@ -80,79 +71,31 @@ class LookupOrderConsumer : Consumer<LookupOrder> {
     }
 }
 
-class MessagingRuntime(
-    val provider: ServiceProvider,
-    private val bus: MessageBus,
-    private val directedQueue: String,
-) {
-    private val ready = AtomicBoolean()
-
-    val isReady: Boolean
-        get() = ready.get()
-
-    fun start() {
-        bus.start()
-        ready.set(true)
-    }
-
-    fun stop() {
-        ready.set(false)
-        bus.stop(Duration.ofSeconds(30))
-    }
-
-    suspend fun publish(orderId: UUID) {
-        bus.publish(SubmitOrder(orderId)) { correlationId = orderId }
-    }
-
-    suspend fun send(orderId: UUID) {
-        provider.createScope().use { scope ->
-            scope.serviceProvider
-                .getRequiredService<SendEndpointProvider>()
-                .send("queue:$directedQueue", DispatchOrder(orderId)) { correlationId = orderId }
-        }
-    }
-
-    suspend fun lookup(orderId: UUID): OrderStatus = provider.createScope().use { scope ->
-        scope.serviceProvider
-            .getRequiredService<RequestClientFactory>()
-            .create<LookupOrder>(timeout = 10.seconds)
-            .request(LookupOrder(orderId))
-    }
-}
-
-fun createMessagingRuntime(
+fun Application.messagingModule(
     host: String,
     port: Int,
     queueSuffix: String = "",
     observer: OrderDeliveryObserver = ConsoleOrderDeliveryObserver(),
-): MessagingRuntime {
+) {
     val suffix = queueSuffix.takeIf(String::isNotBlank)?.let { "-$it" }.orEmpty()
     val directedQueue = "kotlin-ktor-dispatch-order$suffix"
-    val services = ServiceCollection.create()
-    services.addSingleton<OrderDeliveryObserver>(observer)
-    services.addServiceBus {
-        consumer<SubmitOrderConsumer>(endpointName = "kotlin-ktor-submit-order$suffix")
-        consumer<DispatchOrderConsumer>(endpointName = directedQueue)
-        consumer<LookupOrderConsumer>(endpointName = "kotlin-ktor-lookup-order$suffix")
-        transport<RabbitMqFactoryConfigurator> { context ->
-            host(host, port) { credentials ->
-                credentials.username("guest")
-                credentials.password("guest")
-            }
-            configureEndpoints(context)
+    install(MyServiceBus) {
+        services {
+            addSingleton<OrderDeliveryObserver>(observer)
         }
-    }
-    val provider = services.buildServiceProvider()
-    return MessagingRuntime(
-        provider,
-        provider.getRequiredService<MessageBus>(),
-        directedQueue,
-    )
-}
-
-fun Application.messagingModule(runtime: MessagingRuntime) {
-    install(MyServiceBusPlugin) {
-        this.runtime = runtime
+        bus {
+            consumer<SubmitOrderConsumer>(endpointName = "kotlin-ktor-submit-order$suffix")
+            consumer<DispatchOrderConsumer>(endpointName = directedQueue)
+            consumer<LookupOrderConsumer>(endpointName = "kotlin-ktor-lookup-order$suffix")
+            transport<RabbitMqFactoryConfigurator> { context ->
+                host(host, port) { credentials ->
+                    credentials.username("guest")
+                    credentials.password("guest")
+                }
+                configureEndpoints(context)
+            }
+        }
+        stopTimeout = 30.seconds
     }
     install(ContentNegotiation) {
         jackson { disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS) }
@@ -163,7 +106,7 @@ fun Application.messagingModule(runtime: MessagingRuntime) {
             call.respond(HealthStatus("live"))
         }
         get("/health/ready") {
-            if (call.application.messagingRuntime.isReady) {
+            if (call.myServiceBus.isReady) {
                 call.respond(HealthStatus("ready"))
             } else {
                 call.respond(HttpStatusCode.ServiceUnavailable, HealthStatus("starting"))
@@ -172,19 +115,20 @@ fun Application.messagingModule(runtime: MessagingRuntime) {
         post("/orders/{orderId}/publish") {
             val orderId = call.parameters["orderId"].toOrderId()
                 ?: return@post call.respond(HttpStatusCode.BadRequest, HealthStatus("invalid order id"))
-            call.application.messagingRuntime.publish(orderId)
+            call.myServiceBus.publish(SubmitOrder(orderId)) { correlationId = orderId }
             call.respond(HttpStatusCode.Accepted, OrderAccepted(orderId, "publish"))
         }
         post("/orders/{orderId}/send") {
             val orderId = call.parameters["orderId"].toOrderId()
                 ?: return@post call.respond(HttpStatusCode.BadRequest, HealthStatus("invalid order id"))
-            call.application.messagingRuntime.send(orderId)
+            call.myServiceBus.send("queue:$directedQueue", DispatchOrder(orderId)) { correlationId = orderId }
             call.respond(HttpStatusCode.Accepted, OrderAccepted(orderId, "send"))
         }
         get("/orders/{orderId}") {
             val orderId = call.parameters["orderId"].toOrderId()
                 ?: return@get call.respond(HttpStatusCode.BadRequest, HealthStatus("invalid order id"))
-            call.respond(call.application.messagingRuntime.lookup(orderId))
+            val status: OrderStatus = call.myServiceBus.request(LookupOrder(orderId), timeout = 10.seconds)
+            call.respond(status)
         }
     }
 }
@@ -195,9 +139,7 @@ fun main() {
     val host = System.getenv("RABBITMQ_HOST") ?: "localhost"
     val port = System.getenv("RABBITMQ_PORT")?.toIntOrNull() ?: 5672
     val httpPort = System.getenv("HTTP_PORT")?.toIntOrNull() ?: 5302
-    val runtime = createMessagingRuntime(host, port)
-
     embeddedServer(Netty, host = "0.0.0.0", port = httpPort) {
-        messagingModule(runtime)
+        messagingModule(host, port)
     }.start(wait = true)
 }

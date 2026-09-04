@@ -3,12 +3,13 @@ package com.myservicebus.kotlin
 import com.myservicebus.MessageBus as JvmMessageBus
 import com.myservicebus.topology.BusTopology
 import java.net.URI
-import java.time.Duration
+import kotlin.time.Duration
+import kotlin.time.toJavaDuration
 
 /** Kotlin's application-facing projection of the shared JVM message bus. */
 class MessageBus internal constructor(
     internal val delegate: JvmMessageBus,
-) : PublishEndpoint, PublishEndpointProvider, SendEndpointProvider {
+) : PublishEndpoint, PublishEndpointProvider, SendEndpointProvider, AutoCloseable {
     val address: URI
         get() = delegate.address
 
@@ -27,7 +28,16 @@ class MessageBus internal constructor(
     }
 
     fun stop(timeout: Duration) {
-        delegate.stop(timeout)
+        require(!timeout.isNegative()) { "Stop timeout must not be negative." }
+        if (timeout == Duration.INFINITE) {
+            delegate.stop()
+        } else {
+            delegate.stop(timeout.toJavaDuration())
+        }
+    }
+
+    override fun close() {
+        stop()
     }
 
     override suspend fun publish(message: Any) {

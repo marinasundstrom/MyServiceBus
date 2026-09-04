@@ -449,10 +449,15 @@ contracts, so ordinary Kotlin application code uses `publish`, `send`, and
 `request` throughout.
 
 The Ktor sample exercises that projection as a server integration rather than
-as an isolated language demo. Its application plugin starts and drains the bus
-with Ktor's lifecycle, exposes readiness to health routes, and lets suspending
-routes publish, send, and request directly. A broker-backed test verifies the
-routes and their consumers through RabbitMQ.
+as an isolated language demo. Its generic application plugin builds and owns
+the shared service provider from concise `services` and `bus` blocks, then
+starts and drains the bus with Ktor's lifecycle using Kotlin `Duration`, exposes
+readiness to health routes, and provides scoped services to suspending routes.
+Routes get direct suspending `publish`, `send`, and `request` operations, with
+an explicit scoped block only for less common services. A broker-backed test
+verifies publish, directed send, request/response, and consumer completion
+through RabbitMQ. The adapter remains in the sample until this framework-facing
+shape is mature enough to publish.
 
 #### Azure Service Bus preview
 

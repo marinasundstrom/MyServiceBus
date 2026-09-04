@@ -67,40 +67,30 @@ val mediator = ServiceCollection.create().createMediator {
 
 val status: OrderStatus = mediator.request(LookupOrder(orderId))`;
 
-export const ktorIntegration = `class MyServiceBusPluginConfiguration {
-    lateinit var runtime: MessagingRuntime
-}
-
-private val runtimeKey = AttributeKey<MessagingRuntime>("MyServiceBusRuntime")
-
-val MyServiceBusPlugin = createApplicationPlugin(
-    name = "MyServiceBus",
-    createConfiguration = ::MyServiceBusPluginConfiguration,
-) {
-    val runtime = pluginConfig.runtime
-    application.attributes.put(runtimeKey, runtime)
-    application.monitor.subscribe(ApplicationStarted) { runtime.start() }
-    application.monitor.subscribe(ApplicationStopping) { runtime.stop() }
-}
-
-val Application.messagingRuntime: MessagingRuntime
-    get() = attributes[runtimeKey]
-
-fun Application.messagingModule(runtime: MessagingRuntime) {
-    install(MyServiceBusPlugin) {
-        this.runtime = runtime
+export const ktorIntegration = `fun Application.messagingModule() {
+    install(MyServiceBus) {
+        bus {
+            consumer<LookupOrderConsumer>()
+            transport<RabbitMqFactoryConfigurator> { context ->
+                host("localhost")
+                configureEndpoints(context)
+            }
+        }
+        stopTimeout = 30.seconds
     }
 
     routing {
         post("/orders/{orderId}/publish") {
             val orderId = UUID.fromString(call.parameters["orderId"])
-            call.application.messagingRuntime.publish(orderId)
+            call.myServiceBus.publish(SubmitOrder(orderId))
             call.respond(HttpStatusCode.Accepted)
         }
 
         get("/orders/{orderId}") {
             val orderId = UUID.fromString(call.parameters["orderId"])
-            call.respond(call.application.messagingRuntime.lookup(orderId))
+            val status: OrderStatus =
+                call.myServiceBus.request(LookupOrder(orderId), timeout = 10.seconds)
+            call.respond(status)
         }
     }
 }`;
@@ -155,7 +145,7 @@ The mediator uses the shared scoped consumer pipeline but stays entirely in proc
 
 ## Host it natively in Ktor
 
-The server sample integrates through a Ktor application plugin instead of a Java-shaped bootstrap wrapper. Ktor owns bus startup and graceful shutdown, health readiness follows the bus lifecycle, and suspending routes use the projected runtime directly. Its integration test runs publish, directed send, and correlated request/response through an isolated RabbitMQ broker and waits for the consumers to complete.
+The server sample integrates through a Ktor application plugin instead of a Java-shaped bootstrap wrapper. One <code>install(MyServiceBus)</code> block declares the bus and optional application services; the plugin builds and owns the provider, startup, graceful shutdown with Kotlin <code>Duration</code>, readiness, and scopes. Suspending routes use the projected bus or open a scoped service block directly. The generic adapter remains sample-first while its ownership model settles. Its integration test runs publish, directed send, and correlated request/response through an isolated RabbitMQ broker and waits for the consumers to complete.
 
 <CodeViewer code={ktorIntegration} label="Ktor application integration" language="kotlin" />
 

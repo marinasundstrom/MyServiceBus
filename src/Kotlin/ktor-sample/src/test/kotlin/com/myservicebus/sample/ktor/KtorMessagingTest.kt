@@ -21,10 +21,9 @@ class KtorMessagingTest {
             rabbitMq.start()
             val suffix = UUID.randomUUID().toString().replace("-", "")
             val deliveries = RecordingOrderDeliveryObserver()
-            val runtime = createMessagingRuntime(rabbitMq.host, rabbitMq.amqpPort, suffix, deliveries)
 
             testApplication {
-                application { messagingModule(runtime) }
+                application { messagingModule(rabbitMq.host, rabbitMq.amqpPort, suffix, deliveries) }
 
                 assertEquals(HttpStatusCode.OK, client.get("/health/live").status)
                 assertEquals(HttpStatusCode.OK, client.get("/health/ready").status)

@@ -25,8 +25,13 @@ Framework integration belongs at this projection boundary too. A Kotlin server
 adapter should use the framework's lifecycle, configuration, dependency, and
 coroutine conventions instead of exposing a Java bootstrap API through Kotlin.
 The Ktor sample is the first proof: an application plugin owns bus startup and
-shutdown and presents a Kotlin runtime to suspending routes, while transport and
-delivery remain in the shared JVM implementation.
+shutdown, builds and owns the shared service provider from native configuration
+blocks, and presents a Kotlin runtime with readiness and suspending scoped
+access plus direct messaging operations to routes, while transport and delivery
+remain in the shared JVM implementation. Keeping this adapter in the sample
+first lets lifecycle and
+scope ownership settle before a framework package becomes a compatibility
+commitment.
 
 Both projections must enter the same topology and pipeline stages. A Kotlin
 consumer is not a parallel runtime path: its coroutine is adapted to the shared
@@ -99,6 +104,11 @@ Kotlin-native projection.
 
 This keeps ordinary Kotlin code independent from Java overloads while the
 shared implementation still resides in the Java modules.
+
+Lifecycle values are part of the projection as well. The Kotlin bus accepts
+Kotlin `Duration` for bounded stop, treats `Duration.INFINITE` as the untimed
+shared stop, and implements `AutoCloseable`; Java's `java.time.Duration` remains
+behind the facade.
 
 ## Possible future module shape
 

@@ -181,23 +181,46 @@ gradle :kotlin-sample:run
 ```
 
 The server-side sample at `src/Kotlin/ktor-sample` puts the same projection
-behind Ktor routes. A Ktor application plugin owns the bus lifecycle and makes
-the messaging runtime available as `application.messagingRuntime`:
+behind Ktor routes. A generic Ktor application plugin owns the bus lifecycle,
+builds the MyServiceBus service provider, and exposes the projected bus and
+scoped services through `call.myServiceBus`:
 
 ```kotlin
-fun Application.messagingModule(runtime: MessagingRuntime) {
-    install(MyServiceBusPlugin) {
-        this.runtime = runtime
+fun Application.messagingModule() {
+    install(MyServiceBus) {
+        bus {
+            consumer<LookupOrderConsumer>()
+            transport<RabbitMqFactoryConfigurator> { context ->
+                host("localhost")
+                configureEndpoints(context)
+            }
+        }
+        stopTimeout = 30.seconds
     }
 
     routing {
         post("/orders/{orderId}/publish") {
-            call.application.messagingRuntime.publish(orderId)
+            call.myServiceBus.publish(SubmitOrder(orderId))
             call.respond(HttpStatusCode.Accepted)
+        }
+
+        get("/orders/{orderId}") {
+            val status: OrderStatus =
+                call.myServiceBus.request(LookupOrder(orderId), timeout = 10.seconds)
+            call.respond(status)
         }
     }
 }
 ```
+
+The plugin shape deliberately remains in the sample while the experiment tests
+how Ktor lifecycle and scopes should compose with the shared JVM container. The
+optional `services { ... }` block registers application dependencies without
+requiring callers to construct infrastructure objects. Routes normally use
+direct suspending `publish`, `send`, and `request`; `withScope` remains available
+for other scoped services. The Kotlin `MessageBus` itself is `AutoCloseable`;
+its timed `stop` accepts Kotlin `Duration`, and `Duration.INFINITE` selects the
+untimed shared shutdown path.
 
 Run it against the repository RabbitMQ instance:
 
