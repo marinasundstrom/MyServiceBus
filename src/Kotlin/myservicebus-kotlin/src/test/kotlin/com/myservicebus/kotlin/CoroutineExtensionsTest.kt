@@ -211,6 +211,21 @@ class CoroutineExtensionsTest {
     }
 
     @Test
+    fun `annotated consumer function is registered explicitly and invoked through reflection`() = runBlocking {
+        val services = ServiceCollection.create()
+        val repository = FunctionOrderRepository()
+        services.addSingleton(repository)
+        val mediator = services.createMediator {
+            consumerFunction(::lookupOrderFunction, dispatcher = Dispatchers.Unconfined)
+        }
+
+        val response: OrderStatus = mediator.request(LookupOrder("reflected-42"))
+
+        assertEquals(OrderStatus("reflected-42", "function-ready"), response)
+        assertEquals(listOf("reflected-42"), repository.lookups)
+    }
+
+    @Test
     fun `cancelling mediator request cancels suspend handler`() = runBlocking {
         CancellableHandler.started = CompletableDeferred()
         CancellableHandler.stopped = CompletableDeferred()
@@ -515,7 +530,7 @@ data class OrderStatus(val orderId: String, val status: String)
 
 private object ConsumerFunctionDeclarations
 
-private class FunctionOrderRepository {
+internal class FunctionOrderRepository {
     val lookups = mutableListOf<String>()
 
     fun find(orderId: String): OrderStatus {
@@ -525,7 +540,7 @@ private class FunctionOrderRepository {
 }
 
 @ConsumerFunction("lookup-order")
-private suspend fun lookupOrderFunction(
+internal suspend fun lookupOrderFunction(
     lookupOrder: LookupOrder,
     orders: FunctionOrderRepository,
     context: ConsumeContext<LookupOrder>,

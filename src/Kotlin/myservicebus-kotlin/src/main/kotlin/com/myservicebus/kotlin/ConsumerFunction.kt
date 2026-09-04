@@ -4,7 +4,7 @@ import com.myservicebus.di.ServiceProvider
 
 /** Declares a top-level suspending function as a MyServiceBus consumer. */
 @Target(AnnotationTarget.FUNCTION)
-@Retention(AnnotationRetention.BINARY)
+@Retention(AnnotationRetention.RUNTIME)
 annotation class ConsumerFunction(val endpointName: String = "")
 
 /**

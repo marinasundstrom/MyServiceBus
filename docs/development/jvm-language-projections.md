@@ -195,11 +195,17 @@ consume context as a correlated response. Coroutine completion, failure, and
 cancellation enter the same pipeline as class consumers.
 
 `ConsumerFunction` is declaration metadata; it does not use reified generics.
-KSP should resolve the signature at compile time and emit a direct adapter to
-the public `registerConsumerFunction` runtime seam. Generated code supplies a
-stable package-and-function identity, the concrete message and response types,
-endpoint policy, and dependency-resolution calls. Compiler-generated lambda or
-file-facade class names must not become the logical consumer identity.
+Applications can explicitly register one declaration through
+`consumerFunction(::lookupOrder)`. This bounded reflection path validates the
+signature, binds the first parameter as the message, supplies an optional
+matching context, resolves other parameters from the active message scope, and
+invokes the suspending function. It does not scan the classpath.
+
+KSP should resolve the same signature at compile time and emit a direct adapter
+to the public `registerConsumerFunction` runtime seam. Generated code supplies
+a stable package-and-function identity, the concrete message and response
+types, endpoint policy, and dependency-resolution calls. Compiler-generated
+lambda or file-facade class names must not become the logical consumer identity.
 
 ## MVP package and artifact shape
 

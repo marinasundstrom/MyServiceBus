@@ -23,6 +23,14 @@ import com.myservicebus.mediator.MediatorBus
 import java.util.function.Supplier
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlin.reflect.KClass
+import kotlin.reflect.KFunction
+import kotlin.reflect.KParameter
+import kotlin.reflect.full.callSuspend
+import kotlin.reflect.full.extensionReceiverParameter
+import kotlin.reflect.full.instanceParameter
+import kotlin.reflect.jvm.javaMethod
+import kotlin.reflect.jvm.jvmErasure
 
 @DslMarker
 annotation class MyServiceBusDsl
@@ -86,6 +94,73 @@ class ServiceBusConfigurator internal constructor(
                 },
             ),
         )
+    }
+
+    /** Discovers and registers one explicitly referenced Kotlin consumer function. */
+    fun consumerFunction(
+        function: KFunction<*>,
+        dispatcher: CoroutineDispatcher = Dispatchers.Default,
+    ) {
+        require(function.isSuspend) { "Consumer function ${function.name} must be suspending." }
+        require(function.typeParameters.isEmpty()) { "Consumer function ${function.name} must not be generic." }
+        require(function.instanceParameter == null && function.extensionReceiverParameter == null) {
+            "Consumer function ${function.name} must be top-level."
+        }
+        val annotation = function.annotations.filterIsInstance<ConsumerFunction>().singleOrNull()
+            ?: throw IllegalArgumentException("Consumer function ${function.name} must have @ConsumerFunction.")
+        val parameters = function.parameters.filter { it.kind == KParameter.Kind.VALUE }
+        require(parameters.isNotEmpty()) { "Consumer function ${function.name} requires a message parameter." }
+
+        val messageParameter = parameters.first()
+        val messageClass = concreteClass(messageParameter, function)
+        val contextParameters = parameters.drop(1).filter { it.type.jvmErasure == ConsumeContext::class }
+        require(contextParameters.size <= 1) { "Consumer function ${function.name} has more than one ConsumeContext." }
+        contextParameters.singleOrNull()?.let { contextParameter ->
+            val contextMessage = contextParameter.type.arguments.singleOrNull()?.type?.classifier
+            require(contextMessage == messageParameter.type.classifier) {
+                "ConsumeContext message type must match ${messageClass.name}."
+            }
+        }
+
+        val method = requireNotNull(function.javaMethod) {
+            "Consumer function ${function.name} must have a JVM method."
+        }
+        val endpointName = annotation.endpointName.ifBlank { function.name }
+        val responseClass = function.returnType
+            .takeUnless { it.jvmErasure == Unit::class }
+            ?.also { require(!it.isMarkedNullable) { "Consumer function response must not be nullable." } }
+            ?.jvmErasure
+            ?.java
+
+        @Suppress("UNCHECKED_CAST")
+        registerConsumerFunction(
+            functionIdentity = "${method.declaringClass.name}::${function.name}",
+            declarationType = method.declaringClass,
+            messageType = messageClass as Class<Any>,
+            endpointName = endpointName,
+            endpointNameExplicit = annotation.endpointName.isNotBlank(),
+            responseType = responseClass,
+            dispatcher = dispatcher,
+            invoker = ConsumerFunctionInvoker { message, context, provider ->
+                val arguments = parameters.mapIndexed { index, parameter ->
+                    when {
+                        index == 0 -> message
+                        parameter.type.jvmErasure == ConsumeContext::class -> context
+                        else -> provider.getRequiredService(parameter.type.jvmErasure.java)
+                    }
+                }
+                function.callSuspend(*arguments.toTypedArray())
+            },
+        )
+    }
+
+    private fun concreteClass(parameter: KParameter, function: KFunction<*>): Class<*> {
+        val classifier = parameter.type.classifier as? KClass<*>
+            ?: throw IllegalArgumentException("Consumer function ${function.name} message type must be concrete.")
+        require(classifier != ConsumeContext::class) {
+            "Consumer function ${function.name} must bind the message directly as its first parameter."
+        }
+        return classifier.java
     }
 
     /** Explicitly registers a consumer authored against the Java frontend. */
