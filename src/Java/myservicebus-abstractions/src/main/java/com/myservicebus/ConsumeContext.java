@@ -203,15 +203,6 @@ public class ConsumeContext<T>
         return sendEndpointProvider.getSendEndpoint(uri);
     }
 
-    @Override
-    public OutgoingMessageDispatcher getMessageDispatcher(String destination) {
-        SendEndpoint endpoint = getSendEndpoint(destination);
-        return (message, configure, cancellationToken) -> endpoint.send(
-                message,
-                context -> configure.configure(context),
-                cancellationToken);
-    }
-
     /**
      * Sends a correlated response to the incoming request.
      *

@@ -59,7 +59,7 @@ class ConsumeContext<TMessage : Any> internal constructor(
     }
 
     override fun getSendEndpoint(destination: String): SendEndpoint =
-        MessageDispatcherFacade(delegate.getMessageDispatcher(destination))
+        JvmSendEndpointFacade(delegate.getMessageDispatcher(destination))
 
     /** Sends while preserving the correlation and causation metadata of the consumed message. */
     override suspend fun send(destination: String, message: Any) {

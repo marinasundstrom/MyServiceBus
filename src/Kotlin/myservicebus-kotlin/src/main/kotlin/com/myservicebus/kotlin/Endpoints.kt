@@ -1,10 +1,9 @@
 package com.myservicebus.kotlin
 
-import com.myservicebus.PublishEndpoint as JvmPublishEndpoint
-import com.myservicebus.PublishEndpointProvider as JvmPublishEndpointProvider
 import com.myservicebus.OutgoingMessageDispatcher
-import com.myservicebus.SendEndpoint as JvmSendEndpoint
-import com.myservicebus.SendEndpointProvider as JvmSendEndpointProvider
+import com.myservicebus.OutgoingMessageDispatcherProvider
+import com.myservicebus.OutgoingMessagePublisher
+import com.myservicebus.OutgoingMessagePublisherProvider
 
 /** A Kotlin endpoint that publishes messages through the shared JVM runtime. */
 interface PublishEndpoint {
@@ -39,41 +38,27 @@ interface SendEndpointProvider {
 }
 
 internal class JvmPublishEndpointFacade(
-    private val delegate: JvmPublishEndpoint,
+    private val delegate: OutgoingMessagePublisher,
 ) : PublishEndpoint {
     override suspend fun publish(message: Any) {
-        awaitOperation { cancellationToken -> delegate.publish(message, cancellationToken) }
+        awaitOperation { cancellationToken -> delegate.publishMessage(message, {}, cancellationToken) }
     }
 
     override suspend fun publish(message: Any, configure: PublishContext.() -> Unit) {
         awaitOperation { cancellationToken ->
-            delegate.publish(message, { context -> PublishContext(context).configure() }, cancellationToken)
+            delegate.publishMessage(message, { context -> PublishContext(context).configure() }, cancellationToken)
         }
     }
 }
 
 internal class JvmPublishEndpointProviderFacade(
-    private val delegate: JvmPublishEndpointProvider,
+    private val delegate: OutgoingMessagePublisherProvider,
 ) : PublishEndpointProvider {
     override val publishEndpoint: PublishEndpoint
-        get() = JvmPublishEndpointFacade(delegate.publishEndpoint)
+        get() = JvmPublishEndpointFacade(delegate.messagePublisher)
 }
 
 internal class JvmSendEndpointFacade(
-    private val delegate: JvmSendEndpoint,
-) : SendEndpoint {
-    override suspend fun send(message: Any) {
-        awaitOperation { cancellationToken -> delegate.send(message, cancellationToken) }
-    }
-
-    override suspend fun send(message: Any, configure: SendContext.() -> Unit) {
-        awaitOperation { cancellationToken ->
-            delegate.send(message, { context -> SendContext(context).configure() }, cancellationToken)
-        }
-    }
-}
-
-internal class MessageDispatcherFacade(
     private val delegate: OutgoingMessageDispatcher,
 ) : SendEndpoint {
     override suspend fun send(message: Any) {
@@ -88,8 +73,8 @@ internal class MessageDispatcherFacade(
 }
 
 internal class JvmSendEndpointProviderFacade(
-    private val delegate: JvmSendEndpointProvider,
+    private val delegate: OutgoingMessageDispatcherProvider,
 ) : SendEndpointProvider {
     override fun getSendEndpoint(destination: String): SendEndpoint =
-        JvmSendEndpointFacade(delegate.getSendEndpoint(destination))
+        JvmSendEndpointFacade(delegate.getMessageDispatcher(destination))
 }

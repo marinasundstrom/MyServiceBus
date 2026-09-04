@@ -41,17 +41,17 @@ class MessageBus internal constructor(
     }
 
     override suspend fun publish(message: Any) {
-        awaitOperation { cancellationToken -> delegate.publish(message, cancellationToken) }
+        awaitOperation { cancellationToken -> delegate.publishMessage(message, {}, cancellationToken) }
     }
 
     override suspend fun publish(message: Any, configure: PublishContext.() -> Unit) {
         awaitOperation { cancellationToken ->
-            delegate.publish(message, { context -> PublishContext(context).configure() }, cancellationToken)
+            delegate.publishMessage(message, { context -> PublishContext(context).configure() }, cancellationToken)
         }
     }
 
     override fun getSendEndpoint(destination: String): SendEndpoint =
-        JvmSendEndpointFacade(delegate.getSendEndpoint(destination))
+        JvmSendEndpointFacade(delegate.getMessageDispatcher(destination))
 
     /** Accesses shared JVM bus capabilities that do not have a Kotlin projection. */
     fun <TResult> jvm(block: JvmMessageBus.() -> TResult): TResult = delegate.block()

@@ -13,7 +13,7 @@ import com.myservicebus.tasks.CancellationToken;
  * the overload set and callback types of the public Java {@link ConsumeContext}
  * API.</p>
  */
-public interface MessageDeliveryContext<TMessage> extends PipeContext {
+public interface MessageDeliveryContext<TMessage> extends PipeContext, OutgoingMessageDispatcherProvider {
     TMessage getMessage();
 
     Map<String, Object> getHeaders();
@@ -55,5 +55,4 @@ public interface MessageDeliveryContext<TMessage> extends PipeContext {
 
     CompletableFuture<Void> respondWithFault(Exception exception, CancellationToken cancellationToken);
 
-    OutgoingMessageDispatcher getMessageDispatcher(String destination);
 }

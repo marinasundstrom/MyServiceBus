@@ -56,6 +56,12 @@ The Kotlin module is a language projection over the existing JVM runtime. A
 future runtime split may make that boundary physical as well as conceptual;
 see [JVM language projections](../development/jvm-language-projections.md).
 
+A Kotlin application should choose the Kotlin projection as its ordinary
+application API. Java packages remain callable for ecosystem interoperability
+and through documented `jvm { ... }` escape hatches, but Java and Kotlin own
+separate frontend contracts over the same definitions, runtime, transports,
+and wire behavior.
+
 ## Messages and consumers
 
 ```kotlin

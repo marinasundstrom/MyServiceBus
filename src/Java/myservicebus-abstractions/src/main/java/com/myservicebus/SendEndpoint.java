@@ -8,7 +8,8 @@ import java.util.function.Consumer;
 
 import com.myservicebus.tasks.CancellationToken;
 
-public interface SendEndpoint {
+@FunctionalInterface
+public interface SendEndpoint extends OutgoingMessageDispatcher {
     <T> CompletableFuture<Void> send(T message, CancellationToken cancellationToken);
 
     default <T> CompletableFuture<Void> send(Class<T> messageType, Object message,
@@ -42,6 +43,14 @@ public interface SendEndpoint {
         SendContext ctx = new SendContext(message, cancellationToken);
         contextCallback.accept(ctx);
         return send(ctx);
+    }
+
+    @Override
+    default CompletableFuture<Void> sendMessage(
+            Object message,
+            OutgoingMessageContextCallback configure,
+            CancellationToken cancellationToken) {
+        return send(message, context -> configure.configure(context), cancellationToken);
     }
 
     default <T> CompletableFuture<Void> send(T message, Consumer<SendContext> contextCallback) {

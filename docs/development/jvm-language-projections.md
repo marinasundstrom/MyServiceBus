@@ -31,6 +31,13 @@ projection are stabilized release surfaces, while the Kotlin projection is
 explicitly experimental. Kotlin can evolve independently, but it must continue
 to prove the same observable core behavior.
 
+Applications choose one primary language projection. Java applications use the
+Java contracts; Kotlin applications use the Kotlin contracts. Kotlin can call
+Java packages when library interop or an unprojected capability requires it,
+but those APIs are an explicit interoperability path rather than the default
+Kotlin experience. The projections are peers over shared foundations, not a
+Java public API with Kotlin convenience extensions layered on top.
+
 The public concept map should stay directly translatable across C#, Java, and
 Kotlin: consumer, consume context, send context, publish context, definition,
 endpoint, handler, request client, and bus should retain the same meaning and
@@ -134,6 +141,15 @@ concrete `ConsumeContext` parameter and supplies the adapter itself, so generate
 and handwritten Java registrations keep their source shape. Kotlin consumers
 compose their own suspending `ConsumeContext` directly over the shared contract;
 tests invoke one with no Java consume-context instance at all.
+
+Endpoint projections use the same pattern. Java's functional `PublishEndpoint`
+and `SendEndpoint` retain their existing methods and provide default adapters
+to the shared `OutgoingMessagePublisher` and `OutgoingMessageDispatcher`
+capabilities. Their provider interfaces similarly adapt the common provider
+contracts. Kotlin's separately owned endpoint interfaces expose suspending
+operations and now depend on those common capabilities internally; tests drive
+the Kotlin facades with implementations that do not implement either Java
+endpoint interface.
 
 ## Current transition
 
