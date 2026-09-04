@@ -403,6 +403,12 @@ public final class OrderConsumers {
 
 Use `cfg.addConsumerMethods(OrderConsumers.class)` for reflection discovery, or add `myservicebus-processor` to the build's `annotationProcessor` configuration and register `GeneratedConsumerCatalog.INSTANCE`. The processor is JSR 269 tooling and does not lock the application to Spring, Quarkus, Micronaut, or another framework.
 
+For bounded reflection discovery across both Java `Consumer<T>` implementations
+and annotated consumer methods, pass the finite candidate set to
+`cfg.addConsumers(OrderConsumer.class, OrderFunctions.class)`. The predicate
+overload provides the same filtering concept as .NET `AddConsumers(...)`
+without introducing implicit JVM classpath scanning.
+
 #### Kotlin
 
 Kotlin uses native projection types and extension functions over the same service collection and

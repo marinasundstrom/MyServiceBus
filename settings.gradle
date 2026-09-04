@@ -8,6 +8,9 @@ project(':myservicebus').projectDir = file("${javaDir}/myservicebus")
 include 'myservicebus-kotlin'
 project(':myservicebus-kotlin').projectDir = file('src/Kotlin/myservicebus-kotlin')
 
+include 'myservicebus-kotlin-processor'
+project(':myservicebus-kotlin-processor').projectDir = file('src/Kotlin/myservicebus-kotlin-processor')
+
 include 'kotlin-sample'
 project(':kotlin-sample').projectDir = file('src/Kotlin/sample')
 

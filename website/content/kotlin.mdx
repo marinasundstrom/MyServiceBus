@@ -11,6 +11,34 @@ dependencies {
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.17.2")
 }`;
 
+export const kotlinConsumerFunction = `@ConsumerFunction("lookup-order")
+suspend fun lookupOrder(
+    lookupOrder: LookupOrder,
+    orders: OrderRepository,
+): OrderStatus = orders.find(lookupOrder.orderId)
+
+services.addServiceBus {
+    consumer<SubmitOrderConsumer>()
+    consumerFunction(::lookupOrder)
+}`;
+
+export const kotlinGeneratedCatalog = `plugins {
+    id("com.google.devtools.ksp") version "2.2.20-2.0.4"
+}
+
+dependencies {
+    ksp("io.github.marinasundstrom.myservicebus:myservicebus-kotlin-processor:0.1.0-preview.10")
+}
+
+ksp {
+    arg("myservicebus.catalog.package", "com.example.orders.generated")
+    arg("myservicebus.catalog.name", "OrdersConsumerCatalog")
+}
+
+services.addServiceBus {
+    OrdersConsumerCatalog.register(this)
+}`;
+
 export const kotlinConsumer = `data class SubmitOrder(val orderId: UUID)
 data class OrderSubmitted(val orderId: UUID)
 
@@ -117,6 +145,21 @@ The Kotlin artifact sits above the shared JVM runtime. Add the Kotlin Jackson mo
 Kotlin owns both <code>Consumer&lt;T&gt;</code> and <code>ConsumeContext&lt;T&gt;</code>. The handler can call suspending messaging operations directly; MyServiceBus waits for the coroutine before acknowledging the delivery and propagates cancellation and failure into the shared receive pipeline.
 
 <CodeViewer code={kotlinConsumer} label="Suspending Kotlin consumer" language="kotlin" />
+
+## Use a suspending function when a class is unnecessary
+
+The first parameter binds the message directly. Additional application parameters resolve from the active per-message dependency-injection scope, and an optional matching <code>ConsumeContext&lt;T&gt;</code> exposes delivery metadata and messaging operations. A non-<code>Unit</code> result is returned as the correlated response.
+
+The example registers both the class and function explicitly. The function-reference path uses bounded startup reflection and never scans the classpath.
+
+<CodeViewer code={kotlinConsumerFunction} label="Explicit Kotlin consumer registration" language="kotlin" />
+
+<div className="callout">
+  <strong>Optional generated catalog</strong>
+  <p>In a larger application split across projects and packages, KSP can discover annotated functions and ordinary Kotlin consumer and handler classes during compilation. It emits the same finite registration list a developer could write manually, without startup scanning. Give each feature module a distinct catalog name, then register those few module catalogs in the application. Omit the KSP plugin and processor dependency to disable generation.</p>
+</div>
+
+<CodeViewer code={kotlinGeneratedCatalog} label="Optional Kotlin generated catalog" language="kotlin" />
 
 ## Configure and publish without Java ceremony
 

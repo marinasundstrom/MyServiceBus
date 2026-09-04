@@ -91,6 +91,27 @@ GeneratedConsumerCatalog.INSTANCE.register(configurator);
 
 The Java CI smoke application uses this catalog with the mediator and `ServiceCollection.createAot()`, builds a GraalVM native executable without tracing-agent reachability metadata, and executes a real message dispatch. The factory-only container does not use Guice activation: every service reached at runtime must have an explicit provider factory. Conventional applications can continue using `ServiceCollection.create()` and its Guice-backed constructor injection.
 
+Kotlin uses the same catalog boundary through KSP. The processor generates
+direct registrations for Kotlin consumer classes, handlers, and annotated
+suspending consumer functions, so no Kotlin reflection is required on the
+generated registration or dispatch path:
+
+```kotlin
+plugins {
+    id("com.google.devtools.ksp") version "2.2.20-2.0.4"
+}
+
+dependencies {
+    ksp("io.github.marinasundstrom.myservicebus:myservicebus-kotlin-processor:0.1.0-preview.10")
+}
+
+GeneratedConsumerCatalog.register(configurator)
+```
+
+Explicit `consumerFunction(::function)` registration remains a compatibility
+option and uses bounded startup reflection. Applications targeting native-image
+or strict closed-world deployment should use the generated catalog instead.
+
 The public DI extension boundary remains container-neutral: factory registrations use the JDK-standard `Supplier`, provider-aware registrations return a `Supplier`, and custom providers can create a `ServiceScope` from their scoped provider and cleanup callback. See [Java dependency-injection boundary](java-dependency-injection.md).
 
 An application may also materialize the MyServiceBus collection with another container. Its adapter must preserve the MyServiceBus scope and resolution contract; any trimming annotations, reachability metadata, or build-time generation required by that container remain part of the application's selected AOT stack.

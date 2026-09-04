@@ -269,6 +269,27 @@ public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigura
         registerMethodDefinitions(ReflectionConsumerMethodDiscovery.discover(declaringType, false), endpointName);
     }
 
+    @Override
+    @SuppressWarnings({ "unchecked", "rawtypes" })
+    public void addConsumers(Class<?>... candidateTypes) {
+        if (candidateTypes == null) {
+            throw new IllegalArgumentException("candidateTypes must not be null");
+        }
+        for (Class<?> candidateType : candidateTypes) {
+            if (candidateType == null) {
+                throw new IllegalArgumentException("candidateTypes must not contain null");
+            }
+            if (com.myservicebus.Consumer.class.isAssignableFrom(candidateType)) {
+                addConsumer((Class) candidateType);
+            }
+            java.util.List<ReflectionConsumerMethodDiscovery.Definition<?>> definitions =
+                    ReflectionConsumerMethodDiscovery.discover(candidateType, true);
+            if (!definitions.isEmpty()) {
+                registerMethodDefinitions(definitions, null);
+            }
+        }
+    }
+
     private void registerMethodDefinitions(
             java.util.List<ReflectionConsumerMethodDiscovery.Definition<?>> definitions,
             String endpointOverride) {

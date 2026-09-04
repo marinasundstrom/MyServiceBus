@@ -201,11 +201,29 @@ signature, binds the first parameter as the message, supplies an optional
 matching context, resolves other parameters from the active message scope, and
 invokes the suspending function. It does not scan the classpath.
 
-KSP should resolve the same signature at compile time and emit a direct adapter
-to the public `registerConsumerFunction` runtime seam. Generated code supplies
+The optional `myservicebus-kotlin-processor` KSP processor resolves the same
+signature at compile time and emits a direct adapter to the public
+`registerConsumerFunction` runtime seam. It also discovers concrete Kotlin
+`Consumer<T>` and `Handler<T, R>` classes and supplies their contract classes
+directly, avoiding runtime generic-interface discovery. Generated code supplies
 a stable package-and-function identity, the concrete message and response
 types, endpoint policy, and dependency-resolution calls. Compiler-generated
 lambda or file-facade class names must not become the logical consumer identity.
+
+Generated registration is optional across the .NET, Java, and Kotlin
+projections. Build tooling differs—Roslyn, JSR 269, and KSP—but each generator
+emits the finite explicit registration list during compilation and lowers it
+into the same definitions. Small applications can keep that list in application
+code. Larger applications split across projects and namespaces can use the
+generated catalog without paying for startup assembly or type scanning.
+Reflection remains an explicit compatibility and dynamic-discovery choice with
+startup and closed-world costs; it is never an implicit fallback. Java
+`annotationProcessor` and Kotlin `ksp` dependencies activate generation, and
+removing them disables it without affecting direct or reflection registration.
+Kotlin feature modules configure `myservicebus.catalog.package` and
+`myservicebus.catalog.name` so their compiled catalogs have distinct JVM type
+identities. The application registers those module catalogs explicitly; KSP
+does not attempt hidden classpath enumeration of dependency modules.
 
 ## MVP package and artifact shape
 

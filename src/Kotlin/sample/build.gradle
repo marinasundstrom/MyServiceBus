@@ -1,5 +1,6 @@
 plugins {
     id 'org.jetbrains.kotlin.jvm'
+    id 'com.google.devtools.ksp'
     id 'application'
 }
 
@@ -8,6 +9,7 @@ group = 'com.myservicebus.kotlin.sample'
 dependencies {
     implementation project(':myservicebus-kotlin')
     implementation project(':myservicebus-rabbitmq')
+    ksp project(':myservicebus-kotlin-processor')
     implementation "com.fasterxml.jackson.module:jackson-module-kotlin:${jacksonVersion}"
     runtimeOnly "org.slf4j:slf4j-simple:${slf4jVersion}"
     testImplementation "org.jetbrains.kotlin:kotlin-test-junit5:2.2.20"

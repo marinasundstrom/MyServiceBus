@@ -59,17 +59,31 @@ internal fun ConsumerRegistrationConfigurator.registerKotlinConsumer(
     val annotationEndpoint = consumerType.getAnnotation(MessageConsumer::class.java)
         ?.value
         ?.takeIf(String::isNotBlank)
-    val resolvedEndpoint = endpointName
-        ?: annotationEndpoint
-        ?: DefaultEndpointNameFormatter.INSTANCE.format(consumerType)
-    val endpointNameExplicit = endpointName != null || annotationEndpoint != null
-
     @Suppress("UNCHECKED_CAST")
-    val concreteConsumerType = consumerType as Class<Any>
+    val concreteConsumerType = consumerType as Class<Consumer<Any>>
     @Suppress("UNCHECKED_CAST")
     val concreteMessageType = messageType as Class<Any>
 
-    serviceCollection.addScoped(concreteConsumerType, concreteConsumerType)
+    registerKotlinConsumer(
+        concreteConsumerType,
+        concreteMessageType,
+        endpointName ?: annotationEndpoint,
+        endpointName != null || annotationEndpoint != null,
+        dispatcher,
+    )
+}
+
+@PublishedApi
+internal fun <TMessage : Any, TConsumer : Consumer<TMessage>> ConsumerRegistrationConfigurator.registerKotlinConsumer(
+    consumerType: Class<TConsumer>,
+    messageType: Class<TMessage>,
+    endpointName: String?,
+    endpointNameExplicit: Boolean,
+    dispatcher: CoroutineDispatcher,
+) {
+    val resolvedEndpoint = endpointName ?: DefaultEndpointNameFormatter.INSTANCE.format(consumerType)
+
+    serviceCollection.addScoped(consumerType, consumerType)
     val definition = ConsumerDefinitionModel(
         consumerType,
         EndpointDefinitionModel(
@@ -79,15 +93,14 @@ internal fun ConsumerRegistrationConfigurator.registerKotlinConsumer(
             null,
             null,
         ),
-        listOf(concreteMessageType),
+        listOf(messageType),
     )
     addConsumerRegistration(
         ConsumerRegistration(
             definition,
-            concreteMessageType,
+            messageType,
             ConsumerInvoker { provider, context ->
-                @Suppress("UNCHECKED_CAST")
-                val consumer = provider.getRequiredService(concreteConsumerType) as Consumer<Any>
+                val consumer = provider.getRequiredService(consumerType)
                 consumer.consumeAsync(context, dispatcher)
             },
         ),
@@ -104,17 +117,31 @@ internal fun ConsumerRegistrationConfigurator.registerKotlinHandler(
     val annotationEndpoint = handlerType.getAnnotation(MessageConsumer::class.java)
         ?.value
         ?.takeIf(String::isNotBlank)
-    val resolvedEndpoint = endpointName
-        ?: annotationEndpoint
-        ?: DefaultEndpointNameFormatter.INSTANCE.format(handlerType)
-    val endpointNameExplicit = endpointName != null || annotationEndpoint != null
-
     @Suppress("UNCHECKED_CAST")
-    val concreteHandlerType = handlerType as Class<Any>
+    val concreteHandlerType = handlerType as Class<Handler<Any, Any>>
     @Suppress("UNCHECKED_CAST")
     val concreteRequestType = requestType as Class<Any>
 
-    serviceCollection.addScoped(concreteHandlerType, concreteHandlerType)
+    registerKotlinHandler(
+        concreteHandlerType,
+        concreteRequestType,
+        endpointName ?: annotationEndpoint,
+        endpointName != null || annotationEndpoint != null,
+        dispatcher,
+    )
+}
+
+@PublishedApi
+internal fun <TRequest : Any, TResponse : Any, THandler : Handler<TRequest, TResponse>> ConsumerRegistrationConfigurator.registerKotlinHandler(
+    handlerType: Class<THandler>,
+    requestType: Class<TRequest>,
+    endpointName: String?,
+    endpointNameExplicit: Boolean,
+    dispatcher: CoroutineDispatcher,
+) {
+    val resolvedEndpoint = endpointName ?: DefaultEndpointNameFormatter.INSTANCE.format(handlerType)
+
+    serviceCollection.addScoped(handlerType, handlerType)
     val definition = ConsumerDefinitionModel(
         handlerType,
         EndpointDefinitionModel(
@@ -124,15 +151,14 @@ internal fun ConsumerRegistrationConfigurator.registerKotlinHandler(
             null,
             null,
         ),
-        listOf(concreteRequestType),
+        listOf(requestType),
     )
     addConsumerRegistration(
         ConsumerRegistration(
             definition,
-            concreteRequestType,
+            requestType,
             ConsumerInvoker { provider, context ->
-                @Suppress("UNCHECKED_CAST")
-                val handler = provider.getRequiredService(concreteHandlerType) as Handler<Any, Any>
+                val handler = provider.getRequiredService(handlerType)
                 handler.handleAsync(context, dispatcher)
             },
         ),
@@ -319,8 +345,8 @@ internal fun <TMessage : Any> Consumer<TMessage>.consumeAsync(
     consume(ConsumeContext(context))
 }.asVoidFuture()
 
-private fun Handler<Any, Any>.handleAsync(
-    context: MessageDeliveryContext<Any>,
+private fun <TRequest : Any, TResponse : Any> Handler<TRequest, TResponse>.handleAsync(
+    context: MessageDeliveryContext<TRequest>,
     dispatcher: CoroutineDispatcher,
 ): CompletableFuture<Void> = coroutineFuture(context.cancellationToken, dispatcher) {
     val kotlinContext = ConsumeContext(context)

@@ -4,11 +4,13 @@ import com.myservicebus.di.ServiceCollection
 import com.myservicebus.di.ServiceProvider
 import com.myservicebus.kotlin.ConsumeContext
 import com.myservicebus.kotlin.Consumer
+import com.myservicebus.kotlin.ConsumerFunction
 import com.myservicebus.kotlin.MessageBus
 import com.myservicebus.kotlin.RequestClientFactory
 import com.myservicebus.kotlin.RequestResult
 import com.myservicebus.kotlin.Handler
 import com.myservicebus.kotlin.addServiceBus
+import com.myservicebus.kotlin.addSingleton
 import com.myservicebus.kotlin.createMediator
 import com.myservicebus.kotlin.getRequiredService
 import com.myservicebus.rabbitmq.RabbitMqFactoryConfigurator
@@ -26,6 +28,20 @@ data class LookupOrder(val orderId: UUID)
 data class OrderStatus(val orderId: UUID, val status: String)
 
 data class OrderNotFound(val orderId: UUID)
+
+data class GeneratedLookupOrder(val orderId: UUID)
+
+data class GeneratedOrderStatus(val orderId: UUID, val status: String)
+
+fun interface OrderRepository {
+    fun find(orderId: UUID): GeneratedOrderStatus
+}
+
+@ConsumerFunction("generated-lookup-order")
+suspend fun lookupOrder(
+    lookupOrder: GeneratedLookupOrder,
+    orders: OrderRepository,
+): GeneratedOrderStatus = orders.find(lookupOrder.orderId)
 
 class SubmitOrderConsumer : Consumer<SubmitOrder> {
     override suspend fun consume(context: ConsumeContext<SubmitOrder>) {
@@ -54,9 +70,11 @@ class LookupOrderConsumer : Consumer<LookupOrder> {
 
 fun createServices(host: String = "localhost", port: Int = 5672): ServiceCollection =
     ServiceCollection.create().apply {
+        addSingleton<OrderRepository>(OrderRepository { orderId -> GeneratedOrderStatus(orderId, "Pending") })
         addServiceBus {
             consumer<SubmitOrderConsumer>()
             consumer<LookupOrderConsumer>()
+            consumerFunction(::lookupOrder)
             transport<RabbitMqFactoryConfigurator> { context ->
                 host(host, port) { credentials ->
                     credentials.username("guest")

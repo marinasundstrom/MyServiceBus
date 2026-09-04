@@ -9,6 +9,7 @@ import com.myservicebus.di.ServiceCollection
 import com.myservicebus.di.ServiceProviderBasedProvider
 import com.myservicebus.kotlin.ConsumeContext
 import com.myservicebus.kotlin.Consumer
+import com.myservicebus.kotlin.ConsumerFunction
 import com.myservicebus.kotlin.Handler
 import com.myservicebus.kotlin.MessageBus
 import com.myservicebus.kotlin.PublishEndpoint
@@ -19,6 +20,7 @@ import com.myservicebus.kotlin.SendEndpointProvider
 import com.myservicebus.kotlin.addServiceBus
 import com.myservicebus.kotlin.createMediator
 import com.myservicebus.kotlin.getRequiredService
+import com.myservicebus.kotlin.generated.GeneratedConsumerCatalog
 import java.net.URI
 import java.util.concurrent.CompletableFuture
 import java.util.UUID
@@ -56,6 +58,14 @@ data class PackageSmokeRequest(val value: String)
 data class PackageSmokeResponse(val value: String)
 
 data class PackageSmokeRejection(val value: String)
+
+data class GeneratedPackageSmokeRequest(val value: String)
+
+data class GeneratedPackageSmokeResponse(val value: String)
+
+@ConsumerFunction("generated-package-smoke")
+suspend fun generatedPackageSmoke(request: GeneratedPackageSmokeRequest): GeneratedPackageSmokeResponse =
+    GeneratedPackageSmokeResponse(request.value)
 
 class PackageSmokeHandler : Handler<PackageSmokeRequest, PackageSmokeResponse> {
     override suspend fun handle(context: ConsumeContext<PackageSmokeRequest>): PackageSmokeResponse =
@@ -121,9 +131,7 @@ fun main() = runBlocking {
     }
 
     val mediator = ServiceCollection.create().createMediator {
-        consumer<PackageSmokeConsumer>()
-        consumer<PackageSmokeFollowUpConsumer>()
-        handler<PackageSmokeHandler>()
+        GeneratedConsumerCatalog.register(this)
     }
     val message = PackageSmokeMessage("package-smoke")
     mediator.publish(message)
@@ -132,6 +140,9 @@ fun main() = runBlocking {
 
     val response: PackageSmokeResponse = mediator.request(PackageSmokeRequest("request-smoke"))
     check(response.value == "request-smoke")
+    val generatedResponse: GeneratedPackageSmokeResponse =
+        mediator.request(GeneratedPackageSmokeRequest("generated-smoke"))
+    check(generatedResponse.value == "generated-smoke")
 
     val correlationId = UUID.randomUUID()
     val result: RequestResult<PackageSmokeResponse, PackageSmokeRejection> = provider.createScope().use { scope ->

@@ -3,7 +3,7 @@ set -eu
 
 output="${1:-build/maven-central-bundle.zip}"
 version="${2:-0.1.0-preview.10}"
-modules="myservicebus-abstractions myservicebus-di myservicebus-logging myservicebus-tasks myservicebus myservicebus-kotlin myservicebus-processor myservicebus-serialization-bson myservicebus-postgresql myservicebus-inspection myservicebus-monitoring myservicebus-rabbitmq myservicebus-azure-service-bus myservicebus-amazon-sqs myservicebus-testing"
+modules="myservicebus-abstractions myservicebus-di myservicebus-logging myservicebus-tasks myservicebus myservicebus-kotlin myservicebus-kotlin-processor myservicebus-processor myservicebus-serialization-bson myservicebus-postgresql myservicebus-inspection myservicebus-monitoring myservicebus-rabbitmq myservicebus-azure-service-bus myservicebus-amazon-sqs myservicebus-testing"
 staging_dir="$(mktemp -d)"
 
 case "$version" in
@@ -25,8 +25,8 @@ output_dir="$(cd "$output_dir" && pwd)"
 
 for module in $modules; do
   module_dir="src/Java/$module"
-  if [ "$module" = "myservicebus-kotlin" ]; then
-    module_dir="src/Kotlin/myservicebus-kotlin"
+  if [ "$module" = "myservicebus-kotlin" ] || [ "$module" = "myservicebus-kotlin-processor" ]; then
+    module_dir="src/Kotlin/$module"
   fi
   repository="$module_dir/build/repository"
   version_directory="$repository/io/github/marinasundstrom/myservicebus/$module/$version"

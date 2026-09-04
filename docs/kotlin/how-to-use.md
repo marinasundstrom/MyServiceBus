@@ -129,6 +129,83 @@ val mediator = services.createMediator {
 mediator.send(SubmitOrder(UUID.randomUUID()))
 ```
 
+## Consumer functions and generated registration
+
+Small consumers can be top-level suspending functions. The first parameter is
+the message; an optional matching `ConsumeContext<T>` comes from the delivery,
+and all other parameters resolve from the active per-message dependency scope.
+A non-`Unit` result becomes the correlated response.
+
+```kotlin
+@ConsumerFunction("lookup-order")
+suspend fun lookupOrder(
+    lookupOrder: LookupOrder,
+    orders: OrderRepository,
+): OrderStatus = orders.find(lookupOrder.orderId)
+```
+
+Register it explicitly from the normal configuration DSL:
+
+```kotlin
+services.addServiceBus {
+    consumer<SubmitOrderConsumer>()
+    consumerFunction(::lookupOrder)
+}
+```
+
+This function-reference path uses bounded reflection and never scans the
+classpath. For a larger application split across projects and packages, KSP
+can generate the finite registration list during compilation:
+
+```kotlin
+plugins {
+    id("com.google.devtools.ksp") version "2.2.20-2.0.4"
+}
+
+dependencies {
+    ksp("io.github.marinasundstrom.myservicebus:myservicebus-kotlin-processor:0.1.0-preview.10")
+}
+
+ksp {
+    arg("myservicebus.catalog.package", "com.example.orders.generated")
+    arg("myservicebus.catalog.name", "OrdersConsumerCatalog")
+}
+```
+
+KSP discovers this function as well as concrete Kotlin `Consumer<T>` and
+`Handler<T, R>` classes in the compilation. Register its direct, typed catalog
+from the same DSL:
+
+```kotlin
+import com.example.orders.generated.OrdersConsumerCatalog
+
+services.addServiceBus {
+    OrdersConsumerCatalog.register(this)
+    // transport configuration
+}
+```
+
+The generated catalog supplies concrete
+contract types and direct invokers without startup signature discovery or
+reflective invocation. `consumerFunction(::lookupOrder)` remains available as
+an explicit compatibility path for applications that cannot run KSP. It
+reflects only the supplied function reference and never scans the classpath.
+Generation is activated explicitly by applying KSP and adding the processor
+dependency shown above; remove those two build entries to disable it.
+The package and name options prevent catalog-class collisions when multiple
+feature modules generate catalogs. An application normally registers one
+catalog per feature module—a short stable list instead of every consumer. A
+single-module application may omit both options and use
+`com.myservicebus.kotlin.generated.GeneratedConsumerCatalog`.
+
+Generation is not required. Register a class explicitly with `consumer<T>()`
+or `handler<T>()`; register a function explicitly with a typed
+`registerConsumerFunction(...)` adapter; use `consumerFunction(::function)` for
+bounded reflection; or let KSP write those registrations into the catalog.
+These styles may be mixed—the developer chooses whether concise discovery,
+fully explicit wiring, startup cost, or closed-world deployment matters most
+for each application component.
+
 ## Suspending request handlers
 
 A Kotlin handler returns its response directly. Registration and dispatch still

@@ -87,6 +87,10 @@ Continue with the [Java quick start](#java) or the detailed [Java guide](src/Jav
 Kotlin applications can add the Kotlin facade alongside their selected transport:
 
 ```kotlin
+plugins {
+    kotlin("jvm") version "2.2.20"
+}
+
 dependencies {
     implementation("io.github.marinasundstrom.myservicebus:myservicebus-kotlin:0.1.0-preview.10")
     implementation("io.github.marinasundstrom.myservicebus:myservicebus-rabbitmq:0.1.0-preview.10")
@@ -106,6 +110,7 @@ See the [Kotlin guide](docs/kotlin/how-to-use.md) and the evolving
 | --- | --- |
 | [`io.github.marinasundstrom.myservicebus:myservicebus`](https://central.sonatype.com/artifact/io.github.marinasundstrom.myservicebus/myservicebus) | Core messaging runtime and in-memory mediator |
 | `io.github.marinasundstrom.myservicebus:myservicebus-kotlin` | Experimental Kotlin-native projection with configuration DSLs, coroutines, suspend consumers and request handlers, and dependency-injection extensions over the shared JVM runtime |
+| `io.github.marinasundstrom.myservicebus:myservicebus-kotlin-processor` | Optional KSP processor for generated Kotlin class-consumer, handler, and consumer-function catalogs |
 | `io.github.marinasundstrom.myservicebus:myservicebus-processor` | Optional JSR 269 processor for generated consumer catalogs and direct method invokers |
 | `io.github.marinasundstrom.myservicebus:myservicebus-serialization-bson` | Optional MassTransit-compatible BSON envelope serialization |
 | `io.github.marinasundstrom.myservicebus:myservicebus-postgresql` | PostgreSQL transactional outbox and inbox persistence |

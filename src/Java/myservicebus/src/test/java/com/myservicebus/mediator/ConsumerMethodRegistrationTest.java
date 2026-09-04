@@ -127,6 +127,27 @@ public class ConsumerMethodRegistrationTest {
     }
 
     @Test
+    public void addConsumersDiscoversInterfaceConsumersAndAnnotatedMethods() {
+        ServiceCollection services = ServiceCollection.create();
+        var configurator = new BusRegistrationConfiguratorImpl(services);
+
+        configurator.addConsumers(
+                type -> type != GroupedConsumers.class,
+                InterfaceConsumer.class,
+                MethodOnlyConsumers.class,
+                GroupedConsumers.class);
+        configurator.complete();
+
+        var topology = services.buildServiceProvider()
+                .getRequiredService(com.myservicebus.topology.TopologyRegistry.class);
+        Assertions.assertEquals(2, topology.getConsumers().size());
+        Assertions.assertEquals("interface-orders", endpointFor(topology, Order.class));
+        Assertions.assertTrue(topology.getConsumers().stream()
+                .anyMatch(consumer -> consumer.getMethodInvoker() != null
+                        && consumer.getQueueName().equals("method-orders")));
+    }
+
+    @Test
     public void explicitInvokerUsesTheSameMethodConsumerTopology() {
         ServiceCollection services = ServiceCollection.create();
         Audit audit = new Audit();

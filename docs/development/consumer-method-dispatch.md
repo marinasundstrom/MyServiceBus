@@ -184,3 +184,21 @@ public final class OrderConsumers {
 ```
 
 Applications may register the same declaration reflectively with `addConsumerMethods(OrderConsumers.class)`, register a typed Java `ConsumerMethodInvoker<Order>` by hand, or add `myservicebus-processor` to the standard `annotationProcessor` configuration and call `GeneratedConsumerCatalog.INSTANCE.register(configurator)`. The Java invoker adapts to the shared `ConsumerInvoker` used by normalized `ConsumerRegistration` instances, so Kotlin suspend consumers enter the same topology and scoped pipeline without changing Java's source API. Generated Java calls the method directly and does not require Spring, Quarkus, Micronaut, or another application framework.
+
+Registration policy is a developer choice rather than a hidden runtime mode:
+
+| Style | What the application supplies | Tradeoff |
+| --- | --- | --- |
+| Explicit | A consumer implementation, or a typed method/function invoker | Most control and no discovery; method adapters require application code |
+| Reflection | Bounded assemblies, candidate classes, or a Kotlin function reference | Convenient compatibility path with startup and closed-world/AOT costs |
+| Generated catalog | The language-specific generator plus one catalog registration | Compile-time discovery with direct typed registration and dispatch |
+
+All three styles lower into the same consumer definitions and pipeline. They
+can be mixed in one application when different components need different
+tradeoffs; duplicate registration remains governed by the projection's normal
+identity rules.
+
+Java also exposes `addConsumers(Class<?>...)` and a predicate overload as the
+bounded counterpart to .NET `AddConsumers(...)`. It registers `Consumer<T>`
+implementations and annotated consumer methods from the supplied candidate
+types. The JVM API deliberately does not scan the whole classpath.

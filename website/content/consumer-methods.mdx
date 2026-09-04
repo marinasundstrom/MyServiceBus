@@ -87,6 +87,27 @@ export const javaGeneratedExample = `dependencies {
 
 GeneratedConsumerCatalog.INSTANCE.register(configurator);`;
 
+export const javaCombinedReflection = `configurator.addConsumers(
+    type -> type.getPackageName().startsWith("com.example.sales"),
+    SubmitOrderConsumer.class,
+    OrderFunctions.class);`;
+
+export const kotlinFunctionExample = `@ConsumerFunction("submit-order")
+suspend fun submitOrder(
+    order: SubmitOrder,
+    orders: OrderService,
+): SubmitOrderResponse = orders.submit(order)`;
+
+export const kotlinGeneratedExample = `plugins {
+    id("com.google.devtools.ksp") version "2.2.20-2.0.4"
+}
+
+dependencies {
+    ksp("io.github.marinasundstrom.myservicebus:myservicebus-kotlin-processor:0.1.0-preview.10")
+}
+
+GeneratedConsumerCatalog.register(configurator)`;
+
 <p className="docs-kicker">C# and Java consumer declarations · Preview</p>
 
 # Declare consumers with methods or consumer types.
@@ -100,6 +121,12 @@ GeneratedConsumerCatalog.INSTANCE.register(configurator);`;
 Java uses <code>@MessageConsumer</code> because <code>Consumer&lt;T&gt;</code> already names its interface-consumer contract. Its binding and endpoint semantics match the C# declaration without requiring a shared attribute or interface.
 
 <CodeViewer code={javaMethodExample} label="Java consumer method" language="java" />
+
+## The Kotlin function projection
+
+Kotlin declares the same idea as a top-level suspending function. Its message is bound directly, other parameters come from the delivery scope, and the returned value becomes the response.
+
+<CodeViewer code={kotlinFunctionExample} label="Kotlin consumer function" language="kotlin" />
 
 ## Return a response
 
@@ -162,6 +189,10 @@ Reflection discovery is already limited to the supplied assemblies. An optional 
 
 <CodeViewer code={filteredScanExample} label="C# filtered consumer discovery" language="csharp" />
 
+Java offers the similar bounded <code>addConsumers(...)</code> surface for both <code>Consumer&lt;T&gt;</code> implementations and annotated methods. Callers supply the finite candidate classes because MyServiceBus does not perform implicit classpath scanning.
+
+<CodeViewer code={javaCombinedReflection} label="Java combined consumer discovery" language="java" />
+
 ## Override an interface consumer endpoint
 
 The attribute is also an alternative to fluent endpoint mapping for a normal <code>IConsumer&lt;T&gt;</code> class. In that case it overrides the consumer&apos;s endpoint name; it does not turn <code>Consume</code> into a separately discovered method consumer.
@@ -170,14 +201,23 @@ The attribute is also an alternative to fluent endpoint mapping for a normal <co
 
 ## Reflection or generated dispatch
 
-MyServiceBus has two discovery and registration paths. Reflection inspects declarations at startup. The C# generator and Java JSR 269 processor scan their compilations and emit explicit typed registrations. Once registered, both paths enter the same runtime pipeline.
+Registration is an application choice. Explicit registration names a consumer implementation or supplies a typed method/function invoker without discovery. Reflection inspects explicitly selected declarations at startup. The C# generator, Java JSR 269 processor, and Kotlin KSP processor scan their compilations and emit the explicit typed registrations for the application. Every path enters the same runtime pipeline.
+
+<div className="docs-feature-grid">
+  <div><span>01</span><h3>Explicit</h3><p>Register consumer implementations or typed invokers directly for maximum control and no discovery.</p></div>
+  <div><span>02</span><h3>Reflection</h3><p>Discover bounded assemblies, classes, or function references with a startup and AOT tradeoff.</p></div>
+  <div><span>03</span><h3>Generated</h3><p>Let build-time tooling emit direct registrations for predictable startup and closed-world deployment.</p></div>
+</div>
 
 <ul className="check-list">
   <li>Assembly discovery builds method descriptors and invokes methods through reflection.</li>
-  <li>The C# and Java generators bind parameters and call methods directly.</li>
+  <li>The C#, Java, and Kotlin generators bind parameters and call methods or functions directly.</li>
   <li>Both modes use the same receive, retry, fault, telemetry, and dependency scopes.</li>
   <li>Java reflection inspects only explicitly registered classes; it does not scan the classpath.</li>
+  <li>Applications may mix styles when different components need different tradeoffs.</li>
 </ul>
+
+<CodeViewer code={kotlinGeneratedExample} label="Kotlin generated catalog" language="kotlin" />
 
 <CodeViewer code={javaGeneratedExample} label="Java generated consumer registration" language="java" />
 

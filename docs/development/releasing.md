@@ -69,7 +69,7 @@ Using one immutable tag for both workflows prevents a branch update from causing
 ## Publishing both ecosystems
 
 1. In GitHub Actions, run **Publish Maven Central preview** and select the release tag.
-2. Wait for the workflow to reach Maven Central state `PUBLISHING` or `PUBLISHED`. It tests all JVM modules, creates signed publications, verifies clean Java and Kotlin consumers, uploads one bundle containing all fifteen artifacts, and waits for Central to validate and accept it. Publication then continues asynchronously in Central.
+2. Wait for the workflow to reach Maven Central state `PUBLISHING` or `PUBLISHED`. It tests all JVM modules, creates signed publications, verifies clean Java and Kotlin consumers, uploads one bundle containing all sixteen artifacts, and waits for Central to validate and accept it. Publication then continues asynchronously in Central.
 3. Run **Publish NuGet preview** and select the same release tag.
 4. Confirm that all eleven NuGet packages and the ten symbol packages were accepted. The analyzer-only generator package does not produce a symbol package.
 5. Run **Publish monitoring images** from the same tag and confirm that the separately deployable collector and dashboard images were accepted by GitHub Container Registry for AMD64 and ARM64.
@@ -84,7 +84,7 @@ Maven Central accepted the original eight-artifact `0.1.0-preview.3` deployment 
 
 ## Failure and retry behavior
 
-NuGet and Maven Central package versions are immutable. The NuGet workflow uses `--skip-duplicate`, allowing an interrupted multi-package push to resume without replacing accepted packages. Maven Central uploads all fifteen JVM artifacts as one deployment bundle; validation failure leaves the deployment failed rather than partially publishing individual modules. The collector and dashboard are applications rather than client libraries, so they are distributed as separate OCI images named `ghcr.io/marinasundstrom/myservicebus-monitoring-collector` and `ghcr.io/marinasundstrom/myservicebus-monitoring-dashboard`.
+NuGet and Maven Central package versions are immutable. The NuGet workflow uses `--skip-duplicate`, allowing an interrupted multi-package push to resume without replacing accepted packages. Maven Central uploads all sixteen JVM artifacts as one deployment bundle; validation failure leaves the deployment failed rather than partially publishing individual modules. The collector and dashboard are applications rather than client libraries, so they are distributed as separate OCI images named `ghcr.io/marinasundstrom/myservicebus-monitoring-collector` and `ghcr.io/marinasundstrom/myservicebus-monitoring-dashboard`.
 
 If the Maven workflow is interrupted before Central accepts the deployment, do
 not upload the version again. Dispatch a ref containing the workflow's

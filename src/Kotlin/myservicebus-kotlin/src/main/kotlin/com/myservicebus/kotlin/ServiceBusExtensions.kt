@@ -51,6 +51,42 @@ class ServiceBusConfigurator internal constructor(
     @PublishedApi
     internal val registeredKotlinFunctions = mutableSetOf<String>()
 
+    /** Registers a compiler-generated adapter for a Kotlin consumer class. */
+    fun <TMessage : Any, TConsumer : Consumer<TMessage>> registerConsumerClass(
+        consumerType: Class<TConsumer>,
+        messageType: Class<TMessage>,
+        endpointName: String? = null,
+        endpointNameExplicit: Boolean = endpointName != null,
+        dispatcher: CoroutineDispatcher = Dispatchers.Default,
+    ) {
+        if (!registeredKotlinConsumers.add(consumerType)) return
+        delegate.registerKotlinConsumer(
+            consumerType,
+            messageType,
+            endpointName,
+            endpointNameExplicit,
+            dispatcher,
+        )
+    }
+
+    /** Registers a compiler-generated adapter for a Kotlin request handler. */
+    fun <TRequest : Any, TResponse : Any, THandler : Handler<TRequest, TResponse>> registerHandlerClass(
+        handlerType: Class<THandler>,
+        requestType: Class<TRequest>,
+        endpointName: String? = null,
+        endpointNameExplicit: Boolean = endpointName != null,
+        dispatcher: CoroutineDispatcher = Dispatchers.Default,
+    ) {
+        if (!registeredKotlinConsumers.add(handlerType)) return
+        delegate.registerKotlinHandler(
+            handlerType,
+            requestType,
+            endpointName,
+            endpointNameExplicit,
+            dispatcher,
+        )
+    }
+
     /**
      * Registers a compiler-generated adapter for an annotated Kotlin consumer
      * function. This is public so generated application code can target a
@@ -134,7 +170,8 @@ class ServiceBusConfigurator internal constructor(
 
         @Suppress("UNCHECKED_CAST")
         registerConsumerFunction(
-            functionIdentity = "${method.declaringClass.name}::${function.name}",
+            functionIdentity = "${method.declaringClass.name}::${method.name}(" +
+                method.parameterTypes.joinToString(",") { it.name } + ")",
             declarationType = method.declaringClass,
             messageType = messageClass as Class<Any>,
             endpointName = endpointName,

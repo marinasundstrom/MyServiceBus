@@ -4,6 +4,8 @@ This changelog summarizes the bigger themes in the repository history rather tha
 
 ## Unreleased
 
+- Added Kotlin consumer functions with direct message binding, optional scoped dependency and consume-context injection, suspending execution, and automatic responses. Explicit function-reference reflection remains a compatibility path, while a new KSP processor generates direct registration for Kotlin consumer classes, request handlers, and annotated consumer functions through the same normalized definition and invocation seam.
+
 ## 0.1.0-preview.10 - 2026-09-04
 
 - Added the first cross-platform consumer- and endpoint-definition layer for .NET and the Java platform. Reusable or inline definitions can assign endpoint identity, consumer concurrency, and prefetch policy before topology materialization, while normalized definitions retain the resolved consumer, message, and endpoint intent for tooling and language projections. Explicit endpoint configuration takes precedence and transport defaults remain the fallback. Definitions establish the shared policy boundary for future pipeline, durability, transport-option, generated-registration, and Kotlin projection work.

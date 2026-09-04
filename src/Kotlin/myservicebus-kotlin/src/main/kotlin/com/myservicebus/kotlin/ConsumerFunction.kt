@@ -7,6 +7,11 @@ import com.myservicebus.di.ServiceProvider
 @Retention(AnnotationRetention.RUNTIME)
 annotation class ConsumerFunction(val endpointName: String = "")
 
+/** Registers a finite, compile-time-known set of Kotlin consumers. */
+fun interface ConsumerCatalog {
+    fun register(configurator: ServiceBusConfigurator)
+}
+
 /**
  * Compiler-facing invocation contract for a generated Kotlin consumer function.
  * Application dependencies are resolved from [services], which is the active

@@ -123,6 +123,26 @@ public interface BusRegistrationConfigurator extends ConsumerRegistrationConfigu
 
     void addConsumerMethods(Class<?> declaringType, String endpointName);
 
+    /**
+     * Discovers interface consumers and annotated consumer methods from a
+     * finite set of application types.
+     */
+    void addConsumers(Class<?>... candidateTypes);
+
+    default void addConsumers(
+            java.util.function.Predicate<Class<?>> typeFilter,
+            Class<?>... candidateTypes) {
+        if (typeFilter == null) {
+            throw new IllegalArgumentException("typeFilter must not be null");
+        }
+        if (candidateTypes == null) {
+            throw new IllegalArgumentException("candidateTypes must not be null");
+        }
+        addConsumers(java.util.Arrays.stream(candidateTypes)
+                .filter(typeFilter)
+                .toArray(Class<?>[]::new));
+    }
+
     default <TMessage> void addConsumerMethod(
             Class<?> declaringType,
             Class<TMessage> messageClass,

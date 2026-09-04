@@ -47,6 +47,11 @@ public abstract class BusRegistrationConfiguratorDecorator implements BusRegistr
     }
 
     @Override
+    public void addConsumers(Class<?>... candidateTypes) {
+        inner.addConsumers(candidateTypes);
+    }
+
+    @Override
     public <TMessage> void addConsumerMethod(
             Class<?> declaringType,
             Class<TMessage> messageClass,

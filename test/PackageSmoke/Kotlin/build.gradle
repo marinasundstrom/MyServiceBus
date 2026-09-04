@@ -1,5 +1,6 @@
 plugins {
     id 'org.jetbrains.kotlin.jvm' version '2.2.20'
+    id 'com.google.devtools.ksp' version '2.2.20-2.0.4'
     id 'application'
 }
 
@@ -29,11 +30,15 @@ repositories {
     maven {
         url = uri("${stagingRepositoryRoot}/src/Kotlin/myservicebus-kotlin/build/repository")
     }
+    maven {
+        url = uri("${stagingRepositoryRoot}/src/Kotlin/myservicebus-kotlin-processor/build/repository")
+    }
     mavenCentral()
 }
 
 dependencies {
     implementation 'io.github.marinasundstrom.myservicebus:myservicebus-kotlin:0.1.0-preview.10'
+    ksp 'io.github.marinasundstrom.myservicebus:myservicebus-kotlin-processor:0.1.0-preview.10'
 }
 
 kotlin {

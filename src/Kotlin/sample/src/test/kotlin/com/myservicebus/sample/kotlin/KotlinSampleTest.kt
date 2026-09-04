@@ -2,6 +2,9 @@ package com.myservicebus.sample.kotlin
 
 import com.myservicebus.SendContext
 import com.myservicebus.kotlin.getRequiredService
+import com.myservicebus.kotlin.addSingleton
+import com.myservicebus.kotlin.createMediator
+import com.myservicebus.kotlin.generated.GeneratedConsumerCatalog
 import com.myservicebus.kotlin.MessageBus
 import com.myservicebus.serialization.ByteArrayMessageBody
 import com.myservicebus.serialization.EnvelopeMessageDeserializer
@@ -33,5 +36,23 @@ class KotlinSampleTest {
         val actual: SubmitOrder = inbound.getMessage(SubmitOrder::class.java)
 
         assertEquals(expected, actual)
+    }
+
+    @Test
+    fun `generated catalog invokes consumer function with scoped dependencies`() {
+        val orderId = UUID.randomUUID()
+        val repository = OrderRepository { id -> GeneratedOrderStatus(id, "Found") }
+        val services = com.myservicebus.di.ServiceCollection.create().apply {
+            addSingleton(repository)
+        }
+        val mediator = services.createMediator {
+            GeneratedConsumerCatalog.register(this)
+        }
+
+        val response: GeneratedOrderStatus = kotlinx.coroutines.runBlocking {
+            mediator.request(GeneratedLookupOrder(orderId))
+        }
+
+        assertEquals(GeneratedOrderStatus(orderId, "Found"), response)
     }
 }

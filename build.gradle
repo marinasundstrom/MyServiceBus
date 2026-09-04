@@ -1,6 +1,7 @@
 
 plugins {
     id 'org.jetbrains.kotlin.jvm' version '2.2.20' apply false
+    id 'com.google.devtools.ksp' version '2.2.20-2.0.4' apply false
 }
 
 group = 'io.github.marinasundstrom.myservicebus'
@@ -13,6 +14,7 @@ def publishedProjectDescriptions = [
     'myservicebus-tasks'        : 'Asynchronous task abstractions for MyServiceBus.',
     'myservicebus'              : 'Idiomatic Java messaging runtime with MassTransit-compatible concepts and wire conventions.',
     'myservicebus-kotlin'       : 'Experimental idiomatic Kotlin projection for the shared MyServiceBus JVM runtime.',
+    'myservicebus-kotlin-processor': 'Optional KSP processor for generated Kotlin consumer-function catalogs.',
     'myservicebus-serialization-bson': 'Optional MassTransit-compatible BSON envelope serialization for MyServiceBus.',
     'myservicebus-postgresql'    : 'PostgreSQL transactional outbox and inbox persistence for MyServiceBus.',
     'myservicebus-processor'    : 'Optional Java annotation processor for generated MyServiceBus consumer catalogs.',
