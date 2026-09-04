@@ -1,5 +1,7 @@
 package com.myservicebus;
 
+import com.myservicebus.core.ConsumerInvoker;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;

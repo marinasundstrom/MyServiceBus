@@ -26,5 +26,7 @@ These dependencies mirror common practices in their respective ecosystems and ai
 - **Asynchronous API**: `kotlinx-coroutines-core` 1.11 through `myservicebus-kotlin`
 - **Serialization in the sample**: `com.fasterxml.jackson.module:jackson-module-kotlin`
 
-The Kotlin facade is intentionally thin. Transports, topology, serialization,
-and delivery semantics continue to come from the shared JVM runtime.
+The Kotlin projection is intentionally thin. Transports, topology,
+serialization, and delivery semantics continue to come from the shared JVM
+runtime. Kotlin applications select this projection as their application API;
+Java packages remain available for explicit ecosystem interoperability.

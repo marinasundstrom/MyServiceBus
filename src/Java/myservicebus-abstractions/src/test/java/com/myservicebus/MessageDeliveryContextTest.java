@@ -9,6 +9,7 @@ import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.Test;
 
 import com.myservicebus.tasks.CancellationToken;
+import com.myservicebus.core.MessageDeliveryContext;
 
 class MessageDeliveryContextTest {
     @Test

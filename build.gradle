@@ -12,7 +12,7 @@ def publishedProjectDescriptions = [
     'myservicebus-logging'      : 'Logging abstractions and adapters for MyServiceBus.',
     'myservicebus-tasks'        : 'Asynchronous task abstractions for MyServiceBus.',
     'myservicebus'              : 'Idiomatic Java messaging runtime with MassTransit-compatible concepts and wire conventions.',
-    'myservicebus-kotlin'       : 'Idiomatic Kotlin extensions for configuring and consuming the MyServiceBus JVM runtime.',
+    'myservicebus-kotlin'       : 'Experimental idiomatic Kotlin projection for the shared MyServiceBus JVM runtime.',
     'myservicebus-serialization-bson': 'Optional MassTransit-compatible BSON envelope serialization for MyServiceBus.',
     'myservicebus-postgresql'    : 'PostgreSQL transactional outbox and inbox persistence for MyServiceBus.',
     'myservicebus-processor'    : 'Optional Java annotation processor for generated MyServiceBus consumer catalogs.',

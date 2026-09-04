@@ -1,4 +1,4 @@
-package com.myservicebus;
+package com.myservicebus.core;
 
 import java.net.URI;
 import java.time.Instant;
@@ -7,6 +7,8 @@ import java.util.Map;
 import java.util.UUID;
 
 import com.myservicebus.serialization.MessageIntent;
+import com.myservicebus.PipeContext;
+import com.myservicebus.ScheduledMessage;
 
 /**
  * Mutable outgoing-message state shared by runtime implementations and

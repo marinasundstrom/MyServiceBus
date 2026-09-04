@@ -2,11 +2,11 @@ package com.myservicebus.kotlin
 
 import com.myservicebus.BusRegistrationConfiguratorImpl
 import com.myservicebus.ConsumeContext as JvmConsumeContext
-import com.myservicebus.ConsumerRegistrationConfigurator
+import com.myservicebus.core.ConsumerRegistrationConfigurator
 import com.myservicebus.MediatorResponseTypeException
-import com.myservicebus.MessageDeliveryContext
-import com.myservicebus.OutgoingMessageContextCallback
-import com.myservicebus.OutgoingMessageDispatcher
+import com.myservicebus.core.MessageDeliveryContext
+import com.myservicebus.core.OutgoingMessageContextCallback
+import com.myservicebus.core.OutgoingMessageDispatcher
 import com.myservicebus.RequestClient
 import com.myservicebus.RequestTimeout
 import com.myservicebus.Response2

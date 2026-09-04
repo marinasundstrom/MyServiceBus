@@ -5,7 +5,7 @@ import com.myservicebus.Consumer;
 import com.myservicebus.ConsumerFaultFilter;
 import com.myservicebus.ConsumerFactory;
 import com.myservicebus.ConsumerMessageFilter;
-import com.myservicebus.ConsumerInvoker;
+import com.myservicebus.core.ConsumerInvoker;
 import com.myservicebus.ConsumerInvocationFilter;
 import com.myservicebus.ScopeConsumerFactory;
 import com.myservicebus.ErrorTransportFilter;

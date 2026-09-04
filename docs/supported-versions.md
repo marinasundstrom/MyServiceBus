@@ -10,7 +10,7 @@ The baseline distinguishes language/API compatibility from the build and runtime
 | --- | --- | --- | --- |
 | .NET | .NET 10; experimental .NET 11 core assets | .NET SDK `10.0.100`, with latest-patch roll-forward; .NET 11 Preview 7 union and Runtime Async gates | All C# packages target `net10.0`. The abstractions and core runtime packages also contain experimental `net11.0` assets. |
 | Java | Java 17 or newer | Temurin Java 17 | Published bytecode and APIs target Java 17. Newer Java releases are expected to work but are not release-gating environments. |
-| Kotlin | Kotlin 2.2 | Kotlin `2.2.20` and kotlinx.coroutines `1.11.0` on Temurin Java 17 | The Kotlin facade and sample target the shared Java 17-compatible runtime. |
+| Kotlin | Kotlin 2.2, experimental projection | Kotlin `2.2.20` and kotlinx.coroutines `1.11.0` on Temurin Java 17 | The Kotlin facade and samples target the shared Java 17-compatible runtime. Its source API may evolve between previews. |
 | Gradle | Gradle 9.0 | Gradle `9.0.0` | Build and Maven publication tooling; not an application runtime dependency. |
 | PostgreSQL | PostgreSQL 17 | Docker image `postgres:17.6-alpine` | Transactional outbox/inbox persistence baseline. The provider is not production-promoted until the remaining integration and O01–O06 gates pass. |
 | .NET PostgreSQL client | Npgsql 10.0 | `10.0.3` | Implementation and public transaction boundary of the C# PostgreSQL provider. |

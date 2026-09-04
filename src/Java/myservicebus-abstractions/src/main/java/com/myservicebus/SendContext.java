@@ -1,5 +1,7 @@
 package com.myservicebus;
 
+import com.myservicebus.core.OutgoingMessageContext;
+
 import com.myservicebus.serialization.MessageIntent;
 import com.myservicebus.serialization.MessageSerializationContext;
 import com.myservicebus.serialization.MessageSerializer;

@@ -1,10 +1,12 @@
-package com.myservicebus;
+package com.myservicebus.core;
 
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 import com.myservicebus.tasks.CancellationToken;
+import com.myservicebus.ConsumeContext;
+import com.myservicebus.PipeContext;
 
 /**
  * Shared JVM state and operations for one delivered message.

@@ -1,6 +1,6 @@
 package com.myservicebus.topology;
 
-import com.myservicebus.ConsumerInvoker;
+import com.myservicebus.core.ConsumerInvoker;
 
 /**
  * A source-language-neutral consumer registration ready for JVM topology

@@ -4,6 +4,7 @@ import java.util.concurrent.CompletableFuture;
 
 import com.myservicebus.di.ServiceProvider;
 import com.myservicebus.di.ServiceScope;
+import com.myservicebus.core.ConsumerInvoker;
 
 /** Runs a source-language-neutral consumer invocation in the active message scope. */
 public class ConsumerInvocationFilter<T> implements Filter<ConsumeContext<T>> {

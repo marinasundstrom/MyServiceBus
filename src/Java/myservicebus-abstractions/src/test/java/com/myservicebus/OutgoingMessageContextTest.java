@@ -1,5 +1,7 @@
 package com.myservicebus;
 
+import com.myservicebus.core.OutgoingMessageContext;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 

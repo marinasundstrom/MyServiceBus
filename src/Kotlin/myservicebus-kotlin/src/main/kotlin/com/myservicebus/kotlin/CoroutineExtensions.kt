@@ -3,11 +3,11 @@
 package com.myservicebus.kotlin
 
 import com.myservicebus.ConsumeContext as JvmConsumeContext
-import com.myservicebus.ConsumerInvoker
-import com.myservicebus.ConsumerRegistrationConfigurator
+import com.myservicebus.core.ConsumerInvoker
+import com.myservicebus.core.ConsumerRegistrationConfigurator
 import com.myservicebus.DefaultEndpointNameFormatter
 import com.myservicebus.MessageConsumer
-import com.myservicebus.MessageDeliveryContext
+import com.myservicebus.core.MessageDeliveryContext
 import com.myservicebus.PublishEndpoint as JvmPublishEndpoint
 import com.myservicebus.RequestClient as JvmRequestClient
 import com.myservicebus.SendEndpoint as JvmSendEndpoint

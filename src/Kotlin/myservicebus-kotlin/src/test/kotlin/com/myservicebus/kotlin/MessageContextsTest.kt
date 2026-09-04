@@ -1,8 +1,8 @@
 package com.myservicebus.kotlin
 
-import com.myservicebus.OutgoingMessageContext
-import com.myservicebus.OutgoingMessageDispatcher
-import com.myservicebus.OutgoingMessagePublisher
+import com.myservicebus.core.OutgoingMessageContext
+import com.myservicebus.core.OutgoingMessageDispatcher
+import com.myservicebus.core.OutgoingMessagePublisher
 import java.net.URI
 import java.util.concurrent.CompletableFuture
 import java.util.UUID

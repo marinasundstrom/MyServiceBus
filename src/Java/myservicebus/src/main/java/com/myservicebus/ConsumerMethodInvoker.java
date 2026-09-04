@@ -3,6 +3,8 @@ package com.myservicebus;
 import java.util.concurrent.CompletableFuture;
 
 import com.myservicebus.di.ServiceProvider;
+import com.myservicebus.core.ConsumerInvoker;
+import com.myservicebus.core.MessageDeliveryContext;
 
 /**
  * Java projection contract for invoking a consumer method in the active

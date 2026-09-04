@@ -1,8 +1,9 @@
 # JVM language projections
 
-MyServiceBus currently implements its JVM runtime in Java and layers the
-`myservicebus-kotlin` package on top. Kotlin is a main target, not a convenience
-wrapper, so the Java public API must not dictate Kotlin method and class shapes.
+MyServiceBus currently implements its JVM runtime in Java and publishes the
+`myservicebus-kotlin` artifact as a sibling language projection. Kotlin is a
+main target, not a convenience wrapper, so the Java public API must not dictate
+Kotlin method and class shapes.
 
 ## Boundary
 
@@ -172,21 +173,35 @@ Kotlin `Duration` for bounded stop, treats `Duration.INFINITE` as the untimed
 shared stop, and implements `AutoCloseable`; Java's `java.time.Duration` remains
 behind the facade.
 
-## Emerging module shape
+## MVP package and artifact shape
 
-The JVM implementation should evolve toward an implementation-focused shared
-core with separate Java and Kotlin public projections. The normalized
+The JVM implementation has an implementation-focused shared core with separate
+Java and Kotlin public projections. The normalized
 `ConsumerRegistration` and `ConsumerDefinitionModel`, `ConsumerInvoker`, and
 narrow `ConsumerRegistrationConfigurator` are the first executable logical
 seam. Frontend-specific consumer and handler shapes become definitions and an
 invocation adapter before topology is materialized, and Kotlin registration
 depends on the narrow sink rather than Java's full bus configurator.
 
-These types deliberately remain in the current implementation package during
-the POC. We should establish the context, configuration, transport, and runtime
-dependency boundaries through working projections before assigning classes to
-new Maven artifacts or final JVM packages. The final Java/core/Kotlin package
-and artifact graph must be settled before the Kotlin work is released.
+The MVP package ownership is explicit:
+
+- `com.myservicebus.core` contains shared runtime capabilities and projection
+  registration contracts;
+- `com.myservicebus` is the stable Java projection and retains the established
+  Java source API;
+- `com.myservicebus.kotlin` is the experimental Kotlin projection and can
+  evolve independently between previews.
+
+The artifact graph remains intentionally compact. `myservicebus-abstractions`
+contains the lowest shared context and endpoint capabilities,
+`myservicebus` contains the runtime, normalized registration pipeline, and
+canonical Java projection, and `myservicebus-kotlin` adds only the Kotlin
+projection and coroutine dependency. A separate core artifact is not required
+for the MVP: it would force a broad migration without changing what an
+application selects, and the package boundary already prevents the frontend
+contracts from becoming the shared invocation model. Kotlin transitively
+receives the runtime through its projection artifact and applications add the
+transport they intend to use.
 
 Pressure that determines the next extraction boundary includes:
 

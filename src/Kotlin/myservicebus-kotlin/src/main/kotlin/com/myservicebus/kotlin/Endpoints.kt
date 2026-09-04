@@ -1,9 +1,9 @@
 package com.myservicebus.kotlin
 
-import com.myservicebus.OutgoingMessageDispatcher
-import com.myservicebus.OutgoingMessageDispatcherProvider
-import com.myservicebus.OutgoingMessagePublisher
-import com.myservicebus.OutgoingMessagePublisherProvider
+import com.myservicebus.core.OutgoingMessageDispatcher
+import com.myservicebus.core.OutgoingMessageDispatcherProvider
+import com.myservicebus.core.OutgoingMessagePublisher
+import com.myservicebus.core.OutgoingMessagePublisherProvider
 
 /** A Kotlin endpoint that publishes messages through the shared JVM runtime. */
 interface PublishEndpoint {

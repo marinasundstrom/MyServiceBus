@@ -11,6 +11,8 @@ import java.util.function.Consumer;
 import java.net.URI;
 
 import com.myservicebus.tasks.CancellationToken;
+import com.myservicebus.core.MessageDeliveryContext;
+import com.myservicebus.core.OutgoingMessageContextCallback;
 
 /**
  * Context passed to consumers when a message is received.

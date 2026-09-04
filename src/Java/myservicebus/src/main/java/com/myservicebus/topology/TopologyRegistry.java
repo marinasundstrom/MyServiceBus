@@ -6,7 +6,7 @@ import java.util.function.Consumer;
 
 import com.myservicebus.ConsumeContext;
 import com.myservicebus.ConsumerDefinition;
-import com.myservicebus.ConsumerInvoker;
+import com.myservicebus.core.ConsumerInvoker;
 import com.myservicebus.ConsumerMethodInvoker;
 import com.myservicebus.EntityNameFormatter;
 import com.myservicebus.PipeConfigurator;

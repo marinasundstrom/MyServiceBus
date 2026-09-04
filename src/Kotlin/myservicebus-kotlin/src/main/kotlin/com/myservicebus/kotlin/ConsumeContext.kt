@@ -1,7 +1,7 @@
 package com.myservicebus.kotlin
 
 import com.myservicebus.ConsumeContext as JvmConsumeContext
-import com.myservicebus.MessageDeliveryContext
+import com.myservicebus.core.MessageDeliveryContext
 import com.myservicebus.tasks.CancellationToken
 import java.util.UUID
 

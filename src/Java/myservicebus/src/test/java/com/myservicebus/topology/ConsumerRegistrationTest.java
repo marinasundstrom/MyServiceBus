@@ -10,7 +10,7 @@ import java.util.concurrent.CompletableFuture;
 
 import org.junit.jupiter.api.Test;
 
-import com.myservicebus.ConsumerInvoker;
+import com.myservicebus.core.ConsumerInvoker;
 
 class ConsumerRegistrationTest {
     @Test

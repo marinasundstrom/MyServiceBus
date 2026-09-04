@@ -1,6 +1,6 @@
 package com.myservicebus.kotlin
 
-import com.myservicebus.OutgoingMessageContext as JvmOutgoingMessageContext
+import com.myservicebus.core.OutgoingMessageContext as JvmOutgoingMessageContext
 import com.myservicebus.SendContext as JvmSendContext
 import com.myservicebus.serialization.MessageIntent
 import com.myservicebus.tasks.CancellationToken

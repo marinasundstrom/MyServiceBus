@@ -1,5 +1,7 @@
 package com.myservicebus;
 
+import com.myservicebus.core.ConsumerRegistrationConfigurator;
+
 import com.myservicebus.choreography.ChoreographyBuilder;
 import com.myservicebus.choreography.ChoreographyFragment;
 import com.myservicebus.di.ServiceCollection;

@@ -6,11 +6,11 @@ import java.util.Map;
 import java.util.function.Consumer;
 
 import com.myservicebus.ConsumeContext;
-import com.myservicebus.ConsumerInvoker;
 import com.myservicebus.ConsumerMethodInvoker;
 import com.myservicebus.EndpointNameFormatter;
 import com.myservicebus.PipeConfigurator;
 import com.myservicebus.serialization.MessageSerializer;
+import com.myservicebus.core.ConsumerInvoker;
 
 public class ConsumerTopology {
     private ConsumerDefinitionModel definition;

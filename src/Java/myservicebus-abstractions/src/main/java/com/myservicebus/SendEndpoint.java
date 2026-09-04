@@ -7,6 +7,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
 import com.myservicebus.tasks.CancellationToken;
+import com.myservicebus.core.OutgoingMessageContextCallback;
+import com.myservicebus.core.OutgoingMessageDispatcher;
 
 @FunctionalInterface
 public interface SendEndpoint extends OutgoingMessageDispatcher {

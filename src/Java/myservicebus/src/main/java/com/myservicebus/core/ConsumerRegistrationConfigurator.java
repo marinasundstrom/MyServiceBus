@@ -1,4 +1,4 @@
-package com.myservicebus;
+package com.myservicebus.core;
 
 import com.myservicebus.di.ServiceCollection;
 import com.myservicebus.topology.ConsumerDefinitionModel;
