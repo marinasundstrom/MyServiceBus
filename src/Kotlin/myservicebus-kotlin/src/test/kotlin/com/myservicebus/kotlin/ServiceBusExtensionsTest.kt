@@ -9,11 +9,23 @@ import com.myservicebus.di.ServiceCollection
 import com.myservicebus.rabbitmq.RabbitMqFactoryConfigurator
 import java.util.concurrent.CompletableFuture
 import kotlin.test.Test
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class ServiceBusExtensionsTest {
+    @Test
+    fun `Kotlin application contracts are sibling projections of Java contracts`() {
+        assertFalse(com.myservicebus.PublishEndpoint::class.java.isAssignableFrom(PublishEndpoint::class.java))
+        assertFalse(com.myservicebus.PublishEndpointProvider::class.java.isAssignableFrom(PublishEndpointProvider::class.java))
+        assertFalse(com.myservicebus.SendEndpoint::class.java.isAssignableFrom(SendEndpoint::class.java))
+        assertFalse(com.myservicebus.SendEndpointProvider::class.java.isAssignableFrom(SendEndpointProvider::class.java))
+        assertFalse(com.myservicebus.ConsumeContext::class.java.isAssignableFrom(com.myservicebus.kotlin.ConsumeContext::class.java))
+        assertFalse(com.myservicebus.SendContext::class.java.isAssignableFrom(com.myservicebus.kotlin.SendContext::class.java))
+        assertFalse(com.myservicebus.PublishContext::class.java.isAssignableFrom(com.myservicebus.kotlin.PublishContext::class.java))
+    }
+
     @Test
     fun `service bus configuration uses Kotlin receiver extensions`() {
         val services = ServiceCollection.create()
