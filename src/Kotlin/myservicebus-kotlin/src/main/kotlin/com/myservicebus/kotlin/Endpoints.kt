@@ -2,6 +2,7 @@ package com.myservicebus.kotlin
 
 import com.myservicebus.PublishEndpoint as JvmPublishEndpoint
 import com.myservicebus.PublishEndpointProvider as JvmPublishEndpointProvider
+import com.myservicebus.OutgoingMessageDispatcher
 import com.myservicebus.SendEndpoint as JvmSendEndpoint
 import com.myservicebus.SendEndpointProvider as JvmSendEndpointProvider
 
@@ -68,6 +69,20 @@ internal class JvmSendEndpointFacade(
     override suspend fun send(message: Any, configure: SendContext.() -> Unit) {
         awaitOperation { cancellationToken ->
             delegate.send(message, { context -> SendContext(context).configure() }, cancellationToken)
+        }
+    }
+}
+
+internal class MessageDispatcherFacade(
+    private val delegate: OutgoingMessageDispatcher,
+) : SendEndpoint {
+    override suspend fun send(message: Any) {
+        awaitOperation { cancellationToken -> delegate.sendMessage(message, {}, cancellationToken) }
+    }
+
+    override suspend fun send(message: Any, configure: SendContext.() -> Unit) {
+        awaitOperation { cancellationToken ->
+            delegate.sendMessage(message, { context -> SendContext(context).configure() }, cancellationToken)
         }
     }
 }

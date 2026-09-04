@@ -76,6 +76,9 @@ context has real suspending `publish`, `send`, `respond`, `forward`, and
 overloads. MyServiceBus still runs the consumer through the shared scoped
 pipeline, waits before acknowledging the message, propagates failures into
 retry and fault handling, and cancels the coroutine when delivery is cancelled.
+The Kotlin context composes over the common JVM `MessageDeliveryContext`, not
+the concrete Java context; the Java projection adapts that same contract while
+retaining its existing source API.
 
 The Kotlin module reconstructs the application messaging boundary with its own
 `MessageBus`, `Mediator`, `PublishEndpoint`, `PublishEndpointProvider`,

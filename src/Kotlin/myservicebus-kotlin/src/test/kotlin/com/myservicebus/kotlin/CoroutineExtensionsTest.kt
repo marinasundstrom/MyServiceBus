@@ -4,6 +4,9 @@ import com.myservicebus.BusRegistrationConfiguratorImpl
 import com.myservicebus.ConsumeContext as JvmConsumeContext
 import com.myservicebus.ConsumerRegistrationConfigurator
 import com.myservicebus.MediatorResponseTypeException
+import com.myservicebus.MessageDeliveryContext
+import com.myservicebus.OutgoingMessageContextCallback
+import com.myservicebus.OutgoingMessageDispatcher
 import com.myservicebus.RequestClient
 import com.myservicebus.RequestTimeout
 import com.myservicebus.Response2
@@ -37,6 +40,20 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
 class CoroutineExtensionsTest {
+    @Test
+    fun `Kotlin consumer invocation depends on shared delivery context`() {
+        val message = CoroutineMessage("shared")
+        val context: MessageDeliveryContext<CoroutineMessage> = TestMessageDeliveryContext(message)
+        var consumed: CoroutineMessage? = null
+
+        Consumer<CoroutineMessage> { consumed = it.message }
+            .consumeAsync(context, Dispatchers.Unconfined)
+            .join()
+
+        assertSame(message, consumed)
+        assertFalse(context is JvmConsumeContext<*>)
+    }
+
     @Test
     fun `Kotlin consumer registration only requires the shared core sink`() {
         val configurator = CapturingConsumerRegistrationConfigurator()
@@ -359,6 +376,66 @@ private class CapturingConsumerRegistrationConfigurator : ConsumerRegistrationCo
     }
 
     override fun getServiceCollection(): ServiceCollection = services
+}
+
+private class TestMessageDeliveryContext<TMessage : Any>(
+    private val deliveredMessage: TMessage,
+) : MessageDeliveryContext<TMessage> {
+    override fun getMessage(): TMessage = deliveredMessage
+
+    override fun getHeaders(): MutableMap<String, Any> = mutableMapOf()
+
+    override fun getMessageId(): UUID? = null
+
+    override fun getRequestId(): UUID? = null
+
+    override fun getCorrelationId(): UUID? = null
+
+    override fun getConversationId(): UUID? = null
+
+    override fun getInitiatorId(): UUID? = null
+
+    override fun getFaultAddress(): String? = null
+
+    override fun getErrorAddress(): String? = null
+
+    override fun getCancellationToken(): CancellationToken = CancellationToken.none()
+
+    override fun publishMessage(
+        message: Any,
+        configure: OutgoingMessageContextCallback,
+        cancellationToken: CancellationToken,
+    ): CompletableFuture<Void> = unsupported()
+
+    override fun sendMessage(
+        destination: String,
+        message: Any,
+        configure: OutgoingMessageContextCallback,
+        cancellationToken: CancellationToken,
+    ): CompletableFuture<Void> = unsupported()
+
+    override fun respondMessage(
+        message: Any,
+        configure: OutgoingMessageContextCallback,
+        cancellationToken: CancellationToken,
+    ): CompletableFuture<Void> = unsupported()
+
+    override fun forwardMessage(
+        destination: String,
+        message: Any,
+        cancellationToken: CancellationToken,
+    ): CompletableFuture<Void> = unsupported()
+
+    override fun respondWithFault(
+        exception: Exception,
+        cancellationToken: CancellationToken,
+    ): CompletableFuture<Void> = unsupported()
+
+    override fun getMessageDispatcher(destination: String): OutgoingMessageDispatcher =
+        OutgoingMessageDispatcher { _, _, _ -> unsupported() }
+
+    private fun unsupported(): CompletableFuture<Void> =
+        CompletableFuture.failedFuture(UnsupportedOperationException())
 }
 
 data class CoroutineMessage(val value: String)

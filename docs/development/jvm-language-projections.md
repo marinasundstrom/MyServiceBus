@@ -125,6 +125,16 @@ Kotlin method directly. Java interface consumers and Java consumer methods can
 lower to the same registration primitive without becoming the superclass of
 the Kotlin frontend.
 
+The consume path now makes that boundary executable as well. The shared
+`MessageDeliveryContext` carries incoming state and projection-neutral delivery
+operations, while Java's `ConsumeContext` implements it without changing its
+existing overloads. `ConsumerInvoker` receives the shared contract. Java's
+`ConsumerMethodInvoker` remains a functional interface with its familiar
+concrete `ConsumeContext` parameter and supplies the adapter itself, so generated
+and handwritten Java registrations keep their source shape. Kotlin consumers
+compose their own suspending `ConsumeContext` directly over the shared contract;
+tests invoke one with no Java consume-context instance at all.
+
 ## Current transition
 
 `myservicebus-kotlin` is the first explicit projection. Its configuration DSL

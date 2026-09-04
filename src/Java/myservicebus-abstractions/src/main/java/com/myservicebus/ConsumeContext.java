@@ -24,6 +24,7 @@ import com.myservicebus.tasks.CancellationToken;
 public class ConsumeContext<T>
         implements PipeContext,
         MessageConsumeContext,
+        MessageDeliveryContext<T>,
         PublishEndpoint,
         SendEndpointProvider {
 
@@ -187,11 +188,28 @@ public class ConsumeContext<T>
     }
 
     @Override
+    public CompletableFuture<Void> publishMessage(
+            Object message,
+            OutgoingMessageContextCallback configure,
+            CancellationToken cancellationToken) {
+        return publish(message, context -> configure.configure(context), cancellationToken);
+    }
+
+    @Override
     public SendEndpoint getSendEndpoint(String uri) {
         if (sendEndpointProvider == null) {
             throw new UnsupportedOperationException("SendEndpointProvider not configured");
         }
         return sendEndpointProvider.getSendEndpoint(uri);
+    }
+
+    @Override
+    public OutgoingMessageDispatcher getMessageDispatcher(String destination) {
+        SendEndpoint endpoint = getSendEndpoint(destination);
+        return (message, configure, cancellationToken) -> endpoint.send(
+                message,
+                context -> configure.configure(context),
+                cancellationToken);
     }
 
     /**
@@ -223,6 +241,14 @@ public class ConsumeContext<T>
         SendContext ctx = new SendContext(message, cancellationToken);
         contextCallback.accept(ctx);
         return respond(ctx);
+    }
+
+    @Override
+    public CompletableFuture<Void> respondMessage(
+            Object message,
+            OutgoingMessageContextCallback configure,
+            CancellationToken cancellationToken) {
+        return respond(message, context -> configure.configure(context), cancellationToken);
     }
 
     public <TMessage> CompletableFuture<Void> respond(TMessage message, Consumer<SendContext> contextCallback) {
@@ -272,6 +298,15 @@ public class ConsumeContext<T>
         applyConsumerMetadata(context);
         contextCallback.accept(context);
         return endpoint.send(context);
+    }
+
+    @Override
+    public CompletableFuture<Void> sendMessage(
+            String destination,
+            Object message,
+            OutgoingMessageContextCallback configure,
+            CancellationToken cancellationToken) {
+        return send(destination, message, context -> configure.configure(context), cancellationToken);
     }
 
     public <TMessage> CompletableFuture<Void> send(String destination, TMessage message,
@@ -327,6 +362,14 @@ public class ConsumeContext<T>
         }, cancellationToken);
     }
 
+    @Override
+    public CompletableFuture<Void> forwardMessage(
+            String destination,
+            Object message,
+            CancellationToken cancellationToken) {
+        return forward(destination, message, cancellationToken);
+    }
+
     public <TMessage> CompletableFuture<Void> forward(String destination, TMessage message) {
         return forward(destination, message, CancellationToken.none());
     }
@@ -367,6 +410,11 @@ public class ConsumeContext<T>
                     context.setCausationMessageId(messageId);
                 },
                 cancellationToken);
+    }
+
+    @Override
+    public CompletableFuture<Void> respondWithFault(Exception exception, CancellationToken cancellationToken) {
+        return respondFault(exception, cancellationToken);
     }
 
     @Override

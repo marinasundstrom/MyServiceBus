@@ -13,5 +13,5 @@ import com.myservicebus.di.ServiceProvider;
  */
 @FunctionalInterface
 public interface ConsumerInvoker<TMessage> {
-    CompletableFuture<Void> invoke(ServiceProvider serviceProvider, ConsumeContext<TMessage> context) throws Exception;
+    CompletableFuture<Void> invoke(ServiceProvider serviceProvider, MessageDeliveryContext<TMessage> context) throws Exception;
 }

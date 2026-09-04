@@ -7,6 +7,7 @@ import com.myservicebus.ConsumerInvoker
 import com.myservicebus.ConsumerRegistrationConfigurator
 import com.myservicebus.DefaultEndpointNameFormatter
 import com.myservicebus.MessageConsumer
+import com.myservicebus.MessageDeliveryContext
 import com.myservicebus.PublishEndpoint as JvmPublishEndpoint
 import com.myservicebus.RequestClient as JvmRequestClient
 import com.myservicebus.SendEndpoint as JvmSendEndpoint
@@ -312,14 +313,14 @@ internal fun unwrapCompletionFailure(failure: Throwable): Throwable =
 
 @PublishedApi
 internal fun <TMessage : Any> Consumer<TMessage>.consumeAsync(
-    context: JvmConsumeContext<TMessage>,
+    context: MessageDeliveryContext<TMessage>,
     dispatcher: CoroutineDispatcher,
 ): CompletableFuture<Void> = coroutineFuture(context.cancellationToken, dispatcher) {
     consume(ConsumeContext(context))
 }.asVoidFuture()
 
 private fun Handler<Any, Any>.handleAsync(
-    context: JvmConsumeContext<Any>,
+    context: MessageDeliveryContext<Any>,
     dispatcher: CoroutineDispatcher,
 ): CompletableFuture<Void> = coroutineFuture(context.cancellationToken, dispatcher) {
     val kotlinContext = ConsumeContext(context)
