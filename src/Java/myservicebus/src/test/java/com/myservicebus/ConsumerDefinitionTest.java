@@ -34,7 +34,11 @@ class ConsumerDefinitionTest {
         ConsumerDefinitionModel model = registry.getConsumerDefinitions().get(0);
         assertEquals(DefinedConsumer.class, model.consumerType());
         assertEquals("defined-orders", model.endpointName());
+        assertTrue(model.endpointNameExplicit());
+        assertEquals(DefinedConsumer.class, model.endpointNameFormatterType());
+        assertEquals(java.util.List.of(SubmitOrder.class), model.messageTypes());
         assertEquals(7, model.concurrentMessageLimit());
+        assertEquals(model, consumer.getDefinition());
     }
 
     @Test
@@ -65,6 +69,40 @@ class ConsumerDefinitionTest {
         assertEquals(3, model.concurrentMessageLimit());
     }
 
+    @Test
+    void capturesResolvedMetadataIndependentlyFromTheJavaConsumerInterfaceShape() {
+        ServiceCollection services = ServiceCollection.create();
+        BusRegistrationConfiguratorImpl configurator = new BusRegistrationConfiguratorImpl(services);
+
+        configurator.addConsumerMethod(
+                ConsumerFunctions.class,
+                SubmitOrder.class,
+                "function-orders",
+                (provider, context) -> CompletableFuture.completedFuture(null));
+        configurator.addConsumer(TypedConsumer.class, SubmitOrder.class);
+        configurator.complete();
+        TopologyRegistry registry = services.buildServiceProvider().getRequiredService(TopologyRegistry.class);
+
+        ConsumerDefinitionModel function = registry.getConsumerDefinitions().stream()
+                .filter(definition -> definition.consumerType().equals(ConsumerFunctions.class))
+                .findFirst()
+                .orElseThrow();
+        assertEquals(java.util.List.of(SubmitOrder.class), function.messageTypes());
+        assertEquals("function-orders", function.endpointName());
+        assertTrue(function.endpointNameExplicit());
+
+        ConsumerDefinitionModel typed = registry.getConsumerDefinitions().stream()
+                .filter(definition -> definition.consumerType().equals(TypedConsumer.class))
+                .findFirst()
+                .orElseThrow();
+        assertEquals(java.util.List.of(SubmitOrder.class), typed.messageTypes());
+        assertEquals(typed, registry.getConsumers().stream()
+                .filter(consumer -> consumer.getConsumerType().equals(TypedConsumer.class))
+                .findFirst()
+                .orElseThrow()
+                .getDefinition());
+    }
+
     private record SubmitOrder(String orderId) {
     }
 
@@ -76,6 +114,18 @@ class ConsumerDefinitionTest {
     }
 
     static final class InlineConsumer implements Consumer<SubmitOrder> {
+        @Override
+        public CompletableFuture<Void> consume(ConsumeContext<SubmitOrder> context) {
+            return CompletableFuture.completedFuture(null);
+        }
+    }
+
+    static final class ConsumerFunctions {
+        private ConsumerFunctions() {
+        }
+    }
+
+    static final class TypedConsumer implements Consumer<SubmitOrder> {
         @Override
         public CompletableFuture<Void> consume(ConsumeContext<SubmitOrder> context) {
             return CompletableFuture.completedFuture(null);

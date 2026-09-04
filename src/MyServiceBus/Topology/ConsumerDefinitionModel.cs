@@ -5,11 +5,17 @@ namespace MyServiceBus.Topology;
 /// </summary>
 public sealed record ConsumerDefinitionModel
 {
-    public ConsumerDefinitionModel(Type consumerType, string? endpointName, int? concurrentMessageLimit)
+    public ConsumerDefinitionModel(
+        Type consumerType,
+        string endpointName,
+        bool endpointNameIsExplicit,
+        Type? endpointNameFormatterType,
+        IEnumerable<Type> messageTypes,
+        int? concurrentMessageLimit)
     {
         ArgumentNullException.ThrowIfNull(consumerType);
-        if (endpointName is not null)
-            ArgumentException.ThrowIfNullOrWhiteSpace(endpointName);
+        ArgumentException.ThrowIfNullOrWhiteSpace(endpointName);
+        ArgumentNullException.ThrowIfNull(messageTypes);
         if (concurrentMessageLimit is <= 0)
         {
             throw new ArgumentOutOfRangeException(
@@ -18,14 +24,29 @@ public sealed record ConsumerDefinitionModel
                 "The concurrent message limit must be greater than zero.");
         }
 
+        var capturedMessageTypes = messageTypes.Distinct().ToArray();
+        if (capturedMessageTypes.Length == 0)
+            throw new ArgumentException("At least one consumed message type is required.", nameof(messageTypes));
+        if (capturedMessageTypes.Any(messageType => messageType is null))
+            throw new ArgumentException("Consumed message types must not contain null.", nameof(messageTypes));
+
         ConsumerType = consumerType;
         EndpointName = endpointName;
+        EndpointNameIsExplicit = endpointNameIsExplicit;
+        EndpointNameFormatterType = endpointNameFormatterType;
+        MessageTypes = capturedMessageTypes;
         ConcurrentMessageLimit = concurrentMessageLimit;
     }
 
     public Type ConsumerType { get; }
 
-    public string? EndpointName { get; }
+    public string EndpointName { get; }
+
+    public bool EndpointNameIsExplicit { get; }
+
+    public Type? EndpointNameFormatterType { get; }
+
+    public IReadOnlyList<Type> MessageTypes { get; }
 
     public int? ConcurrentMessageLimit { get; }
 }

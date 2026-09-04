@@ -30,6 +30,7 @@ public class TopologyRegistry implements BusTopology {
         return consumers;
     }
 
+    @Override
     public List<ConsumerDefinitionModel> getConsumerDefinitions() {
         return java.util.Collections.unmodifiableList(consumerDefinitions);
     }
@@ -120,7 +121,7 @@ public class TopologyRegistry implements BusTopology {
                 messageTypes);
     }
 
-    public <TConsumer> void registerConsumerDefinition(
+    public <TConsumer> ConsumerDefinitionModel registerConsumerDefinition(
             Class<TConsumer> consumerType,
             String queueName,
             boolean endpointNameExplicit,
@@ -128,7 +129,7 @@ public class TopologyRegistry implements BusTopology {
             Consumer<PipeConfigurator<ConsumeContext<Object>>> configure,
             ConsumerDefinition<TConsumer> definition,
             Class<?>... messageTypes) {
-        registerConsumerCore(
+        return registerConsumerCore(
                 consumerType,
                 queueName,
                 endpointNameExplicit,
@@ -138,7 +139,7 @@ public class TopologyRegistry implements BusTopology {
                 messageTypes);
     }
 
-    private <TConsumer> void registerConsumerCore(
+    private <TConsumer> ConsumerDefinitionModel registerConsumerCore(
             Class<TConsumer> consumerType,
             String queueName,
             boolean endpointNameExplicit,
@@ -146,13 +147,14 @@ public class TopologyRegistry implements BusTopology {
             Consumer<PipeConfigurator<ConsumeContext<Object>>> configure,
             ConsumerDefinition<TConsumer> definition,
             Class<?>... messageTypes) {
-        if (definition != null && consumerDefinitions.stream()
-                .noneMatch(existing -> existing.consumerType().equals(consumerType))) {
-            consumerDefinitions.add(new ConsumerDefinitionModel(
-                    consumerType,
-                    definition.getEndpointName(),
-                    definition.getConcurrentMessageLimit()));
-        }
+        ConsumerDefinitionModel model = new ConsumerDefinitionModel(
+                consumerType,
+                queueName,
+                endpointNameExplicit,
+                endpointNameFormatterType,
+                java.util.Arrays.asList(messageTypes),
+                definition != null ? definition.getConcurrentMessageLimit() : null);
+        consumerDefinitions.add(model);
         ensureReceiveEndpoint(queueName);
         List<MessageBinding> bindings = new ArrayList<>();
         for (Class<?> mt : messageTypes) {
@@ -166,6 +168,7 @@ public class TopologyRegistry implements BusTopology {
             bindings.add(binding);
         }
         ConsumerTopology consumer = new ConsumerTopology();
+        consumer.setDefinition(model);
         consumer.setConsumerType(consumerType);
         consumer.setQueueName(queueName);
         consumer.setEndpointNameExplicit(endpointNameExplicit);
@@ -176,6 +179,7 @@ public class TopologyRegistry implements BusTopology {
             consumer.setConcurrentMessageLimit(definition.getConcurrentMessageLimit());
         }
         consumers.add(consumer);
+        return model;
     }
 
     public <TMessage> void registerConsumerMethod(

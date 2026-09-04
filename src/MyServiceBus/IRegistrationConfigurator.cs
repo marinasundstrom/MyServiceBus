@@ -24,7 +24,7 @@ public interface IRegistrationConfigurator
 
     [RequiresDynamicCode("Runtime consumer discovery closes generic registrations dynamically. Use AddGeneratedConsumers for NativeAOT.")]
     [RequiresUnreferencedCode("Runtime consumer discovery cannot guarantee that consumer metadata is preserved. Use AddGeneratedConsumers for trimmed applications.")]
-    void AddConsumer<T>(ConsumerDefinition<T> definition) where T : class, IConsumer;
+    IConsumerRegistrationConfigurator<T> AddConsumer<T>(ConsumerDefinition<T> definition) where T : class, IConsumer;
 
     [RequiresDynamicCode("Runtime consumer method discovery closes generic registrations dynamically. Use AddGeneratedConsumers for NativeAOT.")]
     [RequiresUnreferencedCode("Runtime consumer method discovery requires method and parameter metadata. Use AddGeneratedConsumers for trimmed applications.")]

@@ -9,6 +9,7 @@ import com.myservicebus.orchestration.SagaRepository;
 import com.myservicebus.orchestration.SagaRepositoryCapabilities;
 import com.myservicebus.orchestration.SagaStateMachine;
 import com.myservicebus.serialization.SerializerFactory;
+import com.myservicebus.topology.ConsumerDefinitionModel;
 
 public interface BusRegistrationConfigurator {
     void addChoreography(ChoreographyFragment fragment);
@@ -83,9 +84,9 @@ public interface BusRegistrationConfigurator {
 
     <T> void addConsumer(Class<T> consumerClass);
 
-    <T> void addConsumer(Class<T> consumerClass, ConsumerDefinition<T> definition);
+    <T> ConsumerDefinitionModel addConsumer(Class<T> consumerClass, ConsumerDefinition<T> definition);
 
-    default <T> void addConsumer(
+    default <T> ConsumerDefinitionModel addConsumer(
             Class<T> consumerClass,
             java.util.function.Consumer<ConsumerDefinition<T>> configureDefinition) {
         if (configureDefinition == null) {
@@ -93,7 +94,7 @@ public interface BusRegistrationConfigurator {
         }
         ConsumerDefinition<T> definition = new ConsumerDefinition<>();
         configureDefinition.accept(definition);
-        addConsumer(consumerClass, definition);
+        return addConsumer(consumerClass, definition);
     }
 
     default <THandler extends MediatorHandler> void addHandler(Class<THandler> handlerClass) {

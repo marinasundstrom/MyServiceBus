@@ -49,12 +49,9 @@ public class ConsumerDefinition<TConsumer> : IConsumerDefinition, IConsumerConfi
     }
 }
 
-internal sealed class ConsumerRegistrationConfigurator<TConsumer>(ConsumerDefinition<TConsumer> definition)
+internal sealed class ConsumerRegistrationConfigurator<TConsumer>(Topology.ConsumerDefinitionModel definition)
     : IConsumerRegistrationConfigurator<TConsumer>
     where TConsumer : class, IConsumer
 {
-    public Topology.ConsumerDefinitionModel Definition { get; } = new(
-        definition.ConsumerType,
-        definition.EndpointName,
-        definition.ConcurrentMessageLimit);
+    public Topology.ConsumerDefinitionModel Definition { get; } = definition;
 }

@@ -168,7 +168,7 @@ public class BusRegistrationConfigurator : IBusRegistrationConfigurator
 
     [RequiresDynamicCode("Runtime consumer discovery closes generic registrations dynamically. Use AddGeneratedConsumers for NativeAOT.")]
     [RequiresUnreferencedCode("Runtime consumer discovery cannot guarantee that consumer metadata is preserved. Use AddGeneratedConsumers for trimmed applications.")]
-    public void AddConsumer<TConsumer>(ConsumerDefinition<TConsumer> definition) where TConsumer : class, IConsumer
+    public IConsumerRegistrationConfigurator<TConsumer> AddConsumer<TConsumer>(ConsumerDefinition<TConsumer> definition) where TConsumer : class, IConsumer
     {
         ArgumentNullException.ThrowIfNull(definition);
         var messageTypes = GetHandledMessageTypes(typeof(TConsumer));
@@ -178,20 +178,20 @@ public class BusRegistrationConfigurator : IBusRegistrationConfigurator
         Services.AddScoped<TConsumer>();
         Services.AddScoped<IConsumer, TConsumer>((sp) => sp.GetRequiredService<TConsumer>());
 
-        var messageType = messageTypes.First();
         var attributeEndpointName = typeof(TConsumer).GetCustomAttribute<ConsumerAttribute>()?.EndpointName;
         var endpointName = definition.EndpointName
             ?? attributeEndpointName
             ?? DefaultEndpointNameFormatter.Instance.Format(typeof(TConsumer));
 
-        _topology.RegisterConsumerWithEndpointMetadata<TConsumer>(
+        var model = _topology.RegisterConsumerWithEndpointMetadata<TConsumer>(
           queueName: endpointName,
           configurePipe: null,
           endpointNameIsExplicit: definition.EndpointName is not null || attributeEndpointName is not null,
           endpointNameFormatterType: typeof(TConsumer),
           definition: definition,
-          messageTypes: messageType
+          messageTypes: messageTypes
       );
+        return new ConsumerRegistrationConfigurator<TConsumer>(model);
     }
 
     [RequiresDynamicCode("Runtime consumer method discovery closes generic registrations dynamically. Use AddGeneratedConsumers for NativeAOT.")]

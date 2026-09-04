@@ -9,7 +9,6 @@ public static class RegistrationConfiguratorExtensions
         ArgumentNullException.ThrowIfNull(configurator);
         var definition = new ConsumerDefinition<T>();
         configure?.Invoke(definition);
-        configurator.AddConsumer(definition);
-        return new ConsumerRegistrationConfigurator<T>(definition);
+        return configurator.AddConsumer(definition);
     }
 }

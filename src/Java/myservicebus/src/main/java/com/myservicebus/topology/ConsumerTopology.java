@@ -12,6 +12,7 @@ import com.myservicebus.PipeConfigurator;
 import com.myservicebus.serialization.MessageSerializer;
 
 public class ConsumerTopology {
+    private ConsumerDefinitionModel definition;
     private Class<?> consumerType;
     private String queueName;
     private boolean endpointNameExplicit;
@@ -23,6 +24,14 @@ public class ConsumerTopology {
     private Map<String, Object> queueArguments;
     private Class<? extends MessageSerializer> serializerClass;
     private ConsumerMethodInvoker<?> methodInvoker;
+
+    public ConsumerDefinitionModel getDefinition() {
+        return definition;
+    }
+
+    public void setDefinition(ConsumerDefinitionModel definition) {
+        this.definition = definition;
+    }
 
     public Class<?> getConsumerType() {
         return consumerType;
