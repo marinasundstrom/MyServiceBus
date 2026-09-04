@@ -1,0 +1,91 @@
+package com.myservicebus;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.util.concurrent.CompletableFuture;
+
+import org.junit.jupiter.api.Test;
+
+import com.myservicebus.di.ServiceCollection;
+import com.myservicebus.di.ServiceProvider;
+import com.myservicebus.topology.ConsumerTopology;
+import com.myservicebus.topology.ConsumerDefinitionModel;
+import com.myservicebus.topology.TopologyRegistry;
+
+class ConsumerDefinitionTest {
+    @Test
+    void appliesDefinitionBeforeMaterializingConsumerTopology() {
+        ServiceCollection services = ServiceCollection.create();
+        BusRegistrationConfiguratorImpl configurator = new BusRegistrationConfiguratorImpl(services);
+        DefinedConsumerDefinition definition = new DefinedConsumerDefinition();
+
+        configurator.addConsumer(DefinedConsumer.class, definition);
+        definition.endpointName("changed-after-registration").concurrentMessageLimit(9);
+        configurator.complete();
+        ServiceProvider provider = services.buildServiceProvider();
+        TopologyRegistry registry = provider.getRequiredService(TopologyRegistry.class);
+        ConsumerTopology consumer = registry.getConsumers().get(0);
+
+        assertEquals("defined-orders", consumer.getQueueName());
+        assertTrue(consumer.isEndpointNameExplicit());
+        assertEquals(7, consumer.getConcurrentMessageLimit());
+        ConsumerDefinitionModel model = registry.getConsumerDefinitions().get(0);
+        assertEquals(DefinedConsumer.class, model.consumerType());
+        assertEquals("defined-orders", model.endpointName());
+        assertEquals(7, model.concurrentMessageLimit());
+    }
+
+    @Test
+    void rejectsInvalidDefinitionValues() {
+        ConsumerDefinition<DefinedConsumer> definition = new ConsumerDefinition<>();
+
+        assertThrows(IllegalArgumentException.class, () -> definition.endpointName(" "));
+        assertThrows(IllegalArgumentException.class, () -> definition.concurrentMessageLimit(0));
+    }
+
+    @Test
+    void inlineConfigurationBuildsTheSameDefinitionModel() {
+        ServiceCollection services = ServiceCollection.create();
+        BusRegistrationConfiguratorImpl configurator = new BusRegistrationConfiguratorImpl(services);
+
+        configurator.addConsumer(InlineConsumer.class, definition -> definition
+                .endpointName("inline-orders")
+                .concurrentMessageLimit(3));
+        configurator.complete();
+        TopologyRegistry registry = services.buildServiceProvider().getRequiredService(TopologyRegistry.class);
+        ConsumerTopology consumer = registry.getConsumers().get(0);
+
+        assertEquals("inline-orders", consumer.getQueueName());
+        assertEquals(3, consumer.getConcurrentMessageLimit());
+        ConsumerDefinitionModel model = registry.getConsumerDefinitions().get(0);
+        assertEquals(InlineConsumer.class, model.consumerType());
+        assertEquals("inline-orders", model.endpointName());
+        assertEquals(3, model.concurrentMessageLimit());
+    }
+
+    private record SubmitOrder(String orderId) {
+    }
+
+    static final class DefinedConsumer implements Consumer<SubmitOrder> {
+        @Override
+        public CompletableFuture<Void> consume(ConsumeContext<SubmitOrder> context) {
+            return CompletableFuture.completedFuture(null);
+        }
+    }
+
+    static final class InlineConsumer implements Consumer<SubmitOrder> {
+        @Override
+        public CompletableFuture<Void> consume(ConsumeContext<SubmitOrder> context) {
+            return CompletableFuture.completedFuture(null);
+        }
+    }
+
+    static final class DefinedConsumerDefinition extends ConsumerDefinition<DefinedConsumer> {
+        DefinedConsumerDefinition() {
+            endpointName("defined-orders");
+            concurrentMessageLimit(7);
+        }
+    }
+}

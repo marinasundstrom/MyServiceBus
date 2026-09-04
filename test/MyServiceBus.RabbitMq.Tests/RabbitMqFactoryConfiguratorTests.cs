@@ -171,6 +171,31 @@ public class RabbitMqFactoryConfiguratorTests
         Assert.Equal("custom-exchange", def.Bindings[0].EntityName);
     }
 
+    [Fact]
+    public void ReceiveEndpoint_preserves_definition_concurrency_unless_explicitly_overridden()
+    {
+        var registry = new TopologyRegistry();
+        registry.RegisterConsumer<MyConsumer>("original-queue", null, typeof(MyMessage));
+        registry.Consumers.Single().ConcurrentMessageLimit = 7;
+
+        var services = new ServiceCollection();
+        services.AddSingleton(registry);
+        services.AddSingleton<IMessageBus, TestMessageBus>();
+        var provider = services.BuildServiceProvider();
+        var context = new TestBusRegistrationContext(provider);
+        var configurator = new TestRabbitMqFactoryConfigurator();
+
+        configurator.ReceiveEndpoint("defined-queue", endpoint => endpoint.ConfigureConsumer<MyConsumer>(context));
+        Assert.Equal(7, registry.Consumers.Single().ConcurrentMessageLimit);
+
+        configurator.ReceiveEndpoint("explicit-queue", endpoint =>
+        {
+            endpoint.ConcurrentMessageLimit(3);
+            endpoint.ConfigureConsumer<MyConsumer>(context);
+        });
+        Assert.Equal(3, registry.Consumers.Single().ConcurrentMessageLimit);
+    }
+
     class StaticEntityFormatter<T> : IMessageEntityNameFormatter<T>
     {
         public string FormatEntityName() => $"formatted-{typeof(T).Name.ToLowerInvariant()}";

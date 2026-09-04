@@ -83,6 +83,19 @@ public interface BusRegistrationConfigurator {
 
     <T> void addConsumer(Class<T> consumerClass);
 
+    <T> void addConsumer(Class<T> consumerClass, ConsumerDefinition<T> definition);
+
+    default <T> void addConsumer(
+            Class<T> consumerClass,
+            java.util.function.Consumer<ConsumerDefinition<T>> configureDefinition) {
+        if (configureDefinition == null) {
+            throw new IllegalArgumentException("configureDefinition must not be null");
+        }
+        ConsumerDefinition<T> definition = new ConsumerDefinition<>();
+        configureDefinition.accept(definition);
+        addConsumer(consumerClass, definition);
+    }
+
     default <THandler extends MediatorHandler> void addHandler(Class<THandler> handlerClass) {
         addConsumer(handlerClass);
     }

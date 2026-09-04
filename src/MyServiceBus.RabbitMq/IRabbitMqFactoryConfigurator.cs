@@ -128,7 +128,8 @@ public class ReceiveEndpointConfigurator
         }
 
         consumer.PrefetchCount = _prefetchCount;
-        consumer.ConcurrentMessageLimit = _concurrentMessageLimit;
+        if (_concurrentMessageLimit is not null)
+            consumer.ConcurrentMessageLimit = _concurrentMessageLimit;
         consumer.QueueArguments = _queueArguments;
         consumer.SerializerType = _serializerType;
 

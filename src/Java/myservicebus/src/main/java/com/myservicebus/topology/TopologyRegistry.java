@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.function.Consumer;
 
 import com.myservicebus.ConsumeContext;
+import com.myservicebus.ConsumerDefinition;
 import com.myservicebus.ConsumerMethodInvoker;
 import com.myservicebus.EntityNameFormatter;
 import com.myservicebus.PipeConfigurator;
@@ -14,6 +15,7 @@ import com.myservicebus.orchestration.SagaStateMachineDefinition;
 public class TopologyRegistry implements BusTopology {
     private final List<MessageTopology> messages = new ArrayList<>();
     private final List<ConsumerTopology> consumers = new ArrayList<>();
+    private final List<ConsumerDefinitionModel> consumerDefinitions = new ArrayList<>();
     private final List<ReceiveEndpointDefinition> receiveEndpoints = new ArrayList<>();
     private final List<ChoreographyFragment> choreographies = new ArrayList<>();
     private final List<SagaStateMachineTopology> sagaStateMachines = new ArrayList<>();
@@ -26,6 +28,10 @@ public class TopologyRegistry implements BusTopology {
     @Override
     public List<ConsumerTopology> getConsumers() {
         return consumers;
+    }
+
+    public List<ConsumerDefinitionModel> getConsumerDefinitions() {
+        return java.util.Collections.unmodifiableList(consumerDefinitions);
     }
 
     @Override
@@ -104,6 +110,49 @@ public class TopologyRegistry implements BusTopology {
             Class<?> endpointNameFormatterType,
             Consumer<PipeConfigurator<ConsumeContext<Object>>> configure,
             Class<?>... messageTypes) {
+        registerConsumerCore(
+                consumerType,
+                queueName,
+                endpointNameExplicit,
+                endpointNameFormatterType,
+                configure,
+                null,
+                messageTypes);
+    }
+
+    public <TConsumer> void registerConsumerDefinition(
+            Class<TConsumer> consumerType,
+            String queueName,
+            boolean endpointNameExplicit,
+            Class<?> endpointNameFormatterType,
+            Consumer<PipeConfigurator<ConsumeContext<Object>>> configure,
+            ConsumerDefinition<TConsumer> definition,
+            Class<?>... messageTypes) {
+        registerConsumerCore(
+                consumerType,
+                queueName,
+                endpointNameExplicit,
+                endpointNameFormatterType,
+                configure,
+                definition,
+                messageTypes);
+    }
+
+    private <TConsumer> void registerConsumerCore(
+            Class<TConsumer> consumerType,
+            String queueName,
+            boolean endpointNameExplicit,
+            Class<?> endpointNameFormatterType,
+            Consumer<PipeConfigurator<ConsumeContext<Object>>> configure,
+            ConsumerDefinition<TConsumer> definition,
+            Class<?>... messageTypes) {
+        if (definition != null && consumerDefinitions.stream()
+                .noneMatch(existing -> existing.consumerType().equals(consumerType))) {
+            consumerDefinitions.add(new ConsumerDefinitionModel(
+                    consumerType,
+                    definition.getEndpointName(),
+                    definition.getConcurrentMessageLimit()));
+        }
         ensureReceiveEndpoint(queueName);
         List<MessageBinding> bindings = new ArrayList<>();
         for (Class<?> mt : messageTypes) {
@@ -123,6 +172,9 @@ public class TopologyRegistry implements BusTopology {
         consumer.setEndpointNameFormatterType(endpointNameFormatterType);
         consumer.setBindings(bindings);
         consumer.setConfigure(configure);
+        if (definition != null) {
+            consumer.setConcurrentMessageLimit(definition.getConcurrentMessageLimit());
+        }
         consumers.add(consumer);
     }
 
@@ -141,11 +193,12 @@ public class TopologyRegistry implements BusTopology {
             boolean endpointNameExplicit,
             Class<?> endpointNameFormatterType,
             ConsumerMethodInvoker<TMessage> invoker) {
-        registerConsumer(
+        registerConsumerCore(
                 declaringType,
                 queueName,
                 endpointNameExplicit,
                 endpointNameFormatterType,
+                null,
                 null,
                 messageType);
         consumers.get(consumers.size() - 1).setMethodInvoker(invoker);

@@ -82,7 +82,9 @@ public final class AzureServiceBusReceiveEndpointConfigurator {
             binding.setEntityName(entityNameResolver.apply(binding.getMessageType()));
         }
         definition.setPrefetchCount(prefetchCount);
-        definition.setConcurrentMessageLimit(concurrentMessageLimit);
+        if (concurrentMessageLimit != null) {
+            definition.setConcurrentMessageLimit(concurrentMessageLimit);
+        }
         definition.setSerializerClass(serializerClass);
         if (retryCount != null) {
             @SuppressWarnings("unchecked")

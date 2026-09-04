@@ -12,11 +12,13 @@ public class TopologyRegistry : IBusTopology
 {
     public List<MessageTopology> Messages { get; } = new();
     public List<ConsumerTopology> Consumers { get; } = new();
+    private readonly List<ConsumerDefinitionModel> consumerDefinitions = new();
     private readonly List<ReceiveEndpointDefinition> _receiveEndpoints = new();
     private readonly List<ChoreographyFragment> choreographies = new();
     private readonly List<SagaStateMachineTopology> sagaStateMachines = new();
 
     public IReadOnlyList<ReceiveEndpointDefinition> ReceiveEndpoints => _receiveEndpoints;
+    public IReadOnlyList<ConsumerDefinitionModel> ConsumerDefinitions => consumerDefinitions;
     public IReadOnlyList<ChoreographyFragment> Choreographies => choreographies;
     public IReadOnlyList<SagaStateMachineTopology> SagaStateMachines => sagaStateMachines;
 
@@ -83,13 +85,15 @@ public class TopologyRegistry : IBusTopology
             configurePipe,
             endpointNameIsExplicit: false,
             endpointNameFormatterType: typeof(TConsumer),
-            messageTypes);
+            definition: null,
+            messageTypes: messageTypes);
 
     internal void RegisterConsumerWithEndpointMetadata<TConsumer>(
         string queueName,
         Delegate? configurePipe,
         bool endpointNameIsExplicit,
         Type? endpointNameFormatterType,
+        IConsumerDefinition? definition = null,
         params Type[] messageTypes)
     {
         RegisterConsumer(
@@ -99,6 +103,7 @@ public class TopologyRegistry : IBusTopology
             ReflectionConsumerRegistrationDescriptorFactory.Create(typeof(TConsumer), messageTypes.First()),
             endpointNameIsExplicit,
             endpointNameFormatterType,
+            definition,
             messageTypes: messageTypes);
     }
 
@@ -132,6 +137,7 @@ public class TopologyRegistry : IBusTopology
             new ConsumerRegistrationDescriptor<TConsumer, TMessage>(),
             endpointNameIsExplicit,
             endpointNameFormatterType,
+            definition: null,
             typeof(TMessage));
     }
 
@@ -146,6 +152,7 @@ public class TopologyRegistry : IBusTopology
             ReflectionConsumerMethodRegistrationDescriptorFactory.Create(definition),
             endpointNameIsExplicit: endpointName is not null || definition.EndpointNameIsExplicit,
             endpointNameFormatterType: endpointName is not null ? null : definition.EndpointNameFormatterType,
+            definition: null,
             messageTypes: [definition.MessageType]);
     }
 
@@ -156,8 +163,17 @@ public class TopologyRegistry : IBusTopology
         IConsumerRegistrationDescriptor? registration,
         bool endpointNameIsExplicit,
         Type? endpointNameFormatterType,
+        IConsumerDefinition? definition,
         params Type[] messageTypes)
     {
+        if (definition is not null && consumerDefinitions.All(existing => existing.ConsumerType != definition.ConsumerType))
+        {
+            consumerDefinitions.Add(new ConsumerDefinitionModel(
+                definition.ConsumerType,
+                definition.EndpointName,
+                definition.ConcurrentMessageLimit));
+        }
+
         EnsureReceiveEndpoint(queueName);
         var bindings = messageTypes.Select(mt =>
         {
@@ -173,7 +189,8 @@ public class TopologyRegistry : IBusTopology
             EndpointNameFormatterType = endpointNameFormatterType,
             Bindings = bindings,
             ConfigurePipe = configurePipe,
-            Registration = registration
+            Registration = registration,
+            ConcurrentMessageLimit = definition?.ConcurrentMessageLimit
         });
     }
 

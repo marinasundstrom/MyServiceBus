@@ -4,6 +4,8 @@ This changelog summarizes the bigger themes in the repository history rather tha
 
 ## Unreleased
 
+- Added the first cross-platform consumer-definition layer for .NET and the Java platform. Reusable or inline definitions can assign endpoint identity and consumer concurrency before topology materialization, with explicit endpoint configuration taking precedence and transport defaults remaining the fallback. Definitions remain separate from realized topology and establish the shared policy boundary for future pipeline, endpoint, transport-option, generated-registration, and Kotlin projection work.
+
 ## 0.1.0-preview.9 - 2026-09-01
 
 - Updated the .NET, interoperability, NuGet publication, and monitoring-image workflows to Node 24-compatible checkout and .NET setup actions before tagging the release candidate.

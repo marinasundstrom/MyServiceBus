@@ -67,6 +67,36 @@ await app.StartAsync();
 var bus = app.Services.GetRequiredService<IMessageBus>();
 ```
 
+Consumer-specific policy can be kept with the consumer in a reusable definition
+instead of being repeated in transport configuration:
+
+```csharp
+public sealed class SubmitOrderConsumerDefinition
+    : ConsumerDefinition<SubmitOrderConsumer>
+{
+    public SubmitOrderConsumerDefinition()
+    {
+        EndpointName = "submit-order";
+        ConcurrentMessageLimit = 8;
+    }
+}
+
+x.AddConsumer<SubmitOrderConsumer>(new SubmitOrderConsumerDefinition());
+```
+
+For local configuration, the same definition model is available inline:
+
+```csharp
+x.AddConsumer<SubmitOrderConsumer>(definition =>
+{
+    definition.EndpointName = "submit-order";
+    definition.ConcurrentMessageLimit = 8;
+});
+```
+
+An explicitly configured receive endpoint overrides the definition; otherwise
+the definition overrides transport defaults.
+
 For .NET NativeAOT and trimmed applications, reference the `Sundstrom.MyServiceBus.Generators` analyzer and replace reflection-based assembly scanning with the generated catalog:
 
 ```csharp
@@ -178,6 +208,21 @@ dependencies {
 ```java
 GeneratedConsumerCatalog.INSTANCE.register(cfg);
 ```
+
+Java uses the same definition semantics with its native fluent shape:
+
+```java
+cfg.addConsumer(SubmitOrderConsumer.class, definition -> definition
+        .endpointName("submit-order")
+        .concurrentMessageLimit(8));
+```
+
+Reusable Java definitions can extend `ConsumerDefinition<TConsumer>` and be
+passed to the same registration overload. Definitions are retained separately
+from realized topology so future Java and Kotlin projections can share policy
+without sharing source-level API shapes. See
+[Consumer definitions](development/consumer-definitions.md) for the current
+boundary and planned additions.
 
 See [NativeAOT](development/native-aot.md) for the current support boundary.
 

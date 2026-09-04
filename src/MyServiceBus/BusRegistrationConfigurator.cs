@@ -164,7 +164,13 @@ public class BusRegistrationConfigurator : IBusRegistrationConfigurator
     [RequiresDynamicCode("Runtime consumer discovery closes generic registrations dynamically. Use AddGeneratedConsumers for NativeAOT.")]
     [RequiresUnreferencedCode("Runtime consumer discovery cannot guarantee that consumer metadata is preserved. Use AddGeneratedConsumers for trimmed applications.")]
     public void AddConsumer<TConsumer>() where TConsumer : class, IConsumer
+        => AddConsumer(new ConsumerDefinition<TConsumer>());
+
+    [RequiresDynamicCode("Runtime consumer discovery closes generic registrations dynamically. Use AddGeneratedConsumers for NativeAOT.")]
+    [RequiresUnreferencedCode("Runtime consumer discovery cannot guarantee that consumer metadata is preserved. Use AddGeneratedConsumers for trimmed applications.")]
+    public void AddConsumer<TConsumer>(ConsumerDefinition<TConsumer> definition) where TConsumer : class, IConsumer
     {
+        ArgumentNullException.ThrowIfNull(definition);
         var messageTypes = GetHandledMessageTypes(typeof(TConsumer));
         if (messageTypes.Length == 0)
             throw new InvalidOperationException($"Consumer type {typeof(TConsumer)} does not implement IConsumer<TMessage>. Use AddConsumerMethods<TConsumer>() for method consumers.");
@@ -174,14 +180,16 @@ public class BusRegistrationConfigurator : IBusRegistrationConfigurator
 
         var messageType = messageTypes.First();
         var attributeEndpointName = typeof(TConsumer).GetCustomAttribute<ConsumerAttribute>()?.EndpointName;
-        var endpointName = attributeEndpointName
+        var endpointName = definition.EndpointName
+            ?? attributeEndpointName
             ?? DefaultEndpointNameFormatter.Instance.Format(typeof(TConsumer));
 
         _topology.RegisterConsumerWithEndpointMetadata<TConsumer>(
           queueName: endpointName,
           configurePipe: null,
-          endpointNameIsExplicit: attributeEndpointName is not null,
+          endpointNameIsExplicit: definition.EndpointName is not null || attributeEndpointName is not null,
           endpointNameFormatterType: typeof(TConsumer),
+          definition: definition,
           messageTypes: messageType
       );
     }

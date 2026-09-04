@@ -167,6 +167,17 @@ public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigura
 
     @Override
     public <T> void addConsumer(Class<T> consumerClass) {
+        addConsumer(consumerClass, new ConsumerDefinition<>());
+    }
+
+    @Override
+    public <T> void addConsumer(Class<T> consumerClass, ConsumerDefinition<T> definition) {
+        if (consumerClass == null) {
+            throw new IllegalArgumentException("consumerClass must not be null");
+        }
+        if (definition == null) {
+            throw new IllegalArgumentException("definition must not be null");
+        }
         if (consumerTypes.contains(consumerClass)) {
             logger.debug("Consumer '{}' already registered, skipping", consumerClass.getSimpleName());
             return;
@@ -177,7 +188,9 @@ public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigura
         String attributeEndpointName = annotation != null && !annotation.value().isBlank()
                 ? annotation.value()
                 : null;
-        String endpointName = attributeEndpointName != null
+        String endpointName = definition.getEndpointName() != null
+                ? definition.getEndpointName()
+                : attributeEndpointName != null
                 ? attributeEndpointName
                 : DefaultEndpointNameFormatter.INSTANCE.format(consumerClass);
 
@@ -187,11 +200,12 @@ public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigura
                 if (raw instanceof Class<?> rawClass && com.myservicebus.Consumer.class.isAssignableFrom(rawClass)) {
                     Type actualType = pt.getActualTypeArguments()[0];
                     Class<?> messageType = getClassFromType(actualType);
-                    topology.registerConsumer(consumerClass,
+                    topology.registerConsumerDefinition(consumerClass,
                             endpointName,
-                            attributeEndpointName != null,
+                            definition.getEndpointName() != null || attributeEndpointName != null,
                             consumerClass,
                             null,
+                            definition,
                             messageType);
                 }
             }
