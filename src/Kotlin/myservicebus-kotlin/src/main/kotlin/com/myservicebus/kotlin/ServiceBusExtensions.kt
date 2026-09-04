@@ -12,6 +12,10 @@ import com.myservicebus.PublishEndpoint as JvmPublishEndpoint
 import com.myservicebus.PublishEndpointProvider as JvmPublishEndpointProvider
 import com.myservicebus.ScopedClientFactory as JvmScopedClientFactory
 import com.myservicebus.SendEndpointProvider as JvmSendEndpointProvider
+import com.myservicebus.core.ConsumerInvoker
+import com.myservicebus.topology.ConsumerDefinitionModel
+import com.myservicebus.topology.ConsumerRegistration
+import com.myservicebus.topology.EndpointDefinitionModel
 import com.myservicebus.di.ServiceCollection
 import com.myservicebus.di.ServiceProvider
 import com.myservicebus.di.ServiceProviderBasedProvider
@@ -35,6 +39,54 @@ class ServiceBusConfigurator internal constructor(
 ) {
     @PublishedApi
     internal val registeredKotlinConsumers = mutableSetOf<Class<*>>()
+
+    @PublishedApi
+    internal val registeredKotlinFunctions = mutableSetOf<String>()
+
+    /**
+     * Registers a compiler-generated adapter for an annotated Kotlin consumer
+     * function. This is public so generated application code can target a
+     * stable runtime seam; ordinary application code should use
+     * [ConsumerFunction].
+     */
+    fun <TMessage : Any> registerConsumerFunction(
+        functionIdentity: String,
+        declarationType: Class<*>,
+        messageType: Class<TMessage>,
+        endpointName: String,
+        endpointNameExplicit: Boolean,
+        responseType: Class<*>?,
+        dispatcher: CoroutineDispatcher = Dispatchers.Default,
+        invoker: ConsumerFunctionInvoker<TMessage>,
+    ) {
+        require(functionIdentity.isNotBlank()) { "functionIdentity must not be blank" }
+        require(endpointName.isNotBlank()) { "endpointName must not be blank" }
+        if (!registeredKotlinFunctions.add(functionIdentity)) return
+
+        val definition = ConsumerDefinitionModel(
+            declarationType,
+            EndpointDefinitionModel(endpointName, endpointNameExplicit, null, null, null),
+            listOf(messageType),
+        )
+        delegate.addConsumerRegistration(
+            ConsumerRegistration(
+                definition,
+                messageType,
+                ConsumerInvoker { provider, delivery ->
+                    coroutineFuture(delivery.cancellationToken, dispatcher) {
+                        val context = ConsumeContext(delivery)
+                        val response = invoker.invoke(delivery.message, context, provider)
+                        if (responseType != null) {
+                            require(response != null) {
+                                "Consumer function $functionIdentity returned null for response ${responseType.name}."
+                            }
+                            context.respond(response)
+                        }
+                    }.asVoidFuture()
+                },
+            ),
+        )
+    }
 
     /** Explicitly registers a consumer authored against the Java frontend. */
     inline fun <reified TConsumer : JvmConsumer<*>> javaConsumer() {

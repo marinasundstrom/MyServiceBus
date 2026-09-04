@@ -327,7 +327,7 @@ private fun Handler<Any, Any>.handleAsync(
     kotlinContext.respond(handle(kotlinContext))
 }.asVoidFuture()
 
-private fun <T> coroutineFuture(
+internal fun <T> coroutineFuture(
     cancellationToken: CancellationToken,
     dispatcher: CoroutineDispatcher,
     operation: suspend () -> T,
@@ -365,7 +365,7 @@ private fun <T> coroutineFuture(
     return future
 }
 
-private fun CompletableFuture<*>.asVoidFuture(): CompletableFuture<Void> {
+internal fun CompletableFuture<*>.asVoidFuture(): CompletableFuture<Void> {
     val result = CompletableFuture<Void>()
     whenComplete { _, failure ->
         when {

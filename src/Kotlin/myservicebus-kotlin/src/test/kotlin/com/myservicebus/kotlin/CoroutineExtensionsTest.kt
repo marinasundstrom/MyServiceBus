@@ -181,6 +181,36 @@ class CoroutineExtensionsTest {
     }
 
     @Test
+    fun `generated consumer function binds message scoped dependencies context and response`() = runBlocking {
+        val services = ServiceCollection.create()
+        val repository = FunctionOrderRepository()
+        services.addSingleton(repository)
+        val mediator = services.createMediator {
+            registerConsumerFunction(
+                functionIdentity = "com.myservicebus.kotlin.lookupOrderFunction",
+                declarationType = ConsumerFunctionDeclarations::class.java,
+                messageType = LookupOrder::class.java,
+                endpointName = "lookup-order",
+                endpointNameExplicit = true,
+                responseType = OrderStatus::class.java,
+                dispatcher = Dispatchers.Unconfined,
+                invoker = ConsumerFunctionInvoker { message, context, provider ->
+                    lookupOrderFunction(
+                        message,
+                        provider.getRequiredService(FunctionOrderRepository::class.java),
+                        context,
+                    )
+                },
+            )
+        }
+
+        val response: OrderStatus = mediator.request(LookupOrder("function-42"))
+
+        assertEquals(OrderStatus("function-42", "function-ready"), response)
+        assertEquals(listOf("function-42"), repository.lookups)
+    }
+
+    @Test
     fun `cancelling mediator request cancels suspend handler`() = runBlocking {
         CancellableHandler.started = CompletableDeferred()
         CancellableHandler.stopped = CompletableDeferred()
@@ -482,6 +512,27 @@ class FailingSuspendConsumer : Consumer<FailingMessage> {
 data class LookupOrder(val orderId: String)
 
 data class OrderStatus(val orderId: String, val status: String)
+
+private object ConsumerFunctionDeclarations
+
+private class FunctionOrderRepository {
+    val lookups = mutableListOf<String>()
+
+    fun find(orderId: String): OrderStatus {
+        lookups += orderId
+        return OrderStatus(orderId, "function-ready")
+    }
+}
+
+@ConsumerFunction("lookup-order")
+private suspend fun lookupOrderFunction(
+    lookupOrder: LookupOrder,
+    orders: FunctionOrderRepository,
+    context: ConsumeContext<LookupOrder>,
+): OrderStatus {
+    assertSame(lookupOrder, context.message)
+    return orders.find(lookupOrder.orderId)
+}
 
 abstract class BaseSuspendHandler<TRequest : Any, TResponse : Any> : Handler<TRequest, TResponse>
 

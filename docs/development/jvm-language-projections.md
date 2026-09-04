@@ -173,6 +173,34 @@ Kotlin `Duration` for bounded stop, treats `Duration.INFINITE` as the untimed
 shared stop, and implements `AutoCloseable`; Java's `java.time.Duration` remains
 behind the facade.
 
+## Kotlin consumer functions
+
+Kotlin may declare a consumer as a top-level suspending function without an
+otherwise empty consumer class:
+
+```kotlin
+@ConsumerFunction("lookup-order")
+suspend fun lookupOrder(
+    lookupOrder: LookupOrder,
+    orders: OrderRepository,
+    context: ConsumeContext<LookupOrder>,
+): OrderStatus = orders.find(lookupOrder.orderId)
+```
+
+The first ordinary parameter is the message contract. Recognized framework
+parameters such as `ConsumeContext<T>` come from the delivery, and every other
+parameter is resolved from the active per-message dependency-injection scope.
+Only the message is required. A non-`Unit` return value is sent through the
+consume context as a correlated response. Coroutine completion, failure, and
+cancellation enter the same pipeline as class consumers.
+
+`ConsumerFunction` is declaration metadata; it does not use reified generics.
+KSP should resolve the signature at compile time and emit a direct adapter to
+the public `registerConsumerFunction` runtime seam. Generated code supplies a
+stable package-and-function identity, the concrete message and response types,
+endpoint policy, and dependency-resolution calls. Compiler-generated lambda or
+file-facade class names must not become the logical consumer identity.
+
 ## MVP package and artifact shape
 
 The JVM implementation has an implementation-focused shared core with separate
