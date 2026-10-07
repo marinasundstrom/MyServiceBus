@@ -80,8 +80,8 @@ The catalog concept is shared without requiring identical build tooling. Java su
 
 ```java
 dependencies {
-    implementation "io.github.marinasundstrom.myservicebus:myservicebus:0.1.0-preview.11"
-    annotationProcessor "io.github.marinasundstrom.myservicebus:myservicebus-processor:0.1.0-preview.11"
+    implementation "io.github.marinasundstrom.myservicebus:myservicebus:0.1.0-preview.12"
+    annotationProcessor "io.github.marinasundstrom.myservicebus:myservicebus-processor:0.1.0-preview.12"
 }
 ```
 
@@ -102,7 +102,7 @@ plugins {
 }
 
 dependencies {
-    ksp("io.github.marinasundstrom.myservicebus:myservicebus-kotlin-processor:0.1.0-preview.11")
+    ksp("io.github.marinasundstrom.myservicebus:myservicebus-kotlin-processor:0.1.0-preview.12")
 }
 
 GeneratedConsumerCatalog.register(configurator)

@@ -2,7 +2,7 @@
 
 This changelog summarizes the bigger themes in the repository history rather than every individual commit.
 
-## Unreleased
+## 2026-10-07 — 0.1.0-preview.12
 
 - Added Azure Service Bus inherited-topic forwarding in create-topology mode for both clients, including persisted-outbox topology preparation. SNS/SQS retains explicit selected-contract publication.
 

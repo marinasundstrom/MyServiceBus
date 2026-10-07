@@ -28,4 +28,9 @@ Preview releases after the foundation MVP also contain explicitly versioned insp
 
 Each preview can be tagged when the release-candidate gate is complete and the candidate commit passes CI. A failure in an experimental addon blocks the coordinated preview when that addon is one of its published artifacts, but its successful build does not upgrade the addon's documented readiness.
 
-The current release work follows the [Enterprise Production Readiness](../enterprise-readiness.md) plan. Preview `0.1.0-preview.11` advances the experimental Kotlin projection with directly bound suspending consumer functions, explicit reflection registration, KSP-generated catalogs for consumer classes and functions, and a Kotlin-native saga state-machine DSL over shared JVM registration and runtime infrastructure. Java retains its C#-shaped declarative state-machine frontend. These additions retain their documented experimental boundaries and do not expand the foundation MVP's production-readiness claim.
+The current release work follows the [Enterprise Production Readiness](../enterprise-readiness.md) plan. Preview `0.1.0-preview.12` aligns explicit wire contracts, inherited publication,
+standalone startup, interface serialization, consumer policy configuration, and
+outbox/monitoring behavior across C# and Java. It adds workflow identity validation,
+cloud receive contract matching, and Azure inherited-topic provisioning. Kotlin
+remains an experimental projection over the shared JVM runtime. Cloud topology
+provisioning tests do not by themselves establish live-cloud delivery conformance.
