@@ -23,6 +23,35 @@ public sealed class RabbitMqTransportFactory : ITransportFactory
     private readonly ILoggerFactory? _loggerFactory;
     private readonly IBusHookDispatcher? _hooks;
 
+    private readonly SemaphoreSlim _publishTopologyLock = new(1, 1);
+    private readonly HashSet<string> _publishedTypes = new();
+
+    public Task PreparePublishTopology(Type messageType, CancellationToken cancellationToken = default)
+        => PreparePublishTopology(MessageTypeCache.GetMessageTypes(messageType).Select(GetPublishEntityName).ToArray(), cancellationToken);
+
+    public async Task PreparePublishTopology(IReadOnlyList<string> entityNames, CancellationToken cancellationToken = default)
+    {
+        if (entityNames.Count == 0) throw new ArgumentException("At least one publish entity is required.", nameof(entityNames));
+        var key = System.Text.Json.JsonSerializer.Serialize(entityNames);
+        await _publishTopologyLock.WaitAsync(cancellationToken);
+        try
+        {
+            if (_publishedTypes.Contains(key)) return;
+            var connection = await _connectionProvider.GetOrCreateConnectionAsync(cancellationToken);
+            await using var channel = await connection.CreateChannelAsync(cancellationToken: cancellationToken);
+            var source = entityNames[0];
+            await channel.ExchangeDeclareAsync(source, ExchangeType.Fanout, true, false, cancellationToken: cancellationToken);
+            foreach (var destination in entityNames.Skip(1).Distinct())
+            {
+                if (destination == source) continue;
+                await channel.ExchangeDeclareAsync(destination, ExchangeType.Fanout, true, false, cancellationToken: cancellationToken);
+                await channel.ExchangeBindAsync(destination, source, "", cancellationToken: cancellationToken);
+            }
+            _publishedTypes.Add(key);
+        }
+        finally { _publishTopologyLock.Release(); }
+    }
+
     public TransportCapabilityDescriptor Capabilities => TransportCapabilityDescriptors.RabbitMq;
 
     public RabbitMqTransportFactory(

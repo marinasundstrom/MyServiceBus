@@ -12,7 +12,7 @@ public sealed record TopologySnapshot(
     [property: JsonPropertyName("choreographies")] IReadOnlyList<ChoreographyFragment> Choreographies,
     [property: JsonPropertyName("sagaStateMachines")] IReadOnlyList<SagaStateMachineTopology>? SagaStateMachines = null)
 {
-    public const int CurrentVersion = 2;
+    public const int CurrentVersion = 3;
 }
 
 public sealed record MessageTopologySnapshot(
@@ -48,16 +48,17 @@ internal static class TopologySnapshotBuilder
 {
     public static TopologySnapshot Create(IBusTopology topology)
     {
+        var contracts = (topology as TopologyRegistry)?.Contracts ?? new MessageContractRegistry();
         var messages = topology.Messages
-            .GroupBy(x => MessageUrn.For(x.MessageType), StringComparer.Ordinal)
+            .GroupBy(x => contracts.GetMessageUrn(x.MessageType), StringComparer.Ordinal)
             .Select(group => group.First())
             .Select(message => new MessageTopologySnapshot(
-                MessageUrn.For(message.MessageType),
+                contracts.GetMessageUrn(message.MessageType),
                 FormatTypeName(message.MessageType),
-                MessageUrn.For(message.MessageType),
+                contracts.GetMessageUrn(message.MessageType),
                 message.EntityName,
-                message.MessageType.GetInterfaces()
-                    .Select(MessageUrn.For)
+                MessageTypeCache.GetMessageTypes(message.MessageType).Skip(1)
+                    .Select(contracts.GetMessageUrn)
                     .Distinct(StringComparer.Ordinal)
                     .OrderBy(x => x, StringComparer.Ordinal)
                     .ToArray()))
@@ -73,7 +74,7 @@ internal static class TopologySnapshotBuilder
                     $"{endpointId}|consumer:{consumerType}",
                     consumerType,
                     endpointId,
-                    consumer.Bindings.Select(x => MessageUrn.For(x.MessageType))
+                    consumer.Bindings.Select(x => contracts.GetMessageUrn(x.MessageType))
                         .Distinct(StringComparer.Ordinal)
                         .OrderBy(x => x, StringComparer.Ordinal)
                         .ToArray());
@@ -87,7 +88,7 @@ internal static class TopologySnapshotBuilder
             .SelectMany(consumer => consumer.Bindings.Select(binding =>
             {
                 var endpointId = EndpointId(consumer.QueueName);
-                var messageId = MessageUrn.For(binding.MessageType);
+                var messageId = contracts.GetMessageUrn(binding.MessageType);
                 return new MessageBindingTopologySnapshot(
                     $"{endpointId}|binding:{messageId}|{binding.EntityName}",
                     endpointId,

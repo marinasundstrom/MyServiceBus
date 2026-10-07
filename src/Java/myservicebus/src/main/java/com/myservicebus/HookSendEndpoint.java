@@ -82,7 +82,8 @@ final class HookSendEndpoint implements SendEndpoint {
                             ? null
                             : sendContext.getResponseAddress().toString(),
                     sendContext == null ? null : sendContext.getIntent().name(),
-                    body));
+                    body).withMessageUrn(sendContext == null ? MessageUrn.forClass(body.getClass())
+                            : sendContext.getResolvedMessageTypes().get(0)));
         });
     }
 

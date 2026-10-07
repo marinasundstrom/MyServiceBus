@@ -14,14 +14,15 @@ public sealed class GenericRequestClient<TRequest> : IRequestClient<TRequest>, I
     private readonly RequestTimeout _timeout;
     private readonly ISendContextFactory _sendContextFactory;
     private readonly IBusHookDispatcher? _hooks;
+    private readonly MessageContractRegistry _contracts;
 
     [Microsoft.Extensions.DependencyInjection.ActivatorUtilitiesConstructor]
     public GenericRequestClient(
         ITransportFactory transportFactory,
         IMessageSerializer serializer,
         ISendContextFactory sendContextFactory,
-        IBusHookDispatcher hooks)
-        : this(transportFactory, serializer, sendContextFactory, destinationAddress: null, timeout: default, hooks: hooks)
+        IBusHookDispatcher hooks, MessageContractRegistry? contracts = null)
+        : this(transportFactory, serializer, sendContextFactory, destinationAddress: null, timeout: default, hooks: hooks, contracts: contracts)
     {
     }
 
@@ -31,12 +32,13 @@ public sealed class GenericRequestClient<TRequest> : IRequestClient<TRequest>, I
         ISendContextFactory sendContextFactory,
         Uri? destinationAddress = null,
         RequestTimeout timeout = default,
-        IBusHookDispatcher? hooks = null)
+        IBusHookDispatcher? hooks = null, MessageContractRegistry? contracts = null)
     {
         _transportFactory = transportFactory;
         _serializer = serializer;
         _sendContextFactory = sendContextFactory;
         _hooks = hooks;
+        _contracts = contracts ?? new MessageContractRegistry();
         _destinationAddress = destinationAddress;
         _timeout = timeout.TimeSpan == default ? RequestTimeout.Default : timeout;
     }
@@ -70,7 +72,7 @@ public sealed class GenericRequestClient<TRequest> : IRequestClient<TRequest>, I
                     return;
                 }
 
-                if (context.MessageType.Contains(MessageUrn.For(typeof(T))) &&
+                if (context.MessageType.Contains(_contracts.GetMessageUrn(typeof(T))) &&
                     context.TryGetMessage<T>(out var responeMessage))
                 {
                     DispatchResponseObservation(context, responseExchange, responeMessage!);
@@ -79,7 +81,7 @@ public sealed class GenericRequestClient<TRequest> : IRequestClient<TRequest>, I
                     return;
                 }
 
-                if (context.MessageType.Contains(MessageUrn.For(typeof(Fault<TRequest>))) &&
+                if (context.MessageType.Contains(_contracts.GetMessageUrn(typeof(Fault<TRequest>))) &&
                     context.TryGetMessage<Fault<TRequest>>(out var fault))
                 {
                     DispatchResponseObservation(context, responseExchange, fault!);
@@ -152,7 +154,7 @@ public sealed class GenericRequestClient<TRequest> : IRequestClient<TRequest>, I
             kind,
             succeeded,
             typeof(TRequest).FullName ?? typeof(TRequest).Name,
-            MessageUrn.For(typeof(TRequest)),
+            _contracts.GetMessageUrn(typeof(TRequest)),
             null,
             destinationAddress.ToString(),
             duration,
@@ -176,7 +178,7 @@ public sealed class GenericRequestClient<TRequest> : IRequestClient<TRequest>, I
             "consumed",
             true,
             typeof(TResponse).FullName ?? typeof(TResponse).Name,
-            MessageUrn.For(typeof(TResponse)),
+            _contracts.GetMessageUrn(typeof(TResponse)),
             endpointName,
             null,
             TimeSpan.Zero,
@@ -213,14 +215,14 @@ public sealed class GenericRequestClient<TRequest> : IRequestClient<TRequest>, I
                     return;
                 }
 
-                if (context.MessageType.Contains(MessageUrn.For(typeof(T1))) &&
+                if (context.MessageType.Contains(_contracts.GetMessageUrn(typeof(T1))) &&
                     context.TryGetMessage<T1>(out var message1))
                 {
                     taskCompletionSource.TrySetResult(Response<T1, T2>.FromT1(message1));
                     return;
                 }
 
-                if (context.MessageType.Contains(MessageUrn.For(typeof(T2))) &&
+                if (context.MessageType.Contains(_contracts.GetMessageUrn(typeof(T2))) &&
                     context.TryGetMessage<T2>(out var message2))
                 {
                     taskCompletionSource.TrySetResult(Response<T1, T2>.FromT2(message2));
@@ -229,7 +231,7 @@ public sealed class GenericRequestClient<TRequest> : IRequestClient<TRequest>, I
 
                 if (!typeof(T1).IsAssignableFrom(typeof(Fault<TRequest>)) &&
                     !typeof(T2).IsAssignableFrom(typeof(Fault<TRequest>)) &&
-                    context.MessageType.Contains(MessageUrn.For(typeof(Fault<TRequest>))) &&
+                    context.MessageType.Contains(_contracts.GetMessageUrn(typeof(Fault<TRequest>))) &&
                     context.TryGetMessage<Fault<TRequest>>(out var fault))
                 {
                     taskCompletionSource.TrySetException(new RequestFaultException(typeof(TRequest).Name, fault));

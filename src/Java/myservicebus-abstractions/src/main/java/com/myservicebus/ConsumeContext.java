@@ -31,6 +31,11 @@ public class ConsumeContext<T>
         SendEndpointProvider {
 
     private final T message;
+    private MessageContractRegistry contracts = new MessageContractRegistry();
+    private java.util.function.Function<Class<?>, String> publishEntityNameResolver = EntityNameFormatter::format;
+    public void setPublishEntityNameResolver(java.util.function.Function<Class<?>, String> resolver) { publishEntityNameResolver = java.util.Objects.requireNonNull(resolver); }
+    public void setMessageContracts(MessageContractRegistry contracts) { this.contracts = contracts; }
+    public String getMessageUrn(Class<?> type) { return contracts.getMessageUrn(type); }
     private final Map<String, Object> headers;
     private final String responseAddress;
     private final String faultAddress;
@@ -170,7 +175,7 @@ public class ConsumeContext<T>
             context.setInitiatorId(correlationId);
         }
         context.setCausationMessageId(messageId);
-        String exchange = EntityNameFormatter.format(context.getContractType());
+        String exchange = publishEntityNameResolver.apply(context.getContractType());
         URI dest = URI.create(publishAddressProvider.getPublishAddress(exchange));
         context.setSourceAddress(busAddress);
         context.setDestinationAddress(dest);
@@ -394,7 +399,7 @@ public class ConsumeContext<T>
         return endpoint.send(
                 fault,
                 context -> {
-                    context.setMessageTypes(Collections.singletonList(MessageUrn.forFault(message.getClass())));
+                    context.setMessageTypes(Collections.singletonList(contracts.getFaultUrn(message.getClass())));
                     context.setRequestId(requestId);
                     if (conversationId != null) {
                         context.setConversationId(conversationId);

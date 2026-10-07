@@ -9,6 +9,8 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+@com.myservicebus.MessageUrnName(value = "urn:message:TestApp:FulfillmentRequested", useDefaultPrefix = false)
+@com.myservicebus.EntityName("TestApp:FulfillmentRequested")
 public class FulfillmentRequested {
     private UUID orderId;
 }

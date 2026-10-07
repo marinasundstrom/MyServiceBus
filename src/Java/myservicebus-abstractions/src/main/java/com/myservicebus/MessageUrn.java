@@ -13,11 +13,17 @@ public final class MessageUrn {
         if (Proxy.isProxyClass(messageType) && messageType.getInterfaces().length > 0) {
             messageType = messageType.getInterfaces()[0];
         }
-        return String.format("urn:message:TestApp:%s", messageType.getSimpleName());
+        MessageUrnName override = messageType.getAnnotation(MessageUrnName.class);
+        if (override != null) {
+            if (override.value().isBlank()) throw new IllegalArgumentException("Message URN must not be blank");
+            return (override.useDefaultPrefix() ? "urn:message:" : "") + override.value();
+        }
+        return "urn:message:" + messageType.getPackageName() + ":" + messageType.getSimpleName();
     }
 
     public static String forFault(Class<?> messageType) {
-        return String.format("urn:message:MassTransit:Fault[[TestApp:%s]]", messageType.getSimpleName());
+        String urn = forClass(messageType);
+        return "urn:message:MassTransit:Fault[[" + (urn.startsWith("urn:message:") ? urn.substring(12) : urn) + "]]";
     }
 
     public static List<String> forMessageTypes(Class<?> messageType) {

@@ -18,7 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class TopologySnapshotTest {
     @Test
     void readsCanonicalTopologyFixture() throws Exception {
-        try (var stream = getClass().getResourceAsStream("/topology/v2/basic-topology.json")) {
+        try (var stream = getClass().getResourceAsStream("/topology/v3/basic-topology.json")) {
             var snapshot = new ObjectMapper().readValue(stream, TopologySnapshot.class);
 
             assertEquals(TopologySnapshot.CURRENT_VERSION, snapshot.version());

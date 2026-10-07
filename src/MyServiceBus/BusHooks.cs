@@ -141,9 +141,12 @@ internal sealed class BusHookRetryObserver : IRetryObserver
 {
     private readonly IBusHookDispatcher dispatcher;
 
-    public BusHookRetryObserver(IBusHookDispatcher dispatcher)
+    private readonly MessageContractRegistry contracts;
+
+    public BusHookRetryObserver(IBusHookDispatcher dispatcher, MessageContractRegistry? contracts = null)
     {
         this.dispatcher = dispatcher;
+        this.contracts = contracts ?? new MessageContractRegistry();
     }
 
     public void Observe(RetryEvent retryEvent)
@@ -160,7 +163,7 @@ internal sealed class BusHookRetryObserver : IRetryObserver
             retryEvent.Exhausted ? "retry_exhausted" : "retry_attempted",
             false,
             messageType.FullName ?? messageType.Name,
-            MessageUrn.For(messageType),
+            contracts.GetMessageUrn(messageType),
             null,
             null,
             TimeSpan.Zero,
@@ -209,11 +212,13 @@ internal sealed class BusHookConsumeFilter<TMessage> : IFilter<ConsumeContext<TM
 {
     private readonly IBusHookDispatcher dispatcher;
     private readonly string endpointName;
+    private readonly MessageContractRegistry contracts;
 
-    public BusHookConsumeFilter(IBusHookDispatcher dispatcher, string endpointName)
+    public BusHookConsumeFilter(IBusHookDispatcher dispatcher, string endpointName, MessageContractRegistry? contracts = null)
     {
         this.dispatcher = dispatcher;
         this.endpointName = endpointName;
+        this.contracts = contracts ?? new MessageContractRegistry();
     }
 
     public async Task Send(ConsumeContext<TMessage> context, IPipe<ConsumeContext<TMessage>> next)
@@ -242,7 +247,7 @@ internal sealed class BusHookConsumeFilter<TMessage> : IFilter<ConsumeContext<TM
                 succeeded ? "consumed" : "consume_faulted",
                 succeeded,
                 typeof(TMessage).FullName ?? typeof(TMessage).Name,
-                MessageUrn.For(typeof(TMessage)),
+                contracts.GetMessageUrn(typeof(TMessage)),
                 endpointName,
                 null,
                 Stopwatch.GetElapsedTime(startedAt),

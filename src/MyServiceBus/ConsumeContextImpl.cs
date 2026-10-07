@@ -42,6 +42,7 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
 
     internal ReceiveContext ReceiveContext => receiveContext;
 
+    /// <exception cref="MessageDeserializationException">The payload cannot be materialized as the selected contract.</exception>
     public TMessage Message => message ??= receiveContext.TryGetMessage<TMessage>(out var deserialized) && deserialized is not null
         ? deserialized
         : throw new MessageDeserializationException($"Cannot deserialize message as {typeof(TMessage)}.");
@@ -78,6 +79,7 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
         var effectiveCancellationToken = cancellationToken.CanBeCanceled
             ? cancellationToken
             : receiveContext.CancellationToken;
+        await _transportFactory.PreparePublishTopology(typeof(T), effectiveCancellationToken);
         var exchangeName = _transportFactory.GetPublishEntityName(typeof(T));
 
         var uri = _transportFactory.GetPublishAddress(typeof(T));
@@ -244,7 +246,7 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
             kind,
             succeeded,
             messageType.FullName ?? messageType.Name,
-            MessageUrn.For(messageType),
+            context.MessageTypeUrns.FirstOrDefault() ?? MessageUrn.For(messageType),
             null,
             context.DestinationAddress?.ToString(),
             Stopwatch.GetElapsedTime(startedAt),

@@ -47,6 +47,10 @@ public final class InteropTestPeer {
     }
 
     public static void main(String[] args) throws Exception {
+        if (args.length > 0 && args[0].startsWith("polymorphic-")) {
+            PolymorphicInteropPeer.run(args);
+            return;
+        }
         if (args.length > 0 && args[0].startsWith("postgres-recurring-")) {
             com.myservicebus.persistence.postgresql.RecurringJobPostgreSqlInteropPeer.run(args);
             return;

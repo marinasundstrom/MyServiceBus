@@ -10,6 +10,7 @@ namespace MyServiceBus.Topology;
 
 public class TopologyRegistry : IBusTopology
 {
+    public MessageContractRegistry Contracts { get; } = new();
     public List<MessageTopology> Messages { get; } = new();
     public List<ConsumerTopology> Consumers { get; } = new();
     private readonly List<ConsumerDefinitionModel> consumerDefinitions = new();

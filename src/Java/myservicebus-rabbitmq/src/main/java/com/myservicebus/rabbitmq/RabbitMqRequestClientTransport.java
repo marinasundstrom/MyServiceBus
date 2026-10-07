@@ -29,8 +29,14 @@ import com.rabbitmq.client.DeliverCallback;
 public class RabbitMqRequestClientTransport implements RequestClientTransport {
     private final ConnectionProvider connectionProvider;
     private final ObjectMapper mapper;
+    private final com.myservicebus.MessageContractRegistry contracts;
 
     public RabbitMqRequestClientTransport(ConnectionProvider connectionProvider) {
+        this(connectionProvider, new com.myservicebus.MessageContractRegistry());
+    }
+
+    public RabbitMqRequestClientTransport(ConnectionProvider connectionProvider, com.myservicebus.MessageContractRegistry contracts) {
+        this.contracts = contracts;
         this.connectionProvider = connectionProvider;
         this.mapper = new ObjectMapper();
         this.mapper.findAndRegisterModules();
@@ -96,7 +102,7 @@ public class RabbitMqRequestClientTransport implements RequestClientTransport {
             envelope.setDestinationAddress(destinationAddress);
             envelope.setResponseAddress(address);
             envelope.setFaultAddress(address);
-            envelope.setMessageType(List.of(MessageUrn.forClass(requestType)));
+            envelope.setMessageType(List.of(contracts.getMessageUrn(requestType)));
             @SuppressWarnings("unchecked")
             TRequest request = (TRequest) context.getMessage();
             envelope.setMessage(request);
@@ -142,7 +148,7 @@ public class RabbitMqRequestClientTransport implements RequestClientTransport {
                         Envelope<Fault<TRequest>> fault = mapper.readValue(delivery.getBody(), faultType);
                         future.completeExceptionally(
                                 new RequestFaultException(requestType.getSimpleName(), fault.getMessage()));
-                    } else if (hasMessageType(delivery.getBody(), MessageUrn.forClass(responseType1))) {
+                    } else if (hasMessageType(delivery.getBody(), contracts.getMessageUrn(responseType1))) {
                         JavaType type1 = mapper.getTypeFactory().constructParametricType(Envelope.class, responseType1);
                         Envelope<T1> env1 = mapper.readValue(delivery.getBody(), type1);
                         future.complete(Response2.fromT1(env1.getMessage()));
@@ -180,7 +186,7 @@ public class RabbitMqRequestClientTransport implements RequestClientTransport {
             envelope.setDestinationAddress(destinationAddress);
             envelope.setResponseAddress(address);
             envelope.setFaultAddress(address);
-            envelope.setMessageType(List.of(MessageUrn.forClass(requestType)));
+            envelope.setMessageType(List.of(contracts.getMessageUrn(requestType)));
             @SuppressWarnings("unchecked")
             TRequest request = (TRequest) context.getMessage();
             envelope.setMessage(request);
@@ -205,8 +211,8 @@ public class RabbitMqRequestClientTransport implements RequestClientTransport {
         return envelope.getMessageType() != null && envelope.getMessageType().contains(expectedUrn);
     }
 
-    private static String faultUrn(Class<?> requestType) {
-        return MessageUrn.forFault(requestType);
+    private String faultUrn(Class<?> requestType) {
+        return contracts.getFaultUrn(requestType);
     }
 
     private String requestAddress(Class<?> requestType, SendContext context) {

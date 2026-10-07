@@ -89,7 +89,7 @@ class PublishContextAddressTest {
         }
 
         assertEquals(URI.create("rabbitmq://localhost/"), captured.get().getSourceAddress());
-        assertEquals(URI.create("rabbitmq://localhost/exchange/TestApp:TestMessage"),
+        assertEquals(URI.create("rabbitmq://localhost/exchange/com.myservicebus:TestMessage"),
                 captured.get().getDestinationAddress());
     }
 }

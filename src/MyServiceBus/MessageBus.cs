@@ -19,7 +19,7 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector, IConsumerMetho
     private readonly IPublishPipe _publishPipe;
     private readonly IMessageSerializer _messageSerializer;
     private readonly Uri _address;
-    private readonly IBusTopology _topology;
+    private readonly TopologyRegistry _topology;
     private readonly ILogger<MessageBus>? _logger;
     private readonly ISendContextFactory _sendContextFactory;
     private readonly IPublishContextFactory _publishContextFactory;
@@ -31,7 +31,7 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector, IConsumerMetho
 
     // Key = queue name, Value = list of registrations for that queue
     private readonly Dictionary<string, List<ConsumerPipeRegistration>> _consumers = new();
-    private readonly HashSet<Type> _consumerTypes = new();
+    private readonly HashSet<(Type Consumer, Type Message, string Endpoint)> _consumerTypes = new();
     private readonly HashSet<string> _consumerMethods = new(StringComparer.Ordinal);
 
     public MessageBus(ITransportFactory transportFactory, IServiceProvider serviceProvider,
@@ -65,6 +65,7 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector, IConsumerMetho
     public async Task Publish<T>(T message, Action<IPublishContext>? contextCallback = null, CancellationToken cancellationToken = default) where T : class
     {
         EnsureStarted();
+        await _transportFactory.PreparePublishTopology(typeof(T), cancellationToken);
         var exchangeName = _transportFactory.GetPublishEntityName(typeof(T));
 
         var uri = _transportFactory.GetPublishAddress(typeof(T));
@@ -129,7 +130,7 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector, IConsumerMetho
 
         var configurator = new PipeConfigurator<ConsumeContext<TMessage>>();
         configurator.UseFilter(new OpenTelemetryConsumeFilter<TMessage>());
-        configurator.UseFilter(new BusHookConsumeFilter<TMessage>(_hooks, queueName));
+        configurator.UseFilter(new BusHookConsumeFilter<TMessage>(_hooks, queueName, _topology.Contracts));
         var errorLogger = _serviceProvider.GetService<ILogger<ErrorTransportFilter<TMessage>>>();
         configurator.UseFilter(new ErrorTransportFilter<TMessage>(errorLogger));
         configurator.UseFilter(new HandlerFaultFilter<TMessage>(_serviceProvider));
@@ -144,7 +145,7 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector, IConsumerMetho
             await pipe.Send(consumeContext).ConfigureAwait(false);
         }
 
-        var expectedUrn = MessageUrn.For(typeof(TMessage));
+        var expectedUrn = _topology.Contracts.GetMessageUrn(typeof(TMessage));
         Func<string?, bool> isRegistered = mt => mt == expectedUrn || (rawSerializer && mt == null);
         var receiveTransport = await _transportFactory.CreateReceiveTransport(topology, TransportHandler, isRegistered, cancellationToken);
         _activeTransports.Add(receiveTransport);
@@ -154,10 +155,10 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector, IConsumerMetho
         where TConsumer : class, IConsumer<TMessage>
         where TMessage : class
     {
-        var messageType = consumer.Bindings.First().MessageType;
-        var messageUrn = MessageUrn.For(messageType);
+        var messageType = typeof(TMessage);
+        var messageUrn = _topology.Contracts.GetMessageUrn(messageType);
         var queueName = consumer.QueueName;
-        if (_consumerTypes.Contains(typeof(TConsumer)))
+        if (_consumerTypes.Contains((typeof(TConsumer), typeof(TMessage), queueName)))
         {
             _logger?.LogDebug("Consumer {ConsumerType} already registered, skipping", typeof(TConsumer).Name);
             return;
@@ -191,7 +192,7 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector, IConsumerMetho
 
         var configurator = new PipeConfigurator<ConsumeContext<TMessage>>();
         configurator.UseFilter(new OpenTelemetryConsumeFilter<TMessage>());
-        configurator.UseFilter(new BusHookConsumeFilter<TMessage>(_hooks, queueName));
+        configurator.UseFilter(new BusHookConsumeFilter<TMessage>(_hooks, queueName, _topology.Contracts));
         var errorLogger = _serviceProvider.GetService<ILogger<ErrorTransportFilter<TMessage>>>();
         configurator.UseFilter(new ErrorTransportFilter<TMessage>(errorLogger));
         configurator.UseFilter(new ConsumerFaultFilter<TConsumer, TMessage>(_serviceProvider));
@@ -219,8 +220,8 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector, IConsumerMetho
 
         if (!_consumers.TryGetValue(queueName, out var registrations))
             registrations = _consumers[queueName] = new List<ConsumerPipeRegistration>();
-        registrations.Add(new ConsumerPipeRegistration(messageUrn, messageType, pipe, serializer, CreateConsumeContext));
-        _consumerTypes.Add(typeof(TConsumer));
+        registrations.Add(new ConsumerPipeRegistration(messageUrn, messageType, pipe, serializer, CreateConsumeContext, typeof(TConsumer)));
+        _consumerTypes.Add((typeof(TConsumer), typeof(TMessage), queueName));
         if (receiveTransport is not null)
             _activeTransports.Add(receiveTransport);
     }
@@ -242,8 +243,8 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector, IConsumerMetho
             return;
         }
 
-        var messageType = consumer.Bindings.First().MessageType;
-        var messageUrn = MessageUrn.For(messageType);
+        var messageType = typeof(TMessage);
+        var messageUrn = _topology.Contracts.GetMessageUrn(messageType);
         var queueName = consumer.QueueName;
         var topology = new ReceiveEndpointTransportTopology(
             queueName,
@@ -273,7 +274,7 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector, IConsumerMetho
 
         var configurator = new PipeConfigurator<ConsumeContext<TMessage>>();
         configurator.UseFilter(new OpenTelemetryConsumeFilter<TMessage>());
-        configurator.UseFilter(new BusHookConsumeFilter<TMessage>(_hooks, queueName));
+        configurator.UseFilter(new BusHookConsumeFilter<TMessage>(_hooks, queueName, _topology.Contracts));
         var errorLogger = _serviceProvider.GetService<ILogger<ErrorTransportFilter<TMessage>>>();
         configurator.UseFilter(new ErrorTransportFilter<TMessage>(errorLogger));
         configurator.UseFilter(new HandlerFaultFilter<TMessage>(_serviceProvider));
@@ -438,7 +439,7 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector, IConsumerMetho
             return;
         }
 
-        foreach (var registration in matches)
+        foreach (var registration in matches.OrderBy(r => context.MessageType.ToList().IndexOf(r.MessageUrn)).DistinctBy(r => (object?)r.ConsumerType ?? r))
         {
             var consumeContext = registration.CreateContext(context);
 
@@ -463,7 +464,7 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector, IConsumerMetho
         Type MessageType,
         IConsumePipe Pipe,
         IMessageSerializer Serializer,
-        Func<ReceiveContext, ConsumeContext> CreateContext);
+        Func<ReceiveContext, ConsumeContext> CreateContext, Type? ConsumerType = null);
 
     private void DispatchMessageOperation(
         string kind,
@@ -481,7 +482,7 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector, IConsumerMetho
             kind,
             succeeded,
             messageType.FullName ?? messageType.Name,
-            MessageUrn.For(messageType),
+            _topology.Contracts.GetMessageUrn(messageType),
             null,
             context.DestinationAddress?.ToString(),
             duration,

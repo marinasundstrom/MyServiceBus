@@ -40,6 +40,7 @@ import com.myservicebus.Consumer;
 public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
     private final ServiceProvider serviceProvider;
     private final TransportFactory transportFactory;
+    private final MessageContractRegistry contracts;
     private final TransportSendEndpointProvider transportSendEndpointProvider;
     private final PublishPipe publishPipe;
     private final PublishContextFactory publishContextFactory;
@@ -67,6 +68,7 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
         this.serviceProvider = serviceProvider;
         this.consumerFactoryFactory = consumerFactoryFactory;
         this.transportFactory = serviceProvider.getService(TransportFactory.class);
+        this.contracts = serviceProvider.getService(TopologyRegistry.class).getContracts();
         this.transportSendEndpointProvider = serviceProvider.getService(TransportSendEndpointProvider.class);
         PublishContextFactory factory = serviceProvider.getService(PublishContextFactory.class);
         this.publishContextFactory = factory != null ? factory : new DefaultPublishContextFactory();
@@ -149,7 +151,7 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
     }
 
     public void addConsumer(ConsumerTopology consumerDef) throws Exception {
-        String messageUrn = MessageUrn.forClass(consumerDef.getBindings().get(0).getMessageType());
+        String messageUrn = contracts.getMessageUrn(consumerDef.getBindings().get(0).getMessageType());
         if (consumerRegistrations.contains(consumerDef)) {
             if (logger != null) {
                 logger.debug("Consumer for '{}' on '{}' already registered, skipping", messageUrn,
@@ -212,7 +214,7 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
                 } else {
                     final String resolvedMessageTypeUrn = messageTypeUrn;
                     binding = consumerDef.getBindings().stream()
-                            .filter(b -> MessageUrn.forClass(b.getMessageType()).equals(resolvedMessageTypeUrn))
+                            .filter(b -> inboundMessage.getMessageTypes().contains(contracts.getMessageUrn(b.getMessageType())))
                             .findFirst()
                             .orElse(null);
                     if (binding == null) {
@@ -250,6 +252,8 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
                 if (logger != null) {
                     logger.debug("Received {}", messageTypeUrn);
                 }
+                ctx.setMessageContracts(contracts);
+                ctx.setPublishEntityNameResolver(transportFactory::getPublishEntityName);
                 return pipe.send(ctx);
             } catch (Exception e) {
                 CompletableFuture<Void> f = new CompletableFuture<>();
@@ -292,7 +296,7 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
             List<MessageBinding> bindings = new ArrayList<>(bindingsByIdentity.values());
             Set<String> registeredUrns = new HashSet<>();
             for (MessageBinding binding : bindings) {
-                registeredUrns.add(MessageUrn.forClass(binding.getMessageType()));
+                registeredUrns.add(contracts.getMessageUrn(binding.getMessageType()));
             }
 
             ConsumerTopology first = endpointConsumers.get(0);
@@ -354,10 +358,10 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
 
         java.util.function.Function<TransportMessage, CompletableFuture<Void>> transportHandler = tm -> {
             try {
-                String expectedUrn = MessageUrn.forClass(messageType);
+                String expectedUrn = contracts.getMessageUrn(messageType);
                 InboundMessage inboundMessage = inboundMessageResolver.resolve(tm);
                 String messageTypeUrn = inboundMessage.getMessageType();
-                if (messageTypeUrn != null && !expectedUrn.equals(messageTypeUrn)) {
+                if (messageTypeUrn != null && !inboundMessage.getMessageTypes().contains(expectedUrn)) {
                     if (logger != null) {
                         logger.warn("Received message with unregistered type {}", messageTypeUrn);
                     }
@@ -389,6 +393,8 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
                 if (logger != null) {
                     logger.debug("Received {}", messageTypeUrn);
                 }
+                ctx.setMessageContracts(contracts);
+                ctx.setPublishEntityNameResolver(transportFactory::getPublishEntityName);
                 return pipe.send(ctx);
             } catch (Exception e) {
                 CompletableFuture<Void> f = new CompletableFuture<>();
@@ -403,7 +409,7 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
         binding.setEntityName(exchange);
         bindings.add(binding);
 
-        String expectedUrn = MessageUrn.forClass(messageType);
+        String expectedUrn = contracts.getMessageUrn(messageType);
         java.util.function.Function<String, Boolean> isRegisteredHandler = urn -> expectedUrn.equals(urn) || (rawSerializer && urn == null);
 
         ReceiveEndpointTransportTopology endpointTopology = new ReceiveEndpointTransportTopology(
@@ -535,6 +541,11 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
     public CompletableFuture<Void> publish(PublishContext context) {
         if (state != BusState.STARTED)
             return notStartedFuture();
+        try {
+            transportFactory.preparePublishTopology(context.getContractType());
+        } catch (Exception exception) {
+            return CompletableFuture.failedFuture(exception);
+        }
         String exchange = transportFactory.getPublishEntityName(context.getContractType());
         String address = transportFactory.getPublishAddress(context.getContractType());
         context.setSourceAddress(this.address);
@@ -586,7 +597,7 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
                             context.getRequestId() == null ? null : context.getRequestId().toString(),
                             context.getResponseAddress() == null ? null : context.getResponseAddress().toString(),
                             context.getIntent().name(),
-                            context.getMessage()));
+                            context.getMessage()).withMessageUrn(context.getResolvedMessageTypes().get(0)));
                 });
     }
 

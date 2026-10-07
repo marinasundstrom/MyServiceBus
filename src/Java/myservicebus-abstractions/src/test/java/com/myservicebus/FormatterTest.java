@@ -19,13 +19,13 @@ public class FormatterTest {
     @Test
     void getMessageUrnReturnsExpected() {
         String urn = MessageUrn.forClass(SampleUrnMessage.class);
-        assertEquals("urn:message:TestApp:SampleUrnMessage", urn);
+        assertEquals("urn:message:com.myservicebus:SampleUrnMessage", urn);
     }
 
     @Test
     void getFaultMessageUrnReturnsExpected() {
         String urn = MessageUrn.forFault(SampleUrnMessage.class);
-        assertEquals("urn:message:MassTransit:Fault[[TestApp:SampleUrnMessage]]", urn);
+        assertEquals("urn:message:MassTransit:Fault[[com.myservicebus:SampleUrnMessage]]", urn);
     }
 
     @Test

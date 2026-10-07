@@ -127,6 +127,13 @@ public class RabbitMqSendEndpointProvider implements TransportSendEndpointProvid
         return new SendEndpoint() {
             @Override
             public CompletableFuture<Void> send(SendContext ctx) {
+                if (ctx instanceof com.myservicebus.PublishContext) {
+                    try {
+                        transportFactory.preparePublishTopology(ctx.getContractType());
+                    } catch (Exception exception) {
+                        return CompletableFuture.failedFuture(exception);
+                    }
+                }
                 ctx.setSourceAddress(busAddress);
                 ctx.setDestinationAddress(target);
                 return sendPipe.send(ctx).thenCompose(v -> endpoint.send(ctx));

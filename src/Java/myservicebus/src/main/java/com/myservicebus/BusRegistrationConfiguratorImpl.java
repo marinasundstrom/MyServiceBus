@@ -58,6 +58,9 @@ public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigura
     }
 
     @Override
+    public void setMessageUrn(Class<?> messageType, String urn) { topology.getContracts().setMessageUrn(messageType, urn); }
+
+    @Override
     public void addChoreography(ChoreographyFragment fragment) {
         topology.registerChoreography(fragment);
     }
@@ -492,6 +495,12 @@ public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigura
     }
 
     public void complete() {
+        topology.getContracts().freeze(topology.getMessages().stream().map(m -> m.getMessageType()).toList());
+        serviceCollection.addSingleton(MessageContractRegistry.class, sp -> () -> topology.getContracts());
+        sendConfigurator.useFilter((context, next) -> {
+            context.setMessageUrnResolver(topology.getContracts()::getMessageUrn);
+            return next.send(context);
+        });
         boolean hasLogger = serviceCollection.getDescriptors().stream()
                 .anyMatch(d -> d.getServiceType().equals(LoggerFactory.class));
         boolean hasBusOutbox = serviceCollection.getDescriptors().stream()

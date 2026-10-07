@@ -16,10 +16,15 @@ public final class EntityNameFormatter {
     }
 
     public static String format(Class<?> messageType) {
+        return format(messageType, formatter);
+    }
+
+    public static String format(Class<?> messageType, MessageEntityNameFormatter selectedFormatter) {
+        if (Proxy.isProxyClass(messageType)) messageType = messageType.getInterfaces()[0];
         EntityName attr = messageType.getAnnotation(EntityName.class);
         if (attr != null)
             return attr.value();
-        return formatter.formatEntityName(messageType);
+        return (selectedFormatter != null ? selectedFormatter : formatter).formatEntityName(messageType);
     }
 
     static class DefaultMessageEntityNameFormatter implements MessageEntityNameFormatter {
@@ -28,7 +33,7 @@ public final class EntityNameFormatter {
             if (Proxy.isProxyClass(messageType) && messageType.getInterfaces().length > 0) {
                 messageType = messageType.getInterfaces()[0];
             }
-            return String.format("TestApp:%s", messageType.getSimpleName());
+            return messageType.getPackageName() + ":" + messageType.getSimpleName();
         }
     }
 }

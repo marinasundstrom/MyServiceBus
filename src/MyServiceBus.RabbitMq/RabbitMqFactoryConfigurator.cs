@@ -12,7 +12,7 @@ public class RabbitMqFactoryConfigurator : IRabbitMqFactoryConfigurator, IBusFac
     private readonly Dictionary<Type, string> _exchangeNames = new();
     private readonly List<Action<IMessageBus, IServiceProvider>> _endpointActions = new();
     private IEndpointNameFormatter? _endpointNameFormatter;
-    private IMessageEntityNameFormatter? _entityNameFormatter;
+    private IMessageEntityNameFormatter? _entityNameFormatter = MyServiceBus.EntityNameFormatter.Formatter;
     private Type _consumerFactoryType = typeof(DefaultConstructorConsumerFactory<>);
     public ushort PrefetchCount { get; private set; }
 
@@ -38,12 +38,12 @@ public class RabbitMqFactoryConfigurator : IRabbitMqFactoryConfigurator, IBusFac
         ArgumentNullException.ThrowIfNull(messageType);
         return _exchangeNames.TryGetValue(messageType, out var configuredName)
             ? configuredName
-            : MyServiceBus.EntityNameFormatter.Format(messageType);
+            : MyServiceBus.EntityNameFormatter.Format(messageType, _entityNameFormatter);
     }
 
     public void ReceiveEndpoint(string queueName, Action<ReceiveEndpointConfigurator> configure)
     {
-        var configurator = new ReceiveEndpointConfigurator(queueName, _exchangeNames, _endpointActions);
+        var configurator = new ReceiveEndpointConfigurator(queueName, _exchangeNames, _endpointActions, GetEntityName);
         configure(configurator);
     }
 
@@ -73,7 +73,7 @@ public class RabbitMqFactoryConfigurator : IRabbitMqFactoryConfigurator, IBusFac
     public void SetEntityNameFormatter(IMessageEntityNameFormatter formatter)
     {
         _entityNameFormatter = formatter;
-        MyServiceBus.EntityNameFormatter.SetFormatter(formatter);
+
     }
 
     public void SetConsumerFactory(Type consumerFactoryType)

@@ -9,6 +9,7 @@ public sealed class BusInitialization
     private bool initialized;
     private Exception? failure;
 
+    /// <exception cref="InvalidOperationException">An earlier initialization failed; rebuild the service provider before retrying.</exception>
     public void Initialize(IServiceProvider provider)
     {
         lock (sync)

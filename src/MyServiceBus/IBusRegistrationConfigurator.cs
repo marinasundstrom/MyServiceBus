@@ -6,6 +6,10 @@ namespace MyServiceBus;
 
 public interface IBusRegistrationConfigurator : IRegistrationConfigurator
 {
+    /// <summary>Overrides the full wire URN for a message in this bus configuration.</summary>
+    void SetMessageUrn(Type messageType, string urn) => throw new NotSupportedException();
+    void SetMessageUrn<T>(string urn) where T : class => SetMessageUrn(typeof(T), urn);
+
     IServiceCollection Services { get; }
 
     void AddChoreography(ChoreographyFragment fragment);

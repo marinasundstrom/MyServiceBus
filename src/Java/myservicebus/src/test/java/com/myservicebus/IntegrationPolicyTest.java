@@ -9,6 +9,7 @@ class IntegrationPolicyTest {
         static int attempts;
         public java.util.concurrent.CompletableFuture<Void> consume(ConsumeContext<LocalOrder> context) {
             assertNotNull(context.getMessageId());
+            assertEquals("urn:message:Acme:ConfiguredOrder", context.getMessageUrn(LocalOrder.class));
             return ++attempts == 1
                     ? java.util.concurrent.CompletableFuture.failedFuture(new IllegalStateException("retry"))
                     : java.util.concurrent.CompletableFuture.completedFuture(null);
@@ -35,6 +36,7 @@ class IntegrationPolicyTest {
             public String getSendAddress(String queue) { return "loopback://" + queue; }
         });
         var bus = MessageBusImpl.configure(services, cfg -> {
+            cfg.setMessageUrn(LocalOrder.class, "urn:message:Acme:ConfiguredOrder");
             cfg.addConsumer(OrderConsumer.class, new ConsumerDefinition<OrderConsumer>()
                     .endpointName("orders").concurrentMessageLimit(2).configurePipeline(pipe -> pipe.useRetry(1)));
             com.myservicebus.mediator.MediatorTransport.configure(cfg);

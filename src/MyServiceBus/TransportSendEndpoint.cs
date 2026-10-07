@@ -81,7 +81,7 @@ internal class TransportSendEndpoint : ISendEndpoint
                 kind,
                 succeeded,
                 typeof(T).FullName ?? typeof(T).Name,
-                MessageUrn.For(typeof(T)),
+                context.MessageTypeUrns.FirstOrDefault() ?? MessageUrn.For(typeof(T)),
                 null,
                 sendContext.DestinationAddress?.ToString(),
                 duration,

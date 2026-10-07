@@ -38,7 +38,8 @@ public class SendContext : BasePipeContext, ISendContext
     public Uri? SourceAddress { get; set; }
     public Uri? DestinationAddress { get; set; }
     public DateTime? ScheduledEnqueueTime { get; set; }
-    internal IReadOnlyList<string> MessageTypeUrns => messageTypes.Select(MessageUrn.For).ToArray();
+    public Func<Type, string> MessageUrnResolver { get; set; } = MessageUrn.For;
+    internal IReadOnlyList<string> MessageTypeUrns => messageTypes.Select(MessageUrnResolver).ToArray();
     internal IMessageSerializer MessageSerializer => messageSerializer;
 
     public MessageBody GetMessageBody<T>(T message)
@@ -52,7 +53,7 @@ public class SendContext : BasePipeContext, ISendContext
             ConversationId = ConversationId,
             InitiatorId = InitiatorId,
             Intent = Intent,
-            MessageType = [.. messageTypes.Select(x => MessageUrn.For(x))],
+            MessageType = [.. messageTypes.Select(MessageUrnResolver)],
             ResponseAddress = ResponseAddress,
             FaultAddress = FaultAddress,
             SourceAddress = SourceAddress ?? new Uri("loopback://localhost/source"),

@@ -40,7 +40,8 @@ public final class AmazonSqsTransport {
                 provider -> () -> provider.getService(AmazonSqsSendEndpointProvider.class));
         services.addSingleton(RequestClientTransport.class, provider -> () -> new TransportRequestClientTransport(
                 provider.getService(TransportFactory.class), provider.getService(MessageSerializer.class),
-                provider.getService(com.myservicebus.serialization.InboundMessageResolver.class)));
+                provider.getService(com.myservicebus.serialization.InboundMessageResolver.class),
+                        provider.getService(com.myservicebus.MessageContractRegistry.class)));
         services.addScoped(ScopedClientFactory.class, provider -> () ->
                 new RequestClientFactory(
                         provider.getService(RequestClientTransport.class),

@@ -31,7 +31,7 @@ public class RabbitMqFactoryConfigurator implements BusFactoryConfigurator {
     private String password = "guest";
     private final Map<Class<?>, String> exchangeNames = new HashMap<>();
     private EndpointNameFormatter endpointNameFormatter;
-    private MessageEntityNameFormatter entityNameFormatter;
+    private MessageEntityNameFormatter entityNameFormatter = EntityNameFormatter.getFormatter();
     private final java.util.List<HandlerRegistration<?>> handlerRegistrations = new java.util.ArrayList<>();
     private final java.util.List<ConsumerRegistration<?, ?>> consumerRegistrations = new java.util.ArrayList<>();
     private int prefetchCount;
@@ -86,7 +86,7 @@ public class RabbitMqFactoryConfigurator implements BusFactoryConfigurator {
     }
 
     public String getEntityName(Class<?> messageType) {
-        return exchangeNames.getOrDefault(messageType, EntityNameFormatter.format(messageType));
+        return exchangeNames.getOrDefault(messageType, EntityNameFormatter.format(messageType, entityNameFormatter));
     }
 
     public void configureEndpoints(BusRegistrationContext context) {
@@ -134,7 +134,7 @@ public class RabbitMqFactoryConfigurator implements BusFactoryConfigurator {
 
     public void setEntityNameFormatter(MessageEntityNameFormatter formatter) {
         this.entityNameFormatter = formatter;
-        EntityNameFormatter.setFormatter(formatter);
+
     }
 
     public void setPrefetchCount(int prefetchCount) {
@@ -221,7 +221,7 @@ public class RabbitMqFactoryConfigurator implements BusFactoryConfigurator {
         }
     }
 
-    private static class ReceiveEndpointConfiguratorImpl implements ReceiveEndpointConfigurator {
+    private class ReceiveEndpointConfiguratorImpl implements ReceiveEndpointConfigurator {
         private final String queueName;
         private final Map<Class<?>, String> exchangeNames;
         private final java.util.List<HandlerRegistration<?>> handlers;
@@ -309,9 +309,13 @@ public class RabbitMqFactoryConfigurator implements BusFactoryConfigurator {
                 registry.moveConsumerToEndpoint(def, queueName);
 
                 MessageBinding binding = def.getBindings().get(0);
-                String exchange = exchangeNames.get(binding.getMessageType());
-                if (exchange != null) {
-                    binding.setEntityName(exchange);
+                for (MessageBinding configuredBinding : def.getBindings()) {
+                    configuredBinding.setEntityName(getEntityName(configuredBinding.getMessageType()));
+                    for (var message : registry.getMessages()) {
+                        if (message.getMessageType().equals(configuredBinding.getMessageType())) {
+                            message.setEntityName(configuredBinding.getEntityName());
+                        }
+                    }
                 }
 
                 if (retry != null) {
@@ -343,7 +347,7 @@ public class RabbitMqFactoryConfigurator implements BusFactoryConfigurator {
         public <TMessage, TConsumer extends com.myservicebus.Consumer<TMessage>> void consumer(
                 Class<TMessage> messageType,
                 Class<TConsumer> consumerType) {
-            String exchange = exchangeNames.getOrDefault(messageType, EntityNameFormatter.format(messageType));
+            String exchange = exchangeNames.getOrDefault(messageType, EntityNameFormatter.format(messageType, entityNameFormatter));
             consumers.add(new ConsumerRegistration<>(
                     queueName,
                     messageType,
@@ -361,7 +365,7 @@ public class RabbitMqFactoryConfigurator implements BusFactoryConfigurator {
         public <T> void handler(Class<T> messageType, java.util.function.Function<ConsumeContext<T>, java.util.concurrent.CompletableFuture<Void>> handler) {
             String exchange = exchangeNames.containsKey(messageType)
                     ? exchangeNames.get(messageType)
-                    : EntityNameFormatter.format(messageType);
+                    : EntityNameFormatter.format(messageType, entityNameFormatter);
             handlers.add(new HandlerRegistration<>(queueName, messageType, exchange, handler, retryCount, retryDelay,
                     prefetchCount, concurrentMessageLimit, queueArguments, serializerClass));
         }

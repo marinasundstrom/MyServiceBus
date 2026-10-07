@@ -15,6 +15,8 @@ import com.myservicebus.serialization.SerializerFactory;
 import com.myservicebus.topology.ConsumerDefinitionModel;
 
 public interface BusRegistrationConfigurator extends ConsumerRegistrationConfigurator {
+    default void setMessageUrn(Class<?> messageType, String urn) { throw new UnsupportedOperationException(); }
+
     void addChoreography(ChoreographyFragment fragment);
 
     default <TSaga, TStateMachine extends SagaStateMachine<TSaga>> void addSagaStateMachine(

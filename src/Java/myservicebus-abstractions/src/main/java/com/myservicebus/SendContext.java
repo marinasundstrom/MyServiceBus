@@ -44,6 +44,13 @@ public class SendContext implements OutgoingMessageContext {
     private UUID causationMessageId;
     private MessageIntent intent = MessageIntent.SEND;
     private List<String> messageTypes;
+    private java.util.function.Function<Class<?>, String> messageUrnResolver = MessageUrn::forClass;
+    public void setMessageUrnResolver(java.util.function.Function<Class<?>, String> resolver) {
+        messageUrnResolver = java.util.Objects.requireNonNull(resolver);
+    }
+    public List<String> getResolvedMessageTypes() {
+        return messageTypes != null ? messageTypes : MessageUrn.messageTypes(getContractType()).stream().map(messageUrnResolver).toList();
+    }
 
     public SendContext(Object message) {
         this(message, CancellationToken.none());
@@ -187,7 +194,7 @@ public class SendContext implements OutgoingMessageContext {
         context.setConversationId(conversationId);
         context.setInitiatorId(initiatorId);
         context.setIntent(intent);
-        context.setMessageType(messageTypes != null ? messageTypes : MessageUrn.forMessageTypes(getContractType()));
+        context.setMessageType(getResolvedMessageTypes());
         context.setResponseAddress(responseAddress);
         context.setFaultAddress(faultAddress);
         context.setSourceAddress(sourceAddress != null ? sourceAddress : URI.create("loopback://localhost/source"));

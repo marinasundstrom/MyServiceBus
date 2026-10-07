@@ -14,6 +14,9 @@ import com.myservicebus.choreography.ChoreographyFragment;
 import com.myservicebus.orchestration.SagaStateMachineDefinition;
 
 public class TopologyRegistry implements BusTopology {
+    private final com.myservicebus.MessageContractRegistry contracts = new com.myservicebus.MessageContractRegistry();
+    public com.myservicebus.MessageContractRegistry getContracts() { return contracts; }
+
     private final List<MessageTopology> messages = new ArrayList<>();
     private final List<ConsumerTopology> consumers = new ArrayList<>();
     private final List<ConsumerDefinitionModel> consumerDefinitions = new ArrayList<>();

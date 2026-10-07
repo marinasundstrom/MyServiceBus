@@ -39,6 +39,8 @@ public class BusRegistrationConfigurator : IBusRegistrationConfigurator
         publishConfigurator.UseFilter((IFilter<PublishContext>)telemetryFilter);
     }
 
+    public void SetMessageUrn(Type messageType, string urn) => _topology.Contracts.SetMessageUrn(messageType, urn);
+
     public void AddChoreography(ChoreographyFragment fragment)
     {
         _topology.RegisterChoreography(fragment);
@@ -423,6 +425,9 @@ public class BusRegistrationConfigurator : IBusRegistrationConfigurator
         if (!Services.Any(d => d.ServiceType == typeof(ILoggerFactory)))
             Services.AddLogging(b => b.AddSimpleConsole());
 
+        _topology.Contracts.Freeze(_topology.Messages.Select(m => m.MessageType));
+        sendConfigurator.UseFilter(new MessageContractSendFilter(_topology.Contracts));
+        Services.AddSingleton(_topology.Contracts);
         Services.AddSingleton<BusInitialization>();
         Services.AddSingleton(_topology);
         Services.AddSingleton(jobConsumers);

@@ -143,6 +143,7 @@ public class MediatorSendEndpoint implements SendEndpoint {
                         context.getConversationId(),
                         context.getInitiatorId());
 
+                ctx.setMessageContracts(registry.getContracts());
                 tasks.add(pipe.send(ctx));
             }
         }

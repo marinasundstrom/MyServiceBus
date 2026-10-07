@@ -4,7 +4,10 @@ This changelog summarizes the bigger themes in the repository history rather tha
 
 ## Unreleased
 
+
 - Preserved original malformed RabbitMQ payloads in error queues and emitted structured skipped-message hooks and monitoring observations in both clients.
+
+- Aligned wire identity and RabbitMQ delivery across C# and Java: explicit bus-local URNs, isolated entity naming, package-based Java defaults, version 3 topology snapshots and inherited exchange bindings. Added C#↔Java and MassTransit 8.5.1 broker coverage. Existing Java deployments should pin their old URN and entity names before upgrading.
 
 - Added runtime-type C# publication and consumer registration, preserved selected Java class-token publication contracts, and allowed consumer definitions to combine naming, concurrency, prefetch, and pipeline policy.
 

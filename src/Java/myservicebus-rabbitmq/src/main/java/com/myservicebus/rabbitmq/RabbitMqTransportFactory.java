@@ -21,6 +21,29 @@ import com.rabbitmq.client.Connection;
 import com.myservicebus.logging.LoggerFactory;
 
 public class RabbitMqTransportFactory implements TransportFactory {
+    private final java.util.Set<List<String>> publishedTypes = new java.util.HashSet<>();
+
+    @Override
+    public void preparePublishTopology(Class<?> messageType) throws Exception {
+        preparePublishTopology(com.myservicebus.MessageUrn.messageTypes(messageType).stream().map(this::getPublishEntityName).toList());
+    }
+
+    @Override
+    public synchronized void preparePublishTopology(List<String> entityNames) throws Exception {
+        if (entityNames.isEmpty()) throw new IllegalArgumentException("At least one publish entity is required");
+        if (publishedTypes.contains(entityNames)) return;
+        try (Channel channel = connectionProvider.getOrCreateConnection().createChannel()) {
+            String source = entityNames.get(0);
+            channel.exchangeDeclare(source, "fanout", true);
+            for (String destination : entityNames) {
+                if (destination.equals(source)) continue;
+                channel.exchangeDeclare(destination, "fanout", true);
+                channel.exchangeBind(destination, source, "");
+            }
+        }
+        publishedTypes.add(List.copyOf(entityNames));
+    }
+
     @Override
     public TransportCapabilityDescriptor getCapabilities() {
         return TransportCapabilityDescriptors.RABBITMQ;

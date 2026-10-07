@@ -24,6 +24,7 @@ public class IntegrationPolicyTests
         services.AddServiceBus(cfg =>
         {
             cfg.UsingMediator();
+            cfg.SetMessageUrn<LocalOrder>("urn:message:Acme:ConfiguredOrder");
             var definition = new ConsumerDefinition<OrderConsumer> { EndpointName = "orders", ConcurrentMessageLimit = 2 };
             definition.ConfigureMessage<LocalOrder>(pipe => pipe.UseRetry(1));
             cfg.AddConsumer(definition);
@@ -34,6 +35,7 @@ public class IntegrationPolicyTests
         object order = new LocalOrder(3);
         await ((IPublishEndpoint)bus).Publish(order, typeof(LocalOrder));
         Assert.Equal(2, OrderConsumer.Attempts);
+        Assert.Equal("urn:message:Acme:ConfiguredOrder", bus.Topology.GetSnapshot().Messages.Single().MessageUrn);
         await bus.StopAsync(CancellationToken.None);
     }
 

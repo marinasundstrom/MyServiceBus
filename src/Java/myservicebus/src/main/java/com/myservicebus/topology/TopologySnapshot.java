@@ -12,7 +12,7 @@ public record TopologySnapshot(
         List<ChoreographyFragment> choreographies,
         List<SagaStateMachineTopology> sagaStateMachines) {
 
-    public static final int CURRENT_VERSION = 2;
+    public static final int CURRENT_VERSION = 3;
 
     public TopologySnapshot {
         messages = List.copyOf(messages);

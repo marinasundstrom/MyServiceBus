@@ -60,6 +60,7 @@ public class MessageConfigurator
 public class ReceiveEndpointConfigurator
 {
     private readonly string _queueName;
+    private readonly Func<Type, string> _entityNameResolver;
     private readonly IDictionary<Type, string> _exchangeNames;
     private readonly IList<Action<IMessageBus, IServiceProvider>> _endpointActions;
     private int? _retryCount;
@@ -69,10 +70,11 @@ public class ReceiveEndpointConfigurator
     private IDictionary<string, object?>? _queueArguments;
     private Type? _serializerType;
 
-    public ReceiveEndpointConfigurator(string queueName, IDictionary<Type, string> exchangeNames, IList<Action<IMessageBus, IServiceProvider>> endpointActions)
+    public ReceiveEndpointConfigurator(string queueName, IDictionary<Type, string> exchangeNames, IList<Action<IMessageBus, IServiceProvider>> endpointActions, Func<Type, string>? entityNameResolver = null)
     {
         _queueName = queueName;
         _exchangeNames = exchangeNames;
+        _entityNameResolver = entityNameResolver ?? (type => _exchangeNames.TryGetValue(type, out var name) ? name : EntityNameFormatter.Format(type));
         _endpointActions = endpointActions;
     }
 
@@ -123,8 +125,9 @@ public class ReceiveEndpointConfigurator
 
         foreach (var binding in consumer.Bindings)
         {
-            if (_exchangeNames.TryGetValue(binding.MessageType, out var entity))
-                binding.EntityName = entity;
+            binding.EntityName = _entityNameResolver(binding.MessageType);
+            foreach (var message in registry.Messages.Where(m => m.MessageType == binding.MessageType))
+                message.EntityName = binding.EntityName;
         }
 
         if (_prefetchCount is not null)
@@ -167,7 +170,7 @@ public class ReceiveEndpointConfigurator
     {
         var exchangeName = _exchangeNames.TryGetValue(typeof(T), out var entity)
             ? entity
-            : EntityNameFormatter.Format(typeof(T))!;
+            : _entityNameResolver(typeof(T));
         _endpointActions.Add((bus, provider) =>
         {
             IMessageSerializer? serializer = _serializerType != null

@@ -8,6 +8,10 @@ public interface ITransportFactory
 
     TransportCapabilityDescriptor Capabilities => TransportCapabilityDescriptors.Unknown(GetType().Name);
 
+    Task PreparePublishTopology(IReadOnlyList<string> entityNames, CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+    Task PreparePublishTopology(Type messageType, CancellationToken cancellationToken = default) => Task.CompletedTask;
+
     string GetPublishEntityName(Type messageType) => EntityNameFormatter.Format(messageType);
 
     Uri GetPublishAddress(string entityName) => new($"exchange:{entityName}");

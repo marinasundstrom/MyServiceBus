@@ -22,6 +22,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public final class TransportRequestClientTransport implements RequestClientTransport {
     private final TransportFactory transportFactory;
     private final MessageSerializer serializer;
+    private final MessageContractRegistry contracts;
     private final InboundMessageResolver inboundMessageResolver;
 
     public TransportRequestClientTransport(TransportFactory transportFactory, MessageSerializer serializer) {
@@ -35,6 +36,12 @@ public final class TransportRequestClientTransport implements RequestClientTrans
             TransportFactory transportFactory,
             MessageSerializer serializer,
             InboundMessageResolver inboundMessageResolver) {
+        this(transportFactory, serializer, inboundMessageResolver, new MessageContractRegistry());
+    }
+
+    public TransportRequestClientTransport(TransportFactory transportFactory, MessageSerializer serializer,
+            InboundMessageResolver inboundMessageResolver, MessageContractRegistry contracts) {
+        this.contracts = contracts;
         this.transportFactory = transportFactory;
         this.serializer = serializer;
         this.inboundMessageResolver = inboundMessageResolver;
@@ -55,7 +62,7 @@ public final class TransportRequestClientTransport implements RequestClientTrans
                     if (isFault(inbound, requestType)) {
                         wireResponse.completeExceptionally(new RequestFaultException(
                                 requestType.getSimpleName(), inbound.getMessage(Fault.class)));
-                    } else if (inbound.getMessageTypes().contains(MessageUrn.forClass(responseType))) {
+                    } else if (inbound.getMessageTypes().contains(contracts.getMessageUrn(responseType))) {
                         wireResponse.complete(inbound.getMessage(responseType));
                     }
                 },
@@ -80,9 +87,9 @@ public final class TransportRequestClientTransport implements RequestClientTrans
                     if (isFault(inbound, requestType)) {
                         wireResponse.completeExceptionally(new RequestFaultException(
                                 requestType.getSimpleName(), inbound.getMessage(Fault.class)));
-                    } else if (inbound.getMessageTypes().contains(MessageUrn.forClass(responseType1))) {
+                    } else if (inbound.getMessageTypes().contains(contracts.getMessageUrn(responseType1))) {
                         wireResponse.complete(Response2.fromT1(inbound.getMessage(responseType1)));
-                    } else if (inbound.getMessageTypes().contains(MessageUrn.forClass(responseType2))) {
+                    } else if (inbound.getMessageTypes().contains(contracts.getMessageUrn(responseType2))) {
                         wireResponse.complete(Response2.fromT2(inbound.getMessage(responseType2)));
                     }
                 },
@@ -116,6 +123,7 @@ public final class TransportRequestClientTransport implements RequestClientTrans
                     0,
                     bindings,
                     null);
+            context.setMessageUrnResolver(contracts::getMessageUrn);
             UUID requestId = context.getRequestId() != null ? context.getRequestId() : UUID.randomUUID();
             context.setRequestId(requestId);
 
@@ -176,8 +184,8 @@ public final class TransportRequestClientTransport implements RequestClientTrans
         }
     }
 
-    private static boolean isFault(InboundMessage inbound, Class<?> requestType) {
-        return inbound.getMessageTypes().contains(MessageUrn.forFault(requestType));
+    private boolean isFault(InboundMessage inbound, Class<?> requestType) {
+        return inbound.getMessageTypes().contains(contracts.getFaultUrn(requestType));
     }
 
     private static Throwable unwrap(Throwable failure) {

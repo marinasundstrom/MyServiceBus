@@ -13,6 +13,9 @@ public class ConsumerConsumeContext<TConsumer, T> extends ConsumeContext<T> {
         this.context = context;
     }
 
+    @Override
+    public String getMessageUrn(Class<?> type) { return context.getMessageUrn(type); }
+
     public TConsumer getConsumer() {
         return consumer;
     }

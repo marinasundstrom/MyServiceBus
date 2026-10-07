@@ -10,6 +10,8 @@ import com.myservicebus.topology.MessageBinding;
 import com.myservicebus.topology.ReceiveEndpointTransportTopology;
 
 public interface TransportFactory extends PublishAddressProvider {
+    default void preparePublishTopology(List<String> entityNames) throws Exception { }
+    default void preparePublishTopology(Class<?> messageType) throws Exception { }
     default TransportCapabilityDescriptor getCapabilities() {
         return TransportCapabilityDescriptors.unknown(getClass().getSimpleName());
     }

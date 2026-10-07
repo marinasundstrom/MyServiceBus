@@ -78,7 +78,7 @@ class RabbitMqRequestClientTransportTest {
         assertEquals(env.getResponseAddress(), env.getFaultAddress());
         org.junit.jupiter.api.Assertions.assertTrue(
                 env.getResponseAddress().startsWith("rabbitmq://broker.example:5678/exchange/resp-"));
-        assertEquals("rabbitmq://broker.example:5678/exchange/TestApp:Ping",
+        assertEquals("rabbitmq://broker.example:5678/exchange/com.myservicebus.rabbitmq:Ping",
                 env.getDestinationAddress());
         assertNotNull(env.getRequestId());
     }

@@ -12,19 +12,20 @@ final class TopologySnapshots {
     }
 
     static TopologySnapshot create(BusTopology topology) {
+        var contracts = topology instanceof TopologyRegistry registry ? registry.getContracts() : new com.myservicebus.MessageContractRegistry();
         List<TopologySnapshot.Message> messages = topology.getMessages().stream()
                 .collect(Collectors.toMap(
-                        message -> MessageUrn.forClass(message.getMessageType()),
+                        message -> contracts.getMessageUrn(message.getMessageType()),
                         Function.identity(),
                         (left, right) -> left))
                 .values().stream()
                 .map(message -> new TopologySnapshot.Message(
-                        MessageUrn.forClass(message.getMessageType()),
+                        contracts.getMessageUrn(message.getMessageType()),
                         message.getMessageType().getName(),
-                        MessageUrn.forClass(message.getMessageType()),
+                        contracts.getMessageUrn(message.getMessageType()),
                         message.getEntityName(),
-                        List.of(message.getMessageType().getInterfaces()).stream()
-                                .map(MessageUrn::forClass)
+                        MessageUrn.messageTypes(message.getMessageType()).stream().skip(1)
+                                .map(contracts::getMessageUrn)
                                 .distinct()
                                 .sorted()
                                 .toList()))
@@ -40,7 +41,7 @@ final class TopologySnapshots {
                             consumerType,
                             endpointId,
                             consumer.getBindings().stream()
-                                    .map(binding -> MessageUrn.forClass(binding.getMessageType()))
+                                    .map(binding -> contracts.getMessageUrn(binding.getMessageType()))
                                     .distinct()
                                     .sorted()
                                     .toList());
@@ -56,7 +57,7 @@ final class TopologySnapshots {
         List<TopologySnapshot.Binding> bindings = topology.getConsumers().stream()
                 .flatMap(consumer -> consumer.getBindings().stream().map(binding -> {
                     String endpointId = endpointId(consumer.getQueueName());
-                    String messageId = MessageUrn.forClass(binding.getMessageType());
+                    String messageId = contracts.getMessageUrn(binding.getMessageType());
                     return new TopologySnapshot.Binding(
                             endpointId + "|binding:" + messageId + "|" + binding.getEntityName(),
                             endpointId,

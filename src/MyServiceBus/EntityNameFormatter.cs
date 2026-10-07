@@ -14,13 +14,15 @@ public static class EntityNameFormatter
         _formatter = formatter;
     }
 
-    public static string Format(Type messageType)
+    public static string Format(Type messageType) => Format(messageType, null);
+
+    public static string Format(Type messageType, IMessageEntityNameFormatter? formatter)
     {
         var attr = messageType.GetCustomAttribute<EntityNameAttribute>();
         if (attr != null)
             return attr.EntityName;
 
-        return _formatter.FormatEntityName(messageType);
+        return (formatter ?? _formatter).FormatEntityName(messageType);
     }
 
     class DefaultMessageEntityNameFormatter : IMessageEntityNameFormatter

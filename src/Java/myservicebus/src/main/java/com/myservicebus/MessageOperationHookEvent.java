@@ -26,6 +26,13 @@ public record MessageOperationHookEvent(
         String messageIntent,
         Object message) implements BusHookEvent {
 
+    public MessageOperationHookEvent withMessageUrn(String urn) {
+        return new MessageOperationHookEvent(occurredAtUtc, kind, succeeded, messageType, urn, endpointName,
+                destinationAddress, durationMs, exceptionType, exceptionMessage, correlationId, conversationId,
+                traceId, spanId, retryAttempt, retryLimit, messageId, causationMessageId, requestId, responseAddress,
+                messageIntent, message);
+    }
+
     public MessageOperationHookEvent(
             Instant occurredAtUtc,
             String kind,

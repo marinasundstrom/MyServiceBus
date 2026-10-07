@@ -80,7 +80,7 @@ public class ConsumeContextTest {
         ctx.publish(new FakeMessage(), CancellationToken.none()).join();
 
         Assertions.assertEquals(
-                "custom://publish/TestApp:FakeMessage",
+                "custom://publish/com.myservicebus:FakeMessage",
                 provider.uri);
     }
 
@@ -169,7 +169,7 @@ public class ConsumeContextTest {
         ctx.publish(new FakeMessage()).join();
 
         Assertions.assertEquals(URI.create("rabbitmq://localhost/"), captured.get().getSourceAddress());
-        Assertions.assertEquals(URI.create("exchange:TestApp:FakeMessage"), captured.get().getDestinationAddress());
+        Assertions.assertEquals(URI.create("exchange:com.myservicebus:FakeMessage"), captured.get().getDestinationAddress());
     }
 
     @Test
