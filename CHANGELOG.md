@@ -4,6 +4,8 @@ This changelog summarizes the bigger themes in the repository history rather tha
 
 ## Unreleased
 
+- Added Azure Service Bus inherited-topic forwarding in create-topology mode for both clients, including persisted-outbox topology preparation. SNS/SQS retains explicit selected-contract publication.
+
 - Validate saga/choreography declarations against bus-level contract overrides at startup, and match every advertised contract when receiving Azure Service Bus and SNS/SQS envelopes in both clients.
 
 - Preserved configured wire identities and inherited publish topology in outbox records in both clients; capture remains offline and dispatch prepares exchange bindings before delivery.

@@ -21,11 +21,15 @@ public sealed class AzureServiceBusTransportFactory : ITransportFactory
     private readonly IInboundMessageResolver _inboundMessageResolver;
     private readonly ConcurrentDictionary<string, ISendTransport> _sendTransports = new(StringComparer.Ordinal);
 
+    private readonly SemaphoreSlim publishTopologyLock = new(1);
+    private readonly HashSet<string> preparedPublishTopologies = new(StringComparer.Ordinal);
+
     public AzureServiceBusTransportFactory(
         ServiceBusClient client,
         IAzureServiceBusFactoryConfigurator configurator,
         IInboundMessageResolver? inboundMessageResolver = null,
-        ILoggerFactory? loggerFactory = null)
+        ILoggerFactory? loggerFactory = null,
+        ServiceBusAdministrationClient? administrationClient = null)
     {
         ArgumentNullException.ThrowIfNull(client);
         ArgumentNullException.ThrowIfNull(configurator);
@@ -39,9 +43,40 @@ public sealed class AzureServiceBusTransportFactory : ITransportFactory
         _inboundMessageResolver = inboundMessageResolver ?? new InboundMessageResolver();
         if (_topologyMode == AzureServiceBusTopologyMode.Create)
         {
-            _administrationClient = new ServiceBusAdministrationClient(
+            _administrationClient = administrationClient ?? new ServiceBusAdministrationClient(
                 configurator.ManagementConnectionString ?? configurator.ConnectionString);
         }
+    }
+
+    public Task PreparePublishTopology(Type messageType, CancellationToken cancellationToken = default)
+        => PreparePublishTopology(MessageTypeCache.GetMessageTypes(messageType).Select(GetPublishEntityName).ToArray(), cancellationToken);
+
+    /// <summary>Creates direct forwarding subscriptions from the selected topic to its inherited contracts.</summary>
+    /// <exception cref="AzureServiceBusTransportException">The publish topology could not be provisioned.</exception>
+    public async Task PreparePublishTopology(IReadOnlyList<string> entityNames, CancellationToken cancellationToken = default)
+    {
+        if (_topologyMode != AzureServiceBusTopologyMode.Create || entityNames.Count == 0) return;
+        var names = entityNames.Distinct(StringComparer.Ordinal).ToArray();
+        var key = System.Text.Json.JsonSerializer.Serialize(names);
+        await publishTopologyLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            if (preparedPublishTopologies.Contains(key)) return;
+            foreach (var name in names)
+                await EnsureTopic(_administrationClient!, name, cancellationToken).ConfigureAwait(false);
+            foreach (var destination in names.Skip(1))
+            {
+                var hash = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(destination));
+                var subscription = "msb-" + Convert.ToHexString(hash)[..32].ToLowerInvariant();
+                await EnsureSubscription(_administrationClient!, names[0], subscription, destination, cancellationToken).ConfigureAwait(false);
+            }
+            preparedPublishTopologies.Add(key);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException and not AzureServiceBusTransportException)
+        {
+            throw new AzureServiceBusTransportException("provision publish topology", names[0], exception);
+        }
+        finally { publishTopologyLock.Release(); }
     }
 
     public TransportCapabilityDescriptor Capabilities => TransportCapabilityDescriptors.AzureServiceBus;

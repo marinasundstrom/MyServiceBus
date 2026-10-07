@@ -38,9 +38,16 @@ public final class AzureServiceBusTransportFactory implements TransportFactory, 
     private final LoggerFactory loggerFactory;
     private final ConcurrentHashMap<String, SendTransport> sendTransports = new ConcurrentHashMap<>();
 
+    private final java.util.Set<java.util.List<String>> preparedPublishTopologies = new java.util.HashSet<>();
+
     public AzureServiceBusTransportFactory(
             AzureServiceBusFactoryConfigurator configurator,
             LoggerFactory loggerFactory) {
+        this(configurator, loggerFactory, null);
+    }
+
+    AzureServiceBusTransportFactory(AzureServiceBusFactoryConfigurator configurator,
+            LoggerFactory loggerFactory, ServiceBusAdministrationClient administrationClient) {
         this.connectionString = configurator.getConnectionString();
         this.topologyMode = configurator.getTopologyMode();
         this.defaultPrefetchCount = configurator.getPrefetchCount();
@@ -49,12 +56,44 @@ public final class AzureServiceBusTransportFactory implements TransportFactory, 
         this.baseAddress = endpoint(connectionString);
         this.loggerFactory = loggerFactory;
         this.administrationClient = topologyMode == AzureServiceBusTopologyMode.CREATE
-                ? new ServiceBusAdministrationClientBuilder()
+                ? (administrationClient != null ? administrationClient : new ServiceBusAdministrationClientBuilder()
                         .connectionString(configurator.getManagementConnectionString() != null
                                 ? configurator.getManagementConnectionString()
                                 : connectionString)
-                        .buildClient()
+                        .buildClient())
                 : null;
+    }
+
+    @Override
+    public void preparePublishTopology(Class<?> messageType) throws Exception {
+        preparePublishTopology(com.myservicebus.MessageUrn.messageTypes(messageType).stream()
+                .map(this::getPublishEntityName).toList());
+    }
+
+    @Override
+    public synchronized void preparePublishTopology(java.util.List<String> entityNames) throws Exception {
+        if (topologyMode != AzureServiceBusTopologyMode.CREATE || entityNames.isEmpty()) return;
+        var names = entityNames.stream().distinct().toList();
+        if (preparedPublishTopologies.contains(names)) return;
+        try {
+            for (String name : names) ensureTopic(name);
+            for (String destination : names.subList(1, names.size())) {
+                byte[] hash = java.security.MessageDigest.getInstance("SHA-256")
+                        .digest(destination.getBytes(StandardCharsets.UTF_8));
+                String subscription = "msb-" + java.util.HexFormat.of().formatHex(hash).substring(0, 32);
+                if (!administrationClient.getSubscriptionExists(names.get(0), subscription)) {
+                    try {
+                        administrationClient.createSubscription(names.get(0), subscription,
+                                new CreateSubscriptionOptions().setForwardTo(destination));
+                    } catch (ResourceExistsException ignored) {
+                        // Another publisher created the same deterministic forwarding subscription.
+                    }
+                }
+            }
+            preparedPublishTopologies.add(names);
+        } catch (Exception exception) {
+            throw new AzureServiceBusTransportException("provision publish topology", names.get(0), exception);
+        }
     }
 
     @Override

@@ -44,9 +44,19 @@ identity construction; version 1 and 2 fixtures remain historical evidence.
 
 RabbitMQ inherited publication is covered by broker tests, including C# to Java and
 Java to C# with different local type names, and bidirectional publication with
-MassTransit 8.5.1. This does not add equivalent broker
-hierarchy provisioning to Azure Service Bus or Amazon SNS/SQS. Existing direct
-contract transport profiles retain their separate capability and conformance scope.
+MassTransit 8.5.1. Azure Service Bus create-topology mode now provisions direct forwarding subscriptions
+from the selected topic to each distinct base/interface topic. Pre-provisioned mode
+requires those subscriptions to be deployed separately; the forwarding subscription
+name is `msb-` followed by the first 32 lowercase hexadecimal characters of the
+SHA-256 hash of the destination topic's UTF-8 name. Provisioning is covered by SDK
+contract tests; live-cloud hierarchy delivery is not yet a conformance claim.
+
+Amazon SNS/SQS keeps selected-contract publication: SNS does not provide topic-to-topic
+bindings, and the pinned MassTransit 8.5.1 SNS publish topology likewise creates the
+selected topic without inherited bindings. Publish with the interface/base contract
+explicitly when subscribing to that contract. Both cloud adapters now match all URNs
+on received envelopes. This separates receive contract matching from broker routing;
+it does not claim universal transport equivalence.
 
 Queue-per-handler and per-consumer retry policies remain valid integration patterns. Runtime-type dispatch and startup contract validation are
 reasonable integration-layer choices. Expanding every interface subscription into

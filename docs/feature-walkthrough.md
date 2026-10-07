@@ -2004,3 +2004,12 @@ The harness is registered for `IMessageBus` and `ITransportFactory`, so existing
 
 - Read the [design goals](development/design-goals.md) for MyServiceBus.
 - Explore the [design guidelines](development/design-guidelines.md) for architectural patterns and feature parity.
+
+### Cloud transport contract routing
+
+Azure Service Bus create-topology mode forwards a published concrete contract to its
+base/interface topics. Pre-provisioned deployments must create the forwarding
+subscriptions described in [contract migration](development/message-contract-migration.md).
+Amazon SNS/SQS publishes to the selected contract topic; use `Publish<IOrder>(order)`
+in C# or `publish(order, IOrder.class)` in Java for an interface subscription.
+Both cloud receivers accept matching contracts anywhere in the envelope's type list.
