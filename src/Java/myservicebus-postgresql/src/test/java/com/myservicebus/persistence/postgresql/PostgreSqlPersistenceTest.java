@@ -413,6 +413,8 @@ class PostgreSqlPersistenceTest {
             ServiceCollection services = ServiceCollection.create();
             services.addSingleton(TransportFactory.class, ignored -> () -> new NoOpTransportFactory());
             services.from(MessageBusServices.class).addServiceBus(configurator -> {
+                configurator.setMessageUrn(PersistedOrder.class, "urn:message:Portable:Order");
+                configurator.setMessageUrn(PersistedOrderContract.class, "urn:message:Portable:IOrder");
                 configurator.useBusOutbox();
                 MediatorTransport.configure(configurator);
             });
@@ -428,7 +430,7 @@ class PostgreSqlPersistenceTest {
                     try (OutboxSession.Registration ignored = PostgreSqlOutboxSession.useTransaction(
                             scoped.getRequiredService(OutboxSession.class), connection, SERVICE_NAME)) {
                         PublishEndpoint publishEndpoint = scoped.getRequiredService(PublishEndpoint.class);
-                        publishEndpoint.publish(new OrderSubmitted(UUID.randomUUID())).join();
+                        publishEndpoint.publish(new PersistedOrder(UUID.randomUUID())).join();
 
                         SendEndpointProvider endpointProvider = scoped.getRequiredService(SendEndpointProvider.class);
                         SendEndpoint endpoint = endpointProvider.getSendEndpoint("loopback://localhost/orders");
@@ -443,6 +445,18 @@ class PostgreSqlPersistenceTest {
             List<OutboxLease> leases = new PostgreSqlOutboxStore(dataSource, SERVICE_NAME)
                     .lease(request("replica-a", 10)).join();
             assertEquals(2, leases.size());
+            var published = leases.stream().map(OutboxLease::message)
+                    .filter(message -> message.intent() == com.myservicebus.persistence.OutboxDeliveryIntent.PUBLISH)
+                    .findFirst().orElseThrow();
+            assertEquals(List.of("urn:message:Portable:Order", "urn:message:Portable:IOrder"), published.messageTypes());
+            String header = "MyServiceBus.Outbox.PublishEntities";
+            var entities = new com.fasterxml.jackson.databind.ObjectMapper().readValue(published.headers().get(header), String[].class);
+            assertEquals(2, entities.length);
+            var transport = new CapturingTransportFactory();
+            new com.myservicebus.persistence.TransportOutboxDispatcher(transport).dispatch(published, CancellationToken.none()).join();
+            assertEquals(java.util.Arrays.asList(entities), transport.preparedEntities);
+            org.junit.jupiter.api.Assertions.assertArrayEquals(published.body(), transport.body);
+            org.junit.jupiter.api.Assertions.assertFalse(transport.sentHeaders.containsKey(header));
             assertEquals(com.myservicebus.persistence.OutboxDeliveryIntent.PUBLISH, leases.get(0).message().intent());
             assertEquals(com.myservicebus.persistence.OutboxDeliveryIntent.SEND, leases.get(1).message().intent());
             assertEquals("loopback://localhost/orders", leases.get(1).message().destinationAddress().toString());
@@ -942,13 +956,22 @@ class PostgreSqlPersistenceTest {
         }
     }
 
+    private interface PersistedOrderContract { UUID orderId(); }
+    private record PersistedOrder(UUID orderId) implements PersistedOrderContract { }
+
     private static final class CapturingTransportFactory implements TransportFactory {
         private final CountDownLatch sent = new CountDownLatch(1);
         private byte[] body;
+        private List<String> preparedEntities;
+        private java.util.Map<String, Object> sentHeaders;
+
+        @Override
+        public void preparePublishTopology(List<String> entities) { preparedEntities = List.copyOf(entities); }
 
         @Override
         public SendTransport getSendTransport(URI address) {
             return (data, headers, contentType) -> {
+                sentHeaders = new java.util.HashMap<>(headers);
                 body = data.clone();
                 sent.countDown();
             };

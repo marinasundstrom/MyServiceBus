@@ -488,6 +488,8 @@ public sealed class PostgreSqlPersistenceTests : IAsyncLifetime
         var services = new ServiceCollection();
         services.AddServiceBus(configurator =>
         {
+            configurator.SetMessageUrn<PersistedOrder>("urn:message:Portable:Order");
+            configurator.SetMessageUrn<IPersistedOrder>("urn:message:Portable:IOrder");
             configurator.UseBusOutbox();
             configurator.UsingMediator();
         });
@@ -505,7 +507,7 @@ public sealed class PostgreSqlPersistenceTests : IAsyncLifetime
                 .UsePostgreSql(connection, transaction, ServiceName))
             {
                 var publishEndpoint = scope.ServiceProvider.GetRequiredService<IPublishEndpoint>();
-                await publishEndpoint.Publish(new OrderSubmitted(Guid.NewGuid()));
+                await publishEndpoint.Publish(new PersistedOrder(Guid.NewGuid()));
 
                 var endpointProvider = scope.ServiceProvider.GetRequiredService<ISendEndpointProvider>();
                 var endpoint = await endpointProvider.GetSendEndpoint(new Uri("loopback://localhost/orders"));
@@ -520,6 +522,15 @@ public sealed class PostgreSqlPersistenceTests : IAsyncLifetime
         }
 
         var leases = await new PostgreSqlOutboxStore(dataSource, ServiceName).LeaseAsync(Request("replica-a", 10));
+        var published = Assert.Single(leases, lease => lease.Message.Intent == OutboxDeliveryIntent.Publish).Message;
+        Assert.Equal(["urn:message:Portable:Order", "urn:message:Portable:IOrder"], published.MessageTypes);
+        var entities = System.Text.Json.JsonSerializer.Deserialize<string[]>(published.Headers[OutboxMessageFactory.PublishEntitiesHeader])!;
+        Assert.Equal(2, entities.Length);
+        var transport = new CapturingTransportFactory();
+        await new TransportOutboxDispatcher(transport).DispatchAsync(published);
+        Assert.Equal(entities, transport.PreparedEntities);
+        Assert.Equal(published.Body.ToArray(), await transport.SentBody.Task);
+        Assert.DoesNotContain(OutboxMessageFactory.PublishEntitiesHeader, transport.SentHeaders!.Keys);
         Assert.Collection(
             leases.OrderBy(lease => lease.Message.CreatedAtUtc),
             lease => Assert.Equal(OutboxDeliveryIntent.Publish, lease.Message.Intent),
@@ -1067,22 +1078,30 @@ public sealed class PostgreSqlPersistenceTests : IAsyncLifetime
         public string? Origin { get; set; }
     }
 
+    private interface IPersistedOrder { Guid OrderId { get; } }
+    private sealed record PersistedOrder(Guid OrderId) : IPersistedOrder;
+
     private sealed class CapturingTransportFactory : ITransportFactory
     {
+        public IReadOnlyList<string>? PreparedEntities { get; private set; }
+        public IDictionary<string, object>? SentHeaders { get; private set; }
+        public Task PreparePublishTopology(IReadOnlyList<string> entities, CancellationToken cancellationToken = default)
+        { PreparedEntities = entities.ToArray(); return Task.CompletedTask; }
         public TaskCompletionSource<byte[]> SentBody { get; } =
             new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         public Task<ISendTransport> GetSendTransport(
             Uri address,
             CancellationToken cancellationToken = default) =>
-            Task.FromResult<ISendTransport>(new CapturingSendTransport(SentBody));
+            Task.FromResult<ISendTransport>(new CapturingSendTransport(SentBody, headers => SentHeaders = headers));
     }
 
-    private sealed class CapturingSendTransport(TaskCompletionSource<byte[]> sentBody) : ISendTransport
+    private sealed class CapturingSendTransport(TaskCompletionSource<byte[]> sentBody, Action<IDictionary<string, object>> captureHeaders) : ISendTransport
     {
         public Task Send<T>(T message, SendContext context, CancellationToken cancellationToken = default)
             where T : class
         {
+            captureHeaders(new Dictionary<string, object>(context.Headers));
             sentBody.TrySetResult(context.GetMessageBody(message).GetBytes());
             return Task.CompletedTask;
         }
