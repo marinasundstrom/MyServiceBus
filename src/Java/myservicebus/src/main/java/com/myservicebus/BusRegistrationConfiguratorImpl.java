@@ -230,7 +230,7 @@ public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigura
                 endpointName,
                 definition.getEndpointName() != null || attributeEndpointName != null,
                 consumerClass,
-                null,
+                definition.getPipeline(),
                 definition,
                 messageTypes.toArray(Class<?>[]::new));
 

@@ -163,6 +163,24 @@ public class BusRegistrationConfigurator : IBusRegistrationConfigurator
 
     [RequiresDynamicCode("Runtime consumer discovery closes generic registrations dynamically. Use AddGeneratedConsumers for NativeAOT.")]
     [RequiresUnreferencedCode("Runtime consumer discovery cannot guarantee that consumer metadata is preserved. Use AddGeneratedConsumers for trimmed applications.")]
+    public void AddConsumer(Type consumerType)
+    {
+        ArgumentNullException.ThrowIfNull(consumerType);
+        if (!consumerType.IsClass || consumerType.IsAbstract || consumerType.ContainsGenericParameters
+            || !typeof(IConsumer).IsAssignableFrom(consumerType))
+            throw new ArgumentException("A closed concrete consumer type is required.", nameof(consumerType));
+        var method = typeof(BusRegistrationConfigurator).GetMethods()
+            .Single(m => m.Name == nameof(AddConsumer) && m.IsGenericMethodDefinition
+                && m.GetGenericArguments().Length == 1 && m.GetParameters().Length == 0);
+        try { method.MakeGenericMethod(consumerType).Invoke(this, null); }
+        catch (TargetInvocationException exception) when (exception.InnerException is not null)
+        {
+            System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(exception.InnerException).Throw();
+        }
+    }
+
+    [RequiresDynamicCode("Runtime consumer registration requires generic reflection.")]
+    [RequiresUnreferencedCode("Runtime consumer metadata must be preserved.")]
     public void AddConsumer<TConsumer>() where TConsumer : class, IConsumer
         => AddConsumer(new ConsumerDefinition<TConsumer>());
 

@@ -16,7 +16,9 @@ public interface PublishEndpoint extends OutgoingMessagePublisher {
 
     default <T> CompletableFuture<Void> publish(Class<T> messageType, Object message,
             CancellationToken cancellationToken) {
-        return publish(MessageProxy.create(messageType, message), cancellationToken);
+        PublishContext context = new PublishContext(MessageProxy.create(messageType, message), cancellationToken);
+        context.setContractType(messageType);
+        return publish(context);
     }
 
     default CompletableFuture<Void> publish(PublishContext context) {
@@ -66,7 +68,10 @@ public interface PublishEndpoint extends OutgoingMessagePublisher {
     default <T> CompletableFuture<Void> publish(Class<T> messageType, Object message,
             Consumer<PublishContext> contextCallback, CancellationToken cancellationToken) {
         T proxy = MessageProxy.create(messageType, message);
-        return publish(proxy, contextCallback, cancellationToken);
+        PublishContext context = new PublishContext(proxy, cancellationToken);
+        context.setContractType(messageType);
+        contextCallback.accept(context);
+        return publish(context);
     }
 
     default <T> CompletableFuture<Void> publish(Class<T> messageType, Object message,

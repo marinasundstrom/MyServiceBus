@@ -65,9 +65,9 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector, IConsumerMetho
     public async Task Publish<T>(T message, Action<IPublishContext>? contextCallback = null, CancellationToken cancellationToken = default) where T : class
     {
         EnsureStarted();
-        var exchangeName = _transportFactory.GetPublishEntityName(message.GetType());
+        var exchangeName = _transportFactory.GetPublishEntityName(typeof(T));
 
-        var uri = _transportFactory.GetPublishAddress(message.GetType());
+        var uri = _transportFactory.GetPublishAddress(typeof(T));
         _logger?.LogDebug("Publishing {MessageType} to {DestinationAddress}", typeof(T).Name, uri);
         var transport = await _transportFactory.GetSendTransport(uri, cancellationToken);
 

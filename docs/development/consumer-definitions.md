@@ -31,10 +31,16 @@ they are not definition data.
 
 ## Initial model
 
-The first slice supports two transport-neutral policies:
+Definitions support these transport-neutral policies:
 
 - an explicit endpoint name;
-- a concurrent message limit.
+- a concurrent message limit;
+- prefetch count;
+- consume-pipeline configuration, including retries.
+
+Use C# `ConfigureMessage<TMessage>` for a contract-specific pipeline or Java
+`configurePipeline` for the consumer pipeline. Repeated configuration callbacks
+compose in registration order. Runtime callbacks are omitted from snapshots.
 
 Each consumer definition composes an endpoint definition instead of owning a
 second copy of endpoint policy. The initial endpoint model captures its resolved
@@ -59,8 +65,8 @@ consume them today. This keeps inspection and future tooling on the stable
 definition model while the runtime is migrated away from projection-specific
 registration shapes.
 
-The model will grow from this boundary. Consumer pipeline configuration,
-durability and temporary endpoint intent, retry and outbox policy, serializer selection,
+The model will grow from this boundary. Durability and temporary endpoint intent,
+outbox policy, serializer selection,
 transport-specific endpoint options, dependency-injected definition classes,
 reflection discovery, and generated registration remain later slices. Those
 features should extend the definition stage rather than add more state directly

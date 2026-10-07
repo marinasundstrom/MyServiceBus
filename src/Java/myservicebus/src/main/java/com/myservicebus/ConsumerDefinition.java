@@ -8,6 +8,15 @@ package com.myservicebus;
  */
 public class ConsumerDefinition<TConsumer> {
     private final EndpointDefinition endpoint;
+    private java.util.function.Consumer<PipeConfigurator<ConsumeContext<Object>>> pipeline;
+
+    public ConsumerDefinition<TConsumer> configurePipeline(java.util.function.Consumer<PipeConfigurator<ConsumeContext<Object>>> configure) {
+        java.util.Objects.requireNonNull(configure);
+        pipeline = pipeline == null ? configure : pipeline.andThen(configure);
+        return this;
+    }
+
+    public java.util.function.Consumer<PipeConfigurator<ConsumeContext<Object>>> getPipeline() { return pipeline; }
 
     public ConsumerDefinition() {
         this(new EndpointDefinition());

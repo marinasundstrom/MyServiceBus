@@ -19,6 +19,16 @@ import java.time.Instant;
 
 public class SendContext implements OutgoingMessageContext {
     private Object message;
+    private Class<?> contractType;
+    public Class<?> getContractType() {
+        if (contractType != null) return contractType;
+        Class<?> type = message.getClass();
+        return java.lang.reflect.Proxy.isProxyClass(type) ? type.getInterfaces()[0] : type;
+    }
+    public void setContractType(Class<?> type) {
+        if (type == null || !type.isInstance(message)) throw new IllegalArgumentException("Message must implement the selected contract");
+        contractType = type;
+    }
     private final Map<String, Object> headers = new HashMap<>();
     private final CancellationToken cancellationToken;
     private URI sourceAddress;
@@ -177,7 +187,7 @@ public class SendContext implements OutgoingMessageContext {
         context.setConversationId(conversationId);
         context.setInitiatorId(initiatorId);
         context.setIntent(intent);
-        context.setMessageType(messageTypes != null ? messageTypes : MessageUrn.forMessageTypes(message.getClass()));
+        context.setMessageType(messageTypes != null ? messageTypes : MessageUrn.forMessageTypes(getContractType()));
         context.setResponseAddress(responseAddress);
         context.setFaultAddress(faultAddress);
         context.setSourceAddress(sourceAddress != null ? sourceAddress : URI.create("loopback://localhost/source"));

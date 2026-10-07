@@ -12,6 +12,8 @@ public interface IConsumerDefinition
     string? EndpointName { get; }
 
     int? ConcurrentMessageLimit { get; }
+
+    Delegate? GetMessagePipeline(Type messageType) => null;
 }
 
 /// <summary>
@@ -21,6 +23,17 @@ public interface IConsumerDefinition
 public class ConsumerDefinition<TConsumer> : IConsumerDefinition, IConsumerConfigurator<TConsumer>
     where TConsumer : class, IConsumer
 {
+    private readonly Dictionary<Type, Delegate> pipelines = new();
+
+    public void ConfigureMessage<TMessage>(Action<PipeConfigurator<ConsumeContext<TMessage>>> configure) where TMessage : class
+    {
+        ArgumentNullException.ThrowIfNull(configure);
+        pipelines[typeof(TMessage)] = pipelines.TryGetValue(typeof(TMessage), out var existing)
+            ? Delegate.Combine(existing, configure) : configure;
+    }
+
+    public Delegate? GetMessagePipeline(Type messageType) => pipelines.GetValueOrDefault(messageType);
+
     public ConsumerDefinition()
         : this(new EndpointDefinition())
     {

@@ -535,13 +535,13 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
     public CompletableFuture<Void> publish(PublishContext context) {
         if (state != BusState.STARTED)
             return notStartedFuture();
-        String exchange = transportFactory.getPublishEntityName(context.getMessage().getClass());
-        String address = transportFactory.getPublishAddress(context.getMessage().getClass());
+        String exchange = transportFactory.getPublishEntityName(context.getContractType());
+        String address = transportFactory.getPublishAddress(context.getContractType());
         context.setSourceAddress(this.address);
         context.setDestinationAddress(URI.create(address));
 
         if (logger != null) {
-            logger.debug("Publishing {} to {}", context.getMessage().getClass().getSimpleName(), context.getDestinationAddress());
+            logger.debug("Publishing {} to {}", context.getContractType().getSimpleName(), context.getDestinationAddress());
         }
 
         CompletableFuture<Void> delayFuture;
@@ -572,7 +572,7 @@ public class MessageBusImpl implements MessageBus, ReceiveEndpointConnector {
                     hooks.dispatch(MessageOperationHookEvent.create(
                             failure == null ? "published" : "publish_faulted",
                             failure == null,
-                            context.getMessage().getClass(),
+                            context.getContractType(),
                             null,
                             context.getDestinationAddress().toString(),
                             startedAt,

@@ -108,7 +108,7 @@ public class TopologyRegistry : IBusTopology
         {
             MaterializeConsumer(
                 model,
-                configurePipe,
+                configurePipe ?? definition?.GetMessagePipeline(messageType),
                 ReflectionConsumerRegistrationDescriptorFactory.Create(typeof(TConsumer), messageType),
                 [messageType]);
         }

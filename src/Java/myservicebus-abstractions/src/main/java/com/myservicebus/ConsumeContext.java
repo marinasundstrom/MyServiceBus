@@ -170,7 +170,7 @@ public class ConsumeContext<T>
             context.setInitiatorId(correlationId);
         }
         context.setCausationMessageId(messageId);
-        String exchange = EntityNameFormatter.format(context.getMessage().getClass());
+        String exchange = EntityNameFormatter.format(context.getContractType());
         URI dest = URI.create(publishAddressProvider.getPublishAddress(exchange));
         context.setSourceAddress(busAddress);
         context.setDestinationAddress(dest);

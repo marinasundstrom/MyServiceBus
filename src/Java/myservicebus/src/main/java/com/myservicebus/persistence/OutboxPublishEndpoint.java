@@ -62,7 +62,7 @@ public final class OutboxPublishEndpoint implements PublishEndpoint {
                 return fallback.publish(context);
             }
             ensureStarted.run();
-            Class<?> messageType = context.getMessage().getClass();
+            Class<?> messageType = context.getContractType();
             context.setSourceAddress(bus.getAddress());
             context.setDestinationAddress(URI.create(transportFactory.getPublishAddress(messageType)));
             context.setMessageTypes(MessageUrn.forMessageTypes(messageType));
