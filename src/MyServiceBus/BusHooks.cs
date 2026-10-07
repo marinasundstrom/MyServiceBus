@@ -93,6 +93,12 @@ public sealed record MessageOperationHookEvent(
     }
 }
 
+public sealed record MessageSkippedHookEvent(
+    DateTimeOffset OccurredAtUtc,
+    string EndpointName,
+    string? MessageId,
+    IReadOnlyList<string> AdvertisedMessageUrns) : BusHookEvent(OccurredAtUtc);
+
 public sealed record OutboxDeliveryHookEvent(
     DateTimeOffset OccurredAtUtc,
     string ServiceName,

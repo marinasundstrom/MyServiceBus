@@ -4,6 +4,8 @@ This changelog summarizes the bigger themes in the repository history rather tha
 
 ## Unreleased
 
+- Preserved original malformed RabbitMQ payloads in error queues and emitted structured skipped-message hooks and monitoring observations in both clients.
+
 - Added runtime-type C# publication and consumer registration, preserved selected Java class-token publication contracts, and allowed consumer definitions to combine naming, concurrency, prefetch, and pipeline policy.
 
 - Unified C# hosted and standalone endpoint initialization, with restart/idempotence coverage in both clients and late RabbitMQ host configuration reflected in the bus address.

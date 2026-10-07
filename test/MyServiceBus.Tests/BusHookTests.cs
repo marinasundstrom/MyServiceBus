@@ -345,6 +345,38 @@ public class BusHookTests
     }
 
     [Fact]
+    public async Task Monitoring_exporter_reports_skipped_contracts_without_message_bodies()
+    {
+        var handler = new RecordingHttpHandler();
+        var services = new ServiceCollection()
+            .AddSingleton<IBusInspectionProvider>(new StubInspectionProvider());
+        await using var provider = services.BuildServiceProvider();
+        var options = new MonitoringExporterOptions
+        {
+            ServiceAddress = new Uri("http://monitoring.test"),
+            ApplicationName = "dispatcher-tests",
+            ExportInterval = TimeSpan.FromMilliseconds(20),
+            HeartbeatInterval = TimeSpan.FromMinutes(1)
+        };
+        var exporter = new MonitoringExporter(
+            new HttpClient(handler) { BaseAddress = options.ServiceAddress },
+            provider,
+            options,
+            NullLogger<MonitoringExporter>.Instance);
+
+        await exporter.StartAsync(CancellationToken.None);
+        exporter.Handle(new MessageSkippedHookEvent(DateTimeOffset.UtcNow, "orders", "message-id",
+            new[] { "urn:message:Acme:Unknown", "urn:message:Acme:Base" }));
+
+        var batchJson = await handler.BatchReceived.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        batchJson.ShouldContain("\"kind\":\"skipped\"");
+        batchJson.ShouldContain("advertised_message_urns");
+        batchJson.ShouldContain("urn:message:Acme:Base");
+        batchJson.ShouldContain("\"messageBody\":null");
+        await exporter.StopAsync(CancellationToken.None);
+    }
+
+    [Fact]
     public async Task Monitoring_exporter_throttles_idle_cycles_but_preserves_health_changes()
     {
         var handler = new RecordingHttpHandler();

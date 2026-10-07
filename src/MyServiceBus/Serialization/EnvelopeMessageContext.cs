@@ -37,7 +37,13 @@ public class EnvelopeMessageContext : IMessageContext
         IMessageHeaderConvention? headerConvention = null)
     {
         ArgumentNullException.ThrowIfNull(jsonSerializerOptions);
-        _jsonDocument = JsonDocument.Parse(jsonBytes);
+        try { _jsonDocument = JsonDocument.Parse(jsonBytes); }
+        catch (JsonException exception) { throw new MessageDeserializationException("Cannot parse message envelope.", exception); }
+        if (_jsonDocument.RootElement.ValueKind != JsonValueKind.Object)
+        {
+            _jsonDocument.Dispose();
+            throw new MessageDeserializationException("A message envelope must be a JSON object.");
+        }
         _jsonSerializerOptions = jsonSerializerOptions;
         _transportHeaders = transportHeaders;
         _headerConvention = headerConvention ?? MassTransitHeaderConvention.Instance;

@@ -31,10 +31,25 @@ public class RabbitMqTransportFactory implements TransportFactory {
     private final ConcurrentHashMap<String, RabbitMqSendTransport> queueTransports = new ConcurrentHashMap<>();
     private final int defaultPrefetchCount;
     private final LoggerFactory loggerFactory;
+    private final com.myservicebus.BusHookDispatcher hooks;
+    private final com.myservicebus.serialization.InboundMessageResolver inboundResolver;
     private final Function<Class<?>, String> entityNameResolver;
 
     public RabbitMqTransportFactory(ConnectionProvider connectionProvider, RabbitMqFactoryConfigurator configurator,
             LoggerFactory loggerFactory) {
+        this(connectionProvider, configurator, loggerFactory, null);
+    }
+
+    public RabbitMqTransportFactory(ConnectionProvider connectionProvider, RabbitMqFactoryConfigurator configurator,
+            LoggerFactory loggerFactory, com.myservicebus.BusHookDispatcher hooks) {
+        this(connectionProvider, configurator, loggerFactory, hooks, null);
+    }
+
+    public RabbitMqTransportFactory(ConnectionProvider connectionProvider, RabbitMqFactoryConfigurator configurator,
+            LoggerFactory loggerFactory, com.myservicebus.BusHookDispatcher hooks,
+            com.myservicebus.serialization.InboundMessageResolver inboundResolver) {
+        this.inboundResolver = inboundResolver;
+        this.hooks = hooks;
         this.connectionProvider = connectionProvider;
         this.defaultPrefetchCount = configurator.getPrefetchCount();
         this.loggerFactory = loggerFactory;
@@ -212,7 +227,7 @@ public class RabbitMqTransportFactory implements TransportFactory {
 
         String faultAddress = getFaultAddress(topology.queueName());
         return new RabbitMqReceiveTransport(channel, topology.queueName(), handler, faultAddress, isMessageTypeRegistered,
-                loggerFactory, topology.concurrentMessageLimit());
+                loggerFactory, topology.concurrentMessageLimit(), hooks, inboundResolver);
     }
 
     @Override

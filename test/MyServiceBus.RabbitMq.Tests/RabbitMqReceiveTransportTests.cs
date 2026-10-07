@@ -105,6 +105,111 @@ public class RabbitMqReceiveTransportTests
     }
 
     [Fact]
+    public async Task Malformed_body_is_moved_unchanged_before_acknowledgement()
+    {
+        var channel = Substitute.For<IChannel>();
+        AsyncEventingBasicConsumer? consumer = null;
+
+        channel
+            .BasicConsumeAsync(
+                Arg.Any<string>(),
+                Arg.Any<bool>(),
+                Arg.Any<string>(),
+                Arg.Any<bool>(),
+                Arg.Any<bool>(),
+                Arg.Any<IDictionary<string, object>>(),
+                Arg.Any<IAsyncBasicConsumer>(),
+                Arg.Any<CancellationToken>())
+            .Returns(ci =>
+            {
+                consumer = (AsyncEventingBasicConsumer)ci[6]!;
+                return Task.FromResult("tag");
+            });
+
+        var transport = new RabbitMqReceiveTransport(
+            channel,
+            "input",
+            _ => throw new InvalidOperationException("Consumer must not run"),
+            errorAddress: new Uri("rabbitmq://broker/exchange/input_error"),
+            faultAddress: new Uri("rabbitmq://broker/exchange/input_fault"),
+            isMessageTypeRegistered: null);
+
+        await transport.Start();
+        await consumer!.HandleBasicDeliverAsync(
+            "tag",
+            1,
+            false,
+            "ex",
+            "rk",
+            new BasicProperties(),
+            new ReadOnlyMemory<byte>(Encoding.UTF8.GetBytes("{broken-json")),
+            CancellationToken.None);
+
+        await channel.Received().BasicPublishAsync("input_error", "", true,
+            Arg.Is<BasicProperties>(p => p.Headers!.ContainsKey(MessageHeaders.ExceptionMessage)),
+            Arg.Is<ReadOnlyMemory<byte>>(body => Encoding.UTF8.GetString(body.ToArray()) == "{broken-json"),
+            Arg.Any<CancellationToken>());
+        await channel.Received()
+            .BasicAckAsync(1, false, Arg.Any<CancellationToken>());
+        await channel.DidNotReceive()
+            .BasicNackAsync(Arg.Any<ulong>(), Arg.Any<bool>(), Arg.Any<bool>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Skipped_message_emits_contract_diagnostics_after_preserving_body()
+    {
+        var channel = Substitute.For<IChannel>();
+        AsyncEventingBasicConsumer? consumer = null;
+
+        channel
+            .BasicConsumeAsync(
+                Arg.Any<string>(),
+                Arg.Any<bool>(),
+                Arg.Any<string>(),
+                Arg.Any<bool>(),
+                Arg.Any<bool>(),
+                Arg.Any<IDictionary<string, object>>(),
+                Arg.Any<IAsyncBasicConsumer>(),
+                Arg.Any<CancellationToken>())
+            .Returns(ci =>
+            {
+                consumer = (AsyncEventingBasicConsumer)ci[6]!;
+                return Task.FromResult("tag");
+            });
+
+        var hooks = Substitute.For<IBusHookDispatcher>();
+        var transport = new RabbitMqReceiveTransport(
+            channel,
+            "input",
+            _ => throw new InvalidOperationException("Consumer must not run"),
+            errorAddress: new Uri("rabbitmq://broker/exchange/input_error"),
+            faultAddress: new Uri("rabbitmq://broker/exchange/input_fault"),
+            isMessageTypeRegistered: _ => false, hooks: hooks);
+
+        await transport.Start();
+        await consumer!.HandleBasicDeliverAsync(
+            "tag",
+            1,
+            false,
+            "ex",
+            "rk",
+            new BasicProperties(),
+            new ReadOnlyMemory<byte>(Encoding.UTF8.GetBytes("{\"messageType\":[\"urn:message:unknown\"],\"message\":{}}")),
+            CancellationToken.None);
+
+        await channel.Received().BasicPublishAsync("input_skipped", "", true,
+            Arg.Any<BasicProperties>(),
+            Arg.Is<ReadOnlyMemory<byte>>(body => Encoding.UTF8.GetString(body.ToArray()) == "{\"messageType\":[\"urn:message:unknown\"],\"message\":{}}"),
+            Arg.Any<CancellationToken>());
+        await channel.Received()
+            .BasicAckAsync(1, false, Arg.Any<CancellationToken>());
+        hooks.Received().Dispatch(Arg.Is<MessageSkippedHookEvent>(e => e.EndpointName == "input"
+            && e.AdvertisedMessageUrns.Single() == "urn:message:unknown"));
+        await channel.DidNotReceive()
+            .BasicNackAsync(Arg.Any<ulong>(), Arg.Any<bool>(), Arg.Any<bool>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task Nacks_message_when_skipped_move_is_not_confirmed()
     {
         var channel = Substitute.For<IChannel>();

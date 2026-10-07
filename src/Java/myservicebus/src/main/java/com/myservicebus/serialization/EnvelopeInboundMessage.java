@@ -25,7 +25,12 @@ public class EnvelopeInboundMessage implements InboundMessage {
         this.transportHeaders = transportHeaders;
         this.mapper = mapper;
         this.headerConvention = headerConvention;
-        this.metadataEnvelope = deserializeEnvelope(Object.class);
+        try {
+            this.metadataEnvelope = deserializeEnvelope(Object.class);
+            if (metadataEnvelope == null) throw new MessageDeserializationException("A message envelope must be a JSON object");
+        } catch (com.fasterxml.jackson.core.JsonProcessingException exception) {
+            throw new MessageDeserializationException("Cannot parse message envelope", exception);
+        }
     }
 
     @Override

@@ -489,6 +489,15 @@ public final class MonitoringExporter implements BusHook, ScheduledWorkObserver,
                     options.captureSensitiveData(options.getCaptureRequestResponseMetadata()) ? operation.messageIntent() : null,
                     body.content(), body.contentType(), body.status(), body.originalBytes());
         }
+        if (busEvent instanceof com.myservicebus.MessageSkippedHookEvent skipped) {
+            return new MonitoringProtocol.Observation(
+                    sequence.incrementAndGet(), skipped.occurredAtUtc(), "skipped", true,
+                    null, skipped.advertisedMessageUrns().stream().findFirst().orElse(null), skipped.endpointName(),
+                    null, null, null, null, null, null, null, null, null, null,
+                    Map.of("advertised_message_urns", objectMapper.valueToTree(skipped.advertisedMessageUrns()).toString()),
+                    options.captureSensitiveData(options.getCaptureMessageIdentity()) ? skipped.messageId() : null,
+                    null, null, null, null, null, null, null, null);
+        }
         if (busEvent instanceof OutboxDeliveryHookEvent outbox) {
             Map<String, String> properties = new LinkedHashMap<>();
             properties.put("service_name", outbox.serviceName());

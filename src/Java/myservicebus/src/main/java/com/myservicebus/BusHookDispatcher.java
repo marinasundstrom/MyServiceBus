@@ -5,16 +5,16 @@ import java.util.Set;
 import com.myservicebus.logging.Logger;
 import com.myservicebus.logging.LoggerFactory;
 
-final class BusHookDispatcher {
+public final class BusHookDispatcher {
     private final Set<BusHook> hooks;
     private final Logger logger;
 
-    BusHookDispatcher(Set<BusHook> hooks, LoggerFactory loggerFactory) {
+    public BusHookDispatcher(Set<BusHook> hooks, LoggerFactory loggerFactory) {
         this.hooks = hooks;
         this.logger = loggerFactory == null ? null : loggerFactory.create(BusHookDispatcher.class);
     }
 
-    void dispatch(BusHookEvent busEvent) {
+    public void dispatch(BusHookEvent busEvent) {
         for (BusHook hook : hooks) {
             try {
                 hook.handle(busEvent);
@@ -26,7 +26,7 @@ final class BusHookDispatcher {
         }
     }
 
-    boolean isEnabled() {
+    public boolean isEnabled() {
         return !hooks.isEmpty();
     }
 }

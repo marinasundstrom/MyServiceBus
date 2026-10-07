@@ -24,6 +24,8 @@ import com.myservicebus.serialization.MassTransitHeaderConvention;
 import com.myservicebus.serialization.MessageHeaderConvention;
 
 public class RabbitMqReceiveTransport implements ReceiveTransport {
+    private final com.myservicebus.BusHookDispatcher hooks;
+    private final com.myservicebus.serialization.InboundMessageResolver inboundResolver;
     private final Channel channel;
     private final String queueName;
     private final Function<TransportMessage, CompletableFuture<Void>> handler;
@@ -47,6 +49,25 @@ public class RabbitMqReceiveTransport implements ReceiveTransport {
             Function<TransportMessage, CompletableFuture<Void>> handler, String faultAddress,
             Function<String, Boolean> isMessageTypeRegistered, LoggerFactory loggerFactory,
             int concurrentMessageLimit) {
+        this(channel, queueName, handler, faultAddress, isMessageTypeRegistered, loggerFactory, concurrentMessageLimit, null);
+    }
+
+    public RabbitMqReceiveTransport(Channel channel, String queueName,
+            Function<TransportMessage, CompletableFuture<Void>> handler, String faultAddress,
+            Function<String, Boolean> isMessageTypeRegistered, LoggerFactory loggerFactory,
+            int concurrentMessageLimit, com.myservicebus.BusHookDispatcher hooks) {
+        this(channel, queueName, handler, faultAddress, isMessageTypeRegistered, loggerFactory,
+                concurrentMessageLimit, hooks, null);
+    }
+
+    public RabbitMqReceiveTransport(Channel channel, String queueName,
+            Function<TransportMessage, CompletableFuture<Void>> handler, String faultAddress,
+            Function<String, Boolean> isMessageTypeRegistered, LoggerFactory loggerFactory,
+            int concurrentMessageLimit, com.myservicebus.BusHookDispatcher hooks,
+            com.myservicebus.serialization.InboundMessageResolver inboundResolver) {
+        this.inboundResolver = inboundResolver != null ? inboundResolver
+                : new com.myservicebus.serialization.DefaultInboundMessageResolver(new com.myservicebus.serialization.EnvelopeMessageDeserializer());
+        this.hooks = hooks;
         if (concurrentMessageLimit < 1) {
             throw new IllegalArgumentException("Concurrent message limit must be at least one");
         }
@@ -94,19 +115,17 @@ public class RabbitMqReceiveTransport implements ReceiveTransport {
                 headers.putIfAbsent(headerConvention.getFaultAddressHeader(), faultAddress);
 
                 TransportMessage tm = new TransportMessage(delivery.getBody(), headers);
-                String messageTypeUrn = null;
-                try {
-                    ObjectMapper mapper = new ObjectMapper();
-                    JsonNode node = mapper.readTree(delivery.getBody());
-                    if (node.has("messageType") && node.get("messageType").isArray()
-                            && node.get("messageType").size() > 0) {
-                        messageTypeUrn = node.get("messageType").get(0).asText();
-                    }
-                } catch (Exception e) {
-                    logger.error("Failed to parse message type", e);
-                }
+                var inbound = inboundResolver.resolve(tm);
+                var advertisedUrns = inbound.getMessageTypes();
+                String messageTypeUrn = advertisedUrns.isEmpty() ? null : advertisedUrns.get(0);
+                String messageId = inbound.getMessageId() != null ? inbound.getMessageId().toString()
+                        : delivery.getProperties().getMessageId();
+                boolean registered = isMessageTypeRegistered == null
+                        || advertisedUrns.stream().anyMatch(type -> isMessageTypeRegistered.apply(type));
 
-                if (!isMessageTypeRegistered.apply(messageTypeUrn)) {
+                if (!(registered || (messageTypeUrn == null && isMessageTypeRegistered.apply(null)))) {
+                    logger.warn("Skipping message on " + queueName + " with messageId " + messageId
+                            + ": no matching contract among " + advertisedUrns);
                     synchronized (channel) {
                         channel.basicPublish(
                                 queueName + "_skipped",
@@ -117,6 +136,8 @@ public class RabbitMqReceiveTransport implements ReceiveTransport {
                         channel.waitForConfirmsOrDie();
                         channel.basicAck(delivery.getEnvelope().getDeliveryTag(), false);
                     }
+                    if (hooks != null) hooks.dispatch(new com.myservicebus.MessageSkippedHookEvent(
+                            java.time.Instant.now(), queueName, messageId, advertisedUrns));
                     return;
                 }
 
@@ -137,7 +158,7 @@ public class RabbitMqReceiveTransport implements ReceiveTransport {
                     Thread.currentThread().interrupt();
                 }
                 logger.error("Message receive processing failed", exception);
-                rejectForRedelivery(delivery);
+                settle(delivery, exception);
             } finally {
                 if (!handlerOwnsCompletion) {
                     endDelivery();
@@ -150,8 +171,9 @@ public class RabbitMqReceiveTransport implements ReceiveTransport {
     }
 
     private void settle(com.rabbitmq.client.Delivery delivery, Throwable exception) {
+        Throwable cause = exception;
         if (exception != null) {
-            Throwable cause = exception instanceof java.util.concurrent.CompletionException
+            cause = exception instanceof java.util.concurrent.CompletionException
                     && exception.getCause() != null
                             ? exception.getCause()
                             : exception;
@@ -160,14 +182,33 @@ public class RabbitMqReceiveTransport implements ReceiveTransport {
 
         try {
             synchronized (channel) {
-                if (exception == null || ErrorTransportSettlement.wasMoved(exception)) {
+                if (cause instanceof com.myservicebus.serialization.MessageDeserializationException
+                        || cause instanceof com.fasterxml.jackson.core.JsonProcessingException) {
+                    Map<String, Object> errorHeaders = new HashMap<>();
+                    if (delivery.getProperties().getHeaders() != null) {
+                        errorHeaders.putAll(delivery.getProperties().getHeaders());
+                    }
+                    errorHeaders.put(MessageHeaders.EXCEPTION_TYPE, cause.getClass().getName());
+                    var detail = new java.io.StringWriter();
+                    cause.printStackTrace(new java.io.PrintWriter(detail));
+                    errorHeaders.put(MessageHeaders.EXCEPTION_MESSAGE, detail.toString());
+                    errorHeaders.put(MessageHeaders.REASON, "fault");
+                    channel.basicPublish(queueName + "_error", "", true,
+                            delivery.getProperties().builder().headers(errorHeaders).build(), delivery.getBody());
+                    channel.waitForConfirmsOrDie();
+                    channel.basicAck(delivery.getEnvelope().getDeliveryTag(), false);
+                } else if (exception == null || ErrorTransportSettlement.wasMoved(exception)) {
                     channel.basicAck(delivery.getEnvelope().getDeliveryTag(), false);
                 } else {
                     channel.basicNack(delivery.getEnvelope().getDeliveryTag(), false, true);
                 }
             }
-        } catch (IOException ioException) {
-            logger.error("Failed to settle RabbitMQ message", ioException);
+        } catch (Exception settlementException) {
+            if (settlementException instanceof InterruptedException) {
+                Thread.currentThread().interrupt();
+            }
+            logger.error("Failed to settle RabbitMQ message", settlementException);
+            rejectForRedelivery(delivery);
         }
     }
 

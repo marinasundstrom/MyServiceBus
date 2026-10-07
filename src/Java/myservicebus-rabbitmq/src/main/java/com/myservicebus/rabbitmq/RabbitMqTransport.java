@@ -38,7 +38,9 @@ public class RabbitMqTransport {
             ConnectionProvider provider = sp.getService(ConnectionProvider.class);
             RabbitMqFactoryConfigurator cfgRef = sp.getService(RabbitMqFactoryConfigurator.class);
             LoggerFactory loggerFactory = sp.getService(LoggerFactory.class);
-            return new RabbitMqTransportFactory(provider, cfgRef, loggerFactory);
+            return new RabbitMqTransportFactory(provider, cfgRef, loggerFactory,
+                    sp.getService(com.myservicebus.BusHookDispatcher.class),
+                    sp.getService(com.myservicebus.serialization.InboundMessageResolver.class));
         });
 
         services.addSingleton(com.myservicebus.TransportFactory.class,

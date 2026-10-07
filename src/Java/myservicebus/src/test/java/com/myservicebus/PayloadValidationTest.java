@@ -10,6 +10,15 @@ class PayloadValidationTest {
     record LocalOrder(int quantity) { }
     interface Order { int getQuantity(); }
     @Test
+    void invalidEnvelopeIsADeserializationFailure() {
+        var deserializer = new EnvelopeMessageDeserializer();
+        for (String json : List.of("null", "[]", "{bad-json")) {
+            assertThrows(MessageDeserializationException.class,
+                    () -> deserializer.deserialize(deserializer.getMessageBody(json), Map.of()));
+        }
+    }
+
+    @Test
     void interfaceBodiesAreValidatedBeforeConsumption() throws Exception {
         var deserializer = new EnvelopeMessageDeserializer();
         var inbound = deserializer.deserialize(deserializer.getMessageBody("{\"message\":{\"quantity\":3}}"), Map.of());

@@ -6,6 +6,14 @@ namespace MyServiceBus.Tests;
 public class InterfacePayloadTests
 {
     public interface IOrder { int Quantity { get; } }
+    [Theory]
+    [InlineData("null")]
+    [InlineData("[]")]
+    [InlineData("{bad-json")]
+    public void Invalid_envelope_is_a_deserialization_failure(string json)
+        => Assert.Throws<MessageDeserializationException>(() => new EnvelopeMessageContext(
+            Encoding.UTF8.GetBytes(json), new Dictionary<string, object>()));
+
     [Fact]
     public void Interface_payload_is_materialized_and_validated_before_consumption()
     {

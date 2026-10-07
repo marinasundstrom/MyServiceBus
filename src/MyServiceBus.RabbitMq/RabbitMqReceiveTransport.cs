@@ -23,6 +23,7 @@ public sealed class RabbitMqReceiveTransport : IReceiveTransport
     private readonly Uri? _faultAddress;
     private readonly Func<string?, bool>? _isMessageTypeRegistered;
     private readonly ILogger<RabbitMqReceiveTransport>? _logger;
+    private readonly IBusHookDispatcher? _hooks;
     private readonly SemaphoreSlim _concurrency;
     private readonly object _lifecycleSync = new();
     private TaskCompletionSource<bool> _drained = CompletedDrain();
@@ -30,7 +31,7 @@ public sealed class RabbitMqReceiveTransport : IReceiveTransport
     private bool _stopping;
     private string _consumerTag;
 
-    public RabbitMqReceiveTransport(IChannel channel, string queueName, Func<ReceiveContext, Task> handler, Uri? errorAddress, Uri? faultAddress, Func<string?, bool>? isMessageTypeRegistered, IInboundMessageResolver? inboundMessageResolver = null, ILogger<RabbitMqReceiveTransport>? logger = null, int concurrentMessageLimit = 1)
+    public RabbitMqReceiveTransport(IChannel channel, string queueName, Func<ReceiveContext, Task> handler, Uri? errorAddress, Uri? faultAddress, Func<string?, bool>? isMessageTypeRegistered, IInboundMessageResolver? inboundMessageResolver = null, ILogger<RabbitMqReceiveTransport>? logger = null, int concurrentMessageLimit = 1, IBusHookDispatcher? hooks = null)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(concurrentMessageLimit, 1);
         _channel = channel;
@@ -41,6 +42,7 @@ public sealed class RabbitMqReceiveTransport : IReceiveTransport
         _isMessageTypeRegistered = isMessageTypeRegistered;
         _inboundMessageResolver = inboundMessageResolver ?? new InboundMessageResolver();
         _logger = logger;
+        _hooks = hooks;
         _concurrency = new SemaphoreSlim(concurrentMessageLimit, concurrentMessageLimit);
     }
 
@@ -88,9 +90,12 @@ public sealed class RabbitMqReceiveTransport : IReceiveTransport
                 var messageContext = _inboundMessageResolver.Resolve(transportMessage);
 
                 var context = new RabbitMqReceiveContext(messageContext, props, ea.DeliveryTag, ea.Exchange, ea.RoutingKey, _errorAddress);
-                var messageType = context.MessageType.FirstOrDefault();
-                if (_isMessageTypeRegistered != null && !_isMessageTypeRegistered(messageType))
+                if (_isMessageTypeRegistered != null && !(context.MessageType.Count == 0
+                        ? _isMessageTypeRegistered(null)
+                        : context.MessageType.Any(type => _isMessageTypeRegistered(type))))
                 {
+                    _logger?.LogWarning("Skipping message {MessageId} on {Endpoint}: no matching contract among {MessageTypes}",
+                        context.MessageId, _queueName, string.Join(", ", context.MessageType));
                     if (_errorAddress != null)
                     {
                         await _channel.BasicPublishAsync(
@@ -102,17 +107,19 @@ public sealed class RabbitMqReceiveTransport : IReceiveTransport
                     }
 
                     await _channel.BasicAckAsync(ea.DeliveryTag, multiple: false);
+                    _hooks?.Dispatch(new MessageSkippedHookEvent(DateTimeOffset.UtcNow, _queueName,
+                        context.MessageId.ToString(), context.MessageType.ToArray()));
                     return;
                 }
 
                 var handling = _messageHandler.Invoke(context);
                 handlerOwnsCompletion = true;
-                _ = CompleteDeliveryAsync(ea.DeliveryTag, handling);
+                _ = CompleteDeliveryAsync(ea.DeliveryTag, handling, payload, props);
                 return;
             }
             catch (Exception exc)
             {
-                await SettleFailureAsync(ea.DeliveryTag, exc).ConfigureAwait(false);
+                await SettleFailureAsync(ea.DeliveryTag, exc, ea.Body.ToArray(), ea.BasicProperties).ConfigureAwait(false);
             }
             finally
             {
@@ -124,7 +131,7 @@ public sealed class RabbitMqReceiveTransport : IReceiveTransport
         _consumerTag = await _channel.BasicConsumeAsync(queue: _queueName, autoAck: false, consumer: consumer, cancellationToken: cancellationToken);
     }
 
-    private async Task CompleteDeliveryAsync(ulong deliveryTag, Task handling)
+    private async Task CompleteDeliveryAsync(ulong deliveryTag, Task handling, byte[] payload, IReadOnlyBasicProperties properties)
     {
         try
         {
@@ -133,7 +140,7 @@ public sealed class RabbitMqReceiveTransport : IReceiveTransport
         }
         catch (Exception exception)
         {
-            await SettleFailureAsync(deliveryTag, exception).ConfigureAwait(false);
+            await SettleFailureAsync(deliveryTag, exception, payload, properties).ConfigureAwait(false);
         }
         finally
         {
@@ -141,11 +148,23 @@ public sealed class RabbitMqReceiveTransport : IReceiveTransport
         }
     }
 
-    private async Task SettleFailureAsync(ulong deliveryTag, Exception exception)
+    private async Task SettleFailureAsync(ulong deliveryTag, Exception exception, byte[] payload, IReadOnlyBasicProperties properties)
     {
         _logger?.LogError(exception, "Message handling failed");
         try
         {
+            if (_errorAddress is not null && exception is MessageDeserializationException or JsonException)
+            {
+                var errorProperties = new BasicProperties(properties);
+                errorProperties.Headers = properties.Headers is null
+                    ? new Dictionary<string, object?>()
+                    : new Dictionary<string, object?>(properties.Headers);
+                errorProperties.Headers[MessageHeaders.ExceptionType] = exception.GetType().FullName;
+                errorProperties.Headers[MessageHeaders.ExceptionMessage] = exception.ToString();
+                errorProperties.Headers[MessageHeaders.Reason] = "fault";
+                await _channel.BasicPublishAsync(_queueName + "_error", "", true, errorProperties, payload);
+                ErrorTransportSettlement.MarkMoved(exception, _errorAddress);
+            }
             if (ErrorTransportSettlement.WasMoved(exception))
             {
                 await _channel.BasicAckAsync(deliveryTag, multiple: false).ConfigureAwait(false);
@@ -162,6 +181,7 @@ public sealed class RabbitMqReceiveTransport : IReceiveTransport
                 "Failed to settle RabbitMQ delivery {DeliveryTag} from queue {QueueName}",
                 deliveryTag,
                 _queueName);
+            await AbortChannelAsync().ConfigureAwait(false); // Unsettled deliveries are requeued by the broker.
         }
     }
 

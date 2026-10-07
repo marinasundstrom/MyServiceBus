@@ -59,6 +59,12 @@ public sealed class MonitoringExporter : BackgroundService, IBusHook, IScheduled
         {
             BusLifecycleHookEvent lifecycle => CreateLifecycleObservation(lifecycle),
             MessageOperationHookEvent operation => CreateMessageObservation(operation),
+            MessageSkippedHookEvent skipped => new MonitoringObservation(
+                Interlocked.Increment(ref sequence), skipped.OccurredAtUtc, "skipped", true,
+                null, skipped.AdvertisedMessageUrns.FirstOrDefault(), skipped.EndpointName,
+                null, null, null, null, null, null, null, null,
+                Properties: new Dictionary<string, string> { ["advertised_message_urns"] = JsonSerializer.Serialize(skipped.AdvertisedMessageUrns) },
+                MessageId: options.CaptureSensitiveData(options.CaptureMessageIdentity) ? skipped.MessageId : null),
             OutboxDeliveryHookEvent outbox => CreateOutboxObservation(outbox),
             SagaStateMachineHookEvent saga => CreateSagaObservation(saga),
             _ => null

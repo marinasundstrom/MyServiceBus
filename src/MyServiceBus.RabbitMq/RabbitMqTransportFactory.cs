@@ -1,4 +1,5 @@
 using System;
+using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -19,17 +20,22 @@ public sealed class RabbitMqTransportFactory : ITransportFactory
     public Uri? BusAddress => _baseAddress;
     private readonly Func<Type, string> _entityNameResolver;
     private readonly IInboundMessageResolver _inboundMessageResolver;
+    private readonly ILoggerFactory? _loggerFactory;
+    private readonly IBusHookDispatcher? _hooks;
 
     public TransportCapabilityDescriptor Capabilities => TransportCapabilityDescriptors.RabbitMq;
 
     public RabbitMqTransportFactory(
         ConnectionProvider connectionProvider,
         IRabbitMqFactoryConfigurator configurator,
-        IInboundMessageResolver? inboundMessageResolver = null)
+        IInboundMessageResolver? inboundMessageResolver = null, ILoggerFactory? loggerFactory = null, IBusHookDispatcher? hooks = null)
     {
         _connectionProvider = connectionProvider;
         _configurator = configurator;
+        _loggerFactory = loggerFactory;
+        _hooks = hooks;
         _entityNameResolver = configurator.GetEntityName;
+
         _inboundMessageResolver = inboundMessageResolver ?? new InboundMessageResolver();
     }
 
@@ -391,7 +397,8 @@ public sealed class RabbitMqTransportFactory : ITransportFactory
             faultAddress,
             isMessageTypeRegistered,
             _inboundMessageResolver,
-            concurrentMessageLimit: rabbitMqTopology.ConcurrentMessageLimit);
+            logger: _loggerFactory?.CreateLogger<RabbitMqReceiveTransport>(),
+            concurrentMessageLimit: rabbitMqTopology.ConcurrentMessageLimit, hooks: _hooks);
     }
 
     private static void ParseExchangeSettings(string? queryString, ref bool durable, ref bool autoDelete)

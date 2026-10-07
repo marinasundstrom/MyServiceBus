@@ -31,14 +31,16 @@ class SkippedQueueTest {
 
         Function<TransportMessage, CompletableFuture<Void>> handler = tm -> CompletableFuture.completedFuture(null);
 
+        var events = new java.util.ArrayList<BusHookEvent>();
+        var hooks = new BusHookDispatcher(java.util.Set.of(events::add), null);
         LoggerFactory loggerFactory = new Slf4jLoggerFactory();
         RabbitMqReceiveTransport transport = new RabbitMqReceiveTransport(channel, "input", handler, "fault", s -> false,
-                loggerFactory);
+                loggerFactory, 1, hooks);
         transport.start();
 
         DeliverCallback callback = captor.getValue();
         AMQP.BasicProperties props = new AMQP.BasicProperties();
-        byte[] body = new byte[0];
+        byte[] body = "{\"messageId\":\"12345678-1234-1234-1234-123456789012\",\"messageType\":[\"urn:message:unknown\"],\"message\":{}}".getBytes();
         Envelope envelope = new Envelope(1L, false, "ex", "rk");
         Delivery delivery = new Delivery(envelope, props, body);
         callback.handle("tag", delivery);
@@ -46,6 +48,37 @@ class SkippedQueueTest {
         verify(channel).basicPublish(eq("input_skipped"), eq(""), eq(true), eq(props), eq(body));
         verify(channel).waitForConfirmsOrDie();
         verify(channel).basicAck(1L, false);
+        var skipped = (MessageSkippedHookEvent) events.get(0);
+        assertEquals("12345678-1234-1234-1234-123456789012", skipped.messageId());
+        assertEquals(java.util.List.of("urn:message:unknown"), skipped.advertisedMessageUrns());
+    }
+
+    @Test
+    void preservesMalformedBodyInErrorQueue() throws Exception {
+        Channel channel = mock(Channel.class);
+        ArgumentCaptor<DeliverCallback> captor = ArgumentCaptor.forClass(DeliverCallback.class);
+        when(channel.basicConsume(eq("input"), eq(false), captor.capture(), any(CancelCallback.class))).thenReturn("tag");
+
+        Function<TransportMessage, CompletableFuture<Void>> handler = tm -> CompletableFuture.completedFuture(null);
+
+        var events = new java.util.ArrayList<BusHookEvent>();
+        var hooks = new BusHookDispatcher(java.util.Set.of(events::add), null);
+        LoggerFactory loggerFactory = new Slf4jLoggerFactory();
+        RabbitMqReceiveTransport transport = new RabbitMqReceiveTransport(channel, "input", handler, "fault", s -> true,
+                loggerFactory, 1, hooks);
+        transport.start();
+
+        DeliverCallback callback = captor.getValue();
+        AMQP.BasicProperties props = new AMQP.BasicProperties();
+        byte[] body = "{bad-json".getBytes();
+        Envelope envelope = new Envelope(1L, false, "ex", "rk");
+        Delivery delivery = new Delivery(envelope, props, body);
+        callback.handle("tag", delivery);
+
+        verify(channel).basicPublish(eq("input_error"), eq(""), eq(true), any(AMQP.BasicProperties.class), eq(body));
+        verify(channel).waitForConfirmsOrDie();
+        verify(channel).basicAck(1L, false);
+        assertTrue(events.isEmpty());
     }
 
     @Test
