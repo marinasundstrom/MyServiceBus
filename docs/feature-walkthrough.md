@@ -226,6 +226,85 @@ boundary and planned additions.
 
 See [NativeAOT](development/native-aot.md) for the current support boundary.
 
+### Explicit wire contracts and integration APIs
+
+Use separate names for the wire contract (URN), broker entity, and receive endpoint.
+A broker entity override does not change the URN. Shared explicit names allow C# and
+Java applications to use different local namespaces, packages, and type names.
+
+```csharp
+[MessageUrn("urn:message:Acme:OrderSubmitted", false)]
+[EntityName("acme-order-submitted")]
+public record LocalOrderSubmitted(string OrderId);
+
+// Inside AddServiceBus; overrides the attribute for this bus.
+x.SetMessageUrn<LocalOrderSubmitted>("urn:message:Acme:OrderSubmitted");
+x.AddConsumer(runtimeConsumerType);
+
+// IPublishEndpoint resolves the concrete runtime type, or accepts an explicit type.
+await publishEndpoint.Publish(message, message.GetType());
+```
+
+```java
+@MessageUrnName(value = "urn:message:Acme:OrderSubmitted", useDefaultPrefix = false)
+@EntityName("acme-order-submitted")
+public record JavaOrderSubmitted(String orderId) { }
+
+cfg.setMessageUrn(JavaOrderSubmitted.class, "urn:message:Acme:OrderSubmitted");
+cfg.addConsumer(OrderConsumer.class);
+bus.publish(JavaOrderSubmitted.class, message).join();
+```
+
+The attribute/annotation defaults to the `urn:message:` prefix, matching the
+[pinned MassTransit 8.5.1 attribute convention](https://github.com/MassTransit/MassTransit/blob/v8.5.1/src/MassTransit.Abstractions/Attributes/MessageUrnAttribute.cs).
+Pass `false`/`useDefaultPrefix = false` when
+supplying a complete URN. MyServiceBus also accepts the complete standard-prefixed URN with the flag set to
+false; MassTransit 8.5.1 requires its standard-prefixed identity to be supplied as a
+short name with the default flag.
+Bus-local overrides freeze when configuration completes; duplicate registered
+identities and late mutations fail. Configure identities before building the bus.
+
+Definitions can combine endpoint naming, concurrency, prefetch, and retry policy:
+
+```csharp
+x.AddConsumer<OrderConsumer>(definition =>
+{
+    definition.EndpointName = "orders";
+    definition.ConcurrentMessageLimit = 8;
+    definition.PrefetchCount = 16;
+    definition.ConfigureMessage<LocalOrderSubmitted>(pipe => pipe.UseRetry(3));
+});
+```
+
+```java
+cfg.addConsumer(OrderConsumer.class, new ConsumerDefinition<OrderConsumer>()
+        .endpointName("orders").concurrentMessageLimit(8).prefetchCount(16)
+        .configurePipeline(pipe -> pipe.useRetry(3)));
+```
+
+C# runtime-type registration/publication uses reflection; NativeAOT applications
+should use the existing typed/generated paths. The Java class-token overload
+publishes the selected contract, including when the object has a more specific type.
+
+RabbitMQ publications install bindings from the selected concrete exchange to its
+eligible base and interface exchanges, including for publisher-only buses. Consumers
+match any advertised URN. The default JSON serializers materialize property-only C#
+interfaces and Java getter interfaces; method behavior is not a message contract.
+Custom serializers and NativeAOT applications must provide their own supported
+contract materialization. Outbox publication persists the resolved exchange names
+and creates bindings at dispatch, so capture does not require a broker connection.
+
+Malformed and null payloads raise `MessageDeserializationException` before invoking
+the consumer. RabbitMQ preserves the original body in `_error`. Unrecognized
+contracts go to `_skipped` and emit a warning plus `MessageSkippedHookEvent` after
+successful settlement. Monitoring exports a `skipped` observation with advertised
+URNs, respecting message-identity capture settings. Repeated unchanged empty outbox
+polls are exported at the heartbeat interval; work, failures, recovery, and backlog
+changes remain immediate. Local outbox hooks still observe every cycle.
+
+See [Contract migration](development/message-contract-migration.md) before updating
+existing Java deployments or applications that use nested C# message types.
+
 **Without host (fluent configuration pattern)**
 
 Outside of an ASP.NET host (or generic host), the fluent configuration pattern can populate an `IServiceCollection` directly.
@@ -245,8 +324,12 @@ services.AddServiceBus(x =>
 
 IServiceProvider serviceProvider = services.BuildServiceProvider();
 var bus = serviceProvider.GetRequiredService<IMessageBus>();
-await bus.StartAsync();
+await bus.StartAsync(CancellationToken.None);
 ```
+
+Standalone `StartAsync` executes consumer initialization once. Do not enumerate
+`IPostBuildAction` manually; hosted and standalone startup share this initialization.
+Dispose the service provider after stopping the bus.
 
 **Factory pattern**
 

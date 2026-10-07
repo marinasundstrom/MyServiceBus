@@ -46,7 +46,9 @@ A **contract** is the language-neutral identity and shape under which data is ex
 
 A **message** is one occurrence of a contract and its application data. An outgoing occurrence has a message identity that remains stable across in-process retry, transport redelivery, and compatibility copies. Creating a new outgoing message normally creates a new identity.
 
-A concrete message may advertise several eligible contracts, such as implemented interfaces or non-root base contracts. The selected protocol profile defines their identity and ordering.
+A concrete message may advertise several eligible contracts, such as implemented interfaces or non-root base contracts. The selected protocol profile defines their identity and ordering. Platform implementation interfaces are not message contracts. Explicit wire identity is independent of broker entity and endpoint naming. The portable clients validate configured identity collisions before startup and reject late identity overrides.
+
+Supported interface contract materialization and invalid-payload handling are serializer capabilities. A recognized but invalid or null payload must not reach an application consumer as a null message; preserve the deserialization cause. Unrecognized contracts and malformed payloads are distinct outcomes. RabbitMQ preserves them in skipped and error queues respectively.
 
 ### Envelope
 

@@ -25,6 +25,18 @@ Parity in this document means equivalent concepts, behavior, and wire outcomes. 
 | Configuration API (host, queue, message overrides, endpoint formatter) | Implemented | Implemented | Both clients support overriding names and automatic endpoint configuration with custom formatters. |
 | Logging and tracing flow | Implemented | Implemented | Both clients emit MassTransit-style lifecycle and message-flow logs and propagate OpenTelemetry context across send/publish/consume pipelines. |
 
+## Integration feedback fixes
+
+Both clients support explicit bus-local URNs, isolated RabbitMQ entity naming,
+RabbitMQ matching of all advertised contracts, inherited RabbitMQ publication, JSON interface
+materialization, deserialization failures before consumer invocation, identifier
+forwarding, scoped-send hooks, combined consumer-definition policies, skipped
+observations, and throttled idle outbox export. C# adds runtime-type publication
+and registration; Java's class-token publication now preserves the selected contract.
+C# hosted and standalone startup share one initializer; Java retains its start-time
+initialization. See the [canonical examples](../feature-walkthrough.md#explicit-wire-contracts-and-integration-apis)
+and [migration notes](message-contract-migration.md) for compatibility boundaries.
+
 ## Readiness vocabulary
 
 The website API and capability status view tracks what adopters can use today and what could still change:
