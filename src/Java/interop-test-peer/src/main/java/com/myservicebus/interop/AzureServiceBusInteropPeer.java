@@ -425,6 +425,7 @@ final class AzureServiceBusInteropPeer {
         return value;
     }
 
+    @com.myservicebus.MessageUrnName("TestApp:InteropRequest")
     public static final class InteropRequest {
         private String value;
 
@@ -437,6 +438,7 @@ final class AzureServiceBusInteropPeer {
         }
     }
 
+    @com.myservicebus.MessageUrnName("TestApp:InteropResponse")
     public static final class InteropResponse {
         private String value;
 

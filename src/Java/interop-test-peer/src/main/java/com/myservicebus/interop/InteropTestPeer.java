@@ -518,6 +518,8 @@ public final class InteropTestPeer {
         return value;
     }
 
+    @com.myservicebus.MessageUrnName("TestApp:CrossLanguageMessage")
+    @com.myservicebus.EntityName("TestApp:CrossLanguageMessage")
     public static class CrossLanguageMessage {
         private String value;
 
@@ -530,6 +532,8 @@ public final class InteropTestPeer {
         }
     }
 
+    @com.myservicebus.MessageUrnName("TestApp:InteropRequest")
+    @com.myservicebus.EntityName("TestApp:InteropRequest")
     public static class InteropRequest {
         private String value;
 
@@ -542,6 +546,8 @@ public final class InteropTestPeer {
         }
     }
 
+    @com.myservicebus.MessageUrnName("TestApp:InteropResponse")
+    @com.myservicebus.EntityName("TestApp:InteropResponse")
     public static class InteropResponse {
         private String value;
 
