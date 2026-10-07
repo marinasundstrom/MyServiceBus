@@ -52,7 +52,7 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector, IConsumerMetho
             ?? new BusHookDispatcher(_serviceProvider.GetServices<IBusHook>(), _serviceProvider.GetService<ILogger<BusHookDispatcher>>());
     }
 
-    public Uri Address => _address;
+    public Uri Address => _transportFactory.BusAddress ?? _address;
 
     public IBusTopology Topology => _topology;
 
@@ -74,7 +74,7 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector, IConsumerMetho
         var context = _publishContextFactory.Create(MessageTypeCache.GetMessageTypes(typeof(T)), _messageSerializer, cancellationToken);
         context.RoutingKey = exchangeName;
         context.MessageId = Guid.NewGuid().ToString();
-        context.SourceAddress = _address;
+        context.SourceAddress = Address;
         context.DestinationAddress = uri;
 
         contextCallback?.Invoke(context);
@@ -106,7 +106,7 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector, IConsumerMetho
     {
         var loggerFactory = _serviceProvider.GetService<ILoggerFactory>();
         var logger = loggerFactory?.CreateLogger<TransportSendEndpoint>();
-        ISendEndpoint endpoint = new TransportSendEndpoint(_transportFactory, _sendPipe, _messageSerializer, uri, _address, _sendContextFactory, logger, EnsureStarted, _hooks);
+        ISendEndpoint endpoint = new TransportSendEndpoint(_transportFactory, _sendPipe, _messageSerializer, uri, Address, _sendContextFactory, logger, EnsureStarted, _hooks);
         return Task.FromResult(endpoint);
     }
 
@@ -140,7 +140,7 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector, IConsumerMetho
 
         async Task TransportHandler(ReceiveContext context)
         {
-            var consumeContext = new ConsumeContextImpl<TMessage>(context, _transportFactory, _sendPipe, _publishPipe, endpointSerializer, _address, _sendContextFactory, _publishContextFactory, _serviceProvider.GetService<ILoggerFactory>(), _hooks);
+            var consumeContext = new ConsumeContextImpl<TMessage>(context, _transportFactory, _sendPipe, _publishPipe, endpointSerializer, Address, _sendContextFactory, _publishContextFactory, _serviceProvider.GetService<ILoggerFactory>(), _hooks);
             await pipe.Send(consumeContext).ConfigureAwait(false);
         }
 
@@ -211,7 +211,7 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector, IConsumerMetho
             _sendPipe,
             _publishPipe,
             serializer,
-            _address,
+            Address,
             _sendContextFactory,
             _publishContextFactory,
             _serviceProvider.GetService<ILoggerFactory>(),
@@ -291,7 +291,7 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector, IConsumerMetho
             _sendPipe,
             _publishPipe,
             serializer,
-            _address,
+            Address,
             _sendContextFactory,
             _publishContextFactory,
             _serviceProvider.GetService<ILoggerFactory>(),
@@ -320,6 +320,7 @@ public class MessageBus : IMessageBus, IReceiveEndpointConnector, IConsumerMetho
                 if (requirements is not null)
                     TransportCapabilityValidator.Validate(_transportFactory.Capabilities, requirements.Items);
 
+                _serviceProvider.GetService<BusInitialization>()?.Initialize(_serviceProvider);
                 foreach (var transport in _activeTransports)
                 {
                     await transport.Start(cancellationToken).ConfigureAwait(false);

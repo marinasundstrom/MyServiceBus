@@ -13,8 +13,10 @@ public sealed class RabbitMqTransportFactory : ITransportFactory
     private readonly ConnectionProvider _connectionProvider;
     private readonly ConcurrentDictionary<string, ISendTransport> _sendTransports = new();
     private readonly ConcurrentDictionary<string, ISendTransport> _queueTransports = new();
-    private readonly ushort _prefetchCount;
-    private readonly Uri _baseAddress;
+    private readonly IRabbitMqFactoryConfigurator _configurator;
+    private ushort _prefetchCount => _configurator.PrefetchCount;
+    private Uri _baseAddress => new UriBuilder("rabbitmq", _configurator.ClientHost, _configurator.ClientPort).Uri;
+    public Uri? BusAddress => _baseAddress;
     private readonly Func<Type, string> _entityNameResolver;
     private readonly IInboundMessageResolver _inboundMessageResolver;
 
@@ -26,9 +28,8 @@ public sealed class RabbitMqTransportFactory : ITransportFactory
         IInboundMessageResolver? inboundMessageResolver = null)
     {
         _connectionProvider = connectionProvider;
-        _prefetchCount = configurator.PrefetchCount;
+        _configurator = configurator;
         _entityNameResolver = configurator.GetEntityName;
-        _baseAddress = new UriBuilder("rabbitmq", configurator.ClientHost, configurator.ClientPort).Uri;
         _inboundMessageResolver = inboundMessageResolver ?? new InboundMessageResolver();
     }
 

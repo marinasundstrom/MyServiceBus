@@ -4,6 +4,8 @@ namespace MyServiceBus;
 
 public interface ITransportFactory
 {
+    Uri? BusAddress => null;
+
     TransportCapabilityDescriptor Capabilities => TransportCapabilityDescriptors.Unknown(GetType().Name);
 
     string GetPublishEntityName(Type messageType) => EntityNameFormatter.Format(messageType);

@@ -18,11 +18,7 @@ public sealed class ServiceBusHostedService : IHostedService
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
-        foreach (var action in serviceProvider.GetServices<IPostBuildAction>())
-        {
-            action.Execute(serviceProvider);
-        }
-
+        (serviceProvider.GetService<BusInitialization>() ?? new BusInitialization()).Initialize(serviceProvider);
         messageBus = serviceProvider.GetRequiredService<IMessageBus>();
         await messageBus.StartAsync(cancellationToken);
 

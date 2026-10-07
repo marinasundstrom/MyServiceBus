@@ -60,10 +60,7 @@ public class InMemoryTestHarness : IMessageBus, ITransportFactory, IReceiveEndpo
 
             if (provider != null)
             {
-                foreach (var action in provider.GetServices<IPostBuildAction>())
-                {
-                    action.Execute(provider);
-                }
+                provider.GetRequiredService<BusInitialization>().Initialize(provider);
             }
 
             Volatile.Write(ref started, 1);

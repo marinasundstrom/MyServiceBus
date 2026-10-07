@@ -97,8 +97,7 @@ public class RabbitMqFactoryConfigurator : IRabbitMqFactoryConfigurator, IBusFac
         var services = new ServiceCollection();
         Configure(services);
         var provider = services.BuildServiceProvider();
-        foreach (var action in provider.GetServices<IPostBuildAction>())
-            action.Execute(provider);
+        provider.GetRequiredService<BusInitialization>().Initialize(provider);
         return provider.GetRequiredService<IMessageBus>();
     }
 

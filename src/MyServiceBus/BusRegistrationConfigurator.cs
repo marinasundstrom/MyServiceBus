@@ -405,6 +405,7 @@ public class BusRegistrationConfigurator : IBusRegistrationConfigurator
         if (!Services.Any(d => d.ServiceType == typeof(ILoggerFactory)))
             Services.AddLogging(b => b.AddSimpleConsole());
 
+        Services.AddSingleton<BusInitialization>();
         Services.AddSingleton(_topology);
         Services.AddSingleton(jobConsumers);
         Services.AddSingleton<IJobConsumerRegistry>(provider => provider.GetRequiredService<JobConsumerRegistry>());

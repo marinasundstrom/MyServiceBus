@@ -42,8 +42,7 @@ public class BusFactoryBuilder : IBusFactory
         cfg.Configure(services);
         var provider = services.BuildServiceProvider();
 
-        foreach (var action in provider.GetServices<IPostBuildAction>())
-            action.Execute(provider);
+        (provider.GetService<BusInitialization>() ?? new BusInitialization()).Initialize(provider);
 
         return provider.GetRequiredService<IMessageBus>();
     }
