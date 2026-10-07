@@ -8,6 +8,18 @@ using Xunit;
 
 public class EnvelopeMessageSerializerTests
 {
+    [Theory]
+    [InlineData("{}")]
+    [InlineData("{\"message\":null}")]
+    [InlineData("{\"message\":{\"value\":42}}")]
+    public void Invalid_payload_preserves_deserialization_failure(string json)
+    {
+        var context = new EnvelopeMessageContext(System.Text.Encoding.UTF8.GetBytes(json), new Dictionary<string, object>());
+        var exception = Assert.Throws<MessageDeserializationException>(() => context.TryGetMessage<SampleMessage>(out _));
+        if (json.Contains("42"))
+            Assert.IsAssignableFrom<JsonException>(exception.InnerException);
+    }
+
     public class SampleMessage
     {
         public string Value { get; set; } = string.Empty;

@@ -21,6 +21,10 @@ public final class MessageUrn {
     }
 
     public static List<String> forMessageTypes(Class<?> messageType) {
+        return messageTypes(messageType).stream().map(MessageUrn::forClass).toList();
+    }
+
+    public static List<Class<?>> messageTypes(Class<?> messageType) {
         if (Proxy.isProxyClass(messageType) && messageType.getInterfaces().length > 0) {
             messageType = messageType.getInterfaces()[0];
         }
@@ -29,7 +33,7 @@ public final class MessageUrn {
         types.add(messageType);
         for (Class<?> baseType = messageType.getSuperclass(); baseType != null && baseType != Object.class;
                 baseType = baseType.getSuperclass()) {
-            types.add(baseType);
+            if (isContractType(baseType)) types.add(baseType);
         }
         LinkedHashSet<Class<?>> discoveredInterfaces = new LinkedHashSet<>();
         for (Class<?> type = messageType; type != null && type != Object.class; type = type.getSuperclass()) {
@@ -37,8 +41,13 @@ public final class MessageUrn {
         }
         List<Class<?>> interfaces = new ArrayList<>(discoveredInterfaces);
         interfaces.sort(Comparator.comparing(Class::getName));
-        types.addAll(interfaces);
-        return types.stream().map(MessageUrn::forClass).toList();
+        interfaces.stream().filter(MessageUrn::isContractType).forEach(types::add);
+        return List.copyOf(types);
+    }
+
+    public static boolean isContractType(Class<?> type) {
+        String name = type.getPackageName();
+        return !name.startsWith("java.") && !name.startsWith("javax.") && !name.startsWith("jdk.");
     }
 
     private static void collectInterfaces(Class<?> type, LinkedHashSet<Class<?>> interfaces) {

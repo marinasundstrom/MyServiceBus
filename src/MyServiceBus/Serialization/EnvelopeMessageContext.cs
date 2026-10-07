@@ -111,6 +111,7 @@ public class EnvelopeMessageContext : IMessageContext
 
     public InboundMessageFormat Format => InboundMessageFormat.Envelope;
 
+    /// <exception cref="MessageDeserializationException">The payload is missing, null, or invalid for the requested contract.</exception>
     public bool TryGetMessage<T>(out T? message) where T : class
     {
         if (_messageCache.TryGetValue(typeof(T), out var cached))
@@ -121,8 +122,7 @@ public class EnvelopeMessageContext : IMessageContext
 
         if (!_jsonDocument.RootElement.TryGetProperty("message", out var value))
         {
-            message = null;
-            return false;
+            throw new MessageDeserializationException("The envelope has no message body.");
         }
 
         try
@@ -130,14 +130,14 @@ public class EnvelopeMessageContext : IMessageContext
             var typeInfo = _jsonSerializerOptions.GetTypeInfo(typeof(T)) as JsonTypeInfo<T>
                 ?? throw new InvalidOperationException($"JSON metadata is not configured for {typeof(T)}.");
             message = value.Deserialize(typeInfo);
-            if (message != null)
-                _messageCache[typeof(T)] = message;
-            return message != null;
+            if (message is null)
+                throw new MessageDeserializationException($"The payload for {typeof(T)} is null.");
+            _messageCache[typeof(T)] = message;
+            return true;
         }
-        catch
+        catch (Exception exception) when (exception is JsonException or NotSupportedException or InvalidOperationException)
         {
-            message = null;
-            return false;
+            throw new MessageDeserializationException($"Cannot deserialize message as {typeof(T)}.", exception);
         }
     }
 

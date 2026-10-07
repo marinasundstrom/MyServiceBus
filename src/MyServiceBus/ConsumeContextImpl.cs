@@ -42,7 +42,9 @@ public class ConsumeContextImpl<TMessage> : BasePipeContext, ConsumeContext<TMes
 
     internal ReceiveContext ReceiveContext => receiveContext;
 
-    public TMessage Message => message is null ? (receiveContext.TryGetMessage(out message) ? message : default) : message;
+    public TMessage Message => message ??= receiveContext.TryGetMessage<TMessage>(out var deserialized) && deserialized is not null
+        ? deserialized
+        : throw new MessageDeserializationException($"Cannot deserialize message as {typeof(TMessage)}.");
     public Guid? MessageId => receiveContext.MessageId == Guid.Empty ? null : receiveContext.MessageId;
     public Guid? RequestId => receiveContext.RequestId;
     public Guid? CorrelationId => receiveContext.CorrelationId;

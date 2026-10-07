@@ -12,6 +12,7 @@ internal static class JsonSerializationDefaults
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         PropertyNameCaseInsensitive = true,
         TypeInfoResolver = JsonSerializerOptions.Default.TypeInfoResolver,
+        Converters = { new InterfaceMessageConverter() },
         WriteIndented = false
     };
 
@@ -21,6 +22,7 @@ internal static class JsonSerializationDefaults
     {
         PropertyNameCaseInsensitive = true,
         TypeInfoResolver = JsonSerializerOptions.Default.TypeInfoResolver,
+        Converters = { new InterfaceMessageConverter() },
         WriteIndented = false
     };
 }

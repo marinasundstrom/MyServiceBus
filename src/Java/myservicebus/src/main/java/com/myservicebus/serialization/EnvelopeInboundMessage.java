@@ -114,12 +114,22 @@ public class EnvelopeInboundMessage implements InboundMessage {
             return (T) cached;
         }
 
-        Envelope<T> typedEnvelope = deserializeEnvelope(type);
-        T message = typedEnvelope.getMessage();
-        if (message != null) {
+        try {
+            if (type instanceof Class<?> contract && contract.isInterface() && com.myservicebus.MessageUrn.isContractType(contract)) {
+                T message = (T) InterfaceMessageProxy.read(contract, mapper.readTree(body).get("message"), mapper);
+                messageCache.put(type, message);
+                return message;
+            }
+            Envelope<T> typedEnvelope = deserializeEnvelope(type);
+            T message = typedEnvelope.getMessage();
+            if (message == null) {
+                throw new MessageDeserializationException("The envelope message body is missing or null: " + type);
+            }
             messageCache.put(type, message);
+            return message;
+        } catch (com.fasterxml.jackson.core.JsonProcessingException exception) {
+            throw new MessageDeserializationException("Cannot deserialize message as " + type, exception);
         }
-        return message;
     }
 
     private <T> Envelope<T> deserializeEnvelope(Type type) throws java.io.IOException {

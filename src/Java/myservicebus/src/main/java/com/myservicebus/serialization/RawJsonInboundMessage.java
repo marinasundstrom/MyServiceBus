@@ -84,10 +84,17 @@ public class RawJsonInboundMessage implements InboundMessage {
             return (T) cached;
         }
 
-        T message = (T) mapper.readValue(body, mapper.getTypeFactory().constructType(type));
-        if (message != null) {
+        try {
+            T message = (T) (type instanceof Class<?> contract && contract.isInterface()
+                    ? InterfaceMessageProxy.read(contract, mapper.readTree(body), mapper)
+                    : mapper.readValue(body, mapper.getTypeFactory().constructType(type)));
+            if (message == null) {
+                throw new MessageDeserializationException("The message body is null: " + type);
+            }
             messageCache.put(type, message);
+            return message;
+        } catch (com.fasterxml.jackson.core.JsonProcessingException exception) {
+            throw new MessageDeserializationException("Cannot deserialize message as " + type, exception);
         }
-        return message;
     }
 }

@@ -6,6 +6,9 @@ namespace MyServiceBus;
 
 public static class MessageTypeCache
 {
+    public static bool IsContractType(Type type) => type.Namespace != "System"
+        && !(type.Namespace?.StartsWith("System.", StringComparison.Ordinal) ?? false);
+
     public static Type[] GetMessageTypes(Type messageType)
     {
         if (messageType.IsGenericType && messageType.GetGenericTypeDefinition() == typeof(Batch<>))
@@ -16,9 +19,10 @@ public static class MessageTypeCache
 
         var types = new List<Type> { messageType };
         for (var baseType = messageType.BaseType; baseType is not null && baseType != typeof(object); baseType = baseType.BaseType)
-            types.Add(baseType);
+            if (IsContractType(baseType))
+                types.Add(baseType);
 
-        types.AddRange(messageType.GetInterfaces().OrderBy(type => type.FullName, StringComparer.Ordinal));
+        types.AddRange(messageType.GetInterfaces().Where(IsContractType).OrderBy(type => type.FullName, StringComparer.Ordinal));
         return types.Distinct().ToArray();
     }
 }

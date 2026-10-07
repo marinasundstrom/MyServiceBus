@@ -22,7 +22,9 @@ public class ConsumePipe<TMessage> : IConsumePipe
 
     public Task Send(ConsumeContext context)
     {
-        return pipe.Send((ConsumeContext<TMessage>)context);
+        var typed = (ConsumeContext<TMessage>)context;
+        _ = typed.Message; // Materialize before retry/fault filters or application code run.
+        return pipe.Send(typed);
     }
 }
 
