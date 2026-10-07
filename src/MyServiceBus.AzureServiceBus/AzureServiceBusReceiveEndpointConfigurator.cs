@@ -72,7 +72,7 @@ public sealed class AzureServiceBusReceiveEndpointConfigurator
         }
     }
 
-    internal void ConfigureConsumer(IBusRegistrationContext context, ConsumerTopology consumer)
+    internal void ConfigureConsumer(IBusRegistrationContext context, ConsumerTopology consumer, IMessageBus? bus = null)
     {
         var registration = consumer.Registration
             ?? throw new InvalidOperationException($"Consumer {consumer.ConsumerType} has no runtime registration descriptor.");
@@ -97,15 +97,15 @@ public sealed class AzureServiceBusReceiveEndpointConfigurator
                 : Delegate.Combine(retryConfiguration, consumer.ConfigurePipe);
         }
 
-        var bus = context.ServiceProvider.GetRequiredService<IMessageBus>();
-        registration.Register(bus, consumer, CancellationToken.None).GetAwaiter().GetResult();
+        if (bus is not null)
+            registration.Register(bus, consumer, CancellationToken.None).GetAwaiter().GetResult();
     }
 
     public void Consumer<TConsumer, TMessage>()
         where TConsumer : class, IConsumer<TMessage>
         where TMessage : class
     {
-        _endpointActions.Add((_, provider) =>
+        _endpointActions.Add((bus, provider) =>
         {
             var registry = provider.GetRequiredService<TopologyRegistry>();
             registry.RegisterConsumer<TConsumer, TMessage>(
@@ -113,7 +113,7 @@ public sealed class AzureServiceBusReceiveEndpointConfigurator
                 endpointNameIsExplicit: true,
                 endpointNameFormatterType: null);
             var consumer = registry.Consumers[^1];
-            ConfigureConsumer(new BusRegistrationContext(provider), consumer);
+            ConfigureConsumer(new BusRegistrationContext(provider), consumer, bus);
         });
     }
 
