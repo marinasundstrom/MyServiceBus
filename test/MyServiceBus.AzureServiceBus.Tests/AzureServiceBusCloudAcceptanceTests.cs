@@ -60,6 +60,65 @@ public sealed class AzureServiceBusCloudAcceptanceTests
     }
 
     [AzureServiceBusCloudFact]
+    public async Task Publisher_only_bus_forwards_to_interface_subscription()
+    {
+        var suffix = Guid.NewGuid().ToString("N")[..12];
+        var queueName = $"msb-cloud-csharp-{suffix}";
+        var topicName = $"msb-cloud-message-{suffix}";
+        var received = new TaskCompletionSource<ICloudContract>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var administrationClient = new ServiceBusAdministrationClient(ConnectionString);
+        var bus = MessageBus.Factory.Create<AzureServiceBusFactoryConfigurator>(cfg =>
+        {
+            cfg.Host(ConnectionString);
+            cfg.Message<InheritedCloudMessage>(message => message.SetEntityName(topicName + "-concrete"));
+            cfg.Message<ICloudContract>(message => message.SetEntityName(topicName));
+            cfg.ReceiveEndpoint(queueName, endpoint =>
+                endpoint.Handler<ICloudContract>(context =>
+                {
+                    received.TrySetResult(context.Message);
+                    return Task.CompletedTask;
+                }));
+        });
+
+        var publisher = MessageBus.Factory.Create<AzureServiceBusFactoryConfigurator>(cfg =>
+        {
+            cfg.Host(ConnectionString);
+            cfg.Message<InheritedCloudMessage>(message => message.SetEntityName(topicName + "-concrete"));
+            cfg.Message<ICloudContract>(message => message.SetEntityName(topicName));
+        });
+        try
+        {
+            await bus.StartAsync(CancellationToken.None);
+
+            Assert.True((await administrationClient.QueueExistsAsync(queueName)).Value);
+            Assert.True((await administrationClient.QueueExistsAsync(queueName + "_error")).Value);
+            Assert.True((await administrationClient.QueueExistsAsync(queueName + "_skipped")).Value);
+            Assert.True((await administrationClient.TopicExistsAsync(topicName)).Value);
+            Assert.True((await administrationClient.TopicExistsAsync(queueName + "_fault")).Value);
+            var subscription = (await administrationClient.GetSubscriptionAsync(topicName, queueName)).Value;
+            Assert.Equal(queueName, EntityName(subscription.ForwardTo));
+
+            await publisher.StartAsync(CancellationToken.None);
+            await publisher.Publish(new InheritedCloudMessage { Value = "csharp-live-azure" });
+
+            var message = await received.Task.WaitAsync(TimeSpan.FromSeconds(30));
+            Assert.Equal("csharp-live-azure", message.Value);
+        }
+        finally
+        {
+            await publisher.StopAsync(CancellationToken.None);
+            await bus.StopAsync(CancellationToken.None);
+            await DeleteQueueIfExists(administrationClient, queueName);
+            await DeleteQueueIfExists(administrationClient, queueName + "_error");
+            await DeleteQueueIfExists(administrationClient, queueName + "_skipped");
+            await DeleteTopicIfExists(administrationClient, topicName + "-concrete");
+            await DeleteTopicIfExists(administrationClient, topicName);
+            await DeleteTopicIfExists(administrationClient, queueName + "_fault");
+        }
+    }
+
+    [AzureServiceBusCloudFact]
     public async Task Csharp_create_mode_provisions_a_temporary_request_endpoint()
     {
         var suffix = Guid.NewGuid().ToString("N")[..12];
@@ -200,6 +259,9 @@ public sealed class AzureServiceBusCloudAcceptanceTests
         Uri.TryCreate(address, UriKind.Absolute, out var uri)
             ? Uri.UnescapeDataString(uri.AbsolutePath.Trim('/'))
             : address;
+
+    public interface ICloudContract { string Value { get; } }
+    public sealed class InheritedCloudMessage : ICloudContract { public string Value { get; set; } = string.Empty; }
 
     public sealed class CloudMessage
     {

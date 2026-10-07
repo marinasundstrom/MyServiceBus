@@ -49,10 +49,12 @@ from the selected topic to each distinct base/interface topic. Pre-provisioned m
 requires those subscriptions to be deployed separately; the forwarding subscription
 name is `msb-` followed by the first 32 lowercase hexadecimal characters of the
 SHA-256 hash of the destination topic's UTF-8 name. Provisioning is covered by SDK
-contract tests; live-cloud hierarchy delivery is not yet a conformance claim.
+contract tests and publisher-only interface-delivery tests against live Azure.
+Forwarding remains at-least-once: overlapping forwarding routes or subscriptions
+can deliver duplicates, and Azure forwarding hop limits still apply.
 
 Amazon SNS/SQS keeps selected-contract publication: SNS does not provide topic-to-topic
-bindings, and the pinned MassTransit 8.5.1 SNS publish topology likewise creates the
+bindings, and the [pinned MassTransit 8.5.1 SNS publish topology](https://github.com/MassTransit/MassTransit/blob/v8.5.1/src/Transports/MassTransit.AmazonSqsTransport/AmazonSqsTransport/Topology/AmazonSqsMessagePublishTopology.cs) likewise creates the
 selected topic without inherited bindings. Publish with the interface/base contract
 explicitly when subscribing to that contract. Both cloud adapters now match all URNs
 on received envelopes. This separates receive contract matching from broker routing;

@@ -78,6 +78,14 @@ subprojects {
 
     tasks.withType(Test) {
         useJUnitPlatform()
+        // Enabling a broker gate must not reuse results from a run that skipped it.
+        def transportTestGates = [
+            'myservicebus-azure-service-bus': ['RUN_AZURE_SERVICEBUS_CLOUD_TESTS', 'RUN_AZURE_SERVICEBUS_EMULATOR_TESTS'],
+            'myservicebus-amazon-sqs': ['RUN_AMAZON_SQS_CLOUD_TESTS', 'RUN_AMAZON_SQS_LOCALSTACK_TESTS']
+        ]
+        transportTestGates.getOrDefault(project.name, []).each { gate ->
+            inputs.property(gate, providers.environmentVariable(gate).orElse('0'))
+        }
     }
 }
 
