@@ -4,6 +4,8 @@ This changelog summarizes the bigger themes in the repository history rather tha
 
 ## Unreleased
 
+- Validate saga/choreography declarations against bus-level contract overrides at startup, and match every advertised contract when receiving Azure Service Bus and SNS/SQS envelopes in both clients.
+
 - Preserved configured wire identities and inherited publish topology in outbox records in both clients; capture remains offline and dispatch prepares exchange bindings before delivery.
 
 - Preserved original malformed RabbitMQ payloads in error queues and emitted structured skipped-message hooks and monitoring observations in both clients.

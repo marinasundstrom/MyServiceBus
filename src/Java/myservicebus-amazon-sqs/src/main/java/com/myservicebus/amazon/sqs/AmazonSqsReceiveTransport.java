@@ -1,7 +1,5 @@
 package com.myservicebus.amazon.sqs;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.myservicebus.ErrorTransportSettlement;
 import com.myservicebus.ReceiveTransport;
 import com.myservicebus.TransportMessage;
@@ -27,7 +25,9 @@ public final class AmazonSqsReceiveTransport implements ReceiveTransport {
     private final Function<String, Boolean> isMessageTypeRegistered;
     private final String faultAddress;
     private final Logger logger;
-    private final ObjectMapper mapper = new ObjectMapper();
+    private final com.myservicebus.serialization.InboundMessageResolver inboundResolver =
+            new com.myservicebus.serialization.DefaultInboundMessageResolver(
+                    new com.myservicebus.serialization.EnvelopeMessageDeserializer());
     private final ExecutorService poller = Executors.newSingleThreadExecutor();
     private final ExecutorService workers;
     private final Semaphore availableWorkers;
@@ -99,8 +99,10 @@ public final class AmazonSqsReceiveTransport implements ReceiveTransport {
         try {
             byte[] body = message.body().getBytes(StandardCharsets.UTF_8);
             TransportMessage transport = new TransportMessage(body, AmazonSqsMessageMapper.headers(message, faultAddress));
-            String messageType = readMessageType(body);
-            if (isMessageTypeRegistered != null && !isMessageTypeRegistered.apply(messageType)) {
+            var messageTypes = inboundResolver.resolve(transport).getMessageTypes();
+            if (isMessageTypeRegistered != null && !(messageTypes.isEmpty()
+                    ? isMessageTypeRegistered.apply(null)
+                    : messageTypes.stream().anyMatch(type -> isMessageTypeRegistered.apply(type)))) {
                 if (skippedQueueUrl != null) sqs.sendMessage(AmazonSqsMessageMapper.sqsRequest(
                         skippedQueueUrl, body, "application/vnd.masstransit+json"));
                 delete(message);
@@ -124,15 +126,6 @@ public final class AmazonSqsReceiveTransport implements ReceiveTransport {
         }
     }
 
-    private String readMessageType(byte[] body) {
-        try {
-            JsonNode types = mapper.readTree(body).get("messageType");
-            return types != null && types.isArray() && !types.isEmpty() ? types.get(0).asText() : null;
-        } catch (Exception exception) {
-            logger.error("Failed to read Amazon SQS message type", exception);
-            return null;
-        }
-    }
 
     private void delete(Message message) {
         sqs.deleteMessage(builder -> builder.queueUrl(queueUrl).receiptHandle(message.receiptHandle()));

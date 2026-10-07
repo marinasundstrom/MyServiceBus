@@ -84,9 +84,10 @@ public sealed class AzureServiceBusReceiveTransport : IReceiveTransport
             var headers = AzureServiceBusMessageMapper.CreateHeaders(args.Message, _faultAddress);
             var transportMessage = new AzureServiceBusTransportMessage(headers, args.Message.Body.ToArray());
             var inboundMessage = _inboundMessageResolver.Resolve(transportMessage);
-            var messageType = inboundMessage.MessageType.FirstOrDefault();
 
-            if (_isMessageTypeRegistered is not null && !_isMessageTypeRegistered(messageType))
+            if (_isMessageTypeRegistered is not null && !(inboundMessage.MessageType.Count == 0
+                    ? _isMessageTypeRegistered(null)
+                    : inboundMessage.MessageType.Any(type => _isMessageTypeRegistered(type))))
             {
                 await _skippedSender.SendMessageAsync(
                     AzureServiceBusMessageMapper.Copy(args.Message),

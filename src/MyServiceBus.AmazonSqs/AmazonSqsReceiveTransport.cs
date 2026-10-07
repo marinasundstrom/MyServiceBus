@@ -172,9 +172,10 @@ public sealed class AmazonSqsReceiveTransport : IReceiveTransport
             var transportMessage = new AmazonSqsTransportMessage(
                 headers, System.Text.Encoding.UTF8.GetBytes(message.Body));
             var inboundMessage = _inboundMessageResolver.Resolve(transportMessage);
-            var messageType = inboundMessage.MessageType.FirstOrDefault();
 
-            if (_isMessageTypeRegistered is not null && !_isMessageTypeRegistered(messageType))
+            if (_isMessageTypeRegistered is not null && !(inboundMessage.MessageType.Count == 0
+                    ? _isMessageTypeRegistered(null)
+                    : inboundMessage.MessageType.Any(type => _isMessageTypeRegistered(type))))
             {
                 if (_skippedQueueUrl is not null)
                     await _sqs.SendMessageAsync(AmazonSqsMessageMapper.CreateSqsRequest(

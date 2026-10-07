@@ -9,8 +9,6 @@ import com.myservicebus.TransportMessage;
 import com.myservicebus.logging.Logger;
 import com.myservicebus.logging.LoggerFactory;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.util.Map;
 import java.time.Duration;
@@ -25,7 +23,9 @@ public final class AzureServiceBusReceiveTransport implements ReceiveTransport {
     private final Function<String, Boolean> isMessageTypeRegistered;
     private final String faultAddress;
     private final Logger logger;
-    private final ObjectMapper mapper = new ObjectMapper();
+    private final com.myservicebus.serialization.InboundMessageResolver inboundResolver =
+            new com.myservicebus.serialization.DefaultInboundMessageResolver(
+                    new com.myservicebus.serialization.EnvelopeMessageDeserializer());
     private final Object lifecycleMonitor = new Object();
     private int activeMessages;
     private boolean stopping;
@@ -59,8 +59,10 @@ public final class AzureServiceBusReceiveTransport implements ReceiveTransport {
         try {
             Map<String, Object> headers = AzureServiceBusMessageMapper.createHeaders(message, faultAddress);
             TransportMessage transportMessage = new TransportMessage(message.getBody().toBytes(), headers);
-            String messageType = readMessageType(message.getBody().toBytes());
-            if (isMessageTypeRegistered != null && !isMessageTypeRegistered.apply(messageType)) {
+            var messageTypes = inboundResolver.resolve(transportMessage).getMessageTypes();
+            if (isMessageTypeRegistered != null && !(messageTypes.isEmpty()
+                    ? isMessageTypeRegistered.apply(null)
+                    : messageTypes.stream().anyMatch(type -> isMessageTypeRegistered.apply(type)))) {
                 skippedSender.sendMessage(AzureServiceBusMessageMapper.copy(message));
                 context.complete();
                 return;
@@ -184,16 +186,6 @@ public final class AzureServiceBusReceiveTransport implements ReceiveTransport {
         skippedSender.close();
     }
 
-    private String readMessageType(byte[] body) {
-        try {
-            JsonNode node = mapper.readTree(body);
-            JsonNode types = node.get("messageType");
-            return types != null && types.isArray() && !types.isEmpty() ? types.get(0).asText() : null;
-        } catch (Exception exception) {
-            logger.error("Failed to read Azure Service Bus message type", exception);
-            return null;
-        }
-    }
 
     private static Throwable unwrap(Throwable exception) {
         Throwable current = exception;
