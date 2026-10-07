@@ -22,9 +22,13 @@ public static class AzureServiceBusServiceCollectionExtensions
         Action<IBusRegistrationContext, IAzureServiceBusFactoryConfigurator> configure)
     {
         services.AddSingleton<IAzureServiceBusFactoryConfigurator>(configurator);
-        services.AddSingleton<IPostBuildAction>(
-            new AzureServiceBusPostBuildConfigureAction(configure, configurator));
-        services.AddSingleton(_ => new ServiceBusClient(configurator.ConnectionString));
+        var action = new AzureServiceBusPostBuildConfigureAction(configure, configurator);
+        services.AddSingleton<IPostBuildAction>(action);
+        services.AddSingleton(provider =>
+        {
+            action.Configure(provider);
+            return new ServiceBusClient(configurator.ConnectionString);
+        });
         services.AddSingleton<ITransportFactory, AzureServiceBusTransportFactory>();
         services.AddSingleton<IMessageBus>(provider => new MessageBus(
             provider.GetRequiredService<ITransportFactory>(),
@@ -56,10 +60,33 @@ internal sealed class AzureServiceBusPostBuildConfigureAction : IPostBuildAction
         _configurator = configurator;
     }
 
+    private readonly object configurationLock = new();
+    private bool configured;
+    private Exception? configurationFailure;
+
+    internal void Configure(IServiceProvider provider)
+    {
+        lock (configurationLock)
+        {
+            if (configured) return;
+            if (configurationFailure is not null)
+                throw new InvalidOperationException("Transport configuration previously failed. Rebuild the service provider before retrying.", configurationFailure);
+            try
+            {
+                _configure(new BusRegistrationContext(provider), _configurator);
+                configured = true;
+            }
+            catch (Exception exception)
+            {
+                configurationFailure = exception;
+                throw;
+            }
+        }
+    }
+
     public void Execute(IServiceProvider provider)
     {
-        var context = new BusRegistrationContext(provider);
-        _configure(context, _configurator);
+        Configure(provider);
         _configurator.Apply(provider.GetRequiredService<IMessageBus>(), provider);
     }
 }

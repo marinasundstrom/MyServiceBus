@@ -25,9 +25,18 @@ public static class AmazonSqsServiceCollectionExtensions
         Action<IBusRegistrationContext, IAmazonSqsFactoryConfigurator> configure)
     {
         services.AddSingleton<IAmazonSqsFactoryConfigurator>(configurator);
-        services.AddSingleton<IPostBuildAction>(new AmazonSqsPostBuildConfigureAction(configure, configurator));
-        services.AddSingleton<IAmazonSQS>(_ => CreateSqsClient(configurator));
-        services.AddSingleton<IAmazonSimpleNotificationService>(_ => CreateSnsClient(configurator));
+        var action = new AmazonSqsPostBuildConfigureAction(configure, configurator);
+        services.AddSingleton<IPostBuildAction>(action);
+        services.AddSingleton<IAmazonSQS>(provider =>
+        {
+            action.Configure(provider);
+            return CreateSqsClient(configurator);
+        });
+        services.AddSingleton<IAmazonSimpleNotificationService>(provider =>
+        {
+            action.Configure(provider);
+            return CreateSnsClient(configurator);
+        });
         services.AddSingleton<ITransportFactory, AmazonSqsTransportFactory>();
         services.AddSingleton<IMessageBus>(provider => new MessageBus(
             provider.GetRequiredService<ITransportFactory>(), provider,
@@ -82,10 +91,33 @@ internal sealed class AmazonSqsPostBuildConfigureAction : IPostBuildAction
         _configurator = configurator;
     }
 
+    private readonly object configurationLock = new();
+    private bool configured;
+    private Exception? configurationFailure;
+
+    internal void Configure(IServiceProvider provider)
+    {
+        lock (configurationLock)
+        {
+            if (configured) return;
+            if (configurationFailure is not null)
+                throw new InvalidOperationException("Transport configuration previously failed. Rebuild the service provider before retrying.", configurationFailure);
+            try
+            {
+                _configure(new BusRegistrationContext(provider), _configurator);
+                configured = true;
+            }
+            catch (Exception exception)
+            {
+                configurationFailure = exception;
+                throw;
+            }
+        }
+    }
+
     public void Execute(IServiceProvider provider)
     {
-        var context = new BusRegistrationContext(provider);
-        _configure(context, _configurator);
+        Configure(provider);
         _configurator.Apply(provider.GetRequiredService<IMessageBus>(), provider);
     }
 }
