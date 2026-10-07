@@ -22,6 +22,7 @@ public sealed class MonitoringExporter : BackgroundService, IBusHook, IScheduled
     private readonly DateTimeOffset startedAtUtc = DateTimeOffset.UtcNow;
     private readonly object scheduledWorkSync = new();
     private readonly Dictionary<string, MonitoringScheduledWorkItem> scheduledWork = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, OutboxDeliveryHookEvent> lastOutbox = new();
     private long sequence;
     private long droppedObservations;
     private int queuedObservations;
@@ -53,6 +54,7 @@ public sealed class MonitoringExporter : BackgroundService, IBusHook, IScheduled
 
     public void Handle(BusHookEvent busEvent)
     {
+        if (busEvent is OutboxDeliveryHookEvent poll && !ShouldExportOutbox(poll)) return;
         var observation = busEvent switch
         {
             BusLifecycleHookEvent lifecycle => CreateLifecycleObservation(lifecycle),
@@ -74,6 +76,25 @@ public sealed class MonitoringExporter : BackgroundService, IBusHook, IScheduled
         var queued = Interlocked.Increment(ref queuedObservations);
         if (queued >= options.MaxBatchSize && batchReady.CurrentCount == 0)
             batchReady.Release();
+    }
+
+    private bool ShouldExportOutbox(OutboxDeliveryHookEvent poll)
+    {
+        lock (lastOutbox)
+        {
+            var key = poll.ServiceName + "|" + poll.OwnerId;
+            if (poll.Succeeded && poll.BatchLeased == 0 && poll.BatchDispatched == 0
+                && poll.BatchFailed == 0 && poll.BatchLostLeases == 0
+                && lastOutbox.TryGetValue(key, out var previous) && previous.Succeeded
+                && previous.BatchLeased == 0 && previous.BatchDispatched == 0 && previous.BatchFailed == 0 && previous.BatchLostLeases == 0
+                && previous.Pending == poll.Pending && previous.Leased == poll.Leased
+                && previous.Retrying == poll.Retrying && previous.StoredDispatched == poll.StoredDispatched
+                && previous.Dead == poll.Dead && previous.Cancelled == poll.Cancelled
+                && poll.OccurredAtUtc - previous.OccurredAtUtc < options.HeartbeatInterval)
+                return false;
+            lastOutbox[key] = poll;
+            return true;
+        }
     }
 
     public void Observe(ScheduledWorkState state)

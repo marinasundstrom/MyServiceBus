@@ -4,6 +4,8 @@ This changelog summarizes the bigger themes in the repository history rather tha
 
 ## Unreleased
 
+- Throttled unchanged empty outbox observations to the monitoring heartbeat interval in both clients, while exporting work, failures, recovery, and backlog changes immediately. Local dispatcher hooks remain unchanged.
+
 - Preserved message identifiers through consumer wrappers and restored direct scoped-send observations in both C# and Java.
 
 ## 0.1.0-preview.11 - 2026-09-04

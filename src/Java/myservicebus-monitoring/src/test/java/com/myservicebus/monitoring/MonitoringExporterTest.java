@@ -204,6 +204,66 @@ class MonitoringExporterTest {
     }
 
     @Test
+    void exporterThrottlesIdleCyclesButPreservesHealthChanges() throws Exception {
+        CountDownLatch batchReceived = new CountDownLatch(1);
+        AtomicReference<String> batchJson = new AtomicReference<>();
+        HttpServer server = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
+        server.createContext("/api/monitoring/v1/metadata", exchange -> {
+            readBody(exchange);
+            respond(exchange);
+        });
+        server.createContext("/api/monitoring/v1/observations:batch", exchange -> {
+            batchJson.set(readBody(exchange));
+            respond(exchange);
+            batchReceived.countDown();
+        });
+        server.createContext("/api/monitoring/v1/heartbeat", exchange -> {
+            readBody(exchange);
+            respond(exchange);
+        });
+        server.createContext("/api/monitoring/v1/scheduled-work", exchange -> {
+            readBody(exchange);
+            respond(exchange);
+        });
+        server.start();
+
+        MonitoringExporterOptions options = new MonitoringExporterOptions();
+        options.setServiceAddress(URI.create("http://localhost:" + server.getAddress().getPort()));
+        options.setApplicationName("dispatcher-java");
+        options.setExportInterval(Duration.ofMillis(20));
+        options.setHeartbeatInterval(Duration.ofMinutes(1));
+        options.setMaxBatchSize(100);
+
+        MonitoringExporter exporter = new MonitoringExporter(options);
+        try {
+            Instant now = Instant.now();
+            exporter.handle(idlePoll(now, true, 0, 0));
+            for (int i = 1; i < 60; i++) exporter.handle(idlePoll(now.plusSeconds(i), true, 0, 0));
+            exporter.handle(idlePoll(now.plusSeconds(60), true, 0, 0));
+            exporter.handle(idlePoll(now, true, 1, 0));
+            exporter.handle(idlePoll(now, false, 0, 0));
+            exporter.handle(idlePoll(now, true, 0, 0));
+            exporter.handle(idlePoll(now, true, 0, 1));
+            exporter.start(() -> new BusInspectionSnapshot(
+                    "mediator", URI.create("loopback://localhost/"), Instant.now(),
+                    List.of(), List.of(), List.of()));
+
+            assertTrue(batchReceived.await(2, TimeUnit.SECONDS));
+            org.junit.jupiter.api.Assertions.assertEquals(6,
+                    new com.fasterxml.jackson.databind.ObjectMapper().readTree(batchJson.get()).get("observations").size());
+        } finally {
+            exporter.close();
+            server.stop(0);
+        }
+    }
+
+    private static OutboxDeliveryHookEvent idlePoll(Instant at, boolean succeeded, int pending, int dispatched) {
+        return new OutboxDeliveryHookEvent(at, "orders", "worker", succeeded, 1,
+                dispatched, dispatched, 0, 0, pending, 0, 0, 0, 0, 0, null,
+                succeeded ? null : "storage");
+    }
+
+    @Test
     void exporterSendsScheduledWorkSnapshotsWithoutMessageBodies() throws Exception {
         CountDownLatch scheduledReceived = new CountDownLatch(1);
         AtomicReference<String> scheduledJson = new AtomicReference<>();

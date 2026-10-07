@@ -140,12 +140,36 @@ public final class MonitoringExporter implements BusHook, ScheduledWorkObserver,
 
     @Override
     public void handle(BusHookEvent busEvent) {
+        if (busEvent instanceof OutboxDeliveryHookEvent poll && !shouldExportOutbox(poll)) return;
         MonitoringProtocol.Observation observation = map(busEvent);
         if (observation != null && !observations.offer(observation)) {
             dropped.incrementAndGet();
         } else if (observation != null && started.get() && !closed.get()
                 && observations.size() >= options.getMaxBatchSize()) {
             worker.execute(this::exportSafely);
+        }
+    }
+
+    private final java.util.Map<String, OutboxDeliveryHookEvent> lastOutbox = new java.util.HashMap<>();
+
+    private boolean shouldExportOutbox(OutboxDeliveryHookEvent poll) {
+        synchronized (lastOutbox) {
+            String key = poll.serviceName() + "|" + poll.ownerId();
+            var previous = lastOutbox.get(key);
+            if (poll.succeeded() && poll.batchLeased() == 0 && poll.batchDispatched() == 0
+                    && poll.batchFailed() == 0 && poll.batchLostLeases() == 0
+                    && previous != null && previous.succeeded() && previous.batchLeased() == 0 && previous.batchDispatched() == 0
+                    && previous.batchFailed() == 0 && previous.batchLostLeases() == 0
+                    && java.util.Objects.equals(previous.pending(), poll.pending())
+                    && java.util.Objects.equals(previous.leased(), poll.leased())
+                    && java.util.Objects.equals(previous.retrying(), poll.retrying())
+                    && java.util.Objects.equals(previous.storedDispatched(), poll.storedDispatched())
+                    && java.util.Objects.equals(previous.dead(), poll.dead())
+                    && java.util.Objects.equals(previous.cancelled(), poll.cancelled())
+                    && java.time.Duration.between(previous.occurredAtUtc(), poll.occurredAtUtc()).compareTo(options.getHeartbeatInterval()) < 0)
+                return false;
+            lastOutbox.put(key, poll);
+            return true;
         }
     }
 

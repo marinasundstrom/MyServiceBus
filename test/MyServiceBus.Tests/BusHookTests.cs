@@ -345,6 +345,44 @@ public class BusHookTests
     }
 
     [Fact]
+    public async Task Monitoring_exporter_throttles_idle_cycles_but_preserves_health_changes()
+    {
+        var handler = new RecordingHttpHandler();
+        var services = new ServiceCollection()
+            .AddSingleton<IBusInspectionProvider>(new StubInspectionProvider());
+        await using var provider = services.BuildServiceProvider();
+        var options = new MonitoringExporterOptions
+        {
+            ServiceAddress = new Uri("http://monitoring.test"),
+            ApplicationName = "dispatcher-tests",
+            ExportInterval = TimeSpan.FromMilliseconds(20),
+            HeartbeatInterval = TimeSpan.FromMinutes(1)
+        };
+        var exporter = new MonitoringExporter(
+            new HttpClient(handler) { BaseAddress = options.ServiceAddress },
+            provider,
+            options,
+            NullLogger<MonitoringExporter>.Instance);
+
+        var first = new OutboxDeliveryHookEvent(DateTimeOffset.UtcNow, "orders", "worker", true,
+            1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, null, null);
+        exporter.Handle(first);
+        for (var i = 1; i < 60; i++)
+            exporter.Handle(first with { OccurredAtUtc = first.OccurredAtUtc.AddSeconds(i) });
+        exporter.Handle(first with { OccurredAtUtc = first.OccurredAtUtc.AddMinutes(1) });
+        exporter.Handle(first with { Pending = 1 });
+        exporter.Handle(first with { Succeeded = false, FailureCategory = "storage" });
+        exporter.Handle(first); // Recovery must be visible immediately.
+        exporter.Handle(first with { BatchLeased = 1, BatchDispatched = 1 });
+        await exporter.StartAsync(CancellationToken.None);
+
+        var batchJson = await handler.BatchReceived.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        using var json = System.Text.Json.JsonDocument.Parse(batchJson);
+        Assert.Equal(6, json.RootElement.GetProperty("observations").GetArrayLength());
+        await exporter.StopAsync(CancellationToken.None);
+    }
+
+    [Fact]
     public async Task Monitoring_exporter_sends_scheduled_work_without_message_bodies()
     {
         var handler = new RecordingHttpHandler();
