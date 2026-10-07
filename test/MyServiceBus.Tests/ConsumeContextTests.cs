@@ -31,6 +31,8 @@ public class ConsumeContextTests
             new PublishContextFactory());
 
         Assert.Equal(messageId, context.MessageId);
+        var wrapped = new ConsumerConsumeContextImpl<object, FakeMessage>(new object(), context);
+        Assert.Equal(messageId, ((ConsumeContext<FakeMessage>)wrapped).MessageId);
     }
 
     [Fact]

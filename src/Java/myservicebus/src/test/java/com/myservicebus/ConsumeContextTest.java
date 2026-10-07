@@ -11,6 +11,17 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 public class ConsumeContextTest {
+    @Test
+    public void consumerWrapperPreservesAllIdentifiers() {
+        var ids = java.util.stream.IntStream.range(0, 5).mapToObj(i -> java.util.UUID.randomUUID()).toList();
+        var source = new ConsumeContext<>("hello", Map.of(), null, null, null, CancellationToken.none(),
+                new StubProvider(), URI.create("loopback://localhost/"), entity -> "exchange:" + entity,
+                ids.get(0), ids.get(1), ids.get(2), ids.get(3), ids.get(4));
+        var wrapped = new ConsumerConsumeContext<>(new Object(), source);
+        Assertions.assertEquals(ids, java.util.List.of(wrapped.getMessageId(), wrapped.getRequestId(),
+                wrapped.getCorrelationId(), wrapped.getConversationId(), wrapped.getInitiatorId()));
+    }
+
     static class StubSendEndpoint implements SendEndpoint {
         @Override
         public <T> CompletableFuture<Void> send(T message, CancellationToken cancellationToken) {

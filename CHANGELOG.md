@@ -4,6 +4,8 @@ This changelog summarizes the bigger themes in the repository history rather tha
 
 ## Unreleased
 
+- Preserved message identifiers through consumer wrappers and restored direct scoped-send observations in both C# and Java.
+
 ## 0.1.0-preview.11 - 2026-09-04
 
 - Made detached JVM dependency-injection scopes safe for service resolution after a Kotlin coroutine resumes on another thread, fixing scoped request clients in the Ktor integration sample while retaining one owned scoped instance set.

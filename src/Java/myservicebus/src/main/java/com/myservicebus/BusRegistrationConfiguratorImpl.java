@@ -511,7 +511,8 @@ public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigura
                         hasBusOutbox ? sp.getService(com.myservicebus.persistence.OutboxSession.class) : null,
                         sp.getService(SendPipe.class),
                         sp.getService(com.myservicebus.serialization.MessageSerializer.class),
-                        sp.getService(SendContextFactory.class)));
+                        sp.getService(SendContextFactory.class),
+                        sp.getService(BusHookDispatcher.class)));
         serviceCollection.addScoped(PublishEndpointProvider.class,
                 sp -> () -> new PublishEndpointProviderImpl(
                         sp.getService(ConsumeContextProvider.class),

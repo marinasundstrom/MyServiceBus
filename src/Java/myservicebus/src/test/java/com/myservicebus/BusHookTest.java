@@ -54,6 +54,36 @@ class BusHookTest {
     }
 
     @Test
+    void scopedProviderObservesDirectSendExactlyOnce() {
+        RecordingHook.EVENTS.clear();
+        var dispatcher = new BusHookDispatcher(Set.of(new RecordingHook()), null);
+        TransportSendEndpointProvider transport = new TransportSendEndpointProvider() {
+            @Override
+            public TransportSendEndpointProvider withSerializer(com.myservicebus.serialization.MessageSerializer serializer) {
+                return this;
+            }
+
+            @Override
+            public SendEndpoint getSendEndpoint(String uri) {
+                return new SendEndpoint() {
+                    @Override
+                    public <T> java.util.concurrent.CompletableFuture<Void> send(T message, CancellationToken token) {
+                        return java.util.concurrent.CompletableFuture.completedFuture(null);
+                    }
+                };
+            }
+        };
+        var provider = new SendEndpointProviderImpl(new ConsumeContextProvider(), transport,
+                null, null, null, null, null, null, dispatcher);
+        provider.getSendEndpoint("loopback://localhost/orders").send(new TestMessage("hello")).join();
+        var events = RecordingHook.EVENTS.stream().filter(MessageOperationHookEvent.class::isInstance)
+                .map(MessageOperationHookEvent.class::cast).toList();
+        assertEquals(1, events.size());
+        assertEquals("sent", events.get(0).kind());
+        assertTrue(events.get(0).succeeded());
+    }
+
+    @Test
     void registeredHooksObserveLifecycleAndMessageOperations() throws Exception {
         RecordingHook.EVENTS.clear();
         ServiceCollection services = ServiceCollection.create();

@@ -10,6 +10,23 @@ using Shouldly;
 public class BusHookTests
 {
     [Fact]
+    public async Task Scoped_provider_observes_direct_send_once()
+    {
+        var services = new ServiceCollection();
+        services.AddServiceBus(cfg => { cfg.UsingMediator(); cfg.AddHook<RecordingHook>(); });
+        await using var provider = services.BuildServiceProvider();
+        var hosted = provider.GetRequiredService<IHostedService>();
+        await hosted.StartAsync(CancellationToken.None);
+        using var scope = provider.CreateScope();
+        var endpoint = await scope.ServiceProvider.GetRequiredService<ISendEndpointProvider>()
+            .GetSendEndpoint(new Uri("loopback://localhost/test"));
+        await endpoint.Send(new TestMessage("scoped"));
+        var events = provider.GetServices<IBusHook>().OfType<RecordingHook>().Single().Events;
+        Assert.Single(events.OfType<MessageOperationHookEvent>(), e => e.Kind == "sent");
+        await hosted.StopAsync(CancellationToken.None);
+    }
+
+    [Fact]
     public async Task Registered_hooks_observe_lifecycle_and_message_operations()
     {
         var services = new ServiceCollection();

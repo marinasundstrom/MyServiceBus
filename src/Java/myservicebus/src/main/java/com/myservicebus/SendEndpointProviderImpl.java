@@ -17,6 +17,7 @@ class SendEndpointProviderImpl implements SendEndpointProvider {
     private final SendPipe sendPipe;
     private final MessageSerializer serializer;
     private final SendContextFactory contextFactory;
+    private final BusHookDispatcher hooks;
 
     SendEndpointProviderImpl(ConsumeContextProvider contextProvider,
             TransportSendEndpointProvider transportProvider) {
@@ -45,6 +46,15 @@ class SendEndpointProviderImpl implements SendEndpointProvider {
             SendPipe sendPipe,
             MessageSerializer serializer,
             SendContextFactory contextFactory) {
+        this(contextProvider, transportProvider, loggerFactory, messageBus, outboxSession, sendPipe, serializer,
+                contextFactory, null);
+    }
+
+    SendEndpointProviderImpl(ConsumeContextProvider contextProvider,
+            TransportSendEndpointProvider transportProvider, LoggerFactory loggerFactory, MessageBus messageBus,
+            OutboxSession outboxSession, SendPipe sendPipe, MessageSerializer serializer,
+            SendContextFactory contextFactory, BusHookDispatcher hooks) {
+        this.hooks = hooks;
         this.consumeContext = contextProvider.getContext();
         this.transportProvider = transportProvider;
         this.logger = loggerFactory != null ? loggerFactory.create(SendEndpointProviderImpl.class) : null;
@@ -62,6 +72,9 @@ class SendEndpointProviderImpl implements SendEndpointProvider {
         }
 
         SendEndpoint endpoint = transportProvider.getSendEndpoint(uri);
+        if (hooks != null && hooks.isEnabled()) {
+            endpoint = new HookSendEndpoint(endpoint, URI.create(uri), hooks);
+        }
         SendEndpoint loggingEndpoint = new LoggingSendEndpoint(endpoint, URI.create(uri), logger);
         SendEndpoint fallback;
         if (!(messageBus instanceof MessageBusImpl hostedBus)) {

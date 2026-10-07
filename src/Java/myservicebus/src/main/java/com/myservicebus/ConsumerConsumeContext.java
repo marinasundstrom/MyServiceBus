@@ -18,6 +18,31 @@ public class ConsumerConsumeContext<TConsumer, T> extends ConsumeContext<T> {
     }
 
     @Override
+    public java.util.UUID getMessageId() {
+        return context.getMessageId();
+    }
+
+    @Override
+    public java.util.UUID getRequestId() {
+        return context.getRequestId();
+    }
+
+    @Override
+    public java.util.UUID getCorrelationId() {
+        return context.getCorrelationId();
+    }
+
+    @Override
+    public java.util.UUID getConversationId() {
+        return context.getConversationId();
+    }
+
+    @Override
+    public java.util.UUID getInitiatorId() {
+        return context.getInitiatorId();
+    }
+
+    @Override
     public <TMessage> CompletableFuture<Void> publish(TMessage message, CancellationToken cancellationToken) {
         return context.publish(message, cancellationToken);
     }

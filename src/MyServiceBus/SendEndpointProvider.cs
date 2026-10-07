@@ -16,10 +16,11 @@ internal class SendEndpointProvider : ISendEndpointProvider
     readonly ISendContextFactory _sendContextFactory;
     readonly ILoggerFactory? _loggerFactory;
     readonly OutboxSession? _outboxSession;
+    readonly IBusHookDispatcher? _hooks;
 
     public SendEndpointProvider(ITransportFactory transportFactory, ISendPipe sendPipe, IMessageSerializer serializer,
         ConsumeContextProvider contextProvider, IMessageBus bus, ISendContextFactory sendContextFactory,
-        ILoggerFactory? loggerFactory = null, OutboxSession? outboxSession = null)
+        ILoggerFactory? loggerFactory = null, OutboxSession? outboxSession = null, IBusHookDispatcher? hooks = null)
     {
         _transportFactory = transportFactory;
         _sendPipe = sendPipe;
@@ -29,6 +30,7 @@ internal class SendEndpointProvider : ISendEndpointProvider
         _sendContextFactory = sendContextFactory;
         _loggerFactory = loggerFactory;
         _outboxSession = outboxSession;
+        _hooks = hooks;
     }
 
     public Task<ISendEndpoint> GetSendEndpoint(Uri uri)
@@ -38,7 +40,7 @@ internal class SendEndpointProvider : ISendEndpointProvider
 
         var logger = _loggerFactory?.CreateLogger<TransportSendEndpoint>();
         Action? ensureStarted = _bus is MessageBus messageBus ? messageBus.EnsureStarted : null;
-        ISendEndpoint endpoint = new TransportSendEndpoint(_transportFactory, _sendPipe, _serializer, uri, _bus.Address, _sendContextFactory, logger, ensureStarted);
+        ISendEndpoint endpoint = new TransportSendEndpoint(_transportFactory, _sendPipe, _serializer, uri, _bus.Address, _sendContextFactory, logger, ensureStarted, _hooks);
         if (_outboxSession is not null)
         {
             endpoint = new OutboxSendEndpoint(

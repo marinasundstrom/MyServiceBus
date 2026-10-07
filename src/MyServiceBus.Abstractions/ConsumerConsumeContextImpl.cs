@@ -18,6 +18,7 @@ public class ConsumerConsumeContextImpl<TConsumer, TMessage> : ConsumerConsumeCo
 
     public TConsumer Consumer { get; }
     public TMessage Message => context.Message;
+    public Guid? MessageId => context.MessageId;
     public Guid? RequestId => context.RequestId;
     public Guid? CorrelationId => context.CorrelationId;
     public Guid? ConversationId => context.ConversationId;
