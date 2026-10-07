@@ -22,34 +22,36 @@ public sealed class TransportOutboxDispatcher : IOutboxTransportDispatcher
     public async Task DispatchAsync(OutboxMessage message, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(message);
-        var transport = await transportFactory.GetSendTransport(message.DestinationAddress, cancellationToken);
-        var serializer = new PersistedEnvelopeSerializer(message.ContentType, message.Body);
-        var context = new SendContext([typeof(PersistedEnvelope)], serializer, cancellationToken)
-        {
-            MessageId = message.MessageId.ToString(),
-            RequestId = message.RequestId,
-            CorrelationId = message.CorrelationId?.ToString(),
-            ConversationId = message.ConversationId,
-            InitiatorId = message.InitiatorId,
-            CausationMessageId = message.CausationMessageId,
-            Intent = MapIntent(message.Intent),
-            DestinationAddress = message.DestinationAddress,
-            ResponseAddress = message.ResponseAddress,
-            FaultAddress = message.FaultAddress
-        };
-
-        foreach (var (key, value) in message.Headers)
-            context.Headers[key] = value;
-        context.Headers["_content_type"] = message.ContentType;
-        context.Headers["_message_id"] = message.MessageId.ToString();
-        if (message.CorrelationId is { } correlationId)
-            context.Headers["_correlation_id"] = correlationId.ToString();
-        if (message.ResponseAddress is { } responseAddress)
-            context.Headers["_reply_to"] = responseAddress.ToString();
-
         var startedAt = Stopwatch.GetTimestamp();
         try
         {
+            if (message.Intent == OutboxDeliveryIntent.Publish && message.Headers.TryGetValue(OutboxMessageFactory.PublishEntitiesHeader, out var entities))
+                await transportFactory.PreparePublishTopology(System.Text.Json.JsonSerializer.Deserialize<string[]>(entities) ?? throw new InvalidOperationException("Persisted publish entities must be an array."), cancellationToken);
+            var transport = await transportFactory.GetSendTransport(message.DestinationAddress, cancellationToken);
+            var serializer = new PersistedEnvelopeSerializer(message.ContentType, message.Body);
+            var context = new SendContext([typeof(PersistedEnvelope)], serializer, cancellationToken)
+            {
+                MessageId = message.MessageId.ToString(),
+                RequestId = message.RequestId,
+                CorrelationId = message.CorrelationId?.ToString(),
+                ConversationId = message.ConversationId,
+                InitiatorId = message.InitiatorId,
+                CausationMessageId = message.CausationMessageId,
+                Intent = MapIntent(message.Intent),
+                DestinationAddress = message.DestinationAddress,
+                ResponseAddress = message.ResponseAddress,
+                FaultAddress = message.FaultAddress
+            };
+
+            foreach (var (key, value) in message.Headers)
+                if (key != OutboxMessageFactory.PublishEntitiesHeader) context.Headers[key] = value;
+            context.Headers["_content_type"] = message.ContentType;
+            context.Headers["_message_id"] = message.MessageId.ToString();
+            if (message.CorrelationId is { } correlationId)
+                context.Headers["_correlation_id"] = correlationId.ToString();
+            if (message.ResponseAddress is { } responseAddress)
+                context.Headers["_reply_to"] = responseAddress.ToString();
+
             await transport.Send(PersistedEnvelope.Instance, context, cancellationToken);
             DispatchObservation(message, Stopwatch.GetElapsedTime(startedAt));
         }

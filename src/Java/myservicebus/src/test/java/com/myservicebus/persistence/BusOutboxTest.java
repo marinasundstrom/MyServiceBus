@@ -56,6 +56,10 @@ class BusOutboxTest {
             publishEndpoint.publish(new DirectBusMessage(UUID.randomUUID())).join();
 
             assertEquals(2, writer.messages.size());
+            assertEquals(List.of("urn:message:Acme:OrderSubmitted"), writer.messages.get(0).messageTypes());
+            assertEquals(List.of("urn:message:Acme:SubmitOrder"), writer.messages.get(1).messageTypes());
+            assertTrue(new String(writer.messages.get(0).body(), java.nio.charset.StandardCharsets.UTF_8)
+                    .contains("urn:message:Acme:OrderSubmitted"));
             assertEquals(OutboxDeliveryIntent.PUBLISH, writer.messages.get(0).intent());
             assertEquals(publishCorrelationId, writer.messages.get(0).correlationId());
             assertEquals(OutboxDeliveryIntent.SEND, writer.messages.get(1).intent());
@@ -137,6 +141,8 @@ class BusOutboxTest {
         services.addSingleton(TransportFactory.class, ignored -> () -> new NoOpTransportFactory());
         services.from(MessageBusServices.class).addServiceBus(configurator -> {
             configurator.useBusOutbox();
+            configurator.setMessageUrn(OrderSubmitted.class, "urn:message:Acme:OrderSubmitted");
+            configurator.setMessageUrn(SubmitOrder.class, "urn:message:Acme:SubmitOrder");
             MediatorTransport.configure(configurator);
         });
         return services;

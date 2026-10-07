@@ -60,6 +60,6 @@ internal sealed class OutboxPublishEndpoint : IPublishEndpoint
 
         await publishPipe.Send(context);
         await sendPipe.Send(context);
-        await writer.AddAsync(OutboxMessageFactory.Create(typed, context), cancellationToken);
+        await writer.AddAsync(OutboxMessageFactory.Create(typed, context, publishEntities: MessageTypeCache.GetMessageTypes(typeof(T)).Select(transportFactory.GetPublishEntityName).ToArray()), cancellationToken);
     }
 }

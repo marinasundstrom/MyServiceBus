@@ -13,6 +13,8 @@ public sealed class BusOutboxTests
         services.AddServiceBus(configurator =>
         {
             configurator.UseBusOutbox();
+            configurator.SetMessageUrn<OrderSubmitted>("urn:message:Acme:OrderSubmitted");
+            configurator.SetMessageUrn<SubmitOrder>("urn:message:Acme:SubmitOrder");
             configurator.UsingMediator();
         });
 
@@ -43,11 +45,14 @@ public sealed class BusOutboxTests
             {
                 Assert.Equal(OutboxDeliveryIntent.Publish, published.Intent);
                 Assert.Equal(publishCorrelationId, published.CorrelationId);
+                Assert.Equal("urn:message:Acme:OrderSubmitted", Assert.Single(published.MessageTypes));
+                Assert.Contains("urn:message:Acme:OrderSubmitted", System.Text.Encoding.UTF8.GetString(published.Body.Span));
             },
             sent =>
             {
                 Assert.Equal(OutboxDeliveryIntent.Send, sent.Intent);
                 Assert.Equal(sendCorrelationId, sent.CorrelationId);
+                Assert.Equal("urn:message:Acme:SubmitOrder", Assert.Single(sent.MessageTypes));
                 Assert.Equal(new Uri("loopback://localhost/orders"), sent.DestinationAddress);
             });
 

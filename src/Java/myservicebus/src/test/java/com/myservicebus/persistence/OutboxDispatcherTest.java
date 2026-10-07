@@ -108,13 +108,15 @@ class OutboxDispatcherTest {
                 UUID.randomUUID(), UUID.randomUUID(), OutboxDeliveryIntent.PUBLISH,
                 URI.create("exchange:orders"), List.of("urn:message:Contracts:OrderSubmitted"),
                 new byte[] { 1, 2, 3 }, "application/vnd.masstransit+json",
-                Map.of("traceparent", "00-test"), NOW,
+                Map.of("traceparent", "00-test", OutboxMessageFactory.PUBLISH_ENTITIES_HEADER, "[\"orders\",\"base-orders\"]"), NOW,
                 null, correlationId, conversationId, null, responseAddress, null);
         CapturingTransportFactory factory = new CapturingTransportFactory();
         RecordingHook hook = new RecordingHook();
 
         new TransportOutboxDispatcher(factory, List.of(hook)).dispatch(message, CancellationToken.none()).join();
 
+        assertEquals(List.of("orders", "base-orders"), factory.entities);
+        assertEquals(false, factory.transport.headers.containsKey(OutboxMessageFactory.PUBLISH_ENTITIES_HEADER));
         assertEquals(message.destinationAddress(), factory.address);
         assertArrayEquals(message.body(), factory.transport.body);
         assertEquals(message.contentType(), factory.transport.contentType);
@@ -183,6 +185,9 @@ class OutboxDispatcherTest {
     private static final class CapturingTransportFactory implements TransportFactory {
         private final CapturingSendTransport transport = new CapturingSendTransport();
         private URI address;
+        private List<String> entities;
+        @Override
+        public void preparePublishTopology(List<String> entities) { this.entities = entities; }
 
         @Override
         public SendTransport getSendTransport(URI address) {

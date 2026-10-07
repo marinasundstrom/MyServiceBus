@@ -4,10 +4,11 @@ namespace MyServiceBus.Persistence;
 
 public static class OutboxMessageFactory
 {
+    public const string PublishEntitiesHeader = "MyServiceBus.Outbox.PublishEntities";
     public static OutboxMessage Create<T>(
         T message,
         SendContext context,
-        TimeProvider? timeProvider = null)
+        TimeProvider? timeProvider = null, IReadOnlyList<string>? publishEntities = null)
         where T : class
     {
         ArgumentNullException.ThrowIfNull(message);
@@ -24,6 +25,8 @@ public static class OutboxMessageFactory
             pair => Convert.ToString(pair.Value, CultureInfo.InvariantCulture) ?? string.Empty,
             StringComparer.Ordinal);
 
+        if (publishEntities is { Count: > 0 })
+            headers[PublishEntitiesHeader] = System.Text.Json.JsonSerializer.Serialize(publishEntities);
         var createdAtUtc = (timeProvider ?? TimeProvider.System).GetUtcNow();
         var scheduledAtUtc = context.ScheduledEnqueueTime is { } scheduled
             ? new DateTimeOffset(scheduled.ToUniversalTime())

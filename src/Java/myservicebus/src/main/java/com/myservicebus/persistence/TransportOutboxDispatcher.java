@@ -39,8 +39,13 @@ public final class TransportOutboxDispatcher implements OutboxTransportDispatche
 
         long startedAt = System.nanoTime();
         try {
+            String entities = message.headers().get(OutboxMessageFactory.PUBLISH_ENTITIES_HEADER);
+            if (message.intent() == OutboxDeliveryIntent.PUBLISH && entities != null) {
+                transportFactory.preparePublishTopology(java.util.Arrays.asList(new com.fasterxml.jackson.databind.ObjectMapper().readValue(entities, String[].class)));
+            }
             SendTransport transport = transportFactory.getSendTransport(message.destinationAddress());
             Map<String, Object> headers = new LinkedHashMap<>(message.headers());
+            headers.remove(OutboxMessageFactory.PUBLISH_ENTITIES_HEADER);
             headers.put("_content_type", message.contentType());
             headers.put("_message_id", message.messageId().toString());
             if (message.correlationId() != null) {

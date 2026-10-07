@@ -65,13 +65,12 @@ public final class OutboxPublishEndpoint implements PublishEndpoint {
             Class<?> messageType = context.getContractType();
             context.setSourceAddress(bus.getAddress());
             context.setDestinationAddress(URI.create(transportFactory.getPublishAddress(messageType)));
-            context.setMessageTypes(MessageUrn.forMessageTypes(messageType));
             return publishPipe.send(context)
                     .thenCompose(ignored -> sendPipe.send(context))
                     .thenCompose(ignored -> {
                         try {
                             return writer.add(
-                                    OutboxMessageFactory.create(context, serializer),
+                                    OutboxMessageFactory.create(context, serializer, java.time.Clock.systemUTC(), MessageUrn.messageTypes(context.getContractType()).stream().map(transportFactory::getPublishEntityName).toList()),
                                     context.getCancellationToken());
                         } catch (Exception failure) {
                             return CompletableFuture.failedFuture(failure);

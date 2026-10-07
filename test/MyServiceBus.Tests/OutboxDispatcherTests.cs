@@ -84,13 +84,15 @@ public class OutboxDispatcherTests
         var message = new OutboxMessage(
             Guid.NewGuid(), Guid.NewGuid(), OutboxDeliveryIntent.Publish,
             new Uri("exchange:orders"), ["urn:message:Contracts:OrderSubmitted"], [1, 2, 3],
-            "application/vnd.masstransit+json", new Dictionary<string, string> { ["traceparent"] = "00-test" },
+            "application/vnd.masstransit+json", new Dictionary<string, string> { ["traceparent"] = "00-test", [OutboxMessageFactory.PublishEntitiesHeader] = "[\"orders\",\"base-orders\"]" },
             Now, correlationId: correlationId, conversationId: conversationId, responseAddress: responseAddress);
         var factory = new CapturingTransportFactory();
         var hooks = new CapturingHookDispatcher();
 
         await new TransportOutboxDispatcher(factory, hooks).DispatchAsync(message);
 
+        Assert.Equal(new[] { "orders", "base-orders" }, factory.Entities);
+        Assert.False(factory.Transport.Context!.Headers.ContainsKey(OutboxMessageFactory.PublishEntitiesHeader));
         Assert.Equal(message.DestinationAddress, factory.Address);
         Assert.Equal(message.Body.ToArray(), factory.Transport.Body);
         Assert.Equal(message.ContentType, factory.Transport.ContentType);
@@ -156,6 +158,8 @@ public class OutboxDispatcherTests
     {
         public CapturingSendTransport Transport { get; } = new();
         public Uri? Address { get; private set; }
+        public IReadOnlyList<string>? Entities { get; private set; }
+        public Task PreparePublishTopology(IReadOnlyList<string> entities, CancellationToken token = default) { Entities = entities; return Task.CompletedTask; }
 
         public Task<ISendTransport> GetSendTransport(
             Uri address,

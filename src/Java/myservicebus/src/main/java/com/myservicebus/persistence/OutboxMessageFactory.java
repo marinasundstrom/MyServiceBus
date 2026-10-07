@@ -12,6 +12,7 @@ import java.util.Objects;
 import java.util.UUID;
 
 public final class OutboxMessageFactory {
+    public static final String PUBLISH_ENTITIES_HEADER = "MyServiceBus.Outbox.PublishEntities";
     private OutboxMessageFactory() {
     }
 
@@ -21,6 +22,10 @@ public final class OutboxMessageFactory {
 
     public static OutboxMessage create(SendContext context, MessageSerializer serializer, Clock clock)
             throws Exception {
+        return create(context, serializer, clock, List.of());
+    }
+
+    public static OutboxMessage create(SendContext context, MessageSerializer serializer, Clock clock, List<String> publishEntities) throws Exception {
         Objects.requireNonNull(context, "context");
         Objects.requireNonNull(serializer, "serializer");
         Objects.requireNonNull(clock, "clock");
@@ -34,9 +39,8 @@ public final class OutboxMessageFactory {
         byte[] body = context.getMessageBody(serializer).getBytes();
         Map<String, String> headers = new LinkedHashMap<>();
         context.getHeaders().forEach((key, value) -> headers.put(key, Objects.toString(value, "")));
-        List<String> messageTypes = context.getMessageTypes() != null
-                ? context.getMessageTypes()
-                : MessageUrn.forMessageTypes(context.getMessage().getClass());
+        if (!publishEntities.isEmpty()) headers.put(PUBLISH_ENTITIES_HEADER, new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(publishEntities));
+        List<String> messageTypes = context.getResolvedMessageTypes();
 
         var createdAtUtc = clock.instant();
         var scheduledAtUtc = context.getScheduledEnqueueTime();

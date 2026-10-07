@@ -31,7 +31,9 @@ class OutboxMessageFactoryTest {
         context.getHeaders().put("tenant", 42);
 
         EnvelopeMessageSerializer serializer = new EnvelopeMessageSerializer();
-        OutboxMessage persisted = OutboxMessageFactory.create(context, serializer);
+        OutboxMessage persisted = OutboxMessageFactory.create(context, serializer, Clock.systemUTC(), java.util.List.of("orders", "base-orders"));
+        assertEquals("[\"orders\",\"base-orders\"]", persisted.headers().get(OutboxMessageFactory.PUBLISH_ENTITIES_HEADER));
+        assertTrue(!new String(persisted.body(), java.nio.charset.StandardCharsets.UTF_8).contains(OutboxMessageFactory.PUBLISH_ENTITIES_HEADER));
 
         assertEquals(messageId, persisted.messageId());
         assertEquals(correlationId, persisted.correlationId());

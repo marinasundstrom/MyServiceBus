@@ -4,6 +4,7 @@ This changelog summarizes the bigger themes in the repository history rather tha
 
 ## Unreleased
 
+- Preserved configured wire identities and inherited publish topology in outbox records in both clients; capture remains offline and dispatch prepares exchange bindings before delivery.
 
 - Preserved original malformed RabbitMQ payloads in error queues and emitted structured skipped-message hooks and monitoring observations in both clients.
 

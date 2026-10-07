@@ -59,7 +59,6 @@ public final class OutboxSendEndpoint implements SendEndpoint {
             ensureStarted.run();
             context.setSourceAddress(source);
             context.setDestinationAddress(destination);
-            context.setMessageTypes(MessageUrn.forMessageTypes(context.getMessage().getClass()));
             return sendPipe.send(context).thenCompose(ignored -> {
                 try {
                     return writer.add(

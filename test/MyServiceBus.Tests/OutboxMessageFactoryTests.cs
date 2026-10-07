@@ -23,7 +23,9 @@ public sealed class OutboxMessageFactoryTests
         };
         context.Headers["tenant"] = 42;
 
-        var persisted = OutboxMessageFactory.Create(new OrderSubmitted("A-123"), context);
+        var persisted = OutboxMessageFactory.Create(new OrderSubmitted("A-123"), context, publishEntities: ["orders", "base-orders"]);
+        Assert.Equal("[\"orders\",\"base-orders\"]", persisted.Headers[OutboxMessageFactory.PublishEntitiesHeader]);
+        Assert.DoesNotContain(OutboxMessageFactory.PublishEntitiesHeader, System.Text.Encoding.UTF8.GetString(persisted.Body.Span));
 
         Assert.Equal(messageId, persisted.MessageId);
         Assert.Equal(correlationId, persisted.CorrelationId);
