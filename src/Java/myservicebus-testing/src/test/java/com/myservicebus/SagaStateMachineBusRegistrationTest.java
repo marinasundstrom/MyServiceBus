@@ -13,6 +13,20 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class SagaStateMachineBusRegistrationTest {
     @Test
+    void rejectsSupersededEventAndOutputDeclarations() {
+        for (Class<?> contract : new Class<?>[] { OrderSubmitted.class, ReserveInventory.class }) {
+            ServiceCollection services = ServiceCollection.create();
+            var error = org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class, () ->
+                    TestingServiceExtensions.addServiceBusTestHarness(services, cfg -> {
+                        cfg.addSagaStateMachine(OrderStateMachine.class);
+                        cfg.setMessageUrn(contract, "urn:message:Acme:Replacement");
+                    }));
+            org.junit.jupiter.api.Assertions.assertTrue(error.getMessage().contains("Saga 'order-state-machine'"));
+            org.junit.jupiter.api.Assertions.assertTrue(error.getMessage().contains("urn:message:Acme:Replacement"));
+        }
+    }
+
+    @Test
     void registersEventsAndDispatchesOutgoingWorkThroughTheConsumeContext() {
         ServiceCollection services = ServiceCollection.create();
         RecordingHook.events.clear();

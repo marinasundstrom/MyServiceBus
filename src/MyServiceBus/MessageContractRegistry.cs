@@ -57,6 +57,20 @@ public sealed class MessageContractRegistry
         }
     }
 
+    /// <summary>Rejects declarations that retain a contract identity replaced by a bus override.</summary>
+    /// <exception cref="InvalidOperationException">The declaration uses a superseded identity.</exception>
+    public void ValidateDeclaration(string? urn, string declaration)
+    {
+        if (urn is null) return;
+        lock (sync)
+        {
+            if (owners.ContainsKey(urn)) return;
+            foreach (var (type, configured) in overrides)
+                if (urn == MessageUrn.For(type) && urn != configured)
+                    throw new InvalidOperationException($"{declaration} uses superseded message identity '{urn}' for {type}. Use configured identity '{configured}' in the declaration.");
+        }
+    }
+
     private string DefaultUrn(Type type)
     {
         if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Fault<>))

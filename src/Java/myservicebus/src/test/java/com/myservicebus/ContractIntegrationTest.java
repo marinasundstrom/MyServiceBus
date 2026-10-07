@@ -29,4 +29,30 @@ class ContractIntegrationTest {
         assertFalse(MessageUrn.forMessageTypes(LocalOrder.class).stream().anyMatch(urn -> urn.contains("java.lang:Record")));
     }
 
+    @Test
+    void topologyRejectsSupersededChoreographyTriggersAndOutputs() {
+        for (boolean output : new boolean[] { false, true }) {
+            var topology = new com.myservicebus.topology.TopologyRegistry();
+            topology.registerChoreography(new com.myservicebus.choreography.ChoreographyBuilder("orders", "1", "service")
+                    .step("submit", output ? "urn:external:Trigger" : MessageUrn.forClass(LocalOrder.class), step ->
+                            step.publishes(output ? MessageUrn.forClass(LocalOrder.class) : "urn:external:Output"))
+                    .build());
+            topology.getContracts().setMessageUrn(LocalOrder.class, "urn:message:Acme:Replacement");
+            topology.getContracts().freeze(List.of());
+            var error = assertThrows(IllegalStateException.class, topology::validateDeclaredContracts);
+            assertTrue(error.getMessage().contains("Choreography 'orders'"));
+            assertTrue(error.getMessage().contains("urn:message:Acme:Replacement"));
+        }
+    }
+
+    @Test
+    void registryAcceptsCorrectedAndExternalDeclarations() {
+        var registry = new MessageContractRegistry();
+        registry.setMessageUrn(LocalOrder.class, "urn:message:Acme:Replacement");
+        registry.freeze(List.of());
+        registry.validateDeclaration("urn:message:Acme:Replacement", "Saga 'orders'");
+        registry.validateDeclaration("urn:external:Contract", "Saga 'orders'");
+        assertThrows(IllegalStateException.class, () -> registry.validateDeclaration(
+                MessageUrn.forClass(LocalOrder.class), "Saga 'orders'"));
+    }
 }

@@ -36,6 +36,19 @@ public final class MessageContractRegistry {
         return MessageUrn.messageTypes(type).stream().map(this::getMessageUrn).toList();
     }
 
+    /** Rejects declarations retaining an identity replaced by a bus override.
+     * @throws IllegalStateException if the declaration uses a superseded identity
+     */
+    public synchronized void validateDeclaration(String urn, String declaration) {
+        if (urn == null || owners.containsKey(urn)) return;
+        for (var entry : overrides.entrySet()) {
+            if (urn.equals(MessageUrn.forClass(entry.getKey())) && !urn.equals(entry.getValue()))
+                throw new IllegalStateException(declaration + " uses superseded message identity '" + urn
+                        + "' for " + entry.getKey() + ". Use configured identity '" + entry.getValue()
+                        + "' in the declaration.");
+        }
+    }
+
     public synchronized void freeze(Collection<? extends Class<?>> types) {
         if (frozen) return;
         owners.clear();

@@ -38,7 +38,8 @@ Bus-level URN overrides win over attributes/annotations and are frozen after
 configuration. They apply to normal envelope publication, receive matching, requests,
 outbox message metadata, and topology snapshots. Choreography and saga declarations
 that already contain explicit string URNs remain application-owned; use the same
-identity in those declarations. Snapshot version 3 identifies the changed contract
+identity in those declarations. Startup rejects declarations using a known contract
+identity that a bus-level override has superseded, and identifies the required replacement. Snapshot version 3 identifies the changed contract
 identity construction; version 1 and 2 fixtures remain historical evidence.
 
 RabbitMQ inherited publication is covered by broker tests, including C# to Java and
@@ -47,8 +48,7 @@ MassTransit 8.5.1. This does not add equivalent broker
 hierarchy provisioning to Azure Service Bus or Amazon SNS/SQS. Existing direct
 contract transport profiles retain their separate capability and conformance scope.
 
-The OpinionatedFramework integration's queue-per-handler and per-consumer retry
-policies remain valid. Runtime-type dispatch and startup contract validation are
+Queue-per-handler and per-consumer retry policies remain valid integration patterns. Runtime-type dispatch and startup contract validation are
 reasonable integration-layer choices. Expanding every interface subscription into
 concrete subscriptions and invoking post-build actions manually were workarounds;
 ordinary RabbitMQ interface subscriptions and standalone bus startup now cover those

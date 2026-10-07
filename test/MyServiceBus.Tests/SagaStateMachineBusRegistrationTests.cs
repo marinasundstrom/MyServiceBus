@@ -5,6 +5,21 @@ namespace MyServiceBus.Tests;
 
 public class SagaStateMachineBusRegistrationTests
 {
+    [Theory]
+    [InlineData(typeof(OrderSubmitted))]
+    [InlineData(typeof(ReserveInventory))]
+    public void Rejects_superseded_event_and_output_declarations(Type contract)
+    {
+        var services = new ServiceCollection();
+        var error = Assert.Throws<InvalidOperationException>(() => services.AddServiceBusTestHarness(cfg =>
+        {
+            cfg.AddSagaStateMachine<OrderStateMachine, OrderState>();
+            cfg.SetMessageUrn(contract, "urn:message:Acme:Replacement");
+        }));
+        Assert.Contains("Saga 'order-state-machine'", error.Message);
+        Assert.Contains("urn:message:Acme:Replacement", error.Message);
+    }
+
     [Fact]
     public async Task Registers_events_and_dispatches_outgoing_work_through_the_consume_context()
     {

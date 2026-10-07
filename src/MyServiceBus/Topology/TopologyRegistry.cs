@@ -23,6 +23,27 @@ public class TopologyRegistry : IBusTopology
     public IReadOnlyList<ChoreographyFragment> Choreographies => choreographies;
     public IReadOnlyList<SagaStateMachineTopology> SagaStateMachines => sagaStateMachines;
 
+    internal void ValidateDeclaredContracts()
+    {
+        foreach (var fragment in Choreographies)
+            foreach (var step in fragment.Steps)
+            {
+                var location = $"Choreography '{fragment.ChoreographyId}' step '{step.Id}'";
+                Contracts.ValidateDeclaration(step.TriggerMessageUrn, location);
+                foreach (var output in step.Outputs)
+                    Contracts.ValidateDeclaration(output.MessageUrn, location);
+            }
+        foreach (var saga in SagaStateMachines)
+        {
+            var definition = saga.Definition;
+            var location = $"Saga '{definition.StateMachineId}'";
+            foreach (var message in definition.Events)
+                Contracts.ValidateDeclaration(message.MessageUrn, location);
+            foreach (var activity in definition.Behaviors.SelectMany(behavior => behavior.Activities))
+                Contracts.ValidateDeclaration(activity.MessageUrn, location);
+        }
+    }
+
     public void RegisterSagaStateMachine(SagaStateMachineDefinition definition, string endpointName)
     {
         ArgumentNullException.ThrowIfNull(definition);

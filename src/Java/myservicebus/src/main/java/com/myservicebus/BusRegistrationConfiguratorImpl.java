@@ -496,6 +496,7 @@ public class BusRegistrationConfiguratorImpl implements BusRegistrationConfigura
 
     public void complete() {
         topology.getContracts().freeze(topology.getMessages().stream().map(m -> m.getMessageType()).toList());
+        topology.validateDeclaredContracts();
         serviceCollection.addSingleton(MessageContractRegistry.class, sp -> () -> topology.getContracts());
         sendConfigurator.useFilter((context, next) -> {
             context.setMessageUrnResolver(topology.getContracts()::getMessageUrn);

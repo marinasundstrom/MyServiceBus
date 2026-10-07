@@ -54,6 +54,23 @@ public class TopologyRegistry implements BusTopology {
         return List.copyOf(sagaStateMachines);
     }
 
+    public void validateDeclaredContracts() {
+        for (var fragment : choreographies) {
+            for (var step : fragment.steps()) {
+                String location = "Choreography '" + fragment.choreographyId() + "' step '" + step.id() + "'";
+                contracts.validateDeclaration(step.triggerMessageUrn(), location);
+                for (var output : step.outputs()) contracts.validateDeclaration(output.messageUrn(), location);
+            }
+        }
+        for (var saga : sagaStateMachines) {
+            var definition = saga.definition();
+            String location = "Saga '" + definition.stateMachineId() + "'";
+            for (var event : definition.events()) contracts.validateDeclaration(event.messageUrn(), location);
+            for (var behavior : definition.behaviors())
+                for (var activity : behavior.activities()) contracts.validateDeclaration(activity.messageUrn(), location);
+        }
+    }
+
     public void registerSagaStateMachine(SagaStateMachineDefinition definition, String endpointName) {
         if (definition == null) {
             throw new IllegalArgumentException("definition must not be null");

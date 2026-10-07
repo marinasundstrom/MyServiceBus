@@ -426,6 +426,7 @@ public class BusRegistrationConfigurator : IBusRegistrationConfigurator
             Services.AddLogging(b => b.AddSimpleConsole());
 
         _topology.Contracts.Freeze(_topology.Messages.Select(m => m.MessageType));
+        _topology.ValidateDeclaredContracts();
         sendConfigurator.UseFilter(new MessageContractSendFilter(_topology.Contracts));
         Services.AddSingleton(_topology.Contracts);
         Services.AddSingleton<BusInitialization>();
