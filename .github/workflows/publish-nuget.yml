@@ -67,6 +67,12 @@ jobs:
       - name: Verify NuGet package consumer
         run: ./eng/verify-dotnet-package-consumer.sh
 
+      - name: Install Raven compiler runtime
+        shell: bash
+        run: |
+          curl --fail --silent --show-error --location https://dot.net/v1/dotnet-install.sh --output "$RUNNER_TEMP/dotnet-install-raven.sh"
+          bash "$RUNNER_TEMP/dotnet-install-raven.sh" --runtime dotnet --version 11.0.0-rc.3.26522.148 --install-dir "$DOTNET_ROOT" --no-path
+
       - name: Verify .NET 11 union package consumers
         run: ./eng/verify-dotnet11-union-package-consumers.sh artifacts/packages "${{ steps.package-version.outputs.version }}"
 

@@ -54,7 +54,12 @@ func Consume(
     message: OrderCommand,
     audit: UnionConsumerAudit) {
     match message {
-        SubmitOrder(let orderId) => audit.Events.Add("submit:$orderId")
+        SubmitOrder order => RecordSubmission(order, audit)
         CancelOrder(let orderId) => audit.Events.Add("cancel:$orderId")
     }
+}
+
+// Parameter deconstruction retains SubmitOrder as the ordinary CLR input type.
+func RecordSubmission(SubmitOrder(let orderId): SubmitOrder, audit: UnionConsumerAudit) {
+    audit.Events.Add("submit:$orderId")
 }

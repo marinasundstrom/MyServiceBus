@@ -2,6 +2,10 @@
 
 This changelog summarizes the bigger themes in the repository history rather than every individual commit.
 
+## 2026-10-26
+
+- Updated Raven sample SDK and macro compiler dependencies to 0.1.16, demonstrated record parameter deconstruction in the consumer guide and union package smoke, and refreshed website syntax highlighting from the release. Installed the published compiler’s .NET 11 RC3 runtime in package-validation CI and documented compiler rebuild requirements and the Optional, Result failure-case, range, propagation, and macro-provider naming migrations without changing shared C# or Java messaging behavior.
+
 ## 2026-10-07 — 0.1.0-preview.12
 
 - Added Azure Service Bus inherited-topic forwarding in create-topology mode for both clients, including persisted-outbox topology preparation. SNS/SQS retains explicit selected-contract publication.

@@ -38,10 +38,9 @@ export const ravenConsumerFunction = `record SubmitOrder(OrderId: Guid)
 
 [Consumer("orders")]
 async func SubmitOrderConsumer(
-    message: SubmitOrder,
+    SubmitOrder(let orderId): SubmitOrder,
     orders: IOrderService
 ) {
-    let (orderId) = message
     await orders.Submit(orderId)
 }`;
 
@@ -116,6 +115,20 @@ saga! OrderSaga {
   <p>Raven and MyServiceBus are both evolving. Ordinary CLR integration is the foundation, while consumer-function projection, .NET 11 unions, generated registration, and the <code>saga!</code> macro have capability-specific preview or experimental boundaries. Do not treat this page as a stable 1.0 API commitment.</p>
 </div>
 
+## Raven version and migration
+
+The repository samples pin <code>Raven.Sdk/0.1.16</code>; the saga macro project also pins <code>Raven.CodeAnalysis</code> to <code>0.1.16</code>. The published compiler host requires the .NET 11 RC3 runtime (<code>11.0.0-rc.3.26522.148</code>), including when compiling a <code>net10.0</code> application. Install it alongside your SDK. Rebuild macro providers and consuming applications together when upgrading the compiler API.
+
+The <a href="https://github.com/marinasundstrom/raven/blob/v0.1.16/CHANGELOG.md">Raven release changelog</a> includes these migration points since the previous 0.1.6 baseline:
+
+- <code>System.Option&lt;T&gt;</code> is now <code>System.Optional&lt;T&gt;</code>; update imports and converter references. <code>Some</code> and <code>None</code> keep their names.
+- <code>Result&lt;T, E&gt;.Error</code> is now <code>Failure</code>, including tagged JSON case names. Existing stored tags and external producers need a coordinated migration. Diagnostic APIs and domain members named <code>Error</code> retain their names.
+- Ranges use <code>..</code> for an exclusive end and <code>..=</code> for an inclusive end; sequence spreads use <code>...</code>. The old <code>..&lt;</code> spelling is removed.
+- Replace removed <code>try? expression</code> with <code>(try expression)?</code>. Postfix propagation after <code>await</code> or <code>try</code> now applies to the complete expression; parenthesize the operand when propagation belongs inside it.
+- Compact <code>macro Name</code> declarations emit provider types named <code>NameMacro</code>. The saga prototype uses an explicit <code>SagaMacro</code> provider and does not depend on synthesized provider names.
+
+The current messaging samples do not use Optional/Result carriers or their JSON tags as message contracts. These language changes do not change MyServiceBus wire contracts or the shared C# and Java runtime behavior.
+
 ## Start MyServiceBus with RabbitMQ
 
 Reference the preview <code>Sundstrom.MyServiceBus.RabbitMq</code> package from a Raven project, start a local RabbitMQ broker, and configure the bus through the same .NET hosting and dependency-injection APIs used by C#. The complete minimal application below discovers its attributed consumer function, creates the <code>submit-order</code> receive endpoint, and starts the bus as a hosted service.
@@ -131,6 +144,8 @@ Use the <Link href="/docs/getting-started">getting-started guide</Link> for the 
 MyServiceBus does not require Raven to imitate C# source structure. A consumer is fundamentally a callable declaration with a message, optional consume context, application services, and an endpoint mapping. Raven can express that naturally as an attributed namespace-level function rather than adding a class only to contain one method.
 
 <CodeViewer code={ravenConsumerFunction} label="Raven consumer function" language="raven" />
+
+The <code>SubmitOrder(let orderId): SubmitOrder</code> parameter pattern binds the record payload directly while preserving <code>SubmitOrder</code> as the CLR parameter type. Use a named message parameter, as in the RabbitMQ example, when the body needs the whole message. Parameter patterns must be irrefutable for their input type; union alternatives still belong in an exhaustive <code>match</code>.
 
 The function shape remains local to the application. MyServiceBus binds it to the ordinary consumer pipeline, where endpoint topology, scoped services, retries, faults, telemetry, and message settlement retain their normal meaning. On the wire, <code>SubmitOrder</code> is the same contract a C# or Java service sees.
 
@@ -188,7 +203,7 @@ The executable sample creates an order saga, correlates three messages, sends in
 
 <div className="callout">
   <strong>The saga DSL is currently a repository prototype</strong>
-  <p>It lives under <code>test/Experiments/RavenSagaDsl</code>, uses Raven 0.1.6, and references the MyServiceBus source project. It is executable evidence for the integration design, not yet a supported package or stable syntax.</p>
+  <p>It lives under <code>test/Experiments/RavenSagaDsl</code>, uses Raven 0.1.16, and references the MyServiceBus source project. It is executable evidence for the integration design, not yet a supported package or stable syntax.</p>
 </div>
 
 ## Make every position mean one thing

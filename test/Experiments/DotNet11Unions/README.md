@@ -28,6 +28,8 @@ The prototype verifies that:
 - the existing C# `Response<T1, T2>` shape can implement the .NET union ABI; and
 - `System.Text.Json` writes only the selected response case.
 
+The Raven project pins `Raven.Sdk/0.1.16`. Its published compiler host also requires the .NET 11 RC3 runtime (`11.0.0-rc.3.26522.148`) alongside the SDK selected by this experiment’s `global.json`. Its submit arm calls `RecordSubmission(SubmitOrder(let orderId): SubmitOrder, audit: UnionConsumerAudit)`, demonstrating record parameter deconstruction. The existing dispatch assertion checks the extracted order ID.
+
 The Raven consumer is an attributed namespace-level function that accepts the named parenthesized union `union OrderCommand(SubmitOrder | CancelOrder)`. Raven emits the standard .NET union ABI for that declaration. This verifies both that consumer-method discovery recognizes Raven's compiler-generated CLR method and that union discovery is based on the shared CLR ABI rather than the C# compiler or a C# named-union type.
 
 This is a C# convenience over ordinary MyServiceBus contracts. Java and older .NET applications continue to publish and consume `SubmitOrder`, `CancelOrder`, and response contracts normally. They do not need the C# carrier or union language support.

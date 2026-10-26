@@ -36,9 +36,15 @@ assigned or the outgoing message being constructed.
 
 It does not silently approximate the fuller proposal. Named final outcomes, guarded transitions, and durable `after` scheduling remain unsupported until the shared MyServiceBus primitives define their behavior. The macro reports those gaps instead of generating a different runtime contract.
 
+## Compiler upgrade
+
+Keep `Raven.Sdk` and `Raven.CodeAnalysis` on 0.1.16 and rebuild both projects together. The [Raven changelog](https://github.com/marinasundstrom/raven/blob/v0.1.16/CHANGELOG.md) records compiler API changes since 0.1.6, including removal of `TypeSymbolExtensions.GetClrType`. This provider uses semantic symbols and explicit `IMacroDefinition` implementation, so neither that removed adapter nor the new synthesized `NameMacro` naming requires a source migration here.
+
+The 0.1.16 `Option` → `Optional` and `Result.Error` → `Result.Failure` renames do not apply to the prototype's own `Error` properties or diagnostic helpers. Keep those names. Compact macro declarations and newer editor support remain possible tooling improvements; they do not expand the saga runtime's supported semantics.
+
 ## Run
 
-The projects use the published Raven 0.1.6 SDK and compiler API, while referencing the local MyServiceBus source project:
+The projects use the published Raven 0.1.16 SDK and compiler API, while referencing the local MyServiceBus source project. The published compiler host requires the .NET 11 RC3 runtime (`11.0.0-rc.3.26522.148`), even though these projects target `net10.0`. Install that runtime alongside the repository SDK before running:
 
 ```bash
 dotnet run --project test/Experiments/RavenSagaDsl/app/RavenSagaDslSample.rvnproj --property WarningLevel=0

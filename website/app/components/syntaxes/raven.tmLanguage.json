@@ -8,6 +8,10 @@
     ],
     "patterns": [
         {
+            "name": "variable.other.identifier.raven",
+            "match": "`[^`\\r\\n\\x{0085}\\x{2028}\\x{2029}]+`"
+        },
+        {
             "include": "#comments"
         },
         {
@@ -678,7 +682,7 @@
                 },
                 {
                     "name": "keyword.control.flow.raven",
-                    "match": "\\b(return|yield|throw|goto|break|continue|expand|replace|introduce|fragment|token)\\b"
+                    "match": "(?<=yield)\\s+from\\b|\\b(return|yield|throw|goto|break|continue|expand|replace|introduce|fragment|token)\\b"
                 },
                 {
                     "name": "keyword.control.async.raven",
@@ -706,7 +710,7 @@
                 },
                 {
                     "name": "keyword.other.conversion.raven",
-                    "match": "\\b(implicit|explicit)\\b"
+                    "match": "\\b(implicit|explicit|checked|unchecked)\\b"
                 },
                 {
                     "name": "storage.modifier.parameter.raven",
@@ -865,7 +869,7 @@
             "patterns": [
                 {
                     "name": "keyword.operator.raven",
-                    "match": "(\\|>|\\?\\?=|\\?\\?|\\.\\.\\.|\\.\\.|\\?\\.|\\.\\?|==|!=|<=|>=|<<|>>|=>|->|::|\\+\\+|--|\\+=|-=|\\*=|/=|%=|&=|\\|=|\\^=|&&|\\|\\||\\+|-|\\*|/|%|=|<|>|!|~|&|\\||\\^|\\?|:)"
+                    "match": "(\\|>|\\?\\?=|\\?\\?|\\.\\.\\.|\\.\\.=|\\.\\.|\\?\\.|\\.\\?|==|!=|<=|>=|>>>=|<<=|>>=|>>>|<<|>>|=>|->|::|\\+\\+|--|\\+=|-=|\\*=|/=|%=|&=|\\|=|\\^=|&&|\\|\\||\\+|-|\\*|/|%|=|<|>|!|~|&|\\||\\^|\\?|:)"
                 }
             ]
         },
@@ -917,7 +921,7 @@
                 },
                 {
                     "name": "support.type.builtin.raven",
-                    "match": "\\b(Option|Result|Task|ValueTask)\\b"
+                    "match": "\\b(Optional|Result|Task|ValueTask)\\b"
                 },
                 {
                     "name": "entity.name.type.raven",

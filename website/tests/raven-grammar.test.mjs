@@ -32,4 +32,17 @@ test('Raven grammar identifies representative language tokens', async () => {
   assert.ok(scopes.some((scope) => scope.startsWith('entity.name.type')));
   assert.ok(scopes.some((scope) => scope.startsWith('string.quoted')));
   assert.ok(scopes.some((scope) => scope.startsWith('comment.line')));
+
+  // Keep highlighting aligned with the pinned Raven 0.1.16 release.
+  for (const [source, expectedText, expectedScope] of [
+    ['Optional<int>', 'Optional', 'support.type.builtin.raven'],
+    ['`order-id`', '`order-id`', 'variable.other.identifier.raven'],
+    ['0..=10', '..=', 'keyword.operator.raven'],
+    ['checked(1 + 2)', 'checked', 'keyword.other.conversion.raven'],
+  ]) {
+    const token = grammar.tokenizeLine(source).tokens.find(
+      ({ startIndex, endIndex }) => source.slice(startIndex, endIndex) === expectedText,
+    );
+    assert.ok(token?.scopes.includes(expectedScope), `Missing ${expectedScope} for ${expectedText}`);
+  }
 });
