@@ -33,8 +33,13 @@ test('Raven grammar identifies representative language tokens', async () => {
   assert.ok(scopes.some((scope) => scope.startsWith('string.quoted')));
   assert.ok(scopes.some((scope) => scope.startsWith('comment.line')));
 
-  // Keep highlighting aligned with the pinned Raven 0.1.16 release.
+  // Include escaped identifiers in the grammar-only editor fallback.
   for (const [source, expectedText, expectedScope] of [
+    ['func `Calculate total price`() {}', '`Calculate total price`', 'entity.name.function.raven'],
+    ['object.`Calculate total price`()', '`Calculate total price`', 'entity.name.function.raven'],
+    ['let `if /* comment */` = 1', '`if /* comment */`', 'variable.other.identifier.raven'],
+    ['let @if = 1', '@if', 'variable.other.identifier.raven'],
+    ['object.@class()', '@class', 'entity.name.function.raven'],
     ['Optional<int>', 'Optional', 'support.type.builtin.raven'],
     ['`order-id`', '`order-id`', 'variable.other.identifier.raven'],
     ['0..=10', '..=', 'keyword.operator.raven'],

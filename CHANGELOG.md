@@ -4,6 +4,8 @@ This changelog summarizes the bigger themes in the repository history rather tha
 
 ## 2026-10-26
 
+- Update Raven code highlighting for whole backtick and `@`-escaped identifiers, including function names and references; verify grammar-only rendering.
+
 - Updated Raven sample SDK and macro compiler dependencies to 0.1.16, demonstrated record parameter deconstruction in the consumer guide and union package smoke, and refreshed website syntax highlighting from the release. Installed the published compiler’s .NET 11 RC3 runtime in package-validation CI and documented compiler rebuild requirements and the Optional, Result failure-case, range, propagation, and macro-provider naming migrations without changing shared C# or Java messaging behavior.
 
 ## 2026-10-07 — 0.1.0-preview.12

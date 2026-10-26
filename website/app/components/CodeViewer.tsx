@@ -28,6 +28,7 @@ function defineCodeTheme(monaco: Monaco) {
       { token: 'keyword', foreground: '569CD6' },
       { token: 'type', foreground: '4EC9B0' },
       { token: 'function', foreground: 'DCDCAA' },
+      { token: 'identifier', foreground: '9CDCFE' },
       { token: 'parameter', foreground: '9CDCFE' },
       { token: 'operator', foreground: 'D4D4D4' },
       { token: 'invalid', foreground: 'F44747' },

@@ -22,6 +22,10 @@ class RavenTokenState {
 }
 
 function tokenType(scopes: string[]) {
+  const leaf = scopes.at(-1) ?? '';
+  if (leaf === 'variable.other.identifier.raven') return 'identifier';
+  if (leaf.startsWith('entity.name.function')) return 'function';
+  if (leaf.startsWith('entity.name.type')) return 'type';
   const scope = scopes.join(' ');
 
   if (scope.includes('invalid.')) return 'invalid';
